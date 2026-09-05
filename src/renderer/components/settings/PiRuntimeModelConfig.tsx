@@ -129,7 +129,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
     <FieldSet className="rounded-lg border border-border bg-surface-raised p-3">
       <FieldGroup className="grid grid-cols-2 gap-3">
         <Field orientation="horizontal" className="items-center justify-between gap-2">
-          <FieldLabel className="text-[11px] text-muted-foreground">
+          <FieldLabel className="text-xs text-muted-foreground">
             {i18nService.t('piRuntimeApi')}
           </FieldLabel>
           <Select value={value?.api ?? PiRuntimeSelectValue.Auto} onValueChange={updateApi}>
@@ -154,7 +154,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
         <Field orientation="horizontal" className="items-center justify-between gap-2">
           <FieldLabel
             htmlFor="custom-model-pi-runtime-reasoning"
-            className="text-[11px] text-muted-foreground"
+            className="text-xs text-muted-foreground"
           >
             {i18nService.t('piRuntimeReasoning')}
           </FieldLabel>
@@ -210,7 +210,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
 
               <div className="grid grid-cols-2 gap-2">
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
-                  <FieldLabel className="text-[11px] text-muted-foreground">
+                  <FieldLabel className="text-xs text-muted-foreground">
                     {i18nService.t('piRuntimeMaxTokensField')}
                   </FieldLabel>
                   <Select
@@ -246,7 +246,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                 </Field>
 
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
-                  <FieldLabel className="text-[11px] text-muted-foreground">
+                  <FieldLabel className="text-xs text-muted-foreground">
                     {i18nService.t('piRuntimeThinkingFormat')}
                   </FieldLabel>
                   <Select
@@ -282,7 +282,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                 </Field>
 
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
-                  <FieldLabel className="text-[11px] text-muted-foreground">
+                  <FieldLabel className="text-xs text-muted-foreground">
                     {i18nService.t('piRuntimeCacheControlFormat')}
                   </FieldLabel>
                   <Select

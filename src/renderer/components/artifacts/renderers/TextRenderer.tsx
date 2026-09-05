@@ -93,7 +93,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
                   <th
                     key={i}
                     className={`px-3 py-1.5 text-left font-medium border-b border-border sticky top-0 ${
-                      isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
+                      'bg-editor-background text-editor-foreground'
                     }`}
                   >
                     {cell}
@@ -116,7 +116,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
         ) : (
           <pre
             className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre-wrap wrap-break-word min-h-full ${
-              isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
+              'bg-editor-background text-editor-foreground'
             }`}
           >
             {lines.map((line, i) => (

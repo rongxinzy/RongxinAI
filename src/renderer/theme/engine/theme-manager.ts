@@ -1,3 +1,6 @@
+import { generateThemeCSS } from './css-generator';
+import { injectStyles } from './style-injector';
+import { validateTheme } from '../themes/plugins';
 import type { ThemeDefinition } from '../themes/types';
 
 export interface ThemeStorage {
@@ -26,7 +29,9 @@ export class ThemeManager {
   private mqHandler: ((e: MediaQueryListEvent) => void) | null = null;
 
   constructor(themes: ThemeDefinition[], options: ThemeManagerOptions = {}) {
+    themes.forEach(validateTheme);
     this.themes = new Map(themes.map(t => [t.meta.id, t]));
+    if (this.themes.size !== themes.length) throw new Error('Duplicate theme ID');
     const fallback = themes[0]?.meta.id ?? '';
     this.currentId = fallback;
     this.opts = {
@@ -99,10 +104,14 @@ export class ThemeManager {
   private apply(id: string): void {
     const theme = this.themes.get(id);
     if (!theme) return;
+    const css = generateThemeCSS(theme);
     this.currentId = id;
 
     if (typeof document !== 'undefined') {
       const root = document.documentElement;
+
+      // Replace one stylesheet atomically; never remount the application.
+      injectStyles(css);
 
       // Set data-theme attribute — CSS selectors do the rest
       root.dataset.theme = id;

@@ -32,6 +32,7 @@ export interface AppConfig {
   providers?: Record<string, ProviderConfig>;
   // 主题配置
   theme: 'light' | 'dark' | 'system';
+  themeStyle?: string;
   // 语言配置
   language: 'zh' | 'en';
   // 是否使用系统代理

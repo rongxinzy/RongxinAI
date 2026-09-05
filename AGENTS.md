@@ -437,7 +437,7 @@ These global skills complement, not replace, the conventions in this file.
 
 > **主题 token 架构（已更新，旧的 hex/HSL 不兼容问题不复存在）**
 >
-> 颜色现在是双真源：`src/renderer/theme/css/shadcn-token-bridge.css` 的 `:root`/`.dark` **直写 oklch**（shadcn 语义层），`themes.css` 的 `--zy-*` 为兼容层。`bg-primary`、`bg-card`、`text-muted-foreground` 等 shadcn 语义 utility 可直接使用，不会再出现 `hsl(#hex)` 失效问题。以 DESIGN.md「色彩 → 事实来源」为准；新建组件优先使用 shadcn 语义 utility，减少新增 `--zy-*` 依赖。
+> 主题插件现在是单一值来源：`src/renderer/theme/themes/*.ts` 提供完整 token，`themes.css` 由生成器生成，`shadcn-token-bridge.css` 仅保留基础规则。Tailwind 通过 `theme/css/tailwind.css` 的 inline 映射读取插件值。新组件优先使用语义 utility，禁止业务代码硬编码色值。新增风格按 `src/renderer/theme/README.md` 注册，同时提供浅色/深色。`bun run lint` 包含生成文件一致性及颜色归属检查。
 >
 > **CRITICAL: Tailwind v4 Variant Syntax**
 >

@@ -332,7 +332,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                   {relativeTime.compact}
                 </span>
               )}
-              <span className="text-[10px] uppercase tracking-wider whitespace-nowrap">
+              <span className="text-xs uppercase tracking-wider whitespace-nowrap">
                 {i18nService.t(statusLabels[session.status])}
               </span>
             </div>

@@ -683,10 +683,10 @@ const ModelCard = memo(function ModelCard({
 function MetadataRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[68px_minmax(0,1fr)] items-start gap-2.5">
-      <div className={cn('pt-0.5 text-[11px] font-medium leading-4', localInferenceMutedTextClass)}>
+      <div className={cn('pt-0.5 text-xs font-medium leading-4', localInferenceMutedTextClass)}>
         {label}
       </div>
-      <div className="min-w-0 text-[13px] font-medium leading-5 text-foreground">
+      <div className="min-w-0 text-sm font-medium leading-5 text-foreground">
         <span className="block break-all">{value}</span>
       </div>
     </div>

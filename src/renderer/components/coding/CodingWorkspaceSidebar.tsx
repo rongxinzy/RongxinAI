@@ -223,7 +223,7 @@ export const CodingWorkspaceSidebar = ({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between px-1.5">
-        <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+        <h2 className="min-w-0 truncate text-sm font-normal text-foreground opacity-[0.28]">
           {i18nService.t('codingWorkspaceSection')}
         </h2>
         <div className="flex items-center">
@@ -520,7 +520,7 @@ const WorkspaceNode = ({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="sidebar-interactive-surface ml-[-6px] h-8 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[14px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  className="sidebar-interactive-surface ml-[-6px] h-8 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
                   onClick={() => onCreateSession(workspace)}
                 >
                   {i18nService.t('codingSessionNew')}
@@ -605,7 +605,7 @@ const SessionRow = ({
       type="button"
       variant="ghost"
       className={cn(
-        'ml-[-6px] h-8 w-[calc(100%+12px)] min-w-0 justify-start gap-2 rounded-md py-0 pr-2.5 text-left text-[14px] font-normal transition-colors hover:bg-transparent',
+        'ml-[-6px] h-8 w-[calc(100%+12px)] min-w-0 justify-start gap-2 rounded-md py-0 pr-2.5 text-left text-sm font-normal transition-colors hover:bg-transparent',
         nested ? 'pl-[46px]' : 'pl-[38px]',
         active
           ? 'sidebar-interactive-surface-active text-foreground'
@@ -621,7 +621,7 @@ const SessionRow = ({
       {agentName ? (
         <span
           className={cn(
-            'shrink-0 truncate text-[12px] font-normal text-foreground opacity-[0.28] transition-opacity',
+            'shrink-0 truncate text-xs font-normal text-foreground opacity-[0.28] transition-opacity',
             onDelete && 'group-hover:pointer-events-none group-hover:opacity-0',
           )}
         >

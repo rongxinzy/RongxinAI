@@ -170,11 +170,14 @@ const getHighlighter = (
 
   // Shiki core loads on first highlight rather than at app startup; the
   // caller already handles the async upgrade from raw to highlighted tokens.
-  const highlighterPromise = import('shiki').then(({ createHighlighter }) =>
-    createHighlighter({
-      langs: [language],
-      themes: ['github-light', 'github-dark'],
-    }),
+  const highlighterPromise = import('shiki').then(
+    ({ createHighlighter, createCssVariablesTheme }) =>
+      createHighlighter({
+        langs: [language],
+        themes: [
+          createCssVariablesTheme({ name: 'zhiyuan', variablePrefix: '--zy-syntax-shiki-' }),
+        ],
+      }),
   );
 
   highlighterCache.set(language, highlighterPromise);
@@ -230,8 +233,8 @@ export const highlightCode = (
       const result = highlighter.codeToTokens(code, {
         lang: langToUse,
         themes: {
-          dark: 'github-dark',
-          light: 'github-light',
+          dark: 'zhiyuan',
+          light: 'zhiyuan',
         },
       });
 

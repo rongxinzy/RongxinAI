@@ -1,7 +1,7 @@
+import { editorHighlightStyle } from '../theme/syntax/codemirror';
 import { defaultKeymap, historyKeymap } from '@codemirror/commands';
 import {
   bracketMatching,
-  defaultHighlightStyle,
   foldGutter,
   foldKeymap,
   LanguageDescription,
@@ -551,14 +551,14 @@ function buildSearchPanel(view: EditorView): Panel {
 
 const baseTheme = EditorView.theme({
   '&': {
-    fontSize: '13px',
-    fontFamily: "'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
+    fontSize: 'var(--zy-component-text-sm)',
+    fontFamily: 'var(--zy-style-font-mono)',
   },
   '.cm-gutters': { border: 'none', userSelect: 'none' },
   '.cm-lineNumbers .cm-gutterElement': {
     minWidth: '2.5em',
     padding: '0 8px 0 4px',
-    fontSize: '12px',
+    fontSize: 'var(--zy-component-text-xs)',
     opacity: '0.5',
   },
   '.cm-content': { padding: '8px 0' },
@@ -567,9 +567,9 @@ const baseTheme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { overflow: 'auto' },
   // Diff colors
-  '.cm-deletedChunk': { backgroundColor: 'rgba(255,80,80,0.15)' },
-  '.cm-insertedChunk': { backgroundColor: 'rgba(60,180,100,0.15)' },
-  '.cm-changedText': { backgroundColor: 'rgba(255,200,0,0.25)' },
+  '.cm-deletedChunk': { backgroundColor: 'var(--zy-component-editor-deleted-chunk)' },
+  '.cm-insertedChunk': { backgroundColor: 'var(--zy-component-editor-inserted-chunk)' },
+  '.cm-changedText': { backgroundColor: 'var(--zy-component-editor-changed)' },
   // Custom search panel
   '.cm-search-custom': {
     display: 'flex',
@@ -578,18 +578,18 @@ const baseTheme = EditorView.theme({
     padding: '5px 10px',
     borderBottom: '1px solid var(--zy-border)',
     background: 'var(--zy-surface-raised)',
-    fontFamily: "'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
-    fontSize: '12px',
+    fontFamily: 'var(--zy-style-font-mono)',
+    fontSize: 'var(--zy-component-text-xs)',
   },
   '.cm-search-input': {
     flex: '0 0 160px',
     height: '26px',
     padding: '0 8px',
-    borderRadius: '5px',
+    borderRadius: 'var(--zy-style-radius-sm)',
     border: '1px solid var(--zy-border)',
     background: 'var(--zy-surface)',
     color: 'var(--zy-foreground)',
-    fontSize: '12px',
+    fontSize: 'var(--zy-component-text-xs)',
     outline: 'none',
   },
   '.cm-search-input:focus': {
@@ -598,13 +598,13 @@ const baseTheme = EditorView.theme({
   '.cm-search-count': {
     flex: '0 0 auto',
     minWidth: '36px',
-    fontSize: '11px',
+    fontSize: 'var(--zy-component-text-xs)',
     color: 'var(--zy-text-secondary)',
     textAlign: 'center',
     fontVariantNumeric: 'tabular-nums',
   },
   '.cm-search-count--none': {
-    color: '#e05252',
+    color: 'var(--zy-component-editor-error)',
   },
   '.cm-search-nav-btn': {
     display: 'inline-flex',
@@ -613,7 +613,7 @@ const baseTheme = EditorView.theme({
     width: '26px',
     height: '26px',
     padding: '0',
-    borderRadius: '5px',
+    borderRadius: 'var(--zy-style-radius-sm)',
     border: '1px solid var(--zy-border)',
     background: 'var(--zy-surface-raised)',
     color: 'var(--zy-text-secondary)',
@@ -637,9 +637,9 @@ const baseTheme = EditorView.theme({
     gap: '4px',
     height: '26px',
     padding: '0 6px',
-    borderRadius: '5px',
+    borderRadius: 'var(--zy-style-radius-sm)',
     border: '1px solid transparent',
-    fontSize: '12px',
+    fontSize: 'var(--zy-component-text-xs)',
     color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
     userSelect: 'none',
@@ -663,7 +663,7 @@ const baseTheme = EditorView.theme({
     height: '26px',
     padding: '0',
     marginLeft: 'auto',
-    borderRadius: '5px',
+    borderRadius: 'var(--zy-style-radius-sm)',
     border: 'none',
     background: 'transparent',
     color: 'var(--zy-text-secondary)',
@@ -675,54 +675,66 @@ const baseTheme = EditorView.theme({
     color: 'var(--zy-foreground)',
   },
   '.cm-searchMatch': {
-    backgroundColor: 'rgba(255,180,0,0.3)',
+    backgroundColor: 'var(--zy-component-editor-search)',
     borderRadius: '2px',
   },
-  '.cm-searchMatch-selected': { backgroundColor: 'rgba(255,130,0,0.5)' },
+  '.cm-searchMatch-selected': { backgroundColor: 'var(--zy-component-editor-search-selected)' },
   // Indentation markers
   '.cm-indent-markers': {
-    '--indent-marker-bg-color': 'rgba(128,128,128,0.15)',
-    '--indent-marker-active-bg-color': 'rgba(128,128,128,0.35)',
+    '--indent-marker-bg-color': 'var(--zy-component-editor-indent-fallback)',
+    '--indent-marker-active-bg-color': 'var(--zy-component-editor-indent-active-fallback)',
   },
 });
 
 const darkThemeExt = EditorView.theme({
-  '&': { backgroundColor: '#282c34', color: '#abb2bf' },
-  '.cm-gutters': { backgroundColor: '#282c34', color: '#636d83' },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: '#3e4451 !important',
+  '&': {
+    backgroundColor: 'var(--zy-component-editor-background)',
+    color: 'var(--zy-component-editor-foreground)',
   },
-  '.cm-activeLine': { backgroundColor: 'rgba(255,255,255,0.04)' },
-  '.cm-activeLineGutter': { backgroundColor: 'rgba(255,255,255,0.04)' },
+  '.cm-gutters': {
+    backgroundColor: 'var(--zy-component-editor-background)',
+    color: 'var(--zy-component-editor-gutter)',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+    backgroundColor: 'var(--zy-component-editor-selection) !important',
+  },
+  '.cm-activeLine': { backgroundColor: 'var(--zy-component-editor-active-line)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--zy-component-editor-active-line)' },
   '.cm-deletedChunk .cm-line, .cm-changedChunk .cm-deletedLine': {
-    backgroundColor: 'rgba(255,80,80,0.18)',
+    backgroundColor: 'var(--zy-component-editor-deleted)',
   },
   '.cm-insertedChunk .cm-line, .cm-changedChunk .cm-insertedLine': {
-    backgroundColor: 'rgba(60,200,100,0.15)',
+    backgroundColor: 'var(--zy-component-editor-inserted)',
   },
   '.cm-indent-markers': {
-    '--indent-marker-bg-color': 'rgba(255,255,255,0.08)',
-    '--indent-marker-active-bg-color': 'rgba(255,255,255,0.22)',
+    '--indent-marker-bg-color': 'var(--zy-component-editor-indent)',
+    '--indent-marker-active-bg-color': 'var(--zy-component-editor-indent-active)',
   },
 });
 
 const lightThemeExt = EditorView.theme({
-  '&': { backgroundColor: '#f0f2f5', color: '#383a42' },
-  '.cm-gutters': { backgroundColor: '#f0f2f5', color: '#9d9d9f' },
-  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-    backgroundColor: '#d7d9e0 !important',
+  '&': {
+    backgroundColor: 'var(--zy-component-editor-background)',
+    color: 'var(--zy-component-editor-foreground)',
   },
-  '.cm-activeLine': { backgroundColor: 'rgba(0,0,0,0.04)' },
-  '.cm-activeLineGutter': { backgroundColor: 'rgba(0,0,0,0.04)' },
+  '.cm-gutters': {
+    backgroundColor: 'var(--zy-component-editor-background)',
+    color: 'var(--zy-component-editor-gutter)',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+    backgroundColor: 'var(--zy-component-editor-selection) !important',
+  },
+  '.cm-activeLine': { backgroundColor: 'var(--zy-component-editor-active-line)' },
+  '.cm-activeLineGutter': { backgroundColor: 'var(--zy-component-editor-active-line)' },
   '.cm-deletedChunk .cm-line, .cm-changedChunk .cm-deletedLine': {
-    backgroundColor: 'rgba(220,40,40,0.12)',
+    backgroundColor: 'var(--zy-component-editor-deleted)',
   },
   '.cm-insertedChunk .cm-line, .cm-changedChunk .cm-insertedLine': {
-    backgroundColor: 'rgba(30,160,60,0.12)',
+    backgroundColor: 'var(--zy-component-editor-inserted)',
   },
   '.cm-indent-markers': {
-    '--indent-marker-bg-color': 'rgba(0,0,0,0.08)',
-    '--indent-marker-active-bg-color': 'rgba(0,0,0,0.22)',
+    '--indent-marker-bg-color': 'var(--zy-component-editor-indent)',
+    '--indent-marker-active-bg-color': 'var(--zy-component-editor-indent-active)',
   },
 });
 
@@ -893,7 +905,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
   return createPortal(
     <div
       className="fixed inset-0 z-200 flex flex-col"
-      style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+      style={{ backgroundColor: 'var(--zy-component-overlay-strong)', backdropFilter: 'blur(4px)' }}
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -901,7 +913,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
       {/* Modal container */}
       <div
         className="flex flex-col m-8 rounded-xl overflow-hidden border border-border shadow-2xl"
-        style={{ flex: 1, minHeight: 0, backgroundColor: isDark ? '#282c34' : '#f0f2f5' }}
+        style={{ flex: 1, minHeight: 0, backgroundColor: 'var(--zy-component-editor-background)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
@@ -1154,7 +1166,7 @@ function useCodeMirrorView({
         indentationMarkers(),
 
         // Syntax highlighting
-        syntaxHighlighting(defaultHighlightStyle),
+        syntaxHighlighting(editorHighlightStyle),
 
         // Search — custom panel with match counter
         search({ createPanel: buildSearchPanel }),
@@ -1420,7 +1432,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
   if (!match) {
     return (
       <div className="my-2 relative group">
-        <div className="overflow-x-auto rounded-lg border border-border-subtle dark:bg-[#282c34] bg-[#f0f2f5] text-[13px] leading-6">
+        <div className="overflow-x-auto rounded-lg border border-border-subtle bg-editor-background text-sm leading-6">
           <CodeBlockTooltip
             content={i18nService.t('copyToClipboard')}
             className="absolute top-2 right-2 z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
@@ -1440,7 +1452,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               )}
             </Button>
           </CodeBlockTooltip>
-          <code className="block px-4 py-3 font-mono dark:text-gray-100 text-gray-800 whitespace-pre">
+          <code className="block px-4 py-3 font-mono text-editor-foreground whitespace-pre">
             {trimmedCodeText}
           </code>
         </div>
@@ -1590,8 +1602,8 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
             />
           )
         ) : (
-          <div className="m-0 overflow-x-auto dark:bg-[#282c34] bg-[#f0f2f5] text-[13px] leading-6">
-            <code className="block px-4 py-3 font-mono dark:text-gray-100 text-gray-800 whitespace-pre">
+          <div className="m-0 overflow-x-auto bg-editor-background text-sm leading-6">
+            <code className="block px-4 py-3 font-mono text-editor-foreground whitespace-pre">
               {trimmedCodeText}
             </code>
           </div>

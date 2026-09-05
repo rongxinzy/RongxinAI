@@ -1,0 +1,313 @@
+/* ── Tailwind v4 theme configuration ── */
+@theme inline {
+  --shadow-xs: var(--zy-style-shadow-xs);
+  --font-weight-bold: var(--zy-component-font-weight-bold);
+  --font-weight-semibold: var(--zy-component-font-weight-semibold);
+  --font-weight-medium: var(--zy-component-font-weight-medium);
+  --font-weight-normal: var(--zy-component-font-weight-normal);
+  --text-9xl--line-height: var(--zy-component-text-9xl--line-height);
+  --text-9xl: var(--zy-component-text-9xl);
+  --text-8xl--line-height: var(--zy-component-text-8xl--line-height);
+  --text-8xl: var(--zy-component-text-8xl);
+  --text-7xl--line-height: var(--zy-component-text-7xl--line-height);
+  --text-7xl: var(--zy-component-text-7xl);
+  --text-6xl--line-height: var(--zy-component-text-6xl--line-height);
+  --text-6xl: var(--zy-component-text-6xl);
+  --text-5xl--line-height: var(--zy-component-text-5xl--line-height);
+  --text-5xl: var(--zy-component-text-5xl);
+  --text-4xl--line-height: var(--zy-component-text-4xl--line-height);
+  --text-4xl: var(--zy-component-text-4xl);
+  --text-3xl--line-height: var(--zy-component-text-3xl--line-height);
+  --text-3xl: var(--zy-component-text-3xl);
+  --text-2xl--line-height: var(--zy-component-text-2xl--line-height);
+  --text-2xl: var(--zy-component-text-2xl);
+  --text-xl--line-height: var(--zy-component-text-xl--line-height);
+  --text-xl: var(--zy-component-text-xl);
+  --text-lg--line-height: var(--zy-component-text-lg--line-height);
+  --text-lg: var(--zy-component-text-lg);
+  --text-base--line-height: var(--zy-component-text-base--line-height);
+  --text-base: var(--zy-component-text-base);
+  --text-sm--line-height: var(--zy-component-text-sm--line-height);
+  --text-sm: var(--zy-component-text-sm);
+  --text-xs--line-height: var(--zy-component-text-xs--line-height);
+  --text-xs: var(--zy-component-text-xs);
+  --color-zinc-950: var(--zy-component-palette-zinc-950);
+  --color-zinc-800: var(--zy-component-palette-zinc-800);
+  --color-zinc-400: var(--zy-component-palette-zinc-400);
+  --color-zinc-100: var(--zy-component-palette-zinc-100);
+  --color-yellow-900: var(--zy-component-palette-yellow-900);
+  --color-yellow-800: var(--zy-component-palette-yellow-800);
+  --color-yellow-700: var(--zy-component-palette-yellow-700);
+  --color-yellow-600: var(--zy-component-palette-yellow-600);
+  --color-yellow-500: var(--zy-component-palette-yellow-500);
+  --color-yellow-50: var(--zy-component-palette-yellow-50);
+  --color-yellow-400: var(--zy-component-palette-yellow-400);
+  --color-yellow-200: var(--zy-component-palette-yellow-200);
+  --color-white: var(--zy-component-palette-white);
+  --color-red-900: var(--zy-component-palette-red-900);
+  --color-red-800: var(--zy-component-palette-red-800);
+  --color-red-700: var(--zy-component-palette-red-700);
+  --color-red-600: var(--zy-component-palette-red-600);
+  --color-red-500: var(--zy-component-palette-red-500);
+  --color-red-50: var(--zy-component-palette-red-50);
+  --color-red-400: var(--zy-component-palette-red-400);
+  --color-red-200: var(--zy-component-palette-red-200);
+  --color-orange-600: var(--zy-component-palette-orange-600);
+  --color-orange-500: var(--zy-component-palette-orange-500);
+  --color-neutral-950: var(--zy-component-palette-neutral-950);
+  --color-neutral-800: var(--zy-component-palette-neutral-800);
+  --color-neutral-700: var(--zy-component-palette-neutral-700);
+  --color-neutral-600: var(--zy-component-palette-neutral-600);
+  --color-neutral-50: var(--zy-component-palette-neutral-50);
+  --color-neutral-300: var(--zy-component-palette-neutral-300);
+  --color-neutral-200: var(--zy-component-palette-neutral-200);
+  --color-green-600: var(--zy-component-palette-green-600);
+  --color-green-500: var(--zy-component-palette-green-500);
+  --color-green-400: var(--zy-component-palette-green-400);
+  --color-gray-600: var(--zy-component-palette-gray-600);
+  --color-gray-400: var(--zy-component-palette-gray-400);
+  --color-gray-300: var(--zy-component-palette-gray-300);
+  --color-blue-600: var(--zy-component-palette-blue-600);
+  --color-blue-500: var(--zy-component-palette-blue-500);
+  --color-blue-400: var(--zy-component-palette-blue-400);
+  --color-black: var(--zy-component-palette-black);
+  --color-amber-950: var(--zy-component-palette-amber-950);
+  --color-amber-800: var(--zy-component-palette-amber-800);
+  --color-amber-700: var(--zy-component-palette-amber-700);
+  --color-amber-500: var(--zy-component-palette-amber-500);
+  --color-amber-50: var(--zy-component-palette-amber-50);
+  --color-amber-400: var(--zy-component-palette-amber-400);
+  --color-amber-200: var(--zy-component-palette-amber-200);
+  --color-diff-removed-background: var(--zy-component-diff-removed-background);
+  --color-diff-added-background: var(--zy-component-diff-added-background);
+  --color-diff-removed: var(--zy-component-diff-removed);
+  --color-diff-added: var(--zy-component-diff-added);
+  --color-overlay-strong: var(--zy-component-overlay-strong);
+  --color-editor-indent-active-fallback: var(--zy-component-editor-indent-active-fallback);
+  --color-editor-indent-fallback: var(--zy-component-editor-indent-fallback);
+  --color-editor-error: var(--zy-component-editor-error);
+  --color-editor-search-selected: var(--zy-component-editor-search-selected);
+  --color-editor-search: var(--zy-component-editor-search);
+  --color-editor-changed: var(--zy-component-editor-changed);
+  --color-editor-inserted-chunk: var(--zy-component-editor-inserted-chunk);
+  --color-editor-deleted-chunk: var(--zy-component-editor-deleted-chunk);
+  --color-editor-indent-active: var(--zy-component-editor-indent-active);
+  --color-editor-indent: var(--zy-component-editor-indent);
+  --color-editor-inserted: var(--zy-component-editor-inserted);
+  --color-editor-deleted: var(--zy-component-editor-deleted);
+  --color-editor-active-line: var(--zy-component-editor-active-line);
+  --color-editor-selection: var(--zy-component-editor-selection);
+  --color-editor-gutter: var(--zy-component-editor-gutter);
+  --color-editor-foreground: var(--zy-component-editor-foreground);
+  --color-editor-background: var(--zy-component-editor-background);
+  /* Typography scale extension (arithmetic series, 2px step — see DESIGN.md) */
+  --text-xxl: var(--zy-style-text-xxl);
+  --text-xxl--line-height: var(--zy-style-text-xxl--line-height);
+
+  /* Semantic theme colors (driven by CSS variables) */
+  --color-background: var(--zy-background);
+  --color-foreground: var(--zy-foreground);
+  --color-primary: var(--zy-primary);
+  --color-switch-thumb-foreground: var(--zy-switch-thumb-foreground);
+  --color-primary-foreground: var(--zy-primary-foreground);
+  --color-primary-hover: var(--zy-primary-hover);
+  --color-primary-muted: var(--zy-primary-muted);
+  --color-primary-strong: var(--zy-primary-strong);
+  --color-primary-dark: var(--zy-primary-hover);
+  --color-accent: var(--zy-accent);
+  --color-accent-foreground: var(--zy-accent-foreground);
+  --color-surface: var(--zy-surface);
+  --color-surface-foreground: var(--zy-surface-foreground);
+  --color-surface-raised: var(--zy-surface-raised);
+  --color-surface-tertiary: var(--zy-surface-tertiary);
+  --color-surface-overlay: var(--zy-surface-overlay);
+  --color-surface-inset: var(--zy-surface-raised);
+  --color-border: var(--zy-border);
+  --color-border-subtle: var(--zy-border-subtle);
+  --color-border-input: var(--zy-input-border);
+  --color-destructive: var(--zy-destructive);
+  --color-destructive-foreground: var(--zy-destructive-foreground);
+  --color-success: var(--zy-success);
+  --color-warning: var(--zy-warning);
+
+  /* shadcn/ui compatible tokens */
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-input: var(--input);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Legacy claude.* aliases */
+  --color-claude-bg: var(--zy-background);
+  --color-claude-surface: var(--zy-surface);
+  --color-claude-surfaceHover: var(--zy-surface-raised);
+  --color-claude-surfaceMuted: var(--zy-surface-raised);
+  --color-claude-surfaceInset: var(--zy-surface-raised);
+  --color-claude-border: var(--zy-border);
+  --color-claude-borderLight: var(--zy-border-subtle);
+  --color-claude-text: var(--zy-text-primary);
+  --color-claude-textSecondary: var(--zy-text-secondary);
+  --color-claude-darkBg: var(--zy-background);
+  --color-claude-darkSurface: var(--zy-surface);
+  --color-claude-darkSurfaceHover: var(--zy-surface-raised);
+  --color-claude-darkSurfaceMuted: var(--zy-surface-raised);
+  --color-claude-darkSurfaceInset: var(--zy-surface-raised);
+  --color-claude-darkBorder: var(--zy-border);
+  --color-claude-darkBorderLight: var(--zy-border-subtle);
+  --color-claude-darkText: var(--zy-text-primary);
+  --color-claude-darkTextSecondary: var(--zy-text-secondary);
+  --color-claude-accent: var(--zy-primary);
+  --color-claude-accentHover: var(--zy-primary-hover);
+  --color-claude-accentLight: var(--zy-primary);
+  --color-claude-accentMuted: var(--zy-primary-muted);
+
+  --font-sans: var(--zy-style-font-sans);
+  --font-mono: var(--zy-style-font-mono);
+  --radius-2xl: var(--zy-style-radius-2xl);
+  --radius-3xl: var(--zy-style-radius-3xl);
+  /* Border radius */
+  --radius-theme: var(--zy-radius);
+  --radius-sm: var(--zy-style-radius-sm);
+  --radius-md: var(--zy-style-radius-md);
+  --radius-lg: var(--zy-style-radius-lg);
+  --radius-xl: var(--zy-style-radius-xl);
+
+  /* Box shadows */
+  --shadow-subtle: var(--zy-style-shadow-subtle);
+  --shadow-card: var(--zy-style-shadow-card);
+  --shadow-elevated: var(--zy-style-shadow-elevated);
+  --shadow-modal: var(--zy-style-shadow-modal);
+  --shadow-popover: var(--zy-style-shadow-popover);
+  --shadow-glow-accent: var(--zy-style-shadow-glow-accent);
+  --shadow-inset: var(--zy-style-shadow-inset);
+
+  /* Map Tailwind's built-in shadow scale onto project shadow tiers
+     (literal values, no var chain — guaranteed to resolve in v4 @theme) */
+  --shadow-sm: var(--zy-style-shadow-sm);
+  --shadow-md: var(--zy-style-shadow-md);
+  --shadow-lg: var(--zy-style-shadow-lg);
+  --shadow-xl: var(--zy-style-shadow-xl);
+  --shadow-2xl: var(--zy-style-shadow-2xl);
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-in-up: fade-in-up 0.25s ease-out;
+  --animate-fade-in-down: fade-in-down 0.2s ease-out;
+  --animate-slide-in-right: slide-in-right 0.28s var(--ease-smooth) both;
+  --animate-slide-in-left: slide-in-left 0.28s var(--ease-smooth) both;
+  --animate-scale-in: scale-in 0.2s ease-out;
+  --animate-shimmer: shimmer 1.5s infinite;
+  --animate-shake: shake 0.4s ease-in-out;
+  --animate-message-in: message-in 0.25s ease-out both;
+
+  /* Transition timing */
+  --ease-smooth: var(--zy-style-ease-smooth);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in-down {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-3px);
+    }
+    40% {
+      transform: translateX(3px);
+    }
+    60% {
+      transform: translateX(-2px);
+    }
+    80% {
+      transform: translateX(2px);
+    }
+  }
+  @keyframes message-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}

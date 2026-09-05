@@ -1447,12 +1447,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               railTooltip &&
               createPortal(
                 <div
-                  className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
+                  className={`fixed z-100 px-3.5 py-2 text-sm leading-snug pointer-events-none overflow-hidden
               max-w-[240px] shadow-elevated
               border
               ${
                 railTooltip.isUser
-                  ? 'rounded-[12px_12px_4px_12px] bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
+                  ? 'rounded-xl rounded-br-sm bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
                   : 'rounded-xl bg-neutral-50 border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
               }`}
                   style={{
@@ -1462,7 +1462,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   }}
                 >
                   {!railTooltip.isUser && (
-                    <div className="text-[12px] font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
+                    <div className="text-xs font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
                       知远智能体：
                     </div>
                   )}
@@ -1540,7 +1540,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onCancelTaskResume={onCancelTaskResume}
                   sessionId={displayedSessionId ?? currentSession?.id}
                 />
-                <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
+                <p className="text-center text-xs text-muted opacity-85 mt-2 mb-[-8px] select-none">
                   {i18nService.t('aiGeneratedDisclaimer')}
                 </p>
               </div>

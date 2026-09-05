@@ -214,20 +214,20 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 <Button
                   variant="ghost"
                   onClick={() => onRetryLoadTasks(workspace.id)}
-                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-destructive hover:bg-destructive/10"
+                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-sm font-normal text-destructive hover:bg-destructive/10"
                 >
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
               )}
               {workspace.isLoadingTasks && workspace.tasks.length === 0 && (
-                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">
+                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-sm text-muted-foreground">
                   {i18nService.t('loading')}
                 </div>
               )}
               {!workspace.isLoadingTasks &&
                 !workspace.hasLoadError &&
                 workspace.tasks.length === 0 && (
-                  <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-[13px] text-muted-foreground">
+                  <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-sm text-muted-foreground">
                     {i18nService.t('myAgentSidebarNoTasks')}
                   </div>
                 )}

@@ -426,7 +426,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
                     {/* 问题 */}
                     <div className="text-sm font-medium text-foreground">
                       {question.header && (
-                        <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 mr-1.5 rounded-full bg-surface-raised text-muted-foreground align-middle">
+                        <span className="inline-block text-xs uppercase tracking-wide px-2 py-0.5 mr-1.5 rounded-full bg-surface-raised text-muted-foreground align-middle">
                           {question.header}
                         </span>
                       )}
@@ -472,7 +472,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-background border border-border">
-                  <code className="text-[11px]">&gt;_</code>
+                  <code className="text-xs">&gt;_</code>
                 </span>
                 <span>{permission.toolName}</span>
               </div>

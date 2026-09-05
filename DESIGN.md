@@ -23,7 +23,7 @@
 
 - **界面退后，内容向前。** 界面骨架由中性灰构成，颜色只出现在该出现的地方（品牌强调、状态语义）。不做炫技的渐变、发光、彩色装饰。
 - **用留白和字重建立层级，而不是用颜色和边框。** 分组靠间距，强调靠字重，分隔优先用空白，其次用 1px 细线，最后才是阴影。
-- **暗色与亮色是同一套设计的两个面。** 主题只保留：浅色 / 深色 / 跟随系统。不再新增彩色主题。所有设计决策必须同时在两种外观下成立。
+- **暗色与亮色是同一套设计的两个面。** 明暗模式保留浅色 / 深色 / 跟随系统；风格由主题插件独立提供。所有设计决策必须同时在两种外观下成立。
 
 ### 质感目标：轻盈、流畅、有呼吸感
 
@@ -36,18 +36,13 @@
 
 ## 色彩
 
-### 事实来源（过渡期双真源）
+### 事实来源：主题插件
 
-颜色只允许通过语义 token 使用。当前存在**两层变量，值同步**：
+`theme/themes` 中的 TypeScript 主题定义是唯一值来源；契约覆盖兼容变量、shadcn 语义变量、字体、圆角、阴影与组件外观。`themes.css` 由生成器生成，禁止手工维护。桥接 CSS 只保留基础规则。
 
-1. **shadcn 语义层** —— `src/renderer/theme/css/shadcn-token-bridge.css`
-   `:root` / `.dark`（并挂 `[data-theme]` 别名）直写 oklch。这是与标准 shadcn 语义表逐值一致的真源，含 `--sidebar-primary` 品牌蓝、`--chart-1..5`、`--radius: 0.625rem`。
-2. **项目兼容层** —— `src/renderer/theme/css/themes.css` 的 `--zy-*`（oklch）
-   供仍使用 `var(--zy-*)` / `bg-surface` 等的存量组件消费；`tokens/contract.ts`、`themes/classic-light.ts`、`themes/classic-dark.ts` 与之同步。
+主题插件提供版本、唯一 ID、显示名称与浅色/深色定义。明暗模式与风格分离；当前内置 Codex 风格，未来风格通过相同契约注册。插件仅提供展示数据，不持有 React 组件、事件处理器、IPC 或业务状态。切换时原位更新 CSS 变量，保留 DOM、草稿、焦点、滚动和打开中的弹层。
 
-Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: var(--zy-background)` 等映射到 `--zy-*`，shadcn 语义名（`card`、`popover`、`secondary`、`muted` 等）映射到 bridge 的 `var(--语义名)`。组件可通过 `bg-background` / `bg-card` / `text-muted-foreground` 等 utility 消费，也可直接用 `var(--zy-*)`。
-
-> **过渡说明**：两层构成双真源。彻底单层需将存量组件的 `var(--zy-*)` / `bg-surface` 全部迁到 shadcn 语义名，留待后续重构。新建组件**应优先使用 shadcn 语义 utility**（`bg-card`、`text-muted-foreground` 等），减少对 `--zy-*` 的新增依赖。
+Tailwind 的语义颜色、字体、圆角和阴影映射到插件变量。页面仍负责布局和状态；交互外观由共享组件的 variant 管理。品牌标识、用户文档内容与第三方预览不随主题重着色。
 
 **禁止：**
 
@@ -107,7 +102,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 ### 字体族
 
-- **界面字体：** 系统字体栈（`index.css` 中 `:root` 已定义：SF Pro / PingFang SC / Microsoft YaHei / Inter / system-ui 等）。禁止引入 Web 字体文件。
+- **界面字体：** 系统字体栈（`theme/themes` 定义、`theme/css/components.css` 消费：SF Pro / PingFang SC / Microsoft YaHei / Inter / system-ui 等）。禁止引入 Web 字体文件。
 - **代码字体：** `'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace`。所有代码块、行内代码、终端、diff 统一使用。
 - 全局统一，禁止在组件上用 `font-family` 覆盖。
 
@@ -124,7 +119,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 展示 | `text-xl`   | 20px | 仅用于空状态/欢迎页等展示场景，一张屏幕至多一处 |
 | 超大 | `text-xxl`  | 22px | 页面 hero 主标题，一张屏幕至多一处              |
 
-刻度为等差数列（公差 2px）。`text-xxl` 非 Tailwind 原生类，由 `index.css` `@theme` 中的 `--text-xxl: 22px`（行高 1.375）定义。
+刻度为等差数列（公差 2px）。`text-xxl` 非 Tailwind 原生类，由主题插件通过 `@theme inline` 映射（默认 22px、行高 1.375）。
 
 ### 字重
 
@@ -149,7 +144,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 ## 圆角
 
-基准值 `--zy-radius` = **10px**（0.625rem），同步于 `shadcn-token-bridge.css` 的 `--radius: 0.625rem`。派生刻度：
+基准值 `--zy-radius` = **10px**（0.625rem），由主题插件同时提供 shadcn 兼容别名。派生刻度：
 
 | 圆角    | 类名                        | 用途                                                        |
 | ------- | --------------------------- | ----------------------------------------------------------- |
@@ -168,7 +163,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 ## 阴影
 
-定义于 `index.css` `@theme` 块中，将 Tailwind 内置 `--shadow-sm/md/lg/xl/2xl` 以字面值映射到项目档位（保证 v4 `@theme` 下确定生效，无 var 链），并额外提供 `--shadow-inset` 用于内嵌态。**禁止手写 `shadow-[...]` 任意值**：
+定义于主题插件中，由 `theme/css/tailwind.css` 的 `@theme inline` 块映射，将 Tailwind 内置 `--shadow-sm/md/lg/xl/2xl` 映射到主题插件的阴影变量，并额外提供 `--shadow-inset` 用于内嵌态。**禁止手写 `shadow-[...]` 任意值**：
 
 | 级别                 | 类名                               | 用途 |
 | -------------------- | ---------------------------------- | ---- |

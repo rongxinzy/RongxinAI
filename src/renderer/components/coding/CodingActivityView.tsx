@@ -163,7 +163,7 @@ const PlanActivityBody = ({ activity }: { activity: CodingConversationActivity }
           {entry.priority && (
             <Badge
               variant={PLAN_PRIORITY_VARIANT[entry.priority] ?? 'outline'}
-              className="shrink-0 text-[10px]"
+              className="shrink-0 text-xs"
             >
               {i18nService.t(PLAN_PRIORITY_I18N_KEY[entry.priority] ?? entry.priority)}
             </Badge>

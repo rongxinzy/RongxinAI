@@ -169,7 +169,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
         {/* Weekday headers */}
         <div className="grid grid-cols-7 gap-0.5 mb-1">
           {WEEKDAY_KEYS.map(key => (
-            <div key={key} className="text-center text-[10px] text-muted-foreground py-0.5">
+            <div key={key} className="text-center text-xs text-muted-foreground py-0.5">
               {i18nService.t(key)}
             </div>
           ))}

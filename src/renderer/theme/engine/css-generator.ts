@@ -1,8 +1,10 @@
+import { validateTheme } from '../themes/plugins';
 import type { ThemeDefinition } from '../themes/types';
 import { TOKEN_CONTRACT, TOKEN_NAMES } from '../tokens/contract';
 
 /** Generate a single [data-theme="id"] block */
 export function generateThemeCSS(theme: ThemeDefinition): string {
+  validateTheme(theme);
   const vars = TOKEN_NAMES.map(name => `  ${TOKEN_CONTRACT[name]}: ${theme.tokens[name]};`).join(
     '\n',
   );
@@ -13,6 +15,7 @@ export function generateThemeCSS(theme: ThemeDefinition): string {
 /** Generate the full CSS for all themes.
  *  The first theme is merged with :root to avoid duplication. */
 export function generateAllThemesCSS(themes: ThemeDefinition[]): string {
+  themes.forEach(validateTheme);
   if (themes.length === 0) return '';
 
   const defaultTheme = themes[0];

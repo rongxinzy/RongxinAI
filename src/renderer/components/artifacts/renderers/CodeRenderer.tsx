@@ -1,23 +1,10 @@
+import { prismTheme } from '../../../theme/syntax/prism';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import type { Artifact } from '@/types/artifact';
 
 const MAX_HIGHLIGHT_SIZE = 50_000;
-
-function useIsDark() {
-  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-  return isDark;
-}
 
 const LANGUAGE_MAP: Record<string, string> = {
   html: 'html',
@@ -33,7 +20,6 @@ interface CodeRendererProps {
 }
 
 const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
-  const isDark = useIsDark();
   const containerRef = useRef<HTMLDivElement>(null);
   const hScrollRef = useRef<HTMLDivElement>(null);
   const [contentWidth, setContentWidth] = useState(0);
@@ -107,7 +93,7 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
       <div className="h-full overflow-auto">
         <pre
           className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre ${
-            isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
+            'bg-editor-background text-editor-foreground'
           }`}
         >
           {artifact.content}
@@ -117,7 +103,7 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
   }
 
   const language = artifact.language || LANGUAGE_MAP[artifact.type] || 'text';
-  const style = isDark ? oneDark : oneLight;
+  const style = prismTheme;
   const needsHScroll = contentWidth > viewportWidth;
 
   return (
@@ -136,7 +122,7 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
             customStyle={{
               margin: 0,
               borderRadius: 0,
-              fontSize: '13px',
+              fontSize: 'var(--zy-component-text-sm)',
               lineHeight: '1.5',
               overflow: 'visible',
             }}

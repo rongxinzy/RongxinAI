@@ -578,7 +578,7 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
     [content],
   );
   return (
-    <div className={`markdown-content text-[15px] leading-[23px] ${className}`}>
+    <div className={`markdown-content text-sm leading-[23px] ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

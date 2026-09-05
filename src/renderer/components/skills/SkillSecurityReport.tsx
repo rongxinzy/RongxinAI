@@ -178,7 +178,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                               {finding.line ? `:${finding.line}` : ''}
                             </p>
                             {finding.matchedPattern && (
-                              <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] text-muted-foreground break-all overflow-x-auto max-h-16">
+                              <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-xs text-muted-foreground break-all overflow-x-auto max-h-16">
                                 {finding.matchedPattern}
                               </p>
                             )}

@@ -116,7 +116,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         isNested ? 'ml-[-6px] w-[calc(100%+12px)]' : 'ml-0 w-full'
       } flex h-[30px] cursor-pointer items-center gap-2 rounded-md ${
         isBatchMode ? 'pl-4' : isNested ? 'pl-[38px]' : 'pl-3'
-      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} text-[14px] font-normal transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} text-sm font-normal transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
         isSelected
           ? 'sidebar-interactive-surface-active text-foreground'
           : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground'
@@ -149,7 +149,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
             if (e.key === 'Enter') void handleRenameSave();
             if (e.key === 'Escape') handleRenameCancel();
           }}
-          className="min-w-0 flex-1 border border-border bg-background px-1.5 py-0.5 text-[14px] font-normal"
+          className="min-w-0 flex-1 border border-border bg-background px-1.5 py-0.5 text-sm font-normal"
         />
       ) : (
         <>
@@ -166,7 +166,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         <div className="absolute right-1 top-1/2 flex h-6 w-[52px] -translate-y-1/2 items-center justify-end">
           {showRelativeTime && (
             <span
-              className="absolute inset-y-0 right-0 flex items-center whitespace-nowrap text-[12px] font-normal text-foreground opacity-[0.28] transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
+              className="absolute inset-y-0 right-0 flex items-center whitespace-nowrap text-xs font-normal text-foreground opacity-[0.28] transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
               title={relativeTime.full}
             >
               {relativeTime.compact}

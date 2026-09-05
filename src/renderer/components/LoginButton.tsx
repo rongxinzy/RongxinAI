@@ -146,7 +146,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
         onClick={() => setShowMenu(open => !open)}
         aria-expanded={showMenu}
         aria-haspopup="menu"
-        className="inline-flex h-8 w-full items-center justify-start gap-2 rounded-lg px-2 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4"
+        className="inline-flex h-8 w-full items-center justify-start gap-2 rounded-lg px-2 text-sm font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4"
       >
         <UserRound data-icon="inline-start" />
         <span className="truncate">{accountLabel}</span>

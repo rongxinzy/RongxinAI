@@ -273,7 +273,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex-1">
                 {currentQuestion.header && (
-                  <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-surface-raised text-muted-foreground mb-3">
+                  <span className="inline-block text-xs uppercase tracking-wide px-2 py-1 rounded-full bg-surface-raised text-muted-foreground mb-3">
                     {currentQuestion.header}
                   </span>
                 )}
