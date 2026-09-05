@@ -49,6 +49,18 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+      - name: Install checksum-pinned workflow validator
+        run: |
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          curl --fail --location --retry 3 --max-time 60 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            -o "$RUNNER_TEMP/actionlint/archive.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint/archive.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint/archive.tar.gz" -C "$RUNNER_TEMP/actionlint" actionlint
+      - name: Validate workflow syntax and job dependencies
+        # ShellCheck policy is separate; this gate validates every workflow's
+        # YAML, expressions, reusable-workflow inputs and dependency graph.
+        run: '"$RUNNER_TEMP/actionlint/actionlint" -shellcheck='
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
