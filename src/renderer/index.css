@@ -25,6 +25,7 @@
   --color-background: var(--zy-background);
   --color-foreground: var(--zy-foreground);
   --color-primary: var(--zy-primary);
+  --color-switch-thumb-foreground: var(--zy-switch-thumb-foreground);
   --color-primary-foreground: var(--zy-primary-foreground);
   --color-primary-hover: var(--zy-primary-hover);
   --color-primary-muted: var(--zy-primary-muted);

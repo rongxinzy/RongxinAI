@@ -1,5 +1,4 @@
 import { ModelSelectorName } from '@shared/components/ai-elements/model-selector';
-import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
 import {
   Command,
   CommandEmpty,
@@ -9,12 +8,13 @@ import {
   CommandList,
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
-import { ChevronDown } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ProviderIcon } from '../../providers/uiRegistry';
 import { i18nService } from '../../services/i18n';
 import type { Model } from '../../store/slices/modelSlice';
+import { PromptSelectorButton } from './PromptSelectorButton';
 
 type CoworkModelPickerProps = {
   models: Model[];
@@ -26,7 +26,7 @@ type CoworkModelPickerProps = {
 };
 
 function ModelProviderIcon({ provider }: { provider: string }) {
-  return <ProviderIcon id={provider} className="size-3" />;
+  return <ProviderIcon id={provider} className="size-4" />;
 }
 
 export function CoworkModelPicker({
@@ -64,12 +64,11 @@ export function CoworkModelPicker({
       <PopoverTrigger
         nativeButton={true}
         render={
-          <PromptInputButton
-            className={compact ? 'gap-1 px-2' : 'max-w-[200px] gap-1 px-2 text-sm'}
-            aria-label={displayedSelectedModel?.name ?? i18nService.t('selectModel')}
-          >
-            {displayedSelectedModel ? (
-              <>
+          <PromptSelectorButton
+            compact={compact}
+            label={displayedSelectedModel?.name ?? i18nService.t('selectModel')}
+            icon={
+              displayedSelectedModel ? (
                 <ModelProviderIcon
                   provider={
                     displayedSelectedModel.providerKey ||
@@ -77,15 +76,11 @@ export function CoworkModelPicker({
                     'openai'
                   }
                 />
-                {!compact && <ModelSelectorName>{displayedSelectedModel.name}</ModelSelectorName>}
-              </>
-            ) : (
-              !compact && (
-                <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
+              ) : (
+                <Bot className="size-4" />
               )
-            )}
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          </PromptInputButton>
+            }
+          />
         }
       />
       <PopoverContent

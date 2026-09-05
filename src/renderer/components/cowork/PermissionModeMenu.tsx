@@ -1,4 +1,3 @@
-import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,11 +5,12 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
-import { ChevronDown, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck } from 'lucide-react';
 import React from 'react';
 
 import { CoworkPermissionMode } from '../../../shared/cowork/constants';
 import { i18nService } from '../../services/i18n';
+import { PromptSelectorButton } from './PromptSelectorButton';
 
 interface PermissionModeMenuProps {
   value: CoworkPermissionMode;
@@ -42,15 +42,12 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
         nativeButton={true}
         disabled={disabled}
         render={
-          <PromptInputButton
+          <PromptSelectorButton
             disabled={disabled}
-            aria-label={i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}
-            className={compact ? 'gap-1 px-2' : 'sidebar-interactive-surface gap-1 px-2 text-sm'}
-          >
-            <TriggerIcon className="size-4 text-foreground" />
-            {!compact && <span>{i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}</span>}
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </PromptInputButton>
+            compact={compact}
+            label={i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}
+            icon={<TriggerIcon className="size-4" />}
+          />
         }
       />
       <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56 p-2">

@@ -43,6 +43,7 @@ import {
   SidebarAnimatedSearchIcon,
   type SidebarAnimatedSearchIconHandle,
 } from './icons/SidebarAnimatedSearchIcon';
+import { ShellIconButton } from './shell/ShellIconButton';
 import { SidebarAnimatedPanelLeftCloseIcon } from './icons/SidebarAnimatedPanelLeftCloseIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
@@ -542,16 +543,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className="logo-dark h-5 w-auto select-none"
                 />
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
+              <ShellIconButton
                 onClick={onToggleCollapse}
-                className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-                aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
+                label={i18nService.t(isCollapsed ? 'expand' : 'collapse')}
               >
                 <SidebarAnimatedPanelLeftCloseIcon />
-              </Button>
+              </ShellIconButton>
             </div>
             <SidebarNavigationControls
               activeView={activeView}
