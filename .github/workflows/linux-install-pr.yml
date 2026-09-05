@@ -1,15 +1,14 @@
 name: Linux install and startup gate
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      MODELSCOPE_TOKENS:
+        required: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: linux-install-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
