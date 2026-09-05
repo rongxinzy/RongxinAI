@@ -293,19 +293,24 @@ interface ProvidersImportPayload {
   providers?: Record<string, ProvidersImportEntry>;
 }
 
-const LOCAL_NO_KEY_PROVIDERS = new Set<ProviderType>([
+const NO_USER_KEY_PROVIDERS = new Set<ProviderType>([
+  ProviderName.Zhiyuan,
   ProviderName.Ollama,
   ProviderName.LlamaCpp,
   'github-copilot',
 ]);
 
 const providerRequiresApiKey = (provider: ProviderType) =>
-  !LOCAL_NO_KEY_PROVIDERS.has(provider) && !isCustomProvider(provider);
+  !NO_USER_KEY_PROVIDERS.has(provider) && !isCustomProvider(provider);
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
   if (isCustomProvider(provider)) {
     return config.baseUrl.trim().length > 0;
   }
-  if (provider === ProviderName.Ollama || provider === ProviderName.LlamaCpp) {
+  if (
+    provider === ProviderName.Zhiyuan ||
+    provider === ProviderName.Ollama ||
+    provider === ProviderName.LlamaCpp
+  ) {
     return true;
   }
 
@@ -450,7 +455,12 @@ const shouldAutoSwitchProviderBaseUrl = (
   );
 };
 const shouldShowProviderModels = (providerKey: string, providerConfig: ProviderConfig): boolean => {
-  if (providerKey === ProviderName.Ollama || providerKey === ProviderName.LlamaCpp) return true;
+  if (
+    providerKey === ProviderName.Zhiyuan ||
+    providerKey === ProviderName.Ollama ||
+    providerKey === ProviderName.LlamaCpp
+  )
+    return true;
   if (isCustomProvider(providerKey)) return Boolean(providerConfig.baseUrl?.trim());
   return Boolean(providerConfig.apiKey?.trim());
 };
@@ -1986,9 +1996,11 @@ const Settings: React.FC<SettingsProps> = ({
             providerConfig,
           );
           const normalizedEnabled =
-            providerKey === ProviderName.LlamaCpp
-              ? providerConfig.userEnabled === true
-              : providerConfig.enabled && hasValidAuth;
+            providerKey === ProviderName.Zhiyuan
+              ? true
+              : providerKey === ProviderName.LlamaCpp
+                ? providerConfig.userEnabled === true
+                : providerConfig.enabled && hasValidAuth;
           return [
             providerKey,
             {

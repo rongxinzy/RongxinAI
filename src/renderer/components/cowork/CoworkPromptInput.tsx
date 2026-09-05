@@ -692,6 +692,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       if (result === false) {
         // Submission rejected — restore the prompt so the user can retry.
         setValue(finalPrompt);
+        dispatch(setDraftPrompt({ sessionId: draftKey, draft: finalPrompt }));
+        dispatch(setDraftAttachments({ draftKey, attachments }));
       } else if (activeSkills.length > 0) {
         // Skills describe this one input only. Clear their selection after a
         // successful send so the next message starts with a clean context.
