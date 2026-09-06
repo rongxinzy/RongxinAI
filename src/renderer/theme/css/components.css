@@ -371,8 +371,6 @@ select::-ms-expand {
 
 /* Skeleton loading */
 .skeleton {
-  background-color: var(--zy-surface-raised);
-  @apply rounded;
   position: relative;
   overflow: hidden;
 }
@@ -381,8 +379,7 @@ select::-ms-expand {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, var(--zy-component-shimmer), transparent);
-  animation: shimmer 1.5s infinite;
+
 }
 
 /* Respect reduced-motion preference */
@@ -396,64 +393,10 @@ select::-ms-expand {
   }
 }
 
-/* Switch: shadcn uses hsl(var(--primary)) → hsl(#3B82F6) = invalid CSS with zhiyuan hex values.
-   Define track colors and transition directly, bypassing the broken hsl() wrapper.
-   !important required — base-ui may strip transition classes at runtime. */
-[data-slot='switch'] {
-  transition:
-    background-color 200ms ease,
-    box-shadow 200ms ease !important;
-}
-[data-slot='switch'][data-unchecked] {
-  background-color: var(--zy-surface-raised);
-  box-shadow: var(--shadow-inset);
-}
-[data-fluid-switch][data-slot='switch'][data-unchecked]:hover {
-  background-color: color-mix(in oklab, var(--zy-surface-raised), var(--zy-text-primary) 8%);
-}
-[data-slot='switch'][data-checked] {
-  background-color: var(--zy-switch-track-checked);
-}
-[data-fluid-switch][data-slot='switch'][data-checked]:hover {
-  background-color: var(--zy-switch-track-checked-hover);
-}
-[data-fluid-switch] [data-slot='switch-thumb'] {
-  background-color: var(--color-white) !important;
-  transition: translate 200ms ease !important;
-}
+/* Work/Chat positioning is shared; its appearance values belong to the package. */
 [data-mode='work-chat'] [data-slot='switch-thumb'] {
-  background-color: var(--zy-primary-foreground) !important;
+  background-color: var(--zy-style-work-chat-thumb) !important;
 }
-/* Normal thumbs are positioned by Motion; the Work/Chat variant below keeps
-   its existing translate utility classes and dedicated left-position rules. */
-
-/* Slider: zhiyuan theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
-[data-slot='slider-track'] {
-  background-color: var(--zy-surface-raised);
-}
-[data-slot='slider-indicator'] {
-  background-color: var(--zy-primary);
-}
-[data-slot='slider-thumb'] {
-  background-color: var(--zy-surface);
-  border-color: var(--zy-primary);
-}
-[data-slot='slider-thumb']:focus-visible {
-  box-shadow: 0 0 0 2px var(--zy-primary-muted);
-}
-
-[data-slot='progress-track'] {
-  background-color: var(--zy-surface-raised);
-}
-[data-slot='progress-indicator'] {
-  background-color: var(--zy-primary);
-}
-
-[data-slot='toggle'][aria-pressed='true'] {
-  background-color: var(--zy-surface-raised);
-  color: var(--zy-foreground);
-}
-
 /* Base UI select popup dimensions use runtime CSS variables. */
 [data-slot='select-content'] {
   width: var(--anchor-width) !important;
@@ -490,7 +433,7 @@ select::-ms-expand {
 [data-mode='work-chat'] [data-slot='switch-thumb'] {
   width: calc(50% + 4px) !important;
   height: calc(100% + 4px) !important;
-  border-radius: 9999px !important;
+  border-radius: var(--zy-style-work-chat-thumb-radius) !important;
   box-shadow: var(--shadow-card) !important;
   position: absolute !important;
   transition: left 200ms ease !important;

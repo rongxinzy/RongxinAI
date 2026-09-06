@@ -39,7 +39,7 @@ export function MarketplaceModelCardSkeleton() {
       loading
       header={
         <>
-          <Skeleton className="size-10 shrink-0 rounded-lg" />
+          <Skeleton className="theme-scene-market-loading shrink-0" />
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-4 w-24" />

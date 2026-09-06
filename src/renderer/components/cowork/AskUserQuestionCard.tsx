@@ -162,8 +162,8 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                         key={option.label}
                         htmlFor={optionId}
                         className={cn(
-                          'cursor-pointer rounded-md px-2 py-1.5 transition-colors hover:bg-muted',
-                          checked && 'bg-muted',
+                          'theme-scene-choice cursor-pointer',
+                          checked && 'theme-scene-choice-selected',
                         )}
                       >
                         <Checkbox
@@ -203,8 +203,8 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                         key={option.label}
                         htmlFor={optionId}
                         className={cn(
-                          'cursor-pointer rounded-md px-2 py-1.5 transition-colors hover:bg-muted',
-                          checked && 'bg-muted',
+                          'theme-scene-choice cursor-pointer',
+                          checked && 'theme-scene-choice-selected',
                         )}
                       >
                         <RadioGroupItem id={optionId} value={option.label} />
@@ -225,7 +225,7 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
               )}
 
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor={otherInputId} className="text-xs text-muted-foreground">
+                <Label htmlFor={otherInputId} className="theme-control-caption-muted">
                   {i18nService.t('coworkQuestionWizardOther')}
                 </Label>
                 <Textarea

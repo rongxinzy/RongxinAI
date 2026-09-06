@@ -25,7 +25,7 @@ const UnsupportedRenderer = React.lazy(() => import('./renderers/UnsupportedRend
  */
 const rendererFallback = (
   <div className="h-full min-h-0 p-4" aria-busy="true">
-    <Skeleton className="h-full w-full rounded-lg" />
+    <Skeleton className="theme-scene-preview-loading h-full w-full" />
   </div>
 );
 

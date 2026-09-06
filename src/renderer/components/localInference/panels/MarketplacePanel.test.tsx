@@ -7,10 +7,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { MARKETPLACE_PAGE_SIZE } from '../constants';
 import { i18nService } from '../../../services/i18n';
 
-import type {
-  MarketplaceModel,
-  MarketplaceSearchParams,
-} from '../../../../shared/marketplace';
+import type { MarketplaceModel, MarketplaceSearchParams } from '../../../../shared/marketplace';
 import { MarketplacePanel } from './MarketplacePanel';
 
 function makeModel(repoName: string, overrides: Partial<MarketplaceModel> = {}): MarketplaceModel {
@@ -146,7 +143,9 @@ describe('MarketplacePanel result grid', () => {
     renderPanel({ hasSearched: true, models, totalCount: 3318 });
 
     expect(screen.queryByText(/3318/)).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /\u5b89\u88c5/ })).toHaveLength(MARKETPLACE_PAGE_SIZE);
+    expect(screen.getAllByRole('button', { name: /\u5b89\u88c5/ })).toHaveLength(
+      MARKETPLACE_PAGE_SIZE,
+    );
   });
   test('does not render a rendered card count in the header', () => {
     const models = [makeModel('alpha'), makeModel('beta')];
@@ -159,7 +158,7 @@ describe('MarketplacePanel result grid', () => {
     // Regression: server reported 7 matches but every model was filtered out
     // (installed/unsupported). The panel must not print "共 7 个模型" over an
     // empty grid — it should show the empty state instead.
-    renderPanel({ hasSearched: true, models: []});
+    renderPanel({ hasSearched: true, models: [] });
 
     expect(screen.queryByText(/共 7 个模型/)).not.toBeInTheDocument();
     expect(screen.getByText(i18nService.t('marketplaceNoModels'))).toBeInTheDocument();
@@ -257,9 +256,7 @@ describe('MarketplacePanel search and filters', () => {
     await user.type(screen.getByPlaceholderText('搜索模型，如 qwen3、deepseek-r1...'), 'qwen3');
     await user.click(screen.getByRole('button', { name: '搜索' }));
 
-    expect(lastSearchCall(onSearch)).toEqual(
-      expect.objectContaining({ query: 'qwen3' }),
-    );
+    expect(lastSearchCall(onSearch)).toEqual(expect.objectContaining({ query: 'qwen3' }));
   });
 
   test('empty state clear button resets to featured recommendations', async () => {
@@ -290,16 +287,9 @@ describe('MarketplacePanel search and filters', () => {
       'border',
       'border-border-subtle',
     );
-    expect(chatTab).toHaveClass(
-      'h-8',
-      'font-normal',
-      'hover:opacity-100',
-    );
+    expect(chatTab).toHaveClass('theme-fluid-tab', 'hover:opacity-100');
     expect(chatTab.querySelector('[data-fluid-tabs-hover-indicator="true"]')).toHaveClass(
-      'bg-surface',
-      'shadow-md',
-      'opacity-0',
-      'group-hover:opacity-100',
+      'theme-fluid-hover-indicator',
     );
   });
 
@@ -328,7 +318,10 @@ describe('MarketplacePanel search and filters', () => {
 
     await user.click(screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' }));
 
-    expect(document.querySelector('[data-slot="select-content"]')).toHaveAttribute('data-side', 'bottom');
+    expect(document.querySelector('[data-slot="select-content"]')).toHaveAttribute(
+      'data-side',
+      'bottom',
+    );
   });
 
   test('all models keep the local fit filter available', () => {

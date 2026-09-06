@@ -56,7 +56,7 @@ export const ChannelWorkspaceField: React.FC<ChannelWorkspaceFieldProps> = ({
           </SelectGroup>
         </SelectContent>
       </Select>
-      <FieldDescription className="text-xs">
+      <FieldDescription className="theme-control-caption">
         {i18nService.t('imChannelWorkspaceHint')}
       </FieldDescription>
     </Field>

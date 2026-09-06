@@ -561,7 +561,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             >
               {loadingArtifactId === selectedArtifact.id ? (
                 <div className="h-full min-h-0 p-4" aria-busy="true">
-                  <Skeleton className="h-full w-full rounded-lg" />
+                  <Skeleton className="theme-scene-preview-loading h-full w-full" />
                 </div>
               ) : artifactLoadError && artifactLoadError === selectedArtifact.id ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm">

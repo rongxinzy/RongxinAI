@@ -20,7 +20,7 @@ test('builds the conversation loading state from shared Skeleton primitives', ()
   expect(view.container.querySelectorAll('[data-slot="session-loading-turn"]')).toHaveLength(4);
   expect(skeletons).toHaveLength(14);
   skeletons.forEach(skeleton => {
-    expect(skeleton).toHaveClass('skeleton', 'animate-none');
+    expect(skeleton).toHaveClass('skeleton', 'theme-skeleton');
     expect(skeleton).not.toHaveClass('animate-pulse');
   });
 });
@@ -32,7 +32,7 @@ test('adds an input placeholder only when no session shell exists yet', () => {
   expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
   expect(skeletons).toHaveLength(17);
   skeletons.forEach(skeleton => {
-    expect(skeleton).toHaveClass('skeleton', 'animate-none');
+    expect(skeleton).toHaveClass('skeleton', 'theme-skeleton');
     expect(skeleton).not.toHaveClass('animate-pulse');
   });
 });

@@ -61,7 +61,9 @@ export function AppearanceSettings({
           }}
         >
           <SelectTrigger aria-label={i18nService.t('themeStyle')}>
-            <SelectValue />
+            <SelectValue>
+              {resolveThemePlugin(styleId).name[i18nService.getLanguage() === 'zh' ? 'zh' : 'en']}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {themePlugins.map(plugin => (

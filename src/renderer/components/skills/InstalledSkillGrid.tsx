@@ -109,7 +109,7 @@ export function InstalledSkillGrid({
 
 function SkillIcon({ skill }: { skill: Skill }) {
   return (
-    <Avatar className="size-10 shrink-0 rounded-xl bg-muted">
+    <Avatar className="theme-scene-skill-avatar shrink-0">
       {skill.iconUrl && (
         <AvatarImage
           src={resolveSkillIconUrl(skill.iconUrl)}
@@ -117,7 +117,7 @@ function SkillIcon({ skill }: { skill: Skill }) {
           className="m-auto size-8 rounded-lg object-contain"
         />
       )}
-      <AvatarFallback className="rounded-lg text-xl font-semibold text-muted-foreground">
+      <AvatarFallback className="theme-scene-skill-fallback">
         {getSkillInitial(skill.displayName || skill.name)}
       </AvatarFallback>
     </Avatar>

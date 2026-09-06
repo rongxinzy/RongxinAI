@@ -305,7 +305,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                       }}
                       className="theme-control-sizing-15 items-start gap-2"
                     >
-                      <Avatar className="size-8 shrink-0 rounded-md bg-muted after:rounded-md">
+                      <Avatar className="theme-scene-prompt-avatar shrink-0">
                         {skill.iconUrl && (
                           <AvatarImage
                             src={resolveSkillIconUrl(skill.iconUrl)}
@@ -313,7 +313,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                             className="m-auto size-6 rounded-sm object-contain"
                           />
                         )}
-                        <AvatarFallback className="rounded-md text-base font-semibold text-muted-foreground">
+                        <AvatarFallback className="theme-scene-prompt-avatar-fallback">
                           {getSkillInitial(skill.displayName || skill.name)}
                         </AvatarFallback>
                       </Avatar>

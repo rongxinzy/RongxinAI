@@ -77,7 +77,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
         {embeddingEnabled && (
           <div className="space-y-3 pt-2">
             <div>
-              <Label className="text-xs">{i18nService.t('coworkMemoryEmbeddingProvider')}</Label>
+              <Label className="theme-control-caption">{i18nService.t('coworkMemoryEmbeddingProvider')}</Label>
               <Select
                 value={embeddingProvider}
                 onValueChange={v => onEmbeddingProviderChange(v ?? 'openai')}
@@ -99,7 +99,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
             </div>
 
             <div>
-              <Label className="text-xs">{i18nService.t('coworkMemoryEmbeddingModel')}</Label>
+              <Label className="theme-control-caption">{i18nService.t('coworkMemoryEmbeddingModel')}</Label>
               <Input
                 value={embeddingModel}
                 onChange={e => onEmbeddingModelChange(e.target.value)}
@@ -112,7 +112,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
             </div>
 
             <div>
-              <Label className="text-xs">
+              <Label className="theme-control-caption">
                 {i18nService.t('coworkMemoryEmbeddingRemoteBaseUrl')}
               </Label>
               <Input
@@ -127,7 +127,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
             </div>
 
             <div>
-              <Label className="text-xs">
+              <Label className="theme-control-caption">
                 {i18nService.t('coworkMemoryEmbeddingRemoteApiKey')}
               </Label>
               <Input
@@ -155,7 +155,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-3 pt-3">
                 <div>
-                  <Label className="text-xs">
+                  <Label className="theme-control-caption">
                     {i18nService.t('coworkMemoryEmbeddingWeight')}:{' '}
                     {embeddingVectorWeight.toFixed(2)}
                   </Label>

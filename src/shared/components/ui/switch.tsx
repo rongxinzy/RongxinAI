@@ -4,6 +4,8 @@ import { animate, motion, useMotionValue, useReducedMotion, type Transition } fr
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -22,6 +24,11 @@ interface SwitchGeometry {
   trackHeight: number;
   thumbSize: number;
   thumbOffset: number;
+  borderWidth: number;
+  hoverExtend: number;
+  pressExtend: number;
+  pressShrink: number;
+  motionMs: number;
 }
 
 const SWITCH_GEOMETRY: Record<SwitchSize, SwitchGeometry> = {
@@ -30,25 +37,26 @@ const SWITCH_GEOMETRY: Record<SwitchSize, SwitchGeometry> = {
     trackHeight: 20,
     thumbSize: 16,
     thumbOffset: 1,
+    borderWidth: 1,
+    hoverExtend: 2,
+    pressExtend: 4,
+    pressShrink: 4,
+    motionMs: 160,
   },
   sm: {
     trackWidth: 24,
     trackHeight: 14,
     thumbSize: 12,
     thumbOffset: 1,
+    borderWidth: 1,
+    hoverExtend: 2,
+    pressExtend: 4,
+    pressShrink: 4,
+    motionMs: 160,
   },
 };
 
-const TRACK_BORDER_WIDTH = 1;
-const PILL_EXTEND = 2;
-const PRESS_EXTEND = 4;
-const PRESS_SHRINK = 4;
 const DRAG_DEAD_ZONE = 2;
-const DEFAULT_THUMB_TRANSITION: Transition = {
-  type: 'spring',
-  duration: 0.16,
-  bounce: 0,
-};
 
 type SwitchProps = SwitchPrimitive.Root.Props & {
   'data-mode'?: (typeof SwitchMode)[keyof typeof SwitchMode];
@@ -71,17 +79,65 @@ function Switch({
   onPointerMove,
   onPointerUp,
   readOnly = false,
+  ref,
   size = 'default',
   thumbTransition,
   ...props
 }: SwitchProps) {
   const isWorkChat = dataMode === SwitchMode.WorkChat;
-  const geometry = SWITCH_GEOMETRY[size];
-  const trackContentWidth = geometry.trackWidth - TRACK_BORDER_WIDTH * 2;
+  const rootRef = useRef<HTMLButtonElement>(null);
+  useImperativeHandle(ref, () => rootRef.current!, []);
+  const [geometry, setGeometry] = useState(SWITCH_GEOMETRY[size]);
+  useLayoutEffect(() => {
+    const element = rootRef.current;
+    if (!element || isWorkChat) return;
+    const measure = () => {
+      const css = getComputedStyle(element);
+      const fallback = SWITCH_GEOMETRY[size];
+      const number = (name: string, fallbackValue: number) => {
+        const value = parseFloat(css.getPropertyValue(`--zy-style-switch-${name}`));
+        return Number.isFinite(value) && value >= 0 ? value : fallbackValue;
+      };
+      const next: SwitchGeometry = {
+        trackWidth: element.offsetWidth || fallback.trackWidth,
+        trackHeight: element.offsetHeight || fallback.trackHeight,
+        borderWidth: parseFloat(css.borderLeftWidth) || 0,
+        thumbSize: number(size === 'sm' ? 'thumb-size-sm' : 'thumb-size', fallback.thumbSize),
+        thumbOffset: number('thumb-offset', fallback.thumbOffset),
+        hoverExtend: number('hover-extend', fallback.hoverExtend),
+        pressExtend: number('press-extend', fallback.pressExtend),
+        pressShrink: number('press-shrink', fallback.pressShrink),
+        motionMs: number('motion-ms', fallback.motionMs),
+      };
+      setGeometry(previous =>
+        Object.keys(next).every(
+          key => previous[key as keyof SwitchGeometry] === next[key as keyof SwitchGeometry],
+        )
+          ? previous
+          : next,
+      );
+    };
+    measure();
+    const resize = new ResizeObserver(measure);
+    resize.observe(element);
+    const theme = new MutationObserver(measure);
+    theme.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'class', 'style'],
+    });
+    return () => {
+      resize.disconnect();
+      theme.disconnect();
+    };
+  }, [isWorkChat, size]);
+  const trackContentWidth = geometry.trackWidth - geometry.borderWidth * 2;
   const prefersReducedMotion = useReducedMotion();
   const transition = useMemo<Transition>(
-    () => (prefersReducedMotion ? { duration: 0 } : (thumbTransition ?? DEFAULT_THUMB_TRANSITION)),
-    [prefersReducedMotion, thumbTransition],
+    () =>
+      prefersReducedMotion
+        ? { duration: 0 }
+        : (thumbTransition ?? { type: 'spring', duration: geometry.motionMs / 1000, bounce: 0 }),
+    [prefersReducedMotion, thumbTransition, geometry.motionMs],
   );
   const [uncontrolledChecked, setUncontrolledChecked] = useState(defaultChecked ?? false);
   const [hovered, setHovered] = useState(false);
@@ -108,14 +164,16 @@ function Switch({
   const thumbWidth = prefersReducedMotion
     ? geometry.thumbSize
     : pressed
-      ? geometry.thumbSize + PRESS_EXTEND
+      ? geometry.thumbSize + geometry.pressExtend
       : hovered
-        ? geometry.thumbSize + PILL_EXTEND
+        ? geometry.thumbSize + geometry.hoverExtend
         : geometry.thumbSize;
   const thumbHeight =
-    prefersReducedMotion || !pressed ? geometry.thumbSize : geometry.thumbSize - PRESS_SHRINK;
+    prefersReducedMotion || !pressed
+      ? geometry.thumbSize
+      : geometry.thumbSize - geometry.pressShrink;
   const thumbY =
-    (geometry.trackHeight - TRACK_BORDER_WIDTH * 2 - geometry.thumbSize) / 2 +
+    (geometry.trackHeight - geometry.borderWidth * 2 - geometry.thumbSize) / 2 +
     (geometry.thumbSize - thumbHeight) / 2;
   const thumbX = currentChecked
     ? trackContentWidth - geometry.thumbOffset - thumbWidth
@@ -176,10 +234,13 @@ function Switch({
       if (!dragging.current) {
         if (Math.abs(delta) < DRAG_DEAD_ZONE) return;
         dragging.current = true;
+        // Pointer movement owns the position once dragging starts. Stop an
+        // in-flight toggle/press animation before it can overwrite motionX.
+        motionX.stop();
       }
 
       const dragMin = geometry.thumbOffset;
-      const pressedThumbWidth = geometry.thumbSize + PRESS_EXTEND;
+      const pressedThumbWidth = geometry.thumbSize + geometry.pressExtend;
       const dragMax = trackContentWidth - geometry.thumbOffset - pressedThumbWidth;
       const rawX = pointerStart.current.originX + delta;
       motionX.set(Math.max(dragMin, Math.min(dragMax, rawX)));
@@ -195,7 +256,7 @@ function Switch({
       if (dragging.current) {
         didDrag.current = true;
         const dragMin = geometry.thumbOffset;
-        const pressedThumbWidth = geometry.thumbSize + PRESS_EXTEND;
+        const pressedThumbWidth = geometry.thumbSize + geometry.pressExtend;
         const dragMax = trackContentWidth - geometry.thumbOffset - pressedThumbWidth;
         const shouldBeChecked = motionX.get() > (dragMin + dragMax) / 2;
 
@@ -248,6 +309,7 @@ function Switch({
 
   return (
     <SwitchPrimitive.Root
+      ref={rootRef}
       data-slot="switch"
       data-size={size}
       data-mode={dataMode}
@@ -279,16 +341,13 @@ function Switch({
       onPointerMove={isWorkChat ? onPointerMove : handlePointerMove}
       onPointerUp={isWorkChat ? onPointerUp : handlePointerUp}
       className={cn(
-        'peer group/switch relative inline-flex shrink-0 cursor-pointer touch-none items-center rounded-full border border-transparent outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=default]:h-5 data-[size=default]:w-[34px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-disabled:opacity-50',
+        'theme-switch peer group/switch relative inline-flex shrink-0 cursor-pointer touch-none items-center after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
         className,
       )}
       {...props}
     >
       {isWorkChat ? (
-        <SwitchPrimitive.Thumb
-          data-slot="switch-thumb"
-          className="pointer-events-none block rounded-full bg-background ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0 dark:data-unchecked:bg-foreground"
-        />
+        <SwitchPrimitive.Thumb data-slot="switch-thumb" className="pointer-events-none block" />
       ) : (
         <SwitchPrimitive.Thumb
           data-slot="switch-thumb"
@@ -307,7 +366,7 @@ function Switch({
             return (
               <motion.span
                 {...rest}
-                className="pointer-events-none absolute top-0 left-0 block rounded-full ring-0"
+                className="theme-switch-thumb pointer-events-none absolute top-0 left-0 block"
                 initial={false}
                 style={{
                   ...(baseStyle as CSSProperties | undefined),

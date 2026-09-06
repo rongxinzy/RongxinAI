@@ -149,7 +149,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
   const isEmpty = displayedRuns.length === 0;
 
   return (
-    <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border bg-card p-4">
+    <ScrollArea className="theme-scene-history min-h-0 flex-1">
       <div>
         {/* Filter area */}
         <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -210,13 +210,13 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-1/3 text-muted-foreground">
+                <TableHead className="theme-scene-history-head-start w-1/3">
                   {i18nService.t('scheduledTasksHistoryColTitle')}
                 </TableHead>
-                <TableHead className="w-1/3 text-center text-muted-foreground">
+                <TableHead className="theme-scene-history-head-center w-1/3 text-center">
                   {i18nService.t('scheduledTasksHistoryColTime')}
                 </TableHead>
-                <TableHead className="w-1/3 text-right text-muted-foreground">
+                <TableHead className="theme-scene-history-head-end w-1/3 text-right">
                   <span className="ml-auto block w-14 text-center">
                     {i18nService.t('scheduledTasksHistoryColStatus')}
                   </span>
@@ -230,7 +230,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
                 return (
                   <TableRow
                     key={run.id}
-                    className={isClickable ? 'cursor-pointer hover:bg-muted' : 'hover:bg-muted'}
+                    className={isClickable ? 'theme-scene-history-row cursor-pointer' : 'theme-scene-history-row'}
                     onClick={() => handleRowClick(run)}
                   >
                     <TableCell className="w-1/3 min-w-0">

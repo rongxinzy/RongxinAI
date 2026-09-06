@@ -170,7 +170,7 @@ export const CodingAgentManager = ({
             <ScrollArea className="h-full">
               <div className="p-6 pt-4">
                 {profiles.length === 0 ? (
-                  <Empty className="min-h-80 border border-border">
+                  <Empty className="theme-scene-coding-empty min-h-80">
                     <EmptyHeader>
                       <EmptyMedia variant="icon">
                         <Bot />

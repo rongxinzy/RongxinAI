@@ -131,3 +131,32 @@ Tabs list surfaces, trigger dimensions, typography, states, icon sizing and line
 | User choices stay limited to whole theme and mode | `AppearanceSettings` exposes only package selection and light/dark/system choices; individual component/background preferences are absent. |
 
 The source inventories are heuristics, not a substitute for rendered verification. Remaining parent-fill dimensions, flex shrink resets, popup viewport bounds and indicator layout coordinates express relationships and stay in shared code. Theme data does not control events, focus order, hit testing, DOM structure or persistence.
+
+
+### 大明风华
+
+`themes/daming.ts` 注册纸白和墨夜两种外观。以纸白、朱红和墨色组织主界面，玉色、古铜色与青灰色承担状态和分类。仅页面标题使用本机宋体字体栈，正文与操作控件保持系统无衬线。主画布使用包内静态纸纹；墨夜不启用纸纹。背景、颜色和形状均属于主题定义，不提供独立设置。
+
+共享的 FluidTabs、Checkbox、Slider、Progress、Switch、RadioGroup 和 Toggle 通过固定 `theme-*` hooks 消费组件 recipe；页面标题使用 `theme-heading`。拖动位置、进度值和选中状态仍归共享组件管理。新增主题不能替换组件实现或引入业务判断。
+
+
+开关尺寸使用 `style-switch-*` 变量，组件通过元素测量和主题属性观察同步 Motion 坐标；`style-work-chat-thumb` 与 `primary-foreground` 独立。Codex 保留原尺寸与白色滑块，大明风华使用方圆形状。FluidTabs 的指示块跟随实际标签矩形，过渡曲线在 recipe 中定义。
+
+
+#### 覆盖与验收（2026-09-06）
+
+基础控件、展示控件、表单、通知、共享侧栏及业务组合外观均通过固定 hook 消费包内 recipe。`classic-scenes.ts` 管理问答选项、技能/专家头像框、表格与骨架屏等组合；头像图片和第三方品牌内容仍保持原样。旧局部覆盖已从调用点移到包内，交互状态与页面布局继续由共享组件管理。
+
+| 验收范围 | 结果与证据 |
+| --- | --- |
+| 四种外观往返切换 | 真实 React 控件浏览器夹具验证 Codex 浅/深、大明风华浅/深及切回；原节点、选择状态保留。 |
+| 开关、分段选项与选择控件 | 开关默认 34×20px；主题改为 44×26px、20px 滑块后测量同步；立即拖动、键盘、只读、禁用通过。指示块与标签矩形差小于 1px。 |
+| 展示、表单与组合 | 表格选中/悬停、末行边框、头像尺寸、字段禁用/错误去重/整卡选中、问答选项、本地访问开关、通知圆角、滚动区键盘焦点通过。 |
+| 共享侧栏 | 空/字符串 data-active 均识别；选中字重 500，常规/大号高度 32/48px，折叠恢复为 32×32px，操作按钮显隐正确。 |
+| 动效 | Spinner、Skeleton 和会话扫光由包内隔离 keyframe 提供；减少动态效果时停用。扫光渐变可定制，远程 URL 仍被契约拒绝。 |
+| 色板完整性 | 语义侧栏、图表、旧 amber/yellow/red 映射到包内角色；正文、次要文字、主要按钮、成功/警告/危险文字的指定表面对比度测试通过。 |
+| 实机页面 | 最新生产构建通过 Computer Use 检查纸白/墨夜模型市场、设置、搜索、会话，以及纸白专家、技能、自动化空状态和创建表单。 |
+| 实机功能 | 保存大明风华后免费模型回复 DAMINGOK；搜索 Return 跳转成功；已有草稿在保存切回 Codex 后保持原文。启动读取已保存的大明风华墨夜成功。 |
+| 自动检查 | Renderer/shared 176 个测试文件、886 项测试通过；lint、主题生成一致性/样式审计、TypeScript、生产构建和体积预算通过。启动图 1.60 MiB。 |
+
+扩展 JSX 控件调用点和交互表面审计均无剩余命中，但这些清单属于启发式证据。实机验收覆盖上表场景，不代表执行过所有 IPC、模型安装、外部渠道或导出格式。主题不修改这些业务流程；OS 原生窗口、用户文档、第三方预览与品牌原图不在重着色范围内。

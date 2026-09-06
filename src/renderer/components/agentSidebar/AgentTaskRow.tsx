@@ -230,7 +230,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                   <Share className="h-3.5 w-3.5" /> {i18nService.t('coworkShareSession')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-red-500 focus:text-red-500"
+                  variant="destructive"
                   onClick={() => setShowConfirmDelete(true)}
                 >
                   <Trash2 className="h-3.5 w-3.5" /> {i18nService.t('deleteSession')}

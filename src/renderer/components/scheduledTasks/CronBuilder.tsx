@@ -299,7 +299,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
             className="w-full"
             spellCheck={false}
           />
-          <FieldDescription className="text-xs">
+          <FieldDescription className="theme-control-caption">
             {i18nService.t(
               'scheduledTasksFormCronInputHint' as Parameters<typeof i18nService.t>[0],
             )}
@@ -366,7 +366,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
 
       {/* Optional timezone */}
       <div className="flex flex-col gap-1">
-        <FieldLabel htmlFor="scheduled-task-cron-timezone" className="text-xs">
+        <FieldLabel htmlFor="scheduled-task-cron-timezone" className="theme-control-caption">
           {i18nService.t('scheduledTasksFormCronTimezone' as Parameters<typeof i18nService.t>[0])}
           <span className="ml-1 text-muted-foreground font-normal">
             {i18nService.t('scheduledTasksFormOptional')}
