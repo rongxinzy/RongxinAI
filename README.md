@@ -67,7 +67,7 @@ Tool execution follows the selected permission mode. Operations requiring approv
 
 ## Choose your workspace appearance
 
-ZhiYuan includes **Codex** and **Daming Fenghua** themes. Codex uses neutral surfaces and compact controls. Daming Fenghua combines paper white, cinnabar, and ink with jade, bronze, and a dark ink appearance.
+ZhiYuan includes **Codex**, **Daming Fenghua**, and **Changan Fengwu** themes. Codex uses neutral surfaces and compact controls. Daming Fenghua combines paper white, cinnabar, and ink. Changan Fengwu adds silk white, peacock green, warm bronze, rounder controls, and a deep green night appearance.
 
 In **Settings → Appearance**, select a theme preview card and choose light, dark, or system mode. Every card updates with the selected mode. Backgrounds, textures, typography, shapes, controls, and interaction states belong to the complete theme package.
 

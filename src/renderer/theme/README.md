@@ -60,7 +60,7 @@ background: {
 // Or: kind: BackgroundKind.Texture, texture: BackgroundTexture.Paper
 ```
 
-Images must be bundled assets (Vite imports or public theme assets) or inline raster data. Paper uses a static procedural SVG grain; grid/dots use CSS paints. Opacity is applied to the background layer only. Page canvases reveal the layer while cards, editors, inputs and portal dialogs retain their own surfaces. Switching to a theme without a background clears the previous image, color and opacity. Light and dark appearances may define different backgrounds. These backgrounds do not change OS-native windows or exported document styling.
+Images must be bundled assets (Vite imports or public theme assets) or inline raster data. Paper uses a static procedural SVG grain; grid/dots/silk use CSS paints. Opacity is applied to the background layer only. Page canvases reveal the layer while cards, editors, inputs and portal dialogs retain their own surfaces. Switching to a theme without a background clears the previous image, color and opacity. Light and dark appearances may define different backgrounds. These backgrounds do not change OS-native windows or exported document styling.
 
 ## Component appearance recipes
 
@@ -160,3 +160,12 @@ The source inventories are heuristics, not a substitute for rendered verificatio
 | 自动检查 | Renderer/shared 176 个测试文件、886 项测试通过；lint、主题生成一致性/样式审计、TypeScript、生产构建和体积预算通过。启动图 1.60 MiB。 |
 
 扩展 JSX 控件调用点和交互表面审计均无剩余命中，但这些清单属于启发式证据。实机验收覆盖上表场景，不代表执行过所有 IPC、模型安装、外部渠道或导出格式。主题不修改这些业务流程；OS 原生窗口、用户文档、第三方预览与品牌原图不在重着色范围内。
+
+
+### 长安风物
+
+`themes/changan.ts` 提供绢白与夜阑两套外观，复用共享交互与完整组件 recipe。主操作使用孔雀青，辅助色为古金、玉色与赭红；卡片、弹层及输入区使用更圆润的轮廓，普通开关保持胶囊形。字号和操作尺寸保留共享基线。
+
+背景使用 `BackgroundTexture.Silk` 的静态经纬线绘制，浅色透明度 0.045、深色 0.025。它复用背景图层，不引入图片请求、动画或独立用户设置。预览卡片通过同一背景定义绘制，跟随当前明暗模式。新增包无需添加设置页业务分支。
+
+验收记录：Renderer/shared 177 个测试文件、891 项测试通过；lint、主题生成一致性、样式审计、生产构建和体积预算通过，启动图 1.61 MiB。真实 React 控件夹具验证六种外观往返切换、选择状态、开关尺寸与滑块对比度、组合边框、键盘焦点和减少动态效果。Computer Use 在隔离配置的 Electron 生产构建中检查三套主题预览、长安风物浅/深外观、保存后主界面、搜索弹层及结果跳转、已有会话内容。此次未重新执行模型安装或外部渠道流程。
