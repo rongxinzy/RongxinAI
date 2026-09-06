@@ -6,6 +6,16 @@ const appearanceVariables = new Set<string>([
 
 /** Stable component hooks. Theme packages cannot supply selectors or behavior. */
 export const COMPONENT_SELECTORS = {
+  'appearance-preview-frame': '.theme-appearance-preview-frame',
+  'appearance-preview-sidebar': '.theme-appearance-preview-sidebar',
+  'appearance-preview-main': '.theme-appearance-preview-main',
+  'appearance-preview-line': '.theme-appearance-preview-line',
+  'appearance-preview-muted': '.theme-appearance-preview-muted',
+  'appearance-preview-selection': '.theme-appearance-preview-selection',
+  'appearance-preview-message': '.theme-appearance-preview-message',
+  'appearance-preview-composer': '.theme-appearance-preview-composer',
+  'appearance-preview-send': '.theme-appearance-preview-send',
+  'appearance-preview-check': '.theme-appearance-preview-check',
   radio: '.theme-radio',
   'radio-checked-invalid': '.theme-radio[aria-checked="true"]',
   'radio-indicator': '.theme-radio-indicator',
@@ -925,6 +935,7 @@ export const COMPONENT_SELECTORS = {
   'tabs-vertical-indicator':
     '[data-slot="tabs"][data-orientation="vertical"] .theme-tabs-trigger::after',
   'tabs-content': '.theme-tabs-content',
+  'appearance-mode-tab': '.theme-appearance-mode-tabs .theme-fluid-tab',
   'page-tabs-list': '.theme-page-tabs-list',
   'page-tabs-trigger': '.theme-page-tabs-trigger',
   'page-tabs-indicator': '.theme-page-tabs-indicator',

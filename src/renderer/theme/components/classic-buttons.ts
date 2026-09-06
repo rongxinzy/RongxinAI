@@ -96,7 +96,7 @@ export function classicButtons(dark: boolean): ButtonAppearances {
       hover: { 'background-color': 'var(--muted)' },
       selected: {
         'border-color': 'var(--primary)',
-        'background-color': 'var(--zy-primary-muted)',
+        'background-color': 'var(--background)',
         color: 'var(--primary)',
       },
     }),
