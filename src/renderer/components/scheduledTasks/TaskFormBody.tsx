@@ -151,7 +151,7 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
               </SelectGroup>
             </SelectContent>
           </Select>
-          <FieldDescription className="text-xs">
+          <FieldDescription className="theme-control-caption">
             {i18nService.t('scheduledTasksFormWorkspaceHint')}
           </FieldDescription>
           <FieldError>{errors.workspaceId}</FieldError>
@@ -187,7 +187,7 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
               </SelectGroup>
             </SelectContent>
           </Select>
-          <FieldDescription className="text-xs">
+          <FieldDescription className="theme-control-caption">
             {i18nService.t(
               `scheduledTasksFormSessionBinding${
                 sessionBinding === SessionBindingStrategy.PerRun
@@ -245,7 +245,7 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
             placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
             aria-invalid={Boolean(errors.payloadText)}
           />
-          <FieldDescription className="text-xs">
+          <FieldDescription className="theme-control-caption">
             {i18nService.t('scheduledTasksFormPayloadTextAgentHint')}
           </FieldDescription>
           <FieldError>{errors.payloadText}</FieldError>

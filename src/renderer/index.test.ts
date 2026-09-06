@@ -1,52 +1,29 @@
-import fs from 'fs';
-import path from 'path';
 import { expect, test } from 'vitest';
 import { classicDark } from './theme/themes/classic-dark';
 import { classicLight } from './theme/themes/classic-light';
+import { generateThemeCSS } from './theme/engine/css-generator';
 
-test('fluid switch thumbs stay pure white across interaction states', () => {
-  const css = fs.readFileSync(
-    path.join(process.cwd(), 'src', 'renderer', 'theme', 'css', 'components.css'),
-    'utf-8',
-  );
-
-  expect(css).toMatch(
-    /\[data-fluid-switch\] \[data-slot='switch-thumb'\]\s*\{\s*background-color: var\(--color-white\) !important;/,
-  );
-  expect(css).not.toMatch(
-    /\[data-fluid-switch\][^{]*:hover[^{]*\[data-slot='switch-thumb'\][^{]*\{[^}]*background-color:/,
-  );
-});
-
-test('work chat switch keeps its existing thumb token', () => {
-  const css = fs.readFileSync(
-    path.join(process.cwd(), 'src', 'renderer', 'theme', 'css', 'components.css'),
-    'utf-8',
-  );
-
-  expect(css).toMatch(
-    /\[data-mode='work-chat'\] \[data-slot='switch-thumb'\]\s*\{\s*background-color: var\(--zy-primary-foreground\) !important;/,
-  );
-});
-
-test('checked switch tracks use the primary accent in both themes', () => {
-  const css = fs.readFileSync(
-    path.join(process.cwd(), 'src', 'renderer', 'theme', 'css', 'components.css'),
-    'utf-8',
-  );
-  const themeCss = fs.readFileSync(
-    path.join(process.cwd(), 'src', 'renderer', 'theme', 'css', 'themes.css'),
-    'utf-8',
-  );
-
-  expect(css).toContain('background-color: var(--zy-switch-track-checked);');
-  expect(css).toContain('background-color: var(--zy-switch-track-checked-hover);');
-  expect(classicLight.tokens['switch-track-checked']).toBe('var(--zy-primary)');
-  expect(classicLight.tokens['switch-track-checked-hover']).toBe('var(--zy-primary-hover)');
-  expect(classicDark.tokens['switch-track-checked']).toBe('var(--zy-primary)');
-  expect(classicDark.tokens['switch-track-checked-hover']).toBe('var(--zy-primary-hover)');
-  expect(themeCss.match(/--zy-switch-track-checked: var\(--zy-primary\);/g)).toHaveLength(2);
-  expect(
-    themeCss.match(/--zy-switch-track-checked-hover: var\(--zy-primary-hover\);/g),
-  ).toHaveLength(2);
+test('Codex switch retains white thumbs, accent tracks and original dimensions', () => {
+  for (const theme of [classicLight, classicDark]) {
+    const t = theme.tokens;
+    const c = theme.components;
+    expect(t['style-switch-thumb']).toBe('#ffffff');
+    expect(t['style-work-chat-thumb']).toBe('var(--zy-primary-foreground)');
+    expect(t['style-switch-width']).toBe('34px');
+    expect(t['style-switch-height']).toBe('20px');
+    expect(t['style-switch-thumb-size']).toBe('16px');
+    expect(t['style-switch-width-sm']).toBe('24px');
+    expect(t['style-switch-height-sm']).toBe('14px');
+    expect(t['style-switch-thumb-size-sm']).toBe('12px');
+    expect(c['switch-thumb'].base['background-color']).toBe('var(--zy-style-switch-thumb)');
+    expect(c['switch-thumb'].hover).toEqual({});
+    expect(c['switch-checked'].base['background-color']).toBe('var(--zy-switch-track-checked)');
+    expect(c['switch-fluid-checked'].hover['background-color']).toBe(
+      'var(--zy-switch-track-checked-hover)',
+    );
+    const css = generateThemeCSS(theme);
+    expect(css.indexOf(':where(.theme-switch[data-checked]) {')).toBeLessThan(
+      css.indexOf(':where(.theme-switch[data-fluid-switch][data-checked]):where('),
+    );
+  }
 });

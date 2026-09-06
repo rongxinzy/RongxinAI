@@ -311,7 +311,7 @@ function WorkbenchTaskTrajectorySkeleton() {
           <span aria-hidden="true" className="absolute inset-y-0 left-3.5 w-px bg-border" />
           {[0, 1, 2, 3, 4].map(index => (
             <div key={index} className="relative pl-10">
-              <Skeleton className="absolute top-0 left-0 size-7 rounded-full" />
+              <Skeleton className="theme-scene-trajectory-loading absolute top-0 left-0" />
               <div className="flex flex-col gap-2 pt-1.5">
                 <Skeleton className="h-4 w-40" />
                 <Skeleton className="h-3 w-24" />

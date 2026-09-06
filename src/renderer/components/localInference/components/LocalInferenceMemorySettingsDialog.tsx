@@ -71,7 +71,7 @@ export function LocalInferenceMemorySettingsDialog({
         >
           <Label
             htmlFor="llamacpp-memory-policy-auto"
-            className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/50"
+            className="theme-scene-memory-choice flex cursor-pointer items-center gap-3"
           >
             <RadioGroupItem
               id="llamacpp-memory-policy-auto"
@@ -89,7 +89,7 @@ export function LocalInferenceMemorySettingsDialog({
           </Label>
           <Label
             htmlFor="llamacpp-memory-policy-manual"
-            className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 hover:bg-muted/50"
+            className="theme-scene-memory-choice flex cursor-pointer items-center gap-3"
           >
             <RadioGroupItem
               id="llamacpp-memory-policy-manual"
@@ -112,11 +112,11 @@ export function LocalInferenceMemorySettingsDialog({
             <div className="flex items-center justify-between gap-3">
               <Label
                 htmlFor="llamacpp-memory-budget"
-                className="text-sm font-medium text-foreground"
+                className="theme-control-label-strong"
               >
                 {i18nService.t('localInferenceMemoryBudgetPercent')}
               </Label>
-              <span className="text-sm font-medium text-foreground">{memoryBudgetPercent}%</span>
+              <span className="theme-control-label-strong">{memoryBudgetPercent}%</span>
             </div>
             <Slider
               id="llamacpp-memory-budget"

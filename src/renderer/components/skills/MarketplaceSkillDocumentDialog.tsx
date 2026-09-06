@@ -77,9 +77,9 @@ export function MarketplaceSkillDocumentDialog({
       <section className="flex h-[min(32rem,calc(100%-3rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
         <header className="flex h-14 shrink-0 items-center justify-between px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <Avatar className="size-9 rounded-lg">
+            <Avatar className="theme-scene-skill-document-avatar">
               {skill.iconUrl && <AvatarImage src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="object-contain" />}
-              <AvatarFallback className="rounded-lg text-lg font-semibold text-muted-foreground">
+              <AvatarFallback className="theme-scene-skill-document-fallback">
                 {getSkillInitial(skill.name)}
               </AvatarFallback>
             </Avatar>
