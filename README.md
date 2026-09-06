@@ -1,115 +1,88 @@
-# ZhiYuan Agent — Open-source, local-first desktop AI agent
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="public/zhiyuan-logo-dark-1600.png">
-    <img src="public/zhiyuan-logo-light-1600.png" alt="ZhiYuan Agent" width="120">
+    <img src="public/zhiyuan-logo-light-1600.png" alt="ZhiYuan Agent" width="160">
   </picture>
 </p>
 
-<p align="center">
-  <strong>An AI agent that works with your files, terminal, browser, skills, MCP tools, and local models — on your computer.</strong>
-</p>
+<h1 align="center">ZhiYuan Agent</h1>
+
+<p align="center"><strong>Give AI a task. Get work done on your computer.</strong></p>
+<p align="center">Open source · Local first · Files and browser tools · Local models · Reusable workflows</p>
 
 <p align="center">
-  <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=for-the-badge&logo=github&label=Stars" alt="GitHub Stars"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-red.svg?style=for-the-badge" alt="GNU AGPL v3 License"></a>
-  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-brightgreen?style=for-the-badge" alt="Platform">
-</p>
-
-<p align="center">
-  <a href="https://www.rongxzyai.com/">Website & download</a> ·
-  <a href="#quick-start-for-developers">Quick start</a> ·
-  <a href="#how-zhiyuan-agent-works">Architecture</a> ·
+  <a href="https://www.rongxzyai.com/#download">Download</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#developer-quick-start">Develop locally</a> ·
+  <a href="https://github.com/rongxinzy/RongxinAI/issues">Report an issue</a> ·
   <a href="README_zh.md">中文</a>
 </p>
 
-This project is maintained by Li Keran.
-
 <p align="center">
-  <img src="public/readme/zhiyuan-ppt-demo.gif" alt="ZhiYuan Agent creating an introductory AI presentation from a natural-language request" width="960">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&amp;label=CI" alt="CI"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat" alt="GitHub Stars"></a>
 </p>
 
-ZhiYuan Agent is an open-source, local-first desktop AI agent built by Beijing Rongxin Zhiyuan for development, research, automation, and everyday knowledge work. It is not another chat wrapper: the agent can execute multi-step tasks on your machine, show its progress, and pause for approval before sensitive actions.
-
-Its agent runtime and GGUF inference engine are developed in-house. The desktop app brings execution, local models, 40+ built-in skills, MCP integrations, recurring tasks, and IM or email delivery into one workspace.
-
-## Why ZhiYuan: a local-first AI agent that can act
-
-| What you need | What ZhiYuan does |
-| --- | --- |
-| Work completed, not just suggested | Reads and writes files, runs terminal commands, operates a browser, and produces documents |
-| Control over sensitive actions | Shows tool state and requests per-action approval before high-risk operations |
-| A private local-model option | Installs and runs GGUF models with configurable context, GPU offload, threads, and lifecycle |
-| Reusable workflows | Combines 40+ bundled skills, custom skills, MCP services, and scheduled tasks |
-| Results beyond the desktop | Delivers completed work through WeChat, WeCom, DingTalk, Feishu/Lark, QQ, or email |
-
-Typical use cases include repository research, document and spreadsheet work, browser-based operations, recurring briefings, inbox cleanup, local-model experiments, and internal tool automation.
-
-## Download ZhiYuan Agent
-
-Download the latest release from the [official website](https://www.rongxzyai.com/#download):
-
-- Windows 10/11 (x64)
-- macOS (Apple silicon)
-- Linux (build from source)
-
-If you find ZhiYuan useful, consider giving the repository a star.
-
-## Key features
-
-- **Cowork agent workflows**: Run multi-step tasks with file tools, shell commands, browser automation, document processing, and approval-gated actions.
-- **Local GGUF inference**: Manage models, tune the inference service, and connect local models to agent workflows.
-- **Model marketplace**: Search GGUF models from ModelScope and install them into the app-managed model directory.
-- **Skills and MCP**: Use 40+ bundled skills, create your own, and connect external tools or internal services through MCP.
-- **Scheduled tasks**: Create recurring briefings, follow-ups, inbox cleanup, reports, and other background work.
-- **Messaging and email channels**: Reach the agent through WeChat, WeCom, DingTalk, Feishu(Lark), QQ, and email.
-- **Local data and permission control**: Sessions, configuration, and task metadata stay in local SQLite; sensitive tool calls require approval.
-
-## How ZhiYuan Agent works
+ZhiYuan Agent is a desktop AI workspace from Beijing Rongxin Zhiyuan, maintained by Li Keran. Use it to organize research, create documents, analyze spreadsheets, work on code, or run recurring tasks. The agent can read and write files, run commands, and operate a browser while showing messages, tool activity, and results.
 
 <p align="center">
-  <img src="public/readme/zhiyuan_agent_architecture_en.svg" alt="ZhiYuan Agent architecture" width="760">
+  <img src="public/readme/zhiyuan-ppt-demo.gif" alt="A recording of ZhiYuan creating a presentation from a natural-language task" width="960">
+</p>
+<p align="center"><sub>From a task description to a presentation, with visible progress and generated files.</sub></p>
+
+## What you can do
+
+| Task | Workflow |
+| --- | --- |
+| Research | Search the web, read local material, and organize findings with sources |
+| Documents and data | Create presentations, work with Word, PDF, and Excel, and produce files from analysis |
+| Code | Select a project directory, explore a repository, edit code, run commands, and inspect artifacts |
+| Everyday work | Track work in Todos and schedule briefings, reports, and other recurring tasks |
+| Browser tasks | Find information and operate web pages while following the agent's progress |
+| Messaging | Connect WeChat, WeCom, DingTalk, Feishu/Lark, QQ, or email to use the agent through configured channels |
+
+Experts provide presets for specific kinds of work. Skills package reusable methods and tools. MCP connects external services. Start with the bundled integrations and extend the workflows you need.
+
+## Get started
+
+1. Choose an installer for your system on the [official website](https://www.rongxzyai.com/#download). Release history and attached downloads are also available in [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases).
+2. Open the app and start with the **built-in ZhiYuan free model**, without entering a third-party API key. You can also configure your own provider in model settings.
+3. For local files or code, select a project directory, describe the task, and attach any relevant material.
+4. Follow the progress, respond to approval requests, inspect the output, and continue with feedback.
+
+The free model requires a network connection; availability and usage limits are shown in the app. The desktop project supports macOS, Windows, and Linux. Check the download page for available installers and architectures, or [run from source](#developer-quick-start).
+
+### Use local models
+
+Open the local inference workspace, browse the model marketplace, and choose a GGUF model and quantization suited to your hardware. Install the model and start its service. Adjust context length, GPU allocation, threads, and other options, then use a running local model for agent tasks.
+
+Local models reduce reliance on cloud inference. Web search, model downloads, remote MCP services, and messaging channels still require their respective network services.
+
+### Data and permissions
+
+Sessions, configuration, and task metadata are stored locally. The desktop execution environment accesses local files. When you use a cloud model or remote tool, the content needed for that request is sent to the corresponding service.
+
+Tool execution follows the selected permission mode. Operations requiring approval display a request; automatic authorization allows some operations to run directly. Progress and results remain visible in the workspace.
+
+## Choose your workspace appearance
+
+ZhiYuan includes **Codex** and **Daming Fenghua** themes. Codex uses neutral surfaces and compact controls. Daming Fenghua combines paper white, cinnabar, and ink with jade, bronze, and a dark ink appearance.
+
+In **Settings → Appearance**, select a theme preview card and choose light, dark, or system mode. Every card updates with the selected mode. Backgrounds, textures, typography, shapes, controls, and interaction states belong to the complete theme package.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/theme-previews/appearance-settings-dark.png">
+    <img src="docs/theme-previews/appearance-settings-light.png" alt="Appearance settings component: theme preview cards above a shared light, dark, and system selector; Chinese UI shown" width="760">
+  </picture>
 </p>
 
-ZhiYuan Agent uses Electron with strict process isolation. The renderer hosts the React UI, preload exposes controlled IPC through `contextBridge`, and the main process manages agent sessions, local inference, storage, skills, MCP integrations, scheduled tasks, and messaging gateways.
+To create a theme, start with the [theme authoring guide](src/renderer/theme/README.md) and [design specification](DESIGN.md). Packages supply presentation data; shared components retain interaction and state ownership.
 
-### Cowork agent runtime
+## Developer quick start
 
-A task moves from the renderer through controlled IPC to the built-in agent runtime. Messages, permission requests, tool state, and completion events stream back to the UI in real time.
-
-| Event | Description |
-| --- | --- |
-| `message` | A new message enters the session |
-| `messageUpdate` | Incremental streaming content update |
-| `permissionRequest` | A tool call requires approval |
-| `complete` | The session has finished |
-| `error` | The session failed |
-
-### Local inference and model marketplace
-
-The local inference workspace manages the app-owned service, GGUF models, the ModelScope-backed marketplace, and per-model settings such as context length, GPU offload layers, threads, batch size, main GPU, memory mapping, and keep-alive.
-
-### Skills, MCP, and automation
-
-`SKILLs/` contains the bundled skills, while `SKILLs/skills.config.json` controls default enablement and ordering. MCP settings connect external tool services such as GitHub, browsers, databases, file systems, and internal enterprise systems.
-
-Scheduled tasks can be created with natural language or through the GUI. A run starts a Cowork session, stores its result in the desktop app, and can deliver a notification through a configured IM or email channel.
-
-## Quick start for developers
-
-### Requirements
-
-- Git
-- Node.js `24.x`
-- Bun `1.4.x`
-
-On Windows, native dependency builds may also require:
-
-- Python 3
-- Visual Studio Build Tools with **Desktop development with C++**
-
-### Run locally
+Install Git, Node.js **24.x**, and Bun **1.4.0**, as pinned in [`package.json`](package.json). Native dependencies may require Python and a C/C++ toolchain when prebuilt binaries are unavailable. See the [contributing guide](CONTRIBUTING.md) for Windows build requirements.
 
 ```bash
 git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent
@@ -118,58 +91,61 @@ bun install
 bun run electron:dev
 ```
 
-To prepare local inference separately:
+The development command prepares the channel and memory runtimes, then starts Vite and Electron. Initial runtime preparation requires network access. To use local inference, download the inference runtime for your host separately:
 
 ```bash
-# Download the llama.cpp runtime for the current host
 bun run llamacpp:runtime:download
 ```
 
-The Pi execution kernel runs in-process. Channel and Cron transport is provided by
-the pinned `cc-connect` sidecar during release builds; it does not own agent execution
-or persistent task state.
+### Useful commands
 
-### Build, test, and package
-
-```bash
-bun run build              # TypeScript typecheck + Vite production build
-bun run lint               # oxlint
-bun run format:check       # oxfmt
-bun test                   # Vitest
-bun run compile:electron   # Electron main process only
-
-bun run dist:mac
-bun run dist:win
-bun run dist:linux
-```
-
-## Tech stack
-
-| Layer | Technology |
+| Command | Purpose |
 | --- | --- |
-| Desktop | Electron 40 |
-| Frontend | React 19, TypeScript 7 |
-| Build | Vite 8 (Rolldown) |
-| Styling | Tailwind CSS 4 |
-| Tooling | Bun, oxlint, oxfmt |
-| State | Redux Toolkit |
-| Agent runtime | Self-developed |
-| Local inference | Self-developed, GGUF-compatible |
-| Storage | better-sqlite3 |
-| Rendering | react-markdown, Mermaid, KaTeX |
+| `bun run build` | Typecheck, build production assets, and verify runtime dependencies |
+| `bun run test` | Run the project test script with native-module preparation and Electron dependency restoration |
+| `bun run lint` | Check code, generated theme consistency, and style ownership |
+| `bun run format:check` | Check formatting |
+| `bun run test:bundle-budget` | Check the built renderer's bundle size |
+| `bun run theme:generate` | Regenerate CSS after changing theme definitions |
+| `bun run compile:electron` | Compile the Electron main process, including native dependency preparation |
 
-## Contributing
+Release packaging uses `bun run dist:mac`, `bun run dist:win`, or `bun run dist:linux`. These also involve platform runtimes, resources, and signing configuration; see [CONTRIBUTING.md](CONTRIBUTING.md) and [`package.json`](package.json).
 
-Bug reports, feature requests, and pull requests are welcome.
+### Project map
 
-- [Report a bug](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml)
-- [Request a feature](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml)
-- Read the [contributing guide](CONTRIBUTING.md) before opening a pull request
+| Path | Responsibility |
+| --- | --- |
+| [`src/renderer`](src/renderer) | React workspace, conversations, settings, and local inference UI |
+| [`src/shared`](src/shared) | Shared UI, types, and communication contracts |
+| [`src/main`](src/main) | Desktop lifecycle, task execution, storage, and system services |
+| [`src/main/preload.ts`](src/main/preload.ts) | Controlled IPC through `contextBridge` |
+| [`src/renderer/theme`](src/renderer/theme) | Theme contracts, component appearance, backgrounds, and generation |
+| [`SKILLs`](SKILLs) / [`MCPs`](MCPs) | Bundled skills and tool integrations |
+| [`.github/workflows`](.github/workflows) | Tests, installer validation, and releases |
 
-## Sponsors
+The stack includes Electron, React, TypeScript, Vite, Tailwind CSS, Redux Toolkit, and SQLite. Refer to [`package.json`](package.json) and [`bun.lock`](bun.lock) for dependency versions.
 
-Special thanks to [AnySearch](https://github.com/anysearch-ai) for supporting the built-in web search capability. See the implementation in [`SKILLs/web-search`](SKILLs/web-search) before leaving the repository for the sponsor site.
+<details>
+<summary>Desktop architecture</summary>
 
-## License
+<p align="center">
+  <img src="public/readme/zhiyuan_agent_architecture_en.svg" alt="ZhiYuan desktop architecture and module relationships" width="760">
+</p>
+
+The renderer owns the UI, preload provides the communication boundary, and the main process owns sessions, execution, data, and service lifecycles. Task messages, tool status, and approval requests stream back to the UI. Dedicated services manage local inference, skills, MCP, and messaging channels.
+
+</details>
+
+## Contribute
+
+- [Report a bug](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml) with your system, app version, reproduction steps, and relevant logs.
+- [Suggest a feature](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml) by describing the workflow and expected behavior.
+- [Contribute code or documentation](CONTRIBUTING.md). Read [`AGENTS.md`](AGENTS.md) first and follow [`DESIGN.md`](DESIGN.md) for UI changes.
+
+Star the repository to follow the project, or share a workflow you have built with ZhiYuan.
+
+## Acknowledgments and license
+
+Thanks to [AnySearch](https://github.com/anysearch-ai) for supporting the built-in web search capability. Its integration lives in [`SKILLs/web-search`](SKILLs/web-search).
 
 ZhiYuan Agent is licensed under the [GNU Affero General Public License v3.0](LICENSE).
