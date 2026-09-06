@@ -4,7 +4,7 @@ export const BackgroundKind = {
   Image: 'image',
   Texture: 'texture',
 } as const;
-export const BackgroundTexture = { Paper: 'paper', Grid: 'grid', Dots: 'dots' } as const;
+export const BackgroundTexture = { Paper: 'paper', Silk: 'silk', Grid: 'grid', Dots: 'dots' } as const;
 export const BackgroundFit = { Cover: 'cover', Contain: 'contain', Tile: 'tile' } as const;
 export type ThemeBackground = {
   kind: (typeof BackgroundKind)[keyof typeof BackgroundKind];
@@ -65,7 +65,10 @@ export function backgroundStyle(input: ThemeBackground): Record<string, string> 
   }
   if (value.kind === BackgroundKind.Texture) {
     repeat = 'repeat';
-    if (value.texture === BackgroundTexture.Grid) {
+    if (value.texture === BackgroundTexture.Silk) {
+      image = `linear-gradient(90deg, ${value.color} 1px, transparent 1px), linear-gradient(${value.color} 1px, transparent 1px)`;
+      size = '4px 4px, 4px 6px';
+    } else if (value.texture === BackgroundTexture.Grid) {
       image = `linear-gradient(${value.color} 1px, transparent 1px), linear-gradient(90deg, ${value.color} 1px, transparent 1px)`;
       size = '24px 24px';
     } else if (value.texture === BackgroundTexture.Dots) {

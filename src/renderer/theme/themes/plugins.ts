@@ -1,3 +1,4 @@
+import { changanLight, changanDark } from './changan';
 import { damingLight, damingDark } from './daming';
 import { validateComponentAppearances } from '../components/contract';
 import { classicDark } from './classic-dark';
@@ -67,6 +68,12 @@ export const themePlugins = defineThemePlugins([
     id: 'daming',
     name: { zh: '大明风华', en: 'Daming Fenghua' },
     appearances: { light: damingLight, dark: damingDark },
+  },
+  {
+    version: THEME_PLUGIN_VERSION,
+    id: 'changan',
+    name: { zh: '长安风物', en: 'Changan Fengwu' },
+    appearances: { light: changanLight, dark: changanDark },
   },
 ]);
 
