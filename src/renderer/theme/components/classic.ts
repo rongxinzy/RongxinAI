@@ -1,3 +1,4 @@
+import { classicAppearancePreview } from './classic-appearance-preview';
 import { classicScenes } from './classic-scenes';
 import { classicSidebar } from './classic-sidebar';
 import { classicFields } from './classic-fields';
@@ -173,5 +174,6 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...classicFields(dark),
     ...classicSidebar(),
     ...classicScenes(),
+    ...classicAppearancePreview(),
   };
 }

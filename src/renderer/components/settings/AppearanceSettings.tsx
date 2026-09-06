@@ -1,39 +1,51 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
-import type { CSSProperties } from 'react';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import { Check } from 'lucide-react';
+import { useSyncExternalStore, type CSSProperties } from 'react';
 import { i18nService } from '../../services/i18n';
+import { backgroundStyle, normalizeBackground } from '../../theme/background/background';
 import { resolveThemePlugin, themePlugins } from '../../theme/themes/plugins';
 import { TOKEN_CONTRACT, TOKEN_NAMES } from '../../theme/tokens/contract';
 
 type Appearance = 'light' | 'dark' | 'system';
+const APPEARANCES = ['light', 'dark', 'system'] as const;
+const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
+function subscribeSystemAppearance(onChange: () => void) {
+  const query = window.matchMedia(SYSTEM_DARK_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+const getSystemDark = () => window.matchMedia(SYSTEM_DARK_QUERY).matches;
+const getServerDark = () => false;
 
 function ThemePreview({ styleId, appearance }: { styleId: string; appearance: 'light' | 'dark' }) {
   const theme = resolveThemePlugin(styleId).appearances[appearance];
-  const variables = Object.fromEntries(
-    TOKEN_NAMES.map(key => [TOKEN_CONTRACT[key], theme.tokens[key]]),
-  ) as CSSProperties;
+  const variables = {
+    ...Object.fromEntries(TOKEN_NAMES.map(key => [TOKEN_CONTRACT[key], theme.tokens[key]])),
+    ...backgroundStyle(normalizeBackground(theme.background)),
+  } as CSSProperties;
   return (
     <span
       style={variables}
+      data-theme-preview={theme.meta.id}
       aria-hidden="true"
-      className="flex size-full overflow-hidden bg-background"
+      className="theme-appearance-preview-frame flex aspect-[3/2] w-full overflow-hidden"
     >
-      <span className="flex w-1/4 flex-col gap-1 bg-surface-raised p-2">
-        <span className="h-1 w-full rounded-full bg-muted-foreground/60" />
-        <span className="h-1 w-3/4 rounded-full bg-muted-foreground/30" />
-        <span className="h-1 w-full rounded-full bg-muted-foreground/30" />
+      <span className="theme-appearance-preview-sidebar flex w-1/4 flex-col gap-2">
+        <span className="theme-appearance-preview-line w-3/4" />
+        <span className="theme-appearance-preview-selection w-full" />
+        <span className="theme-appearance-preview-muted w-full" />
+        <span className="theme-appearance-preview-muted w-3/4" />
+        <span className="theme-appearance-preview-muted mt-auto w-1/2" />
       </span>
-      <span className="flex flex-1 flex-col gap-1.5 p-3">
-        <span className="h-1 w-2/3 rounded-full bg-foreground/50" />
-        <span className="h-1 w-full rounded-full bg-muted-foreground/25" />
-        <span className="h-1 w-4/5 rounded-full bg-muted-foreground/25" />
-        <span className="mt-auto h-5 rounded-sm border border-border bg-card" />
+      <span data-main-canvas className="theme-appearance-preview-main relative flex min-w-0 flex-1 flex-col gap-2">
+        <span className="theme-appearance-preview-line w-2/3" />
+        <span className="theme-appearance-preview-message mt-2 w-2/3 self-end" />
+        <span className="theme-appearance-preview-muted w-full" />
+        <span className="theme-appearance-preview-muted w-4/5" />
+        <span className="theme-appearance-preview-composer mt-auto flex items-end justify-end">
+          <span className="theme-appearance-preview-send" />
+        </span>
       </span>
     </span>
   );
@@ -50,57 +62,41 @@ export function AppearanceSettings({
   onAppearanceChange: (appearance: Appearance) => void;
   onStyleChange: (id: string) => void;
 }) {
+  const systemDark = useSyncExternalStore(subscribeSystemAppearance, getSystemDark, getServerDark);
+  const previewAppearance = appearance === 'system' ? (systemDark ? 'dark' : 'light') : appearance;
+  const language = i18nService.getLanguage() === 'zh' ? 'zh' : 'en';
   return (
     <div className="space-y-6">
-      <h4 className="text-sm font-medium">{i18nService.t('appearance')}</h4>
-      {themePlugins.length > 1 && (
-        <Select
-          value={styleId}
-          onValueChange={id => {
-            if (id) onStyleChange(id);
-          }}
-        >
-          <SelectTrigger aria-label={i18nService.t('themeStyle')}>
-            <SelectValue>
-              {resolveThemePlugin(styleId).name[i18nService.getLanguage() === 'zh' ? 'zh' : 'en']}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {themePlugins.map(plugin => (
-              <SelectItem key={plugin.id} value={plugin.id}>
-                {plugin.name[i18nService.getLanguage() === 'zh' ? 'zh' : 'en']}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-      <div className="grid grid-cols-3 gap-3">
-        {(['light', 'dark', 'system'] as const).map(mode => (
-          <Button
-            key={mode}
-            variant="appearance"
-            size="appearance"
-            aria-pressed={appearance === mode}
-            onClick={() => onAppearanceChange(mode)}
-          >
-            <span className="flex aspect-[3/2] w-full overflow-hidden rounded-md">
-              {mode === 'system' ? (
-                <>
-                  <span className="w-1/2 overflow-hidden">
-                    <ThemePreview styleId={styleId} appearance="light" />
-                  </span>
-                  <span className="w-1/2 overflow-hidden">
-                    <ThemePreview styleId={styleId} appearance="dark" />
-                  </span>
-                </>
-              ) : (
-                <ThemePreview styleId={styleId} appearance={mode} />
-              )}
-            </span>
-            <span>{i18nService.t(mode)}</span>
-          </Button>
-        ))}
-      </div>
+      <section className="space-y-3" aria-label={i18nService.t('themeStyle')}>
+        <h4 className="text-sm font-medium">{i18nService.t('themeStyle')}</h4>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3">
+          {themePlugins.map(plugin => (
+            <Button
+              key={plugin.id}
+              variant="appearance"
+              size="appearance"
+              aria-pressed={styleId === plugin.id}
+              onClick={() => onStyleChange(plugin.id)}
+            >
+              <ThemePreview styleId={plugin.id} appearance={previewAppearance} />
+              <span className="flex w-full items-center justify-between gap-2">
+                <span>{plugin.name[language]}</span>
+                <Check aria-hidden="true" className={`theme-appearance-preview-check ${styleId === plugin.id ? '' : 'invisible'}`} />
+              </span>
+            </Button>
+          ))}
+        </div>
+      </section>
+      <section className="space-y-3" aria-label={i18nService.t('appearanceMode')}>
+        <h4 className="text-sm font-medium">{i18nService.t('appearanceMode')}</h4>
+        <FluidTabs<Appearance>
+          className="theme-appearance-mode-tabs"
+          aria-label={i18nService.t('appearanceMode')}
+          value={appearance}
+          onValueChange={onAppearanceChange}
+          items={APPEARANCES.map(value => ({ value, label: i18nService.t(value) }))}
+        />
+      </section>
     </div>
   );
 }
