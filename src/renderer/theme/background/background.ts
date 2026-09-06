@@ -4,7 +4,13 @@ export const BackgroundKind = {
   Image: 'image',
   Texture: 'texture',
 } as const;
-export const BackgroundTexture = { Paper: 'paper', Silk: 'silk', Grid: 'grid', Dots: 'dots' } as const;
+export const BackgroundTexture = {
+  Paper: 'paper',
+  Silk: 'silk',
+  Clouds: 'clouds',
+  Grid: 'grid',
+  Dots: 'dots',
+} as const;
 export const BackgroundFit = { Cover: 'cover', Contain: 'contain', Tile: 'tile' } as const;
 export type ThemeBackground = {
   kind: (typeof BackgroundKind)[keyof typeof BackgroundKind];
@@ -65,7 +71,14 @@ export function backgroundStyle(input: ThemeBackground): Record<string, string> 
   }
   if (value.kind === BackgroundKind.Texture) {
     repeat = 'repeat';
-    if (value.texture === BackgroundTexture.Silk) {
+    if (value.texture === BackgroundTexture.Clouds) {
+      // Fixed local artwork: open cloud scrolls occupy corners, leaving the reading center clear.
+      const scroll = 'M-40 180 C80 180 45 80 160 80 C240 80 260 140 215 158 C178 171 163 130 195 119 C225 110 269 149 320 116 C371 84 331 38 385 25 M-30 206 C101 205 70 108 159 106 C207 104 219 133 200 139 M40 245 C143 240 115 181 209 187 C280 192 315 168 348 139 C393 99 428 104 451 121 M308 75 C348 28 411 64 447 16';
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="none"><filter id="stone"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" stitchTiles="stitch" seed="11"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .3 .3 .3 0 -.3" result="grain"/><feFlood flood-color="${value.color}"/><feComposite in2="grain" operator="in"/></filter><rect width="100%" height="100%" opacity=".2" filter="url(#stone)"/><g fill="none" stroke="${value.color}" stroke-width="1.4" stroke-linecap="round"><path d="${scroll}" transform="translate(1200 0) scale(-1 1)"/><path d="${scroll}" transform="translate(0 800) scale(1 -1)"/><path opacity=".2" d="M0 560 C100 520 140 600 220 530 M1020 230 C1120 210 1130 290 1200 245"/></g></svg>`;
+      image = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+      size = '100% 100%';
+      repeat = 'no-repeat';
+    } else if (value.texture === BackgroundTexture.Silk) {
       image = `linear-gradient(90deg, ${value.color} 1px, transparent 1px), linear-gradient(${value.color} 1px, transparent 1px)`;
       size = '4px 4px, 4px 6px';
     } else if (value.texture === BackgroundTexture.Grid) {

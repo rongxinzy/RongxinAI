@@ -1,3 +1,4 @@
+import { weiyangLight, weiyangDark } from './weiyang';
 import { changanLight, changanDark } from './changan';
 import { damingLight, damingDark } from './daming';
 import { validateComponentAppearances } from '../components/contract';
@@ -74,6 +75,12 @@ export const themePlugins = defineThemePlugins([
     id: 'changan',
     name: { zh: '长安风物', en: 'Changan Fengwu' },
     appearances: { light: changanLight, dark: changanDark },
+  },
+  {
+    version: THEME_PLUGIN_VERSION,
+    id: 'weiyang',
+    name: { zh: '未央金石', en: 'Weiyang Jinshi' },
+    appearances: { light: weiyangLight, dark: weiyangDark },
   },
 ]);
 
