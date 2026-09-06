@@ -77,3 +77,30 @@ test('isolates theme motion and places pseudo-element state selectors on their o
     'Invalid component motion property',
   );
 });
+
+test('shared fluid tabs retain Codex geometry and hover feedback in theme recipes', () => {
+  const c = classicLight.components;
+  expect(c['fluid-tab-default'].base.height).toBe('2rem');
+  expect(c['fluid-tab'].base['font-weight']).toBe('var(--zy-component-font-weight-normal)');
+  expect(c['fluid-hover-indicator'].base['background-color']).toBe('var(--zy-surface)');
+  expect(c['fluid-hover-indicator'].base.opacity).toBe('0');
+  expect(c['fluid-hover-visible'].parentHover.opacity).toBe('1');
+  expect(c['fluid-hover-visible'].parentFocus.opacity).toBe('1');
+});
+
+test('selected appearances recognize both Base UI boolean attributes and string states', () => {
+  const css = generateThemeCSS(classicLight);
+  expect(css).toContain('[data-active=""]');
+  expect(css).toContain('[data-active="true"]');
+  expect(css).toContain('[data-state="selected"]');
+});
+
+test('component gradients can be themed without allowing remote image requests', () => {
+  const theme = structuredClone(classicLight);
+  theme.components['loading-shimmer-layer'].base['background-image'] =
+    'linear-gradient(90deg, transparent, var(--zy-primary), transparent)';
+  expect(() => validateComponentAppearances(theme.components)).not.toThrow();
+  theme.components['loading-shimmer-layer'].base['background-image'] =
+    'url(https://example.com/tracker.png)';
+  expect(() => validateComponentAppearances(theme.components)).toThrow();
+});

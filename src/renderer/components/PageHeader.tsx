@@ -68,7 +68,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       }
       content={
         leftContent ??
-        (title ? <h1 className="truncate text-lg font-semibold text-foreground">{title}</h1> : null)
+        (title ? <h1 className="theme-heading truncate text-lg font-semibold text-foreground">{title}</h1> : null)
       }
       actions={actions}
       windowControls={<WindowTitleBar inline />}

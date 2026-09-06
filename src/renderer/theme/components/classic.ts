@@ -1,3 +1,10 @@
+import { classicScenes } from './classic-scenes';
+import { classicSidebar } from './classic-sidebar';
+import { classicFields } from './classic-fields';
+import { classicMisc } from './classic-misc';
+import { classicDisplay } from './classic-display';
+import { classicChoiceControls } from './classic-choice-controls';
+import { classicSupplementaryControls } from './classic-supplementary-controls';
 import { classicTabs } from './classic-tabs';
 import { classicMessageSurfaces } from './classic-message-surfaces';
 import { classicPromptActions } from './classic-prompt-actions';
@@ -159,5 +166,12 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...classicPromptActions(),
     ...classicMessageSurfaces(dark),
     ...classicTabs(dark),
+    ...classicSupplementaryControls(dark),
+    ...classicChoiceControls(dark),
+    ...classicDisplay(),
+    ...classicMisc(dark),
+    ...classicFields(dark),
+    ...classicSidebar(),
+    ...classicScenes(),
   };
 }

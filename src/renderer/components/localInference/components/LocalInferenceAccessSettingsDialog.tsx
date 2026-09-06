@@ -72,7 +72,7 @@ export function LocalInferenceAccessSettingsDialog({
           <div className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-2 sm:gap-4">
             <div className="flex min-w-0 items-center justify-between gap-4">
               <div className="flex min-w-0 flex-col gap-1">
-                <Label htmlFor="llamacpp-allow-lan" className="text-sm font-medium text-foreground">
+                <Label htmlFor="llamacpp-allow-lan" className="theme-control-label-strong">
                   {i18nService.t('localInferenceAccessAllowLan')}
                 </Label>
               </div>
@@ -81,12 +81,12 @@ export function LocalInferenceAccessSettingsDialog({
                 checked={allowLanAccess}
                 onCheckedChange={onAllowLanAccessChange}
                 disabled={saving}
-                className="border-border data-unchecked:bg-muted data-checked:border-primary data-checked:bg-primary"
+                className="theme-scene-access-switch"
               />
             </div>
             <div className="flex min-w-0 items-center gap-3 sm:border-l sm:border-border sm:pl-4">
               <div className="min-w-0 flex-1">
-                <Label htmlFor="llamacpp-port" className="text-sm font-medium text-foreground">
+                <Label htmlFor="llamacpp-port" className="theme-control-label-strong">
                   {i18nService.t('localInferenceServiceConfigPortLabel')}
                 </Label>
               </div>
@@ -108,7 +108,7 @@ export function LocalInferenceAccessSettingsDialog({
               <div className="flex min-w-0 flex-col gap-1">
                 <Label
                   htmlFor="llamacpp-keep-running-on-app-quit"
-                  className="text-sm font-medium text-foreground"
+                  className="theme-control-label-strong"
                 >
                   {i18nService.t('localInferenceKeepRunningOnAppQuit')}
                 </Label>
@@ -118,7 +118,7 @@ export function LocalInferenceAccessSettingsDialog({
                 checked={keepRunningOnAppQuit}
                 onCheckedChange={onKeepRunningOnAppQuitChange}
                 disabled={saving}
-                className="border-border data-unchecked:bg-muted data-checked:border-primary data-checked:bg-primary"
+                className="theme-scene-access-switch"
               />
             </div>
           </div>

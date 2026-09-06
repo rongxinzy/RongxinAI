@@ -84,7 +84,7 @@ export function MarketplaceSkillGrid({
               className="theme-page-marketplace-skill-grid-button-1 min-w-0 flex-1 shrink justify-start text-left whitespace-normal"
               onClick={() => onSelect(skill)}
             >
-              <Avatar className="size-10 shrink-0 rounded-xl bg-muted">
+              <Avatar className="theme-scene-skill-avatar shrink-0">
                 {skill.iconUrl && (
                   <AvatarImage
                     src={resolveSkillIconUrl(skill.iconUrl)}
@@ -92,7 +92,7 @@ export function MarketplaceSkillGrid({
                     className="m-auto size-8 rounded-lg object-contain"
                   />
                 )}
-                <AvatarFallback className="rounded-lg text-xl font-semibold text-muted-foreground">
+                <AvatarFallback className="theme-scene-skill-fallback">
                   {getSkillInitial(skill.name)}
                 </AvatarFallback>
               </Avatar>
@@ -131,7 +131,7 @@ export function MarketplaceSkillGrid({
               <Progress
                 value={installProgress}
                 aria-label={`${i18nService.t('skillInstalling')} ${installProgress}%`}
-                className="absolute bottom-0 left-0 h-1 w-full gap-0 rounded-none"
+                className="theme-scene-skill-progress absolute bottom-0 left-0 w-full gap-0"
               />
             )}
           </Card>

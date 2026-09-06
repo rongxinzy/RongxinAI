@@ -1,3 +1,4 @@
+import { damingLight, damingDark } from './daming';
 import { validateComponentAppearances } from '../components/contract';
 import { classicDark } from './classic-dark';
 import { classicLight } from './classic-light';
@@ -60,6 +61,12 @@ export const themePlugins = defineThemePlugins([
     id: DEFAULT_THEME_PLUGIN_ID,
     name: { zh: 'Codex', en: 'Codex' },
     appearances: { light: classicLight, dark: classicDark },
+  },
+  {
+    version: THEME_PLUGIN_VERSION,
+    id: 'daming',
+    name: { zh: '大明风华', en: 'Daming Fenghua' },
+    appearances: { light: damingLight, dark: damingDark },
   },
 ]);
 

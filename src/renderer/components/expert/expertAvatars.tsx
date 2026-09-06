@@ -105,11 +105,11 @@ export function ExpertAvatar({ name, label, className }: ExpertAvatarProps) {
     return (
       <Avatar
         className={cn(
-          'size-10 shrink-0 overflow-hidden rounded-xl border border-border bg-muted after:hidden',
+          'theme-scene-expert-empty-avatar shrink-0 overflow-hidden after:hidden',
           className,
         )}
       >
-        <AvatarFallback className="rounded-[inherit] text-xl font-semibold text-muted-foreground">
+        <AvatarFallback className="theme-scene-expert-fallback">
           {label.slice(0, 1).toUpperCase()}
         </AvatarFallback>
       </Avatar>
@@ -121,12 +121,12 @@ export function ExpertAvatar({ name, label, className }: ExpertAvatarProps) {
     <Avatar
       aria-hidden="true"
       className={cn(
-        'size-10 shrink-0 overflow-hidden rounded-xl border border-border after:hidden',
+        'theme-scene-expert-avatar shrink-0 overflow-hidden after:hidden',
         className,
       )}
       style={{ background: style.background }}
     >
-      <AvatarFallback className="rounded-[inherit] bg-transparent">
+      <AvatarFallback className="theme-scene-expert-artwork">
         <Icon
           aria-hidden="true"
           className="size-5"

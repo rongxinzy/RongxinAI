@@ -2,7 +2,6 @@
 
 import { Tabs as TabsPrimitive } from '@base-ui/react/tabs';
 import { cn } from '@shared/lib/utils';
-import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
 
@@ -42,6 +41,8 @@ export interface FluidTabsProps<Value extends string> {
 interface IndicatorGeometry {
   x: number;
   width: number;
+  y: number;
+  height: number;
 }
 
 export function FluidTabs<Value extends string>({
@@ -55,10 +56,6 @@ export function FluidTabs<Value extends string>({
   onValueChange,
   value,
 }: FluidTabsProps<Value>) {
-  const sizeClasses = size === FluidTabsSize.Default
-    ? { list: 'h-10', tab: 'h-8' }
-    : { list: 'h-9', tab: 'h-7' };
-  const prefersReducedMotion = useReducedMotion();
   const listRef = useRef<HTMLDivElement | null>(null);
   const [indicator, setIndicator] = useState<IndicatorGeometry | null>(null);
 
@@ -66,8 +63,21 @@ export function FluidTabs<Value extends string>({
     const list = listRef.current;
     const activeTab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!activeTab) return;
-    const next = { x: activeTab.offsetLeft, width: activeTab.offsetWidth };
-    setIndicator(prev => (prev && prev.x === next.x && prev.width === next.width ? prev : next));
+    const next = {
+      x: activeTab.offsetLeft,
+      width: activeTab.offsetWidth,
+      y: activeTab.offsetTop,
+      height: activeTab.offsetHeight,
+    };
+    setIndicator(prev =>
+      prev &&
+      prev.x === next.x &&
+      prev.width === next.width &&
+      prev.y === next.y &&
+      prev.height === next.height
+        ? prev
+        : next,
+    );
   }, []);
 
   // Re-measure whenever the active tab changes (value drives a new aria-selected).
@@ -82,8 +92,7 @@ export function FluidTabs<Value extends string>({
     if (!list || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(list);
-    const activeTab = list.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (activeTab) observer.observe(activeTab);
+    list.querySelectorAll<HTMLElement>('[role="tab"]').forEach(tab => observer.observe(tab));
     return () => observer.disconnect();
   }, [measure, value]);
 
@@ -95,21 +104,23 @@ export function FluidTabs<Value extends string>({
     >
       <TabsPrimitive.List
         ref={listRef}
+        data-size={size}
         activateOnFocus
         aria-label={ariaLabel}
-        className={cn('relative inline-flex items-center gap-0.5 rounded-lg bg-muted/80 p-1 select-none', sizeClasses.list, listClassName)}
+        className={cn(
+          'theme-fluid-list relative inline-flex items-center gap-0.5 select-none',
+          listClassName,
+        )}
       >
         {indicator ? (
           <span
             aria-hidden="true"
-            className={cn(
-              'pointer-events-none absolute top-1 bottom-1 left-0 z-0 rounded-full border border-border-subtle bg-surface shadow-md',
-              // Balanced glide (project --ease-smooth), not easeOutExpo: an
-              // aggressive ease-out covers ~40% of the distance in the first
-              // frame and then crawls, which reads as a jump, not a slide.
-              !prefersReducedMotion && 'transition-[transform,width] duration-200 ease-(--ease-smooth)',
-            )}
-            style={{ width: indicator.width, transform: `translateX(${indicator.x}px)` }}
+            className="theme-fluid-indicator pointer-events-none absolute top-0 left-0 z-0"
+            style={{
+              width: indicator.width,
+              height: indicator.height,
+              transform: `translate(${indicator.x}px, ${indicator.y}px)`,
+            }}
           />
         ) : null}
         {items.map(item => {
@@ -119,25 +130,15 @@ export function FluidTabs<Value extends string>({
               key={item.value}
               value={item.value}
               className={cn(
-                'group relative z-10 flex min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-sm leading-5 whitespace-nowrap outline-none transition-[color,opacity] duration-150 ease-out',
-                sizeClasses.tab,
-                'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
-                isActive
-                  ? 'font-semibold text-foreground'
-                  : cn('font-normal text-muted-foreground opacity-50 hover:text-foreground', inactiveTabClassName),
+                'theme-fluid-tab group relative z-10 flex min-w-16 cursor-pointer items-center justify-center whitespace-nowrap',
+                !isActive && inactiveTabClassName,
               )}
             >
               {showInactiveHoverIndicator ? (
                 <span
                   aria-hidden="true"
                   data-fluid-tabs-hover-indicator="true"
-                  className={cn(
-                    'pointer-events-none absolute inset-0 rounded-full border border-border-subtle bg-surface shadow-md opacity-0 transition-opacity duration-150',
-                    // Keep mounted on activation so it fades out instead of
-                    // vanishing in one frame (reads as a flash under the
-                    // arriving active pill).
-                    !isActive && 'group-hover:opacity-100 group-focus-visible:opacity-100',
-                  )}
+                  className="theme-fluid-hover-indicator pointer-events-none absolute inset-0"
                 />
               ) : null}
               <span className="relative z-10">{item.label}</span>
