@@ -144,6 +144,8 @@ import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { resolvePiBuiltinProviderId } from './piProviderIds';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
+import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
+import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
@@ -559,6 +561,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
   private legacyMemoryMigrationService: LegacyMemoryMigrationService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
+  private scheduledTaskService: ScheduledTaskService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
   private readonly pendingMemoryCompletions = new Map<string, Promise<string>>();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
@@ -590,6 +593,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setConversationHistoryService(service: ConversationHistoryService): void {
     this.conversationHistoryService = service;
+  }
+  setScheduledTaskService(service: ScheduledTaskService): void {
+    this.scheduledTaskService = service;
   }
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
     if (this.workbenchTaskService && this.workbenchApprovalListener) {
@@ -887,6 +893,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           buildPiConversationHistoryTool({
             service: this.conversationHistoryService,
             workingDirectory: workspaceRoot,
+          }),
+        );
+      }
+      if (this.scheduledTaskService && options.sessionMode === 'work') {
+        customTools.push(
+          buildPiScheduledTaskTool({
+            service: this.scheduledTaskService,
+            workspaceId: this.store?.getSession(sessionId)?.workspaceId ?? null,
+            sessionKey: sessionId,
           }),
         );
       }
