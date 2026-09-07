@@ -5,7 +5,7 @@ import { Input } from '@shared/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
-import { AlertTriangle, ChevronDown, ChevronRight, FileDiff, FileSearch, FolderGit2, FolderOpen, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, FileDiff, FileSearch, FolderGit2, FolderOpen, Maximize2, Minimize2, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CodingGitDiffScope as CodingGitDiffScopeType, CodingGitFileChange, CodingGitStatus, CodingGitTargetInput } from '../../../shared/codingAgent';
@@ -14,7 +14,7 @@ import { i18nService } from '../../services/i18n';
 import { CodingGitQuickActions } from './CodingGitQuickActions';
 import { CodingGitQuickActionMode } from './constants';
 
-interface CodingGitPanelProps { workspaceRoot: string; laneId: string | null; sourceRoot: string; refreshKey: string; onClose?: () => void; }
+interface CodingGitPanelProps { workspaceRoot: string; laneId: string | null; sourceRoot: string; refreshKey: string; onClose?: () => void; isExpanded?: boolean; onToggleExpanded?: () => void; }
 interface DiffSelection { path: string; scope: CodingGitDiffScopeType; }
 interface GitFileTreeNode { name: string; path: string; file: CodingGitFileChange | null; children: Map<string, GitFileTreeNode>; }
 
@@ -46,7 +46,7 @@ const diffLineClassName = (line: string): string => {
   return '';
 };
 
-export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, onClose }: CodingGitPanelProps) => {
+export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, onClose, isExpanded = false, onToggleExpanded }: CodingGitPanelProps) => {
   const [status, setStatus] = useState<CodingGitStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,6 +110,7 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
           mode={CodingGitQuickActionMode.Commit}
         />
         <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('codingGitRefresh')} disabled={loading} onClick={() => void refresh()}>{loading ? <Spinner /> : <RefreshCw />}</Button>
+        {onToggleExpanded ? <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t(isExpanded ? 'codingGitExitExpanded' : 'codingGitExpand')} onClick={onToggleExpanded}>{isExpanded ? <Minimize2 /> : <Maximize2 />}</Button> : null}
         {onClose ? <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('close')} onClick={onClose}><X /></Button> : null}
       </div>
     </header>

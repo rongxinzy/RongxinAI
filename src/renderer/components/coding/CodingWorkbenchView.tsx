@@ -115,6 +115,7 @@ export const CodingWorkbenchView = ({
   const [sidePanelView, setSidePanelView] = useState<CodingSidePanelViewType | null>(null);
   const [sidePanelTabs, setSidePanelTabs] = useState<CodingSidePanelViewType[]>([]);
   const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
+  const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
   const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [isNarrowViewport, setIsNarrowViewport] = useState(() => window.innerWidth < 1024);
   const [laneChangePreview, setLaneChangePreview] = useState<string | null>(null);
@@ -1140,7 +1141,7 @@ export const CodingWorkbenchView = ({
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
       {desktopSidePanelOpen && (
-        <aside className="relative flex min-h-0 flex-col border-l border-border-subtle max-lg:hidden">
+        <aside className={cn('relative flex min-h-0 flex-col border-l border-border-subtle max-lg:hidden', sidePanelExpanded && 'absolute inset-0 z-20 bg-background')}>
           <ArtifactPanelResizeHandle
             ariaLabel={i18nService.t('codingAgentSidePanel')}
             currentWidth={resolvedSidePanelWidth}
@@ -1208,6 +1209,8 @@ export const CodingWorkbenchView = ({
                 laneId={activeLane?.id ?? null}
                 sourceRoot={gitSourceRoot}
                 refreshKey={gitRefreshKey}
+                isExpanded={sidePanelExpanded}
+                onToggleExpanded={() => setSidePanelExpanded(current => !current)}
               />
             )}
           </div>
