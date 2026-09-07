@@ -8,13 +8,16 @@ import {
 } from '@shared/components/ui/dialog';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Spinner } from '@shared/components/ui/spinner';
+import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
+import { MessageCirclePlus } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
+import { setDraftPrompt } from '../../store/slices/coworkSlice';
 import PageHeader from '../PageHeader';
 import AllRunsHistory from './AllRunsHistory';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -43,6 +46,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
+  const dispatch = useDispatch();
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
@@ -117,6 +121,16 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     setActiveTab(AUTO_TAB.Tasks);
   }, []);
 
+  const handleCreateByChat = useCallback(() => {
+    dispatch(
+      setDraftPrompt({
+        sessionId: '__home__',
+        draft: i18nService.t('scheduledTasksCreateByChatPrompt'),
+      }),
+    );
+    onNewChat?.();
+  }, [dispatch, onNewChat]);
+
   if (!initialDataLoaded) {
     return (
       <div className="flex h-full items-center justify-center bg-background">
@@ -155,9 +169,13 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       />
 
       <div className="mx-auto w-full max-w-2xl shrink-0 px-8">
-        <p className="pt-4 text-sm text-muted-foreground">
-          {i18nService.t('scheduledTasksHeroDesc')}
-        </p>
+        <div className="flex items-center justify-between gap-4 pt-4">
+          <p className="text-sm text-muted-foreground">{i18nService.t('scheduledTasksHeroDesc')}</p>
+          <Button type="button" variant="outline" size="sm" onClick={handleCreateByChat}>
+            <MessageCirclePlus className="size-4" />
+            {i18nService.t('scheduledTasksCreateByChat')}
+          </Button>
+        </div>
       </div>
 
       <div
