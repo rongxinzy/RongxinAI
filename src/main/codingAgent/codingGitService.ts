@@ -288,6 +288,16 @@ const countUntrackedLines = async (
   }
 };
 
+const toGitHubRepositoryUrl = (remote: string): string | null => {
+  const httpsMatch = /^https:\/\/github\.com\/([^\s]+)$/.exec(remote.trim());
+  const sshMatch = /^git@github\.com:([^\s]+)$/.exec(remote.trim());
+  const repositoryPath = httpsMatch?.[1] ?? sshMatch?.[1];
+  if (!repositoryPath) return null;
+  const normalizedPath = repositoryPath.replace(/\.git$/, '').replace(/\/+$/, '');
+  if (!normalizedPath || normalizedPath.includes('..')) return null;
+  return `https://github.com/${normalizedPath}`;
+};
+
 export class CodingGitService {
   async getStatus(
     targetRoot: string,
@@ -301,7 +311,9 @@ export class CodingGitService {
         isRepository: false,
         targetRoot,
         repositoryRoot: null,
+        githubRepositoryUrl: null,
         branch: null,
+        localBranches: [],
         head: null,
         detached: false,
         upstream: null,
@@ -319,11 +331,17 @@ export class CodingGitService {
     const statusOutput = (await runGit(targetRoot, ['status', '--porcelain=v2', '--branch', '-z']))
       .stdout;
     const parsed = parsePorcelainStatus(statusOutput);
-    const [stagedOutput, unstagedOutput] = await Promise.all([
+    const [stagedOutput, unstagedOutput, originRemoteOutput, localBranchesOutput] = await Promise.all([
       runGit(targetRoot, ['diff', '--no-ext-diff', '--cached', '--numstat', '-z']).then(
         result => result.stdout,
       ),
       runGit(targetRoot, ['diff', '--no-ext-diff', '--numstat', '-z']).then(
+        result => result.stdout,
+      ),
+      runGit(targetRoot, ['remote', 'get-url', 'origin'], { acceptedExitCodes: [0, 2] }).then(
+        result => result.stdout,
+      ),
+      runGit(targetRoot, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']).then(
         result => result.stdout,
       ),
     ]);
@@ -350,7 +368,9 @@ export class CodingGitService {
       isRepository: true,
       targetRoot,
       repositoryRoot,
+      githubRepositoryUrl: toGitHubRepositoryUrl(originRemoteOutput),
       branch: parsed.branch,
+      localBranches: localBranchesOutput.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
       head: parsed.head,
       detached: parsed.detached,
       upstream: parsed.upstream,
@@ -410,5 +430,12 @@ export class CodingGitService {
   async push(targetRoot: string): Promise<void> {
     await runGit(targetRoot, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
     await runGit(targetRoot, ['push']);
+  }
+
+  async switchBranch(targetRoot: string, branch: string): Promise<void> {
+    const value = branch.trim();
+    if (!value || value.startsWith('-')) throw new Error('Invalid Git branch.');
+    await runGit(targetRoot, ['check-ref-format', '--branch', value]);
+    await runGit(targetRoot, ['switch', '--', value]);
   }
 }

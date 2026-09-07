@@ -61,10 +61,18 @@ export const CodingInspectorTab = {
 export type CodingInspectorTab = (typeof CodingInspectorTab)[keyof typeof CodingInspectorTab];
 
 export const CodingSidePanelView = {
-  Git: 'git',
-  Inspector: 'inspector',
+  Launcher: 'launcher',
+  Files: 'files',
+  Review: 'review',
 } as const;
 export type CodingSidePanelView = (typeof CodingSidePanelView)[keyof typeof CodingSidePanelView];
+
+export const CodingGitQuickActionMode = {
+  Environment: 'environment',
+  Commit: 'commit',
+} as const;
+export type CodingGitQuickActionMode =
+  (typeof CodingGitQuickActionMode)[keyof typeof CodingGitQuickActionMode];
 
 export const CodingExternalActivityStatus = {
   Completed: 'completed',

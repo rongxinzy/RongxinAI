@@ -718,6 +718,12 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.CommitGitChanges, input),
     pushGitBranch: (input: import('../shared/codingAgent').CodingGitTargetInput) =>
       ipcRenderer.invoke(CodingAgentIpc.PushGitBranch, input),
+    switchGitBranch: (input: import('../shared/codingAgent').CodingGitBranchInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.SwitchGitBranch, input),
+    listWorkspaceFiles: (input: import('../shared/codingAgent').CodingWorkspaceFileInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.ListWorkspaceFiles, input),
+    readWorkspaceFile: (input: import('../shared/codingAgent').CodingWorkspaceFileInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.ReadWorkspaceFile, input),
     discoverAgents: (input: { workspaceRoot: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.DiscoverAgents, input),
     probeAgent: (input: { workspaceRoot: string; profileId: string }) =>
