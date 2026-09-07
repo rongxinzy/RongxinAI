@@ -39,6 +39,8 @@ export const CodingParticipants = ({
     ];
   });
 
+  if (items.length === 0) return null;
+
   return (
     <FluidTabs
       value={activeLaneId ?? ''}
