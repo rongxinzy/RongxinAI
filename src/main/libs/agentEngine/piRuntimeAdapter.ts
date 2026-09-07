@@ -43,6 +43,11 @@ import {
   type HarnessModelProfileInput,
 } from '../../../shared/harness';
 import {
+  ZhiyuanModelPoolHeader,
+  ZhiyuanModelPoolWorkload,
+  type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
+} from '../../../shared/modelPool/constants';
+import {
   MAX_STALE_PRODUCTION_ITERATIONS,
   ProductionLoopStatus,
 } from '../../../shared/productionLoop';
@@ -784,7 +789,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // default resource loader supplies the Pi Coding Assistant identity,
       // so override that loader per session to keep expert contexts isolated.
       // Resolve model early — needed by both MCP proxy and subagent tool
-      const resolvedModel = await resolvePiModel(pi, options.modelOverride);
+      const resolvedModel = await resolvePiModel(pi, options.modelOverride, undefined, {
+        conversationId: sessionId,
+        workload:
+          options.sessionMode === CoworkSessionMode.Chat
+            ? ZhiyuanModelPoolWorkload.Chat
+            : ZhiyuanModelPoolWorkload.Work,
+      });
       if (!isCurrentInitialization()) return;
       const modelId =
         typeof resolvedModel.model.id === 'string'
@@ -1602,7 +1613,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
     try {
       const pi = await getPiModules();
-      const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime);
+      const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime, {
+        conversationId: sessionId,
+        workload:
+          active.workbenchContract.kind === WorkbenchContractKind.Chat
+            ? ZhiyuanModelPoolWorkload.Chat
+            : ZhiyuanModelPoolWorkload.Work,
+      });
       const model = resolvedModel.model;
       await active.piSession.setModel(model);
       active.model = model;
@@ -2251,7 +2268,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   async chatDirect(prompt: string, modelId?: string): Promise<string> {
     const pi = await getPiModules();
-    const resolvedModel = await resolvePiModel(pi, modelId);
+    const resolvedModel = await resolvePiModel(pi, modelId, undefined, {
+      conversationId: randomUUID(),
+      workload: ZhiyuanModelPoolWorkload.Chat,
+    });
     const context = buildPiBackgroundCompletionContext([
       { role: SessionMemoryCompletionRole.User, content: prompt },
     ]);
@@ -3511,6 +3531,11 @@ const DEFAULT_PI_CLOUD_MAX_TOKENS = 32768;
 const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
 const PI_MANAGED_PROXY_API_KEY = `sk-zhiyuan-${randomUUID()}`;
 
+interface ModelPoolRequestContext {
+  conversationId: string;
+  workload: ZhiyuanModelPoolWorkloadValue;
+}
+
 function resolvePiCustomModelApi(resolution: ApiConfigResolution): ProviderModelPiApi {
   const configuredApi = resolution.providerMetadata?.piRuntime?.api;
   if (configuredApi) return configuredApi;
@@ -3528,6 +3553,7 @@ function hasRecordEntries(value: unknown): value is Record<string, unknown> {
 function buildPiCustomModel(
   resolution: ApiConfigResolution,
   baseUrlOverride?: string,
+  modelPoolRequestContext?: ModelPoolRequestContext,
 ): Record<string, unknown> {
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
@@ -3570,6 +3596,14 @@ function buildPiCustomModel(
       providerMetadata.contextTokens ||
       fallbackContextWindow,
     maxTokens: endpoint?.maxTokens || providerMetadata.maxTokens || fallbackMaxTokens,
+    ...(providerMetadata.providerName === ProviderName.Zhiyuan && modelPoolRequestContext
+      ? {
+          headers: {
+            [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
+            [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
+          },
+        }
+      : {}),
   };
 }
 
@@ -3639,6 +3673,7 @@ async function resolvePiCustomModelRuntime(
   resolution: ApiConfigResolution,
   builtinModel: Record<string, unknown> | null,
   existingModelRuntime?: PiModelRuntime | null,
+  modelPoolRequestContext?: ModelPoolRequestContext,
 ): Promise<PiCustomModelRuntimeResolution> {
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
@@ -3667,7 +3702,7 @@ async function resolvePiCustomModelRuntime(
     existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
   const api = resolvePiCustomModelApi(resolution);
   const runtimeBaseUrl = await resolvePiCustomModelBaseUrl(resolution, api);
-  const model = buildPiCustomModel(resolution, runtimeBaseUrl);
+  const model = buildPiCustomModel(resolution, runtimeBaseUrl, modelPoolRequestContext);
   const providerId = providerMetadata.providerName;
   modelRuntime.registerProvider(providerId, {
     name: providerId,
@@ -3713,6 +3748,7 @@ async function resolvePiModel(
   pi: PiModules,
   modelRef?: string,
   existingModelRuntime?: PiModelRuntime | null,
+  modelPoolRequestContext?: ModelPoolRequestContext,
 ): Promise<PiResolvedModel> {
   const normalizedModelRef = modelRef?.trim() || '';
   const resolution = normalizedModelRef
@@ -3729,9 +3765,11 @@ async function resolvePiModel(
     resolution,
     builtinModel,
     existingModelRuntime,
+    modelPoolRequestContext,
   );
   const modelRuntime = customRuntime.modelRuntime;
-  const customModel = customRuntime.customModel ?? buildPiCustomModel(resolution);
+  const customModel =
+    customRuntime.customModel ?? buildPiCustomModel(resolution, undefined, modelPoolRequestContext);
   const registeredModel = modelRuntime?.getModel(
     resolution.providerMetadata.providerName,
     resolution.config.model,

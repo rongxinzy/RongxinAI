@@ -2,7 +2,11 @@ import { app, ipcMain, session } from 'electron';
 
 import { ModelPoolIpc } from '../shared/ipc/channels';
 import { ModelPoolModelsSchema, ModelPoolStreamSchema } from '../shared/ipc/schemas';
-import { ZhiyuanModelPool } from '../shared/modelPool/constants';
+import {
+  ZhiyuanModelPool,
+  ZhiyuanModelPoolHeader,
+  ZhiyuanModelPoolWorkload,
+} from '../shared/modelPool/constants';
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { t } from './i18n';
 
@@ -47,6 +51,7 @@ async function fetchModelPool(
   body: Record<string, unknown>,
   token: string,
   signal: AbortSignal,
+  conversationId: string,
 ): Promise<Response> {
   return session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/chat/completions`, {
     method: 'POST',
@@ -54,6 +59,8 @@ async function fetchModelPool(
       Accept: 'text/event-stream',
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      [ZhiyuanModelPoolHeader.ConversationId]: conversationId,
+      [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Chat,
     },
     body: JSON.stringify({ ...body, model: ZhiyuanModelPool.FreeModelId, stream: true }),
     signal,
@@ -125,10 +132,20 @@ export function registerModelPoolIpcHandlers(
 
     try {
       let accessToken = await communityAuthSession.getModelPoolAccessToken();
-      let response = await fetchModelPool(input.body, accessToken, controller.signal);
+      let response = await fetchModelPool(
+        input.body,
+        accessToken,
+        controller.signal,
+        input.requestId,
+      );
       if (response.status === 401) {
         accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
-        response = await fetchModelPool(input.body, accessToken, controller.signal);
+        response = await fetchModelPool(
+          input.body,
+          accessToken,
+          controller.signal,
+          input.requestId,
+        );
       }
 
       if (!response.ok || !response.body) {
