@@ -1,14 +1,54 @@
 import { expect, test } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import { applyCoworkLanguagePrompt } from '../coworkLanguagePrompt';
 import { composeCoworkSystemPrompt } from './composer';
-import { ZhiyuanIdentityPrompt } from './constants';
+import { CoworkBundledPromptMarker, ZhiyuanIdentityPrompt } from './constants';
 
 const countOccurrences = (value: string, target: string): number => value.split(target).length - 1;
 
 const expert = (promptSnapshot: string) => ({
   promptSnapshot,
+});
+
+test('preserves the bundled identity once across composition and expert switching', () => {
+  const basePrompt = readFileSync('resources/SYSTEM_PROMPT.md', 'utf8');
+  let prompt = basePrompt;
+  for (let iteration = 0; iteration < 3; iteration += 1) {
+    prompt = composeCoworkSystemPrompt({ basePrompt: prompt, language: 'zh' });
+  }
+  expect(countOccurrences(prompt, CoworkBundledPromptMarker.IdentityStart)).toBe(1);
+  expect(prompt).not.toContain(ZhiyuanIdentityPrompt);
+  expect(prompt).toContain('北京容芯致远科技有限公司');
+
+  const selectedExpert = expert('Follow expert A SOP.');
+  const withExpert = composeCoworkSystemPrompt({
+    basePrompt: prompt,
+    expertSnapshots: [selectedExpert],
+    language: 'zh',
+  });
+  expect(withExpert.indexOf(selectedExpert.promptSnapshot)).toBeLessThan(
+    withExpert.indexOf(CoworkBundledPromptMarker.IdentityStart),
+  );
+  const restored = composeCoworkSystemPrompt({
+    basePrompt: withExpert,
+    previousExpertSnapshots: [selectedExpert],
+    language: 'zh',
+  });
+  expect(restored).toBe(prompt);
+});
+
+test('retains fallback identity when the bundled block is incomplete or empty', () => {
+  for (const basePrompt of [
+    '',
+    CoworkBundledPromptMarker.IdentityStart,
+    `${CoworkBundledPromptMarker.IdentityStart}\n ${CoworkBundledPromptMarker.IdentityEnd}`,
+    `${CoworkBundledPromptMarker.IdentityEnd} text ${CoworkBundledPromptMarker.IdentityStart}`,
+  ]) {
+    const prompt = composeCoworkSystemPrompt({ basePrompt, language: 'en' });
+    expect(countOccurrences(prompt, ZhiyuanIdentityPrompt)).toBe(1);
+  }
 });
 
 test('keeps managed prompt sections idempotent across repeated composition', () => {

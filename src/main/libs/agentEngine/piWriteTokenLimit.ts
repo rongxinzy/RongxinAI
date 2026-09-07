@@ -56,13 +56,11 @@ export const createPiLargeFileWriteSystemPrompt = (maxOutputTokens: number): str
   return [
     '## Large File Writes',
     '',
-    '- Use the built-in write tool only for new files or complete rewrites that fit safely in one response.',
-    `- Never put more than ${chunkCharacterLimit} characters in a single write.content or edit.edits[].newText when generating a large file.`,
-    '- For a large new file, use write to create a small skeleton with a unique continuation marker, then use edit to replace that marker with one content chunk plus the same marker.',
-    '- Emit only one content-bearing write or edit call per assistant response during a chunked write. Continue with the next chunk after the tool result.',
-    '- Remove the continuation marker and verify the completed file with read or grep before reporting success.',
-    '- For a complete rewrite of an existing file, assemble and verify a sibling temporary file first, then use the built-in bash tool to replace the target only after the temporary file is complete.',
-    '- If a write call hits the output token limit, do not retry the full content. Switch to the chunked write and edit workflow immediately.',
+    '- Use the built-in write tool for new files or complete rewrites that fit one response.',
+    `- Limit each write.content or edit.edits[].newText to ${chunkCharacterLimit} characters for large files.`,
+    '- For larger files, write a skeleton with a unique continuation marker; use edit to replace it with one chunk plus the marker. Emit only one content-bearing write or edit call per response, waiting for its result before continuing.',
+    '- Remove the marker and verify with read or grep before reporting success. For existing-file rewrites, build and verify a sibling temporary file before replacing the target with the built-in bash tool.',
+    '- On output token limit, switch to chunking immediately; never retry the full content.',
   ].join('\n');
 };
 

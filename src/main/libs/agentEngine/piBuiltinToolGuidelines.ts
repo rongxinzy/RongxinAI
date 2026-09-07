@@ -14,8 +14,6 @@ export const PiBuiltinFileToolSystemPrompt = [
   '## File tool usage',
   '',
   '- Use `read` to examine files instead of `cat` or `sed`.',
-  '- Use `edit` for precise changes; `edits[].oldText` must match the file content exactly.',
-  '- When changing multiple separate locations in one file, use one `edit` call with multiple entries in `edits[]` instead of multiple `edit` calls.',
-  '- Each `edits[].oldText` is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits; merge nearby changes into one entry.',
-  '- Keep `edits[].oldText` as small as possible while still being unique in the file.',
+  '- Use `edit` for precise changes. Batch separate changes to one file in one `edits[]` call.',
+  '- Each `edits[].oldText` must exactly match the original file and be minimal but unique. Entries must not overlap or nest; merge nearby changes.',
 ].join('\n');
