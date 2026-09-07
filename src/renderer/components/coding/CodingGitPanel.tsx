@@ -5,7 +5,7 @@ import { Input } from '@shared/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
-import { AlertTriangle, ChevronDown, ChevronRight, FileDiff, FileSearch, FolderGit2, FolderOpen, RefreshCw, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, FileDiff, FileSearch, FolderGit2, FolderOpen, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CodingGitDiffScope as CodingGitDiffScopeType, CodingGitFileChange, CodingGitStatus, CodingGitTargetInput } from '../../../shared/codingAgent';
@@ -109,7 +109,6 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
           refreshKey={refreshKey}
           mode={CodingGitQuickActionMode.Commit}
         />
-        <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('codingGitRefresh')} disabled={loading} onClick={() => void refresh()}>{loading ? <Spinner /> : <RefreshCw />}</Button>
         {onClose ? <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('close')} onClick={onClose}><X /></Button> : null}
       </div>
     </header>
