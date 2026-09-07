@@ -1138,10 +1138,10 @@ export const CodingWorkbenchView = ({
                 const active = tab === sidePanelView;
                 return (
                   active ? (
-                    <ButtonGroup key={tab} className="group shrink-0">
+                    <ButtonGroup key={tab} className="group theme-button theme-button-secondary shrink-0">
                       <Button
                         type="button"
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
                         onClick={() => openSidePanelTab(tab)}
                       >
@@ -1150,7 +1150,7 @@ export const CodingWorkbenchView = ({
                       </Button>
                       <Button
                         type="button"
-                        variant="secondary"
+                        variant="ghost"
                         size="icon-xs"
                         className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
                         aria-label={i18nService.t('close')}
