@@ -3,6 +3,7 @@ import path from 'path';
 import {
   CodingLaneStatus,
   type CodingGitCommitInput,
+  type CodingGitBranchInput,
   type CodingGitDiffInput,
   type CodingGitPathActionInput,
   type CodingGitStatus,
@@ -54,6 +55,12 @@ export class CodingGitController {
   async push(input: CodingGitTargetInput): Promise<CodingGitStatus> {
     const target = this.resolveMutableTarget(input);
     await this.git.push(target.targetRoot);
+    return await this.git.getStatus(target.targetRoot, target);
+  }
+
+  async switchBranch(input: CodingGitBranchInput): Promise<CodingGitStatus> {
+    const target = this.resolveMutableTarget(input);
+    await this.git.switchBranch(target.targetRoot, input.branch);
     return await this.git.getStatus(target.targetRoot, target);
   }
 

@@ -13,10 +13,9 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import { FileDiff, FolderGit2, GitBranch, Layers, PanelRight, Settings2 } from 'lucide-react';
+import { File, FileDiff, FolderGit2, Layers, PanelRight, Plus, Settings2, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -46,6 +45,8 @@ import {
 } from '../../store/slices/artifactSlice';
 import PageHeader from '../PageHeader';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
+import ArtifactPanelResizeHandle from '../artifacts/ArtifactPanelResizeHandle';
+import { clampArtifactPanelWidth } from '../artifacts/artifactPanelResize';
 import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
@@ -54,7 +55,9 @@ import { CodingAuthAndPermissionDialogs } from './CodingAuthAndPermissionDialogs
 import { CodingComposer } from './CodingComposer';
 import { CodingEventStream } from './CodingEventStream';
 import { CodingGitPanel } from './CodingGitPanel';
-import { CodingInspector } from './CodingInspector';
+import { CodingGitQuickActions } from './CodingGitQuickActions';
+import { CodingWorkspaceFileBrowser } from './CodingWorkspaceFileBrowser';
+import { CodingSidePanelLauncher } from './CodingSidePanelLauncher';
 import { CodingParticipants } from './CodingParticipants';
 import { CodingSessionSetupDialog } from './CodingSessionSetupDialog';
 import {
@@ -73,6 +76,8 @@ const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
 
 const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
+const CODING_PANEL_MIN_WIDTH = 280;
+const CODING_PANEL_DEFAULT_WIDTH = 560;
 
 const ArtifactPanelFrame = lazy(() =>
   import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
@@ -106,9 +111,12 @@ export const CodingWorkbenchView = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
-  const [inspectorSheetOpen, setInspectorSheetOpen] = useState(false);
-  const [gitSheetOpen, setGitSheetOpen] = useState(false);
+  const [sidePanelSheetOpen, setSidePanelSheetOpen] = useState(false);
   const [sidePanelView, setSidePanelView] = useState<CodingSidePanelViewType | null>(null);
+  const [sidePanelTabs, setSidePanelTabs] = useState<CodingSidePanelViewType[]>([]);
+  const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
+  const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() => window.innerWidth < 1024);
   const [laneChangePreview, setLaneChangePreview] = useState<string | null>(null);
   const [applyConflict, setApplyConflict] = useState<string | null>(null);
   const [authTerminal, setAuthTerminal] = useState<{
@@ -127,6 +135,8 @@ export const CodingWorkbenchView = ({
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
+  const workbenchRef = useRef<HTMLDivElement | null>(null);
+  const transientSidePanelWidthRef = useRef<number | null>(null);
   const sessionSetupSelectionKeyRef = useRef<string | null>(null);
   const selectionKey = `${workspaceRoot}:${selectedLaneId ?? ''}:${draftSession?.id ?? ''}`;
   useEffect(() => {
@@ -339,23 +349,75 @@ export const CodingWorkbenchView = ({
         : [],
     [activeLane, snapshot],
   );
-  const hasInspectorContent = useMemo(
-    () =>
-      activeEvents.some(
-        event =>
-          event.kind === CodingEventKind.FileChange || event.kind === CodingEventKind.Terminal,
-      ),
-    [activeEvents],
-  );
   const gitSourceRoot =
     draftSession?.sourceRoot ??
     activeLane?.sourceRoot ??
     snapshot?.room.workspaceRoot ??
     workspaceRoot;
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
-  const desktopSidePanelOpen =
-    sidePanelView === CodingSidePanelView.Git ||
-    (sidePanelView === CodingSidePanelView.Inspector && hasInspectorContent);
+  const desktopSidePanelOpen = sidePanelView !== null && !isNarrowViewport;
+  const resolvedSidePanelWidth = clampArtifactPanelWidth(
+    sidePanelWidth,
+    CODING_PANEL_MIN_WIDTH,
+    sidePanelMaxWidth,
+  );
+  const renderedSidePanelWidth = transientSidePanelWidthRef.current ?? resolvedSidePanelWidth;
+  const visibleSidePanelTabs =
+    sidePanelTabs.length > 0
+      ? sidePanelTabs
+      : sidePanelView !== null && sidePanelView !== CodingSidePanelView.Launcher
+        ? [sidePanelView]
+        : [];
+
+  const applySidePanelFrameWidth = useCallback(
+    (width: number) => {
+      const nextWidth = clampArtifactPanelWidth(
+        width,
+        CODING_PANEL_MIN_WIDTH,
+        sidePanelMaxWidth,
+      );
+      transientSidePanelWidthRef.current = nextWidth;
+      if (workbenchRef.current) {
+        workbenchRef.current.style.gridTemplateColumns = `minmax(0, 1fr) ${nextWidth}px`;
+      }
+    },
+    [sidePanelMaxWidth],
+  );
+
+  const completeSidePanelResize = useCallback(
+    (width: number) => {
+      const nextWidth = clampArtifactPanelWidth(
+        width,
+        CODING_PANEL_MIN_WIDTH,
+        sidePanelMaxWidth,
+      );
+      transientSidePanelWidthRef.current = null;
+      setSidePanelWidth(nextWidth);
+    },
+    [sidePanelMaxWidth],
+  );
+
+  useEffect(() => {
+    const root = workbenchRef.current;
+    if (!root) return;
+    const updateMaxWidth = () => {
+      const maxWidth = resolveArtifactPanelMaxWidth(root.clientWidth, CODING_PANEL_MIN_WIDTH);
+      setSidePanelMaxWidth(maxWidth);
+      setSidePanelWidth(current => clampArtifactPanelWidth(current, CODING_PANEL_MIN_WIDTH, maxWidth));
+    };
+    updateMaxWidth();
+    const observer = new ResizeObserver(updateMaxWidth);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1023px)');
+    const syncViewport = () => setIsNarrowViewport(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
+  }, []);
   const activePermission = useMemo(
     () =>
       activeLane?.status === CodingLaneStatus.WaitingApproval
@@ -392,10 +454,30 @@ export const CodingWorkbenchView = ({
   }, [activeLane?.id]);
 
   useEffect(() => {
-    setSidePanelView(current => (current === CodingSidePanelView.Inspector ? null : current));
-    setInspectorSheetOpen(false);
-    setGitSheetOpen(false);
+    setSidePanelView(null);
+    setSidePanelTabs([]);
+    setSidePanelSheetOpen(false);
   }, [activeLane?.id]);
+
+  const openSidePanelTab = useCallback((view: CodingSidePanelViewType) => {
+    if (view === CodingSidePanelView.Launcher) {
+      setSidePanelView(CodingSidePanelView.Launcher);
+      return;
+    }
+    setSidePanelTabs(current => (current.includes(view) ? current : [...current, view]));
+    setSidePanelView(view);
+  }, []);
+
+  const closeSidePanelTab = useCallback(
+    (view: CodingSidePanelViewType) => {
+      const nextTabs = sidePanelTabs.filter(tab => tab !== view);
+      setSidePanelTabs(nextTabs);
+      setSidePanelView(active =>
+        active === view ? (nextTabs.at(-1) ?? CodingSidePanelView.Launcher) : active,
+      );
+    },
+    [sidePanelTabs],
+  );
 
   const prompt = draftSession
     ? newSessionDraftState.id === draftSession.id
@@ -696,11 +778,17 @@ export const CodingWorkbenchView = ({
 
   return (
     <div
+      ref={workbenchRef}
       data-page-canvas
       className={cn(
         'grid h-full min-h-0 bg-background',
-        desktopSidePanelOpen ? 'grid-cols-[minmax(0,1fr)_360px] max-lg:grid-cols-1' : 'grid-cols-1',
+        'grid-cols-1',
       )}
+      style={
+        desktopSidePanelOpen
+          ? { gridTemplateColumns: `minmax(0, 1fr) ${renderedSidePanelWidth}px` }
+          : undefined
+      }
     >
       <main className="relative flex min-h-0 flex-col">
         <CodingAuthAndPermissionDialogs
@@ -836,6 +924,18 @@ export const CodingWorkbenchView = ({
               >
                 <Settings2 />
               </Button>
+              <CodingGitQuickActions
+                target={{
+                  workspaceRoot,
+                  laneId: activeLane?.id ?? undefined,
+                  sourceRoot: gitSourceRoot,
+                }}
+                refreshKey={gitRefreshKey}
+                onOpenReview={() => {
+                  openSidePanelTab(CodingSidePanelView.Review);
+                  if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                }}
+              />
               {artifactSessionKey && laneArtifacts.length > 0 && (
                 <Button
                   type="button"
@@ -860,87 +960,21 @@ export const CodingWorkbenchView = ({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="max-lg:hidden"
-                aria-label={i18nService.t('codingGitPanel')}
-                aria-pressed={sidePanelView === CodingSidePanelView.Git}
-                onClick={() =>
-                  setSidePanelView(current =>
-                    current === CodingSidePanelView.Git ? null : CodingSidePanelView.Git,
-                  )
-                }
-              >
-                <GitBranch />
-              </Button>
-              <Sheet open={gitSheetOpen} onOpenChange={setGitSheetOpen}>
-                <SheetTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="lg:hidden"
-                      aria-label={i18nService.t('codingGitPanel')}
-                    />
+                aria-label={i18nService.t('codingAgentSidePanel')}
+                aria-pressed={sidePanelView !== null}
+                onClick={() => {
+                  const closeEmptyPanel = sidePanelView !== null && sidePanelTabs.length === 0;
+                  if (closeEmptyPanel) {
+                    setSidePanelView(null);
+                    setSidePanelSheetOpen(false);
+                    return;
                   }
-                >
-                  <GitBranch />
-                </SheetTrigger>
-                <SheetContent side="bottom" className="theme-control-sizing-4 h-[80dvh]">
-                  <SheetHeader className="sr-only">
-                    <SheetTitle>{i18nService.t('codingGitPanel')}</SheetTitle>
-                  </SheetHeader>
-                  <CodingGitPanel
-                    workspaceRoot={workspaceRoot}
-                    laneId={activeLane?.id ?? null}
-                    sourceRoot={gitSourceRoot}
-                    refreshKey={gitRefreshKey}
-                  />
-                </SheetContent>
-              </Sheet>
-              {hasInspectorContent && (
-                <>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="max-lg:hidden"
-                    aria-label={i18nService.t('codingAgentInspector')}
-                    aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
-                    onClick={() =>
-                      setSidePanelView(current =>
-                        current === CodingSidePanelView.Inspector
-                          ? null
-                          : CodingSidePanelView.Inspector,
-                      )
-                    }
-                  >
-                    <PanelRight />
-                  </Button>
-                  <Sheet open={inspectorSheetOpen} onOpenChange={setInspectorSheetOpen}>
-                    <SheetTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="lg:hidden"
-                          aria-label={i18nService.t('codingAgentInspector')}
-                        >
-                          <PanelRight />
-                        </Button>
-                      }
-                    />
-                    <SheetContent side="bottom" className="theme-control-sizing-4 h-[70dvh]">
-                      <SheetHeader>
-                        <SheetTitle>{i18nService.t('codingAgentInspector')}</SheetTitle>
-                      </SheetHeader>
-                      <div className="min-h-0 flex-1">
-                        <CodingInspector events={activeEvents} />
-                      </div>
-                    </SheetContent>
-                  </Sheet>
-                </>
-              )}
+                  openSidePanelTab(CodingSidePanelView.Launcher);
+                  if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                }}
+              >
+                <PanelRight />
+              </Button>
             </>
           }
         />
@@ -1106,20 +1140,111 @@ export const CodingWorkbenchView = ({
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
       {desktopSidePanelOpen && (
-        <aside className="min-h-0 border-l border-border-subtle max-lg:hidden">
-          {sidePanelView === CodingSidePanelView.Git ? (
+        <aside className="relative flex min-h-0 flex-col border-l border-border-subtle max-lg:hidden">
+          <ArtifactPanelResizeHandle
+            ariaLabel={i18nService.t('codingAgentSidePanel')}
+            currentWidth={resolvedSidePanelWidth}
+            minWidth={CODING_PANEL_MIN_WIDTH}
+            maxWidth={sidePanelMaxWidth}
+            onResizeFrame={applySidePanelFrameWidth}
+            onResizeComplete={completeSidePanelResize}
+          />
+          <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-2">
+              {visibleSidePanelTabs.map(tab => {
+                const isReview = tab === CodingSidePanelView.Review;
+                const active = tab === sidePanelView;
+                return (
+                  <div key={tab} className="group flex items-center gap-0">
+                    <Button
+                      type="button"
+                      variant={active ? 'secondary' : 'ghost'}
+                      size="sm"
+                      onClick={() => openSidePanelTab(tab)}
+                    >
+                      {isReview ? <FileDiff /> : <File />}
+                      {i18nService.t(isReview ? 'codingAgentReview' : 'codingAgentOpenFiles')}
+                    </Button>
+                    {active ? (
+                      <Button
+                        type="button"
+                        variant={active ? 'secondary' : 'ghost'}
+                        size="icon-xs"
+                        className={active ? undefined : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}
+                        aria-label={i18nService.t('close')}
+                        onClick={() => closeSidePanelTab(tab)}
+                      >
+                        <X />
+                      </Button>
+                    ) : null}
+                  </div>
+                );
+              })}
+              <Button
+                type="button"
+                variant="toolbar"
+                size="icon-sm"
+                className={visibleSidePanelTabs.length === 0 ? 'ml-auto' : undefined}
+                aria-label={i18nService.t('codingAgentSidePanel')}
+                onClick={() => openSidePanelTab(CodingSidePanelView.Launcher)}
+              >
+                <Plus />
+              </Button>
+          </div>
+          <div className="min-h-0 flex-1">
+            {sidePanelView === CodingSidePanelView.Launcher ? (
+              <CodingSidePanelLauncher
+                onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
+                onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+              />
+            ) : sidePanelView === CodingSidePanelView.Files ? (
+              <CodingWorkspaceFileBrowser
+                workspaceRoot={workspaceRoot}
+                sourceRoot={gitSourceRoot}
+                onClose={() => closeSidePanelTab(CodingSidePanelView.Files)}
+              />
+            ) : (
+              <CodingGitPanel
+                workspaceRoot={workspaceRoot}
+                laneId={activeLane?.id ?? null}
+                sourceRoot={gitSourceRoot}
+                refreshKey={gitRefreshKey}
+              />
+            )}
+          </div>
+        </aside>
+      )}
+      <Sheet open={sidePanelSheetOpen} onOpenChange={setSidePanelSheetOpen}>
+        <SheetContent side="bottom" className="theme-control-sizing-4 h-[80dvh]">
+          <SheetHeader className="sr-only">
+            <SheetTitle>
+              {sidePanelView === CodingSidePanelView.Launcher
+                ? i18nService.t('codingAgentSidePanel')
+                : sidePanelView === CodingSidePanelView.Files
+                ? i18nService.t('codingAgentFiles')
+                : i18nService.t('codingAgentReview')}
+            </SheetTitle>
+          </SheetHeader>
+          {sidePanelView === CodingSidePanelView.Launcher ? (
+            <CodingSidePanelLauncher
+              onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
+              onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+            />
+          ) : sidePanelView === CodingSidePanelView.Files ? (
+            <CodingWorkspaceFileBrowser
+              workspaceRoot={workspaceRoot}
+              sourceRoot={gitSourceRoot}
+              onClose={() => closeSidePanelTab(CodingSidePanelView.Files)}
+            />
+          ) : (
             <CodingGitPanel
               workspaceRoot={workspaceRoot}
               laneId={activeLane?.id ?? null}
               sourceRoot={gitSourceRoot}
               refreshKey={gitRefreshKey}
-              onClose={() => setSidePanelView(null)}
             />
-          ) : (
-            <CodingInspector events={activeEvents} />
           )}
-        </aside>
-      )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

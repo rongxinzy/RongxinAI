@@ -8,6 +8,7 @@ import {
 } from './artifactPanelResize';
 
 interface ArtifactPanelResizeHandleProps {
+  ariaLabel?: string;
   currentWidth: number;
   minWidth: number;
   maxWidth: number;
@@ -16,6 +17,7 @@ interface ArtifactPanelResizeHandleProps {
 }
 
 const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
+  ariaLabel,
   currentWidth,
   minWidth,
   maxWidth,
@@ -151,7 +153,7 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
 
   return (
     <div
-      aria-label={i18nService.t('artifactResizePreview')}
+      aria-label={ariaLabel ?? i18nService.t('artifactResizePreview')}
       aria-orientation="vertical"
       aria-valuemax={Math.round(maxWidth)}
       aria-valuemin={Math.round(minWidth)}
