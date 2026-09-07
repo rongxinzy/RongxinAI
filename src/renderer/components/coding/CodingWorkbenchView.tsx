@@ -15,7 +15,7 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import { File, FileDiff, FolderGit2, Layers, PanelRight, Plus, Settings2, X } from 'lucide-react';
+import { Expand, File, FileDiff, FolderGit2, Layers, Minimize2, PanelRight, Plus, Settings2, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -1184,11 +1184,33 @@ export const CodingWorkbenchView = ({
                 type="button"
                 variant="toolbar"
                 size="icon-sm"
-                className={visibleSidePanelTabs.length === 0 ? 'ml-auto' : undefined}
-                aria-label={i18nService.t('codingAgentSidePanel')}
+                aria-label={i18nService.t('codingAgentAddPage')}
                 onClick={() => openSidePanelTab(CodingSidePanelView.Launcher)}
               >
                 <Plus />
+              </Button>
+              <Button
+                type="button"
+                variant="toolbar"
+                size="icon-sm"
+                aria-label={i18nService.t(sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand')}
+                aria-pressed={sidePanelExpanded}
+                onClick={() => setSidePanelExpanded(current => !current)}
+              >
+                {sidePanelExpanded ? <Minimize2 /> : <Expand />}
+              </Button>
+              <Button
+                type="button"
+                variant="toolbar"
+                size="icon-sm"
+                aria-label={i18nService.t('codingAgentSidePanel')}
+                onClick={() => {
+                  setSidePanelExpanded(false);
+                  setSidePanelView(null);
+                  setSidePanelTabs([]);
+                }}
+              >
+                <PanelRight />
               </Button>
           </div>
           <div className="min-h-0 flex-1">
@@ -1209,8 +1231,6 @@ export const CodingWorkbenchView = ({
                 laneId={activeLane?.id ?? null}
                 sourceRoot={gitSourceRoot}
                 refreshKey={gitRefreshKey}
-                isExpanded={sidePanelExpanded}
-                onToggleExpanded={() => setSidePanelExpanded(current => !current)}
               />
             )}
           </div>
