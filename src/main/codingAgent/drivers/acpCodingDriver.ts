@@ -51,6 +51,7 @@ type EventStream = {
   error: Error | null;
 };
 type PendingPermission = {
+  streamSessionId: string;
   resolve: (result: Record<string, unknown>) => void;
   reject: (error: Error) => void;
 };
@@ -410,6 +411,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'user'));
     const stream: EventStream = { events: [], waiters: [], done: false, error: null };
     this.streams.set(input.sessionId, stream);
+    console.debug(`[AcpCodingDriver] started session prompt for ${input.sessionId}`);
     void this.supervisor
       .request(
         AcpMethod.SessionPrompt,
@@ -425,8 +427,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
         // agent finishing normally or by the user cancelling.
         { timeoutMs: 5 * 60 * 1000 },
       )
-      .then(() => this.finishStream(input.sessionId))
-      .catch(error => this.finishStream(input.sessionId, error));
+      .then(() => {
+        console.debug(`[AcpCodingDriver] session prompt completed for ${input.sessionId}`);
+        this.finishStream(input.sessionId);
+      })
+      .catch(error => {
+        console.warn(`[AcpCodingDriver] session prompt failed for ${input.sessionId}:`, error);
+        this.finishStream(input.sessionId, error);
+      });
     try {
       while (true) {
         const next = await this.nextEvent(stream);
@@ -442,6 +450,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.supervisor.notify(AcpMethod.SessionCancel, { sessionId });
     this.finishStream(sessionId, new Error('ACP session prompt was cancelled.'));
     for (const [requestId, pending] of this.permissions) {
+      if (pending.streamSessionId !== sessionId) continue;
       pending.resolve({ outcome: { outcome: CodingPermissionOutcome.Cancelled } });
       this.permissions.delete(requestId);
     }
@@ -460,6 +469,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
           : { outcome: CodingPermissionOutcome.Selected, optionId: response.optionId },
     });
     this.permissions.delete(response.requestId);
+    console.debug(`[AcpCodingDriver] received permission response ${response.requestId}`);
   }
 
   async setConfigOption(
@@ -634,7 +644,17 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (typeof params.sessionId !== 'string')
       throw new Error('ACP permission request has no session ID.');
     const requestId = randomUUID();
-    this.pushEvent(params.sessionId, {
+    const streamSessionId = this.resolvePermissionStreamSessionId(params.sessionId);
+    if (!streamSessionId) {
+      throw new Error('ACP permission request has no active session prompt.');
+    }
+    console.debug(
+      `[AcpCodingDriver] received permission request for ${params.sessionId}; delivering it to ${streamSessionId}`,
+    );
+    const permission = new Promise<Record<string, unknown>>((resolve, reject) => {
+      this.permissions.set(requestId, { streamSessionId, resolve, reject });
+    });
+    if (!this.pushEvent(streamSessionId, {
       kind: CodingEventKind.Permission,
       payload: {
         requestId,
@@ -642,10 +662,12 @@ export class AcpCodingDriver implements CodingAgentDriver {
         toolCall: params.toolCall,
         options: params.options,
       },
-    });
-    return await new Promise<Record<string, unknown>>((resolve, reject) => {
-      this.permissions.set(requestId, { resolve, reject });
-    });
+    })) {
+      this.permissions.delete(requestId);
+      throw new Error('ACP permission request could not be delivered to the session prompt.');
+    }
+    console.debug(`[AcpCodingDriver] published permission request ${requestId}`);
+    return await permission;
   }
 
   private async readWorkspaceFile(
@@ -873,12 +895,20 @@ export class AcpCodingDriver implements CodingAgentDriver {
     return messageId;
   }
 
-  private pushEvent(sessionId: string, event: DriverEvent): void {
+  private resolvePermissionStreamSessionId(sessionId: string): string | null {
+    if (this.streams.has(sessionId)) return sessionId;
+    if (this.streams.size !== 1) return null;
+    const onlySessionId = this.streams.keys().next().value;
+    return typeof onlySessionId === 'string' ? onlySessionId : null;
+  }
+
+  private pushEvent(sessionId: string, event: DriverEvent): boolean {
     const stream = this.streams.get(sessionId);
-    if (!stream || stream.done) return;
+    if (!stream || stream.done) return false;
     const waiter = stream.waiters.shift();
     if (waiter) waiter.resolve({ done: false, value: event });
     else stream.events.push(event);
+    return true;
   }
 
   private finishStream(sessionId: string, error?: unknown): void {
@@ -886,6 +916,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (!stream || stream.done) return;
     stream.done = true;
     stream.error = error instanceof Error ? error : error ? new Error(String(error)) : null;
+    console.debug(
+      `[AcpCodingDriver] finished session prompt for ${sessionId}${stream.error ? ' with an error' : ''}`,
+    );
+    for (const [requestId, pending] of this.permissions) {
+      if (pending.streamSessionId !== sessionId) continue;
+      pending.reject(stream.error ?? new Error('ACP session prompt ended before permission response.'));
+      this.permissions.delete(requestId);
+    }
     for (const waiter of stream.waiters.splice(0)) {
       if (stream.error) waiter.reject(stream.error);
       else waiter.resolve({ done: true, value: undefined });

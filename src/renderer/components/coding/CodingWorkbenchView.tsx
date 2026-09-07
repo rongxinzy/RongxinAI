@@ -75,6 +75,7 @@ import {
 import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspaceSidebar';
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
+import { findPendingCodingPermission } from './codingPermission';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
@@ -392,6 +393,7 @@ export const CodingWorkbenchView = ({
   // on the event count would rerun `git status` on every streamed chunk.
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${gitRefreshVersion}`;
   const desktopSidePanelOpen =
+<<<<<<< HEAD
     !isNarrowViewport &&
     !sidePanelHidden &&
     sidePanelView !== null &&
@@ -468,6 +470,25 @@ export const CodingWorkbenchView = ({
         : null,
     [activeEvents, activeLane?.status],
   );
+=======
+    sidePanelView === CodingSidePanelView.Git ||
+    (sidePanelView === CodingSidePanelView.Inspector && hasInspectorContent);
+  const activePermission = useMemo(() => {
+    const waitingLaneIds = new Set(
+      (snapshot?.lanes ?? [])
+        .filter(lane => lane.status === CodingLaneStatus.WaitingApproval)
+        .map(lane => lane.id),
+    );
+    if (waitingLaneIds.size === 0) return null;
+    if (activeLane && waitingLaneIds.has(activeLane.id)) {
+      const selectedPermission = findPendingCodingPermission(activeEvents);
+      if (selectedPermission) return selectedPermission;
+    }
+    const waitingEvents =
+      snapshot?.events.filter(event => waitingLaneIds.has(event.laneId)) ?? [];
+    return findPendingCodingPermission(waitingEvents);
+  }, [activeEvents, activeLane, snapshot]);
+>>>>>>> 5750d0f0 (feat(编程页面): 1.修复编程模式下不能进行审批的bug；优化编程模式下的前端呈现效果)
   const recoveryLane =
     activeLane?.pendingRecoveryPrompt && activeLane.pendingRecoveryContext ? activeLane : null;
 

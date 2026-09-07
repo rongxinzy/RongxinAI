@@ -36,6 +36,8 @@ export type ToolHeaderProps = {
   title?: string;
   className?: string;
   statusLabel?: string;
+  /** Places the execution status beside the collapse control. */
+  statusAtEnd?: boolean;
   /** Overrides the default wrench icon, e.g. to reflect an ACP tool kind. */
   icon?: ReactNode;
 } & (
@@ -58,13 +60,13 @@ const statusLabels: Record<ToolPart['state'], string> = {
 };
 
 const statusIcons: Record<ToolPart['state'], ReactNode> = {
-  'approval-requested': <ClockIcon className="size-4 text-yellow-600" />,
-  'approval-responded': <CheckCircleIcon className="size-4 text-blue-600" />,
-  'input-available': <ClockIcon className="size-4 animate-pulse" />,
-  'input-streaming': <CircleIcon className="size-4" />,
-  'output-available': <CheckCircleIcon className="size-4 text-green-600" />,
-  'output-denied': <XCircleIcon className="size-4 text-orange-600" />,
-  'output-error': <XCircleIcon className="size-4 text-red-600" />,
+  'approval-requested': <ClockIcon className="size-4 text-warning" />,
+  'approval-responded': <CheckCircleIcon className="size-4 text-primary" />,
+  'input-available': <ClockIcon className="size-4 animate-pulse text-primary" />,
+  'input-streaming': <CircleIcon className="size-4 text-muted-foreground" />,
+  'output-available': <CheckCircleIcon className="size-4 text-success" />,
+  'output-denied': <XCircleIcon className="size-4 text-warning" />,
+  'output-error': <XCircleIcon className="size-4 text-destructive" />,
 };
 
 export const getStatusBadge = (status: ToolPart['state'], label = statusLabels[status]) => (
@@ -81,22 +83,31 @@ export const ToolHeader = ({
   state,
   statusLabel,
   toolName,
+  statusAtEnd = false,
   icon,
   ...props
 }: ToolHeaderProps) => {
   const derivedName = type === 'dynamic-tool' ? toolName : type.split('-').slice(1).join('-');
+  const statusBadge = getStatusBadge(state, statusLabel);
 
   return (
     <CollapsibleTrigger
-      className={cn('flex w-full items-center justify-between gap-4 p-3', className)}
+      className={cn('group/trigger flex w-full items-center gap-4 p-3', className)}
       {...props}
     >
-      <div className="flex items-center gap-2">
-        {icon ?? <WrenchIcon className="size-4 text-muted-foreground" />}
-        <span className="font-medium text-sm">{title ?? derivedName}</span>
-        {getStatusBadge(state, statusLabel)}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="flex size-4 shrink-0 items-center justify-center">
+          {icon ?? <WrenchIcon className="size-4 text-muted-foreground" />}
+        </span>
+        <span className="min-w-0 truncate font-medium text-sm">{title ?? derivedName}</span>
+        {!statusAtEnd && statusBadge}
       </div>
-      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {statusAtEnd && statusBadge}
+        <ChevronDownIcon
+          className="size-4 rotate-0 text-muted-foreground transition-transform group-data-[panel-open]/trigger:rotate-180"
+        />
+      </div>
     </CollapsibleTrigger>
   );
 };

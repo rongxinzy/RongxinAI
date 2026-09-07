@@ -1340,6 +1340,7 @@ export class CodingRoomService extends EventEmitter {
     );
     if (!event) throw new Error('The coding permission request was not found.');
     const lane = this.requireLane(snapshot.lanes, event.laneId);
+    console.debug(`[CodingRoom] received permission response for lane ${lane.id}`);
     if (this.registry.get(lane.profileId)?.driverKind === CodingAgentDriverKind.Builtin) {
       if (!this.runtime.respondBuiltinPermission) {
         throw new Error('The built-in coding runtime cannot respond to permissions.');
@@ -1639,6 +1640,9 @@ export class CodingRoomService extends EventEmitter {
           driver.getSessionAvailableCommands(sessionId),
         );
         if (event.kind === CodingEventKind.Permission) {
+          console.debug(
+            `[CodingRoom] published permission request for lane ${lane.id} while session ${sessionId} is waiting`,
+          );
           this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
           this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
           const assignment = this.repository.getLatestAssignmentForLane(lane.id);
@@ -1690,6 +1694,7 @@ export class CodingRoomService extends EventEmitter {
         return;
       }
       const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+      console.error(`[CodingRoom] coding turn failed for lane ${lane.id}:`, error);
       if (assignment?.workbenchRunId) {
         this.runtime.failExternalWorkbenchRun?.({
           sessionId: lane.localSessionId,
