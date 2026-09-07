@@ -5,7 +5,11 @@ import {
   type CoworkPromptLanguage,
   stripCoworkLanguagePrompts,
 } from '../coworkLanguagePrompt';
-import { CoworkManagedPromptMarker, ZhiyuanIdentityPrompt } from './constants';
+import {
+  CoworkBundledPromptMarker,
+  CoworkManagedPromptMarker,
+  ZhiyuanIdentityPrompt,
+} from './constants';
 
 type ExpertPromptSnapshot = Pick<CoworkSessionExpertSnapshot, 'promptSnapshot'>;
 
@@ -85,12 +89,22 @@ export const composeCoworkSystemPrompt = ({
   language,
 }: ComposeCoworkSystemPromptOptions): string => {
   const normalizedBasePrompt = stripManagedCoworkPrompt(basePrompt, previousExpertSnapshots);
+  const identityStart = normalizedBasePrompt.indexOf(CoworkBundledPromptMarker.IdentityStart);
+  const identityContentStart = identityStart + CoworkBundledPromptMarker.IdentityStart.length;
+  const identityEnd = normalizedBasePrompt.indexOf(
+    CoworkBundledPromptMarker.IdentityEnd,
+    identityContentStart,
+  );
+  const hasBundledIdentity =
+    identityStart >= 0 &&
+    identityEnd > identityContentStart &&
+    normalizedBasePrompt.slice(identityContentStart, identityEnd).trim().length > 0;
   const expertPrompt = expertSnapshots
     .map(expert => expert.promptSnapshot.trim())
     .filter(Boolean)
     .join('\n\n');
   const sections = [
-    expertPrompt
+    expertPrompt || hasBundledIdentity
       ? null
       : managedBlock(
           CoworkManagedPromptMarker.IdentityStart,
