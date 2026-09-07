@@ -50,6 +50,7 @@ type UseLocalInferenceAccessSettingsInput = {
 };
 
 type UseLocalInferenceAccessSettingsResult = {
+  serviceConfig: LlamaCppServiceConfig;
   accessSettingsOpen: boolean;
   draftAllowLanAccess: boolean;
   draftKeepRunningOnAppQuit: boolean;
@@ -177,6 +178,7 @@ export function useLocalInferenceAccessSettings(
   ]);
 
   return {
+    serviceConfig,
     accessSettingsOpen,
     draftAllowLanAccess,
     draftKeepRunningOnAppQuit,
