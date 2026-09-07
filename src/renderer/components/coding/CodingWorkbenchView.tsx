@@ -1189,29 +1189,31 @@ export const CodingWorkbenchView = ({
               >
                 <Plus />
               </Button>
-              <Button
-                type="button"
-                variant="toolbar"
-                size="icon-sm"
-                aria-label={i18nService.t(sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand')}
-                aria-pressed={sidePanelExpanded}
-                onClick={() => setSidePanelExpanded(current => !current)}
-              >
-                {sidePanelExpanded ? <Minimize2 /> : <Expand />}
-              </Button>
-              <Button
-                type="button"
-                variant="toolbar"
-                size="icon-sm"
-                aria-label={i18nService.t('codingAgentSidePanel')}
-                onClick={() => {
-                  setSidePanelExpanded(false);
-                  setSidePanelView(null);
-                  setSidePanelTabs([]);
-                }}
-              >
-                <PanelRight />
-              </Button>
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="toolbar"
+                  size="icon-sm"
+                  aria-label={i18nService.t(sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand')}
+                  aria-pressed={sidePanelExpanded}
+                  onClick={() => setSidePanelExpanded(current => !current)}
+                >
+                  {sidePanelExpanded ? <Minimize2 /> : <Expand />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="toolbar"
+                  size="icon-sm"
+                  aria-label={i18nService.t('codingAgentSidePanel')}
+                  onClick={() => {
+                    setSidePanelExpanded(false);
+                    setSidePanelView(null);
+                    setSidePanelTabs([]);
+                  }}
+                >
+                  <PanelRight />
+                </Button>
+              </div>
           </div>
           <div className="min-h-0 flex-1">
             {sidePanelView === CodingSidePanelView.Launcher ? (
