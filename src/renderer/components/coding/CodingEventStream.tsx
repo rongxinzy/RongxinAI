@@ -168,7 +168,7 @@ export const CodingEventStream = ({
   return (
     <div
       ref={scrollAreaRef}
-      className="min-h-0 flex-1"
+      className="min-h-0 min-w-0 flex-1 overflow-hidden"
       onScrollCapture={event => {
         if (event.target instanceof HTMLElement) onScrollPositionChange(event.target.scrollTop);
       }}
@@ -181,7 +181,7 @@ export const CodingEventStream = ({
         <ConversationContent
           reverse={false}
           scrollClassName="coding-conversation-scroll"
-          className="mx-auto min-h-full w-full max-w-5xl gap-6 px-4 py-4"
+          className="mx-auto min-h-full min-w-0 w-full max-w-5xl gap-6 overflow-x-hidden px-4 py-4"
         >
           {turns.length === 0 ? (
             <Empty>

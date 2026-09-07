@@ -147,6 +147,21 @@ test('commits staged changes and pushes through the configured upstream', async 
   expect(await readFile(path.join(root, 'tracked.txt'), 'utf8')).toBe('committed\n');
 });
 
+test('switches branches and preserves compatible uncommitted changes', async () => {
+  const root = await createRepository();
+  await git(root, ['switch', '-c', 'feature/test-branch']);
+  await git(root, ['switch', 'main']);
+
+  const service = new CodingGitService();
+  await service.switchBranch(root, 'feature/test-branch');
+  expect(await git(root, ['branch', '--show-current'])).toBe('feature/test-branch');
+
+  await writeFile(path.join(root, 'tracked.txt'), 'dirty\n');
+  await service.switchBranch(root, 'main');
+  expect(await git(root, ['branch', '--show-current'])).toBe('main');
+  expect(await readFile(path.join(root, 'tracked.txt'), 'utf8')).toBe('dirty\n');
+});
+
 test('returns an explicit empty state outside Git repositories', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'coding-not-git-'));
   const status = await new CodingGitService().getStatus(root, {

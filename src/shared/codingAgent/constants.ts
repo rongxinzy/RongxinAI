@@ -138,6 +138,13 @@ export const CodingGitDiffScope = {
 } as const;
 export type CodingGitDiffScope = (typeof CodingGitDiffScope)[keyof typeof CodingGitDiffScope];
 
+export const CodingWorkspaceFileKind = {
+  Directory: 'directory',
+  File: 'file',
+} as const;
+export type CodingWorkspaceFileKind =
+  (typeof CodingWorkspaceFileKind)[keyof typeof CodingWorkspaceFileKind];
+
 export const CodingAgentIpc = {
   ListProfiles: 'codingAgent:listProfiles',
   ListWorkspaces: 'codingAgent:listWorkspaces',
@@ -177,6 +184,10 @@ export const CodingAgentIpc = {
   UnstageGitPaths: 'codingAgent:unstageGitPaths',
   CommitGitChanges: 'codingAgent:commitGitChanges',
   PushGitBranch: 'codingAgent:pushGitBranch',
+  SwitchGitBranch: 'codingAgent:switchGitBranch',
+  CreateGitPullRequest: 'codingAgent:createGitPullRequest',
+  ListWorkspaceFiles: 'codingAgent:listWorkspaceFiles',
+  ReadWorkspaceFile: 'codingAgent:readWorkspaceFile',
   DiscoverAgents: 'codingAgent:discoverAgents',
   ProbeAgent: 'codingAgent:probeAgent',
   AddProfile: 'codingAgent:addProfile',
