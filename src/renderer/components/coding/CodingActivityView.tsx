@@ -31,6 +31,10 @@ import {
   type CodingToolCallLocation,
 } from './codingToolCall';
 import {
+  CodingPermissionResolution,
+  getCodingPermissionResolution,
+} from './codingPermission';
+import {
   CodingConversationActivityKind,
   CodingExternalActivityStatus,
   CodingToolPartState,
@@ -70,6 +74,13 @@ const toolKindLabel = (kind: string | null): string | null =>
 
 const activityState = (activity: CodingConversationActivity): CodingToolPartStateType => {
   if (activity.kind === CodingConversationActivityKind.Permission) {
+    const resolution = getCodingPermissionResolution(activity.event);
+    if (resolution === CodingPermissionResolution.Approved) {
+      return CodingToolPartState.ApprovalResponded;
+    }
+    if (resolution === CodingPermissionResolution.Rejected) {
+      return CodingToolPartState.OutputDenied;
+    }
     return CodingToolPartState.ApprovalRequested;
   }
   const status = activity.event.payload.status;
@@ -79,12 +90,30 @@ const activityState = (activity: CodingConversationActivity): CodingToolPartStat
   return CodingToolPartState.InputAvailable;
 };
 
-const activityStatusLabel = (state: CodingToolPartStateType): string => {
+const permissionStatusLabel = (activity: CodingConversationActivity): string => {
+  const keys = {
+    [CodingPermissionResolution.Pending]: 'codingAgentPermissionEvent',
+    [CodingPermissionResolution.Approved]: 'codingAgentPermissionApproved',
+    [CodingPermissionResolution.Rejected]: 'codingAgentPermissionRejected',
+    [CodingPermissionResolution.Responded]: 'codingAgentPermissionResponded',
+  } as const;
+  return i18nService.t(keys[getCodingPermissionResolution(activity.event)]);
+};
+
+const activityStatusLabel = (
+  activity: CodingConversationActivity,
+  state: CodingToolPartStateType,
+): string => {
+  if (activity.kind === CodingConversationActivityKind.Permission) {
+    return permissionStatusLabel(activity);
+  }
   const keys = {
     [CodingToolPartState.ApprovalRequested]: 'codingAgentPermissionEvent',
+    [CodingToolPartState.ApprovalResponded]: 'codingAgentPermissionApproved',
     [CodingToolPartState.InputAvailable]: 'codingAgentToolRunning',
     [CodingToolPartState.InputStreaming]: 'codingAgentToolPending',
     [CodingToolPartState.OutputAvailable]: 'codingAgentToolCompleted',
+    [CodingToolPartState.OutputDenied]: 'codingAgentPermissionRejected',
     [CodingToolPartState.OutputError]: 'codingAgentToolFailed',
   } as const;
   return i18nService.t(keys[state]);
@@ -230,7 +259,7 @@ const activityTitle = (activity: CodingConversationActivity): string => {
     return i18nService.t('codingAgentPlan');
   }
   if (activity.kind === CodingConversationActivityKind.Permission) {
-    return i18nService.t('codingAgentPermissionEvent');
+    return permissionStatusLabel(activity);
   }
   const view = parseToolCallView(activity.event.payload);
   return view.title ?? toolKindLabel(view.kind) ?? i18nService.t('codingAgentTool');
@@ -239,26 +268,37 @@ const activityTitle = (activity: CodingConversationActivity): string => {
 const CodingActivityComponent = ({
   activity,
   artifacts,
+  open,
+  onOpenChange,
 }: {
   activity: CodingConversationActivity;
   /** File artifacts produced by this tool call, shown as preview cards. */
   artifacts?: Artifact[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) => {
   const state = activityState(activity);
   const isPlan = activity.kind === CodingConversationActivityKind.Plan;
   const isTool = activity.kind === CodingConversationActivityKind.Tool;
   return (
     <div className="flex flex-col gap-2">
-      <Tool defaultOpen={activity.kind === CodingConversationActivityKind.Permission}>
+      <Tool
+        className="mb-0"
+        open={open}
+        onOpenChange={onOpenChange}
+        defaultOpen={false}
+      >
         <ToolHeader
+          className="px-3 py-2"
           type="dynamic-tool"
           toolName="coding-agent"
           state={state}
-          statusLabel={activityStatusLabel(state)}
+          statusLabel={activityStatusLabel(activity, state)}
           title={activityTitle(activity)}
+          statusAtEnd
           icon={isTool ? toolKindIcon(parseToolCallView(activity.event.payload).kind) : undefined}
         />
-        <ToolContent>
+        <ToolContent className="space-y-3 p-3">
           {isPlan ? (
             <PlanActivityBody activity={activity} />
           ) : isTool ? (
