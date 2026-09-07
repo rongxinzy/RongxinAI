@@ -958,6 +958,27 @@ export const CodingWorkbenchView = ({
                   {i18nService.t('codingAgentReviewChanges')}
                 </Button>
               )}
+              {!desktopSidePanelOpen && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={i18nService.t('codingAgentSidePanel')}
+                  aria-pressed={sidePanelView !== null}
+                  onClick={() => {
+                    const closeEmptyPanel = sidePanelView !== null && sidePanelTabs.length === 0;
+                    if (closeEmptyPanel) {
+                      setSidePanelView(null);
+                      setSidePanelSheetOpen(false);
+                      return;
+                    }
+                    openSidePanelTab(CodingSidePanelView.Launcher);
+                    if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                  }}
+                >
+                  <PanelRight />
+                </Button>
+              )}
             </>
           }
         />
