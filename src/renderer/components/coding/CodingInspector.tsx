@@ -14,6 +14,7 @@ import { getCodingEventText } from './codingEventProjection';
 
 interface CodingInspectorProps {
   events: CodingEvent[];
+  initialTab?: CodingInspectorTabType;
 }
 
 const eventText = (event: CodingEvent): string => {
@@ -22,12 +23,16 @@ const eventText = (event: CodingEvent): string => {
   return Object.keys(event.payload).length > 0 ? JSON.stringify(event.payload, null, 2) : '';
 };
 
-export const CodingInspector = ({ events }: CodingInspectorProps) => {
+export const CodingInspector = ({ events, initialTab }: CodingInspectorProps) => {
   const changes = events.filter(event => event.kind === CodingEventKind.FileChange);
   const terminals = events.filter(event => event.kind === CodingEventKind.Terminal);
   const preferredTab =
     changes.length > 0 ? CodingInspectorTab.Changes : CodingInspectorTab.Terminal;
-  const [activeTab, setActiveTab] = useState<CodingInspectorTabType>(preferredTab);
+  const [activeTab, setActiveTab] = useState<CodingInspectorTabType>(initialTab ?? preferredTab);
+
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     if (activeTab === CodingInspectorTab.Changes && changes.length === 0) {

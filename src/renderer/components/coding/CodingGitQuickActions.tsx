@@ -13,7 +13,7 @@ import { Input } from '@shared/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Check, ChevronDown, FileDiff, GitBranch, GitPullRequest, RefreshCw, Send, SlidersHorizontal, Upload } from 'lucide-react';
+import { Check, ChevronDown, FileDiff, GitBranch, GitPullRequest, Send, SlidersHorizontal, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -123,7 +123,7 @@ export const CodingGitQuickActions = ({
     setPullRequestOpen(false);
     setPullRequestTitle('');
     setPullRequestBody('');
-    toast.success(result.url);
+    toast.success(i18nService.t('codingGitPullRequestCreated'));
     void window.electron.shell.openExternal(result.url);
   };
 
@@ -223,12 +223,6 @@ export const CodingGitQuickActions = ({
             </div>
           ) : status?.isRepository ? (
             <div className="space-y-1">
-              <div className="flex items-center justify-between gap-3 px-2 pb-1 pt-2 text-sm font-semibold">
-                <span>{i18nService.t('codingGitEnvironment')}</span>
-                <Button type="button" variant="ghost" size="icon-sm" onClick={() => void loadStatus()}>
-                  <RefreshCw />
-                </Button>
-              </div>
               <GitMenuRow icon={FileDiff} onClick={openReview} trailing={<span className="text-xs"><span className="text-success">+{status.additions}</span> <span className="text-destructive">−{status.deletions}</span></span>}>
                 {i18nService.t('codingGitChanges')}
               </GitMenuRow>

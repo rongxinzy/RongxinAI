@@ -64,6 +64,7 @@ export const CodingSidePanelView = {
   Launcher: 'launcher',
   Files: 'files',
   Review: 'review',
+  Inspector: 'inspector',
 } as const;
 export type CodingSidePanelView = (typeof CodingSidePanelView)[keyof typeof CodingSidePanelView];
 

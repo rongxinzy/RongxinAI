@@ -264,8 +264,8 @@
   --zy-component-palette-amber-50: oklch(98.7% 0.022 95.277);
   --zy-component-palette-amber-400: oklch(82.8% 0.189 84.429);
   --zy-component-palette-amber-200: oklch(92.4% 0.12 95.746);
-  --zy-component-diff-removed-background: rgb(239 68 68 / 10%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 10%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 28%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 28%);
   --zy-component-diff-removed: rgb(185 28 28);
   --zy-component-diff-added: rgb(21 128 61);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -2152,6 +2152,69 @@
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -6870,6 +6933,17 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-auth-choice),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-code-header-button),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-code-hint),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="added"]),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="removed"]),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="context"]),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-line[data-kind="header"]),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-added),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-removed),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-context),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-gutter-header),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-prefix),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-diff-code),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-input),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-textarea),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-input-embedded),
@@ -7777,8 +7851,8 @@ to {
   --zy-component-palette-amber-50: oklch(98.7% 0.022 95.277);
   --zy-component-palette-amber-400: oklch(82.8% 0.189 84.429);
   --zy-component-palette-amber-200: oklch(92.4% 0.12 95.746);
-  --zy-component-diff-removed-background: rgb(239 68 68 / 15%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 15%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 24%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 24%);
   --zy-component-diff-removed: rgb(248 113 113);
   --zy-component-diff-added: rgb(74 222 128);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -9665,6 +9739,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="classic-dark"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="classic-dark"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -14398,6 +14535,17 @@ to {
 [data-theme="classic-dark"] :where(.theme-auth-choice),
 [data-theme="classic-dark"] :where(.theme-code-header-button),
 [data-theme="classic-dark"] :where(.theme-code-hint),
+[data-theme="classic-dark"] :where(.theme-coding-diff),
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="classic-dark"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-added),
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-context),
+[data-theme="classic-dark"] :where(.theme-coding-diff-gutter-header),
+[data-theme="classic-dark"] :where(.theme-coding-diff-prefix),
+[data-theme="classic-dark"] :where(.theme-coding-diff-code),
 [data-theme="classic-dark"] :where(.theme-input),
 [data-theme="classic-dark"] :where(.theme-textarea),
 [data-theme="classic-dark"] :where(.theme-input-embedded),
@@ -15305,8 +15453,8 @@ to {
   --zy-component-palette-amber-50: #F2EADA;
   --zy-component-palette-amber-400: #80652F;
   --zy-component-palette-amber-200: #DCCCA8;
-  --zy-component-diff-removed-background: rgb(239 68 68 / 10%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 10%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 28%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 28%);
   --zy-component-diff-removed: rgb(185 28 28);
   --zy-component-diff-added: rgb(21 128 61);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -17193,6 +17341,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="daming-light"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="daming-light"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -21911,6 +22122,17 @@ to {
 [data-theme="daming-light"] :where(.theme-auth-choice),
 [data-theme="daming-light"] :where(.theme-code-header-button),
 [data-theme="daming-light"] :where(.theme-code-hint),
+[data-theme="daming-light"] :where(.theme-coding-diff),
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="daming-light"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-added),
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-context),
+[data-theme="daming-light"] :where(.theme-coding-diff-gutter-header),
+[data-theme="daming-light"] :where(.theme-coding-diff-prefix),
+[data-theme="daming-light"] :where(.theme-coding-diff-code),
 [data-theme="daming-light"] :where(.theme-input),
 [data-theme="daming-light"] :where(.theme-textarea),
 [data-theme="daming-light"] :where(.theme-input-embedded),
@@ -22818,8 +23040,8 @@ to {
   --zy-component-palette-amber-50: #393326;
   --zy-component-palette-amber-400: #C9B17D;
   --zy-component-palette-amber-200: #766441;
-  --zy-component-diff-removed-background: rgb(239 68 68 / 15%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 15%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 24%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 24%);
   --zy-component-diff-removed: rgb(248 113 113);
   --zy-component-diff-added: rgb(74 222 128);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -24706,6 +24928,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="daming-dark"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="daming-dark"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -29439,6 +29724,17 @@ to {
 [data-theme="daming-dark"] :where(.theme-auth-choice),
 [data-theme="daming-dark"] :where(.theme-code-header-button),
 [data-theme="daming-dark"] :where(.theme-code-hint),
+[data-theme="daming-dark"] :where(.theme-coding-diff),
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="daming-dark"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-added),
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-context),
+[data-theme="daming-dark"] :where(.theme-coding-diff-gutter-header),
+[data-theme="daming-dark"] :where(.theme-coding-diff-prefix),
+[data-theme="daming-dark"] :where(.theme-coding-diff-code),
 [data-theme="daming-dark"] :where(.theme-input),
 [data-theme="daming-dark"] :where(.theme-textarea),
 [data-theme="daming-dark"] :where(.theme-input-embedded),
@@ -30346,8 +30642,8 @@ to {
   --zy-component-palette-amber-50: #F2EADA;
   --zy-component-palette-amber-400: #7B602D;
   --zy-component-palette-amber-200: #DCCCA8;
-  --zy-component-diff-removed-background: rgb(239 68 68 / 10%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 10%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 28%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 28%);
   --zy-component-diff-removed: rgb(185 28 28);
   --zy-component-diff-added: rgb(21 128 61);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -32236,6 +32532,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="changan-light"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="changan-light"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -36957,6 +37316,17 @@ to {
 [data-theme="changan-light"] :where(.theme-auth-choice),
 [data-theme="changan-light"] :where(.theme-code-header-button),
 [data-theme="changan-light"] :where(.theme-code-hint),
+[data-theme="changan-light"] :where(.theme-coding-diff),
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="changan-light"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-added),
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-context),
+[data-theme="changan-light"] :where(.theme-coding-diff-gutter-header),
+[data-theme="changan-light"] :where(.theme-coding-diff-prefix),
+[data-theme="changan-light"] :where(.theme-coding-diff-code),
 [data-theme="changan-light"] :where(.theme-input),
 [data-theme="changan-light"] :where(.theme-textarea),
 [data-theme="changan-light"] :where(.theme-input-embedded),
@@ -37864,8 +38234,8 @@ to {
   --zy-component-palette-amber-50: #393326;
   --zy-component-palette-amber-400: #CBB17A;
   --zy-component-palette-amber-200: #766441;
-  --zy-component-diff-removed-background: rgb(239 68 68 / 15%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 15%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 24%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 24%);
   --zy-component-diff-removed: rgb(248 113 113);
   --zy-component-diff-added: rgb(74 222 128);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -39754,6 +40124,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="changan-dark"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="changan-dark"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -44490,6 +44923,17 @@ to {
 [data-theme="changan-dark"] :where(.theme-auth-choice),
 [data-theme="changan-dark"] :where(.theme-code-header-button),
 [data-theme="changan-dark"] :where(.theme-code-hint),
+[data-theme="changan-dark"] :where(.theme-coding-diff),
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="changan-dark"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-added),
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-context),
+[data-theme="changan-dark"] :where(.theme-coding-diff-gutter-header),
+[data-theme="changan-dark"] :where(.theme-coding-diff-prefix),
+[data-theme="changan-dark"] :where(.theme-coding-diff-code),
 [data-theme="changan-dark"] :where(.theme-input),
 [data-theme="changan-dark"] :where(.theme-textarea),
 [data-theme="changan-dark"] :where(.theme-input-embedded),
@@ -45397,8 +45841,8 @@ to {
   --zy-component-palette-amber-50: #F2EADA;
   --zy-component-palette-amber-400: #765A29;
   --zy-component-palette-amber-200: #DCCCA8;
-  --zy-component-diff-removed-background: rgb(239 68 68 / 10%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 10%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 28%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 28%);
   --zy-component-diff-removed: rgb(185 28 28);
   --zy-component-diff-added: rgb(21 128 61);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -47287,6 +47731,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="weiyang-light"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -52008,6 +52515,17 @@ to {
 [data-theme="weiyang-light"] :where(.theme-auth-choice),
 [data-theme="weiyang-light"] :where(.theme-code-header-button),
 [data-theme="weiyang-light"] :where(.theme-code-hint),
+[data-theme="weiyang-light"] :where(.theme-coding-diff),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-added),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-context),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-gutter-header),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-prefix),
+[data-theme="weiyang-light"] :where(.theme-coding-diff-code),
 [data-theme="weiyang-light"] :where(.theme-input),
 [data-theme="weiyang-light"] :where(.theme-textarea),
 [data-theme="weiyang-light"] :where(.theme-input-embedded),
@@ -52915,8 +53433,8 @@ to {
   --zy-component-palette-amber-50: #393326;
   --zy-component-palette-amber-400: #CBB17A;
   --zy-component-palette-amber-200: #766441;
-  --zy-component-diff-removed-background: rgb(239 68 68 / 15%);
-  --zy-component-diff-added-background: rgb(34 197 94 / 15%);
+  --zy-component-diff-removed-background: rgb(239 68 68 / 24%);
+  --zy-component-diff-added-background: rgb(34 197 94 / 24%);
   --zy-component-diff-removed: rgb(248 113 113);
   --zy-component-diff-added: rgb(74 222 128);
   --zy-component-overlay-strong: rgba(0,0,0,0.65);
@@ -54805,6 +55323,69 @@ to {
   color: var(--foreground);
   border-color: var(--border);
   box-shadow: var(--zy-style-shadow-lg);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-md);
+  font-size: var(--zy-component-text-xs);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="added"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-added);
+  background-color: var(--zy-component-diff-added-background);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="removed"]) {
+  border-left-width: 4px;
+  border-style: solid;
+  border-left-color: var(--zy-component-diff-removed);
+  background-color: var(--zy-component-diff-removed-background);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="context"]) {
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="header"]) {
+  background-color: color-mix(in oklab, var(--muted) 40%, transparent);
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-added) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-added);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-removed) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--zy-component-diff-removed);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-context) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-header) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  opacity: 0.6;
+  padding: 0 0.5rem;
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-prefix) {
+  text-align: center;
+  padding: 0 0.25rem;
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-code) {
+  padding: 0 0.5rem;
+  color: var(--foreground);
 }
 [data-theme="weiyang-dark"] :where(.theme-input) {
   border-radius: var(--zy-style-radius-lg);
@@ -59541,6 +60122,17 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-auth-choice),
 [data-theme="weiyang-dark"] :where(.theme-code-header-button),
 [data-theme="weiyang-dark"] :where(.theme-code-hint),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="added"]),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="removed"]),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="context"]),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-line[data-kind="header"]),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-added),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-removed),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-context),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-gutter-header),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-prefix),
+[data-theme="weiyang-dark"] :where(.theme-coding-diff-code),
 [data-theme="weiyang-dark"] :where(.theme-input),
 [data-theme="weiyang-dark"] :where(.theme-textarea),
 [data-theme="weiyang-dark"] :where(.theme-input-embedded),

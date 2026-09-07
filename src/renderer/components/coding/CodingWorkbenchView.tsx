@@ -16,7 +16,7 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import { Expand, File, FileDiff, FolderGit2, Layers, Minimize2, PanelRight, Plus, Settings2, X } from 'lucide-react';
+import { Expand, File, FileDiff, FolderGit2, Layers, Minimize2, PanelRight, Settings2, Terminal as TerminalIcon, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -57,12 +57,15 @@ import { CodingComposer } from './CodingComposer';
 import { CodingEventStream } from './CodingEventStream';
 import { CodingGitPanel } from './CodingGitPanel';
 import { CodingGitQuickActions } from './CodingGitQuickActions';
+import { CodingInspector } from './CodingInspector';
+import { CodingSidePanelAddMenu } from './CodingSidePanelAddMenu';
 import { CodingWorkspaceFileBrowser } from './CodingWorkspaceFileBrowser';
 import { CodingSidePanelLauncher } from './CodingSidePanelLauncher';
 import { CodingParticipants } from './CodingParticipants';
 import { CodingSessionSetupDialog } from './CodingSessionSetupDialog';
 import {
   CodingAgentStatusI18nKey,
+  CodingInspectorTab,
   CodingSidePanelView,
   CodingUiEvent,
   type CodingCreateSessionEventDetail,
@@ -79,6 +82,7 @@ const profileStatusText = (status: CodingAgentProfileStatus): string =>
 const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
 const CODING_PANEL_MIN_WIDTH = 280;
 const CODING_PANEL_DEFAULT_WIDTH = 560;
+const CODING_PANEL_EXPAND_DRAG_OVERFLOW = 160;
 
 const ArtifactPanelFrame = lazy(() =>
   import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
@@ -351,13 +355,23 @@ export const CodingWorkbenchView = ({
         : [],
     [activeLane, snapshot],
   );
+  const hasInspectorContent = useMemo(
+    () =>
+      activeEvents.some(
+        event => event.kind === CodingEventKind.FileChange || event.kind === CodingEventKind.Terminal,
+      ),
+    [activeEvents],
+  );
   const gitSourceRoot =
     draftSession?.sourceRoot ??
     activeLane?.sourceRoot ??
     snapshot?.room.workspaceRoot ??
     workspaceRoot;
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
-  const desktopSidePanelOpen = sidePanelView !== null && !isNarrowViewport;
+  const desktopSidePanelOpen =
+    !isNarrowViewport &&
+    sidePanelView !== null &&
+    (sidePanelView !== CodingSidePanelView.Inspector || hasInspectorContent);
   const resolvedSidePanelWidth = clampArtifactPanelWidth(
     sidePanelWidth,
     CODING_PANEL_MIN_WIDTH,
@@ -463,6 +477,7 @@ export const CodingWorkbenchView = ({
 
   const openSidePanelTab = useCallback((view: CodingSidePanelViewType) => {
     if (view === CodingSidePanelView.Launcher) {
+      setSidePanelTabs([]);
       setSidePanelView(CodingSidePanelView.Launcher);
       return;
     }
@@ -474,8 +489,13 @@ export const CodingWorkbenchView = ({
     (view: CodingSidePanelViewType) => {
       const nextTabs = sidePanelTabs.filter(tab => tab !== view);
       setSidePanelTabs(nextTabs);
+      if (nextTabs.length === 0) {
+        setSidePanelView(null);
+        setSidePanelSheetOpen(false);
+        return;
+      }
       setSidePanelView(active =>
-        active === view ? (nextTabs.at(-1) ?? CodingSidePanelView.Launcher) : active,
+        active === view ? nextTabs.at(-1)! : active,
       );
     },
     [sidePanelTabs],
@@ -938,7 +958,22 @@ export const CodingWorkbenchView = ({
                   if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
                 }}
               />
-              {artifactSessionKey && laneArtifacts.length > 0 && (
+      {hasInspectorContent && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={i18nService.t('codingAgentInspector')}
+          aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
+          onClick={() => {
+            openSidePanelTab(CodingSidePanelView.Inspector);
+            if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+          }}
+        >
+          <TerminalIcon />
+        </Button>
+      )}
+      {artifactSessionKey && laneArtifacts.length > 0 && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -1150,13 +1185,22 @@ export const CodingWorkbenchView = ({
             currentWidth={resolvedSidePanelWidth}
             minWidth={CODING_PANEL_MIN_WIDTH}
             maxWidth={sidePanelMaxWidth}
+            disabled={sidePanelExpanded}
             onResizeFrame={applySidePanelFrameWidth}
             onResizeComplete={completeSidePanelResize}
+            onReachMaxWidth={() => setSidePanelExpanded(true)}
+            maxWidthOverflowThreshold={CODING_PANEL_EXPAND_DRAG_OVERFLOW}
           />
           <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-2">
               {visibleSidePanelTabs.map(tab => {
                 const isReview = tab === CodingSidePanelView.Review;
+                const isInspector = tab === CodingSidePanelView.Inspector;
                 const active = tab === sidePanelView;
+                const tabLabel = isReview
+                  ? 'codingAgentReview'
+                  : isInspector
+                    ? 'codingAgentInspector'
+                    : 'codingAgentOpenFiles';
                 return (
                   active ? (
                     <ButtonGroup key={tab} className="group theme-button theme-button-secondary shrink-0">
@@ -1166,14 +1210,14 @@ export const CodingWorkbenchView = ({
                         size="sm"
                         onClick={() => openSidePanelTab(tab)}
                       >
-                        {isReview ? <FileDiff /> : <File />}
-                        {i18nService.t(isReview ? 'codingAgentReview' : 'codingAgentOpenFiles')}
+                        {isReview ? <FileDiff /> : isInspector ? <TerminalIcon /> : <File />}
+                        {i18nService.t(tabLabel)}
                       </Button>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon-xs"
-                        className="border-l-0 bg-transparent hover:bg-transparent focus-visible:bg-transparent pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                        className="self-center border-l-0 bg-transparent hover:bg-transparent focus-visible:bg-transparent pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
                         aria-label={i18nService.t('close')}
                         onClick={() => closeSidePanelTab(tab)}
                       >
@@ -1188,21 +1232,16 @@ export const CodingWorkbenchView = ({
                       size="sm"
                       onClick={() => openSidePanelTab(tab)}
                     >
-                      {isReview ? <FileDiff /> : <File />}
-                      {i18nService.t(isReview ? 'codingAgentReview' : 'codingAgentOpenFiles')}
+                      {isReview ? <FileDiff /> : isInspector ? <TerminalIcon /> : <File />}
+                      {i18nService.t(tabLabel)}
                     </Button>
                   )
                 );
               })}
-              <Button
-                type="button"
-                variant="toolbar"
-                size="icon-sm"
-                aria-label={i18nService.t('codingAgentAddPage')}
-                onClick={() => openSidePanelTab(CodingSidePanelView.Launcher)}
-              >
-                <Plus />
-              </Button>
+              <CodingSidePanelAddMenu
+                onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+                onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
+              />
               <div className="ml-auto flex shrink-0 items-center gap-1">
                 <Button
                   type="button"
@@ -1234,6 +1273,8 @@ export const CodingWorkbenchView = ({
               <CodingSidePanelLauncher
                 onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
                 onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+                onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
+                hasInspectorContent={hasInspectorContent}
               />
             ) : sidePanelView === CodingSidePanelView.Files ? (
               <CodingWorkspaceFileBrowser
@@ -1241,6 +1282,8 @@ export const CodingWorkbenchView = ({
                 sourceRoot={gitSourceRoot}
                 onClose={() => closeSidePanelTab(CodingSidePanelView.Files)}
               />
+            ) : sidePanelView === CodingSidePanelView.Inspector ? (
+              <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
             ) : (
               <CodingGitPanel
                 workspaceRoot={workspaceRoot}
@@ -1260,6 +1303,8 @@ export const CodingWorkbenchView = ({
                 ? i18nService.t('codingAgentSidePanel')
                 : sidePanelView === CodingSidePanelView.Files
                 ? i18nService.t('codingAgentFiles')
+                : sidePanelView === CodingSidePanelView.Inspector
+                ? i18nService.t('codingAgentInspector')
                 : i18nService.t('codingAgentReview')}
             </SheetTitle>
           </SheetHeader>
@@ -1267,6 +1312,8 @@ export const CodingWorkbenchView = ({
             <CodingSidePanelLauncher
               onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
               onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+              onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
+              hasInspectorContent={hasInspectorContent}
             />
           ) : sidePanelView === CodingSidePanelView.Files ? (
             <CodingWorkspaceFileBrowser
@@ -1274,6 +1321,8 @@ export const CodingWorkbenchView = ({
               sourceRoot={gitSourceRoot}
               onClose={() => closeSidePanelTab(CodingSidePanelView.Files)}
             />
+          ) : sidePanelView === CodingSidePanelView.Inspector ? (
+            <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
           ) : (
             <CodingGitPanel
               workspaceRoot={workspaceRoot}

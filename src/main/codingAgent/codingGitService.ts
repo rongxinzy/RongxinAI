@@ -39,23 +39,28 @@ interface GitNumStat {
   deletions: number | null;
 }
 
-const runGit = async (
+interface CommandOptions {
+  acceptedExitCodes?: number[];
+  maxOutputBytes?: number;
+  env?: NodeJS.ProcessEnv;
+}
+
+const runCommand = async (
+  command: string,
   cwd: string,
   args: string[],
-  options: { acceptedExitCodes?: number[]; maxOutputBytes?: number } = {},
+  options: CommandOptions = {},
 ): Promise<GitCommandResult> => {
   const acceptedExitCodes = options.acceptedExitCodes ?? [0];
   const maxOutputBytes = options.maxOutputBytes ?? MAX_GIT_OUTPUT_BYTES;
   return await new Promise<GitCommandResult>((resolve, reject) => {
-    const child = spawn('git', args, {
+    const child = spawn(command, args, {
       cwd,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        GIT_TERMINAL_PROMPT: '0',
-        LC_ALL: 'C',
-        LANG: 'C',
+        ...options.env,
       },
     });
     let stdout = '';
@@ -88,16 +93,30 @@ const runGit = async (
         if (acceptedExitCodes.includes(exitCode)) {
           resolve({ stdout, stderr, exitCode });
         } else {
-          reject(new Error(stderr.trim() || `git ${args[0]} failed with exit code ${exitCode}.`));
+          reject(new Error(stderr.trim() || `${command} ${args[0]} failed with exit code ${exitCode}.`));
         }
       });
     });
     const timeout = setTimeout(() => {
       child.kill();
-      finish(() => reject(new Error(`git ${args[0]} timed out.`)));
+      finish(() => reject(new Error(`${command} ${args[0]} timed out.`)));
     }, GIT_COMMAND_TIMEOUT_MS);
   });
 };
+
+const runGit = async (
+  cwd: string,
+  args: string[],
+  options: { acceptedExitCodes?: number[]; maxOutputBytes?: number } = {},
+): Promise<GitCommandResult> =>
+  await runCommand('git', cwd, args, {
+    ...options,
+    env: {
+      GIT_TERMINAL_PROMPT: '0',
+      LC_ALL: 'C',
+      LANG: 'C',
+    },
+  });
 
 const statusFromCode = (code: string): CodingGitFileStatusType | null => {
   switch (code) {
@@ -307,20 +326,12 @@ export class CodingGitService {
     const title = input.title.trim();
     const base = input.base.trim();
     if (!title || !base) throw new Error('A pull request title and base branch are required.');
-    const result = await new Promise<GitCommandResult>((resolve, reject) => {
-      const child = spawn('gh', ['pr', 'create', '--base', base, '--title', title, '--body', input.body], {
-        cwd: targetRoot,
-        shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, GH_PROMPT_DISABLED: '1' },
-      });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', chunk => (stdout += chunk.toString()));
-      child.stderr.on('data', chunk => (stderr += chunk.toString()));
-      child.once('error', reject);
-      child.once('exit', code => code === 0 ? resolve({ stdout, stderr, exitCode: 0 }) : reject(new Error(stderr.trim() || `gh pr create failed with exit code ${code ?? -1}.`)));
-    });
+    const result = await runCommand(
+      'gh',
+      targetRoot,
+      ['pr', 'create', '--base', base, '--title', title, '--body', input.body],
+      { env: { GH_PROMPT_DISABLED: '1' }, maxOutputBytes: MAX_GIT_OUTPUT_BYTES },
+    );
     const url = result.stdout.trim().split(/\s+/).find(value => value.startsWith('https://'));
     if (!url) throw new Error('GitHub did not return a pull request URL.');
     return url;

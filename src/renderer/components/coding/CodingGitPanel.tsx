@@ -5,6 +5,7 @@ import { Input } from '@shared/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
+import { cn } from '@shared/lib/utils';
 import { AlertTriangle, ChevronDown, ChevronRight, FileDiff, FileSearch, FolderGit2, FolderOpen, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -55,6 +56,45 @@ interface CodingGitDiffLine {
   text: string;
   prefix: string;
 }
+
+const DIFF_GUTTER_CLASS: Record<CodingGitDiffLineKind, string> = {
+  [CodingGitDiffLineKind.Added]: 'theme-coding-diff-gutter-added',
+  [CodingGitDiffLineKind.Removed]: 'theme-coding-diff-gutter-removed',
+  [CodingGitDiffLineKind.Context]: 'theme-coding-diff-gutter-context',
+  [CodingGitDiffLineKind.Header]: 'theme-coding-diff-gutter-header',
+};
+
+const DIFF_LINE_HOOK: Record<CodingGitDiffLineKind, string> = {
+  [CodingGitDiffLineKind.Added]: 'theme-coding-diff-line theme-coding-diff-line-added',
+  [CodingGitDiffLineKind.Removed]: 'theme-coding-diff-line theme-coding-diff-line-removed',
+  [CodingGitDiffLineKind.Context]: 'theme-coding-diff-line theme-coding-diff-line-context',
+  [CodingGitDiffLineKind.Header]: 'theme-coding-diff-line theme-coding-diff-line-header',
+};
+
+const DiffLine = ({ line }: { line: CodingGitDiffLine }) => {
+  if (line.kind === CodingGitDiffLineKind.Header) {
+    return (
+      <div
+        data-kind={line.kind}
+        className={cn('w-full min-w-max grid grid-cols-[3rem_3rem_1.5rem_minmax(max-content,1fr)]', DIFF_LINE_HOOK[line.kind])}
+      >
+        <span className="col-span-4 whitespace-pre">{line.text}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-kind={line.kind}
+      className={cn('w-full min-w-max grid grid-cols-[3rem_3rem_1.5rem_minmax(max-content,1fr)]', DIFF_LINE_HOOK[line.kind])}
+    >
+      <span className={cn('theme-coding-diff-gutter select-none', DIFF_GUTTER_CLASS[line.kind])}>{line.oldLineNumber ?? ''}</span>
+      <span className={cn('theme-coding-diff-gutter select-none', DIFF_GUTTER_CLASS[line.kind])}>{line.newLineNumber ?? ''}</span>
+      <span className={cn('theme-coding-diff-gutter theme-coding-diff-prefix select-none', DIFF_GUTTER_CLASS[line.kind])}>{line.prefix}</span>
+      <span className="theme-coding-diff-code whitespace-pre">{line.text || '\u00a0'}</span>
+    </div>
+  );
+};
 
 const diffHunkPattern = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
@@ -164,7 +204,7 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
     return <Button key={node.path} type="button" variant={selected ? 'secondary' : 'ghost'} className="w-full justify-start gap-2" onClick={() => void selectDiff({ path: node.file!.path, scope: diffScopeForFile(node.file!) })} style={{ paddingInlineStart: `${depth * 16 + 8}px` }}><FileDiff /><span className="min-w-0 flex-1 truncate text-left" title={node.file.path}>{node.name}</span><span className="shrink-0 text-xs"><span className="text-success">+{node.file.additions ?? 0}</span>{' '}<span className="text-destructive">−{node.file.deletions ?? 0}</span></span></Button>;
   });
   return <div className="flex h-full min-h-0 flex-col bg-background">
-    <header className="flex min-h-14 shrink-0 items-center gap-2 border-b border-border px-3">
+    <header className="flex min-h-10 shrink-0 items-center gap-2 border-b border-border px-3">
       <Button type="button" variant="secondary" size="sm" disabled>{status?.detached ? i18nService.t('codingGitDetached') : (status?.branch ?? status?.head ?? i18nService.t('codingGitBranch'))}<ChevronDown /></Button>
       <span className="flex shrink-0 items-center gap-2 text-sm"><span className="text-success">+{status?.additions ?? 0}</span><span className="text-destructive">−{status?.deletions ?? 0}</span></span>
       <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -182,15 +222,6 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
     {error ? <Alert variant="destructive" className="m-3 shrink-0"><AlertTriangle /><AlertDescription className="break-words">{error}</AlertDescription></Alert> : null}
     {loading && !status ? <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground"><Spinner />{i18nService.t('codingGitLoading')}</div> : null}
     {status && !status.isRepository ? <Empty className="m-3 flex-1 border"><EmptyHeader><EmptyMedia variant="icon"><FolderGit2 /></EmptyMedia><EmptyTitle>{i18nService.t('codingGitNoRepositoryTitle')}</EmptyTitle><EmptyDescription>{i18nService.t('codingGitNoRepositoryDescription')}</EmptyDescription></EmptyHeader></Empty> : null}
-    {status?.isRepository ? <div className={showFiles ? 'grid min-h-0 flex-1 grid-cols-2' : 'min-h-0 flex-1'}><ScrollArea className={showFiles ? 'min-h-0 border-r border-border-subtle' : 'min-h-0'}><div className="min-h-full p-3">{diffLoading ? <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground"><Spinner />{i18nService.t('codingGitLoading')}</div> : diffSelection ? <><p className="mb-2 truncate text-sm font-medium" title={diffSelection.path}>{diffSelection.path}</p>{diff ? <div className="min-w-0 overflow-x-auto"><table className="min-w-full border-collapse font-mono text-xs leading-relaxed"><tbody>{parseGitDiff(diff).map((line, index) => {
-      const colors = line.kind === CodingGitDiffLineKind.Added
-        ? { background: 'border-l-4 border-diff-added bg-diff-added-background', text: 'text-diff-added', gutter: 'text-diff-added/60' }
-        : line.kind === CodingGitDiffLineKind.Removed
-          ? { background: 'border-l-4 border-diff-removed bg-diff-removed-background', text: 'text-diff-removed', gutter: 'text-diff-removed/60' }
-          : line.kind === CodingGitDiffLineKind.Context
-            ? { background: '', text: 'dark:text-claude-darkTextSecondary text-claude-textSecondary', gutter: 'dark:text-claude-darkTextSecondary/40 text-claude-textSecondary/40' }
-            : { background: 'bg-muted/40', text: 'text-muted-foreground', gutter: 'text-muted-foreground' };
-      return <tr key={`${index}-${line.text}`} className={colors.background}><td className={`w-10 select-none px-2 py-0 text-right ${colors.gutter}`}>{line.oldLineNumber ?? ''}</td><td className={`w-10 select-none px-2 py-0 text-right ${colors.gutter}`}>{line.newLineNumber ?? ''}</td><td className={`w-4 select-none px-1 py-0 text-center ${colors.text}`}>{line.prefix}</td><td className={`whitespace-pre px-2 py-0 ${colors.text}`}>{line.text || '\u00a0'}</td></tr>;
-    })}</tbody></table></div> : <p className="py-4 text-sm text-muted-foreground">{i18nService.t('codingGitDiffEmpty')}</p>}</> : <Empty className="min-h-56"><EmptyHeader><EmptyMedia variant="icon"><FileDiff /></EmptyMedia><EmptyTitle>{i18nService.t('codingGitDiffTitle')}</EmptyTitle><EmptyDescription>{i18nService.t('codingGitSelectFile')}</EmptyDescription></EmptyHeader></Empty>}</div></ScrollArea>{showFiles ? <div className="flex min-h-0 flex-col"><div className="shrink-0 p-3 pb-2"><Input value={filter} placeholder={i18nService.t('codingGitFilesFilter')} onChange={event => setFilter(event.target.value)} /></div><ScrollArea className="min-h-0 flex-1 px-2 pb-3"><div className="flex flex-col gap-1">{renderTree(fileTree)}{files.length === 0 ? <p className="px-2 py-4 text-sm text-muted-foreground">{i18nService.t('codingGitDiffEmpty')}</p> : null}</div></ScrollArea></div> : null}</div> : null}
+    {status?.isRepository ? <div className={showFiles ? 'grid h-full min-h-0 flex-1 grid-cols-2' : 'h-full min-h-0 flex-1'}><ScrollArea className={showFiles ? 'h-full min-h-0 border-r border-border-subtle' : 'h-full min-h-0'}><div className="min-h-full p-3">{diffLoading ? <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground"><Spinner />{i18nService.t('codingGitLoading')}</div> : diffSelection ? <><p className="mb-2 truncate text-sm font-medium" title={diffSelection.path}>{diffSelection.path}</p>{diff ? <div className="theme-coding-diff min-w-0 overflow-x-auto"><div className="min-w-max">{parseGitDiff(diff).map((line, index) => <DiffLine key={`${index}-${line.text}`} line={line} />)}</div></div> : <p className="py-4 text-sm text-muted-foreground">{i18nService.t('codingGitDiffEmpty')}</p>}</> : <Empty className="min-h-56"><EmptyHeader><EmptyMedia variant="icon"><FileDiff /></EmptyMedia><EmptyTitle>{i18nService.t('codingGitDiffTitle')}</EmptyTitle><EmptyDescription>{i18nService.t('codingGitSelectFile')}</EmptyDescription></EmptyHeader></Empty>}</div></ScrollArea>{showFiles ? <div className="flex min-h-0 flex-col"><div className="shrink-0 p-3 pb-2"><Input value={filter} placeholder={i18nService.t('codingGitFilesFilter')} onChange={event => setFilter(event.target.value)} /></div><ScrollArea className="h-full min-h-0 flex-1 px-2 pb-3"><div className="flex flex-col gap-1">{renderTree(fileTree)}{files.length === 0 ? <p className="px-2 py-4 text-sm text-muted-foreground">{i18nService.t('codingGitDiffEmpty')}</p> : null}</div></ScrollArea></div> : null}</div> : null}
   </div>;
 };
