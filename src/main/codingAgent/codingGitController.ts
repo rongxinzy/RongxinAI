@@ -4,6 +4,7 @@ import {
   CodingLaneStatus,
   type CodingGitCommitInput,
   type CodingGitBranchInput,
+  type CodingGitPullRequestInput,
   type CodingGitDiffInput,
   type CodingGitPathActionInput,
   type CodingGitStatus,
@@ -62,6 +63,11 @@ export class CodingGitController {
     const target = this.resolveMutableTarget(input);
     await this.git.switchBranch(target.targetRoot, input.branch);
     return await this.git.getStatus(target.targetRoot, target);
+  }
+
+  async createPullRequest(input: CodingGitPullRequestInput): Promise<string> {
+    const target = this.resolveMutableTarget(input);
+    return await this.git.createPullRequest(target.targetRoot, input);
   }
 
   private resolveMutableTarget(input: CodingGitTargetInput): ResolvedGitTarget {

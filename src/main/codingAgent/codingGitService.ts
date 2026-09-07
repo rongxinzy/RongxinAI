@@ -6,6 +6,7 @@ import {
   CodingGitDiffScope,
   CodingGitFileStatus,
   type CodingGitDiffInput,
+  type CodingGitPullRequestInput,
   type CodingGitFileChange,
   type CodingGitFileStatus as CodingGitFileStatusType,
   type CodingGitStatus,
@@ -299,6 +300,32 @@ const toGitHubRepositoryUrl = (remote: string): string | null => {
 };
 
 export class CodingGitService {
+  async createPullRequest(
+    targetRoot: string,
+    input: Omit<CodingGitPullRequestInput, 'workspaceRoot' | 'laneId' | 'sourceRoot'>,
+  ): Promise<string> {
+    const title = input.title.trim();
+    const base = input.base.trim();
+    if (!title || !base) throw new Error('A pull request title and base branch are required.');
+    const result = await new Promise<GitCommandResult>((resolve, reject) => {
+      const child = spawn('gh', ['pr', 'create', '--base', base, '--title', title, '--body', input.body], {
+        cwd: targetRoot,
+        shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, GH_PROMPT_DISABLED: '1' },
+      });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', chunk => (stdout += chunk.toString()));
+      child.stderr.on('data', chunk => (stderr += chunk.toString()));
+      child.once('error', reject);
+      child.once('exit', code => code === 0 ? resolve({ stdout, stderr, exitCode: 0 }) : reject(new Error(stderr.trim() || `gh pr create failed with exit code ${code ?? -1}.`)));
+    });
+    const url = result.stdout.trim().split(/\s+/).find(value => value.startsWith('https://'));
+    if (!url) throw new Error('GitHub did not return a pull request URL.');
+    return url;
+  }
+
   async getStatus(
     targetRoot: string,
     context: { isIsolated: boolean; isBusy: boolean },
