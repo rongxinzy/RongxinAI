@@ -155,6 +155,7 @@ jobs:
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
             vendor/channel-runtime
+            vendor/rtk-runtime
           key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
@@ -177,6 +178,8 @@ jobs:
         run: |
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
+      - name: Set up RTK runtime
+        run: bun run rtk:runtime:${{ matrix.runtime_target }}
       - name: Connect Certum SimplySign
         if: ${{ matrix.platform == 'windows' }}
         id: certum-signing
@@ -284,6 +287,9 @@ jobs:
       - name: Verify packaged app version
         shell: bash
         run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare-release.outputs.version }}'
+      - name: Verify packaged RTK runtime
+        shell: bash
+        run: node scripts/ci/verify-packaged-rtk-runtime.mjs
       - name: Verify Windows Authenticode signatures
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell

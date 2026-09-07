@@ -90,6 +90,7 @@
 
 1. 执行环境
    - Shell：Windows 下为应用内置的 Git Bash，macOS/Linux 下为系统 shell；Unix 命令与工具链开箱可用。
+   - 工作模式会在权限检查后自动压缩部分查询、测试和构建命令的输出；命令语义与授权范围不变，优化不可用时会执行原始命令。
    - Python：shell 中的 `python` / `python3` 指向应用托管的 Python 环境，已预装 pandas、numpy 等常用数据分析库，可直接 `import`，不需要也不应该手动 `pip install`。
    - Node.js：`node` / `npm` / `npx` 由应用内置提供，可直接运行脚本。
    - 包管理：`uv` 已绑定托管 Python，用于依赖与环境管理。

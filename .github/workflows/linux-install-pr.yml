@@ -37,6 +37,7 @@ jobs:
             ~/.cache/electron-builder
             vendor/engram-runtime
             vendor/channel-runtime
+            vendor/rtk-runtime
           key: linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             linux-install-node24-bun1.4.0-
@@ -53,12 +54,15 @@ jobs:
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
           bun run engram:runtime:linux-x64
+          bun run rtk:runtime:linux-x64
       - name: Build Linux installer artifacts
         timeout-minutes: 65
         run: bun run dist:linux
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify packaged RTK runtime
+        run: node scripts/ci/verify-packaged-rtk-runtime.mjs
       - name: Install the generated deb package
         shell: bash
         run: |

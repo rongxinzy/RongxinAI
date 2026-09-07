@@ -63,6 +63,23 @@
       "linux-x64": "5d32d35a69433072100ab20f01d7fff8b3c8ebde3225e66139b5b6c984c6eba5"
     }
   },
+  "rtkRuntime": {
+    "version": "v0.48.0",
+    "repo": "rtk-ai/rtk",
+    "sourceRevision": "fde0a8f185945556f51718de0f4c430bb62b3df6",
+    "runtimeAssets": {
+      "mac-x64": "rtk-x86_64-apple-darwin.tar.gz",
+      "mac-arm64": "rtk-aarch64-apple-darwin.tar.gz",
+      "win-x64": "rtk-x86_64-pc-windows-msvc.zip",
+      "linux-x64": "rtk-x86_64-unknown-linux-musl.tar.gz"
+    },
+    "runtimeChecksums": {
+      "mac-x64": "a95f2c23e08572dcc84ddff5fbe432e41e7f94369622eb086cca49ae0b6f61e8",
+      "mac-arm64": "4fa025cc93a744b6963f4e53a008e5ba3f74b6a38061f4a47c639e1c3023e0db",
+      "win-x64": "8c9ae56bacde865112777a9fe9791b449186d8b2a081c32c0772ef773f284f93",
+      "linux-x64": "e4e650fa1677c0de2f6839a6040d7b17f312d32f163c402b75af70e9e5af1a91"
+    }
+  },
   "main": "dist-electron/main.js",
   "engines": {
     "node": ">=24 <25"
@@ -138,6 +155,11 @@
     "engram:runtime:win-arm64": "node scripts/download-engram-runtime.cjs win-arm64",
     "engram:runtime:linux-x64": "node scripts/download-engram-runtime.cjs linux-x64",
     "engram:runtime:linux-arm64": "node scripts/download-engram-runtime.cjs linux-arm64",
+    "rtk:runtime:host": "node scripts/download-rtk-runtime.cjs",
+    "rtk:runtime:mac-x64": "node scripts/download-rtk-runtime.cjs mac-x64",
+    "rtk:runtime:mac-arm64": "node scripts/download-rtk-runtime.cjs mac-arm64",
+    "rtk:runtime:win-x64": "node scripts/download-rtk-runtime.cjs win-x64",
+    "rtk:runtime:linux-x64": "node scripts/download-rtk-runtime.cjs linux-x64",
     "llamacpp:runtime:host": "node scripts/llamacpp-runtime-host.cjs",
     "llamacpp:runtime:download": "node scripts/download-llamacpp-runtime.cjs",
     "llamacpp:runtime:download:mac-arm64": "node scripts/download-llamacpp-runtime.cjs mac-arm64",
