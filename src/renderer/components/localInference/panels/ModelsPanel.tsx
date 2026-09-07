@@ -19,7 +19,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/component
 import { Spinner } from '@shared/components/ui/spinner';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { cn } from '@shared/lib/utils';
-import { ArrowRight, Box, Clock3, Ellipsis, ScrollText, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRight, Box, Clock3, Ellipsis, PanelRightOpen, ScrollText, Settings2, Trash2 } from 'lucide-react';
 import {
   type ComponentType,
   type DragEvent,
@@ -103,6 +103,10 @@ function noopOpenLaunchLog() {
   // Launch log panel is optional; some hosts do not provide one.
 }
 
+function noopOpenInspector() {
+  // Model inspector is optional; some hosts do not provide one.
+}
+
 type ModelsPanelProps = {
   loading: boolean;
   loadingModelName: string | null;
@@ -116,6 +120,7 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
+  onOpenInspector?: (model: LlamaCppModel) => void;
   onOpenMarketplace?: () => void;
   onOpenLaunchLog?: (modelName: string) => void;
   renderLoadButton?: (
@@ -138,6 +143,7 @@ type ModelCardProps = {
   onLoadModel: (model: LlamaCppModel) => void;
   onCancelModelLoad: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
+  onOpenInspector: (model: LlamaCppModel) => void;
   onUnload: (modelName: string) => void;
   onDelete: (model: LlamaCppModel) => void;
   dragging: boolean;
@@ -170,6 +176,7 @@ export function ModelsPanel({
   onUnload,
   onDelete,
   onConfigureContext,
+  onOpenInspector,
   onOpenMarketplace,
   onOpenLaunchLog,
   renderLoadButton,
@@ -355,6 +362,7 @@ export function ModelsPanel({
                   onLoadModel={onLoadModel}
                   onCancelModelLoad={onCancelModelLoad}
                   onConfigureContext={onConfigureContext}
+                  onOpenInspector={onOpenInspector ?? noopOpenInspector}
                   onUnload={onUnload}
                   onDelete={setPendingDeleteModel}
                   dragging={draggedModelName === model.name}
@@ -440,6 +448,7 @@ const ModelCard = memo(function ModelCard({
   onLoadModel,
   onCancelModelLoad,
   onConfigureContext,
+  onOpenInspector,
   onUnload,
   onDelete,
   dragging,
@@ -570,6 +579,10 @@ const ModelCard = memo(function ModelCard({
                   }
                 />
                 <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onClick={() => onOpenInspector(model)}>
+                    <PanelRightOpen className="size-4" />
+                    {i18nService.t('localInferenceOpenInspector')}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onConfigureContext(model)}>
                     <Settings2 className="size-4" />
                     {i18nService.t('localInferenceConfigureContext')}
