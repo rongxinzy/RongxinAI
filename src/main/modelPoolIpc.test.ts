@@ -16,6 +16,7 @@ vi.mock('electron', () => ({
 }));
 
 import { ModelPoolIpc } from '../shared/ipc/channels';
+import { ZhiyuanModelPoolHeader, ZhiyuanModelPoolWorkload } from '../shared/modelPool/constants';
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 
@@ -104,15 +105,17 @@ describe('Model Pool IPC', () => {
         },
       ),
     ).resolves.toMatchObject({ ok: true, status: 200 });
-    await vi.waitFor(() =>
-      expect(send).toHaveBeenCalledWith(ModelPoolIpc.streamDone('request-1')),
-    );
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith(ModelPoolIpc.streamDone('request-1')));
 
     const [url, init] = electronMocks.fetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(
       'https://zhiyuan-model-pool-staging.windflyme5.workers.dev/v1/chat/completions',
     );
-    expect(init.headers).toMatchObject({ Authorization: 'Bearer model-pool-access-token' });
+    expect(init.headers).toMatchObject({
+      Authorization: 'Bearer model-pool-access-token',
+      [ZhiyuanModelPoolHeader.ConversationId]: 'request-1',
+      [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Chat,
+    });
     expect(JSON.parse(String(init.body))).toMatchObject({
       model: 'zhiyuan-free',
       stream: true,
