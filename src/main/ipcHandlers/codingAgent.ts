@@ -4,9 +4,12 @@ import {
   CodingAgentIpc,
   type AddCodingAgentProfileInput,
   type CodingGitCommitInput,
+  type CodingGitBranchInput,
+  type CodingGitPullRequestInput,
   type CodingGitDiffInput,
   type CodingGitPathActionInput,
   type CodingGitTargetInput,
+  type CodingWorkspaceFileInput,
   type CodingLaneViewStateInput,
   type CodingLaneConfigOptionInput,
   type CodingPermissionResponse,
@@ -377,6 +380,34 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   ipcMain.handle(CodingAgentIpc.PushGitBranch, async (_event, input: CodingGitTargetInput) => {
     try {
       return { success: true, status: await service.pushGitBranch(input) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle(CodingAgentIpc.SwitchGitBranch, async (_event, input: CodingGitBranchInput) => {
+    try {
+      return { success: true, status: await service.switchGitBranch(input) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle(CodingAgentIpc.CreateGitPullRequest, async (_event, input: CodingGitPullRequestInput) => {
+    try {
+      return { success: true, url: await service.createGitPullRequest(input) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle(CodingAgentIpc.ListWorkspaceFiles, async (_event, input: CodingWorkspaceFileInput) => {
+    try {
+      return { success: true, entries: await service.listWorkspaceFiles(input) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle(CodingAgentIpc.ReadWorkspaceFile, async (_event, input: CodingWorkspaceFileInput) => {
+    try {
+      return { success: true, file: await service.readWorkspaceFile(input) };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }

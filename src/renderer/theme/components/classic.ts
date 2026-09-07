@@ -32,6 +32,7 @@ import { classicSurfaces } from './classic-surfaces';
 import { classicBadges } from './classic-badges';
 import { classicSelect } from './classic-select';
 import { classicButtons } from './classic-buttons';
+import { classicCodingDiff } from './classic-coding-diff';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
 
 /** Codex appearance recipes are package data, never imported by React controls. */
@@ -76,6 +77,7 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
   });
   return {
     ...classicButtons(dark),
+    ...classicCodingDiff(),
     ...classicSurfaces(),
     ...classicCommand(),
     ...classicMenu(dark),

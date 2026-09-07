@@ -6,6 +6,7 @@ import {
   CodingGitDiffScope,
   CodingGitFileStatus,
   type CodingGitDiffInput,
+  type CodingGitPullRequestInput,
   type CodingGitFileChange,
   type CodingGitFileStatus as CodingGitFileStatusType,
   type CodingGitStatus,
@@ -38,23 +39,28 @@ interface GitNumStat {
   deletions: number | null;
 }
 
-const runGit = async (
+interface CommandOptions {
+  acceptedExitCodes?: number[];
+  maxOutputBytes?: number;
+  env?: NodeJS.ProcessEnv;
+}
+
+const runCommand = async (
+  command: string,
   cwd: string,
   args: string[],
-  options: { acceptedExitCodes?: number[]; maxOutputBytes?: number } = {},
+  options: CommandOptions = {},
 ): Promise<GitCommandResult> => {
   const acceptedExitCodes = options.acceptedExitCodes ?? [0];
   const maxOutputBytes = options.maxOutputBytes ?? MAX_GIT_OUTPUT_BYTES;
   return await new Promise<GitCommandResult>((resolve, reject) => {
-    const child = spawn('git', args, {
+    const child = spawn(command, args, {
       cwd,
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        GIT_TERMINAL_PROMPT: '0',
-        LC_ALL: 'C',
-        LANG: 'C',
+        ...options.env,
       },
     });
     let stdout = '';
@@ -87,16 +93,30 @@ const runGit = async (
         if (acceptedExitCodes.includes(exitCode)) {
           resolve({ stdout, stderr, exitCode });
         } else {
-          reject(new Error(stderr.trim() || `git ${args[0]} failed with exit code ${exitCode}.`));
+          reject(new Error(stderr.trim() || `${command} ${args[0]} failed with exit code ${exitCode}.`));
         }
       });
     });
     const timeout = setTimeout(() => {
       child.kill();
-      finish(() => reject(new Error(`git ${args[0]} timed out.`)));
+      finish(() => reject(new Error(`${command} ${args[0]} timed out.`)));
     }, GIT_COMMAND_TIMEOUT_MS);
   });
 };
+
+const runGit = async (
+  cwd: string,
+  args: string[],
+  options: { acceptedExitCodes?: number[]; maxOutputBytes?: number } = {},
+): Promise<GitCommandResult> =>
+  await runCommand('git', cwd, args, {
+    ...options,
+    env: {
+      GIT_TERMINAL_PROMPT: '0',
+      LC_ALL: 'C',
+      LANG: 'C',
+    },
+  });
 
 const statusFromCode = (code: string): CodingGitFileStatusType | null => {
   switch (code) {
@@ -288,7 +308,35 @@ const countUntrackedLines = async (
   }
 };
 
+const toGitHubRepositoryUrl = (remote: string): string | null => {
+  const httpsMatch = /^https:\/\/github\.com\/([^\s]+)$/.exec(remote.trim());
+  const sshMatch = /^git@github\.com:([^\s]+)$/.exec(remote.trim());
+  const repositoryPath = httpsMatch?.[1] ?? sshMatch?.[1];
+  if (!repositoryPath) return null;
+  const normalizedPath = repositoryPath.replace(/\.git$/, '').replace(/\/+$/, '');
+  if (!normalizedPath || normalizedPath.includes('..')) return null;
+  return `https://github.com/${normalizedPath}`;
+};
+
 export class CodingGitService {
+  async createPullRequest(
+    targetRoot: string,
+    input: Omit<CodingGitPullRequestInput, 'workspaceRoot' | 'laneId' | 'sourceRoot'>,
+  ): Promise<string> {
+    const title = input.title.trim();
+    const base = input.base.trim();
+    if (!title || !base) throw new Error('A pull request title and base branch are required.');
+    const result = await runCommand(
+      'gh',
+      targetRoot,
+      ['pr', 'create', '--base', base, '--title', title, '--body', input.body],
+      { env: { GH_PROMPT_DISABLED: '1' }, maxOutputBytes: MAX_GIT_OUTPUT_BYTES },
+    );
+    const url = result.stdout.trim().split(/\s+/).find(value => value.startsWith('https://'));
+    if (!url) throw new Error('GitHub did not return a pull request URL.');
+    return url;
+  }
+
   async getStatus(
     targetRoot: string,
     context: { isIsolated: boolean; isBusy: boolean },
@@ -301,7 +349,9 @@ export class CodingGitService {
         isRepository: false,
         targetRoot,
         repositoryRoot: null,
+        githubRepositoryUrl: null,
         branch: null,
+        localBranches: [],
         head: null,
         detached: false,
         upstream: null,
@@ -319,11 +369,17 @@ export class CodingGitService {
     const statusOutput = (await runGit(targetRoot, ['status', '--porcelain=v2', '--branch', '-z']))
       .stdout;
     const parsed = parsePorcelainStatus(statusOutput);
-    const [stagedOutput, unstagedOutput] = await Promise.all([
+    const [stagedOutput, unstagedOutput, originRemoteOutput, localBranchesOutput] = await Promise.all([
       runGit(targetRoot, ['diff', '--no-ext-diff', '--cached', '--numstat', '-z']).then(
         result => result.stdout,
       ),
       runGit(targetRoot, ['diff', '--no-ext-diff', '--numstat', '-z']).then(
+        result => result.stdout,
+      ),
+      runGit(targetRoot, ['remote', 'get-url', 'origin'], { acceptedExitCodes: [0, 2] }).then(
+        result => result.stdout,
+      ),
+      runGit(targetRoot, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']).then(
         result => result.stdout,
       ),
     ]);
@@ -350,7 +406,9 @@ export class CodingGitService {
       isRepository: true,
       targetRoot,
       repositoryRoot,
+      githubRepositoryUrl: toGitHubRepositoryUrl(originRemoteOutput),
       branch: parsed.branch,
+      localBranches: localBranchesOutput.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
       head: parsed.head,
       detached: parsed.detached,
       upstream: parsed.upstream,
@@ -410,5 +468,12 @@ export class CodingGitService {
   async push(targetRoot: string): Promise<void> {
     await runGit(targetRoot, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
     await runGit(targetRoot, ['push']);
+  }
+
+  async switchBranch(targetRoot: string, branch: string): Promise<void> {
+    const value = branch.trim();
+    if (!value || value.startsWith('-')) throw new Error('Invalid Git branch.');
+    await runGit(targetRoot, ['check-ref-format', '--branch', value]);
+    await runGit(targetRoot, ['switch', '--', value]);
   }
 }

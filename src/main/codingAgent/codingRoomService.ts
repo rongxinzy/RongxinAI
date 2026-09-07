@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { statSync } from 'fs';
+import { readFile, readdir, stat } from 'fs/promises';
 import path from 'path';
 
 import {
@@ -12,6 +13,7 @@ import {
   CodingMissionStatus,
   CodingPermissionOutcome,
   CodingAgentProfileStatus,
+  CodingWorkspaceFileKind,
   type CodingAgentLane,
   type CodingAgentProfile,
   type CodingAgentConfigOption,
@@ -23,6 +25,9 @@ import {
   type CodingGitPathActionInput,
   type CodingGitStatus,
   type CodingGitTargetInput,
+  type CodingWorkspaceFileContent,
+  type CodingWorkspaceFileEntry,
+  type CodingWorkspaceFileInput,
   type CreateCodingCollaborationPresetInput,
   type CodingLaneViewStateInput,
   type CodingPermissionResponse,
@@ -41,6 +46,7 @@ import { CodingAgentRegistry } from './codingAgentRegistry';
 import { AuthTerminalService } from './authTerminalService';
 import { CollaborationService } from './collaborationService';
 import { CodingGitController } from './codingGitController';
+import { WorkspaceBroker } from './workspaceBroker';
 import { CodingRoomRepository } from './codingRoomRepository';
 import { isAssistantResponseEvent } from './codingTurnResponse';
 import {
@@ -1123,6 +1129,78 @@ export class CodingRoomService extends EventEmitter {
 
   async pushGitBranch(input: CodingGitTargetInput): Promise<CodingGitStatus> {
     return await this.git.push(input);
+  }
+
+  async switchGitBranch(input: import('../../shared/codingAgent').CodingGitBranchInput): Promise<CodingGitStatus> {
+    return await this.git.switchBranch(input);
+  }
+
+  async createGitPullRequest(input: import('../../shared/codingAgent').CodingGitPullRequestInput): Promise<string> {
+    return await this.git.createPullRequest(input);
+  }
+
+  async listWorkspaceFiles(input: CodingWorkspaceFileInput): Promise<CodingWorkspaceFileEntry[]> {
+    const { sourceRoot, broker } = this.resolveWorkspaceBrowser(input);
+    const relativePath = this.requireWorkspaceRelativePath(input.path);
+    const directoryPath = await broker.resolveTarget(relativePath);
+    const directory = await stat(directoryPath);
+    if (!directory.isDirectory()) throw new Error('The requested workspace path is not a directory.');
+
+    const entries = await readdir(directoryPath, { withFileTypes: true });
+    return entries
+      .filter(entry => entry.isDirectory() || entry.isFile())
+      .sort((left, right) => {
+        const kindOrder = Number(right.isDirectory()) - Number(left.isDirectory());
+        return kindOrder || left.name.localeCompare(right.name, undefined, { numeric: true });
+      })
+      .slice(0, 300)
+      .map(entry => ({
+        name: entry.name,
+        path: path.relative(sourceRoot, path.join(directoryPath, entry.name)),
+        kind: entry.isDirectory() ? CodingWorkspaceFileKind.Directory : CodingWorkspaceFileKind.File,
+      }));
+  }
+
+  async readWorkspaceFile(input: CodingWorkspaceFileInput): Promise<CodingWorkspaceFileContent> {
+    const { sourceRoot, broker } = this.resolveWorkspaceBrowser(input);
+    const relativePath = this.requireWorkspaceRelativePath(input.path);
+    if (!relativePath) throw new Error('Select a workspace file to preview.');
+    const filePath = await broker.resolveTarget(relativePath);
+    const file = await stat(filePath);
+    if (!file.isFile()) throw new Error('The requested workspace path is not a file.');
+    if (file.size > 512 * 1024) throw new Error('Files larger than 512 KB cannot be previewed.');
+
+    const content = await readFile(filePath);
+    if (content.includes(0)) throw new Error('Binary files cannot be previewed.');
+    return { path: path.relative(sourceRoot, filePath), content: content.toString('utf8') };
+  }
+
+  private resolveWorkspaceBrowser(input: CodingWorkspaceFileInput): {
+    sourceRoot: string;
+    broker: WorkspaceBroker;
+  } {
+    const workspaceRoot = path.resolve(input.workspaceRoot);
+    const room =
+      this.repository.getRoomByRoot(workspaceRoot) ??
+      this.repository
+        .listRooms()
+        .find(candidate => path.resolve(candidate.workspaceRoot) === workspaceRoot);
+    if (!room) throw new Error('Coding workspace was not found.');
+
+    const sourceRoot = path.resolve(input.sourceRoot || room.workspaceRoot);
+    const source = this.repository
+      .listWorkspaceSources(room.id)
+      .find(candidate => path.resolve(candidate.path) === sourceRoot);
+    if (!source) throw new Error('File access is limited to folders in the coding workspace.');
+    return { sourceRoot, broker: new WorkspaceBroker(sourceRoot) };
+  }
+
+  private requireWorkspaceRelativePath(value: string | undefined): string {
+    const relativePath = value?.trim() ?? '';
+    if (path.isAbsolute(relativePath) || relativePath.split(path.sep).includes('..')) {
+      throw new Error('Workspace paths must stay inside the selected source folder.');
+    }
+    return relativePath;
   }
 
   async probeAgent(workspaceRoot: string, profileId: string): Promise<CodingRoomSnapshot> {

@@ -5,6 +5,7 @@ import type {
   CodingEventKind,
   CodingGitDiffScope,
   CodingGitFileStatus,
+  CodingWorkspaceFileKind,
   CodingLaneStatus,
   CodingMissionStatus,
   CodingPermissionOutcome,
@@ -283,6 +284,16 @@ export interface CodingGitTargetInput {
   sourceRoot?: string;
 }
 
+export interface CodingGitBranchInput extends CodingGitTargetInput {
+  branch: string;
+}
+
+export interface CodingGitPullRequestInput extends CodingGitTargetInput {
+  title: string;
+  body: string;
+  base: string;
+}
+
 export interface CodingGitFileChange {
   path: string;
   originalPath?: string;
@@ -296,7 +307,10 @@ export interface CodingGitStatus {
   isRepository: boolean;
   targetRoot: string;
   repositoryRoot: string | null;
+  /** Canonical GitHub repository URL when the origin remote is hosted on GitHub. */
+  githubRepositoryUrl: string | null;
   branch: string | null;
+  localBranches: string[];
   head: string | null;
   detached: boolean;
   upstream: string | null;
@@ -317,6 +331,22 @@ export interface CodingGitDiffInput extends CodingGitTargetInput {
 
 export interface CodingGitPathActionInput extends CodingGitTargetInput {
   paths: string[];
+}
+
+export interface CodingWorkspaceFileInput extends CodingGitTargetInput {
+  /** A path relative to the selected coding source root. */
+  path?: string;
+}
+
+export interface CodingWorkspaceFileEntry {
+  name: string;
+  path: string;
+  kind: CodingWorkspaceFileKind;
+}
+
+export interface CodingWorkspaceFileContent {
+  path: string;
+  content: string;
 }
 
 export interface CodingGitCommitInput extends CodingGitTargetInput {

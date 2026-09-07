@@ -8,25 +8,34 @@ import {
 } from './artifactPanelResize';
 
 interface ArtifactPanelResizeHandleProps {
+  ariaLabel?: string;
   currentWidth: number;
   minWidth: number;
   maxWidth: number;
   onResizeFrame: (width: number) => void;
   onResizeComplete: (width: number) => void;
+  disabled?: boolean;
+  onReachMaxWidth?: () => void;
+  maxWidthOverflowThreshold?: number;
 }
 
 const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
+  ariaLabel,
   currentWidth,
   minWidth,
   maxWidth,
   onResizeFrame,
   onResizeComplete,
+  disabled = false,
+  onReachMaxWidth,
+  maxWidthOverflowThreshold = 0,
 }) => {
   const [isResizing, setIsResizing] = useState(false);
   const isResizingRef = useRef(false);
   const startClientXRef = useRef(0);
   const startWidthRef = useRef(currentWidth);
   const latestWidthRef = useRef(currentWidth);
+  const reachedMaxWidthRef = useRef(false);
   const frameRequestRef = useRef<number | null>(null);
   const originalCursorRef = useRef('');
   const originalUserSelectRef = useRef('');
@@ -83,13 +92,14 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return;
+      if (disabled || event.button !== 0) return;
 
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       startClientXRef.current = event.clientX;
       startWidthRef.current = currentWidth;
       latestWidthRef.current = currentWidth;
+      reachedMaxWidthRef.current = false;
       originalCursorRef.current = document.body.style.cursor;
       originalUserSelectRef.current = document.body.style.userSelect;
       document.body.style.cursor = 'col-resize';
@@ -101,6 +111,15 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
       const handle = event.currentTarget;
       const handleWindowPointerMove = (moveEvent: PointerEvent) => {
         if (!isResizingRef.current || moveEvent.pointerId !== pointerId) return;
+        const requestedWidth =
+          startWidthRef.current + startClientXRef.current - moveEvent.clientX;
+        if (
+          requestedWidth >= maxWidth + maxWidthOverflowThreshold &&
+          !reachedMaxWidthRef.current
+        ) {
+          reachedMaxWidthRef.current = true;
+          onReachMaxWidth?.();
+        }
         scheduleResizeFrame(
           resolveArtifactPanelPointerWidth(
             startWidthRef.current,
@@ -130,11 +149,21 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
       window.addEventListener('pointercancel', handleWindowPointerEnd);
       window.addEventListener('blur', handleWindowBlur);
     },
-    [completeResize, currentWidth, maxWidth, minWidth, scheduleResizeFrame],
+    [
+      completeResize,
+      currentWidth,
+      disabled,
+      maxWidth,
+      maxWidthOverflowThreshold,
+      minWidth,
+      onReachMaxWidth,
+      scheduleResizeFrame,
+    ],
   );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (disabled) return;
       const nextWidth = resolveArtifactPanelKeyboardWidth(
         currentWidth,
         event.key,
@@ -146,24 +175,27 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
       onResizeFrame(nextWidth);
       onResizeComplete(nextWidth);
     },
-    [currentWidth, maxWidth, minWidth, onResizeComplete, onResizeFrame],
+    [currentWidth, disabled, maxWidth, minWidth, onResizeComplete, onResizeFrame],
   );
 
   return (
     <div
-      aria-label={i18nService.t('artifactResizePreview')}
+      aria-label={ariaLabel ?? i18nService.t('artifactResizePreview')}
       aria-orientation="vertical"
       aria-valuemax={Math.round(maxWidth)}
       aria-valuemin={Math.round(minWidth)}
       aria-valuenow={Math.round(currentWidth)}
-      className="absolute inset-y-0 left-0 z-10 w-3 cursor-col-resize touch-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      className={`absolute inset-y-0 left-0 z-10 w-3 touch-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
+        disabled ? 'pointer-events-none cursor-default' : 'cursor-col-resize'
+      }`}
       data-artifact-resize-handle=""
       data-resizing={isResizing ? '' : undefined}
+      aria-disabled={disabled || undefined}
       onKeyDown={handleKeyDown}
       onLostPointerCapture={completeResize}
       onPointerDown={handlePointerDown}
       role="separator"
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
     />
   );
 };

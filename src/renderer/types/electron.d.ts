@@ -1082,6 +1082,26 @@ interface IElectronAPI {
     pushGitBranch: (
       input: import('../../shared/codingAgent').CodingGitTargetInput,
     ) => Promise<CodingGitStatusResult>;
+    switchGitBranch: (
+      input: import('../../shared/codingAgent').CodingGitBranchInput,
+    ) => Promise<CodingGitStatusResult>;
+    createGitPullRequest: (
+      input: import('../../shared/codingAgent').CodingGitPullRequestInput,
+    ) => Promise<{ success: boolean; url?: string; error?: string }>;
+    listWorkspaceFiles: (
+      input: import('../../shared/codingAgent').CodingWorkspaceFileInput,
+    ) => Promise<{
+      success: boolean;
+      entries?: import('../../shared/codingAgent').CodingWorkspaceFileEntry[];
+      error?: string;
+    }>;
+    readWorkspaceFile: (
+      input: import('../../shared/codingAgent').CodingWorkspaceFileInput,
+    ) => Promise<{
+      success: boolean;
+      file?: import('../../shared/codingAgent').CodingWorkspaceFileContent;
+      error?: string;
+    }>;
     discoverAgents: (input: { workspaceRoot: string }) => Promise<CodingAgentActionResult>;
     probeAgent: (input: {
       workspaceRoot: string;
