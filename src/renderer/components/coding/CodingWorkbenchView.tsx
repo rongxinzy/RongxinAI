@@ -75,6 +75,7 @@ import {
 import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspaceSidebar';
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
+import { findPendingCodingPermission } from './codingPermission';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
@@ -369,81 +370,23 @@ export const CodingWorkbenchView = ({
     workspaceRoot;
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
   const desktopSidePanelOpen =
-    !isNarrowViewport &&
-    sidePanelView !== null &&
-    (sidePanelView !== CodingSidePanelView.Inspector || hasInspectorContent);
-  const resolvedSidePanelWidth = clampArtifactPanelWidth(
-    sidePanelWidth,
-    CODING_PANEL_MIN_WIDTH,
-    sidePanelMaxWidth,
-  );
-  const renderedSidePanelWidth = transientSidePanelWidthRef.current ?? resolvedSidePanelWidth;
-  const visibleSidePanelTabs =
-    sidePanelTabs.length > 0
-      ? sidePanelTabs
-      : sidePanelView !== null && sidePanelView !== CodingSidePanelView.Launcher
-        ? [sidePanelView]
-        : [];
-
-  const applySidePanelFrameWidth = useCallback(
-    (width: number) => {
-      const nextWidth = clampArtifactPanelWidth(
-        width,
-        CODING_PANEL_MIN_WIDTH,
-        sidePanelMaxWidth,
-      );
-      transientSidePanelWidthRef.current = nextWidth;
-      if (workbenchRef.current) {
-        workbenchRef.current.style.gridTemplateColumns = `minmax(0, 1fr) ${nextWidth}px`;
-      }
-    },
-    [sidePanelMaxWidth],
-  );
-
-  const completeSidePanelResize = useCallback(
-    (width: number) => {
-      const nextWidth = clampArtifactPanelWidth(
-        width,
-        CODING_PANEL_MIN_WIDTH,
-        sidePanelMaxWidth,
-      );
-      transientSidePanelWidthRef.current = null;
-      setSidePanelWidth(nextWidth);
-    },
-    [sidePanelMaxWidth],
-  );
-
-  useEffect(() => {
-    const root = workbenchRef.current;
-    if (!root) return;
-    const updateMaxWidth = () => {
-      const maxWidth = resolveArtifactPanelMaxWidth(root.clientWidth, CODING_PANEL_MIN_WIDTH);
-      setSidePanelMaxWidth(maxWidth);
-      setSidePanelWidth(current => clampArtifactPanelWidth(current, CODING_PANEL_MIN_WIDTH, maxWidth));
-    };
-    updateMaxWidth();
-    const observer = new ResizeObserver(updateMaxWidth);
-    observer.observe(root);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 1023px)');
-    const syncViewport = () => setIsNarrowViewport(mediaQuery.matches);
-    syncViewport();
-    mediaQuery.addEventListener('change', syncViewport);
-    return () => mediaQuery.removeEventListener('change', syncViewport);
-  }, []);
-  const activePermission = useMemo(
-    () =>
-      activeLane?.status === CodingLaneStatus.WaitingApproval
-        ? (activeEvents
-            .slice()
-            .reverse()
-            .find(event => event.kind === CodingEventKind.Permission) ?? null)
-        : null,
-    [activeEvents, activeLane?.status],
-  );
+    sidePanelView === CodingSidePanelView.Git ||
+    (sidePanelView === CodingSidePanelView.Inspector && hasInspectorContent);
+  const activePermission = useMemo(() => {
+    const waitingLaneIds = new Set(
+      (snapshot?.lanes ?? [])
+        .filter(lane => lane.status === CodingLaneStatus.WaitingApproval)
+        .map(lane => lane.id),
+    );
+    if (waitingLaneIds.size === 0) return null;
+    if (activeLane && waitingLaneIds.has(activeLane.id)) {
+      const selectedPermission = findPendingCodingPermission(activeEvents);
+      if (selectedPermission) return selectedPermission;
+    }
+    const waitingEvents =
+      snapshot?.events.filter(event => waitingLaneIds.has(event.laneId)) ?? [];
+    return findPendingCodingPermission(waitingEvents);
+  }, [activeEvents, activeLane, snapshot]);
   const recoveryLane =
     activeLane?.pendingRecoveryPrompt && activeLane.pendingRecoveryContext ? activeLane : null;
 

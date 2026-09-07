@@ -46,6 +46,13 @@ export const CodingConversationActivityKind = {
 export type CodingConversationActivityKind =
   (typeof CodingConversationActivityKind)[keyof typeof CodingConversationActivityKind];
 
+export const CodingConversationSegmentKind = {
+  Reasoning: 'reasoning',
+  Activity: 'activity',
+} as const;
+export type CodingConversationSegmentKind =
+  (typeof CodingConversationSegmentKind)[keyof typeof CodingConversationSegmentKind];
+
 export const CodingConversationTurnStatus = {
   Complete: 'complete',
   Cancelled: 'cancelled',
@@ -83,9 +90,11 @@ export const CodingExternalActivityStatus = {
 
 export const CodingToolPartState = {
   ApprovalRequested: 'approval-requested',
+  ApprovalResponded: 'approval-responded',
   InputAvailable: 'input-available',
   InputStreaming: 'input-streaming',
   OutputAvailable: 'output-available',
+  OutputDenied: 'output-denied',
   OutputError: 'output-error',
 } as const;
 export type CodingToolPartState = (typeof CodingToolPartState)[keyof typeof CodingToolPartState];
