@@ -1,5 +1,6 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { ButtonGroup } from '@shared/components/ui/button-group';
 import {
   Dialog,
   DialogContent,
@@ -1136,29 +1137,40 @@ export const CodingWorkbenchView = ({
                 const isReview = tab === CodingSidePanelView.Review;
                 const active = tab === sidePanelView;
                 return (
-                  <div key={tab} className="group flex items-center gap-0">
+                  active ? (
+                    <ButtonGroup key={tab} className="group shrink-0">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openSidePanelTab(tab)}
+                      >
+                        {isReview ? <FileDiff /> : <File />}
+                        {i18nService.t(isReview ? 'codingAgentReview' : 'codingAgentOpenFiles')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon-xs"
+                        className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                        aria-label={i18nService.t('close')}
+                        onClick={() => closeSidePanelTab(tab)}
+                      >
+                        <X />
+                      </Button>
+                    </ButtonGroup>
+                  ) : (
                     <Button
+                      key={tab}
                       type="button"
-                      variant={active ? 'secondary' : 'ghost'}
+                      variant="ghost"
                       size="sm"
                       onClick={() => openSidePanelTab(tab)}
                     >
                       {isReview ? <FileDiff /> : <File />}
                       {i18nService.t(isReview ? 'codingAgentReview' : 'codingAgentOpenFiles')}
                     </Button>
-                    {active ? (
-                      <Button
-                        type="button"
-                        variant={active ? 'secondary' : 'ghost'}
-                        size="icon-xs"
-                        className={active ? undefined : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}
-                        aria-label={i18nService.t('close')}
-                        onClick={() => closeSidePanelTab(tab)}
-                      >
-                        <X />
-                      </Button>
-                    ) : null}
-                  </div>
+                  )
                 );
               })}
               <Button
