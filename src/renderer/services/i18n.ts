@@ -968,9 +968,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingSessionSetupConfigureTitle: '先配置编程 Agent',
     codingSessionCreateFailed: 'Agent 或模型当前不可用，Session 未创建。',
     codingSessionCollaborator: '协作者',
-    codingSessionRemove: '删除 Session',
-    codingSessionRemoveConfirm:
-      '删除该 Session 的全部编程记录（主 Session 会连同协作者一起删除），不会删除磁盘文件。',
+    codingSessionRemove: '删除会话',
+    codingSessionRemoveConfirm: '删除当前会话记录，不会删除磁盘文件。',
     codingAgentReady: '可用',
     codingAgentStop: '停止',
     codingAgentEmptyTitle: '准备开始编程',
@@ -4313,8 +4312,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingSessionCreateFailed: 'The agent or model is unavailable. No session was created.',
     codingSessionCollaborator: 'Collaborator',
     codingSessionRemove: 'Delete session',
-    codingSessionRemoveConfirm:
-      'This deletes all coding records of the session (a primary session takes its collaborators with it). Files on disk are never deleted.',
+    codingSessionRemoveConfirm: 'Delete the current session record. Files on disk are never deleted.',
     codingAgentReady: 'Ready',
     codingAgentStop: 'Stop',
     codingAgentEmptyTitle: 'Ready to code',

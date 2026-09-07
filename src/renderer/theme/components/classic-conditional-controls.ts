@@ -269,7 +269,7 @@ export function classicConditionalControls(dark: boolean) {
     'page-coding-workspace-sidebar-button-variant-3': recipe({
       base: {
         height: '2rem',
-        width: 'calc(100%+12px)',
+        width: 'calc(100% + 12px)',
         gap: '0.5rem',
         'border-radius': 'var(--zy-style-radius-md)',
         'padding-block': '0rem',

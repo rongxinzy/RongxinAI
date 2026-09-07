@@ -3148,7 +3148,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -10661,7 +10661,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -18189,7 +18189,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -25702,7 +25702,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -33232,7 +33232,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -40750,7 +40750,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -48283,7 +48283,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -55801,7 +55801,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;

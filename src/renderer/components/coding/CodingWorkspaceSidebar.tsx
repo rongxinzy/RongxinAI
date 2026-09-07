@@ -598,7 +598,7 @@ const SessionRow = ({
       type="button"
       variant="ghost"
       className={cn(
-        'theme-page-coding-workspace-sidebar-button-variant-3 ml-[-6px] min-w-0 justify-start text-left',
+        'theme-page-coding-workspace-sidebar-button-variant-3 ml-[-6px] w-[calc(100%+12px)] min-w-0 justify-start text-left',
         nested
           ? 'theme-page-coding-workspace-sidebar-button-variant-4'
           : 'theme-page-coding-workspace-sidebar-button-variant-5',
