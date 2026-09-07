@@ -288,6 +288,12 @@ export interface CodingGitBranchInput extends CodingGitTargetInput {
   branch: string;
 }
 
+export interface CodingGitPullRequestInput extends CodingGitTargetInput {
+  title: string;
+  body: string;
+  base: string;
+}
+
 export interface CodingGitFileChange {
   path: string;
   originalPath?: string;

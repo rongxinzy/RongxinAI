@@ -185,6 +185,7 @@ export const CodingAgentIpc = {
   CommitGitChanges: 'codingAgent:commitGitChanges',
   PushGitBranch: 'codingAgent:pushGitBranch',
   SwitchGitBranch: 'codingAgent:switchGitBranch',
+  CreateGitPullRequest: 'codingAgent:createGitPullRequest',
   ListWorkspaceFiles: 'codingAgent:listWorkspaceFiles',
   ReadWorkspaceFile: 'codingAgent:readWorkspaceFile',
   DiscoverAgents: 'codingAgent:discoverAgents',

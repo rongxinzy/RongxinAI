@@ -65,12 +65,16 @@ export const CodingGitQuickActions = ({
   const [status, setStatus] = useState<CodingGitStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [commitOpen, setCommitOpen] = useState(false);
+  const [pullRequestOpen, setPullRequestOpen] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
   const [branchFilter, setBranchFilter] = useState('');
   const [pendingBranch, setPendingBranch] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
   const [includeUnstaged, setIncludeUnstaged] = useState(true);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [pullRequestTitle, setPullRequestTitle] = useState('');
+  const [pullRequestBody, setPullRequestBody] = useState('');
+  const [pullRequestBase, setPullRequestBase] = useState('main');
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -105,6 +109,22 @@ export const CodingGitQuickActions = ({
   const openCommit = () => {
     setOpen(false);
     setCommitOpen(true);
+  };
+
+  const createPullRequest = async () => {
+    if (!status || !pullRequestTitle.trim() || !pullRequestBase.trim()) return;
+    setPendingAction('pullRequest');
+    const result = await window.electron.codingAgent.createGitPullRequest({ ...target, title: pullRequestTitle, body: pullRequestBody, base: pullRequestBase });
+    setPendingAction(null);
+    if (!result.success || !result.url) {
+      toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
+      return;
+    }
+    setPullRequestOpen(false);
+    setPullRequestTitle('');
+    setPullRequestBody('');
+    toast.success(result.url);
+    void window.electron.shell.openExternal(result.url);
   };
 
   const switchBranch = async (branch: string) => {
@@ -197,7 +217,7 @@ export const CodingGitQuickActions = ({
               <GitMenuRow icon={Send} onClick={openCommit}>
                 {i18nService.t('codingGitCommitOrPush')}
               </GitMenuRow>
-              <GitMenuRow icon={GitPullRequest} disabled>
+              <GitMenuRow icon={GitPullRequest} onClick={() => { setOpen(false); setPullRequestOpen(true); }}>
                 {i18nService.t('codingGitCreatePullRequest')}
               </GitMenuRow>
             </div>
@@ -270,6 +290,20 @@ export const CodingGitQuickActions = ({
             <Button type="button" variant="outline" disabled={!status?.canMutate || !commitMessage.trim() || pendingAction !== null} onClick={() => void runCommit(false)}>{pendingAction === 'commit' ? <Spinner /> : <Send />}{i18nService.t('codingGitCommit')}</Button>
             <Button type="button" disabled={!status?.canMutate || !commitMessage.trim() || pendingAction !== null || !status?.upstream} onClick={() => void runCommit(true)}>{pendingAction === 'commitAndPush' ? <Spinner /> : <Upload />}{i18nService.t('codingGitCommitAndPush')}</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={pullRequestOpen} onOpenChange={setPullRequestOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{i18nService.t('codingGitCreatePullRequest')}</DialogTitle>
+            <DialogDescription>{i18nService.t('codingGitPullRequestDescription')}</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field><FieldLabel htmlFor="coding-git-pr-title">{i18nService.t('codingGitPullRequestTitle')}</FieldLabel><Input id="coding-git-pr-title" value={pullRequestTitle} onChange={event => setPullRequestTitle(event.target.value)} /></Field>
+            <Field><FieldLabel htmlFor="coding-git-pr-base">{i18nService.t('codingGitPullRequestBase')}</FieldLabel><Input id="coding-git-pr-base" value={pullRequestBase} onChange={event => setPullRequestBase(event.target.value)} /></Field>
+            <Field><FieldLabel htmlFor="coding-git-pr-body">{i18nService.t('codingGitPullRequestBody')}</FieldLabel><Input id="coding-git-pr-body" value={pullRequestBody} onChange={event => setPullRequestBody(event.target.value)} /></Field>
+          </FieldGroup>
+          <DialogFooter><Button type="button" variant="outline" onClick={() => setPullRequestOpen(false)}>{i18nService.t('codingGitCancel')}</Button><Button type="button" disabled={pendingAction !== null || !pullRequestTitle.trim()} onClick={() => void createPullRequest()}>{pendingAction === 'pullRequest' ? <Spinner /> : <GitPullRequest />}{i18nService.t('codingGitCreatePullRequest')}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </>

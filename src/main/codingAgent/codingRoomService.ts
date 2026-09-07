@@ -1135,6 +1135,10 @@ export class CodingRoomService extends EventEmitter {
     return await this.git.switchBranch(input);
   }
 
+  async createGitPullRequest(input: import('../../shared/codingAgent').CodingGitPullRequestInput): Promise<string> {
+    return await this.git.createPullRequest(input);
+  }
+
   async listWorkspaceFiles(input: CodingWorkspaceFileInput): Promise<CodingWorkspaceFileEntry[]> {
     const { sourceRoot, broker } = this.resolveWorkspaceBrowser(input);
     const relativePath = this.requireWorkspaceRelativePath(input.path);
