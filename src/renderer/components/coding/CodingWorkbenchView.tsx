@@ -1152,7 +1152,7 @@ export const CodingWorkbenchView = ({
                         type="button"
                         variant="ghost"
                         size="icon-xs"
-                        className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                        className="border-l-0 bg-transparent hover:bg-transparent focus-visible:bg-transparent pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
                         aria-label={i18nService.t('close')}
                         onClick={() => closeSidePanelTab(tab)}
                       >
