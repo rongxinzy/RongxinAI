@@ -2,7 +2,9 @@
 
 import { timingSafeEqual } from 'crypto';
 
+import { ZhiyuanModelPoolHeader } from '../../../shared/modelPool/constants';
 import { buildOpenAIChatCompletionsURL } from '../coworkFormatTransform';
+
 interface PiOpenAICompatUpstream {
   baseURL: string;
   apiKey?: string;
@@ -65,6 +67,11 @@ function createFetchHeaders(request: IncomingMessage, upstream: PiOpenAICompatUp
   const accept = request.headers.accept;
   if (typeof accept === 'string') {
     headers.set('accept', accept);
+  }
+
+  for (const name of Object.values(ZhiyuanModelPoolHeader)) {
+    const value = request.headers[name];
+    if (typeof value === 'string') headers.set(name, value);
   }
 
   const apiKey = upstream.apiKey?.trim();

@@ -195,8 +195,7 @@ const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
-const mockRegisterPiOpenAICompatTokenRefresher =
-  hoisted.mockRegisterPiOpenAICompatTokenRefresher;
+const mockRegisterPiOpenAICompatTokenRefresher = hoisted.mockRegisterPiOpenAICompatTokenRefresher;
 const mockGetCommunityAuthAccessToken = hoisted.mockGetCommunityAuthAccessToken;
 const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 
@@ -1266,6 +1265,19 @@ describe('PiRuntimeAdapter', () => {
       expect(mockRegisterPiOpenAICompatTokenRefresher).toHaveBeenCalledWith(
         'zhiyuan',
         expect.any(Function),
+      );
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'zhiyuan',
+        expect.objectContaining({
+          models: [
+            expect.objectContaining({
+              headers: {
+                'x-zhiyuan-conversation-id': 'test',
+                'x-zhiyuan-workload': 'work',
+              },
+            }),
+          ],
+        }),
       );
 
       const refresher = mockRegisterPiOpenAICompatTokenRefresher.mock.calls.at(-1)?.[1];

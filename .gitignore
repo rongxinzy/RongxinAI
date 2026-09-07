@@ -97,6 +97,14 @@ documents.md
 reasonix.toml
 .reasonix/
 
+# Local Model Pool provider credentials
+.agens
+.cloudflare-aig
+.groq
+.kimi
+.openrouter
+.tokenrouter
+
 # Scratch/debug artifacts (theme capture scripts, ad-hoc HTML, screenshots)
 /tmp/
 

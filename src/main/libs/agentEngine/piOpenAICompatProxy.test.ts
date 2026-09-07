@@ -141,7 +141,9 @@ describe('piOpenAICompatProxy', () => {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(
         JSON.stringify({
-          choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+          choices: [
+            { index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' },
+          ],
         }),
       );
     });
@@ -227,8 +229,12 @@ describe('piOpenAICompatProxy', () => {
 
   it('protects managed upstream credentials with a per-process local capability', async () => {
     let upstreamRequestCount = 0;
-    const upstream = http.createServer((_request, response) => {
+    let forwardedWorkload: string | undefined;
+    let forwardedConversationId: string | undefined;
+    const upstream = http.createServer((request, response) => {
       upstreamRequestCount += 1;
+      forwardedWorkload = request.headers['x-zhiyuan-workload'];
+      forwardedConversationId = request.headers['x-zhiyuan-conversation-id'];
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ choices: [] }));
     });
@@ -250,6 +256,8 @@ describe('piOpenAICompatProxy', () => {
         headers: {
           authorization: 'Bearer random-local-capability',
           'content-type': 'application/json',
+          'x-zhiyuan-conversation-id': 'work-session-1',
+          'x-zhiyuan-workload': 'work',
         },
         body: JSON.stringify({ model: 'zhiyuan-free', messages: [] }),
       });
@@ -257,6 +265,8 @@ describe('piOpenAICompatProxy', () => {
       expect(unauthorized.status).toBe(401);
       expect(authorized.status).toBe(200);
       expect(upstreamRequestCount).toBe(1);
+      expect(forwardedWorkload).toBe('work');
+      expect(forwardedConversationId).toBe('work-session-1');
     } finally {
       await close(upstream);
     }
