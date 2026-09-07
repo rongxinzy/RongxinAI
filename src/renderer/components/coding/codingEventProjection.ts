@@ -7,6 +7,7 @@ import {
 import { CoworkToolActivityEventType } from '../../../shared/cowork/toolActivity';
 import {
   CodingConversationActivityKind,
+  CodingConversationSegmentKind,
   CodingConversationRole,
   CodingConversationTurnStatus,
   type CodingConversationActivityKind as CodingConversationActivityKindType,
@@ -33,11 +34,26 @@ export interface CodingConversationActivity {
   event: CodingEvent;
 }
 
+export type CodingConversationSegment =
+  | {
+      kind: typeof CodingConversationSegmentKind.Reasoning;
+      id: string;
+      content: string;
+      createdAt: number;
+    }
+  | {
+      kind: typeof CodingConversationSegmentKind.Activity;
+      activity: CodingConversationActivity;
+    };
+
 export interface CodingConversationTurn {
   id: string;
+  startedAt: number;
+  completedAt: number | null;
   userMessage: CodingConversationMessage | null;
   reasoning: CodingConversationReasoning | null;
   activities: CodingConversationActivity[];
+  segments: CodingConversationSegment[];
   assistantMessages: CodingConversationMessage[];
   status: CodingConversationTurnStatusType | null;
   statusDetail: string | null;
@@ -97,9 +113,12 @@ const getMessageId = (event: CodingEvent): string => {
 
 const createTurn = (event: CodingEvent): CodingConversationTurn => ({
   id: event.id,
+  startedAt: event.createdAt,
+  completedAt: null,
   userMessage: null,
   reasoning: null,
   activities: [],
+  segments: [],
   assistantMessages: [],
   status: null,
   statusDetail: null,
@@ -185,6 +204,71 @@ const normalizeToolActivityEvent = (event: CodingEvent): CodingEvent => {
   return event;
 };
 
+const appendReasoningSegment = (
+  turn: CodingConversationTurn,
+  event: CodingEvent,
+  content: string,
+): void => {
+  const lastSegment = turn.segments[turn.segments.length - 1];
+  if (
+    lastSegment?.kind === CodingConversationSegmentKind.Reasoning &&
+    event.payload.streamUpdateMode === CodingStreamUpdateMode.Replace
+  ) {
+    lastSegment.content = content;
+  } else if (
+    lastSegment?.kind === CodingConversationSegmentKind.Reasoning &&
+    event.payload.streamUpdateMode !== CodingStreamUpdateMode.Replace
+  ) {
+    lastSegment.content += content;
+  } else {
+    turn.segments.push({
+      kind: CodingConversationSegmentKind.Reasoning,
+      id: event.id,
+      content,
+      createdAt: event.createdAt,
+    });
+  }
+};
+
+const upsertActivitySegment = (
+  turn: CodingConversationTurn,
+  activity: CodingConversationActivity,
+): void => {
+  const existingSegment = turn.segments.find(
+    segment =>
+      segment.kind === CodingConversationSegmentKind.Activity &&
+      segment.activity.id === activity.id &&
+      segment.activity.kind === activity.kind,
+  );
+  if (existingSegment?.kind === CodingConversationSegmentKind.Activity) {
+    existingSegment.activity = activity;
+  } else {
+    turn.segments.push({ kind: CodingConversationSegmentKind.Activity, activity });
+  }
+};
+
+const mergePermissionResolution = (turn: CodingConversationTurn, event: CodingEvent): boolean => {
+  if (
+    event.kind !== CodingEventKind.ToolCall ||
+    typeof event.payload.permissionRequestId !== 'string' ||
+    typeof event.payload.permissionOutcome !== 'string'
+  ) {
+    return false;
+  }
+  const permissionId = `${CodingConversationActivityKind.Permission}:${event.payload.permissionRequestId}`;
+  const permission = turn.activities.find(
+    activity =>
+      activity.id === permissionId && activity.kind === CodingConversationActivityKind.Permission,
+  );
+  if (!permission) return false;
+  permission.event = {
+    ...permission.event,
+    payload: { ...permission.event.payload, ...event.payload },
+  };
+  upsertActivitySegment(turn, permission);
+  return true;
+};
+
 export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTurn[] => {
   const turns: CodingConversationTurn[] = [];
   let currentTurn: CodingConversationTurn | null = null;
@@ -239,12 +323,14 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
         turn.reasoning.content = content;
       } else if (turn.reasoning) turn.reasoning.content += content;
       else turn.reasoning = { id: event.id, content, createdAt: event.createdAt };
+      appendReasoningSegment(turn, event, content);
       continue;
     }
 
     const projectedActivityKind = activityKind(event);
     if (projectedActivityKind) {
       const turn = ensureTurn(event);
+      if (mergePermissionResolution(turn, event)) continue;
       const id = getActivityId(turn, event, projectedActivityKind);
       const normalizedEvent = normalizeToolActivityEvent(event);
       const existing = turn.activities.find(
@@ -261,13 +347,25 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
                 payload: { ...existing.event.payload, ...normalizedEvent.payload },
               }
             : normalizedEvent;
-      } else turn.activities.push({ id, kind: projectedActivityKind, event: normalizedEvent });
+      } else {
+        turn.activities.push({
+          id,
+          kind: projectedActivityKind,
+          event: normalizedEvent,
+        });
+      }
+      upsertActivitySegment(turn, {
+        id,
+        kind: projectedActivityKind,
+        event: existing?.event ?? normalizedEvent,
+      });
       continue;
     }
 
     if (event.kind === CodingEventKind.TurnComplete) {
       const turn = ensureTurn(event);
       turn.status = CodingConversationTurnStatus.Complete;
+      turn.completedAt = event.createdAt;
       currentTurn = null;
       continue;
     }
@@ -275,6 +373,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
       const turn = ensureTurn(event);
       turn.status = CodingConversationTurnStatus.Cancelled;
       turn.statusDetail = getCodingEventText(event) || null;
+      turn.completedAt = event.createdAt;
       currentTurn = null;
       continue;
     }
@@ -282,6 +381,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
       const turn = ensureTurn(event);
       turn.status = CodingConversationTurnStatus.Failed;
       turn.statusDetail = getCodingEventText(event) || null;
+      turn.completedAt = event.createdAt;
       currentTurn = null;
     }
   }

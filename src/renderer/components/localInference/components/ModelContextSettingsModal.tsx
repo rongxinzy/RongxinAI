@@ -88,19 +88,9 @@ export function ModelContextSettingsModal({
 
   if (!model) return null;
 
-<<<<<<< HEAD
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      className="theme-local-context-modal w-full max-w-md p-0"
-    >
-      <div className="flex flex-col gap-5 p-6">
-=======
   const content = (
     <div className={cn('flex flex-col gap-5', presentation === ModelContextSettingsPresentation.Modal && 'p-6')}>
       {presentation === ModelContextSettingsPresentation.Modal ? (
->>>>>>> 0837e2e7 (feat(本地推理): rebase前存储当前代码)
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="shrink-0 text-base font-semibold text-foreground">
             {i18nService.t('localInferenceConfigureContext')}
@@ -265,7 +255,7 @@ export function ModelContextSettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-md rounded-xl border border-border bg-surface p-0"
+      className="theme-local-context-modal w-full max-w-md p-0"
     >
       {content}
     </Modal>

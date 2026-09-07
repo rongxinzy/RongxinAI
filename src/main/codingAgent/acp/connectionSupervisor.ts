@@ -63,6 +63,7 @@ export interface AcpConnectionLaunchOptions {
 
 type PendingRequest = {
   method: string;
+  startedAt: number;
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout> | null;
@@ -191,6 +192,8 @@ export class AcpConnectionSupervisor {
   ): Promise<T> {
     if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
     const id = ++this.requestId;
+    const startedAt = Date.now();
+    console.debug(`[AcpConnection] sent request ${method} (${id})`);
     const response = new Promise<T>((resolve, reject) => {
       const timeoutMs =
         options.timeoutMs === undefined ? ACP_REQUEST_TIMEOUT_MS : options.timeoutMs;
@@ -199,10 +202,14 @@ export class AcpConnectionSupervisor {
           ? null
           : setTimeout(() => {
               this.pending.delete(id);
+              console.warn(
+                `[AcpConnection] request timed out: ${method} (${id}) after ${Date.now() - startedAt} ms`,
+              );
               reject(new Error(`ACP request timed out: ${method}.`));
             }, timeoutMs);
       this.pending.set(id, {
         method,
+        startedAt,
         resolve: value => resolve(value as T),
         reject,
         timeout,
@@ -280,6 +287,9 @@ export class AcpConnectionSupervisor {
       if (!pending) return;
       this.pending.delete(message.id);
       if (pending.timeout) clearTimeout(pending.timeout);
+      console.debug(
+        `[AcpConnection] received response for ${pending.method} (${String(message.id)}) after ${Date.now() - pending.startedAt} ms`,
+      );
       if (message.error) {
         const detail = String(message.error.message ?? 'ACP request failed.');
         const code =
