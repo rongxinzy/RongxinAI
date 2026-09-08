@@ -1753,6 +1753,11 @@
   background-color: var(--zy-surface);
   padding: 1rem;
 }
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
   border-width: 1px;
@@ -6860,6 +6865,7 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-dialog-title),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-dialog-description),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-dialog-footer),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-dialog-footer-seamless),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-popover-content),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-popover-title),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-popover-description),
@@ -9339,6 +9345,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="classic-dark"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="classic-dark"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -14462,6 +14473,7 @@ to {
 [data-theme="classic-dark"] :where(.theme-dialog-title),
 [data-theme="classic-dark"] :where(.theme-dialog-description),
 [data-theme="classic-dark"] :where(.theme-dialog-footer),
+[data-theme="classic-dark"] :where(.theme-dialog-footer-seamless),
 [data-theme="classic-dark"] :where(.theme-popover-content),
 [data-theme="classic-dark"] :where(.theme-popover-title),
 [data-theme="classic-dark"] :where(.theme-popover-description),
@@ -16941,6 +16953,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="daming-light"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="daming-light"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -22049,6 +22066,7 @@ to {
 [data-theme="daming-light"] :where(.theme-dialog-title),
 [data-theme="daming-light"] :where(.theme-dialog-description),
 [data-theme="daming-light"] :where(.theme-dialog-footer),
+[data-theme="daming-light"] :where(.theme-dialog-footer-seamless),
 [data-theme="daming-light"] :where(.theme-popover-content),
 [data-theme="daming-light"] :where(.theme-popover-title),
 [data-theme="daming-light"] :where(.theme-popover-description),
@@ -24528,6 +24546,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="daming-dark"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="daming-dark"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -29651,6 +29674,7 @@ to {
 [data-theme="daming-dark"] :where(.theme-dialog-title),
 [data-theme="daming-dark"] :where(.theme-dialog-description),
 [data-theme="daming-dark"] :where(.theme-dialog-footer),
+[data-theme="daming-dark"] :where(.theme-dialog-footer-seamless),
 [data-theme="daming-dark"] :where(.theme-popover-content),
 [data-theme="daming-dark"] :where(.theme-popover-title),
 [data-theme="daming-dark"] :where(.theme-popover-description),
@@ -32132,6 +32156,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="changan-light"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="changan-light"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -37243,6 +37272,7 @@ to {
 [data-theme="changan-light"] :where(.theme-dialog-title),
 [data-theme="changan-light"] :where(.theme-dialog-description),
 [data-theme="changan-light"] :where(.theme-dialog-footer),
+[data-theme="changan-light"] :where(.theme-dialog-footer-seamless),
 [data-theme="changan-light"] :where(.theme-popover-content),
 [data-theme="changan-light"] :where(.theme-popover-title),
 [data-theme="changan-light"] :where(.theme-popover-description),
@@ -39724,6 +39754,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="changan-dark"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="changan-dark"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -44850,6 +44885,7 @@ to {
 [data-theme="changan-dark"] :where(.theme-dialog-title),
 [data-theme="changan-dark"] :where(.theme-dialog-description),
 [data-theme="changan-dark"] :where(.theme-dialog-footer),
+[data-theme="changan-dark"] :where(.theme-dialog-footer-seamless),
 [data-theme="changan-dark"] :where(.theme-popover-content),
 [data-theme="changan-dark"] :where(.theme-popover-title),
 [data-theme="changan-dark"] :where(.theme-popover-description),
@@ -47331,6 +47367,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="weiyang-light"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="weiyang-light"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -52442,6 +52483,7 @@ to {
 [data-theme="weiyang-light"] :where(.theme-dialog-title),
 [data-theme="weiyang-light"] :where(.theme-dialog-description),
 [data-theme="weiyang-light"] :where(.theme-dialog-footer),
+[data-theme="weiyang-light"] :where(.theme-dialog-footer-seamless),
 [data-theme="weiyang-light"] :where(.theme-popover-content),
 [data-theme="weiyang-light"] :where(.theme-popover-title),
 [data-theme="weiyang-light"] :where(.theme-popover-description),
@@ -54923,6 +54965,11 @@ to {
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
   padding: 1rem;
+}
+[data-theme="weiyang-dark"] :where(.theme-dialog-footer-seamless) {
+  background-color: transparent;
+  border-top-width: 0;
+  padding: 0;
 }
 [data-theme="weiyang-dark"] :where(.theme-popover-content) {
   font-size: var(--zy-component-text-sm);
@@ -60049,6 +60096,7 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-dialog-title),
 [data-theme="weiyang-dark"] :where(.theme-dialog-description),
 [data-theme="weiyang-dark"] :where(.theme-dialog-footer),
+[data-theme="weiyang-dark"] :where(.theme-dialog-footer-seamless),
 [data-theme="weiyang-dark"] :where(.theme-popover-content),
 [data-theme="weiyang-dark"] :where(.theme-popover-title),
 [data-theme="weiyang-dark"] :where(.theme-popover-description),
