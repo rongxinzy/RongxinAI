@@ -393,7 +393,6 @@ export const CodingWorkbenchView = ({
   // on the event count would rerun `git status` on every streamed chunk.
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${gitRefreshVersion}`;
   const desktopSidePanelOpen =
-<<<<<<< HEAD
     !isNarrowViewport &&
     !sidePanelHidden &&
     sidePanelView !== null &&
@@ -460,19 +459,6 @@ export const CodingWorkbenchView = ({
     mediaQuery.addEventListener('change', syncViewport);
     return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
-  const activePermission = useMemo(
-    () =>
-      activeLane?.status === CodingLaneStatus.WaitingApproval
-        ? (activeEvents
-            .slice()
-            .reverse()
-            .find(event => event.kind === CodingEventKind.Permission) ?? null)
-        : null,
-    [activeEvents, activeLane?.status],
-  );
-=======
-    sidePanelView === CodingSidePanelView.Git ||
-    (sidePanelView === CodingSidePanelView.Inspector && hasInspectorContent);
   const activePermission = useMemo(() => {
     const waitingLaneIds = new Set(
       (snapshot?.lanes ?? [])
@@ -488,7 +474,6 @@ export const CodingWorkbenchView = ({
       snapshot?.events.filter(event => waitingLaneIds.has(event.laneId)) ?? [];
     return findPendingCodingPermission(waitingEvents);
   }, [activeEvents, activeLane, snapshot]);
->>>>>>> 5750d0f0 (feat(编程页面): 1.修复编程模式下不能进行审批的bug；优化编程模式下的前端呈现效果)
   const recoveryLane =
     activeLane?.pendingRecoveryPrompt && activeLane.pendingRecoveryContext ? activeLane : null;
 
