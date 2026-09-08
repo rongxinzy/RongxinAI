@@ -10,7 +10,7 @@ import {
 import { Textarea } from '@shared/components/ui/textarea';
 import { cn } from '@shared/lib/utils';
 import { CalendarDays, Check, ListChecks, Plus, Star, Trash2 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { TodoStatus, type Todo, type TodoList } from '../../../shared/todo';
 import { i18nService } from '../../services/i18n';
@@ -29,6 +29,7 @@ interface TodoTaskDetailProps {
   lists: TodoList[];
   language: 'zh' | 'en';
   onUpdated: () => Promise<void>;
+  onError: () => void;
   onDelete: () => void;
 }
 
@@ -39,6 +40,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   lists,
   language,
   onUpdated,
+  onError,
   onDelete,
 }) => {
   const [title, setTitle] = useState(todo.title);
@@ -48,14 +50,38 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   const [listId, setListId] = useState(todo.listId ?? NO_LIST_VALUE);
   const [stepDraft, setStepDraft] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Background refreshes (onChanged -> loadData) replace the todo object; only
+  // resync fields the user is not editing, otherwise in-progress edits would
+  // be silently reverted by every save of another field.
+  const dirtyFieldsRef = useRef(new Set<string>());
+  const lastTodoIdRef = useRef(todo.id);
 
   useEffect(() => {
-    setTitle(todo.title);
-    setNote(todo.note);
-    setDueDate(toDateInputValue(todo.dueAt));
-    setRemindAt(toDateTimeInputValue(todo.remindAt));
-    setListId(todo.listId ?? NO_LIST_VALUE);
+    if (lastTodoIdRef.current !== todo.id) {
+      lastTodoIdRef.current = todo.id;
+      dirtyFieldsRef.current.clear();
+      setTitle(todo.title);
+      setNote(todo.note);
+      setDueDate(toDateInputValue(todo.dueAt));
+      setRemindAt(toDateTimeInputValue(todo.remindAt));
+      setListId(todo.listId ?? NO_LIST_VALUE);
+      return;
+    }
+    const dirty = dirtyFieldsRef.current;
+    setTitle(current => (dirty.has('title') ? current : todo.title));
+    setNote(current => (dirty.has('note') ? current : todo.note));
+    setDueDate(current => (dirty.has('dueDate') ? current : toDateInputValue(todo.dueAt)));
+    setRemindAt(current => (dirty.has('remindAt') ? current : toDateTimeInputValue(todo.remindAt)));
+    setListId(current => (dirty.has('listId') ? current : todo.listId ?? NO_LIST_VALUE));
   }, [todo]);
+
+  const markDirty = (field: string): void => {
+    dirtyFieldsRef.current.add(field);
+  };
+
+  const clearDirty = (...fields: string[]): void => {
+    for (const field of fields) dirtyFieldsRef.current.delete(field);
+  };
 
   const saveDetails = async (): Promise<void> => {
     const trimmedTitle = title.trim();
@@ -69,7 +95,12 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
         remindAt: fromDateTimeInputValue(remindAt),
         listId: listId === NO_LIST_VALUE ? null : listId,
       });
-      if (result.success) await onUpdated();
+      if (result.success) {
+        clearDirty('title', 'note', 'dueDate', 'remindAt', 'listId');
+        await onUpdated();
+      } else {
+        onError();
+      }
     } finally {
       setIsSaving(false);
     }
@@ -78,6 +109,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   const updateStatus = async (status: TodoStatus): Promise<void> => {
     const result = await todoService.update(todo.id, { status });
     if (result.success) await onUpdated();
+    else onError();
   };
 
   const toggleMyDay = async (): Promise<void> => {
@@ -85,11 +117,13 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
       myDayDate: todo.myDayDate === todayDateKey() ? null : todayDateKey(),
     });
     if (result.success) await onUpdated();
+    else onError();
   };
 
   const toggleImportant = async (): Promise<void> => {
     const result = await todoService.update(todo.id, { important: !todo.important });
     if (result.success) await onUpdated();
+    else onError();
   };
 
   const addStep = async (): Promise<void> => {
@@ -99,28 +133,31 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
     if (result.success) {
       setStepDraft('');
       await onUpdated();
+    } else {
+      onError();
     }
   };
+
+  const inMyDay = todo.myDayDate === todayDateKey();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 pb-6">
       <div className="space-y-4">
         <Input
           value={title}
-          onChange={event => setTitle(event.target.value)}
+          onChange={event => {
+            markDirty('title');
+            setTitle(event.target.value);
+          }}
           onBlur={() => void saveDetails()}
           aria-label={i18nService.t('todoTitleLabel')}
           className="theme-page-todo-task-detail-input-1"
         />
 
         <div className="flex flex-wrap gap-2 border-b border-border-subtle pb-4">
-          <Button
-            type="button"
-            variant={todo.myDayDate ? 'secondary' : 'outline'}
-            onClick={toggleMyDay}
-          >
+          <Button type="button" variant={inMyDay ? 'secondary' : 'outline'} onClick={toggleMyDay}>
             <CalendarDays />
-            {todo.myDayDate === todayDateKey()
+            {inMyDay
               ? i18nService.t('todoRemoveFromMyDay')
               : i18nService.t('todoAddToMyDay')}
           </Button>
@@ -146,10 +183,17 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               type="date"
               value={dueDate}
               onChange={event => {
+                markDirty('dueDate');
                 setDueDate(event.target.value);
                 void todoService
                   .update(todo.id, { dueAt: fromDateInputValue(event.target.value) })
-                  .then(result => (result.success ? onUpdated() : undefined));
+                  .then(result => {
+                    if (result.success) {
+                      clearDirty('dueDate');
+                      return onUpdated();
+                    }
+                    onError();
+                  });
               }}
             />
           </label>
@@ -159,10 +203,17 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               type="datetime-local"
               value={remindAt}
               onChange={event => {
+                markDirty('remindAt');
                 setRemindAt(event.target.value);
                 void todoService
                   .update(todo.id, { remindAt: fromDateTimeInputValue(event.target.value) })
-                  .then(result => (result.success ? onUpdated() : undefined));
+                  .then(result => {
+                    if (result.success) {
+                      clearDirty('remindAt');
+                      return onUpdated();
+                    }
+                    onError();
+                  });
               }}
             />
           </label>
@@ -174,10 +225,17 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
             value={listId}
             onValueChange={value => {
               const nextListId = value ?? NO_LIST_VALUE;
+              markDirty('listId');
               setListId(nextListId);
               void todoService
                 .update(todo.id, { listId: nextListId === NO_LIST_VALUE ? null : nextListId })
-                .then(result => (result.success ? onUpdated() : undefined));
+                .then(result => {
+                  if (result.success) {
+                    clearDirty('listId');
+                    return onUpdated();
+                  }
+                  onError();
+                });
             }}
           >
             <SelectTrigger className="w-full">
@@ -202,7 +260,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
           <span className="text-muted-foreground">{i18nService.t('todoNote')}</span>
           <Textarea
             value={note}
-            onChange={event => setNote(event.target.value)}
+            onChange={event => {
+              markDirty('note');
+              setNote(event.target.value);
+            }}
             onBlur={() => void saveDetails()}
             placeholder={i18nService.t('todoNotePlaceholder')}
             rows={5}
@@ -231,7 +292,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
                 onClick={() =>
                   void todoService
                     .updateStep({ id: step.id, completed: !step.completed })
-                    .then(result => (result.success ? onUpdated() : undefined))
+                    .then(result => {
+                      if (result.success) return onUpdated();
+                      onError();
+                    })
                 }
               >
                 {step.completed ? <Check /> : null}
@@ -251,9 +315,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
                 aria-label={i18nService.t('todoDeleteStep')}
                 title={i18nService.t('todoDeleteStep')}
                 onClick={() =>
-                  void todoService
-                    .deleteStep(step.id)
-                    .then(result => (result.success ? onUpdated() : undefined))
+                  void todoService.deleteStep(step.id).then(result => {
+                    if (result.success) return onUpdated();
+                    onError();
+                  })
                 }
               >
                 <Trash2 className="text-muted-foreground" />
