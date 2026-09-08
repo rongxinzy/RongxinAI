@@ -25,7 +25,12 @@ export {
   ProviderModelPiThinkingFormat,
   resolveProviderModelPiReasoning,
 } from './piRuntime';
-export type { ProviderModelPiRuntimeCompat, ProviderModelPiRuntimeConfig } from './piRuntime';
+export type {
+  ProviderModelPiRuntimeCompat,
+  ProviderModelPiRuntimeConfig,
+  ProviderModelPiThinkingLevel,
+  ProviderModelPiThinkingLevelMap,
+} from './piRuntime';
 export type { ProviderConfig } from './types';
 export { isProviderEnabled } from './types';
 export {
