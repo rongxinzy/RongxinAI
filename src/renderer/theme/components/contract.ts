@@ -311,6 +311,7 @@ export const COMPONENT_SELECTORS = {
   'dialog-title': '.theme-dialog-title',
   'dialog-description': '.theme-dialog-description',
   'dialog-footer': '.theme-dialog-footer',
+  'dialog-footer-seamless': '.theme-dialog-footer-seamless',
   'popover-content': '.theme-popover-content',
   'popover-title': '.theme-popover-title',
   'popover-description': '.theme-popover-description',

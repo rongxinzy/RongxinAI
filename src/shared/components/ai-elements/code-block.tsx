@@ -81,15 +81,59 @@ const LINE_NUMBER_CLASSES = cn(
   'before:select-none',
 );
 
+export const CodeBlockLineNumberMode = {
+  Default: 'default',
+  Approval: 'approval',
+} as const;
+export type CodeBlockLineNumberMode =
+  (typeof CodeBlockLineNumberMode)[keyof typeof CodeBlockLineNumberMode];
+
+export const CodeBlockHeaderSurface = {
+  Default: 'default',
+  Seamless: 'seamless',
+} as const;
+export type CodeBlockHeaderSurface =
+  (typeof CodeBlockHeaderSurface)[keyof typeof CodeBlockHeaderSurface];
+
+const APPROVAL_LINE_NUMBER_CLASSES = cn(
+  'block',
+  'before:content-[counter(line)]',
+  'before:inline-flex',
+  'before:box-border',
+  'before:[counter-increment:line]',
+  'before:w-8',
+  'before:mr-3',
+  'before:pl-2',
+  'before:pr-1',
+  'before:justify-start',
+  'before:bg-muted',
+  'before:border-r',
+  'before:border-border',
+  'before:text-left',
+  'before:text-muted-foreground',
+  'before:font-mono',
+  'before:select-none',
+);
+
 // Line rendering component
 const LineSpan = ({
   keyedLine,
   showLineNumbers,
+  lineNumberMode,
 }: {
   keyedLine: KeyedLine;
   showLineNumbers: boolean;
+  lineNumberMode: CodeBlockLineNumberMode;
 }) => (
-  <span className={showLineNumbers ? LINE_NUMBER_CLASSES : 'block'}>
+  <span
+    className={
+      showLineNumbers
+        ? lineNumberMode === CodeBlockLineNumberMode.Approval
+          ? APPROVAL_LINE_NUMBER_CLASSES
+          : LINE_NUMBER_CLASSES
+        : 'block'
+    }
+  >
     {keyedLine.tokens.length === 0
       ? '\n'
       : keyedLine.tokens.map(({ token, key }) => <TokenSpan key={key} token={token} />)}
@@ -101,6 +145,7 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   code: string;
   language: string;
   showLineNumbers?: boolean;
+  lineNumberMode?: CodeBlockLineNumberMode;
 };
 
 interface TokenizedCode {
@@ -268,10 +313,12 @@ const CodeBlockBody = memo(
   ({
     tokenized,
     showLineNumbers,
+    lineNumberMode,
     className,
   }: {
     tokenized: TokenizedCode;
     showLineNumbers: boolean;
+    lineNumberMode: CodeBlockLineNumberMode;
     className?: string;
   }) => {
     const preStyle = useMemo(
@@ -287,7 +334,8 @@ const CodeBlockBody = memo(
     return (
       <pre
         className={cn(
-          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0 p-4 text-sm',
+          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0 text-sm',
+          lineNumberMode === CodeBlockLineNumberMode.Approval ? 'px-0 py-3' : 'p-4',
           className,
         )}
         style={preStyle}
@@ -299,7 +347,12 @@ const CodeBlockBody = memo(
           )}
         >
           {keyedLines.map(keyedLine => (
-            <LineSpan key={keyedLine.key} keyedLine={keyedLine} showLineNumbers={showLineNumbers} />
+            <LineSpan
+              key={keyedLine.key}
+              keyedLine={keyedLine}
+              showLineNumbers={showLineNumbers}
+              lineNumberMode={lineNumberMode}
+            />
           ))}
         </code>
       </pre>
@@ -308,6 +361,7 @@ const CodeBlockBody = memo(
   (prevProps, nextProps) =>
     prevProps.tokenized === nextProps.tokenized &&
     prevProps.showLineNumbers === nextProps.showLineNumbers &&
+    prevProps.lineNumberMode === nextProps.lineNumberMode &&
     prevProps.className === nextProps.className,
 );
 
@@ -337,11 +391,20 @@ export const CodeBlockContainer = ({
 export const CodeBlockHeader = ({
   children,
   className,
+  showDivider = true,
+  surface = CodeBlockHeaderSurface.Default,
   ...props
-}: HTMLAttributes<HTMLDivElement>) => (
+}: HTMLAttributes<HTMLDivElement> & {
+  showDivider?: boolean;
+  surface?: CodeBlockHeaderSurface;
+}) => (
   <div
     className={cn(
-      'flex items-center justify-between border-b bg-muted/80 px-3 py-2 text-muted-foreground text-xs',
+      'flex items-center justify-between px-3 py-2 text-muted-foreground text-xs',
+      surface === CodeBlockHeaderSurface.Seamless
+        ? 'bg-(--zy-syntax-shiki-background)'
+        : 'bg-muted/80',
+      showDivider && 'border-b',
       className,
     )}
     {...props}
@@ -384,10 +447,12 @@ export const CodeBlockContent = ({
   code,
   language,
   showLineNumbers = false,
+  lineNumberMode = CodeBlockLineNumberMode.Default,
 }: {
   code: string;
   language: string;
   showLineNumbers?: boolean;
+  lineNumberMode?: CodeBlockLineNumberMode;
 }) => {
   // Memoized raw tokens for immediate display
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
@@ -426,7 +491,11 @@ export const CodeBlockContent = ({
 
   return (
     <div className="relative overflow-auto">
-      <CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
+      <CodeBlockBody
+        showLineNumbers={showLineNumbers}
+        lineNumberMode={lineNumberMode}
+        tokenized={tokenized}
+      />
     </div>
   );
 };
@@ -435,6 +504,7 @@ export const CodeBlock = ({
   code,
   language,
   showLineNumbers = false,
+  lineNumberMode = CodeBlockLineNumberMode.Default,
   className,
   children,
   ...props
@@ -445,7 +515,12 @@ export const CodeBlock = ({
     <CodeBlockContext.Provider value={contextValue}>
       <CodeBlockContainer className={className} language={language} {...props}>
         {children}
-        <CodeBlockContent code={code} language={language} showLineNumbers={showLineNumbers} />
+        <CodeBlockContent
+          code={code}
+          language={language}
+          showLineNumbers={showLineNumbers}
+          lineNumberMode={lineNumberMode}
+        />
       </CodeBlockContainer>
     </CodeBlockContext.Provider>
   );

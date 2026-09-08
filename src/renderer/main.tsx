@@ -10,6 +10,7 @@ import {
   LlamaCppModelLaunchLogWindowView,
 } from '../shared/llamacpp';
 import { EnterpriseSessionGate } from './components/enterprise/EnterpriseSessionGate';
+import { ContextMenu } from './components/ContextMenu';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -51,6 +52,7 @@ async function renderRoot(): Promise<void> {
       <EnterpriseSessionGate>
         <Provider store={store}>
           <App />
+          <ContextMenu />
         </Provider>
       </EnterpriseSessionGate>
     </React.StrictMode>,

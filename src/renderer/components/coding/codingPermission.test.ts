@@ -5,6 +5,7 @@ import {
   CodingPermissionOptionKind,
   CodingPermissionResolution,
   getCodingPermissionResolution,
+  isCommandAllowPermissionOption,
   isGenericCodingPermissionOption,
   findPendingCodingPermission,
   formatCodingPermissionInput,
@@ -98,6 +99,13 @@ test('formats request input for a readable permission preview', () => {
 });
 
 test('keeps custom permission scopes distinct from generic options', () => {
+  expect(
+    isCommandAllowPermissionOption({
+      optionId: 'allow-command',
+      name: 'Allow Commands Starting With cmd /c echo',
+      kind: CodingPermissionOptionKind.AllowAlways,
+    }),
+  ).toBe(true);
   expect(
     isGenericCodingPermissionOption({
       optionId: 'allow-session',

@@ -294,6 +294,7 @@ import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { StartupProfiler } from './startupProfiler';
 import { createTray, destroyTray, updateTrayMenu } from './trayManager';
+import { registerContextMenu } from './contextMenu';
 import {
   AppWindowStoreKey,
   MIN_APP_WINDOW_HEIGHT,
@@ -6579,6 +6580,7 @@ if (!gotTheLock) {
 
     // 禁用窗口菜单
     mainWindow.setMenu(null);
+    const unregisterContextMenu = registerContextMenu(mainWindow);
 
     // 处理 window.open 请求（企微 SDK 授权弹窗等）
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -6698,6 +6700,7 @@ if (!gotTheLock) {
 
     // 当窗口关闭时，清除引用
     mainWindow.on('closed', () => {
+      unregisterContextMenu();
       if (windowStateSaveTimer) {
         clearTimeout(windowStateSaveTimer);
         windowStateSaveTimer = null;

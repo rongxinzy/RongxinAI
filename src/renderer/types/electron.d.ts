@@ -1,6 +1,7 @@
 import type { CoworkError } from '../../common/coworkError';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ActivityRun } from '../../shared/activity/types';
+import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
   CoworkPermissionMode,
@@ -676,6 +677,10 @@ interface IElectronAPI {
   appEvents: {
     onOpenSettings: (callback: () => void) => () => void;
     onNewTask: (callback: () => void) => () => void;
+  };
+  contextMenu: {
+    execute: (action: ContextMenuAction) => void;
+    onOpen: (callback: (event: ContextMenuOpenEvent) => void) => () => void;
   };
   window: {
     minimize: () => void;

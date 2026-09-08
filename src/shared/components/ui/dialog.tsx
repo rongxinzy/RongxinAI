@@ -20,6 +20,12 @@ function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
+export const DialogFooterSurface = {
+  Default: 'default',
+  Seamless: 'seamless',
+} as const;
+export type DialogFooterSurface = (typeof DialogFooterSurface)[keyof typeof DialogFooterSurface];
+
 function DialogOverlay({
   className,
   disableCloseAnimation = false,
@@ -89,16 +95,21 @@ function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
 function DialogFooter({
   className,
   showCloseButton = false,
+  surface = DialogFooterSurface.Default,
   children,
   ...props
 }: React.ComponentProps<'div'> & {
   showCloseButton?: boolean;
+  surface?: DialogFooterSurface;
 }) {
   return (
     <div
       data-slot="dialog-footer"
       className={cn(
-        'theme-dialog-footer -mx-4 -mb-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
+        surface === DialogFooterSurface.Seamless
+          ? 'theme-dialog-footer-seamless'
+          : 'theme-dialog-footer -mx-4 -mb-4',
+        'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
         className,
       )}
       {...props}
