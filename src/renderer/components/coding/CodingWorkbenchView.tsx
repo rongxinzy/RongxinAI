@@ -110,6 +110,8 @@ export const CodingWorkbenchView = ({
   onToggleSidebar,
 }: CodingWorkbenchViewProps) => {
   const [snapshot, setSnapshot] = useState<CodingRoomSnapshot | null>(EMPTY_SNAPSHOT);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [promptAttachments, setPromptAttachments] = useState<CodingPromptAttachment[]>([]);
@@ -150,13 +152,21 @@ export const CodingWorkbenchView = ({
     setPromptAttachments([]);
   }, [selectionKey]);
   useEffect(() => {
+    setBootstrapError(null);
     if (!workspaceRoot) {
       setSnapshot(null);
       return;
     }
     let cancelled = false;
     void window.electron.codingAgent.bootstrap(workspaceRoot).then(result => {
-      if (!cancelled && result.success && result.snapshot) setSnapshot(result.snapshot);
+      if (cancelled) return;
+      if (result.success && result.snapshot) {
+        setSnapshot(result.snapshot);
+        return;
+      }
+      // Without a snapshot the workbench would be stuck on its loading
+      // screen forever, so surface the failure with a retry.
+      setBootstrapError(result.error ?? i18nService.t('codingAgentActionFailed'));
     });
     const unsubscribe = window.electron.codingAgent.onChanged(next => {
       if (next.room.workspaceRoot === workspaceRoot) setSnapshot(next);
@@ -165,7 +175,7 @@ export const CodingWorkbenchView = ({
       cancelled = true;
       unsubscribe();
     };
-  }, [workspaceRoot]);
+  }, [workspaceRoot, bootstrapAttempt]);
   useEffect(() => {
     if (
       !workspaceRoot ||
@@ -368,7 +378,9 @@ export const CodingWorkbenchView = ({
     activeLane?.sourceRoot ??
     snapshot?.room.workspaceRoot ??
     workspaceRoot;
-  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
+  // Refresh the git panels on lane switch and turn status change only; keying
+  // on the event count would rerun `git status` on every streamed chunk.
+  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}`;
   const desktopSidePanelOpen =
     !isNarrowViewport &&
     !sidePanelHidden &&
@@ -722,6 +734,7 @@ export const CodingWorkbenchView = ({
       laneId: activeLane.id,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
+    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
   };
   const setLaneConfigOption = async (configId: string, value: string | boolean) => {
     if (!activeLane) return;
@@ -803,7 +816,20 @@ export const CodingWorkbenchView = ({
   if (!snapshot)
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {i18nService.t('codingAgentLoading')}
+        {bootstrapError ? (
+          <div className="flex flex-col items-center gap-3 text-center">
+            <p>{bootstrapError}</p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setBootstrapAttempt(attempt => attempt + 1)}
+            >
+              {i18nService.t('retry')}
+            </Button>
+          </div>
+        ) : (
+          i18nService.t('codingAgentLoading')
+        )}
       </div>
     );
 
