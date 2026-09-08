@@ -127,6 +127,11 @@ export const ApiFetchSchema = {
 
 export const ModelPoolStreamSchema = {
   input: z.object({
+    conversationId: z
+      .string()
+      .min(1)
+      .max(160)
+      .regex(/^[A-Za-z0-9_-]+$/u),
     requestId: z
       .string()
       .min(1)

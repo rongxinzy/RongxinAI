@@ -101,7 +101,8 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     if (provider === ProviderName.Zhiyuan) {
       const { body } = this.buildOpenAICompatibleRequest(messages, '', '', modelId, provider);
       return this.streamOverBridge(chatId, abortSignal, 'openai', {
-        start: requestId => window.electron.modelPool.stream({ requestId, body }),
+        start: requestId =>
+          window.electron.modelPool.stream({ requestId, conversationId: chatId, body }),
         cancel: requestId => window.electron.modelPool.cancelStream(requestId),
         onData: (requestId, callback) =>
           window.electron.modelPool.onStreamData(requestId, callback),

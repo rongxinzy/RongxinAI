@@ -1465,7 +1465,11 @@ interface IElectronAPI {
       models: string[];
       error?: string;
     }>;
-    stream: (input: { requestId: string; body: Record<string, unknown> }) => Promise<{
+    stream: (input: {
+      requestId: string;
+      conversationId: string;
+      body: Record<string, unknown>;
+    }) => Promise<{
       ok: boolean;
       status: number;
       statusText: string;
