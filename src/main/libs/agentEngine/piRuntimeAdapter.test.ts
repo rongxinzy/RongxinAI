@@ -1218,6 +1218,7 @@ describe('PiRuntimeAdapter', () => {
           piRuntime: {
             api: ProviderModelPiApi.OpenAIResponses,
             reasoning: true,
+            thinkingLevelMap: { off: null, low: 'low', high: 'high', max: 'max' },
             compat: {
               supportsDeveloperRole: false,
               maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
@@ -1242,6 +1243,7 @@ describe('PiRuntimeAdapter', () => {
               id: 'agent-model',
               api: ProviderModelPiApi.OpenAIResponses,
               reasoning: true,
+              thinkingLevelMap: { off: null, low: 'low', high: 'high', max: 'max' },
               input: ['text', 'image'],
               compat: {
                 supportsDeveloperRole: false,
