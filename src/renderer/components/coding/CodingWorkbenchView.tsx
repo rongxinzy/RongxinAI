@@ -119,6 +119,7 @@ export const CodingWorkbenchView = ({
   const [sidePanelSheetOpen, setSidePanelSheetOpen] = useState(false);
   const [sidePanelView, setSidePanelView] = useState<CodingSidePanelViewType | null>(null);
   const [sidePanelTabs, setSidePanelTabs] = useState<CodingSidePanelViewType[]>([]);
+  const [sidePanelHidden, setSidePanelHidden] = useState(false);
   const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
   const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
@@ -370,6 +371,7 @@ export const CodingWorkbenchView = ({
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
   const desktopSidePanelOpen =
     !isNarrowViewport &&
+    !sidePanelHidden &&
     sidePanelView !== null &&
     (sidePanelView !== CodingSidePanelView.Inspector || hasInspectorContent);
   const resolvedSidePanelWidth = clampArtifactPanelWidth(
@@ -472,10 +474,12 @@ export const CodingWorkbenchView = ({
   useEffect(() => {
     setSidePanelView(null);
     setSidePanelTabs([]);
+    setSidePanelHidden(false);
     setSidePanelSheetOpen(false);
   }, [activeLane?.id]);
 
   const openSidePanelTab = useCallback((view: CodingSidePanelViewType) => {
+    setSidePanelHidden(false);
     if (view === CodingSidePanelView.Launcher) {
       setSidePanelTabs([]);
       setSidePanelView(CodingSidePanelView.Launcher);
@@ -483,6 +487,11 @@ export const CodingWorkbenchView = ({
     }
     setSidePanelTabs(current => (current.includes(view) ? current : [...current, view]));
     setSidePanelView(view);
+  }, []);
+
+  const restoreSidePanel = useCallback(() => {
+    setSidePanelHidden(false);
+    setSidePanelView(current => current ?? CodingSidePanelView.Launcher);
   }, []);
 
   const closeSidePanelTab = useCallback(
@@ -802,16 +811,78 @@ export const CodingWorkbenchView = ({
     <div
       ref={workbenchRef}
       data-page-canvas
-      className={cn(
-        'grid h-full min-h-0 bg-background',
-        'grid-cols-1',
-      )}
-      style={
-        desktopSidePanelOpen
-          ? { gridTemplateColumns: `minmax(0, 1fr) ${renderedSidePanelWidth}px` }
-          : undefined
-      }
+      className="flex h-full min-h-0 flex-col bg-background"
     >
+      <PageHeader
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
+        leftContent={
+          <>
+            <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+              <FolderGit2 className="size-4 shrink-0" />
+              <span className="truncate">{snapshot.room.name}</span>
+            </span>
+            <CodingParticipants
+              activeLaneId={activeLane?.id ?? null}
+              lanes={activeMissionLanes}
+              profiles={snapshot.profiles}
+              onSelect={laneId => void selectLane(laneId)}
+            />
+            {activeProfile && (
+              <Badge variant="secondary" className="shrink-0">
+                {profileStatusText(activeProfile.status)}
+              </Badge>
+            )}
+          </>
+        }
+        actions={
+          <>
+            {hasInspectorContent && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={i18nService.t('codingAgentInspector')}
+                aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
+                onClick={() => {
+                  openSidePanelTab(CodingSidePanelView.Inspector);
+                  if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                }}
+              >
+                <TerminalIcon />
+              </Button>
+            )}
+            {artifactSessionKey && laneArtifacts.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label={i18nService.t('codingAgentArtifacts')}
+                aria-pressed={isArtifactPanelOpen}
+                onClick={() => dispatch(togglePanel())}
+              >
+                <Layers className="mr-1 size-4" />
+                {i18nService.t('codingAgentArtifacts')}
+                <Badge variant="secondary">{laneArtifacts.length}</Badge>
+              </Button>
+            )}
+            {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
+              <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
+                <FileDiff className="mr-1 size-4" />
+                {i18nService.t('codingAgentReviewChanges')}
+              </Button>
+            )}
+          </>
+        }
+      />
+      <div
+        className="relative grid min-h-0 min-w-0 flex-1 grid-cols-1"
+        style={
+          desktopSidePanelOpen
+            ? { gridTemplateColumns: `minmax(0, 1fr) ${renderedSidePanelWidth}px` }
+            : undefined
+        }
+      >
       <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
         <CodingAuthAndPermissionDialogs
           authTerminal={authTerminal}
@@ -913,114 +984,50 @@ export const CodingWorkbenchView = ({
             </DialogContent>
           </Dialog>
         )}
-        <PageHeader
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleSidebar={onToggleSidebar}
-          leftContent={
-            <>
-              <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                <FolderGit2 className="size-4 shrink-0" />
-                <span className="truncate">{snapshot.room.name}</span>
-              </span>
-              <CodingParticipants
-                activeLaneId={activeLane?.id ?? null}
-                lanes={activeMissionLanes}
-                profiles={snapshot.profiles}
-                onSelect={laneId => void selectLane(laneId)}
-              />
-              {activeProfile && (
-                <Badge variant="secondary" className="shrink-0">
-                  {profileStatusText(activeProfile.status)}
-                </Badge>
-              )}
-            </>
-          }
-          actions={
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={i18nService.t('codingAgentManageAgents')}
-                onClick={() => setAgentManagerOpen(true)}
-              >
-                <Settings2 />
-              </Button>
-              <CodingGitQuickActions
-                target={{
-                  workspaceRoot,
-                  laneId: activeLane?.id ?? undefined,
-                  sourceRoot: gitSourceRoot,
-                }}
-                refreshKey={gitRefreshKey}
-                onOpenReview={() => {
-                  openSidePanelTab(CodingSidePanelView.Review);
-                  if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-                }}
-              />
-      {hasInspectorContent && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={i18nService.t('codingAgentInspector')}
-          aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
-          onClick={() => {
-            openSidePanelTab(CodingSidePanelView.Inspector);
-            if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-          }}
-        >
-          <TerminalIcon />
-        </Button>
-      )}
-      {artifactSessionKey && laneArtifacts.length > 0 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label={i18nService.t('codingAgentArtifacts')}
-                  aria-pressed={isArtifactPanelOpen}
-                  onClick={() => dispatch(togglePanel())}
-                >
-                  <Layers className="mr-1 size-4" />
-                  {i18nService.t('codingAgentArtifacts')}
-                  <Badge variant="secondary">{laneArtifacts.length}</Badge>
-                </Button>
-              )}
-              {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
-                <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
-                  <FileDiff className="mr-1 size-4" />
-                  {i18nService.t('codingAgentReviewChanges')}
-                </Button>
-              )}
-              {!desktopSidePanelOpen && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={i18nService.t('codingAgentSidePanel')}
-                  aria-pressed={sidePanelView !== null}
-                  onClick={() => {
-                    const closeEmptyPanel = sidePanelView !== null && sidePanelTabs.length === 0;
-                    if (closeEmptyPanel) {
-                      setSidePanelView(null);
-                      setSidePanelSheetOpen(false);
-                      return;
-                    }
-                    openSidePanelTab(CodingSidePanelView.Launcher);
-                    if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-                  }}
-                >
-                  <PanelRight />
-                </Button>
-              )}
-            </>
-          }
-        />
         <div ref={artifactRowRef} className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <CodingEventStream
             events={activeEvents}
             isStreaming={activeLane?.status === CodingLaneStatus.Running}
+            headerActions={
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={i18nService.t('codingAgentManageAgents')}
+                  onClick={() => setAgentManagerOpen(true)}
+                >
+                  <Settings2 />
+                </Button>
+                <CodingGitQuickActions
+                  target={{
+                    workspaceRoot,
+                    laneId: activeLane?.id ?? undefined,
+                    sourceRoot: gitSourceRoot,
+                  }}
+                  refreshKey={gitRefreshKey}
+                  onOpenReview={() => {
+                    openSidePanelTab(CodingSidePanelView.Review);
+                    if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                  }}
+                />
+                {!desktopSidePanelOpen && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={i18nService.t('codingAgentSidePanel')}
+                    aria-pressed={false}
+                    onClick={() => {
+                      restoreSidePanel();
+                      if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                    }}
+                  >
+                    <PanelRight />
+                  </Button>
+                )}
+              </>
+            }
             emptyDescription={
               draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
             }
@@ -1202,40 +1209,37 @@ export const CodingWorkbenchView = ({
                     ? 'codingAgentInspector'
                     : 'codingAgentOpenFiles';
                 return (
-                  active ? (
-                    <ButtonGroup key={tab} className="group theme-button theme-button-secondary shrink-0">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openSidePanelTab(tab)}
-                      >
-                        {isReview ? <FileDiff /> : isInspector ? <TerminalIcon /> : <File />}
-                        {i18nService.t(tabLabel)}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        className="self-center border-l-0 bg-transparent hover:bg-transparent focus-visible:bg-transparent pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
-                        aria-label={i18nService.t('close')}
-                        onClick={() => closeSidePanelTab(tab)}
-                      >
-                        <X />
-                      </Button>
-                    </ButtonGroup>
-                  ) : (
+                  <ButtonGroup
+                    key={tab}
+                    className={cn(
+                      'group shrink-0 gap-0 theme-button theme-button-size-sm',
+                      active ? 'theme-button-secondary' : 'theme-button-ghost',
+                    )}
+                  >
                     <Button
-                      key={tab}
                       type="button"
-                      variant="ghost"
+                      variant="embedded"
                       size="sm"
+                      aria-pressed={active}
                       onClick={() => openSidePanelTab(tab)}
                     >
                       {isReview ? <FileDiff /> : isInspector ? <TerminalIcon /> : <File />}
                       {i18nService.t(tabLabel)}
                     </Button>
-                  )
+                    <Button
+                      type="button"
+                      variant="embedded"
+                      size="sm"
+                      className={cn(
+                        'self-center pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                        active && 'pointer-events-auto opacity-100',
+                      )}
+                      aria-label={i18nService.t('close')}
+                      onClick={() => closeSidePanelTab(tab)}
+                    >
+                      <X />
+                    </Button>
+                  </ButtonGroup>
                 );
               })}
               <CodingSidePanelAddMenu
@@ -1247,7 +1251,9 @@ export const CodingWorkbenchView = ({
                   type="button"
                   variant="toolbar"
                   size="icon-sm"
-                  aria-label={i18nService.t(sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand')}
+                  aria-label={i18nService.t(
+                    sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand',
+                  )}
                   aria-pressed={sidePanelExpanded}
                   onClick={() => setSidePanelExpanded(current => !current)}
                 >
@@ -1260,8 +1266,7 @@ export const CodingWorkbenchView = ({
                   aria-label={i18nService.t('codingAgentSidePanel')}
                   onClick={() => {
                     setSidePanelExpanded(false);
-                    setSidePanelView(null);
-                    setSidePanelTabs([]);
+                    setSidePanelHidden(true);
                   }}
                 >
                   <PanelRight />
@@ -1280,7 +1285,6 @@ export const CodingWorkbenchView = ({
               <CodingWorkspaceFileBrowser
                 workspaceRoot={workspaceRoot}
                 sourceRoot={gitSourceRoot}
-                onClose={() => closeSidePanelTab(CodingSidePanelView.Files)}
               />
             ) : sidePanelView === CodingSidePanelView.Inspector ? (
               <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
@@ -1295,6 +1299,7 @@ export const CodingWorkbenchView = ({
           </div>
         </aside>
       )}
+      </div>
       <Sheet open={sidePanelSheetOpen} onOpenChange={setSidePanelSheetOpen}>
         <SheetContent side="bottom" className="theme-control-sizing-4 h-[80dvh]">
           <SheetHeader className="sr-only">
@@ -1319,7 +1324,6 @@ export const CodingWorkbenchView = ({
             <CodingWorkspaceFileBrowser
               workspaceRoot={workspaceRoot}
               sourceRoot={gitSourceRoot}
-              onClose={() => closeSidePanelTab(CodingSidePanelView.Files)}
             />
           ) : sidePanelView === CodingSidePanelView.Inspector ? (
             <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />

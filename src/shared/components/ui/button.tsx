@@ -12,6 +12,7 @@ const buttonVariants = cva(
         outline: 'theme-button-outline',
         secondary: 'theme-button-secondary',
         ghost: 'theme-button-ghost',
+        embedded: 'theme-button-embedded',
         'prompt-selector': 'theme-button-prompt-selector',
         navigation: 'theme-button-navigation justify-start text-left',
         toolbar: 'theme-button-toolbar',

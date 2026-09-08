@@ -60,6 +60,9 @@ export function classicButtons(dark: boolean): ButtonAppearances {
       hover: { ...hover, ...(dark ? { 'background-color': mix('muted', 50) } : {}) },
       expanded: hover,
     }),
+    'button-embedded': recipe({
+      base: { color: 'inherit', 'background-color': 'transparent' },
+    }),
     'button-prompt-selector': recipe({
       base: { 'transition-duration': '200ms' },
       hover: raised,
