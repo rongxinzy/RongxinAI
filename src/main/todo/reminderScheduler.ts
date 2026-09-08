@@ -48,6 +48,11 @@ export class TodoReminderScheduler {
 
   refresh(minimumDelayMs = 0): void {
     if (!this.isStarted) return;
+    if (!this.notifier.isSupported()) {
+      // Notifications can never be delivered on this system; scheduling a
+      // retry would poll forever.
+      return;
+    }
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
 

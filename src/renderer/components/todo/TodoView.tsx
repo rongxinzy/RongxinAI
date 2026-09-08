@@ -9,7 +9,7 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { ListTodo, Menu, Plus, Search } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   TodoStatus,
@@ -92,8 +92,11 @@ const TodoView: React.FC<TodoViewProps> = ({
     return counts;
   }, [allTodos]);
 
+  const loadDataSequence = useRef(0);
   const loadData = useCallback(async () => {
-    setIsLoading(true);
+    // Out-of-order responses (rapid typing, overlapping refreshes) must not
+    // clobber newer results.
+    const request = ++loadDataSequence.current;
     setLoadFailed(false);
     const listInput = {
       view: activeView,
@@ -117,6 +120,7 @@ const TodoView: React.FC<TodoViewProps> = ({
       todoService.list(allInput),
       todoService.list(completedInput),
     ]);
+    if (request !== loadDataSequence.current) return;
     const succeeded =
       todoResult.success && listsResult.success && allResult.success && completedResult.success;
     if (!succeeded) {
@@ -380,7 +384,7 @@ const TodoView: React.FC<TodoViewProps> = ({
                       ? i18nService.t('todoNoSearchResults')
                       : i18nService.t('todoEmpty')}
                   </p>
-                  {!query.trim() ? (
+                  {!query.trim() && activeView !== TodoViewFilter.Completed ? (
                     <Button
                       type="button"
                       variant="outline"
@@ -408,33 +412,35 @@ const TodoView: React.FC<TodoViewProps> = ({
               )}
             </div>
 
-            <form
-              onSubmit={handleCreateTodo}
-              className="shrink-0 border-t border-border-subtle py-4"
-            >
-              <div className="rounded-lg border border-border bg-card p-2 focus-within:ring-3 focus-within:ring-ring/30">
-                <div className="flex items-center gap-2">
-                  <Plus className="ml-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    id="todo-new-input"
-                    value={newTodoTitle}
-                    onChange={event => setNewTodoTitle(event.target.value)}
-                    placeholder={i18nService.t('todoAddTaskPlaceholder')}
-                    aria-label={i18nService.t('todoNewTask')}
-                    className="theme-page-todo-view-input-1"
-                  />
+            {activeView !== TodoViewFilter.Completed ? (
+              <form
+                onSubmit={handleCreateTodo}
+                className="shrink-0 border-t border-border-subtle py-4"
+              >
+                <div className="rounded-lg border border-border bg-card p-2 focus-within:ring-3 focus-within:ring-ring/30">
+                  <div className="flex items-center gap-2">
+                    <Plus className="ml-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <Input
+                      id="todo-new-input"
+                      value={newTodoTitle}
+                      onChange={event => setNewTodoTitle(event.target.value)}
+                      placeholder={i18nService.t('todoAddTaskPlaceholder')}
+                      aria-label={i18nService.t('todoNewTask')}
+                      className="theme-page-todo-view-input-1"
+                    />
+                  </div>
+                  {parsedNewTodo.dueAt !== null || parsedNewTodo.important ? (
+                    <p className="mt-2 pl-7 text-xs text-muted-foreground">
+                      {parsedNewTodo.dueAt !== null
+                        ? `${i18nService.t('todoParsedDue')}: ${formatTodoDate(parsedNewTodo.dueAt, language)}`
+                        : null}
+                      {parsedNewTodo.dueAt !== null && parsedNewTodo.important ? ' · ' : null}
+                      {parsedNewTodo.important ? i18nService.t('todoParsedImportant') : null}
+                    </p>
+                  ) : null}
                 </div>
-                {parsedNewTodo.dueAt !== null || parsedNewTodo.important ? (
-                  <p className="mt-2 pl-7 text-xs text-muted-foreground">
-                    {parsedNewTodo.dueAt !== null
-                      ? `${i18nService.t('todoParsedDue')}: ${formatTodoDate(parsedNewTodo.dueAt, language)}`
-                      : null}
-                    {parsedNewTodo.dueAt !== null && parsedNewTodo.important ? ' · ' : null}
-                    {parsedNewTodo.important ? i18nService.t('todoParsedImportant') : null}
-                  </p>
-                ) : null}
-              </div>
-            </form>
+              </form>
+            ) : null}
           </div>
         </main>
       </div>
