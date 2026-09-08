@@ -6,9 +6,11 @@ import {
   ZhiyuanModelPool,
   ZhiyuanModelPoolHeader,
   ZhiyuanModelPoolWorkload,
+  ModelPoolErrorCode,
 } from '../shared/modelPool/constants';
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { t } from './i18n';
+import { readModelPoolErrorBody, retrySessionBusy } from './modelPoolRetry';
 
 const activeModelPoolStreams = new Map<string, AbortController>();
 
@@ -33,6 +35,7 @@ function modelPoolErrorMessage(rawBody: string, status: number): string {
   if (status === 429) return t('modelPoolQuotaExceeded');
   try {
     const payload = JSON.parse(rawBody) as { error?: { code?: unknown } };
+    if (payload.error?.code === ModelPoolErrorCode.SessionBusy) return t('modelPoolSessionBusy');
     if (payload.error?.code === 'unauthorized') return t('modelPoolServiceUnavailable');
     if (
       payload.error?.code === 'account_disabled' ||
@@ -53,18 +56,22 @@ async function fetchModelPool(
   signal: AbortSignal,
   conversationId: string,
 ): Promise<Response> {
-  return session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Accept: 'text/event-stream',
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      [ZhiyuanModelPoolHeader.ConversationId]: conversationId,
-      [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Chat,
-    },
-    body: JSON.stringify({ ...body, model: ZhiyuanModelPool.FreeModelId, stream: true }),
+  return retrySessionBusy(
+    () =>
+      session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Accept: 'text/event-stream',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          [ZhiyuanModelPoolHeader.ConversationId]: conversationId,
+          [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Chat,
+        },
+        body: JSON.stringify({ ...body, model: ZhiyuanModelPool.FreeModelId, stream: true }),
+        signal,
+      }),
     signal,
-  });
+  );
 }
 
 async function fetchModelPoolModels(
@@ -129,6 +136,16 @@ export function registerModelPoolIpcHandlers(
     const input = ModelPoolStreamSchema.input.parse(rawInput);
     const controller = new AbortController();
     activeModelPoolStreams.set(input.requestId, controller);
+    const destroyed = () => controller.abort();
+    event.sender.once?.('destroyed', destroyed);
+    const cleanup = () => {
+      event.sender.removeListener?.('destroyed', destroyed);
+      if (activeModelPoolStreams.get(input.requestId) === controller)
+        activeModelPoolStreams.delete(input.requestId);
+    };
+    const send = (channel: string, ...args: unknown[]) => {
+      if (!event.sender.isDestroyed?.()) event.sender.send(channel, ...args);
+    };
 
     try {
       let accessToken = await communityAuthSession.getModelPoolAccessToken();
@@ -139,6 +156,7 @@ export function registerModelPoolIpcHandlers(
         input.conversationId,
       );
       if (response.status === 401) {
+        await response.body?.cancel();
         accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
         response = await fetchModelPool(
           input.body,
@@ -150,48 +168,50 @@ export function registerModelPoolIpcHandlers(
 
       if (!response.ok || !response.body) {
         const error = response.body
-          ? modelPoolErrorMessage(await response.text(), response.status)
+          ? modelPoolErrorMessage(await readModelPoolErrorBody(response), response.status)
           : t('modelPoolServiceUnavailable');
-        activeModelPoolStreams.delete(input.requestId);
+        cleanup();
         return { ok: false, status: response.status, statusText: response.statusText, error };
       }
 
       const reader = response.body.getReader();
+      const cancelReader = () => {
+        void reader.cancel().catch((): void => undefined);
+      };
+      controller.signal.addEventListener('abort', cancelReader, { once: true });
       const decoder = new TextDecoder();
       void (async () => {
         try {
           while (true) {
             const { value, done } = await reader.read();
+            controller.signal.throwIfAborted();
             if (done) {
               const finalChunk = decoder.decode();
               if (finalChunk) {
-                event.sender.send(ModelPoolIpc.streamData(input.requestId), finalChunk);
+                send(ModelPoolIpc.streamData(input.requestId), finalChunk);
               }
-              event.sender.send(ModelPoolIpc.streamDone(input.requestId));
+              send(ModelPoolIpc.streamDone(input.requestId));
               break;
             }
-            event.sender.send(
-              ModelPoolIpc.streamData(input.requestId),
-              decoder.decode(value, { stream: true }),
-            );
+            send(ModelPoolIpc.streamData(input.requestId), decoder.decode(value, { stream: true }));
           }
         } catch (error) {
           if (error instanceof Error && error.name === 'AbortError') {
-            event.sender.send(ModelPoolIpc.streamAbort(input.requestId));
+            send(ModelPoolIpc.streamAbort(input.requestId));
           } else {
-            event.sender.send(
-              ModelPoolIpc.streamError(input.requestId),
-              t('modelPoolServiceUnavailable'),
-            );
+            send(ModelPoolIpc.streamError(input.requestId), t('modelPoolStreamInterrupted'));
           }
         } finally {
-          activeModelPoolStreams.delete(input.requestId);
+          controller.signal.removeEventListener('abort', cancelReader);
+          await reader.cancel().catch((): void => undefined);
+          reader.releaseLock();
+          cleanup();
         }
       })();
 
       return { ok: true, status: response.status, statusText: response.statusText };
     } catch {
-      activeModelPoolStreams.delete(input.requestId);
+      cleanup();
       return {
         ok: false,
         status: 0,

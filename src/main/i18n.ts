@@ -315,6 +315,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelPoolEntitlementRequired: '当前账号没有免费模型权益。',
     modelPoolQuotaExceeded: '今日免费模型额度已用完，请明日再试。',
     modelPoolServiceUnavailable: '免费模型服务暂时不可用，请稍后重试。',
+    modelPoolSessionBusy: '当前会话仍在处理，请稍后再试。',
+    modelPoolStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
 
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
@@ -674,6 +676,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelPoolQuotaExceeded: 'Your free model quota is exhausted for today. Try again tomorrow.',
     modelPoolServiceUnavailable:
       'The free model service is temporarily unavailable. Please try again later.',
+    modelPoolSessionBusy: 'This conversation is still being processed. Please try again shortly.',
+    modelPoolStreamInterrupted:
+      'The response was interrupted. Received content is preserved. Retry or ask to continue.',
 
     'enterprise.updateBlocked': 'Updates are managed by enterprise',
   },
