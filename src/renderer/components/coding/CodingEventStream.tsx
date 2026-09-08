@@ -11,11 +11,7 @@ import {
   EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Code2 } from 'lucide-react';
-<<<<<<< HEAD
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
-=======
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
->>>>>>> 8c338a0f (feat(编程页面): 1.修复编程模式下不能进行审批的bug；优化编程模式下的前端呈现效果)
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { CodingEvent } from '../../../shared/codingAgent';
