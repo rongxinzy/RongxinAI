@@ -172,7 +172,15 @@ export const CodingEventStream = ({
       ref={scrollAreaRef}
       className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
       onScrollCapture={event => {
-        if (event.target instanceof HTMLElement) onScrollPositionChange(event.target.scrollTop);
+        // Persist only the conversation viewport's scroll position; inner
+        // scrollable previews (diffs, terminal output) must not overwrite it.
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          target.classList.contains('coding-conversation-scroll')
+        ) {
+          onScrollPositionChange(target.scrollTop);
+        }
       }}
     >
       {headerActions ? (
