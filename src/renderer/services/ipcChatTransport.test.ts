@@ -45,6 +45,7 @@ test('routes the managed model through the dedicated tokenless renderer IPC', as
 
   expect(modelPoolStream).toHaveBeenCalledWith({
     requestId: expect.stringMatching(/^ipcchat_chat-1_/u),
+    conversationId: 'chat-1',
     body: {
       model: 'zhiyuan-free',
       messages: [{ role: 'user', content: 'hello' }],
@@ -61,6 +62,18 @@ test('routes the managed model through the dedicated tokenless renderer IPC', as
     value: { type: 'text-delta', delta: 'hello' },
   });
   await expect(reader.read()).resolves.toMatchObject({ value: { type: 'finish' } });
+  const nextStream = await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [{ id: 'message-2', role: 'user', parts: [{ type: 'text', text: 'continue' }] }],
+    abortSignal: undefined,
+  });
+  await vi.waitFor(() => expect(modelPoolStream).toHaveBeenCalledTimes(2));
+  expect(modelPoolStream).toHaveBeenLastCalledWith(
+    expect.objectContaining({ conversationId: 'chat-1' }),
+  );
+  await nextStream.cancel();
 });
 
 test('closes reasoning before starting the visible text segment', () => {

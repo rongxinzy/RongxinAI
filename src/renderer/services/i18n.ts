@@ -6,6 +6,8 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    chatStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
+    chatStreamLengthLimit: '回答达到输出长度上限，内容可能不完整。可以要求继续。',
     operationFailed: '操作失败',
     authenticationExpired: '登录状态已过期，请重新登录',
     apiKeyMissing: '缺少 API Key，请先完成配置',
@@ -3281,6 +3283,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     todoParsedImportant: '已识别为重要',
   },
   en: {
+    chatStreamInterrupted: 'The response was interrupted. Received content is preserved. Retry or ask to continue.',
+    chatStreamLengthLimit: 'The response reached its output limit and may be incomplete. You can ask to continue.',
     operationFailed: 'Operation failed',
     authenticationExpired: 'Authentication expired. Please sign in again',
     apiKeyMissing: 'API key is missing. Check your configuration',

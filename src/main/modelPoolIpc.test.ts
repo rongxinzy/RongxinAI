@@ -16,6 +16,7 @@ vi.mock('electron', () => ({
 }));
 
 import { ModelPoolIpc } from '../shared/ipc/channels';
+import { ModelPoolStreamSchema } from '../shared/ipc/schemas';
 import { ZhiyuanModelPoolHeader, ZhiyuanModelPoolWorkload } from '../shared/modelPool/constants';
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { registerModelPoolIpcHandlers } from './modelPoolIpc';
@@ -41,6 +42,56 @@ afterEach(() => {
 });
 
 describe('Model Pool IPC', () => {
+  test('cancels while awaiting credentials without starting inference', async () => {
+    const manager = createSessionManager();
+    let resolveToken: (token: string) => void = () => undefined;
+    vi.spyOn(manager, 'getModelPoolAccessToken').mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveToken = resolve;
+        }),
+    );
+    registerModelPoolIpcHandlers(manager);
+    const pending = electronMocks.handlers.get(ModelPoolIpc.Stream)?.(
+      { sender: { send: vi.fn() } },
+      { requestId: 'cancel-auth', conversationId: 'session', body: {} },
+    );
+    expect(electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-auth')).toBe(true);
+    resolveToken('token');
+    await expect(pending).resolves.toMatchObject({ ok: false });
+    expect(electronMocks.fetch).not.toHaveBeenCalled();
+  });
+  test('cancels the response reader and emits abort instead of completion', async () => {
+    const cancelled = vi.fn();
+    electronMocks.fetch.mockResolvedValue(
+      new Response(new ReadableStream({ cancel: cancelled }), {
+        headers: { 'content-type': 'text/event-stream' },
+      }),
+    );
+    registerModelPoolIpcHandlers(createSessionManager());
+    const send = vi.fn();
+    await electronMocks.handlers.get(ModelPoolIpc.Stream)?.(
+      { sender: { send } },
+      { requestId: 'cancel-reader', conversationId: 'session', body: {} },
+    );
+    electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-reader');
+    await vi.waitFor(() =>
+      expect(send).toHaveBeenCalledWith(ModelPoolIpc.streamAbort('cancel-reader')),
+    );
+    expect(cancelled).toHaveBeenCalledOnce();
+    expect(send).not.toHaveBeenCalledWith(ModelPoolIpc.streamDone('cancel-reader'));
+  });
+  test('requires a stable conversation ID and rejects unsafe header values', () => {
+    const input = { requestId: 'request-1', body: {} };
+    for (const conversationId of [undefined, '', 'line\r\nbreak', 'x'.repeat(161)]) {
+      expect(ModelPoolStreamSchema.input.safeParse({ ...input, conversationId }).success).toBe(
+        false,
+      );
+    }
+    expect(
+      ModelPoolStreamSchema.input.safeParse({ ...input, conversationId: 'chat-1' }).success,
+    ).toBe(true);
+  });
   test('lists only logical models returned for the authenticated account', async () => {
     const sessionManager = createSessionManager();
     electronMocks.fetch.mockResolvedValue(
@@ -101,6 +152,7 @@ describe('Model Pool IPC', () => {
         { sender: { send } },
         {
           requestId: 'request-1',
+          conversationId: 'conversation-1',
           body: { model: 'untrusted-model', messages: [{ role: 'user', content: 'hello' }] },
         },
       ),
@@ -113,7 +165,7 @@ describe('Model Pool IPC', () => {
     );
     expect(init.headers).toMatchObject({
       Authorization: 'Bearer model-pool-access-token',
-      [ZhiyuanModelPoolHeader.ConversationId]: 'request-1',
+      [ZhiyuanModelPoolHeader.ConversationId]: 'conversation-1',
       [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Chat,
     });
     expect(JSON.parse(String(init.body))).toMatchObject({
@@ -133,7 +185,11 @@ describe('Model Pool IPC', () => {
     await expect(
       handler?.(
         { sender: { send: vi.fn() } },
-        { requestId: 'request-2', body: { messages: [{ role: 'user', content: 'hello' }] } },
+        {
+          requestId: 'request-2',
+          conversationId: 'conversation-1',
+          body: { messages: [{ role: 'user', content: 'hello' }] },
+        },
       ),
     ).resolves.toMatchObject({ ok: true, status: 200 });
 
@@ -142,5 +198,10 @@ describe('Model Pool IPC', () => {
       forceRefresh: true,
     });
     expect(electronMocks.fetch).toHaveBeenCalledTimes(2);
+    for (const [, init] of electronMocks.fetch.mock.calls as [string, RequestInit][]) {
+      expect(init.headers).toMatchObject({
+        [ZhiyuanModelPoolHeader.ConversationId]: 'conversation-1',
+      });
+    }
   });
 });
