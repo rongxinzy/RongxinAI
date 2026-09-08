@@ -811,6 +811,11 @@ export class CodingRoomService extends EventEmitter {
   async cancel(workspaceRoot: string, laneId: string): Promise<CodingRoomSnapshot> {
     const snapshot = this.bootstrap(workspaceRoot);
     const lane = this.requireLane(snapshot.lanes, laneId);
+    if (lane.status !== CodingLaneStatus.Running && lane.status !== CodingLaneStatus.WaitingApproval) {
+      // Only an active turn can be cancelled; stopping an idle, completed, or
+      // failed lane must not overwrite its mission outcome with "cancelled".
+      return snapshot;
+    }
     const driver = this.getDriver(lane);
     const session = await this.ensureDriverSession(
       driver,
@@ -1723,7 +1728,9 @@ export class CodingRoomService extends EventEmitter {
       this.repository.releaseWriterLease(roomId, lane.sourceRoot, lane.id);
     }
     if (laneStatus === CodingLaneStatus.Completed) {
-      void this.startNextCollaborationStage(roomWorkspaceRoot, lane.id);
+      void this.startNextCollaborationStage(roomWorkspaceRoot, lane.id).catch(error => {
+        console.error('[CodingRoom] failed to start the next collaboration stage:', error);
+      });
     }
   }
 

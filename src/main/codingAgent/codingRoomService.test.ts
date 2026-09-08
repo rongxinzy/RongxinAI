@@ -377,7 +377,39 @@ test('pauses a builtin lane when its runtime reports a recoverable interruption'
   });
 });
 
-test('cancels only the active turn and retains the mission and lane', async () => {
+test('cancels a running turn and retains the mission and lane', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const cancelled: string[] = [];
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async sessionId => {
+      cancelled.push(sessionId);
+    },
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
+  const lane = created.lanes[0];
+  await service.prompt(workspaceRoot, {
+    laneId: lane.id,
+    prompt: 'Implement the change.',
+  });
+  const updated = await service.cancel(workspaceRoot, lane.id);
+
+  expect(cancelled).toEqual([lane.localSessionId]);
+  expect(updated.missions).toHaveLength(1);
+  expect(updated.lanes).toHaveLength(1);
+  expect(updated.lanes[0].status).toBe(CodingLaneStatus.Idle);
+  expect(updated.events.at(-1)?.kind).toBe(CodingEventKind.TurnCancelled);
+});
+
+test('cancel leaves a lane without an active turn untouched', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const cancelled: string[] = [];
@@ -398,11 +430,12 @@ test('cancels only the active turn and retains the mission and lane', async () =
   const lane = created.lanes[0];
   const updated = await service.cancel(workspaceRoot, lane.id);
 
-  expect(cancelled).toEqual([lane.localSessionId]);
-  expect(updated.missions).toHaveLength(1);
-  expect(updated.lanes).toHaveLength(1);
+  expect(cancelled).toEqual([]);
   expect(updated.lanes[0].status).toBe(CodingLaneStatus.Idle);
-  expect(updated.events.at(-1)?.kind).toBe(CodingEventKind.TurnCancelled);
+  expect(updated.missions[0].status).toBe(CodingMissionStatus.Draft);
+  expect(
+    updated.events.filter(event => event.kind === CodingEventKind.TurnCancelled),
+  ).toHaveLength(0);
 });
 
 test('recovers stale running lanes after an application restart without losing the mission', async () => {
