@@ -2,7 +2,7 @@ import { Button } from '@shared/components/ui/button';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@shared/components/ui/empty';
 import { Input } from '@shared/components/ui/input';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { ChevronRight, File, Folder, FolderOpen, LoaderCircle, X } from 'lucide-react';
+import { ChevronRight, File, Folder, FolderOpen, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -14,7 +14,6 @@ import { i18nService } from '../../services/i18n';
 interface CodingWorkspaceFileBrowserProps {
   workspaceRoot: string;
   sourceRoot: string;
-  onClose?: () => void;
 }
 
 interface TreeNode extends CodingWorkspaceFileEntry {
@@ -35,7 +34,6 @@ const replaceNodeChildren = (nodes: TreeNode[], path: string, children: TreeNode
 export const CodingWorkspaceFileBrowser = ({
   workspaceRoot,
   sourceRoot,
-  onClose,
 }: CodingWorkspaceFileBrowserProps) => {
   const [nodes, setNodes] = useState<TreeNode[]>(EMPTY_NODES);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
@@ -167,11 +165,6 @@ export const CodingWorkspaceFileBrowser = ({
           <FolderOpen className="size-4 shrink-0" />
           <span className="truncate text-sm font-medium">{i18nService.t('codingAgentFilesTitle')}</span>
         </div>
-        {onClose ? (
-          <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('close')} onClick={onClose}>
-            <X />
-          </Button>
-        ) : null}
       </header>
       {error ? <p className="px-3 pt-2 text-xs text-destructive">{error}</p> : null}
       <div className="grid min-h-0 flex-1 grid-cols-2">
