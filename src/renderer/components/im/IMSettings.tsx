@@ -733,7 +733,9 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('dingtalk');
                     setActiveDingTalkInstanceId(null);
-                    setDingtalkExpanded(!dingtalkExpanded);
+                    setDingtalkExpanded(current =>
+                      config.dingtalk.instances.length > 0 && !current,
+                    );
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-1 w-full justify-start',
@@ -812,7 +814,7 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('feishu');
                     setActiveFeishuInstanceId(null);
-                    setFeishuExpanded(!feishuExpanded);
+                    setFeishuExpanded(current => config.feishu.instances.length > 0 && !current);
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-7 w-full justify-start',
@@ -888,7 +890,7 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('qq');
                     setActiveQQInstanceId(null);
-                    setQqExpanded(!qqExpanded);
+                    setQqExpanded(current => config.qq.instances.length > 0 && !current);
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-13 w-full justify-start',
@@ -964,7 +966,7 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('wecom');
                     setActiveWecomInstanceId(null);
-                    setWecomExpanded(!wecomExpanded);
+                    setWecomExpanded(current => config.wecom.instances.length > 0 && !current);
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-19 w-full justify-start',
@@ -1040,7 +1042,7 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('telegram');
                     setActiveTelegramInstanceId(null);
-                    setTelegramExpanded(!telegramExpanded);
+                    setTelegramExpanded(current => config.telegram.instances.length > 0 && !current);
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-25 w-full justify-start',
@@ -1119,7 +1121,7 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('discord');
                     setActiveDiscordInstanceId(null);
-                    setDiscordExpanded(!discordExpanded);
+                    setDiscordExpanded(current => config.discord.instances.length > 0 && !current);
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-31 w-full justify-start',
