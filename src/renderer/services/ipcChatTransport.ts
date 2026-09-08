@@ -16,15 +16,7 @@ import {
   shouldUseOpenAIResponsesApi,
 } from './apiConfigResolver';
 import { buildAnthropicMessagesUrl, ProviderName } from '../../shared/providers';
-
-interface StreamBridge {
-  start(requestId: string): Promise<{ ok: boolean; status: number; error?: string }>;
-  cancel(requestId: string): Promise<unknown>;
-  onData(requestId: string, callback: (chunk: string) => void): () => void;
-  onDone(requestId: string, callback: () => void): () => void;
-  onError(requestId: string, callback: (error: string | { message: string }) => void): () => void;
-  onAbort(requestId: string, callback: () => void): () => void;
-}
+import { streamOverBridge, type StreamBridge } from './chatStream/bridge';
 
 export interface IpcChatTransportOptions {
   provider?: string;
@@ -101,7 +93,8 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     if (provider === ProviderName.Zhiyuan) {
       const { body } = this.buildOpenAICompatibleRequest(messages, '', '', modelId, provider);
       return this.streamOverBridge(chatId, abortSignal, 'openai', {
-        start: requestId => window.electron.modelPool.stream({ requestId, body }),
+        start: requestId =>
+          window.electron.modelPool.stream({ requestId, conversationId: chatId, body }),
         cancel: requestId => window.electron.modelPool.cancelStream(requestId),
         onData: (requestId, callback) =>
           window.electron.modelPool.onStreamData(requestId, callback),
@@ -298,102 +291,9 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     apiFormat: 'anthropic' | 'openai' | 'gemini',
     bridge: StreamBridge,
   ): ReadableStream<UIMessageChunk> {
-    const requestId = `ipcchat_${chatId}_${Date.now()}`;
+    const requestId = `ipcchat_${chatId}_${generateId()}`;
     const parser = new SseChunkParser(apiFormat);
-
-    return new ReadableStream({
-      start(controller) {
-        let closed = false;
-        let bufferedSse = '';
-        const close = () => {
-          if (closed) return;
-          closed = true;
-          controller.close();
-          cleanup.forEach(fn => fn());
-        };
-
-        const cleanup: Array<() => void> = [];
-
-        const consumeSse = (chunk: string, flush = false) => {
-          bufferedSse += chunk;
-          const lines = bufferedSse.split('\n');
-          bufferedSse = flush ? '' : (lines.pop() ?? '');
-          for (const line of lines) {
-            const normalizedLine = line.endsWith('\r') ? line.slice(0, -1) : line;
-            if (!normalizedLine.startsWith('data: ')) continue;
-            const data = normalizedLine.slice(6);
-            if (data === '[DONE]') {
-              for (const c of parser.flush()) controller.enqueue(c);
-              controller.enqueue({ type: 'finish', finishReason: 'stop' });
-              close();
-              return;
-            }
-
-            try {
-              const parsed = JSON.parse(data);
-              for (const c of parser.feed(parsed)) {
-                controller.enqueue(c);
-              }
-            } catch (e) {
-              console.warn('[IpcChatTransport] Failed to parse SSE chunk:', e);
-            }
-          }
-        };
-
-        const removeData = bridge.onData(requestId, chunk => {
-          consumeSse(chunk);
-        });
-        cleanup.push(removeData);
-
-        const removeDone = bridge.onDone(requestId, () => {
-          if (!closed) {
-            consumeSse('\n', true);
-            for (const c of parser.flush()) controller.enqueue(c);
-            controller.enqueue({ type: 'finish', finishReason: 'stop' });
-          }
-          close();
-        });
-        cleanup.push(removeDone);
-
-        const removeError = bridge.onError(requestId, error => {
-          const message = typeof error === 'string' ? error : error.message;
-          controller.enqueue({ type: 'error', errorText: message });
-          close();
-        });
-        cleanup.push(removeError);
-
-        const removeAbort = bridge.onAbort(requestId, () => {
-          if (!closed) {
-            controller.enqueue({ type: 'abort', reason: 'user' });
-          }
-          close();
-        });
-        cleanup.push(removeAbort);
-
-        bridge
-          .start(requestId)
-          .then(response => {
-            if (!response.ok) {
-              const message = response.error || `API request failed (${response.status})`;
-              controller.enqueue({ type: 'error', errorText: message });
-              close();
-            }
-          })
-          .catch(error => {
-            controller.enqueue({
-              type: 'error',
-              errorText: error instanceof Error ? error.message : String(error),
-            });
-            close();
-          });
-
-        const handleAbort = () => {
-          void bridge.cancel(requestId);
-        };
-        abortSignal?.addEventListener('abort', handleAbort, { once: true });
-        cleanup.push(() => abortSignal?.removeEventListener('abort', handleAbort));
-      },
-    });
+    return streamOverBridge(requestId, abortSignal, bridge, parser);
   }
 }
 
