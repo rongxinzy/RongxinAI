@@ -119,6 +119,7 @@ export const CodingWorkbenchView = ({
   const [sidePanelSheetOpen, setSidePanelSheetOpen] = useState(false);
   const [sidePanelView, setSidePanelView] = useState<CodingSidePanelViewType | null>(null);
   const [sidePanelTabs, setSidePanelTabs] = useState<CodingSidePanelViewType[]>([]);
+  const [sidePanelHidden, setSidePanelHidden] = useState(false);
   const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
   const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
@@ -370,6 +371,7 @@ export const CodingWorkbenchView = ({
   const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
   const desktopSidePanelOpen =
     !isNarrowViewport &&
+    !sidePanelHidden &&
     sidePanelView !== null &&
     (sidePanelView !== CodingSidePanelView.Inspector || hasInspectorContent);
   const resolvedSidePanelWidth = clampArtifactPanelWidth(
@@ -472,10 +474,12 @@ export const CodingWorkbenchView = ({
   useEffect(() => {
     setSidePanelView(null);
     setSidePanelTabs([]);
+    setSidePanelHidden(false);
     setSidePanelSheetOpen(false);
   }, [activeLane?.id]);
 
   const openSidePanelTab = useCallback((view: CodingSidePanelViewType) => {
+    setSidePanelHidden(false);
     if (view === CodingSidePanelView.Launcher) {
       setSidePanelTabs([]);
       setSidePanelView(CodingSidePanelView.Launcher);
@@ -483,6 +487,11 @@ export const CodingWorkbenchView = ({
     }
     setSidePanelTabs(current => (current.includes(view) ? current : [...current, view]));
     setSidePanelView(view);
+  }, []);
+
+  const restoreSidePanel = useCallback(() => {
+    setSidePanelHidden(false);
+    setSidePanelView(current => current ?? CodingSidePanelView.Launcher);
   }, []);
 
   const closeSidePanelTab = useCallback(
@@ -1010,7 +1019,7 @@ export const CodingWorkbenchView = ({
                     aria-label={i18nService.t('codingAgentSidePanel')}
                     aria-pressed={false}
                     onClick={() => {
-                      openSidePanelTab(CodingSidePanelView.Launcher);
+                      restoreSidePanel();
                       if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
                     }}
                   >
@@ -1257,8 +1266,7 @@ export const CodingWorkbenchView = ({
                   aria-label={i18nService.t('codingAgentSidePanel')}
                   onClick={() => {
                     setSidePanelExpanded(false);
-                    setSidePanelView(null);
-                    setSidePanelTabs([]);
+                    setSidePanelHidden(true);
                   }}
                 >
                   <PanelRight />
