@@ -3582,6 +3582,7 @@ function buildPiCustomModel(
     provider: providerMetadata.providerName,
     baseUrl: baseUrlOverride || endpoint?.baseUrl || config.baseURL,
     reasoning: resolveProviderModelPiReasoning(piRuntime, capabilities),
+    ...(piRuntime?.thinkingLevelMap ? { thinkingLevelMap: piRuntime.thinkingLevelMap } : {}),
     input: supportsImage ? ['text', 'image'] : ['text'],
     ...(hasRecordEntries(compat) ? { compat } : {}),
     cost: {
