@@ -128,6 +128,12 @@ export const WindowIpc = {
 } as const;
 export type WindowIpc = (typeof WindowIpc)[keyof typeof WindowIpc];
 
+export const ContextMenuIpc = {
+  Open: 'context-menu:open',
+  Execute: 'context-menu:execute',
+} as const;
+export type ContextMenuIpc = (typeof ContextMenuIpc)[keyof typeof ContextMenuIpc];
+
 // ─── App-level config ───────────────────────────────────────────────────────
 export const AppConfigIpc = {
   GetApiConfig: 'get-api-config',

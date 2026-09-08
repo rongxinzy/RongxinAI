@@ -18,6 +18,14 @@ export const CodingPermissionOptionKind = {
   RejectAlways: 'reject_always',
 } as const;
 
+export const CodingPermissionOptionName = {
+  AllowCommandPrefix: 'allow command',
+  Reject: 'reject',
+} as const;
+
+export const isCommandAllowPermissionOption = (option: CodingPermissionOption): boolean =>
+  option.name.trim().toLowerCase().startsWith(CodingPermissionOptionName.AllowCommandPrefix);
+
 export const CodingPermissionOptionDefaultName: Record<string, string> = {
   [CodingPermissionOptionKind.AllowOnce]: 'allow once',
   [CodingPermissionOptionKind.AllowAlways]: 'allow for session',
