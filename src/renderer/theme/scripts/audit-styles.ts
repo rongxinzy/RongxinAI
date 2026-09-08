@@ -25,7 +25,8 @@ function scan(dir: string): void {
       continue;
     }
     if (!/\.tsx?$/.test(entry.name) || /\.test\./.test(entry.name)) continue;
-    const name = relative(root, path);
+    // Normalize separators so the allowlist keys match on Windows too.
+    const name = relative(root, path).split('\\').join('/');
     if (name.includes('/icons/') || exceptions[name]) continue;
     scanned++;
     const source = readFileSync(path, 'utf8');
