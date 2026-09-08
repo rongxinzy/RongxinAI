@@ -164,6 +164,7 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
   const [diff, setDiff] = useState('');
   const [diffLoading, setDiffLoading] = useState(false);
   const requestSequence = useRef(0);
+  const diffRequestSequence = useRef(0);
   const target = useMemo<CodingGitTargetInput>(() => ({ workspaceRoot, laneId: laneId ?? undefined, sourceRoot }), [laneId, sourceRoot, workspaceRoot]);
   const refresh = useCallback(async () => {
     const request = ++requestSequence.current;
@@ -177,8 +178,10 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
   useEffect(() => { void refresh(); }, [refresh, refreshKey]);
   useEffect(() => { const handleFocus = () => void refresh(); window.addEventListener('focus', handleFocus); return () => window.removeEventListener('focus', handleFocus); }, [refresh]);
   const selectDiff = useCallback(async (selection: DiffSelection) => {
+    const request = ++diffRequestSequence.current;
     setDiffSelection(selection); setDiff(''); setDiffLoading(true);
     const result = await window.electron.codingAgent.getGitDiff({ ...target, ...selection });
+    if (request !== diffRequestSequence.current) return;
     setDiffLoading(false);
     setDiff(result.success ? (result.diff ?? '') : (result.error ?? i18nService.t('codingGitActionFailed')));
   }, [target]);

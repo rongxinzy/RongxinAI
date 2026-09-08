@@ -78,14 +78,17 @@ export const CodingGitQuickActions = ({
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
-    const result = await window.electron.codingAgent.getGitStatus(target);
-    setLoading(false);
-    if (result.success && result.status) {
-      setStatus(result.status);
-      return result.status;
+    try {
+      const result = await window.electron.codingAgent.getGitStatus(target);
+      if (result.success && result.status) {
+        setStatus(result.status);
+        return result.status;
+      }
+      toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
+      return null;
+    } finally {
+      setLoading(false);
     }
-    toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
-    return null;
   }, [target]);
 
   useEffect(() => {
@@ -114,31 +117,37 @@ export const CodingGitQuickActions = ({
   const createPullRequest = async () => {
     if (!status || !pullRequestTitle.trim() || !pullRequestBase.trim()) return;
     setPendingAction('pullRequest');
-    const result = await window.electron.codingAgent.createGitPullRequest({ ...target, title: pullRequestTitle, body: pullRequestBody, base: pullRequestBase });
-    setPendingAction(null);
-    if (!result.success || !result.url) {
-      toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
-      return;
+    try {
+      const result = await window.electron.codingAgent.createGitPullRequest({ ...target, title: pullRequestTitle, body: pullRequestBody, base: pullRequestBase });
+      if (!result.success || !result.url) {
+        toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
+        return;
+      }
+      setPullRequestOpen(false);
+      setPullRequestTitle('');
+      setPullRequestBody('');
+      toast.success(i18nService.t('codingGitPullRequestCreated'));
+      void window.electron.shell.openExternal(result.url);
+    } finally {
+      setPendingAction(null);
     }
-    setPullRequestOpen(false);
-    setPullRequestTitle('');
-    setPullRequestBody('');
-    toast.success(i18nService.t('codingGitPullRequestCreated'));
-    void window.electron.shell.openExternal(result.url);
   };
 
   const switchBranch = async (branch: string) => {
       if (!status || branch === status.branch || !status.canMutate) return;
     setPendingBranch(branch);
-    const result = await window.electron.codingAgent.switchGitBranch({ ...target, branch });
-    setPendingBranch(null);
-    if (result.success && result.status) {
-      setStatus(result.status);
-      setBranchOpen(false);
-      toast.success(i18nService.t('codingGitBranchSwitched'));
-      return;
+    try {
+      const result = await window.electron.codingAgent.switchGitBranch({ ...target, branch });
+      if (result.success && result.status) {
+        setStatus(result.status);
+        setBranchOpen(false);
+        toast.success(i18nService.t('codingGitBranchSwitched'));
+        return;
+      }
+      toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
+    } finally {
+      setPendingBranch(null);
     }
-    toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
   };
 
   const runCommit = async (pushAfterCommit: boolean) => {
@@ -169,14 +178,17 @@ export const CodingGitQuickActions = ({
 
   const push = async () => {
     setPendingAction('push');
-    const result = await window.electron.codingAgent.pushGitBranch(target);
-    setPendingAction(null);
-    if (result.success) {
-      toast.success(i18nService.t('codingGitPushed'));
-      await loadStatus();
-      return;
+    try {
+      const result = await window.electron.codingAgent.pushGitBranch(target);
+      if (result.success) {
+        toast.success(i18nService.t('codingGitPushed'));
+        await loadStatus();
+        return;
+      }
+      toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
+    } finally {
+      setPendingAction(null);
     }
-    toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
   };
 
   const openRepository = async () => {
