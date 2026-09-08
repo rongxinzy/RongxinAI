@@ -659,7 +659,8 @@ contextBridge.exposeInMainWorld('electron', {
       workspaceRoot: string;
       prompt: import('../shared/codingAgent').CodingPromptInput;
     }) => ipcRenderer.invoke(CodingAgentIpc.Prompt, input),
-    listPendingMessages: (laneId: string) => ipcRenderer.invoke(CodingAgentIpc.ListPendingMessages, laneId),
+    listPendingMessages: (laneId: string) =>
+      ipcRenderer.invoke(CodingAgentIpc.ListPendingMessages, laneId),
     enqueuePendingMessage: (input: { laneId: string; text: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.EnqueuePendingMessage, input),
     updatePendingMessage: (input: { laneId: string; itemId: string; text: string }) =>
@@ -1002,7 +1003,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   modelPool: {
     listModels: () => ipcRenderer.invoke(ModelPoolIpc.ListModels),
-    stream: (input: { requestId: string; body: Record<string, unknown> }) =>
+    stream: (input: { requestId: string; conversationId: string; body: Record<string, unknown> }) =>
       ipcRenderer.invoke(ModelPoolIpc.Stream, input),
     cancelStream: (requestId: string) => ipcRenderer.invoke(ModelPoolIpc.CancelStream, requestId),
     onStreamData: (requestId: string, callback: (data: string) => void) =>

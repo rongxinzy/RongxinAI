@@ -136,7 +136,7 @@ export function registerModelPoolIpcHandlers(
         input.body,
         accessToken,
         controller.signal,
-        input.requestId,
+        input.conversationId,
       );
       if (response.status === 401) {
         accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
@@ -144,7 +144,7 @@ export function registerModelPoolIpcHandlers(
           input.body,
           accessToken,
           controller.signal,
-          input.requestId,
+          input.conversationId,
         );
       }
 
