@@ -84,8 +84,10 @@ export class TodoRepository {
     }
 
     if (query) {
-      conditions.push('(LOWER(t.title) LIKE ? OR LOWER(t.note) LIKE ?)');
-      const pattern = `%${query}%`;
+      // Escape LIKE wildcards so a literal "%" or "_" in the search text is
+      // matched literally instead of as a pattern.
+      conditions.push(`(LOWER(t.title) LIKE ? ESCAPE '\\' OR LOWER(t.note) LIKE ? ESCAPE '\\')`);
+      const pattern = `%${query.replace(/[\\%_]/g, match => `\\${match}`)}%`;
       params.push(pattern, pattern);
     }
 
