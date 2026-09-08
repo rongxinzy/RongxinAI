@@ -1500,6 +1500,10 @@
   background-color: var(--secondary);
   color: var(--secondary-foreground);
 }
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
 }
@@ -6814,6 +6818,7 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-outline),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-secondary),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-ghost),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-embedded),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-prompt-selector),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-toolbar),
@@ -9086,6 +9091,10 @@ to {
 [data-theme="classic-dark"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="classic-dark"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -14416,6 +14425,7 @@ to {
 [data-theme="classic-dark"] :where(.theme-button-outline),
 [data-theme="classic-dark"] :where(.theme-button-secondary),
 [data-theme="classic-dark"] :where(.theme-button-ghost),
+[data-theme="classic-dark"] :where(.theme-button-embedded),
 [data-theme="classic-dark"] :where(.theme-button-prompt-selector),
 [data-theme="classic-dark"] :where(.theme-button-navigation),
 [data-theme="classic-dark"] :where(.theme-button-toolbar),
@@ -16688,6 +16698,10 @@ to {
 [data-theme="daming-light"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="daming-light"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="daming-light"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -22003,6 +22017,7 @@ to {
 [data-theme="daming-light"] :where(.theme-button-outline),
 [data-theme="daming-light"] :where(.theme-button-secondary),
 [data-theme="daming-light"] :where(.theme-button-ghost),
+[data-theme="daming-light"] :where(.theme-button-embedded),
 [data-theme="daming-light"] :where(.theme-button-prompt-selector),
 [data-theme="daming-light"] :where(.theme-button-navigation),
 [data-theme="daming-light"] :where(.theme-button-toolbar),
@@ -24275,6 +24290,10 @@ to {
 [data-theme="daming-dark"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="daming-dark"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -29605,6 +29624,7 @@ to {
 [data-theme="daming-dark"] :where(.theme-button-outline),
 [data-theme="daming-dark"] :where(.theme-button-secondary),
 [data-theme="daming-dark"] :where(.theme-button-ghost),
+[data-theme="daming-dark"] :where(.theme-button-embedded),
 [data-theme="daming-dark"] :where(.theme-button-prompt-selector),
 [data-theme="daming-dark"] :where(.theme-button-navigation),
 [data-theme="daming-dark"] :where(.theme-button-toolbar),
@@ -31879,6 +31899,10 @@ to {
 [data-theme="changan-light"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="changan-light"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="changan-light"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -37197,6 +37221,7 @@ to {
 [data-theme="changan-light"] :where(.theme-button-outline),
 [data-theme="changan-light"] :where(.theme-button-secondary),
 [data-theme="changan-light"] :where(.theme-button-ghost),
+[data-theme="changan-light"] :where(.theme-button-embedded),
 [data-theme="changan-light"] :where(.theme-button-prompt-selector),
 [data-theme="changan-light"] :where(.theme-button-navigation),
 [data-theme="changan-light"] :where(.theme-button-toolbar),
@@ -39471,6 +39496,10 @@ to {
 [data-theme="changan-dark"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="changan-dark"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -44804,6 +44833,7 @@ to {
 [data-theme="changan-dark"] :where(.theme-button-outline),
 [data-theme="changan-dark"] :where(.theme-button-secondary),
 [data-theme="changan-dark"] :where(.theme-button-ghost),
+[data-theme="changan-dark"] :where(.theme-button-embedded),
 [data-theme="changan-dark"] :where(.theme-button-prompt-selector),
 [data-theme="changan-dark"] :where(.theme-button-navigation),
 [data-theme="changan-dark"] :where(.theme-button-toolbar),
@@ -47078,6 +47108,10 @@ to {
 [data-theme="weiyang-light"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="weiyang-light"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -52396,6 +52430,7 @@ to {
 [data-theme="weiyang-light"] :where(.theme-button-outline),
 [data-theme="weiyang-light"] :where(.theme-button-secondary),
 [data-theme="weiyang-light"] :where(.theme-button-ghost),
+[data-theme="weiyang-light"] :where(.theme-button-embedded),
 [data-theme="weiyang-light"] :where(.theme-button-prompt-selector),
 [data-theme="weiyang-light"] :where(.theme-button-navigation),
 [data-theme="weiyang-light"] :where(.theme-button-toolbar),
@@ -54670,6 +54705,10 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
   color: var(--secondary-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-button-embedded) {
+  color: inherit;
+  background-color: transparent;
 }
 [data-theme="weiyang-dark"] :where(.theme-button-prompt-selector) {
   transition-duration: 200ms;
@@ -60003,6 +60042,7 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-button-outline),
 [data-theme="weiyang-dark"] :where(.theme-button-secondary),
 [data-theme="weiyang-dark"] :where(.theme-button-ghost),
+[data-theme="weiyang-dark"] :where(.theme-button-embedded),
 [data-theme="weiyang-dark"] :where(.theme-button-prompt-selector),
 [data-theme="weiyang-dark"] :where(.theme-button-navigation),
 [data-theme="weiyang-dark"] :where(.theme-button-toolbar),

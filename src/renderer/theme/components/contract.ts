@@ -264,6 +264,7 @@ export const COMPONENT_SELECTORS = {
   'button-outline': '.theme-button-outline',
   'button-secondary': '.theme-button-secondary',
   'button-ghost': '.theme-button-ghost',
+  'button-embedded': '.theme-button-embedded',
   'button-prompt-selector': '.theme-button-prompt-selector',
   'button-navigation': '.theme-button-navigation',
   'button-toolbar': '.theme-button-toolbar',
