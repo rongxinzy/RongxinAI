@@ -160,9 +160,9 @@ export class CodingRoomService extends EventEmitter {
   private readonly stagedLaneIds = new Set<string>();
   /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
   private readonly builtinSessionLaneMap = new Map<string, string>();
-  /** Throttle timer for publishing builtin event batches. */
-  private builtinPublishTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly BUILTIN_PUBLISH_THROTTLE_MS = 100;
+  /** Per-workspace throttle timers so streamed events publish snapshots in batches. */
+  private readonly publishTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly PUBLISH_THROTTLE_MS = 100;
 
   constructor(
     private readonly repository: CodingRoomRepository,
@@ -1333,31 +1333,33 @@ export class CodingRoomService extends EventEmitter {
     payload: Record<string, unknown>,
   ): void {
     const laneId = this.builtinSessionLaneMap.get(sessionId);
-    if (!laneId) {
-      // Cache miss: scan rooms once to find the lane, then cache the mapping.
-      for (const workspaceRoot of this.knownRooms()) {
-        const snapshot = this.bootstrap(workspaceRoot);
-        const lane = snapshot.lanes.find(candidate => candidate.localSessionId === sessionId);
-        if (!lane) continue;
-        this.builtinSessionLaneMap.set(sessionId, lane.id);
-        this.applyBuiltinEvent(workspaceRoot, snapshot, lane, kind, payload);
+    if (laneId) {
+      // Fast path: load the lane and its room directly instead of rebuilding
+      // full snapshots of every room per streamed event.
+      const lane = this.repository.getLaneById(laneId);
+      const room = lane ? this.repository.getRoomByLaneId(laneId) : null;
+      if (lane && room) {
+        this.applyBuiltinEvent(room.workspaceRoot, room.id, lane, kind, payload);
         return;
       }
-      return;
     }
-    // Fast path: use cached lane mapping without re-scanning rooms.
+    // Cache miss or stale mapping: scan rooms once to find the lane, then
+    // cache the mapping.
     for (const workspaceRoot of this.knownRooms()) {
       const snapshot = this.bootstrap(workspaceRoot);
-      const lane = snapshot.lanes.find(candidate => candidate.id === laneId);
+      const lane = snapshot.lanes.find(
+        candidate => candidate.localSessionId === sessionId || candidate.id === laneId,
+      );
       if (!lane) continue;
-      this.applyBuiltinEvent(workspaceRoot, snapshot, lane, kind, payload);
+      this.builtinSessionLaneMap.set(sessionId, lane.id);
+      this.applyBuiltinEvent(workspaceRoot, snapshot.room.id, lane, kind, payload);
       return;
     }
   }
 
   private applyBuiltinEvent(
     workspaceRoot: string,
-    snapshot: CodingRoomSnapshot,
+    roomId: string,
     lane: CodingAgentLane,
     kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],
     payload: Record<string, unknown>,
@@ -1366,31 +1368,32 @@ export class CodingRoomService extends EventEmitter {
     if (kind === CodingEventKind.Permission) {
       this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
       this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
-      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.WaitingApproval);
+      const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+      if (assignment) {
+        this.repository.updateAssignmentStatus(
+          assignment.id,
+          CodingAssignmentStatus.WaitingApproval,
+        );
+      }
     }
     if (kind === CodingEventKind.TurnComplete) {
-      this.finishTurn(
-        snapshot.room.id,
-        snapshot.room.workspaceRoot,
-        lane,
-        CodingLaneStatus.Completed,
-      );
+      this.finishTurn(roomId, workspaceRoot, lane, CodingLaneStatus.Completed);
       this.publish(workspaceRoot);
       return;
     }
     if (kind === CodingEventKind.TurnFailed) {
-      this.finishTurn(snapshot.room.id, snapshot.room.workspaceRoot, lane, CodingLaneStatus.Failed);
+      this.finishTurn(roomId, workspaceRoot, lane, CodingLaneStatus.Failed);
       this.publish(workspaceRoot);
       return;
     }
     // Throttle streaming events to avoid flooding the renderer with publishes.
-    this.scheduleBuiltinPublish(workspaceRoot);
+    this.schedulePublish(workspaceRoot);
   }
 
-  private scheduleBuiltinPublish(workspaceRoot: string): void {
-    if (this.builtinPublishTimer || this.isDisposed) return;
-    this.builtinPublishTimer = setTimeout(() => {
-      this.builtinPublishTimer = null;
+  private schedulePublish(workspaceRoot: string): void {
+    if (this.publishTimers.has(workspaceRoot) || this.isDisposed) return;
+    const timer = setTimeout(() => {
+      this.publishTimers.delete(workspaceRoot);
       if (!this.isDisposed) {
         try {
           this.publish(workspaceRoot);
@@ -1399,7 +1402,8 @@ export class CodingRoomService extends EventEmitter {
           console.debug('[CodingRoom] Skipped publish because the service is disposed:', error);
         }
       }
-    }, this.BUILTIN_PUBLISH_THROTTLE_MS);
+    }, this.PUBLISH_THROTTLE_MS);
+    this.publishTimers.set(workspaceRoot, timer);
   }
 
   private isDisposed = false;
@@ -1432,10 +1436,8 @@ export class CodingRoomService extends EventEmitter {
     this.driverSessionPromises.clear();
     this.authTerminals.dispose();
     this.builtinSessionLaneMap.clear();
-    if (this.builtinPublishTimer) {
-      clearTimeout(this.builtinPublishTimer);
-      this.builtinPublishTimer = null;
-    }
+    for (const timer of this.publishTimers.values()) clearTimeout(timer);
+    this.publishTimers.clear();
   }
 
   private getDriver(lane: CodingAgentLane): CodingAgentDriver {
@@ -1602,7 +1604,9 @@ export class CodingRoomService extends EventEmitter {
             );
           }
         }
-        this.publish(roomWorkspaceRoot);
+        // Rebuilding and broadcasting a full snapshot per streamed event makes
+        // streaming cost grow with session size, so publish in batches instead.
+        this.schedulePublish(roomWorkspaceRoot);
       }
       if (this.consumeCancelledTurn(lane.id, turnGeneration)) {
         if (queuedItemId) this.deletePendingMessage(lane.id, queuedItemId);
