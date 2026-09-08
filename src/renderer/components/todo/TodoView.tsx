@@ -57,6 +57,7 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [allTodos, setAllTodos] = useState<Todo[]>([]);
+  const [completedTodos, setCompletedTodos] = useState<Todo[]>([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [suggestionTodos, setSuggestionTodos] = useState<Todo[]>([]);
   const [lists, setLists] = useState<TodoList[]>([]);
@@ -70,9 +71,15 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
 
+  // Look up the selected task in the completed snapshot as well: completing a
+  // task moves it out of the active list, and losing the lookup would close
+  // the detail sheet mid-interaction.
   const selectedTodo = useMemo(
-    () => todos.find(todo => todo.id === selectedTodoId) ?? null,
-    [selectedTodoId, todos],
+    () =>
+      todos.find(todo => todo.id === selectedTodoId) ??
+      completedTodos.find(todo => todo.id === selectedTodoId) ??
+      null,
+    [selectedTodoId, todos, completedTodos],
   );
 
   const activeList = useMemo(
@@ -128,7 +135,9 @@ const TodoView: React.FC<TodoViewProps> = ({
     setLists(listsResult.lists ?? []);
     const allTodoItems = allResult.todos ?? [];
     setAllTodos(allTodoItems);
-    setCompletedCount(completedResult.todos?.length ?? 0);
+    const completedTodoItems = completedResult.todos ?? [];
+    setCompletedTodos(completedTodoItems);
+    setCompletedCount(completedTodoItems.length);
     setSuggestionTodos(
       allTodoItems
         .filter(todo => todo.myDayDate !== todayDateKey())
@@ -480,6 +489,7 @@ const TodoView: React.FC<TodoViewProps> = ({
               lists={lists}
               language={language}
               onUpdated={loadData}
+              onError={showError}
               onDelete={() => setDeleteTodo(selectedTodo)}
             />
           ) : null}
