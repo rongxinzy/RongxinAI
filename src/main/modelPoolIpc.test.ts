@@ -42,6 +42,45 @@ afterEach(() => {
 });
 
 describe('Model Pool IPC', () => {
+  test('cancels while awaiting credentials without starting inference', async () => {
+    const manager = createSessionManager();
+    let resolveToken: (token: string) => void = () => undefined;
+    vi.spyOn(manager, 'getModelPoolAccessToken').mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveToken = resolve;
+        }),
+    );
+    registerModelPoolIpcHandlers(manager);
+    const pending = electronMocks.handlers.get(ModelPoolIpc.Stream)?.(
+      { sender: { send: vi.fn() } },
+      { requestId: 'cancel-auth', conversationId: 'session', body: {} },
+    );
+    expect(electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-auth')).toBe(true);
+    resolveToken('token');
+    await expect(pending).resolves.toMatchObject({ ok: false });
+    expect(electronMocks.fetch).not.toHaveBeenCalled();
+  });
+  test('cancels the response reader and emits abort instead of completion', async () => {
+    const cancelled = vi.fn();
+    electronMocks.fetch.mockResolvedValue(
+      new Response(new ReadableStream({ cancel: cancelled }), {
+        headers: { 'content-type': 'text/event-stream' },
+      }),
+    );
+    registerModelPoolIpcHandlers(createSessionManager());
+    const send = vi.fn();
+    await electronMocks.handlers.get(ModelPoolIpc.Stream)?.(
+      { sender: { send } },
+      { requestId: 'cancel-reader', conversationId: 'session', body: {} },
+    );
+    electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-reader');
+    await vi.waitFor(() =>
+      expect(send).toHaveBeenCalledWith(ModelPoolIpc.streamAbort('cancel-reader')),
+    );
+    expect(cancelled).toHaveBeenCalledOnce();
+    expect(send).not.toHaveBeenCalledWith(ModelPoolIpc.streamDone('cancel-reader'));
+  });
   test('requires a stable conversation ID and rejects unsafe header values', () => {
     const input = { requestId: 'request-1', body: {} };
     for (const conversationId of [undefined, '', 'line\r\nbreak', 'x'.repeat(161)]) {

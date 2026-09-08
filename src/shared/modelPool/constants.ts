@@ -21,3 +21,11 @@ export type ZhiyuanModelPoolWorkload =
 export const ZhiyuanModelPoolEvent = {
   AuthChanged: 'zhiyuan:model-pool-auth-changed',
 } as const;
+
+export const ModelPoolErrorCode = { SessionBusy: 'session_busy' } as const;
+export const ModelPoolRetryPolicy = {
+  MaximumRetries: 2,
+  DefaultDelayMs: 2000,
+  MaximumDelayMs: 3000,
+  MaximumErrorBodyBytes: 16_384,
+} as const;
