@@ -98,22 +98,25 @@ export const CodingAgentManager = ({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
-    const saved = await onAddProfile({
-      name,
-      description,
-      command,
-      args: argumentsText
-        .split('\n')
-        .map(argument => argument.trim())
-        .filter(Boolean),
-    });
-    setSubmitting(false);
-    if (!saved) return;
-    setName('');
-    setDescription('');
-    setCommand('');
-    setArgumentsText('');
-    setActiveTab(CodingAgentManagerTab.Local);
+    try {
+      const saved = await onAddProfile({
+        name,
+        description,
+        command,
+        args: argumentsText
+          .split('\n')
+          .map(argument => argument.trim())
+          .filter(Boolean),
+      });
+      if (!saved) return;
+      setName('');
+      setDescription('');
+      setCommand('');
+      setArgumentsText('');
+      setActiveTab(CodingAgentManagerTab.Local);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
