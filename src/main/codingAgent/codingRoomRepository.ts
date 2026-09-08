@@ -274,6 +274,23 @@ export class CodingRoomRepository {
       .get(laneId) as Record<string, unknown> | undefined;
     return row ? rowAssignment(row) : null;
   }
+  getLaneById(laneId: string): CodingAgentLane | null {
+    const row = this.db
+      .prepare('SELECT * FROM coding_agent_lanes WHERE id = ?')
+      .get(laneId) as Record<string, unknown> | undefined;
+    return row ? rowLane(row) : null;
+  }
+  getRoomByLaneId(laneId: string): CodingRoom | null {
+    const row = this.db
+      .prepare(
+        `SELECT r.* FROM coding_rooms r
+         JOIN coding_missions m ON m.room_id = r.id
+         JOIN coding_agent_lanes l ON l.mission_id = m.id
+         WHERE l.id = ?`,
+      )
+      .get(laneId) as Record<string, unknown> | undefined;
+    return row ? rowRoom(row) : null;
+  }
   listEvents(laneIds: string[]): CodingEvent[] {
     if (!laneIds.length) return [];
     const marks = laneIds.map(() => '?').join(',');
