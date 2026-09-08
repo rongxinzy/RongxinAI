@@ -11,7 +11,6 @@ import {
   EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Code2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { CodingEvent } from '../../../shared/codingAgent';
@@ -37,6 +36,7 @@ interface CodingEventStreamProps {
   scrollAreaRef: RefObject<HTMLDivElement | null>;
   onScrollPositionChange: (scrollPosition: number) => void;
   emptyDescription?: string;
+  headerActions?: ReactNode;
   /**
    * Artifact store key for the active lane. When set, assistant messages are
    * scanned for previewable artifacts (HTML/SVG/Mermaid/code) and rendered as
@@ -101,6 +101,7 @@ export const CodingEventStream = ({
   scrollAreaRef,
   onScrollPositionChange,
   emptyDescription,
+  headerActions,
   artifactSessionKey = null,
   artifactBaseDir = null,
 }: CodingEventStreamProps) => {
@@ -179,11 +180,14 @@ export const CodingEventStream = ({
   return (
     <div
       ref={scrollAreaRef}
-      className="min-h-0 min-w-0 flex-1 overflow-hidden"
+      className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
       onScrollCapture={event => {
         if (event.target instanceof HTMLElement) onScrollPositionChange(event.target.scrollTop);
       }}
     >
+      {headerActions ? (
+        <div className="absolute top-3 right-4 z-10 flex items-center gap-1">{headerActions}</div>
+      ) : null}
       <Conversation
         className="h-full"
         initial="instant"
