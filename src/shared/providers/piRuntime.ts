@@ -29,6 +29,18 @@ export const ProviderModelPiThinkingFormat = {
 export type ProviderModelPiThinkingFormat =
   (typeof ProviderModelPiThinkingFormat)[keyof typeof ProviderModelPiThinkingFormat];
 
+export type ProviderModelPiThinkingLevel =
+  | 'off'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
+export type ProviderModelPiThinkingLevelMap = Partial<
+  Record<ProviderModelPiThinkingLevel, string | null>
+>;
+
 export const ProviderModelPiCacheControlFormat = {
   Anthropic: 'anthropic',
 } as const;
@@ -52,6 +64,7 @@ export interface ProviderModelPiRuntimeCompat {
 export interface ProviderModelPiRuntimeConfig {
   readonly api?: ProviderModelPiApi;
   readonly reasoning?: boolean;
+  readonly thinkingLevelMap?: ProviderModelPiThinkingLevelMap;
   readonly compat?: ProviderModelPiRuntimeCompat;
 }
 
@@ -79,6 +92,20 @@ function optionalEnum<T extends string>(
 
 function hasKeys(value: object): boolean {
   return Object.keys(value).length > 0;
+}
+
+function normalizeThinkingLevelMap(value: unknown): ProviderModelPiThinkingLevelMap | undefined {
+  if (!isRecord(value)) return undefined;
+  const normalized: ProviderModelPiThinkingLevelMap = {};
+  for (const level of ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const) {
+    const mapped = value[level];
+    if (mapped === null) {
+      normalized[level] = null;
+    } else if (typeof mapped === 'string' && mapped.trim() !== '') {
+      normalized[level] = mapped;
+    }
+  }
+  return hasKeys(normalized) ? normalized : undefined;
 }
 
 export function normalizeProviderModelPiRuntimeConfig(
@@ -161,6 +188,9 @@ export function normalizeProviderModelPiRuntimeConfig(
       : {}),
     ...(optionalBoolean(input.reasoning) !== undefined
       ? { reasoning: optionalBoolean(input.reasoning) }
+      : {}),
+    ...(normalizeThinkingLevelMap(input.thinkingLevelMap)
+      ? { thinkingLevelMap: normalizeThinkingLevelMap(input.thinkingLevelMap) }
       : {}),
     ...(hasKeys(compat) ? { compat } : {}),
   };

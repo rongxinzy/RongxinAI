@@ -93,6 +93,9 @@ test('does not acknowledge reminders when notifications are unsupported', () => 
       remind_notified_at: number | null;
     };
     expect(row.remind_notified_at).toBeNull();
+
+    vi.advanceTimersByTime(120_000);
+    expect(vi.getTimerCount()).toBe(0);
   } finally {
     scheduler.stop();
     db.close();

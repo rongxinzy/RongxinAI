@@ -31,6 +31,24 @@ const replaceNodeChildren = (nodes: TreeNode[], path: string, children: TreeNode
       : node;
   });
 
+/**
+ * Keeps the nodes whose own name matches the query plus the ancestor chain of
+ * every nested match, so the filter can surface files below unloaded-looking
+ * folders instead of hiding them with their non-matching parents.
+ */
+const filterTreeNodes = (nodes: TreeNode[], query: string): TreeNode[] => {
+  if (!query) return nodes;
+  const walk = (node: TreeNode): TreeNode | null => {
+    const children = node.children
+      ? node.children.map(walk).filter((child): child is TreeNode => child !== null)
+      : undefined;
+    const selfMatch = node.name.toLocaleLowerCase().includes(query);
+    if (!selfMatch && (!children || children.length === 0)) return null;
+    return children ? { ...node, children } : node;
+  };
+  return nodes.map(walk).filter((node): node is TreeNode => node !== null);
+};
+
 export const CodingWorkspaceFileBrowser = ({
   workspaceRoot,
   sourceRoot,
@@ -151,10 +169,7 @@ export const CodingWorkspaceFileBrowser = ({
 
   const normalizedFilter = filter.trim().toLocaleLowerCase();
   const visibleNodes = useMemo(
-    () =>
-      normalizedFilter
-        ? nodes.filter(node => node.name.toLocaleLowerCase().includes(normalizedFilter))
-        : nodes,
+    () => filterTreeNodes(nodes, normalizedFilter),
     [nodes, normalizedFilter],
   );
 
@@ -208,7 +223,7 @@ export const CodingWorkspaceFileBrowser = ({
                 expandedPaths={expandedPaths}
                 loadingPaths={loadingPaths}
                 selectedPath={selectedPath}
-                filter={normalizedFilter}
+                filterActive={Boolean(normalizedFilter)}
                 onToggleDirectory={toggleDirectory}
                 onOpenFile={openFile}
               />
@@ -225,7 +240,7 @@ interface FileTreeProps {
   expandedPaths: Set<string>;
   loadingPaths: Set<string>;
   selectedPath: string | null;
-  filter: string;
+  filterActive: boolean;
   onToggleDirectory: (node: TreeNode) => void;
   onOpenFile: (node: TreeNode) => void;
 }
@@ -235,14 +250,16 @@ const FileTree = ({
   expandedPaths,
   loadingPaths,
   selectedPath,
-  filter,
+  filterActive,
   onToggleDirectory,
   onOpenFile,
 }: FileTreeProps) => (
   <div className="flex flex-col gap-0.5">
     {nodes.map(node => {
       const directory = node.kind === CodingWorkspaceFileKind.Directory;
-      const expanded = expandedPaths.has(node.path);
+      // While filtering, reveal matching descendants even under folders the
+      // user had collapsed; the node list is already pruned to matches.
+      const expanded = expandedPaths.has(node.path) || (filterActive && Boolean(node.children));
       return (
         <div key={node.path} className="min-w-0">
           <Button
@@ -266,11 +283,11 @@ const FileTree = ({
           {directory && expanded && node.children ? (
             <div className="pl-4">
               <FileTree
-                nodes={filter ? node.children.filter(child => child.name.toLocaleLowerCase().includes(filter)) : node.children}
+                nodes={node.children}
                 expandedPaths={expandedPaths}
                 loadingPaths={loadingPaths}
                 selectedPath={selectedPath}
-                filter={filter}
+                filterActive={filterActive}
                 onToggleDirectory={onToggleDirectory}
                 onOpenFile={onOpenFile}
               />

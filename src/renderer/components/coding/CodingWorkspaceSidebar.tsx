@@ -75,6 +75,7 @@ export const CodingWorkspaceSidebar = ({
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<CodingWorkspaceSummary | null>(null);
   const [removingWorkspace, setRemovingWorkspace] = useState<CodingWorkspaceSummary | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [removingSession, setRemovingSession] = useState<{
     workspace: CodingWorkspaceSummary;
     session: CodingSessionSummary;
@@ -125,11 +126,14 @@ export const CodingWorkspaceSidebar = ({
     ],
   );
 
+  const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
+    const request = ++refreshSequence.current;
     const [workspaceResult, profileResult] = await Promise.all([
       window.electron.codingAgent.listWorkspaces(),
       window.electron.codingAgent.listProfiles(),
     ]);
+    if (request !== refreshSequence.current) return;
     if (workspaceResult.success && workspaceResult.workspaces) {
       applyWorkspaces(workspaceResult.workspaces);
     } else {
@@ -197,28 +201,42 @@ export const CodingWorkspaceSidebar = ({
   };
 
   const removeWorkspace = async () => {
-    if (!removingWorkspace) return;
-    const result = await window.electron.codingAgent.deleteWorkspace(removingWorkspace.id);
-    if (!result.success || !result.workspaces) {
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-      return;
+    if (!removingWorkspace || isRemoving) return;
+    setIsRemoving(true);
+    try {
+      const result = await window.electron.codingAgent.deleteWorkspace(removingWorkspace.id);
+      if (!result.success || !result.workspaces) {
+        setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        return;
+      }
+      setRemovingWorkspace(null);
+      applyWorkspaces(result.workspaces);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+    } finally {
+      setIsRemoving(false);
     }
-    setRemovingWorkspace(null);
-    applyWorkspaces(result.workspaces);
   };
 
   const removeSession = async () => {
-    if (!removingSession) return;
-    const result = await window.electron.codingAgent.deleteSession({
-      workspaceRoot: removingSession.workspace.primaryRoot,
-      laneId: removingSession.session.id,
-    });
-    if (!result.success || !result.workspaces) {
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-      return;
+    if (!removingSession || isRemoving) return;
+    setIsRemoving(true);
+    try {
+      const result = await window.electron.codingAgent.deleteSession({
+        workspaceRoot: removingSession.workspace.primaryRoot,
+        laneId: removingSession.session.id,
+      });
+      if (!result.success || !result.workspaces) {
+        setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        return;
+      }
+      setRemovingSession(null);
+      applyWorkspaces(result.workspaces);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+    } finally {
+      setIsRemoving(false);
     }
-    setRemovingSession(null);
-    applyWorkspaces(result.workspaces);
   };
 
   return (
@@ -320,6 +338,7 @@ export const CodingWorkspaceSidebar = ({
         cancelLabel={i18nService.t('codingWorkspaceCancel')}
         confirmLabel={i18nService.t('codingWorkspaceRemove')}
         confirmVariant="outline"
+        isConfirming={isRemoving}
         onCancel={() => setRemovingWorkspace(null)}
         onConfirm={() => void removeWorkspace()}
       />
@@ -330,6 +349,7 @@ export const CodingWorkspaceSidebar = ({
         cancelLabel={i18nService.t('codingWorkspaceCancel')}
         confirmLabel={i18nService.t('codingSessionRemove')}
         confirmVariant="outline"
+        isConfirming={isRemoving}
         onCancel={() => setRemovingSession(null)}
         onConfirm={() => void removeSession()}
       />
