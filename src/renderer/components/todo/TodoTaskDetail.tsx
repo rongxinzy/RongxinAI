@@ -55,6 +55,12 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   // be silently reverted by every save of another field.
   const dirtyFieldsRef = useRef(new Set<string>());
   const lastTodoIdRef = useRef(todo.id);
+  // Mirror of the newest local values, used to detect edits made while a
+  // save is still in flight.
+  const latestValuesRef = useRef({ title, note, dueDate, remindAt, listId });
+  useEffect(() => {
+    latestValuesRef.current = { title, note, dueDate, remindAt, listId };
+  });
 
   useEffect(() => {
     if (lastTodoIdRef.current !== todo.id) {
@@ -86,17 +92,26 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   const saveDetails = async (): Promise<void> => {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
+    const sent = { title: trimmedTitle, note, dueDate, remindAt, listId };
     setIsSaving(true);
     try {
       const result = await todoService.update(todo.id, {
-        title: trimmedTitle,
-        note,
-        dueAt: fromDateInputValue(dueDate),
-        remindAt: fromDateTimeInputValue(remindAt),
-        listId: listId === NO_LIST_VALUE ? null : listId,
+        title: sent.title,
+        note: sent.note,
+        dueAt: fromDateInputValue(sent.dueDate),
+        remindAt: fromDateTimeInputValue(sent.remindAt),
+        listId: sent.listId === NO_LIST_VALUE ? null : sent.listId,
       });
       if (result.success) {
-        clearDirty('title', 'note', 'dueDate', 'remindAt', 'listId');
+        // Clear a field's dirty flag only when the user has not edited it
+        // again while the save was in flight; otherwise the refresh following
+        // this save would revert that newer edit.
+        const latest = latestValuesRef.current;
+        if (latest.title.trim() === sent.title) clearDirty('title');
+        if (latest.note === sent.note) clearDirty('note');
+        if (latest.dueDate === sent.dueDate) clearDirty('dueDate');
+        if (latest.remindAt === sent.remindAt) clearDirty('remindAt');
+        if (latest.listId === sent.listId) clearDirty('listId');
         await onUpdated();
       } else {
         onError();
@@ -185,11 +200,12 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               onChange={event => {
                 markDirty('dueDate');
                 setDueDate(event.target.value);
+                const sentValue = event.target.value;
                 void todoService
-                  .update(todo.id, { dueAt: fromDateInputValue(event.target.value) })
+                  .update(todo.id, { dueAt: fromDateInputValue(sentValue) })
                   .then(result => {
                     if (result.success) {
-                      clearDirty('dueDate');
+                      if (latestValuesRef.current.dueDate === sentValue) clearDirty('dueDate');
                       return onUpdated();
                     }
                     onError();
@@ -205,11 +221,12 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               onChange={event => {
                 markDirty('remindAt');
                 setRemindAt(event.target.value);
+                const sentValue = event.target.value;
                 void todoService
-                  .update(todo.id, { remindAt: fromDateTimeInputValue(event.target.value) })
+                  .update(todo.id, { remindAt: fromDateTimeInputValue(sentValue) })
                   .then(result => {
                     if (result.success) {
-                      clearDirty('remindAt');
+                      if (latestValuesRef.current.remindAt === sentValue) clearDirty('remindAt');
                       return onUpdated();
                     }
                     onError();
@@ -231,7 +248,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
                 .update(todo.id, { listId: nextListId === NO_LIST_VALUE ? null : nextListId })
                 .then(result => {
                   if (result.success) {
-                    clearDirty('listId');
+                    if (latestValuesRef.current.listId === nextListId) clearDirty('listId');
                     return onUpdated();
                   }
                   onError();
