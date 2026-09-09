@@ -1734,6 +1734,21 @@ export class CodingRoomService extends EventEmitter {
     if (laneStatus === CodingLaneStatus.Completed) {
       void this.startNextCollaborationStage(roomWorkspaceRoot, lane.id).catch(error => {
         console.error('[CodingRoom] failed to start the next collaboration stage:', error);
+        // The next assignment stays Planned, so surface the failure in the
+        // completed lane's conversation instead of leaving silent state.
+        try {
+          this.repository.appendEvent(lane.id, CodingEventKind.Message, {
+            role: 'system',
+            content: t('codingAgentNextStageFailed'),
+            error: this.errorMessage(error),
+          });
+          this.publish(roomWorkspaceRoot);
+        } catch (publishError) {
+          console.debug(
+            '[CodingRoom] Skipped publishing the collaboration stage failure:',
+            publishError,
+          );
+        }
       });
     }
   }
