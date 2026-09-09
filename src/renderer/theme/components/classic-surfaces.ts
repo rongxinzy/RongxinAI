@@ -113,6 +113,13 @@ export function classicSurfaces(): SurfaceAppearances {
         padding: '1rem',
       },
     }),
+    'dialog-footer-seamless': recipe({
+      base: {
+        'background-color': 'transparent',
+        'border-top-width': '0',
+        padding: '0',
+      },
+    }),
     'popover-content': recipe({
       base: {
         ...popup,

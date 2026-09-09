@@ -19,6 +19,13 @@ const CONTEXT_SLIDER_DEFAULT_MAX = 131072;
 const TOKENS_PER_K = 1024;
 const CONTEXT_PRESETS = [4096, 8192, 16384, 32768, 65536, 131072] as const;
 
+export const ModelContextSettingsPresentation = {
+  Modal: 'modal',
+  Inline: 'inline',
+} as const;
+export type ModelContextSettingsPresentation =
+  (typeof ModelContextSettingsPresentation)[keyof typeof ModelContextSettingsPresentation];
+
 type ModelContextSettingsModalProps = {
   isOpen: boolean;
   model: LlamaCppModel | null;
@@ -26,7 +33,9 @@ type ModelContextSettingsModalProps = {
   runningContextSize?: number;
   onClose: () => void;
   onSave: (ctxSize?: number) => void;
-  onValidationError: (message: string) => void;
+  onValidationError?: (message: string) => void;
+  presentation?: ModelContextSettingsPresentation;
+  inlineClassName?: string;
 };
 
 export function ModelContextSettingsModal({
@@ -37,6 +46,8 @@ export function ModelContextSettingsModal({
   onClose,
   onSave,
   onValidationError,
+  presentation = ModelContextSettingsPresentation.Modal,
+  inlineClassName,
 }: ModelContextSettingsModalProps) {
   const [contextSize, setContextSize] = useState(CONTEXT_SLIDER_DEFAULT_VALUE);
   const [customContextValue, setCustomContextValue] = useState<string | null>(null);
@@ -77,13 +88,9 @@ export function ModelContextSettingsModal({
 
   if (!model) return null;
 
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      className="theme-local-context-modal w-full max-w-md p-0"
-    >
-      <div className="flex flex-col gap-5 p-6">
+  const content = (
+    <div className={cn('flex flex-col gap-5', presentation === ModelContextSettingsPresentation.Modal && 'p-6')}>
+      {presentation === ModelContextSettingsPresentation.Modal ? (
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="shrink-0 text-base font-semibold text-foreground">
             {i18nService.t('localInferenceConfigureContext')}
@@ -92,6 +99,7 @@ export function ModelContextSettingsModal({
             {model.name}
           </p>
         </div>
+      ) : null}
 
         <div className="flex flex-col gap-3">
           <div className="flex min-h-7 items-center gap-0">
@@ -222,11 +230,11 @@ export function ModelContextSettingsModal({
             onClick={() => {
               if (customContextValue !== null) {
                 if (!customContextValue.trim()) {
-                  onValidationError(i18nService.t('localInferenceContextInvalid'));
+                  onValidationError?.(i18nService.t('localInferenceContextInvalid'));
                   return;
                 }
                 if (customContextError) {
-                  onValidationError(customContextError);
+                  onValidationError?.(customContextError);
                   return;
                 }
               }
@@ -236,7 +244,20 @@ export function ModelContextSettingsModal({
             {i18nService.t('save')}
           </Button>
         </div>
-      </div>
+    </div>
+  );
+
+  if (presentation === ModelContextSettingsPresentation.Inline) {
+    return <div className={cn('w-full', inlineClassName)}>{content}</div>;
+  }
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      className="theme-local-context-modal w-full max-w-md p-0"
+    >
+      {content}
     </Modal>
   );
 }

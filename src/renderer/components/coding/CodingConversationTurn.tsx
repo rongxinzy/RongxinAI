@@ -5,15 +5,20 @@ import {
   ReasoningTrigger,
 } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
+import { CollapsibleContent } from '@shared/components/ui/collapsible';
 import { CheckCircle2, CircleStop, TriangleAlert } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { Artifact } from '../../types/artifact';
 import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
 import { CodingActivity } from './CodingActivityView';
 import { CodingAgentWorkingIndicator } from './CodingAgentWorkingIndicator';
-import { CodingConversationTurnStatus } from './constants';
+import {
+  CodingConversationActivityKind,
+  CodingConversationSegmentKind,
+  CodingConversationTurnStatus,
+} from './constants';
 import { type CodingConversationTurn as CodingConversationTurnModel } from './codingEventProjection';
 
 interface CodingConversationTurnProps {
@@ -24,6 +29,8 @@ interface CodingConversationTurnProps {
   artifactsByMessageId?: ReadonlyMap<string, Artifact[]>;
   /** File artifacts keyed by the tool call that produced them. */
   artifactsByToolCallId?: ReadonlyMap<string, Artifact[]>;
+  expandedActivityIds: ReadonlySet<string>;
+  onActivityOpenChange: (activityId: string, open: boolean) => void;
 }
 
 const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
@@ -52,79 +59,168 @@ const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
   );
 };
 
+const formatExecutionDuration = (durationMs: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  if (totalSeconds < 60) {
+    return `${totalSeconds} ${i18nService.t('codingAgentDurationSeconds')}`;
+  }
+  const seconds = totalSeconds % 60;
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  if (totalMinutes < 60) {
+    return `${totalMinutes} ${i18nService.t('codingAgentDurationMinutes')} ${seconds} ${i18nService.t('codingAgentDurationSeconds')}`;
+  }
+  const minutes = totalMinutes % 60;
+  const hours = Math.floor(totalMinutes / 60);
+  return `${hours} ${i18nService.t('codingAgentDurationHours')} ${minutes} ${i18nService.t('codingAgentDurationMinutes')} ${seconds} ${i18nService.t('codingAgentDurationSeconds')}`;
+};
+
+const TurnExecutionDuration = ({ turn }: { turn: CodingConversationTurnModel }) => {
+  const [now, setNow] = useState(() => Date.now());
+  const isFinished = turn.completedAt !== null;
+
+  useEffect(() => {
+    if (isFinished) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isFinished]);
+
+  const endAt = turn.completedAt ?? now;
+  const duration = Math.max(0, endAt - turn.startedAt);
+  const label = isFinished
+    ? i18nService.t('codingAgentExecutionDuration')
+    : i18nService.t('codingAgentExecutionElapsed');
+  return (
+    <span className="shrink-0 font-medium text-sm text-muted-foreground">
+      {label} {formatExecutionDuration(duration)}
+    </span>
+  );
+};
+
 const CodingConversationTurnComponent = ({
   isStreaming,
   showWaitingIndicator,
   turn,
   artifactsByMessageId,
   artifactsByToolCallId,
-}: CodingConversationTurnProps) => (
-  <section
-    className="flex flex-col gap-3"
-    aria-label={i18nService.t('codingAgentConversationTurn')}
-  >
-    {turn.userMessage && (
-      <Message from="user" className="animate-message-in">
-        <MessageContent className="theme-message-code-user whitespace-pre-wrap">
-          {turn.userMessage.content}
-        </MessageContent>
-      </Message>
-    )}
+  expandedActivityIds,
+  onActivityOpenChange,
+}: CodingConversationTurnProps) => {
+  const hasPermission = turn.activities.some(
+    activity => activity.kind === CodingConversationActivityKind.Permission,
+  );
+  const [isReasoningOpen, setIsReasoningOpen] = useState(hasPermission);
 
-    <div className="flex flex-col gap-3">
-      {showWaitingIndicator ? <CodingAgentWorkingIndicator /> : null}
+  useEffect(() => {
+    if (hasPermission) setIsReasoningOpen(true);
+  }, [hasPermission]);
 
-      {turn.reasoning && (
-        <Reasoning isStreaming={isStreaming} defaultOpen={false}>
-          <ReasoningTrigger
-            getThinkingMessage={streaming =>
-              streaming ? (
-                <Shimmer duration={1}>{i18nService.t('codingAgentReasoningActive')}</Shimmer>
-              ) : (
-                <span>{i18nService.t('codingAgentReasoningComplete')}</span>
-              )
-            }
-          />
-          <ReasoningContent>{turn.reasoning.content}</ReasoningContent>
-        </Reasoning>
+  const renderActivity = (activity: CodingConversationTurnModel['activities'][number]) => {
+    const toolCallId =
+      typeof activity.event.payload.toolCallId === 'string'
+        ? activity.event.payload.toolCallId
+        : null;
+    return (
+      <CodingActivity
+        key={activity.id}
+        activity={activity}
+        artifacts={toolCallId ? artifactsByToolCallId?.get(toolCallId) : undefined}
+        open={expandedActivityIds.has(activity.id)}
+        onOpenChange={open => onActivityOpenChange(activity.id, open)}
+      />
+    );
+  };
+  const hasReasoningGroup = turn.segments.length > 0;
+
+  return (
+    <section
+      className="flex flex-col gap-3"
+      aria-label={i18nService.t('codingAgentConversationTurn')}
+    >
+      {turn.userMessage && (
+        <Message from="user" className="animate-message-in">
+          <MessageContent className="theme-message-code-user whitespace-pre-wrap">
+            {turn.userMessage.content}
+          </MessageContent>
+        </Message>
       )}
 
-      {turn.activities.map(activity => {
-        const toolCallId =
-          typeof activity.event.payload.toolCallId === 'string'
-            ? activity.event.payload.toolCallId
-            : null;
-        return (
-          <CodingActivity
-            key={activity.id}
-            activity={activity}
-            artifacts={toolCallId ? artifactsByToolCallId?.get(toolCallId) : undefined}
-          />
-        );
-      })}
+      <div className="flex flex-col gap-3">
+        {showWaitingIndicator ? (
+          <CodingAgentWorkingIndicator duration={<TurnExecutionDuration turn={turn} />} />
+        ) : null}
 
-      {turn.assistantMessages.map(message => {
-        const artifacts = artifactsByMessageId?.get(message.id) ?? [];
-        return (
-          <Message key={message.id} from="assistant" className="animate-message-in">
-            <MessageContent>
-              <MessageResponse isAnimating={isStreaming}>{message.content}</MessageResponse>
-              {artifacts.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {artifacts.map(artifact => (
-                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
-                  ))}
-                </div>
-              )}
-            </MessageContent>
-          </Message>
-        );
-      })}
+        {hasReasoningGroup && (
+          <Reasoning
+            isStreaming={isStreaming}
+            defaultOpen={false}
+            open={isReasoningOpen}
+            onOpenChange={setIsReasoningOpen}
+          >
+            <ReasoningTrigger
+              getThinkingMessage={streaming => {
+                const label =
+                turn.reasoning ? (
+                  streaming ? (
+                    <Shimmer duration={1}>{i18nService.t('codingAgentReasoningActive')}</Shimmer>
+                  ) : (
+                    <span>{i18nService.t('codingAgentReasoningComplete')}</span>
+                  )
+                ) : (
+                  <span>{i18nService.t('codingAgentToolCalls')}</span>
+                );
+                return (
+                  <span className="flex min-w-0 items-center gap-2">
+                    {label}
+                    <TurnExecutionDuration turn={turn} />
+                  </span>
+                );
+              }}
+            />
+            <CollapsibleContent className="theme-reasoning-panel mt-2">
+              <div className="flex min-w-0 flex-col gap-2">
+                {turn.segments.map(segment =>
+                  segment.kind === CodingConversationSegmentKind.Reasoning ? (
+                    <ReasoningContent key={segment.id} className="text-left">
+                      {segment.content}
+                    </ReasoningContent>
+                  ) : (
+                    <div key={segment.activity.id}>{renderActivity(segment.activity)}</div>
+                  ),
+                )}
+              </div>
+            </CollapsibleContent>
+          </Reasoning>
+        )}
 
-      <TurnStatus turn={turn} />
-    </div>
-  </section>
-);
+        {turn.assistantMessages.map(message => {
+          const artifacts = artifactsByMessageId?.get(message.id) ?? [];
+          return (
+            <Message key={message.id} from="assistant" className="animate-message-in">
+              <MessageContent>
+                <MessageResponse isAnimating={isStreaming}>{message.content}</MessageResponse>
+                {artifacts.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {artifacts.map(artifact => (
+                      <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                    ))}
+                  </div>
+                )}
+              </MessageContent>
+            </Message>
+          );
+        })}
+
+        {!hasReasoningGroup && turn.completedAt !== null ? (
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <TurnExecutionDuration turn={turn} />
+          </div>
+        ) : null}
+
+        <TurnStatus turn={turn} />
+      </div>
+    </section>
+  );
+};
 
 const messageContentsEqual = (
   a:
@@ -153,13 +249,36 @@ const reasoningContentsEqual = (
     a.content === b.content &&
     a.createdAt === b.createdAt);
 
+const segmentContentsEqual = (
+  a: CodingConversationTurnModel['segments'][number],
+  b: CodingConversationTurnModel['segments'][number],
+): boolean => {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === CodingConversationSegmentKind.Reasoning && b.kind === a.kind) {
+    return a.id === b.id && a.content === b.content && a.createdAt === b.createdAt;
+  }
+  if (a.kind === CodingConversationSegmentKind.Activity && b.kind === a.kind) {
+    return (
+      a.activity.id === b.activity.id &&
+      a.activity.kind === b.activity.kind &&
+      a.activity.event.kind === b.activity.event.kind &&
+      JSON.stringify(a.activity.event.payload) === JSON.stringify(b.activity.event.payload)
+    );
+  }
+  return false;
+};
+
 const turnContentsEqual = (a: CodingConversationTurnModel, b: CodingConversationTurnModel): boolean =>
   a === b ||
   (a.id === b.id &&
+    a.startedAt === b.startedAt &&
+    a.completedAt === b.completedAt &&
     a.status === b.status &&
     a.statusDetail === b.statusDetail &&
     messageContentsEqual(a.userMessage, b.userMessage) &&
     reasoningContentsEqual(a.reasoning, b.reasoning) &&
+    a.segments.length === b.segments.length &&
+    a.segments.every((segment, index) => segmentContentsEqual(segment, b.segments[index])) &&
     a.assistantMessages.length === b.assistantMessages.length &&
     a.assistantMessages.every((message, index) =>
       messageContentsEqual(message, b.assistantMessages[index]),
@@ -186,6 +305,8 @@ const conversationTurnPropsEqual = (
   prev.showWaitingIndicator === next.showWaitingIndicator &&
   prev.artifactsByMessageId === next.artifactsByMessageId &&
   prev.artifactsByToolCallId === next.artifactsByToolCallId &&
+  prev.expandedActivityIds === next.expandedActivityIds &&
+  prev.onActivityOpenChange === next.onActivityOpenChange &&
   turnContentsEqual(prev.turn, next.turn);
 
 export const CodingConversationTurn = memo(
