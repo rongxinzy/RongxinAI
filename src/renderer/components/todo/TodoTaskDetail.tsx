@@ -12,7 +12,7 @@ import { cn } from '@shared/lib/utils';
 import { CalendarDays, Check, ListChecks, Plus, Star, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
-import { TodoStatus, type Todo, type TodoList } from '../../../shared/todo';
+import { TodoStatus, type Todo, type TodoList, type TodoUpdateInput } from '../../../shared/todo';
 import { i18nService } from '../../services/i18n';
 import { todoService } from '../../services/todo';
 import {
@@ -91,27 +91,48 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
 
   const saveDetails = async (): Promise<void> => {
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) return;
-    const sent = { title: trimmedTitle, note, dueDate, remindAt, listId };
+    if (dirtyFieldsRef.current.has('title') && !trimmedTitle) return;
+    // Send only the fields the user actually edited, with their current local
+    // values. A full-snapshot write here could clobber newer server values for
+    // untouched fields (e.g. an immediate date update from another window).
+    const input: TodoUpdateInput = {};
+    const sent: Partial<Record<'title' | 'note' | 'dueDate' | 'remindAt' | 'listId', string>> = {};
+    if (dirtyFieldsRef.current.has('title')) {
+      input.title = trimmedTitle;
+      sent.title = trimmedTitle;
+    }
+    if (dirtyFieldsRef.current.has('note')) {
+      input.note = note;
+      sent.note = note;
+    }
+    if (dirtyFieldsRef.current.has('dueDate')) {
+      input.dueAt = fromDateInputValue(dueDate);
+      sent.dueDate = dueDate;
+    }
+    if (dirtyFieldsRef.current.has('remindAt')) {
+      input.remindAt = fromDateTimeInputValue(remindAt);
+      sent.remindAt = remindAt;
+    }
+    if (dirtyFieldsRef.current.has('listId')) {
+      input.listId = listId === NO_LIST_VALUE ? null : listId;
+      sent.listId = listId;
+    }
+    if (Object.keys(input).length === 0) return;
     setIsSaving(true);
     try {
-      const result = await todoService.update(todo.id, {
-        title: sent.title,
-        note: sent.note,
-        dueAt: fromDateInputValue(sent.dueDate),
-        remindAt: fromDateTimeInputValue(sent.remindAt),
-        listId: sent.listId === NO_LIST_VALUE ? null : sent.listId,
-      });
+      const result = await todoService.update(todo.id, input);
       if (result.success) {
         // Clear a field's dirty flag only when the user has not edited it
         // again while the save was in flight; otherwise the refresh following
         // this save would revert that newer edit.
         const latest = latestValuesRef.current;
-        if (latest.title.trim() === sent.title) clearDirty('title');
-        if (latest.note === sent.note) clearDirty('note');
-        if (latest.dueDate === sent.dueDate) clearDirty('dueDate');
-        if (latest.remindAt === sent.remindAt) clearDirty('remindAt');
-        if (latest.listId === sent.listId) clearDirty('listId');
+        if (sent.title !== undefined && latest.title.trim() === sent.title) clearDirty('title');
+        if (sent.note !== undefined && latest.note === sent.note) clearDirty('note');
+        if (sent.dueDate !== undefined && latest.dueDate === sent.dueDate) clearDirty('dueDate');
+        if (sent.remindAt !== undefined && latest.remindAt === sent.remindAt) {
+          clearDirty('remindAt');
+        }
+        if (sent.listId !== undefined && latest.listId === sent.listId) clearDirty('listId');
         await onUpdated();
       } else {
         onError();
