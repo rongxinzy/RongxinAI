@@ -12,7 +12,7 @@ import { cn } from '@shared/lib/utils';
 import { CalendarDays, Check, ListChecks, Plus, Star, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
-import { TodoStatus, type Todo, type TodoList } from '../../../shared/todo';
+import { TodoStatus, type Todo, type TodoList, type TodoUpdateInput } from '../../../shared/todo';
 import { i18nService } from '../../services/i18n';
 import { todoService } from '../../services/todo';
 import {
@@ -55,11 +55,23 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   // be silently reverted by every save of another field.
   const dirtyFieldsRef = useRef(new Set<string>());
   const lastTodoIdRef = useRef(todo.id);
+  // Mirror of the newest local values, used to detect edits made while a
+  // save is still in flight.
+  const latestValuesRef = useRef({ title, note, dueDate, remindAt, listId });
+  useEffect(() => {
+    latestValuesRef.current = { title, note, dueDate, remindAt, listId };
+  });
+  // Per-field save sequence: only the response of the newest save for a field
+  // may clear its dirty flag and trigger a refresh, so an out-of-order older
+  // response can never resurface stale values.
+  const fieldSaveSequenceRef = useRef(new Map<string, number>());
+  const saveRequestCounterRef = useRef(0);
 
   useEffect(() => {
     if (lastTodoIdRef.current !== todo.id) {
       lastTodoIdRef.current = todo.id;
       dirtyFieldsRef.current.clear();
+      fieldSaveSequenceRef.current.clear();
       setTitle(todo.title);
       setNote(todo.note);
       setDueDate(toDateInputValue(todo.dueAt));
@@ -85,19 +97,71 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
 
   const saveDetails = async (): Promise<void> => {
     const trimmedTitle = title.trim();
-    if (!trimmedTitle) return;
+    if (dirtyFieldsRef.current.has('title') && !trimmedTitle) return;
+    // Send only the fields the user actually edited, with their current local
+    // values. A full-snapshot write here could clobber newer server values for
+    // untouched fields (e.g. an immediate date update from another window).
+    const request = ++saveRequestCounterRef.current;
+    const input: TodoUpdateInput = {};
+    const sent: Partial<Record<'title' | 'note' | 'dueDate' | 'remindAt' | 'listId', string>> = {};
+    if (dirtyFieldsRef.current.has('title')) {
+      input.title = trimmedTitle;
+      sent.title = trimmedTitle;
+      fieldSaveSequenceRef.current.set('title', request);
+    }
+    if (dirtyFieldsRef.current.has('note')) {
+      input.note = note;
+      sent.note = note;
+      fieldSaveSequenceRef.current.set('note', request);
+    }
+    if (dirtyFieldsRef.current.has('dueDate')) {
+      input.dueAt = fromDateInputValue(dueDate);
+      sent.dueDate = dueDate;
+      fieldSaveSequenceRef.current.set('dueDate', request);
+    }
+    if (dirtyFieldsRef.current.has('remindAt')) {
+      input.remindAt = fromDateTimeInputValue(remindAt);
+      sent.remindAt = remindAt;
+      fieldSaveSequenceRef.current.set('remindAt', request);
+    }
+    if (dirtyFieldsRef.current.has('listId')) {
+      input.listId = listId === NO_LIST_VALUE ? null : listId;
+      sent.listId = listId;
+      fieldSaveSequenceRef.current.set('listId', request);
+    }
+    if (Object.keys(input).length === 0) return;
     setIsSaving(true);
     try {
-      const result = await todoService.update(todo.id, {
-        title: trimmedTitle,
-        note,
-        dueAt: fromDateInputValue(dueDate),
-        remindAt: fromDateTimeInputValue(remindAt),
-        listId: listId === NO_LIST_VALUE ? null : listId,
-      });
+      const result = await todoService.update(todo.id, input);
       if (result.success) {
-        clearDirty('title', 'note', 'dueDate', 'remindAt', 'listId');
-        await onUpdated();
+        // Only the newest save of a field owns its dirty flag and the
+        // follow-up refresh; a superseded response carries stale state.
+        const latest = latestValuesRef.current;
+        let isNewestResponse = false;
+        if (sent.title !== undefined && fieldSaveSequenceRef.current.get('title') === request) {
+          isNewestResponse = true;
+          if (latest.title.trim() === sent.title) clearDirty('title');
+        }
+        if (sent.note !== undefined && fieldSaveSequenceRef.current.get('note') === request) {
+          isNewestResponse = true;
+          if (latest.note === sent.note) clearDirty('note');
+        }
+        if (sent.dueDate !== undefined && fieldSaveSequenceRef.current.get('dueDate') === request) {
+          isNewestResponse = true;
+          if (latest.dueDate === sent.dueDate) clearDirty('dueDate');
+        }
+        if (
+          sent.remindAt !== undefined &&
+          fieldSaveSequenceRef.current.get('remindAt') === request
+        ) {
+          isNewestResponse = true;
+          if (latest.remindAt === sent.remindAt) clearDirty('remindAt');
+        }
+        if (sent.listId !== undefined && fieldSaveSequenceRef.current.get('listId') === request) {
+          isNewestResponse = true;
+          if (latest.listId === sent.listId) clearDirty('listId');
+        }
+        if (isNewestResponse) await onUpdated();
       } else {
         onError();
       }
@@ -185,11 +249,15 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               onChange={event => {
                 markDirty('dueDate');
                 setDueDate(event.target.value);
+                const sentValue = event.target.value;
+                const request = ++saveRequestCounterRef.current;
+                fieldSaveSequenceRef.current.set('dueDate', request);
                 void todoService
-                  .update(todo.id, { dueAt: fromDateInputValue(event.target.value) })
+                  .update(todo.id, { dueAt: fromDateInputValue(sentValue) })
                   .then(result => {
                     if (result.success) {
-                      clearDirty('dueDate');
+                      if (fieldSaveSequenceRef.current.get('dueDate') !== request) return undefined;
+                      if (latestValuesRef.current.dueDate === sentValue) clearDirty('dueDate');
                       return onUpdated();
                     }
                     onError();
@@ -205,11 +273,17 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               onChange={event => {
                 markDirty('remindAt');
                 setRemindAt(event.target.value);
+                const sentValue = event.target.value;
+                const request = ++saveRequestCounterRef.current;
+                fieldSaveSequenceRef.current.set('remindAt', request);
                 void todoService
-                  .update(todo.id, { remindAt: fromDateTimeInputValue(event.target.value) })
+                  .update(todo.id, { remindAt: fromDateTimeInputValue(sentValue) })
                   .then(result => {
                     if (result.success) {
-                      clearDirty('remindAt');
+                      if (fieldSaveSequenceRef.current.get('remindAt') !== request) {
+                        return undefined;
+                      }
+                      if (latestValuesRef.current.remindAt === sentValue) clearDirty('remindAt');
                       return onUpdated();
                     }
                     onError();
@@ -227,11 +301,14 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               const nextListId = value ?? NO_LIST_VALUE;
               markDirty('listId');
               setListId(nextListId);
+              const request = ++saveRequestCounterRef.current;
+              fieldSaveSequenceRef.current.set('listId', request);
               void todoService
                 .update(todo.id, { listId: nextListId === NO_LIST_VALUE ? null : nextListId })
                 .then(result => {
                   if (result.success) {
-                    clearDirty('listId');
+                    if (fieldSaveSequenceRef.current.get('listId') !== request) return undefined;
+                    if (latestValuesRef.current.listId === nextListId) clearDirty('listId');
                     return onUpdated();
                   }
                   onError();
