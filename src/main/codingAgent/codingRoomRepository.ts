@@ -116,7 +116,9 @@ export class CodingRoomRepository {
   /** Stream events whose accumulated payload is newer in memory than in SQLite. */
   private readonly pendingStreamWrites = new Map<string, PendingStreamWrite>();
   private readonly streamFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly streamFlushBackoffMs = new Map<string, number>();
   private static readonly STREAM_FLUSH_THROTTLE_MS = 500;
+  private static readonly STREAM_FLUSH_MAX_BACKOFF_MS = 30_000;
 
   constructor(private readonly db: Database.Database) {}
   listRooms(): CodingRoom[] {
@@ -655,17 +657,24 @@ export class CodingRoomRepository {
     return event;
   }
 
-  private scheduleStreamFlush(laneId: string): void {
+  private scheduleStreamFlush(laneId: string, delayMs?: number): void {
     if (this.streamFlushTimers.has(laneId)) return;
+    const delay = delayMs ?? CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS;
     const timer = setTimeout(() => {
       this.streamFlushTimers.delete(laneId);
       this.flushPendingStreamWrites(laneId);
-    }, CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS);
+    }, delay);
     this.streamFlushTimers.set(laneId, timer);
   }
 
   /** Writes coalesced stream payloads to SQLite; defaults to every lane. */
   flushPendingStreamWrites(laneId?: string): void {
+    const hasPendingFor = (id: string): boolean => {
+      for (const entry of this.pendingStreamWrites.values()) {
+        if (entry.laneId === id) return true;
+      }
+      return false;
+    };
     for (const [key, entry] of this.pendingStreamWrites) {
       if (laneId !== undefined && entry.laneId !== laneId) continue;
       try {
@@ -673,16 +682,37 @@ export class CodingRoomRepository {
           .prepare('UPDATE coding_events SET payload_json = ? WHERE id = ?')
           .run(JSON.stringify(entry.payload), entry.id);
       } catch (error) {
-        // The flush timer can fire after the database was closed (test
-        // teardown); the buffered write is best-effort.
-        console.debug('[CodingRoom] Skipped flushing a stream write:', error);
+        if (!this.db.open) {
+          // The database is closed for good (shutdown, test teardown); the
+          // buffered write can never be persisted again.
+          console.debug('[CodingRoom] Dropped a stream write for a closed database:', error);
+          this.pendingStreamWrites.delete(key);
+          continue;
+        }
+        // Transient failure (busy, lock contention): retain the buffer so no
+        // streamed content is lost, and retry with backoff.
+        console.warn('[CodingRoom] Deferred flushing a stream write:', error);
+        const backoff = Math.min(
+          (this.streamFlushBackoffMs.get(entry.laneId) ?? CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS) *
+            2,
+          CodingRoomRepository.STREAM_FLUSH_MAX_BACKOFF_MS,
+        );
+        this.streamFlushBackoffMs.set(entry.laneId, backoff);
+        this.scheduleStreamFlush(entry.laneId, backoff);
+        continue;
       }
       this.pendingStreamWrites.delete(key);
+      this.streamFlushBackoffMs.delete(entry.laneId);
     }
+    // Keep a lane's retry timer alive while it still has buffered writes.
     if (laneId === undefined) {
-      for (const timer of this.streamFlushTimers.values()) clearTimeout(timer);
-      this.streamFlushTimers.clear();
-    } else {
+      for (const [id, timer] of this.streamFlushTimers) {
+        if (!hasPendingFor(id)) {
+          clearTimeout(timer);
+          this.streamFlushTimers.delete(id);
+        }
+      }
+    } else if (!hasPendingFor(laneId)) {
       const timer = this.streamFlushTimers.get(laneId);
       if (timer) {
         clearTimeout(timer);
@@ -698,6 +728,7 @@ export class CodingRoomRepository {
       if (dropped.has(entry.laneId)) this.pendingStreamWrites.delete(key);
     }
     for (const laneId of laneIds) {
+      this.streamFlushBackoffMs.delete(laneId);
       const timer = this.streamFlushTimers.get(laneId);
       if (timer) {
         clearTimeout(timer);

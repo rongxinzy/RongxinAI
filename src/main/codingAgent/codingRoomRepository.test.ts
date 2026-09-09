@@ -1,4 +1,7 @@
 import Database from 'better-sqlite3';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import path from 'path';
 import { afterEach, expect, test } from 'vitest';
 
 import {
@@ -11,10 +14,15 @@ import { initializeCodingAgentSchema } from './schema';
 import { CodingRoomRepository } from './codingRoomRepository';
 
 let db: Database.Database | undefined;
+const tempDirectories: string[] = [];
 
 afterEach(() => {
   db?.close();
   db = undefined;
+  for (const directory of tempDirectories.splice(0)) {
+    // Windows: a just-closed handle can briefly keep the directory busy.
+    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
 });
 
 test('persists independent mission lanes and append-only events', () => {
@@ -262,4 +270,72 @@ test('deleting a lane drops its buffered stream writes', () => {
   expect(
     db.prepare('SELECT COUNT(*) AS count FROM coding_events WHERE lane_id = ?').get(lane.id),
   ).toEqual({ count: 0 });
+});
+
+test('retains buffered stream writes when the flush hits a locked database', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'coding-stream-flush-'));
+  tempDirectories.push(directory);
+  const dbPath = path.join(directory, 'events.sqlite');
+  const lockedDb = new Database(dbPath, { timeout: 10 });
+  db = lockedDb;
+  initializeCodingAgentSchema(lockedDb);
+  const repository = new CodingRoomRepository(lockedDb);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Locked flush');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'Hel',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'lo',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+
+  const blocker = new Database(dbPath);
+  try {
+    blocker.exec('BEGIN EXCLUSIVE');
+    // SQLITE_BUSY must not discard the buffered content.
+    expect(() => repository.flushPendingStreamWrites()).not.toThrow();
+    blocker.exec('ROLLBACK');
+
+    const staleRow = lockedDb
+      .prepare('SELECT payload_json FROM coding_events WHERE id = ?')
+      .get(
+        repository.listEvents([lane.id])[0].id,
+      ) as { payload_json: string };
+    expect(JSON.parse(staleRow.payload_json).content).toBe('Hel');
+    expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello');
+
+    repository.flushPendingStreamWrites();
+    const flushedRow = lockedDb
+      .prepare('SELECT payload_json FROM coding_events WHERE id = ?')
+      .get(
+        repository.listEvents([lane.id])[0].id,
+      ) as { payload_json: string };
+    expect(JSON.parse(flushedRow.payload_json).content).toBe('Hello');
+  } finally {
+    blocker.close();
+  }
+});
+
+test('flushing against a closed database drops buffered writes without throwing', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'coding-stream-closed-'));
+  tempDirectories.push(directory);
+  db = new Database(path.join(directory, 'events.sqlite'));
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Closed flush');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'partial',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+
+  db.close();
+  expect(() => repository.flushPendingStreamWrites()).not.toThrow();
 });
