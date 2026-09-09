@@ -15,7 +15,6 @@ import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import {
   ProductionLoopMode,
@@ -284,17 +283,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       [currentSession?.experts],
     );
     const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(() =>
-      persistedExpertIds.length > 0
-        ? persistedExpertIds
-        : currentAgent?.source === CoworkSessionExpertSource.Package ||
-            currentAgent?.source === CoworkSessionExpertSource.Member
-          ? [currentAgent.id]
-          : [],
+      persistedExpertIds,
     );
     const [value, setValue] = useState(draftPrompt);
     const [goalMode, setGoalMode] = useState(false);
     const [productionLoopMode, setProductionLoopMode] = useState<ProductionLoopModeValue>(
-      ProductionLoopMode.Auto,
+      ProductionLoopMode.Off,
     );
 
     // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
@@ -436,19 +430,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     // Load skills on mount
     useEffect(() => {
-      setSelectedExpertIds(
-        persistedExpertIds.length > 0
-          ? persistedExpertIds
-          : currentAgent?.source === CoworkSessionExpertSource.Package ||
-              currentAgent?.source === CoworkSessionExpertSource.Member
-            ? [currentAgent.id]
-            : [],
-      );
+      setSelectedExpertIds(persistedExpertIds);
     }, [
       currentSession?.id,
       currentAgentId,
-      currentAgent?.id,
-      currentAgent?.source,
       persistedExpertIds,
     ]);
 
