@@ -158,16 +158,25 @@ export const CodingWorkbenchView = ({
       return;
     }
     let cancelled = false;
-    void window.electron.codingAgent.bootstrap(workspaceRoot).then(result => {
-      if (cancelled) return;
-      if (result.success && result.snapshot) {
-        setSnapshot(result.snapshot);
-        return;
-      }
+    const reportFailure = (message: string | undefined): void => {
       // Without a snapshot the workbench would be stuck on its loading
       // screen forever, so surface the failure with a retry.
-      setBootstrapError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    });
+      setBootstrapError(message ?? i18nService.t('codingAgentActionFailed'));
+    };
+    void window.electron.codingAgent
+      .bootstrap(workspaceRoot)
+      .then(result => {
+        if (cancelled) return;
+        if (result.success && result.snapshot) {
+          setSnapshot(result.snapshot);
+          return;
+        }
+        reportFailure(result.error);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        reportFailure(error instanceof Error ? error.message : undefined);
+      });
     const unsubscribe = window.electron.codingAgent.onChanged(next => {
       if (next.room.workspaceRoot === workspaceRoot) setSnapshot(next);
     });
