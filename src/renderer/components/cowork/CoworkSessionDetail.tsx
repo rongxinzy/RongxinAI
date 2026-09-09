@@ -1016,6 +1016,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     return null;
   }
 
+  const hideDefaultAssistantHeader = currentSession.mode === CoworkSessionMode.Chat;
+
   const renderConversationTurns = () => {
     if (turns.length === 0) {
       if (!isStreaming) return null;
@@ -1032,6 +1034,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             toolActivities={toolActivities}
             showCopyButtons={!isStreaming}
             isTurnComplete={false}
+            hideDefaultAssistantHeader={hideDefaultAssistantHeader}
           />
         </div>
       );
@@ -1084,6 +1087,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 resumeTaskId={resumeTaskId}
                 onResumeTask={onResumeTask ? handleResumeTask : undefined}
                 expandToolResults={isExportingImage}
+                hideDefaultAssistantHeader={hideDefaultAssistantHeader}
               />
             </div>
           )}
