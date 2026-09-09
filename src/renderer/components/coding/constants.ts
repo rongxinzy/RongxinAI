@@ -68,6 +68,13 @@ export const CodingSidePanelView = {
 } as const;
 export type CodingSidePanelView = (typeof CodingSidePanelView)[keyof typeof CodingSidePanelView];
 
+export const CodingWorkspaceFileView = {
+  Preview: 'preview',
+  Code: 'code',
+} as const;
+export type CodingWorkspaceFileView =
+  (typeof CodingWorkspaceFileView)[keyof typeof CodingWorkspaceFileView];
+
 export const CodingGitQuickActionMode = {
   Environment: 'environment',
   Commit: 'commit',

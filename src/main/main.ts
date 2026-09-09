@@ -124,7 +124,7 @@ import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
 } from './libs/anysearchGatewayCredentials';
-import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
+import { APP_DATA_DIR_NAME, APP_NAME, APP_USER_MODEL_ID, DB_FILENAME } from './appConstants';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
@@ -305,6 +305,7 @@ import {
 // 设置应用程序名称
 app.name = APP_NAME;
 app.setName(APP_NAME);
+if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
 
 protocol.registerSchemesAsPrivileged([
   {
