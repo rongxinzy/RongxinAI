@@ -33,3 +33,9 @@ export const isScratchWorkspacePath = (rawPath: string): boolean => {
   const normalized = rawPath.trim().replace(/[\\/]+$/, '');
   return /[\\/]\.zhiyuan[\\/]scratch$/i.test(normalized);
 };
+
+export const getWorkspaceDisplayName = (
+  path: string,
+  name: string,
+  defaultWorkspaceLabel: string,
+): string => (isScratchWorkspacePath(path) ? defaultWorkspaceLabel : name);

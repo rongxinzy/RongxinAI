@@ -71,6 +71,7 @@ import type {
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
 import type { CodingRoomSnapshot } from '../../shared/codingAgent';
+import type { WeixinLoginErrorCode } from '../../shared/ipc/channels';
 
 interface CodingAgentActionResult {
   success: boolean;
@@ -1264,13 +1265,13 @@ interface IElectronAPI {
       status?: 'wait';
       qrcode?: string;
       qrcodeUrl?: string;
-      message?: string;
+      errorCode?: WeixinLoginErrorCode;
     }>;
     weixinLoginPoll: (qrcode: string) => Promise<{
       success: boolean;
       status: 'wait' | 'scaned' | 'confirmed' | 'expired';
       accountId?: string;
-      message?: string;
+      errorCode?: WeixinLoginErrorCode;
     }>;
     addQQInstance: (
       name: string,
