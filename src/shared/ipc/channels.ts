@@ -284,6 +284,12 @@ export const WeixinInstallIpc = {
 } as const;
 export type WeixinInstallIpc = (typeof WeixinInstallIpc)[keyof typeof WeixinInstallIpc];
 
+export const WeixinLoginErrorCode = {
+  Setup: 'setup',
+  Transport: 'transport',
+} as const;
+export type WeixinLoginErrorCode = (typeof WeixinLoginErrorCode)[keyof typeof WeixinLoginErrorCode];
+
 // ─── IM Multi-Instance factories ────────────────────────────────────────────
 export const ImInstanceIpc = {
   dingtalkAdd: 'im:dingtalk:instance:add',
