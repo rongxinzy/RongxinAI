@@ -90,6 +90,7 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
+            vendor/rtk-runtime
           key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
@@ -114,6 +115,8 @@ jobs:
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
           bun run engram:runtime:${{ matrix.runtime_target }}
+      - name: Set up RTK runtime
+        run: bun run rtk:runtime:${{ matrix.runtime_target }}
       - name: Build macOS
         if: ${{ matrix.platform == 'macos' }}
         run: bun run dist:mac
@@ -134,6 +137,9 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify packaged RTK runtime
+        shell: bash
+        run: node scripts/ci/verify-packaged-rtk-runtime.mjs
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell

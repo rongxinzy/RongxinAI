@@ -26,6 +26,7 @@ vendor/openclaw-plugins/
 vendor/channel-runtime/
 vendor/llamacpp-runtime/
 vendor/engram-runtime/
+vendor/rtk-runtime/
 
 # Tar archives generated during Windows packaging
 build-tar/

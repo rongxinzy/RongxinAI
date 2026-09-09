@@ -88,6 +88,11 @@
       "from": "vendor/engram-runtime/current",
       "to": "memory",
       "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
+    },
+    {
+      "from": "vendor/rtk-runtime/current",
+      "to": "rtk-runtime",
+      "filter": ["rtk", "rtk.exe", "runtime-build-info.json", "LICENSE"]
     }
   ],
   "protocols": [

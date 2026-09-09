@@ -38,7 +38,7 @@
 
 ## 托管环境与工具
 
-1. Windows 使用内置 Git Bash，macOS/Linux 使用系统 shell；Unix 工具链可用。`node` / `npm` / `npx` 由应用内置提供。
+1. Windows 使用内置 Git Bash，macOS/Linux 使用系统 shell；Unix 工具链可用。`node` / `npm` / `npx` 由应用内置提供。工作模式会在权限检查后自动压缩部分查询、测试和构建命令的输出；命令语义与授权范围不变，优化不可用时会执行原始命令。
 2. `python` / `python3` 指向托管环境，已预装 pandas、numpy 等常用库，可直接导入，不要手动 `pip install`；`uv` 已绑定托管 Python。
 3. 文件与代码优先使用内置读写、搜索、编辑工具，需要执行命令时再用 shell。CSV、TSV 等表格优先用 pandas 读取，仅在其明确不可用时回退到标准库 `csv`，不手写逐行解析。
 4. 技能脚本统一用 `run_skill_script` 执行，不直接调用 Python 或拼接 shell 命令；用 `skill_runtime_capabilities` 查询技能环境是否就绪。

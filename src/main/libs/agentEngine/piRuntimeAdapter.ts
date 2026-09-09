@@ -143,6 +143,8 @@ import {
   type PiExtensionApi,
   type PiExtensionFactory,
 } from './piExtensionTypes';
+import { createPiRtkCommandRewriteExtension } from './piRtkCommandRewrite';
+import { resolvePiRtkRuntimePaths } from './piRtkRuntimePaths';
 import { extractPiSubagentExecutionMetadata } from './piSubagentExecution';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
@@ -855,15 +857,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         typeof resolvedModel.model.contextWindow === 'number'
           ? resolvedModel.model.contextWindow
           : undefined;
-      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
-        sessionId,
-        getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-        settingsManager,
-        getApprovalMode: () =>
-          this.activeSessions.get(sessionId)?.approvalMode ??
-          options.approvalMode ??
-          WorkbenchApprovalMode.Ask,
-      });
+      const rtkRuntimePaths = resolvePiRtkRuntimePaths();
+      const rtkCommandRewriteExtension = rtkRuntimePaths
+        ? createPiRtkCommandRewriteExtension({
+            sessionMode:
+              options.sessionMode === CoworkSessionMode.Chat
+                ? CoworkSessionMode.Chat
+                : CoworkSessionMode.Work,
+            cwd: workspaceRoot,
+            ...rtkRuntimePaths,
+          })
+        : null;
+      const resourceLoader = await this.createPiResourceLoader(
+        pi,
+        workspaceRoot,
+        resourceState,
+        {
+          sessionId,
+          getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
+          settingsManager,
+          getApprovalMode: () =>
+            this.activeSessions.get(sessionId)?.approvalMode ??
+            options.approvalMode ??
+            WorkbenchApprovalMode.Ask,
+        },
+        rtkCommandRewriteExtension ? [rtkCommandRewriteExtension] : [],
+      );
       this.applyPiCompactionOverrides(settingsManager, contextWindowTokens);
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;

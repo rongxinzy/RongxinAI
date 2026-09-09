@@ -37,6 +37,7 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
+            vendor/rtk-runtime
           key: windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             windows-installer-node24-bun1.4.0-
@@ -47,6 +48,7 @@ jobs:
           bun run setup:uv-runtime
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
+          bun run rtk:runtime:win-x64
       - name: Build complete offline installer
         # Keep a stuck packager observable and fail it before the job-level
         # timeout so the diagnostics upload below still gets a chance to run.
@@ -76,6 +78,9 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
+      - name: Verify packaged RTK runtime
+        shell: bash
+        run: node scripts/ci/verify-packaged-rtk-runtime.mjs
       - name: Verify cold install, cache-hit upgrade, and uninstall
         shell: powershell
         run: >-
@@ -93,6 +98,7 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
+            vendor/rtk-runtime
           key: ${{ steps.packaging-cache.outputs.cache-primary-key }}
       - name: Collect installer diagnostics
         if: ${{ failure() }}
