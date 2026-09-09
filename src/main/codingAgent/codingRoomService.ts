@@ -1434,6 +1434,7 @@ export class CodingRoomService extends EventEmitter {
 
   async dispose(): Promise<void> {
     this.isDisposed = true;
+    this.repository.flushPendingStreamWrites();
     await Promise.all([...this.drivers.values()].map(driver => driver.dispose()));
     this.drivers.clear();
     this.driverProfileIds.clear();
