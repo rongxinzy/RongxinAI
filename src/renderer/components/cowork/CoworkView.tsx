@@ -364,7 +364,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
-    productionLoopMode: ProductionLoopModeValue = ProductionLoopMode.Auto,
+    productionLoopMode: ProductionLoopModeValue = ProductionLoopMode.Off,
   ): Promise<boolean | void> => {
     console.log('[CoworkView] handleStartSession: imageAttachments diagnosis', {
       hasImageAttachments: !!imageAttachments,
@@ -943,7 +943,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
-    productionLoopMode: ProductionLoopModeValue = ProductionLoopMode.Auto,
+    productionLoopMode: ProductionLoopModeValue = ProductionLoopMode.Off,
   ) => {
     if (!currentSession) return;
     if (taskResume.interruption) {
