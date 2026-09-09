@@ -18,6 +18,7 @@ import {
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import { getWorkspaceDisplayName } from '../../utils/path';
 import {
   AnimatedFolderOpenIcon,
   type AnimatedFolderOpenIconHandle,
@@ -452,7 +453,11 @@ const WorkspaceNode = ({
             className="min-w-0 flex-1 truncate text-muted-foreground"
             title={workspace.primaryRoot}
           >
-            {workspace.name}
+            {getWorkspaceDisplayName(
+              workspace.primaryRoot,
+              workspace.name,
+              i18nService.t('defaultConversation'),
+            )}
           </span>
         </Button>
         <div className="flex h-7 shrink-0 items-center gap-0.5 pr-1.5">

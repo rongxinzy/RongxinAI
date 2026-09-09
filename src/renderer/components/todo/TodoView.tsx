@@ -246,6 +246,12 @@ const TodoView: React.FC<TodoViewProps> = ({
 
   const focusNewTodoInput = (): void => {
     setIsMobileNavigationOpen(false);
+    if (activeView === TodoViewFilter.Completed) {
+      // The Completed view has no create-task input; route the request to All
+      // where the input exists instead of doing nothing.
+      setActiveView(TodoViewFilter.All);
+      setActiveListId(null);
+    }
     window.setTimeout(() => document.getElementById('todo-new-input')?.focus(), 0);
   };
 
