@@ -11,6 +11,7 @@ import type { Workspace } from '@shared/workspace';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { getWorkspaceDisplayName } from '../../utils/path';
 
 interface ChannelWorkspaceFieldProps {
   accountId: string;
@@ -27,12 +28,16 @@ export const ChannelWorkspaceField: React.FC<ChannelWorkspaceFieldProps> = ({
 }) => {
   const inputId = `channel-workspace-${accountId}`;
   const visibleWorkspaces = workspaces.filter(workspace => !workspace.isHidden);
+  const defaultWorkspaceLabel = i18nService.t('defaultConversation');
   // Base UI resolves the trigger's selected label from the root `items` map, not
   // from the popup items — without it the trigger shows the raw workspace id.
   // Include hidden workspaces so an existing selection still shows its name;
   // only visible workspaces are offered in the popup below.
   const workspaceLabels = Object.fromEntries(
-    workspaces.map(workspace => [workspace.id, workspace.name]),
+    workspaces.map(workspace => [
+      workspace.id,
+      getWorkspaceDisplayName(workspace.path, workspace.name, defaultWorkspaceLabel),
+    ]),
   );
 
   return (
@@ -50,7 +55,7 @@ export const ChannelWorkspaceField: React.FC<ChannelWorkspaceFieldProps> = ({
           <SelectGroup>
             {visibleWorkspaces.map(workspace => (
               <SelectItem key={workspace.id} value={workspace.id}>
-                {workspace.name}
+                {getWorkspaceDisplayName(workspace.path, workspace.name, defaultWorkspaceLabel)}
               </SelectItem>
             ))}
           </SelectGroup>

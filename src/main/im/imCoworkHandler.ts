@@ -9,6 +9,7 @@ import { type CoworkError, CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
+import type { Platform } from '../../shared/platform';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
 import type { ActivityService } from '../activity/activityService';
 import { t } from '../i18n';
@@ -25,7 +26,17 @@ import {
   type ParsedIMScheduledTaskRequest,
 } from './imScheduledTaskHandler';
 import type { IMStore } from './imStore';
-import type { IMMediaAttachment, IMMessage, IMSessionMapping, Platform } from './types';
+import type { IMMediaAttachment, IMMessage, IMSessionMapping } from './types';
+
+const IM_SESSION_TITLE_PLATFORM_KEY = {
+  weixin: 'channelPrefixWeixin',
+  dingtalk: 'channelPrefixDingtalk',
+  feishu: 'channelPrefixFeishu',
+  wecom: 'channelPrefixWecom',
+  qq: 'channelPrefixQq',
+  telegram: 'channelPrefixTelegram',
+  discord: 'channelPrefixDiscord',
+} as const satisfies Record<Platform, string>;
 
 interface MessageAccumulator {
   runId: string;
@@ -127,8 +138,32 @@ export class IMCoworkHandler extends EventEmitter {
       if (!session) {
         continue;
       }
+      this.migrateLegacySessionTitle(
+        session.id,
+        session.title,
+        mapping.platform,
+        session.titleUserRenamed,
+      );
       this.trackSessionMapping(mapping);
     }
+  }
+
+  private migrateLegacySessionTitle(
+    sessionId: string,
+    title: string,
+    platform: Platform,
+    titleUserRenamed: boolean,
+  ): void {
+    if (titleUserRenamed) return;
+    const platformName = t(IM_SESSION_TITLE_PLATFORM_KEY[platform]);
+    const defaultTitle = t('channelConversationFallback', { channel: platformName });
+    if (title === defaultTitle) return;
+
+    this.coworkStore.updateSession(
+      sessionId,
+      { title: defaultTitle },
+      { touchUpdatedAt: false },
+    );
   }
 
   private trackSessionMapping(mapping: IMSessionMapping): void {
@@ -388,8 +423,6 @@ export class IMCoworkHandler extends EventEmitter {
     return this.createCoworkSessionForConversation(
       imConversationId,
       platform,
-      senderId,
-      message,
       workspaceId,
     );
   }
@@ -397,13 +430,11 @@ export class IMCoworkHandler extends EventEmitter {
   private async createCoworkSessionForConversation(
     imConversationId: string,
     platform: Platform,
-    senderId?: string,
-    message?: IMMessage,
     workspaceId?: string,
   ): Promise<string> {
     // Create new Cowork session
     const config = this.coworkStore.getConfig();
-    const title = this.buildSessionTitle(platform, imConversationId, senderId, message);
+    const title = this.buildSessionTitle(platform);
     const systemPrompt = await this.buildSystemPromptWithSkills();
     const workspace = workspaceId ? this.coworkStore.getWorkspace(workspaceId) : null;
     if (!workspace) throw new Error('Channel account workspace is not configured');
@@ -430,20 +461,10 @@ export class IMCoworkHandler extends EventEmitter {
     return session.id;
   }
 
-  /**
-   * Build a human-readable session title based on platform and sender identity.
-   *
-   */
-  private buildSessionTitle(
-    platform: Platform,
-    _imConversationId: string,
-    senderId?: string,
-    message?: IMMessage,
-  ): string {
-    void _imConversationId;
-    void senderId;
-    void message;
-    return `IM-${platform}-${Date.now()}`;
+  /** IM routing identities never become user-visible session titles. */
+  private buildSessionTitle(platform: Platform): string {
+    const platformName = t(IM_SESSION_TITLE_PLATFORM_KEY[platform]);
+    return t('channelConversationFallback', { channel: platformName });
   }
 
   private async buildSystemPromptWithSkills(): Promise<string> {

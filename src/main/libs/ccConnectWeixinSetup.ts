@@ -1,5 +1,7 @@
 import { spawn } from 'child_process';
 
+import { looksLikeTransportErrorText } from './sanitizeForLog';
+
 export type WeixinSetupResult = {
   status: 'wait' | 'scaned' | 'confirmed' | 'expired';
   qrcode?: string;
@@ -8,6 +10,15 @@ export type WeixinSetupResult = {
   botToken?: string;
   baseUrl?: string;
 };
+
+export function isWeixinSetupTransportError(error: unknown): boolean {
+  return error instanceof Error && looksLikeTransportErrorText(error.message);
+}
+
+export function formatWeixinSetupErrorForLog(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/([?&]qrcode=)[^&\s"']+/gi, '$1[redacted]');
+}
 
 export async function runCcConnectWeixinSetup(
   executable: string,

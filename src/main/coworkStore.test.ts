@@ -50,6 +50,7 @@ function setupDb(): void {
     CREATE TABLE IF NOT EXISTS cowork_sessions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      title_user_renamed INTEGER NOT NULL DEFAULT 0,
       claude_session_id TEXT,
       status TEXT NOT NULL DEFAULT 'idle',
       mode TEXT NOT NULL DEFAULT 'work',

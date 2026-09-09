@@ -5,9 +5,20 @@ import { CheckCircle, QrCode, TriangleAlert } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useRef, useState } from 'react';
 
+import { WeixinLoginErrorCode } from '@shared/ipc/channels';
+
 import { i18nService } from '../../services/i18n';
 
 type LoginState = 'idle' | 'loading' | 'showing' | 'scaned' | 'success' | 'error';
+
+const WEIXIN_QR_POLL_RETRY_LIMIT = 2;
+const WEIXIN_QR_POLL_INTERVAL_MS = 2_000;
+
+function getWeixinLoginErrorMessage(errorCode?: WeixinLoginErrorCode): string {
+  return i18nService.t(
+    errorCode === WeixinLoginErrorCode.Transport ? 'imWeixinQrNetworkFailed' : 'imWeixinQrFailed',
+  );
+}
 
 export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<void> }): React.JSX.Element {
   const [state, setState] = useState<LoginState>('idle');
@@ -24,7 +35,7 @@ export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<v
     const result = await window.electron.im.weixinLoginStart();
     if (!result.success || !result.qrcode || !result.qrcodeUrl) {
       setState('error');
-      setError(result.message || i18nService.t('imWeixinQrFailed'));
+      setError(getWeixinLoginErrorMessage(result.errorCode));
       return;
     }
     setQrcodeUrl(result.qrcodeUrl);
@@ -34,12 +45,21 @@ export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<v
   };
 
   const pollLogin = async (qrcode: string): Promise<void> => {
+    let transportRetryCount = 0;
     while (pollingRef.current) {
       const result = await window.electron.im.weixinLoginPoll(qrcode);
       if (!pollingRef.current) return;
       if (!result.success) {
+        if (
+          result.errorCode === WeixinLoginErrorCode.Transport
+          && transportRetryCount < WEIXIN_QR_POLL_RETRY_LIMIT
+        ) {
+          transportRetryCount += 1;
+          await new Promise(resolve => setTimeout(resolve, WEIXIN_QR_POLL_INTERVAL_MS));
+          continue;
+        }
         setState('error');
-        setError(result.message || i18nService.t('imWeixinQrFailed'));
+        setError(getWeixinLoginErrorMessage(result.errorCode));
         pollingRef.current = false;
         return;
       }
@@ -56,7 +76,7 @@ export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<v
         await onConfirmed();
         return;
       }
-      await new Promise(resolve => setTimeout(resolve, 2_000));
+      await new Promise(resolve => setTimeout(resolve, WEIXIN_QR_POLL_INTERVAL_MS));
     }
   };
 

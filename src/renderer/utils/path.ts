@@ -29,7 +29,14 @@ export const getCompactFolderName = (rawPath: string, maxLength?: number): strin
  * `project:ensureScratchDir` IPC (`<home>/.zhiyuan/scratch`). Used to display
  * that workspace as 「无项目」 instead of its folder basename.
  */
-export const isScratchWorkspacePath = (rawPath: string): boolean => {
+export const isScratchWorkspacePath = (rawPath: string | undefined): boolean => {
+  if (!rawPath) return false;
   const normalized = rawPath.trim().replace(/[\\/]+$/, '');
   return /[\\/]\.zhiyuan[\\/]scratch$/i.test(normalized);
 };
+
+export const getWorkspaceDisplayName = (
+  path: string,
+  name: string,
+  defaultWorkspaceLabel: string,
+): string => (isScratchWorkspacePath(path) ? defaultWorkspaceLabel : name);

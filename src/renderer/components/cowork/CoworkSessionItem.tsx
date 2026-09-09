@@ -36,34 +36,6 @@ const statusLabels: Record<CoworkSessionStatus, string> = {
   error: 'coworkStatusError',
 };
 
-const channelTitlePlatforms: Record<string, string> = {
-  飞书: 'feishu',
-  Feishu: 'feishu',
-  钉钉: 'dingtalk',
-  DingTalk: 'dingtalk',
-  企业微信: 'wecom',
-  WeCom: 'wecom',
-  微信: 'weixin',
-  WeChat: 'weixin',
-  QQ: 'qq',
-  TG: 'telegram',
-  Telegram: 'telegram',
-  Discord: 'discord',
-};
-
-const formatSessionTitle = (title: string): string => {
-  const match = /^\[([^\]]+)]\s+(.+)$/.exec(title);
-  if (!match) return title;
-
-  const platform = channelTitlePlatforms[match[1]];
-  if (!platform) return title;
-
-  return i18nService
-    .t('channelConversationTitle')
-    .replace('{channel}', i18nService.t(platform))
-    .replace('{id}', match[2]);
-};
-
 const formatRelativeTime = (timestamp: number): { compact: string; full: string } => {
   const now = Date.now();
   const diff = Math.max(0, now - timestamp);
@@ -208,7 +180,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
   const renameLabel = i18nService.t('renameConversation');
   const deleteLabel = i18nService.t('deleteSession');
   const relativeTime = formatRelativeTime(session.updatedAt);
-  const displayTitle = formatSessionTitle(session.title);
+  const displayTitle = session.title;
   const showRunningIndicator = session.status === 'running';
   const showPendingPermission = hasPendingPermission;
   const showUnreadIndicator = !showRunningIndicator && hasUnread;

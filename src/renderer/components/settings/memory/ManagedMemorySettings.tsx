@@ -47,6 +47,7 @@ import {
 import { i18nService } from '../../../services/i18n';
 import { memoryService } from '../../../services/memory';
 import type { RootState } from '../../../store';
+import { getWorkspaceDisplayName } from '../../../utils/path';
 import { ManagedMemoryView } from './constants';
 import { MemoryRecordList } from './MemoryRecordList';
 import { collectMemorySourceSessionIds, countManagedMemories } from './memoryViewModel';
@@ -90,7 +91,15 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
   const workspaceOptions = useMemo(() => {
     const options = workspaces
       .filter(workspace => !workspace.isHidden)
-      .map(workspace => ({ id: workspace.id, name: workspace.name, path: workspace.path }));
+      .map(workspace => ({
+        id: workspace.id,
+        name: getWorkspaceDisplayName(
+          workspace.path,
+          workspace.name,
+          i18nService.t('defaultConversation'),
+        ),
+        path: workspace.path,
+      }));
     const configuredPath = workingDirectory.trim();
     if (configuredPath && !options.some(option => option.path === configuredPath)) {
       options.push({ id: configuredPath, name: configuredPath, path: configuredPath });

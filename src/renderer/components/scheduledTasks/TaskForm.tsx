@@ -30,7 +30,11 @@ import type {
 import type { Workspace } from '../../../shared/workspace';
 import { CoworkSessionSource } from '../../../shared/cowork/constants';
 import { i18nService } from '../../services/i18n';
-import { getLastPathSegment } from '../../utils/path';
+import {
+  getLastPathSegment,
+  getWorkspaceDisplayName,
+  isScratchWorkspacePath,
+} from '../../utils/path';
 import { coworkService } from '../../services/cowork';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
@@ -82,7 +86,11 @@ const createInitialFormState = (
 };
 
 const getWorkspaceFolderName = (workspace: Workspace): string => {
-  return getLastPathSegment(workspace.path) || workspace.name;
+  return getWorkspaceDisplayName(
+    workspace.path,
+    getLastPathSegment(workspace.path) || workspace.name,
+    i18nService.t('defaultConversation'),
+  );
 };
 
 const TaskForm: React.FC<TaskFormProps> = ({
@@ -321,7 +329,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
         return {
           value: workspace.id,
           label:
-            (counts.get(folderName) ?? 0) > 1
+            !isScratchWorkspacePath(workspace.path) && (counts.get(folderName) ?? 0) > 1
               ? `${folderName} (${workspace.name})`
               : folderName,
         };

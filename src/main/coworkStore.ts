@@ -419,6 +419,7 @@ export interface CoworkConversationReplacementEntry {
 export interface CoworkSession {
   id: string;
   title: string;
+  titleUserRenamed: boolean;
   claudeSessionId: string | null;
   status: CoworkSessionStatus;
   mode?: 'work' | 'chat';
@@ -759,8 +760,8 @@ export class CoworkStore {
     if (!workspace) throw new Error('Workspace not found');
 
     const insertSession = this.db.prepare(`
-      INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, pinned, source, created_at, updated_at)
-      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+      INSERT INTO cowork_sessions (id, title, title_user_renamed, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, pinned, source, created_at, updated_at)
+      VALUES (?, ?, 0, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `);
     const insertExpert = this.db.prepare(`
       INSERT INTO cowork_session_experts
@@ -803,6 +804,7 @@ export class CoworkStore {
     return {
       id: sessionId,
       title,
+      titleUserRenamed: false,
       claudeSessionId: null,
       status: 'idle',
       mode,
@@ -837,6 +839,7 @@ export class CoworkStore {
     interface SessionRow {
       id: string;
       title: string;
+      title_user_renamed?: number | null;
       claude_session_id: string | null;
       status: string;
       mode: string | null;
@@ -856,7 +859,7 @@ export class CoworkStore {
 
     const row = this.getOne<SessionRow>(
       `
-      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, source, created_at, updated_at
+      SELECT id, title, title_user_renamed, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, source, created_at, updated_at
       FROM cowork_sessions
       WHERE id = ?
     `,
@@ -947,6 +950,7 @@ export class CoworkStore {
     return {
       id: row.id,
       title: row.title,
+      titleUserRenamed: Boolean(row.title_user_renamed),
       claudeSessionId: row.claude_session_id,
       status: row.status as CoworkSessionStatus,
       mode: (row.mode as 'work' | 'chat') || 'work',
@@ -989,7 +993,7 @@ export class CoworkStore {
         | 'activeSkillIds'
       >
     >,
-    options: { touchUpdatedAt?: boolean } = {},
+    options: { touchUpdatedAt?: boolean; userInitiatedTitleChange?: boolean } = {},
   ): void {
     const setClauses: string[] = [];
     const values: (string | number | null)[] = [];
@@ -1002,6 +1006,9 @@ export class CoworkStore {
     if (updates.title !== undefined) {
       setClauses.push('title = ?');
       values.push(updates.title);
+      if (options.userInitiatedTitleChange) {
+        setClauses.push('title_user_renamed = 1');
+      }
     }
     if (updates.claudeSessionId !== undefined) {
       setClauses.push('claude_session_id = ?');

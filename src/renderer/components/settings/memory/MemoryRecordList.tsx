@@ -730,20 +730,17 @@ function sourceLabel(
       const sessionTitle = sessionTitles.get(record.promotionSourceSessionId)?.trim();
       return i18nService
         .t('managedMemoryPromotedFromSession')
-        .replace('{name}', sessionTitle || shortenIdentifier(record.promotionSourceSessionId));
+        .replace(
+          '{name}',
+          sessionTitle || i18nService.t('managedMemorySourceUnavailable'),
+        );
     }
     return i18nService.t('managedMemoryPromotedFromWorkspace');
   }
   const sourceSessionId = record.sessionId;
   const sessionTitle = sessionTitles.get(sourceSessionId)?.trim();
   if (sessionTitle) return sessionTitle;
-  return sourceSessionId
-    ? shortenIdentifier(sourceSessionId)
-    : i18nService.t('managedMemorySourceUnavailable');
-}
-
-function shortenIdentifier(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+  return i18nService.t('managedMemorySourceUnavailable');
 }
 
 function formatDate(value: string): string {

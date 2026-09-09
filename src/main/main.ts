@@ -75,6 +75,7 @@ import {
   ManagedProviderIpc,
   ProjectIpc,
   SkillsIpc,
+  WeixinLoginErrorCode,
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
@@ -238,7 +239,11 @@ import { listCcConnectAccountConfigs } from './libs/ccConnectAccountConfig';
 import { resolveCcConnectAccountRuntimeStatus } from './libs/ccConnectAccountRuntimeStatus';
 import { CcConnectRuntimeStatusRegistry } from './libs/ccConnectRuntimeStatusRegistry';
 import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
-import { runCcConnectWeixinSetup } from './libs/ccConnectWeixinSetup';
+import {
+  formatWeixinSetupErrorForLog,
+  isWeixinSetupTransportError,
+  runCcConnectWeixinSetup,
+} from './libs/ccConnectWeixinSetup';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
@@ -4362,7 +4367,11 @@ if (!gotTheLock) {
           return { success: false, error: 'Title is required' };
         }
         const coworkStoreInstance = getCoworkStore();
-        coworkStoreInstance.updateSession(options.sessionId, { title });
+        coworkStoreInstance.updateSession(
+          options.sessionId,
+          { title },
+          { userInitiatedTitleChange: true },
+        );
         return { success: true };
       } catch (error) {
         return {
@@ -5246,9 +5255,15 @@ if (!gotTheLock) {
         qrcodeUrl: result.qrcodeUrl,
       };
     } catch (error) {
+      const errorCode = isWeixinSetupTransportError(error)
+        ? WeixinLoginErrorCode.Transport
+        : WeixinLoginErrorCode.Setup;
+      console.warn(
+        `[WeixinLogin] QR code setup failed with ${errorCode}: ${formatWeixinSetupErrorForLog(error)}`,
+      );
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to start Weixin setup',
+        errorCode,
       };
     }
   });
@@ -5280,10 +5295,16 @@ if (!gotTheLock) {
         accountId: result.status === 'confirmed' ? result.accountId : undefined,
       };
     } catch (error) {
+      const errorCode = isWeixinSetupTransportError(error)
+        ? WeixinLoginErrorCode.Transport
+        : WeixinLoginErrorCode.Setup;
+      console.warn(
+        `[WeixinLogin] QR code polling failed with ${errorCode}: ${formatWeixinSetupErrorForLog(error)}`,
+      );
       return {
         success: false,
         status: 'wait',
-        message: error instanceof Error ? error.message : 'Failed to poll Weixin setup',
+        errorCode,
       };
     }
   });
