@@ -167,6 +167,7 @@ type AnimatedIconHandle = {
 
 export type SettingsOpenOptions = {
   initialTab?: SettingsTabType;
+  initialProvider?: ProviderType;
   notice?: string;
   noticeI18nKey?: string;
   noticeExtra?: string;
@@ -652,6 +653,7 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
 const Settings: React.FC<SettingsProps> = ({
   onClose,
   initialTab,
+  initialProvider,
   notice,
   noticeI18nKey,
   noticeExtra,
@@ -754,7 +756,12 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   // Add state for active provider
-  const [activeProvider, setActiveProvider] = useState<ProviderType>(getDefaultActiveProvider());
+  const [activeProvider, setActiveProvider] = useState<ProviderType>(
+    initialProvider ?? getDefaultActiveProvider(),
+  );
+  const [isInitialProviderPending, setIsInitialProviderPending] = useState(
+    Boolean(initialProvider),
+  );
   const [showApiKey, setShowApiKey] = useState(false);
 
   // MiniMax OAuth state
@@ -1038,7 +1045,7 @@ const Settings: React.FC<SettingsProps> = ({
           });
 
         // Set up providers based on saved config
-        if (config.api) {
+        if (!initialProvider && config.api) {
           // For backward compatibility with older config
           // Initialize active provider based on baseUrl
           const normalizedApiBaseUrl = config.api.baseUrl.toLowerCase();
@@ -1186,7 +1193,7 @@ const Settings: React.FC<SettingsProps> = ({
             const firstEnabledProvider = providerKeys.find(providerKey =>
               isProviderEnabled(providerKey, merged[providerKey]),
             );
-            if (firstEnabledProvider) {
+            if (!initialProvider && firstEnabledProvider) {
               setActiveProvider(firstEnabledProvider);
             }
 
@@ -1227,13 +1234,17 @@ const Settings: React.FC<SettingsProps> = ({
         if (active) {
           setError('Failed to load settings');
         }
+      } finally {
+        if (active) {
+          setIsInitialProviderPending(false);
+        }
       }
     })();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialProvider]);
 
   useEffect(() => {
     const handleLlamaCppRunningModelsChanged = () => {
@@ -1333,6 +1344,7 @@ const Settings: React.FC<SettingsProps> = ({
       // enabled or configured it. Disabled preset providers must not appear
       // as a lone entry in the provider list.
       if (
+        initialProvider === activeProvider ||
         isProviderEnabled(activeProvider, activeConfig) ||
         hasProviderAuthConfigured(activeProvider, activeConfig)
       ) {
@@ -1340,10 +1352,11 @@ const Settings: React.FC<SettingsProps> = ({
       }
     }
     return filtered as ProvidersConfig;
-  }, [activeProvider, language, providers]);
+  }, [activeProvider, initialProvider, language, providers]);
 
   // Ensure activeProvider is always in visibleProviders when language changes
   useEffect(() => {
+    if (isInitialProviderPending) return;
     const visibleKeys = Object.keys(visibleProviders) as ProviderType[];
     if (visibleKeys.length > 0 && !visibleKeys.includes(activeProvider)) {
       // If current activeProvider is not visible, switch to first visible provider
@@ -1352,7 +1365,7 @@ const Settings: React.FC<SettingsProps> = ({
       );
       setActiveProvider(firstEnabledVisible ?? visibleKeys[0]);
     }
-  }, [visibleProviders, activeProvider]);
+  }, [activeProvider, isInitialProviderPending, visibleProviders]);
 
   // Handle adding a new custom provider
   const handleAddCustomProvider = () => {
@@ -4639,11 +4652,12 @@ const Settings: React.FC<SettingsProps> = ({
                                 className={cn(
                                   'h-1.5 w-1.5 shrink-0 rounded-full',
                                   getModelConnectionStatus(activeProvider, model.id) ===
-                                    ModelConnectionStatus.Success
-                                    ? 'bg-success'
-                                    : getModelConnectionStatus(activeProvider, model.id) ===
-                                        ModelConnectionStatus.Failure
-                                      ? 'bg-destructive'
+                                  ModelConnectionStatus.Failure
+                                    ? 'bg-destructive'
+                                    : activeProvider === ProviderName.LlamaCpp ||
+                                        getModelConnectionStatus(activeProvider, model.id) ===
+                                          ModelConnectionStatus.Success
+                                      ? 'bg-success'
                                       : 'bg-muted-foreground',
                                 )}
                               />

@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate/constants';
+import { ProviderName } from '../shared/providers';
 import {
   ManagedProviderAccessMode,
   type ManagedProviderAccessPolicy,
@@ -132,6 +133,7 @@ const App: React.FC = () => {
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
+  const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const [bootScreenVisible, setBootScreenVisible] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
@@ -463,10 +465,41 @@ const App: React.FC = () => {
   const handleShowSettings = useCallback((options?: SettingsOpenOptions) => {
     setSettingsOptions({
       initialTab: options?.initialTab,
+      initialProvider: options?.initialProvider,
       notice: options?.notice,
     });
     setShowSettings(true);
   }, []);
+
+  const handleOpenLocalModelSettings = useCallback(async () => {
+    try {
+      const config = await configService.reload();
+      const providers = config.providers ?? defaultConfig.providers;
+      const localProvider = providers?.[ProviderName.LlamaCpp];
+      if (
+        localProvider &&
+        (localProvider.enabled !== true || localProvider.userEnabled !== true)
+      ) {
+        await configService.updateConfig({
+          providers: {
+            ...providers,
+            [ProviderName.LlamaCpp]: {
+              ...localProvider,
+              enabled: true,
+              userEnabled: true,
+            },
+          },
+        });
+      }
+    } catch (error) {
+      console.error('[App] failed to enable the local model provider before opening settings:', error);
+    } finally {
+      handleShowSettings({
+        initialTab: 'model',
+        initialProvider: ProviderName.LlamaCpp,
+      });
+    }
+  }, [handleShowSettings]);
 
   const handleShowSkills = useCallback(() => {
     setMainView('skills');
@@ -498,6 +531,7 @@ const App: React.FC = () => {
 
   const handleShowLocalInference = useCallback(() => {
     if (managedModelsOnly) return;
+    setLocalInferenceRefreshRequestId(current => current + 1);
     setMainView('localInference');
   }, [managedModelsOnly]);
 
@@ -886,6 +920,7 @@ const App: React.FC = () => {
                 <Settings
                   onClose={handleCloseSettings}
                   initialTab={settingsOptions.initialTab}
+                  initialProvider={settingsOptions.initialProvider}
                   notice={settingsOptions.notice}
                   enterpriseConfig={enterpriseConfig}
                   appUpdateState={appUpdateState}
@@ -951,11 +986,12 @@ const App: React.FC = () => {
                       <LocalInferenceView
                         installRequestId={localInferenceInstallRequestId}
                         onInstallRequestHandled={handleLocalInferenceInstallRequestHandled}
+                        refreshRequestId={localInferenceRefreshRequestId}
                         isSidebarCollapsed={isSidebarCollapsed}
                         isVisible={mainView === 'localInference'}
                         onToggleSidebar={handleToggleSidebar}
                         onNewChat={handleNewChat}
-                        onOpenModelSettings={() => handleShowSettings({ initialTab: 'model' })}
+                        onOpenModelSettings={handleOpenLocalModelSettings}
                         updateBadge={null}
                       />
                     </React.Suspense>
@@ -1068,6 +1104,7 @@ const App: React.FC = () => {
               <Settings
                 onClose={handleCloseSettings}
                 initialTab={settingsOptions.initialTab}
+                initialProvider={settingsOptions.initialProvider}
                 notice={settingsOptions.notice}
                 enterpriseConfig={enterpriseConfig}
                 appUpdateState={appUpdateState}
