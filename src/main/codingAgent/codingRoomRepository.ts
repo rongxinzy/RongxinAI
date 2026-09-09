@@ -82,7 +82,44 @@ const rowWorkspaceSource = (row: Record<string, unknown>): CodingWorkspaceSource
   isPrimary: Boolean(row.is_primary),
 });
 
+/**
+ * A stream chunk whose DB row exists but whose payload is newer in memory.
+ * Writes are coalesced so the per-chunk hot path never touches SQLite.
+ */
+interface PendingStreamWrite {
+  laneId: string;
+  id: string;
+  sequence: number;
+  kind: CodingEvent['kind'];
+  createdAt: number;
+  payload: Record<string, unknown>;
+}
+
+const mergeStreamPayload = (
+  kind: CodingEvent['kind'],
+  previousPayload: Record<string, unknown>,
+  payload: Record<string, unknown>,
+): Record<string, unknown> => {
+  if (kind === CodingEventKind.ToolCall) {
+    return { ...previousPayload, ...payload };
+  }
+  const content =
+    payload.streamUpdateMode === CodingStreamUpdateMode.Replace
+      ? payload.content
+      : `${typeof previousPayload.content === 'string' ? previousPayload.content : ''}${
+          typeof payload.content === 'string' ? payload.content : ''
+        }`;
+  return { ...previousPayload, ...payload, content };
+};
+
 export class CodingRoomRepository {
+  /** Stream events whose accumulated payload is newer in memory than in SQLite. */
+  private readonly pendingStreamWrites = new Map<string, PendingStreamWrite>();
+  private readonly streamFlushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly streamFlushBackoffMs = new Map<string, number>();
+  private static readonly STREAM_FLUSH_THROTTLE_MS = 500;
+  private static readonly STREAM_FLUSH_MAX_BACKOFF_MS = 30_000;
+
   constructor(private readonly db: Database.Database) {}
   listRooms(): CodingRoom[] {
     return (
@@ -210,6 +247,7 @@ export class CodingRoomRepository {
   deleteWorkspace(roomId: string): void {
     const missionIds = this.listMissions(roomId).map(mission => mission.id);
     const laneIds = this.listLanes(missionIds).map(lane => lane.id);
+    this.dropPendingStreamWrites(laneIds);
     const remove = this.db.transaction(() => {
       if (laneIds.length) {
         const laneMarks = laneIds.map(() => '?').join(',');
@@ -294,7 +332,7 @@ export class CodingRoomRepository {
   listEvents(laneIds: string[]): CodingEvent[] {
     if (!laneIds.length) return [];
     const marks = laneIds.map(() => '?').join(',');
-    return (
+    const events = (
       this.db
         .prepare(
           `SELECT * FROM coding_events WHERE lane_id IN (${marks}) ORDER BY lane_id, sequence`,
@@ -308,6 +346,27 @@ export class CodingRoomRepository {
       payload: JSON.parse(String(row.payload_json)) as Record<string, unknown>,
       createdAt: Number(row.created_at),
     }));
+    // Overlay coalesced streams so readers observe the newest in-memory
+    // payload even before the throttled flush has run.
+    for (const entry of this.pendingStreamWrites.values()) {
+      if (!laneIds.includes(entry.laneId)) continue;
+      const index = events.findIndex(event => event.id === entry.id);
+      const projected: CodingEvent = {
+        id: entry.id,
+        laneId: entry.laneId,
+        sequence: entry.sequence,
+        kind: entry.kind,
+        payload: entry.payload,
+        createdAt: entry.createdAt,
+      };
+      if (index >= 0) events[index] = projected;
+      else events.push(projected);
+    }
+    return events.sort((left, right) =>
+      left.laneId === right.laneId
+        ? left.sequence - right.sequence
+        : left.laneId.localeCompare(right.laneId),
+    );
   }
   createMission(roomId: string, title: string, gitBaseline: string | null = null): CodingMission {
     const now = Date.now();
@@ -337,6 +396,7 @@ export class CodingRoomRepository {
   }
   deleteMission(roomId: string, missionId: string): void {
     const laneIds = this.listLanes([missionId]).map(lane => lane.id);
+    this.dropPendingStreamWrites(laneIds);
     const remove = this.db.transaction(() => {
       if (laneIds.length) {
         const marks = laneIds.map(() => '?').join(',');
@@ -357,6 +417,7 @@ export class CodingRoomRepository {
     remove();
   }
   deleteLane(roomId: string, laneId: string): void {
+    this.dropPendingStreamWrites([laneId]);
     const remove = this.db.transaction(() => {
       this.db.prepare('DELETE FROM coding_events WHERE lane_id = ?').run(laneId);
       this.db.prepare('DELETE FROM coding_assignments WHERE lane_id = ?').run(laneId);
@@ -540,44 +601,140 @@ export class CodingRoomRepository {
     if (!streamId || (kind !== CodingEventKind.MessageDelta && kind !== CodingEventKind.ToolCall)) {
       return this.appendEvent(laneId, kind, payload);
     }
+    const key = `${laneId}:${kind}:${streamId}`;
+    const pending = this.pendingStreamWrites.get(key);
+    if (pending) {
+      // Hot path: accumulate in memory only; SQLite is updated by the
+      // throttled flush, so per-chunk cost does not grow with the message.
+      pending.payload = mergeStreamPayload(kind, pending.payload, payload);
+      this.scheduleStreamFlush(laneId);
+      return {
+        id: pending.id,
+        laneId,
+        sequence: pending.sequence,
+        kind,
+        payload: pending.payload,
+        createdAt: pending.createdAt,
+      };
+    }
     const payloadIdPath = kind === CodingEventKind.MessageDelta ? '$.messageId' : '$.toolCallId';
     const previous = this.db
       .prepare(
         `SELECT * FROM coding_events WHERE lane_id = ? AND kind = ? AND json_extract(payload_json, '${payloadIdPath}') = ? ORDER BY sequence DESC LIMIT 1`,
       )
       .get(laneId, kind, streamId) as Record<string, unknown> | undefined;
-    if (!previous) return this.appendEvent(laneId, kind, payload);
-    const previousPayload = JSON.parse(String(previous.payload_json)) as Record<string, unknown>;
-    if (kind === CodingEventKind.ToolCall) {
-      const event = {
-        id: String(previous.id),
+    if (previous) {
+      // The stream row already exists (written before this process saw it);
+      // take it over and continue merging in memory.
+      const event: PendingStreamWrite = {
         laneId,
+        id: String(previous.id),
         sequence: Number(previous.sequence),
         kind,
-        payload: { ...previousPayload, ...payload },
         createdAt: Number(previous.created_at),
-      } satisfies CodingEvent;
-      this.db
-        .prepare('UPDATE coding_events SET payload_json = ? WHERE id = ?')
-        .run(JSON.stringify(event.payload), event.id);
-      return event;
+        payload: mergeStreamPayload(
+          kind,
+          JSON.parse(String(previous.payload_json)) as Record<string, unknown>,
+          payload,
+        ),
+      };
+      this.pendingStreamWrites.set(key, event);
+      this.scheduleStreamFlush(laneId);
+      return { ...event };
     }
-    const content =
-      payload.streamUpdateMode === CodingStreamUpdateMode.Replace
-        ? payload.content
-        : `${typeof previousPayload.content === 'string' ? previousPayload.content : ''}${typeof payload.content === 'string' ? payload.content : ''}`;
-    const event = {
-      id: String(previous.id),
+    // First chunk of a new stream: write through so the row and its sequence
+    // exist, then keep merging subsequent chunks in memory.
+    const event = this.appendEvent(laneId, kind, payload);
+    this.pendingStreamWrites.set(key, {
       laneId,
-      sequence: Number(previous.sequence),
+      id: event.id,
+      sequence: event.sequence,
       kind,
-      payload: { ...previousPayload, ...payload, content },
-      createdAt: Number(previous.created_at),
-    } satisfies CodingEvent;
-    this.db
-      .prepare('UPDATE coding_events SET payload_json = ? WHERE id = ?')
-      .run(JSON.stringify(event.payload), event.id);
+      createdAt: event.createdAt,
+      payload: event.payload,
+    });
+    this.scheduleStreamFlush(laneId);
     return event;
+  }
+
+  private scheduleStreamFlush(laneId: string, delayMs?: number): void {
+    if (this.streamFlushTimers.has(laneId)) return;
+    const delay = delayMs ?? CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS;
+    const timer = setTimeout(() => {
+      this.streamFlushTimers.delete(laneId);
+      this.flushPendingStreamWrites(laneId);
+    }, delay);
+    this.streamFlushTimers.set(laneId, timer);
+  }
+
+  /** Writes coalesced stream payloads to SQLite; defaults to every lane. */
+  flushPendingStreamWrites(laneId?: string): void {
+    const hasPendingFor = (id: string): boolean => {
+      for (const entry of this.pendingStreamWrites.values()) {
+        if (entry.laneId === id) return true;
+      }
+      return false;
+    };
+    for (const [key, entry] of this.pendingStreamWrites) {
+      if (laneId !== undefined && entry.laneId !== laneId) continue;
+      try {
+        this.db
+          .prepare('UPDATE coding_events SET payload_json = ? WHERE id = ?')
+          .run(JSON.stringify(entry.payload), entry.id);
+      } catch (error) {
+        if (!this.db.open) {
+          // The database is closed for good (shutdown, test teardown); the
+          // buffered write can never be persisted again.
+          console.debug('[CodingRoom] Dropped a stream write for a closed database:', error);
+          this.pendingStreamWrites.delete(key);
+          continue;
+        }
+        // Transient failure (busy, lock contention): retain the buffer so no
+        // streamed content is lost, and retry with backoff.
+        console.warn('[CodingRoom] Deferred flushing a stream write:', error);
+        const backoff = Math.min(
+          (this.streamFlushBackoffMs.get(entry.laneId) ?? CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS) *
+            2,
+          CodingRoomRepository.STREAM_FLUSH_MAX_BACKOFF_MS,
+        );
+        this.streamFlushBackoffMs.set(entry.laneId, backoff);
+        this.scheduleStreamFlush(entry.laneId, backoff);
+        continue;
+      }
+      this.pendingStreamWrites.delete(key);
+      this.streamFlushBackoffMs.delete(entry.laneId);
+    }
+    // Keep a lane's retry timer alive while it still has buffered writes.
+    if (laneId === undefined) {
+      for (const [id, timer] of this.streamFlushTimers) {
+        if (!hasPendingFor(id)) {
+          clearTimeout(timer);
+          this.streamFlushTimers.delete(id);
+        }
+      }
+    } else if (!hasPendingFor(laneId)) {
+      const timer = this.streamFlushTimers.get(laneId);
+      if (timer) {
+        clearTimeout(timer);
+        this.streamFlushTimers.delete(laneId);
+      }
+    }
+  }
+
+  private dropPendingStreamWrites(laneIds: string[]): void {
+    if (!laneIds.length) return;
+    const dropped = new Set(laneIds);
+    for (const [key, entry] of this.pendingStreamWrites) {
+      if (dropped.has(entry.laneId)) this.pendingStreamWrites.delete(key);
+    }
+    for (const laneId of laneIds) {
+      this.streamFlushBackoffMs.delete(laneId);
+      const timer = this.streamFlushTimers.get(laneId);
+      if (timer) {
+        clearTimeout(timer);
+        this.streamFlushTimers.delete(laneId);
+      }
+    }
   }
   updateLaneStatus(laneId: string, status: CodingLaneStatus): void {
     this.db

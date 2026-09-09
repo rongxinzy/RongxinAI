@@ -93,6 +93,7 @@ export class SqliteStore {
       CREATE TABLE IF NOT EXISTS cowork_sessions (
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
+        title_user_renamed INTEGER NOT NULL DEFAULT 0,
         claude_session_id TEXT,
         status TEXT NOT NULL DEFAULT 'idle',
         pinned INTEGER NOT NULL DEFAULT 0,
@@ -281,6 +282,13 @@ export class SqliteStore {
 
       if (!colNames.includes('execution_mode')) {
         this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN execution_mode TEXT;');
+        this.didRunMigration = true;
+      }
+
+      if (!colNames.includes('title_user_renamed')) {
+        this.db.exec(
+          'ALTER TABLE cowork_sessions ADD COLUMN title_user_renamed INTEGER NOT NULL DEFAULT 0;',
+        );
         this.didRunMigration = true;
       }
 

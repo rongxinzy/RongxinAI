@@ -117,10 +117,13 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
-  ipcMain.handle(CodingAgentIpc.Bootstrap, (_event, workspaceRoot: string) => ({
-    success: true,
-    snapshot: service.bootstrap(workspaceRoot),
-  }));
+  ipcMain.handle(CodingAgentIpc.Bootstrap, (_event, workspaceRoot: string) => {
+    try {
+      return { success: true, snapshot: service.bootstrap(workspaceRoot) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle(
     CodingAgentIpc.PrepareLane,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {
