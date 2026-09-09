@@ -498,7 +498,7 @@ const ModelCard = memo(function ModelCard({
         )}
       >
         {loadingModel || unloading ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/80 backdrop-blur-[1px]">
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/80 backdrop-blur-[1px]">
             <Button
               type="button"
               disabled
@@ -520,9 +520,32 @@ const ModelCard = memo(function ModelCard({
               </span>
             </Button>
             {loadingModel ? (
-              <Button type="button" size="lg" variant="outline" onClick={handleOpenLaunchLog}>
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                className="pointer-events-auto"
+                onClick={handleOpenLaunchLog}
+              >
                 <ScrollText data-icon="inline-start" />
                 {i18nService.t('localInferenceModelLaunchLogAction')}
+              </Button>
+            ) : null}
+            {loadingModel ? (
+              <Button
+                type="button"
+                size="lg"
+                variant="destructive"
+                className="pointer-events-auto"
+                disabled={cancellingModelLoad}
+                data-local-inference-cancel-load-button="true"
+                onClick={() => onCancelModelLoad(model.name)}
+              >
+                {i18nService.t(
+                  cancellingModelLoad
+                    ? 'localInferenceModelCancelling'
+                    : 'localInferenceCancelModelLoad',
+                )}
               </Button>
             ) : null}
           </div>
@@ -636,22 +659,7 @@ const ModelCard = memo(function ModelCard({
               ))}
             </div>
             <div className="flex shrink-0 items-center">
-              {loadingModel ? (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="min-w-16"
-                  disabled={cancellingModelLoad}
-                  data-local-inference-cancel-load-button="true"
-                  onClick={() => onCancelModelLoad(model.name)}
-                >
-                  {i18nService.t(
-                    cancellingModelLoad
-                      ? 'localInferenceModelCancelling'
-                      : 'localInferenceCancelModelLoad',
-                  )}
-                </Button>
-              ) : isRunning ? (
+              {loadingModel ? null : isRunning ? (
                 <Button
                   type="button"
                   variant="destructive"
