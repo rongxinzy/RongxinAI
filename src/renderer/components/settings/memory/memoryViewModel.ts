@@ -4,6 +4,7 @@ import {
   MemoryScope,
   MemorySummaryFormat,
   type ManagedMemoryRecord,
+  parseMemoryTimestamp,
 } from '../../../../shared/memory';
 import {
   ManagedMemoryScopeFilter,
@@ -29,8 +30,11 @@ export interface ManagedMemoryCounts {
 export function countManagedMemories(records: ManagedMemoryRecord[]): ManagedMemoryCounts {
   return records.reduce<ManagedMemoryCounts>(
     (counts, record) => {
-      if (record.scope === MemoryScope.Session) counts.session += 1;
-      else counts.longTerm += 1;
+      if (record.scope === MemoryScope.Session) {
+        if (isCurrentSessionSummary(record)) counts.session += 1;
+      } else {
+        counts.longTerm += 1;
+      }
       return counts;
     },
     { longTerm: 0, session: 0 },
@@ -71,8 +75,20 @@ export function filterAndSortManagedMemories(
 
 function matchesView(record: ManagedMemoryRecord, view: ManagedMemoryViewValue): boolean {
   return view === ManagedMemoryView.Session
-    ? record.scope === MemoryScope.Session
+    ? record.scope === MemoryScope.Session && isCurrentSessionSummary(record)
     : record.scope !== MemoryScope.Session;
+}
+
+/**
+ * The session view is a read-only projection with no status filter, so it only
+ * shows the current summary of each session; superseded generations stay in the
+ * database for auditing but are not listed here.
+ */
+function isCurrentSessionSummary(record: ManagedMemoryRecord): boolean {
+  return (
+    record.status === MemoryLifecycleStatus.Active ||
+    record.status === MemoryLifecycleStatus.NeedsReview
+  );
 }
 
 function matchesScope(
@@ -115,7 +131,7 @@ function compareManagedMemories(left: ManagedMemoryRecord, right: ManagedMemoryR
   if (deliveryDifference !== 0) return deliveryDifference;
   const lifecycleDifference = lifecyclePriority(left) - lifecyclePriority(right);
   if (lifecycleDifference !== 0) return lifecycleDifference;
-  return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+  return parseMemoryTimestamp(right.updatedAt) - parseMemoryTimestamp(left.updatedAt);
 }
 
 function deliveryPriority(record: ManagedMemoryRecord): number {

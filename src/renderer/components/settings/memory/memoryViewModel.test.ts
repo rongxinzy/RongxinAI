@@ -21,6 +21,7 @@ import {
   filterAndSortManagedMemories,
   isLegacySessionSummaryAwaitingUpgrade,
 } from './memoryViewModel';
+import { parseMemoryTimestamp } from '../../../../shared/memory/timestamps';
 
 function record(id: string, overrides: Partial<ManagedMemoryRecord> = {}): ManagedMemoryRecord {
   return {
@@ -153,4 +154,54 @@ test('prioritizes propagation issues, review candidates, then recent active memo
       query: '',
     }).map(item => item.id),
   ).toEqual(['pending', 'review', 'newer-active', 'older-active']);
+});
+
+test('treats legacy SQLite timestamps as UTC when sorting', () => {
+  expect(parseMemoryTimestamp('2026-09-09 11:14:18')).toBe(
+    Date.parse('2026-09-09T11:14:18Z'),
+  );
+  expect(parseMemoryTimestamp('2026-09-09T11:14:18.684Z')).toBe(
+    Date.parse('2026-09-09T11:14:18.684Z'),
+  );
+  expect(parseMemoryTimestamp('not-a-date')).toBeNaN();
+
+  const records = [
+    // Legacy format written by datetime('now'): 11:14:18 UTC, later than the
+    // ISO-Z row's 11:10:34 UTC even though string comparison suggests otherwise.
+    record('legacy-format', { updatedAt: '2026-09-09 11:14:18' }),
+    record('iso-format', { updatedAt: '2026-09-09T11:10:34.000Z' }),
+  ];
+
+  expect(
+    filterAndSortManagedMemories(records, {
+      view: ManagedMemoryView.LongTerm,
+      scope: ManagedMemoryScopeFilter.All,
+      status: ManagedMemoryStatusFilter.All,
+      query: '',
+    }).map(item => item.id),
+  ).toEqual(['legacy-format', 'iso-format']);
+});
+
+test('session view lists only the current summary of each session', () => {
+  const records = [
+    record('superseded', {
+      scope: MemoryScope.Session,
+      status: MemoryLifecycleStatus.Superseded,
+    }),
+    record('archived', {
+      scope: MemoryScope.Session,
+      status: MemoryLifecycleStatus.Archived,
+    }),
+    record('current', { scope: MemoryScope.Session }),
+  ];
+
+  expect(countManagedMemories(records)).toEqual({ longTerm: 0, session: 1 });
+  expect(
+    filterAndSortManagedMemories(records, {
+      view: ManagedMemoryView.Session,
+      scope: ManagedMemoryScopeFilter.All,
+      status: ManagedMemoryStatusFilter.All,
+      query: '',
+    }).map(item => item.id),
+  ).toEqual(['current']);
 });

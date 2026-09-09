@@ -55,6 +55,7 @@ import {
   MemorySensitivity,
   MemorySourceKind,
   type ManagedMemoryRecord,
+  parseMemoryTimestamp,
 } from '../../../../shared/memory';
 import { i18nService } from '../../../services/i18n';
 import OverflowingSessionTitle from '../../agentSidebar/OverflowingSessionTitle';
@@ -744,10 +745,10 @@ function sourceLabel(
 }
 
 function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  const timestamp = parseMemoryTimestamp(value);
+  if (Number.isNaN(timestamp)) return value;
   return new Intl.DateTimeFormat(i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(date);
+  }).format(new Date(timestamp));
 }
