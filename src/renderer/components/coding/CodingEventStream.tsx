@@ -11,7 +11,7 @@ import {
   EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Code2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { CodingEvent } from '../../../shared/codingAgent';
@@ -108,6 +108,17 @@ export const CodingEventStream = ({
 }: CodingEventStreamProps) => {
   const dispatch = useDispatch();
   const turns = useMemo(() => projectCodingEvents(events), [events]);
+  const [expandedActivityIds, setExpandedActivityIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const setActivityOpen = (activityId: string, open: boolean) => {
+    setExpandedActivityIds(current => {
+      const next = new Set(current);
+      if (open) next.add(activityId);
+      else next.delete(activityId);
+      return next;
+    });
+  };
   const artifacts = useSelector((state: RootState) =>
     artifactSessionKey ? selectSessionArtifacts(state, artifactSessionKey) : undefined,
   );
@@ -220,11 +231,12 @@ export const CodingEventStream = ({
                   turn.userMessage !== null &&
                   turn.reasoning === null &&
                   turn.activities.length === 0 &&
-                  turn.assistantMessages.length === 0 &&
                   turn.status === null
                 }
                 artifactsByMessageId={artifactsByMessageId}
                 artifactsByToolCallId={artifactsByToolCallId}
+                expandedActivityIds={expandedActivityIds}
+                onActivityOpenChange={setActivityOpen}
               />
             ))
           )}

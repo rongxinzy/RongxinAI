@@ -88,6 +88,7 @@ const TurnBlockComponent: React.FC<{
   recoverableTaskId?: string | null;
   resumeTaskId?: string | null;
   onResumeTask?: (interruption: CoworkSessionInterruption) => void;
+  hideDefaultAssistantHeader?: boolean;
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
 }> = ({
@@ -102,10 +103,12 @@ const TurnBlockComponent: React.FC<{
   recoverableTaskId,
   resumeTaskId,
   onResumeTask,
+  hideDefaultAssistantHeader = false,
   expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
   const primaryExpert = getTurnPrimaryExpert(turn);
+  const showAssistantHeader = Boolean(primaryExpert) || !hideDefaultAssistantHeader;
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
@@ -431,20 +434,22 @@ const TurnBlockComponent: React.FC<{
       <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 py-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              {primaryExpert ? (
-                <>
-                  <ExpertAvatar
-                    name={primaryExpert.presetId}
-                    label={primaryExpert.expertName}
-                    className="size-7 rounded-full border-0"
-                  />
-                  <span className="truncate">{primaryExpert.expertName}</span>
-                </>
-              ) : (
-                <span>{i18nService.t('cowork')}</span>
-              )}
-            </div>
+            {showAssistantHeader && (
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                {primaryExpert ? (
+                  <>
+                    <ExpertAvatar
+                      name={primaryExpert.presetId}
+                      label={primaryExpert.expertName}
+                      className="size-7 rounded-full border-0"
+                    />
+                    <span className="truncate">{primaryExpert.expertName}</span>
+                  </>
+                ) : (
+                  <span>{i18nService.t('cowork')}</span>
+                )}
+              </div>
+            )}
             {finalAnswerItem && executionItems.length > 0 && (
               <ExecutionSummary summary={executionSummary} persistKey={`execsummary-${turn.id}`}>
                 {executionItems.map((item, index) => {

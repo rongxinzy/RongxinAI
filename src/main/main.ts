@@ -75,6 +75,7 @@ import {
   ManagedProviderIpc,
   ProjectIpc,
   SkillsIpc,
+  WeixinLoginErrorCode,
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
@@ -123,7 +124,7 @@ import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
 } from './libs/anysearchGatewayCredentials';
-import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
+import { APP_DATA_DIR_NAME, APP_NAME, APP_USER_MODEL_ID, DB_FILENAME } from './appConstants';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
@@ -238,7 +239,11 @@ import { listCcConnectAccountConfigs } from './libs/ccConnectAccountConfig';
 import { resolveCcConnectAccountRuntimeStatus } from './libs/ccConnectAccountRuntimeStatus';
 import { CcConnectRuntimeStatusRegistry } from './libs/ccConnectRuntimeStatusRegistry';
 import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
-import { runCcConnectWeixinSetup } from './libs/ccConnectWeixinSetup';
+import {
+  formatWeixinSetupErrorForLog,
+  isWeixinSetupTransportError,
+  runCcConnectWeixinSetup,
+} from './libs/ccConnectWeixinSetup';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
@@ -289,6 +294,7 @@ import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { StartupProfiler } from './startupProfiler';
 import { createTray, destroyTray, updateTrayMenu } from './trayManager';
+import { registerContextMenu } from './contextMenu';
 import {
   AppWindowStoreKey,
   MIN_APP_WINDOW_HEIGHT,
@@ -300,6 +306,7 @@ import {
 // 设置应用程序名称
 app.name = APP_NAME;
 app.setName(APP_NAME);
+if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -4362,7 +4369,11 @@ if (!gotTheLock) {
           return { success: false, error: 'Title is required' };
         }
         const coworkStoreInstance = getCoworkStore();
-        coworkStoreInstance.updateSession(options.sessionId, { title });
+        coworkStoreInstance.updateSession(
+          options.sessionId,
+          { title },
+          { userInitiatedTitleChange: true },
+        );
         return { success: true };
       } catch (error) {
         return {
@@ -5246,9 +5257,15 @@ if (!gotTheLock) {
         qrcodeUrl: result.qrcodeUrl,
       };
     } catch (error) {
+      const errorCode = isWeixinSetupTransportError(error)
+        ? WeixinLoginErrorCode.Transport
+        : WeixinLoginErrorCode.Setup;
+      console.warn(
+        `[WeixinLogin] QR code setup failed with ${errorCode}: ${formatWeixinSetupErrorForLog(error)}`,
+      );
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Failed to start Weixin setup',
+        errorCode,
       };
     }
   });
@@ -5280,10 +5297,16 @@ if (!gotTheLock) {
         accountId: result.status === 'confirmed' ? result.accountId : undefined,
       };
     } catch (error) {
+      const errorCode = isWeixinSetupTransportError(error)
+        ? WeixinLoginErrorCode.Transport
+        : WeixinLoginErrorCode.Setup;
+      console.warn(
+        `[WeixinLogin] QR code polling failed with ${errorCode}: ${formatWeixinSetupErrorForLog(error)}`,
+      );
       return {
         success: false,
         status: 'wait',
-        message: error instanceof Error ? error.message : 'Failed to poll Weixin setup',
+        errorCode,
       };
     }
   });
@@ -6557,6 +6580,7 @@ if (!gotTheLock) {
 
     // 禁用窗口菜单
     mainWindow.setMenu(null);
+    const unregisterContextMenu = registerContextMenu(mainWindow);
 
     // 处理 window.open 请求（企微 SDK 授权弹窗等）
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -6676,6 +6700,7 @@ if (!gotTheLock) {
 
     // 当窗口关闭时，清除引用
     mainWindow.on('closed', () => {
+      unregisterContextMenu();
       if (windowStateSaveTimer) {
         clearTimeout(windowStateSaveTimer);
         windowStateSaveTimer = null;

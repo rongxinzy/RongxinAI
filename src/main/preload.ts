@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { CoworkError } from '../common/coworkError';
+import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
 import type { ProductionLoopMode } from '../shared/productionLoop';
@@ -13,6 +14,7 @@ import {
   AppConfigIpc,
   AppIpc,
   CommunityAuthIpc,
+  ContextMenuIpc,
   CoworkBootstrapIpc,
   CoworkConfigIpc,
   CoworkPermissionIpc,
@@ -354,6 +356,12 @@ contextBridge.exposeInMainWorld('electron', {
   appEvents: {
     onOpenSettings: (callback: () => void) => onPushVoid('app:openSettings', callback),
     onNewTask: (callback: () => void) => onPushVoid('app:newTask', callback),
+  },
+
+  contextMenu: {
+    execute: (action: ContextMenuAction) => ipcRenderer.send(ContextMenuIpc.Execute, action),
+    onOpen: (callback: (event: ContextMenuOpenEvent) => void) =>
+      onPush<ContextMenuOpenEvent>(ContextMenuIpc.Open, callback),
   },
 
   window: {
@@ -727,6 +735,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.ListWorkspaceFiles, input),
     readWorkspaceFile: (input: import('../shared/codingAgent').CodingWorkspaceFileInput) =>
       ipcRenderer.invoke(CodingAgentIpc.ReadWorkspaceFile, input),
+    writeWorkspaceFile: (input: import('../shared/codingAgent').CodingWorkspaceFileWriteInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.WriteWorkspaceFile, input),
     discoverAgents: (input: { workspaceRoot: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.DiscoverAgents, input),
     probeAgent: (input: { workspaceRoot: string; profileId: string }) =>

@@ -20,6 +20,7 @@ const TRANSPORT_ERROR_TEXT_PATTERNS = [
   /connection refused/i,
   /connection reset/i,
   /timed out/i,
+  /\bEOF\b/i,
   /certificate/i,
   /tls/i,
 ] as const;

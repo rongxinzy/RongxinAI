@@ -1,6 +1,7 @@
 import type { CoworkError } from '../../common/coworkError';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ActivityRun } from '../../shared/activity/types';
+import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
   CoworkPermissionMode,
@@ -71,6 +72,7 @@ import type {
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
 import type { CodingRoomSnapshot } from '../../shared/codingAgent';
+import type { WeixinLoginErrorCode } from '../../shared/ipc/channels';
 
 interface CodingAgentActionResult {
   success: boolean;
@@ -676,6 +678,10 @@ interface IElectronAPI {
     onOpenSettings: (callback: () => void) => () => void;
     onNewTask: (callback: () => void) => () => void;
   };
+  contextMenu: {
+    execute: (action: ContextMenuAction) => void;
+    onOpen: (callback: (event: ContextMenuOpenEvent) => void) => () => void;
+  };
   window: {
     minimize: () => void;
     toggleMaximize: () => void;
@@ -1102,6 +1108,13 @@ interface IElectronAPI {
       file?: import('../../shared/codingAgent').CodingWorkspaceFileContent;
       error?: string;
     }>;
+    writeWorkspaceFile: (
+      input: import('../../shared/codingAgent').CodingWorkspaceFileWriteInput,
+    ) => Promise<{
+      success: boolean;
+      file?: import('../../shared/codingAgent').CodingWorkspaceFileContent;
+      error?: string;
+    }>;
     discoverAgents: (input: { workspaceRoot: string }) => Promise<CodingAgentActionResult>;
     probeAgent: (input: {
       workspaceRoot: string;
@@ -1264,13 +1277,13 @@ interface IElectronAPI {
       status?: 'wait';
       qrcode?: string;
       qrcodeUrl?: string;
-      message?: string;
+      errorCode?: WeixinLoginErrorCode;
     }>;
     weixinLoginPoll: (qrcode: string) => Promise<{
       success: boolean;
       status: 'wait' | 'scaned' | 'confirmed' | 'expired';
       accountId?: string;
-      message?: string;
+      errorCode?: WeixinLoginErrorCode;
     }>;
     addQQInstance: (
       name: string,

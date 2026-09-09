@@ -49,6 +49,7 @@ import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
+import { ModelInspectorSidebar } from './components/ModelInspectorSidebar';
 import { MarketplaceDownloadSidebar } from './components/MarketplaceDownloadSidebar';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
@@ -101,6 +102,7 @@ import { sameRunningModelSnapshot } from './utils/runningModels';
 interface LocalInferenceViewProps {
   installRequestId?: string;
   onInstallRequestHandled?: (requestId: string) => void;
+  refreshRequestId?: number;
   isSidebarCollapsed?: boolean;
   isVisible?: boolean;
   onToggleSidebar?: () => void;
@@ -147,6 +149,7 @@ let cachedStatus: OllamaStatusSnapshot | null = null;
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   installRequestId,
   onInstallRequestHandled,
+  refreshRequestId,
   isSidebarCollapsed,
   isVisible = true,
   onToggleSidebar,
@@ -195,6 +198,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [librarySettingsOpen, setLibrarySettingsOpen] = useState(false);
   const [draftModelsDir, setDraftModelsDir] = useState('');
   const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
+  const [inspectorModel, setInspectorModel] = useState<OllamaModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingModelName, setLoadingModelName] = useState<string | null>(null);
   const [cancellingModelLoad, setCancellingModelLoad] = useState(false);
@@ -718,6 +722,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, []);
 
   const {
+    serviceConfig,
     accessSettingsOpen,
     draftAllowLanAccess,
     draftKeepRunningOnAppQuit,
@@ -808,6 +813,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isVisible) return;
     void runAction(async () => {
       const nextStatus = await refreshStatus();
       await refreshLocalModels();
@@ -825,6 +831,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     refreshRunningModels,
     refreshServiceConfig,
     refreshStatus,
+    isVisible,
+    refreshRequestId,
     runAction,
   ]);
 
@@ -1097,6 +1105,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       const nextTab = value as LocalInferenceTab;
       if (nextTab === activeTab) return;
       closeLaunchLogPanel();
+      setInspectorModel(null);
       setTabDirection(
         LOCAL_INFERENCE_TAB_ORDER.indexOf(nextTab) >= LOCAL_INFERENCE_TAB_ORDER.indexOf(activeTab)
           ? 1
@@ -1236,8 +1245,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onUnload={handleUnload}
                   onDelete={handleDelete}
                   onConfigureContext={setContextModel}
+                  onOpenInspector={model => {
+                    closeLaunchLogPanel();
+                    setInspectorModel(model);
+                  }}
                   onOpenMarketplace={() => handleTabChange('marketplace')}
-                  onOpenLaunchLog={launchLogs.openPanelForModel}
+                  onOpenLaunchLog={modelName => {
+                    setInspectorModel(null);
+                    launchLogs.openPanelForModel(modelName);
+                  }}
                   showRegisteredModelsTitle={false}
                   logPanelVisible={launchLogs.state.visible && !launchLogFullscreen}
                   logPanelModelName={launchLogFullscreen ? null : launchLogs.state.modelName}
@@ -1288,6 +1304,30 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onClose={launchLogs.closePanel}
             />
           )}
+          <ModelInspectorSidebar
+            open={inspectorModel !== null}
+            model={inspectorModel}
+            runningModel={
+              inspectorModel
+                ? runningModels.find(
+                    model =>
+                      model.name === inspectorModel.name || model.model === inspectorModel.name,
+                  )
+                : undefined
+            }
+            preference={inspectorModel ? modelPreferences[inspectorModel.name] : undefined}
+            serviceConfig={serviceConfig}
+            onOpenChange={nextOpen => {
+              if (!nextOpen) setInspectorModel(null);
+            }}
+            onSaveContext={ctxSize => {
+              if (inspectorModel) handleSaveModelContext(inspectorModel.name, ctxSize);
+            }}
+            onOpenLogs={modelName => {
+              setInspectorModel(null);
+              launchLogs.openPanelForModel(modelName);
+            }}
+          />
         </div>
       </Tabs>
 

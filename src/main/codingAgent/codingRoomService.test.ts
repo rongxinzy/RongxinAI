@@ -14,6 +14,7 @@ import {
   CodingLaneStatus,
   CodingMissionStatus,
   CodingPermissionOutcome,
+  CodingWorkflowStage,
 } from '../../shared/codingAgent';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
@@ -436,6 +437,55 @@ test('cancel leaves a lane without an active turn untouched', async () => {
   expect(
     updated.events.filter(event => event.kind === CodingEventKind.TurnCancelled),
   ).toHaveLength(0);
+});
+
+test('reports a failed automatic collaboration stage without changing assignment state', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
+  const sourceLane = created.lanes[0];
+  const mission = created.missions[0];
+  const sourceAssignment = created.assignments[0];
+  // A mission created without a Git baseline makes the automatic handoff fail
+  // deterministically when the completed turn triggers the next stage.
+  const targetLane = repository.createLane(mission.id, 'builtin-zhiyuan-coding', workspaceRoot);
+  repository.createAssignment({
+    missionId: mission.id,
+    laneId: targetLane.id,
+    title: 'Verify',
+    instructions: 'Verify the implementation.',
+    workflowStage: CodingWorkflowStage.Verification,
+    previousAssignmentId: sourceAssignment.id,
+  });
+
+  service.recordBuiltinEvent(sourceLane.localSessionId, CodingEventKind.TurnComplete, {});
+  // The stage failure surfaces through an async rejection handler.
+  await new Promise<void>(resolve => setImmediate(resolve));
+
+  const updated = service.bootstrap(workspaceRoot);
+  expect(updated.lanes.find(lane => lane.id === sourceLane.id)?.status).toBe(
+    CodingLaneStatus.Completed,
+  );
+  expect(
+    updated.assignments.find(assignment => assignment.laneId === targetLane.id)?.status,
+  ).toBe(CodingAssignmentStatus.Planned);
+  const sourceEvents = updated.events.filter(event => event.laneId === sourceLane.id);
+  expect(sourceEvents.at(-1)).toMatchObject({
+    kind: CodingEventKind.Message,
+    payload: { role: 'system', error: expect.stringContaining('frozen baseline') },
+  });
 });
 
 test('recovers stale running lanes after an application restart without losing the mission', async () => {

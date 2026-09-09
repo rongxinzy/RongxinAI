@@ -75,6 +75,7 @@ import {
 import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspaceSidebar';
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
+import { findPendingCodingPermission } from './codingPermission';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
@@ -124,6 +125,7 @@ export const CodingWorkbenchView = ({
   const [sidePanelHidden, setSidePanelHidden] = useState(false);
   const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
+  const [gitRefreshVersion, setGitRefreshVersion] = useState(0);
   const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [isNarrowViewport, setIsNarrowViewport] = useState(() => window.innerWidth < 1024);
   const [laneChangePreview, setLaneChangePreview] = useState<string | null>(null);
@@ -158,16 +160,25 @@ export const CodingWorkbenchView = ({
       return;
     }
     let cancelled = false;
-    void window.electron.codingAgent.bootstrap(workspaceRoot).then(result => {
-      if (cancelled) return;
-      if (result.success && result.snapshot) {
-        setSnapshot(result.snapshot);
-        return;
-      }
+    const reportFailure = (message: string | undefined): void => {
       // Without a snapshot the workbench would be stuck on its loading
       // screen forever, so surface the failure with a retry.
-      setBootstrapError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    });
+      setBootstrapError(message ?? i18nService.t('codingAgentActionFailed'));
+    };
+    void window.electron.codingAgent
+      .bootstrap(workspaceRoot)
+      .then(result => {
+        if (cancelled) return;
+        if (result.success && result.snapshot) {
+          setSnapshot(result.snapshot);
+          return;
+        }
+        reportFailure(result.error);
+      })
+      .catch(error => {
+        if (cancelled) return;
+        reportFailure(error instanceof Error ? error.message : undefined);
+      });
     const unsubscribe = window.electron.codingAgent.onChanged(next => {
       if (next.room.workspaceRoot === workspaceRoot) setSnapshot(next);
     });
@@ -380,7 +391,7 @@ export const CodingWorkbenchView = ({
     workspaceRoot;
   // Refresh the git panels on lane switch and turn status change only; keying
   // on the event count would rerun `git status` on every streamed chunk.
-  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}`;
+  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${gitRefreshVersion}`;
   const desktopSidePanelOpen =
     !isNarrowViewport &&
     !sidePanelHidden &&
@@ -448,16 +459,21 @@ export const CodingWorkbenchView = ({
     mediaQuery.addEventListener('change', syncViewport);
     return () => mediaQuery.removeEventListener('change', syncViewport);
   }, []);
-  const activePermission = useMemo(
-    () =>
-      activeLane?.status === CodingLaneStatus.WaitingApproval
-        ? (activeEvents
-            .slice()
-            .reverse()
-            .find(event => event.kind === CodingEventKind.Permission) ?? null)
-        : null,
-    [activeEvents, activeLane?.status],
-  );
+  const activePermission = useMemo(() => {
+    const waitingLaneIds = new Set(
+      (snapshot?.lanes ?? [])
+        .filter(lane => lane.status === CodingLaneStatus.WaitingApproval)
+        .map(lane => lane.id),
+    );
+    if (waitingLaneIds.size === 0) return null;
+    if (activeLane && waitingLaneIds.has(activeLane.id)) {
+      const selectedPermission = findPendingCodingPermission(activeEvents);
+      if (selectedPermission) return selectedPermission;
+    }
+    const waitingEvents =
+      snapshot?.events.filter(event => waitingLaneIds.has(event.laneId)) ?? [];
+    return findPendingCodingPermission(waitingEvents);
+  }, [activeEvents, activeLane, snapshot]);
   const recoveryLane =
     activeLane?.pendingRecoveryPrompt && activeLane.pendingRecoveryContext ? activeLane : null;
 
@@ -1311,6 +1327,7 @@ export const CodingWorkbenchView = ({
               <CodingWorkspaceFileBrowser
                 workspaceRoot={workspaceRoot}
                 sourceRoot={gitSourceRoot}
+                onFileSaved={() => setGitRefreshVersion(current => current + 1)}
               />
             ) : sidePanelView === CodingSidePanelView.Inspector ? (
               <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
@@ -1350,6 +1367,7 @@ export const CodingWorkbenchView = ({
             <CodingWorkspaceFileBrowser
               workspaceRoot={workspaceRoot}
               sourceRoot={gitSourceRoot}
+              onFileSaved={() => setGitRefreshVersion(current => current + 1)}
             />
           ) : sidePanelView === CodingSidePanelView.Inspector ? (
             <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />

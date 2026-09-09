@@ -1,7 +1,7 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { statSync } from 'fs';
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, rename, stat, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 
 import {
@@ -28,6 +28,7 @@ import {
   type CodingWorkspaceFileContent,
   type CodingWorkspaceFileEntry,
   type CodingWorkspaceFileInput,
+  type CodingWorkspaceFileWriteInput,
   type CreateCodingCollaborationPresetInput,
   type CodingLaneViewStateInput,
   type CodingPermissionResponse,
@@ -1177,10 +1178,48 @@ export class CodingRoomService extends EventEmitter {
 
     const content = await readFile(filePath);
     if (content.includes(0)) throw new Error('Binary files cannot be previewed.');
-    return { path: path.relative(sourceRoot, filePath), content: content.toString('utf8') };
+    return {
+      path: path.relative(sourceRoot, filePath),
+      content: content.toString('utf8'),
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
+  }
+
+  async writeWorkspaceFile(input: CodingWorkspaceFileWriteInput): Promise<CodingWorkspaceFileContent> {
+    if (typeof input.content !== 'string') throw new Error('Workspace file content must be text.');
+    const content = Buffer.from(input.content, 'utf8');
+    if (content.length > 512 * 1024) throw new Error('Files larger than 512 KB cannot be edited.');
+    const { sourceRoot, broker, roomId } = this.resolveWorkspaceBrowser(input);
+    const relativePath = this.requireWorkspaceRelativePath(input.path);
+    if (!relativePath) throw new Error('Select a workspace file to edit.');
+    if (this.repository.getWriterLease(roomId, sourceRoot)) {
+      throw new Error('Wait for the active workspace writer before saving this file.');
+    }
+    const filePath = await broker.resolveTarget(relativePath);
+    const fileStat = await stat(filePath);
+    if (!fileStat.isFile()) throw new Error('The requested workspace path is not a file.');
+    const current = await readFile(filePath);
+    const currentSha256 = createHash('sha256').update(current).digest('hex');
+    if (currentSha256 !== input.expectedSha256) {
+      throw new Error('The file changed outside the editor. Reload it before saving.');
+    }
+    if (current.includes(0)) throw new Error('Binary files cannot be edited.');
+    const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, content, { mode: fileStat.mode });
+      await rename(temporaryPath, filePath);
+    } finally {
+      await unlink(temporaryPath).catch((): void => undefined);
+    }
+    return {
+      path: path.relative(sourceRoot, filePath),
+      content: input.content,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
   }
 
   private resolveWorkspaceBrowser(input: CodingWorkspaceFileInput): {
+    roomId: string;
     sourceRoot: string;
     broker: WorkspaceBroker;
   } {
@@ -1197,7 +1236,7 @@ export class CodingRoomService extends EventEmitter {
       .listWorkspaceSources(room.id)
       .find(candidate => path.resolve(candidate.path) === sourceRoot);
     if (!source) throw new Error('File access is limited to folders in the coding workspace.');
-    return { sourceRoot, broker: new WorkspaceBroker(sourceRoot) };
+    return { roomId: room.id, sourceRoot, broker: new WorkspaceBroker(sourceRoot) };
   }
 
   private requireWorkspaceRelativePath(value: string | undefined): string {
@@ -1301,6 +1340,7 @@ export class CodingRoomService extends EventEmitter {
     );
     if (!event) throw new Error('The coding permission request was not found.');
     const lane = this.requireLane(snapshot.lanes, event.laneId);
+    console.debug(`[CodingRoom] received permission response for lane ${lane.id}`);
     if (this.registry.get(lane.profileId)?.driverKind === CodingAgentDriverKind.Builtin) {
       if (!this.runtime.respondBuiltinPermission) {
         throw new Error('The built-in coding runtime cannot respond to permissions.');
@@ -1434,6 +1474,7 @@ export class CodingRoomService extends EventEmitter {
 
   async dispose(): Promise<void> {
     this.isDisposed = true;
+    this.repository.flushPendingStreamWrites();
     await Promise.all([...this.drivers.values()].map(driver => driver.dispose()));
     this.drivers.clear();
     this.driverProfileIds.clear();
@@ -1599,6 +1640,9 @@ export class CodingRoomService extends EventEmitter {
           driver.getSessionAvailableCommands(sessionId),
         );
         if (event.kind === CodingEventKind.Permission) {
+          console.debug(
+            `[CodingRoom] published permission request for lane ${lane.id} while session ${sessionId} is waiting`,
+          );
           this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
           this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
           const assignment = this.repository.getLatestAssignmentForLane(lane.id);
@@ -1650,6 +1694,7 @@ export class CodingRoomService extends EventEmitter {
         return;
       }
       const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+      console.error(`[CodingRoom] coding turn failed for lane ${lane.id}:`, error);
       if (assignment?.workbenchRunId) {
         this.runtime.failExternalWorkbenchRun?.({
           sessionId: lane.localSessionId,
@@ -1734,6 +1779,21 @@ export class CodingRoomService extends EventEmitter {
     if (laneStatus === CodingLaneStatus.Completed) {
       void this.startNextCollaborationStage(roomWorkspaceRoot, lane.id).catch(error => {
         console.error('[CodingRoom] failed to start the next collaboration stage:', error);
+        // The next assignment stays Planned, so surface the failure in the
+        // completed lane's conversation instead of leaving silent state.
+        try {
+          this.repository.appendEvent(lane.id, CodingEventKind.Message, {
+            role: 'system',
+            content: t('codingAgentNextStageFailed'),
+            error: this.errorMessage(error),
+          });
+          this.publish(roomWorkspaceRoot);
+        } catch (publishError) {
+          console.debug(
+            '[CodingRoom] Skipped publishing the collaboration stage failure:',
+            publishError,
+          );
+        }
       });
     }
   }
