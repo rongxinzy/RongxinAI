@@ -12,6 +12,7 @@ import type { RootState } from '../../store';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
+import { getWorkspaceDisplayName } from '../../utils/path';
 import { TaskSearchDialog } from './TaskSearchDialog';
 
 const SEARCH_SESSION_LIMIT = 100;
@@ -86,7 +87,14 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
     const names = new Map(
       workspaces
         .filter(workspace => !workspace.isHidden)
-        .map(workspace => [workspace.id, workspace.name]),
+        .map(workspace => [
+          workspace.id,
+          getWorkspaceDisplayName(
+            workspace.path,
+            workspace.name,
+            i18nService.t('defaultConversation'),
+          ),
+        ]),
     );
     const normalizedQuery = query.trim().toLocaleLowerCase();
     const sessionById = new Map<string, CoworkSessionSummary>();

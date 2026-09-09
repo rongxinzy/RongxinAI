@@ -249,6 +249,7 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
 
   const [session] = [...coworkStore.sessions.values()];
   expect(session).toBeTruthy();
+  expect(session.title).toBe('钉钉会话');
   expect((session.messages as Array<Record<string, unknown>>).map(message => message.type)).toEqual(
     ['user', 'tool_use', 'tool_result', 'assistant'],
   );
@@ -389,6 +390,77 @@ test('async reminder turns on channel-synced sessions are tracked lazily and rel
   handler.destroy();
 });
 
+test('replaces every mapped IM session title with the platform default when loading conversations', () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const session = coworkStore.createSession('IM-weixin-1788865000000', process.cwd(), '', 'auto');
+  imStore.createSessionMapping('default:user-42', 'weixin', session.id as string);
+
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+
+  expect(coworkStore.getSession(session.id as string)?.title).toBe('微信会话');
+  handler.destroy();
+});
+
+test('uses the mapped platform rather than title content when normalizing IM session titles', () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const sessions = [
+    { platform: 'feishu', title: '任意外部标识' },
+    { platform: 'dingtalk', title: '群聊名称也不保留' },
+    { platform: 'wecom', title: 'user@unknown-format' },
+    { platform: 'qq', title: '123456789' },
+    { platform: 'telegram', title: 'chat::opaque' },
+    { platform: 'discord', title: 'id with symbols !#$' },
+  ] as const;
+
+  for (const [index, item] of sessions.entries()) {
+    const session = coworkStore.createSession(item.title, process.cwd(), '', 'auto');
+    imStore.createSessionMapping(`conversation-${index}`, item.platform, session.id as string);
+  }
+
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+
+  expect(Array.from(coworkStore.sessions.values()).map(session => session.title)).toEqual([
+    '飞书会话',
+    '钉钉会话',
+    '企微会话',
+    'QQ会话',
+    'Telegram会话',
+    'Discord会话',
+  ]);
+  handler.destroy();
+});
+
+test('resets mapped IM session titles to the platform default when loading conversations', () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const session = coworkStore.createSession('客户沟通', process.cwd(), '', 'auto');
+  imStore.createSessionMapping('default:user-42', 'weixin', session.id as string);
+
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+
+  expect(coworkStore.getSession(session.id as string)?.title).toBe('微信会话');
+  handler.destroy();
+});
+
+test('preserves a user-renamed mapped IM session title when loading conversations', () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const session = coworkStore.createSession('客户沟通', process.cwd(), '', 'auto');
+  session.titleUserRenamed = true;
+  imStore.createSessionMapping('default:user-42', 'weixin', session.id as string);
+
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+
+  expect(coworkStore.getSession(session.id as string)?.title).toBe('客户沟通');
+  handler.destroy();
+});
+
 test('falls back to normal agent execution when detector does not recognize a scheduled task', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
@@ -422,6 +494,75 @@ test('falls back to normal agent execution when detector does not recognize a sc
 
   const reply = await pending;
   expect(reply).toBe('这是会议纪要摘要。');
+
+  handler.destroy();
+});
+
+test('uses only the IM platform for WeChat session titles', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore: new FakeIMStore() });
+
+  const response = handler.processMessage(
+    createMessage({ platform: 'weixin', senderName: '微信用户', content: '你好' }),
+    undefined,
+    'workspace-1',
+  );
+  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(1));
+
+  expect(coworkStore.getSession('session-1')?.title).toBe('微信会话');
+
+  runtime.emit('message', 'session-1', {
+    id: 'assistant-1',
+    type: 'assistant',
+    content: '你好',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-1', null);
+
+  await expect(response).resolves.toBe('你好');
+  handler.destroy();
+});
+
+test('uses only the IM platform for group and direct session titles', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore: new FakeIMStore() });
+
+  const groupResponse = handler.processMessage(
+    createMessage({ chatType: 'group', groupName: '产品讨论组', senderName: '测试用户' }),
+    undefined,
+    'workspace-1',
+  );
+  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(1));
+  expect(coworkStore.getSession('session-1')?.title).toBe('钉钉会话');
+  runtime.emit('message', 'session-1', {
+    id: 'assistant-group',
+    type: 'assistant',
+    content: '群聊回复',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-1', null);
+  await expect(groupResponse).resolves.toBe('群聊回复');
+
+  const fallbackResponse = handler.processMessage(
+    createMessage({ messageId: 'im-msg-2', conversationId: 'opaque-123', senderName: undefined }),
+    undefined,
+    'workspace-1',
+  );
+  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(2));
+  expect(coworkStore.getSession('session-2')?.title).toBe('钉钉会话');
+  runtime.emit('message', 'session-2', {
+    id: 'assistant-fallback',
+    type: 'assistant',
+    content: '兜底回复',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-2', null);
+  await expect(fallbackResponse).resolves.toBe('兜底回复');
 
   handler.destroy();
 });
