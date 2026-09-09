@@ -166,6 +166,18 @@ export const CodingGitPanel = ({ workspaceRoot, laneId, sourceRoot, refreshKey, 
   const requestSequence = useRef(0);
   const diffRequestSequence = useRef(0);
   const target = useMemo<CodingGitTargetInput>(() => ({ workspaceRoot, laneId: laneId ?? undefined, sourceRoot }), [laneId, sourceRoot, workspaceRoot]);
+  // Switching lane or source must invalidate in-flight diff responses (the
+  // sequence guard only orders concurrent selectDiff calls) and clear the
+  // previous lane's selection and diff content.
+  useEffect(() => {
+    diffRequestSequence.current += 1;
+    requestSequence.current += 1;
+    setStatus(null);
+    setDiffSelection(null);
+    setDiff('');
+    setDiffLoading(false);
+    setError(null);
+  }, [target]);
   const refresh = useCallback(async () => {
     const request = ++requestSequence.current;
     setLoading(true);
