@@ -290,6 +290,7 @@ const createMarkdownComponents = (
   resolveLocalFilePath?: (href: string, text: string) => string | null,
   showRevealInFolderAction = false,
   onImageClick?: (image: { src: string; alt?: string | null }) => void,
+  restrictLocalFileLinks = false,
 ) => ({
   p: ({ node: _node, className: _className, children, ...props }: any) => (
     <p
@@ -410,8 +411,20 @@ const createMarkdownComponents = (
       hrefValue && !isExternalLink && resolveLocalFilePath
         ? resolveLocalFilePath(hrefValue, linkText)
         : null;
+    const isUnresolvedRestrictedLocalPath =
+      !!hrefValue &&
+      !isExternalLink &&
+      restrictLocalFileLinks &&
+      !resolvedPath &&
+      isLikelyLocalFilePath(hrefValue);
     const isLocalFilePath =
-      !!hrefValue && !isExternalLink && (resolvedPath || isLikelyLocalFilePath(hrefValue));
+      !!hrefValue &&
+      !isExternalLink &&
+      (resolvedPath || (!restrictLocalFileLinks && isLikelyLocalFilePath(hrefValue)));
+
+    if (isUnresolvedRestrictedLocalPath) {
+      return <span className="text-muted-foreground">{children}</span>;
+    }
 
     if (isLocalFilePath) {
       const rawPath = resolvedPath ?? stripFileProtocol(stripHashAndQuery(hrefValue));
@@ -558,6 +571,7 @@ interface MarkdownContentProps {
   content: string;
   className?: string;
   resolveLocalFilePath?: (href: string, text: string) => string | null;
+  restrictLocalFileLinks?: boolean;
   showRevealInFolderAction?: boolean;
   onImageClick?: (image: { src: string; alt?: string | null }) => void;
 }
@@ -566,12 +580,19 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
   content,
   className = '',
   resolveLocalFilePath,
+  restrictLocalFileLinks = false,
   showRevealInFolderAction = false,
   onImageClick,
 }) => {
   const components = useMemo(
-    () => createMarkdownComponents(resolveLocalFilePath, showRevealInFolderAction, onImageClick),
-    [resolveLocalFilePath, showRevealInFolderAction, onImageClick],
+    () =>
+      createMarkdownComponents(
+        resolveLocalFilePath,
+        showRevealInFolderAction,
+        onImageClick,
+        restrictLocalFileLinks,
+      ),
+    [resolveLocalFilePath, showRevealInFolderAction, onImageClick, restrictLocalFileLinks],
   );
   const normalizedContent = useMemo(
     () => normalizeDisplayMath(encodeFileUrlsInMarkdown(content)),

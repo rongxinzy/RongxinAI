@@ -10,6 +10,7 @@ import {
   type CodingGitPathActionInput,
   type CodingGitTargetInput,
   type CodingWorkspaceFileInput,
+  type CodingWorkspaceFileWriteInput,
   type CodingLaneViewStateInput,
   type CodingLaneConfigOptionInput,
   type CodingPermissionResponse,
@@ -415,6 +416,16 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle(
+    CodingAgentIpc.WriteWorkspaceFile,
+    async (_event, input: CodingWorkspaceFileWriteInput) => {
+      try {
+        return { success: true, file: await service.writeWorkspaceFile(input) };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
   ipcMain.handle(
     CodingAgentIpc.SetLaneConfigOption,
     async (_event, input: { workspaceRoot: string; option: CodingLaneConfigOptionInput }) => {

@@ -124,6 +124,7 @@ export const CodingWorkbenchView = ({
   const [sidePanelHidden, setSidePanelHidden] = useState(false);
   const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
+  const [gitRefreshVersion, setGitRefreshVersion] = useState(0);
   const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [isNarrowViewport, setIsNarrowViewport] = useState(() => window.innerWidth < 1024);
   const [laneChangePreview, setLaneChangePreview] = useState<string | null>(null);
@@ -389,7 +390,7 @@ export const CodingWorkbenchView = ({
     workspaceRoot;
   // Refresh the git panels on lane switch and turn status change only; keying
   // on the event count would rerun `git status` on every streamed chunk.
-  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}`;
+  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${gitRefreshVersion}`;
   const desktopSidePanelOpen =
     !isNarrowViewport &&
     !sidePanelHidden &&
@@ -1320,6 +1321,7 @@ export const CodingWorkbenchView = ({
               <CodingWorkspaceFileBrowser
                 workspaceRoot={workspaceRoot}
                 sourceRoot={gitSourceRoot}
+                onFileSaved={() => setGitRefreshVersion(current => current + 1)}
               />
             ) : sidePanelView === CodingSidePanelView.Inspector ? (
               <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
@@ -1359,6 +1361,7 @@ export const CodingWorkbenchView = ({
             <CodingWorkspaceFileBrowser
               workspaceRoot={workspaceRoot}
               sourceRoot={gitSourceRoot}
+              onFileSaved={() => setGitRefreshVersion(current => current + 1)}
             />
           ) : sidePanelView === CodingSidePanelView.Inspector ? (
             <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />

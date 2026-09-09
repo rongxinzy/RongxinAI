@@ -1,7 +1,7 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { statSync } from 'fs';
-import { readFile, readdir, stat } from 'fs/promises';
+import { readFile, readdir, rename, stat, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 
 import {
@@ -28,6 +28,7 @@ import {
   type CodingWorkspaceFileContent,
   type CodingWorkspaceFileEntry,
   type CodingWorkspaceFileInput,
+  type CodingWorkspaceFileWriteInput,
   type CreateCodingCollaborationPresetInput,
   type CodingLaneViewStateInput,
   type CodingPermissionResponse,
@@ -1177,10 +1178,48 @@ export class CodingRoomService extends EventEmitter {
 
     const content = await readFile(filePath);
     if (content.includes(0)) throw new Error('Binary files cannot be previewed.');
-    return { path: path.relative(sourceRoot, filePath), content: content.toString('utf8') };
+    return {
+      path: path.relative(sourceRoot, filePath),
+      content: content.toString('utf8'),
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
+  }
+
+  async writeWorkspaceFile(input: CodingWorkspaceFileWriteInput): Promise<CodingWorkspaceFileContent> {
+    if (typeof input.content !== 'string') throw new Error('Workspace file content must be text.');
+    const content = Buffer.from(input.content, 'utf8');
+    if (content.length > 512 * 1024) throw new Error('Files larger than 512 KB cannot be edited.');
+    const { sourceRoot, broker, roomId } = this.resolveWorkspaceBrowser(input);
+    const relativePath = this.requireWorkspaceRelativePath(input.path);
+    if (!relativePath) throw new Error('Select a workspace file to edit.');
+    if (this.repository.getWriterLease(roomId, sourceRoot)) {
+      throw new Error('Wait for the active workspace writer before saving this file.');
+    }
+    const filePath = await broker.resolveTarget(relativePath);
+    const fileStat = await stat(filePath);
+    if (!fileStat.isFile()) throw new Error('The requested workspace path is not a file.');
+    const current = await readFile(filePath);
+    const currentSha256 = createHash('sha256').update(current).digest('hex');
+    if (currentSha256 !== input.expectedSha256) {
+      throw new Error('The file changed outside the editor. Reload it before saving.');
+    }
+    if (current.includes(0)) throw new Error('Binary files cannot be edited.');
+    const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporaryPath, content, { mode: fileStat.mode });
+      await rename(temporaryPath, filePath);
+    } finally {
+      await unlink(temporaryPath).catch((): void => undefined);
+    }
+    return {
+      path: path.relative(sourceRoot, filePath),
+      content: input.content,
+      sha256: createHash('sha256').update(content).digest('hex'),
+    };
   }
 
   private resolveWorkspaceBrowser(input: CodingWorkspaceFileInput): {
+    roomId: string;
     sourceRoot: string;
     broker: WorkspaceBroker;
   } {
@@ -1197,7 +1236,7 @@ export class CodingRoomService extends EventEmitter {
       .listWorkspaceSources(room.id)
       .find(candidate => path.resolve(candidate.path) === sourceRoot);
     if (!source) throw new Error('File access is limited to folders in the coding workspace.');
-    return { sourceRoot, broker: new WorkspaceBroker(sourceRoot) };
+    return { roomId: room.id, sourceRoot, broker: new WorkspaceBroker(sourceRoot) };
   }
 
   private requireWorkspaceRelativePath(value: string | undefined): string {

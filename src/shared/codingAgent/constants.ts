@@ -188,6 +188,7 @@ export const CodingAgentIpc = {
   CreateGitPullRequest: 'codingAgent:createGitPullRequest',
   ListWorkspaceFiles: 'codingAgent:listWorkspaceFiles',
   ReadWorkspaceFile: 'codingAgent:readWorkspaceFile',
+  WriteWorkspaceFile: 'codingAgent:writeWorkspaceFile',
   DiscoverAgents: 'codingAgent:discoverAgents',
   ProbeAgent: 'codingAgent:probeAgent',
   AddProfile: 'codingAgent:addProfile',

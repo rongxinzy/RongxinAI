@@ -347,6 +347,12 @@ export interface CodingWorkspaceFileEntry {
 export interface CodingWorkspaceFileContent {
   path: string;
   content: string;
+  sha256: string;
+}
+
+export interface CodingWorkspaceFileWriteInput extends CodingWorkspaceFileInput {
+  content: string;
+  expectedSha256: string;
 }
 
 export interface CodingGitCommitInput extends CodingGitTargetInput {
