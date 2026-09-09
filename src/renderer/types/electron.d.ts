@@ -1102,6 +1102,13 @@ interface IElectronAPI {
       file?: import('../../shared/codingAgent').CodingWorkspaceFileContent;
       error?: string;
     }>;
+    writeWorkspaceFile: (
+      input: import('../../shared/codingAgent').CodingWorkspaceFileWriteInput,
+    ) => Promise<{
+      success: boolean;
+      file?: import('../../shared/codingAgent').CodingWorkspaceFileContent;
+      error?: string;
+    }>;
     discoverAgents: (input: { workspaceRoot: string }) => Promise<CodingAgentActionResult>;
     probeAgent: (input: {
       workspaceRoot: string;

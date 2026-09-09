@@ -727,6 +727,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.ListWorkspaceFiles, input),
     readWorkspaceFile: (input: import('../shared/codingAgent').CodingWorkspaceFileInput) =>
       ipcRenderer.invoke(CodingAgentIpc.ReadWorkspaceFile, input),
+    writeWorkspaceFile: (input: import('../shared/codingAgent').CodingWorkspaceFileWriteInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.WriteWorkspaceFile, input),
     discoverAgents: (input: { workspaceRoot: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.DiscoverAgents, input),
     probeAgent: (input: { workspaceRoot: string; profileId: string }) =>
