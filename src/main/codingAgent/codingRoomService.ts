@@ -1209,7 +1209,7 @@ export class CodingRoomService extends EventEmitter {
       await writeFile(temporaryPath, content, { mode: fileStat.mode });
       await rename(temporaryPath, filePath);
     } finally {
-      await unlink(temporaryPath).catch(() => undefined);
+      await unlink(temporaryPath).catch((): void => undefined);
     }
     return {
       path: path.relative(sourceRoot, filePath),
