@@ -26,7 +26,10 @@ const todo: Todo = {
   steps: [],
 };
 
-const renderDetail = (update: (input: unknown) => Promise<unknown>) => {
+const renderDetail = (
+  update: (input: unknown) => Promise<unknown>,
+  onUpdated: () => Promise<void> = vi.fn().mockResolvedValue(undefined),
+) => {
   (window as unknown as { electron: unknown }).electron = {
     todo: {
       update,
@@ -40,7 +43,7 @@ const renderDetail = (update: (input: unknown) => Promise<unknown>) => {
       todo={todo}
       lists={[]}
       language="en"
-      onUpdated={vi.fn().mockResolvedValue(undefined)}
+      onUpdated={onUpdated}
       onError={vi.fn()}
       onDelete={vi.fn()}
     />,
@@ -115,4 +118,39 @@ test('an edit made while a save is in flight keeps its value after the save reso
   fireEvent.blur(titleInput);
   await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
   expect(update).toHaveBeenLastCalledWith({ todoId: todo.id, title: 'Second edit' });
+});
+
+test('only the latest save of a field reacts to its response when returns are out of order', async () => {
+  let resolveFirstSave: (result: { success: boolean }) => void = () => undefined;
+  const onUpdated = vi.fn().mockResolvedValue(undefined);
+  const update = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<{ success: boolean }>(resolve => {
+          resolveFirstSave = resolve;
+        }),
+    )
+    .mockResolvedValue({ success: true });
+  const { container } = renderDetail(update, onUpdated);
+
+  const titleInput = container.querySelector<HTMLInputElement>(
+    '.theme-page-todo-task-detail-input-1',
+  )!;
+  fireEvent.change(titleInput, { target: { value: 'Save A' } });
+  fireEvent.blur(titleInput);
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+
+  // A second save for the same field is issued and resolves before the first.
+  fireEvent.change(titleInput, { target: { value: 'Save B' } });
+  fireEvent.blur(titleInput);
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(onUpdated).toHaveBeenCalledTimes(1));
+  expect(titleInput.value).toBe('Save B');
+
+  // The stale first response must neither clear the field state nor refresh.
+  resolveFirstSave({ success: true });
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+  expect(onUpdated).toHaveBeenCalledTimes(1);
+  expect(titleInput.value).toBe('Save B');
 });
