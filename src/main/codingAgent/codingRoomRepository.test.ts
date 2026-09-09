@@ -180,3 +180,86 @@ test('loads a lane and its owning room directly by lane id', () => {
   expect(repository.getLaneById('missing-lane')).toBeNull();
   expect(repository.getRoomByLaneId('missing-lane')).toBeNull();
 });
+
+test('coalesces stream chunks in memory and flushes them to SQLite', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Memory coalesce');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+
+  const first = repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'Hel',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+  const second = repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'lo',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+
+  // Both projected reads observe the merged content, under one event id.
+  expect(second.id).toBe(first.id);
+  expect(second.payload.content).toBe('Hello');
+  expect(repository.listEvents([lane.id])).toHaveLength(1);
+  expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello');
+
+  // The buffered tail only reaches SQLite through the flush.
+  const staleRow = db
+    .prepare('SELECT payload_json FROM coding_events WHERE id = ?')
+    .get(first.id) as { payload_json: string };
+  expect(JSON.parse(staleRow.payload_json).content).toBe('Hel');
+  repository.flushPendingStreamWrites();
+  const flushedRow = db
+    .prepare('SELECT payload_json FROM coding_events WHERE id = ?')
+    .get(first.id) as { payload_json: string };
+  expect(JSON.parse(flushedRow.payload_json).content).toBe('Hello');
+});
+
+test('takes over an existing stream row without duplicating it after a restart', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Restart takeover');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'Hel',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+  repository.flushPendingStreamWrites();
+  const resumed = repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'lo',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+
+  expect(resumed.payload.content).toBe('Hello');
+  expect(repository.listEvents([lane.id])).toHaveLength(1);
+  repository.flushPendingStreamWrites();
+  expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello');
+});
+
+test('deleting a lane drops its buffered stream writes', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Dropped writes');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'm1',
+    content: 'partial',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
+  });
+  repository.deleteLane(room.id, lane.id);
+  repository.flushPendingStreamWrites();
+  expect(
+    db.prepare('SELECT COUNT(*) AS count FROM coding_events WHERE lane_id = ?').get(lane.id),
+  ).toEqual({ count: 0 });
+});
