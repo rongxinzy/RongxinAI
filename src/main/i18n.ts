@@ -29,6 +29,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkDefaultSessionTitle: '新对话',
     codingAgentDefaultMissionTitle: '新建编程任务',
     codingAgentSessionRecovery: '上一个 Agent 会话无法恢复，已将交接摘要发送到新会话。',
+    codingAgentNextStageFailed:
+      '自动启动下一协作阶段失败，目标阶段仍为待执行状态，可从对应会话手动发起交接。',
     codingAgentConfigModel: '模型',
     codingAgentConfigThinkingLevel: '思考等级',
     codingAgentConfigPermissionMode: '权限模式',
@@ -336,6 +338,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentDefaultMissionTitle: 'New coding task',
     codingAgentSessionRecovery:
       'The previous agent session could not be restored. A handoff summary was sent to a new session.',
+    codingAgentNextStageFailed:
+      'Failed to start the next collaboration stage automatically. The target stage is still planned; start the handoff manually from its session.',
     codingAgentConfigModel: 'Model',
     codingAgentConfigThinkingLevel: 'Thinking level',
     codingAgentConfigPermissionMode: 'Permission mode',
