@@ -38,7 +38,6 @@ import {
   CodingWorkspaceSidebar,
   type CodingSidebarSelection,
 } from './coding/CodingWorkspaceSidebar';
-import { CodingUiEvent, type CodingManageAgentsEventDetail } from './coding/constants';
 import { SidebarSearchTrigger } from './shell/SidebarSearchTrigger';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
 import { workspaceService } from '../services/workspace';
@@ -445,13 +444,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <CodingWorkspaceSidebar
                   selection={codingSelection}
                   onSelectionChange={onCodingSelectionChange}
-                  onManageAgents={workspaceRoot =>
-                    window.dispatchEvent(
-                      new CustomEvent<CodingManageAgentsEventDetail>(CodingUiEvent.ManageAgents, {
-                        detail: { workspaceRoot },
-                      }),
-                    )
-                  }
                 />
               </div>
             ) : null}

@@ -1,13 +1,6 @@
 import { execSync, spawnSync } from 'child_process';
 import { app } from 'electron';
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  statSync,
-  writeFileSync,
-} from 'fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'fs';
 import { delimiter, dirname, join } from 'path';
 
 import { buildSessionTitleFromInput } from '../../common/sessionTitle';
@@ -30,6 +23,7 @@ import { appendPythonRuntimeToEnv } from './pythonRuntime';
 import { findSharedSkillPythonExecutable } from './skillPythonRuntime';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
+import { getFeishuCliBinDirectory } from './feishuConnectorPaths';
 
 const DOMESTIC_NPM_REGISTRY_URL = 'https://registry.npmmirror.com';
 
@@ -71,7 +65,11 @@ function prependSkillSharedPythonToEnv(env: Record<string, string | undefined>):
   const entries = (env.PATH || '').split(delimiter).filter(Boolean);
   if (entries.some(entry => entry.toLowerCase() === binDir.toLowerCase())) return;
   env.PATH = [binDir, ...entries].join(delimiter);
-  coworkLog('INFO', 'applyPackagedEnvOverrides', `Prepended Skill shared Python to PATH: ${binDir}`);
+  coworkLog(
+    'INFO',
+    'applyPackagedEnvOverrides',
+    `Prepended Skill shared Python to PATH: ${binDir}`,
+  );
 }
 
 function hasCommandInEnv(command: string, env: Record<string, string | undefined>): boolean {
@@ -1298,6 +1296,12 @@ export function applyApplicationRuntimeEnv(
       );
     }
 
+    const feishuCliBinDirectory = getFeishuCliBinDirectory(app.getPath('userData'));
+    if (existsSync(feishuCliBinDirectory)) {
+      env.PATH = [feishuCliBinDirectory, env.PATH].filter(Boolean).join(delimiter);
+      if (process.platform === 'win32') ensureWindowsOriginalPath(env);
+    }
+
     return;
   }
 
@@ -1417,6 +1421,15 @@ export function applyApplicationRuntimeEnv(
   }
   appendUvRuntimeToEnv(env);
   configureUvForManagedPython(env);
+
+  // Official connector Skills invoke lark-cli by name. Keep its per-user
+  // launcher ahead of system paths so a globally installed, incompatible CLI
+  // cannot shadow the app-bundled version.
+  const feishuCliBinDirectory = getFeishuCliBinDirectory(app.getPath('userData'));
+  if (existsSync(feishuCliBinDirectory)) {
+    env.PATH = [feishuCliBinDirectory, env.PATH].filter(Boolean).join(delimiter);
+    if (process.platform === 'win32') ensureWindowsOriginalPath(env);
+  }
 
   // Verify node/npx/npm resolution in the constructed environment
   verifyNodeEnvironment(env);

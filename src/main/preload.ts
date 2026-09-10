@@ -143,6 +143,8 @@ contextBridge.exposeInMainWorld('electron', {
     getFeishuCliStatus: () => ipcRenderer.invoke(McpIpc.GetFeishuCliStatus),
     prepareFeishuCli: () => ipcRenderer.invoke(McpIpc.PrepareFeishuCli),
     loadIcon: (iconPath: string) => ipcRenderer.invoke(McpIpc.LoadIcon, iconPath),
+    exportConfig: () => ipcRenderer.invoke(McpIpc.ExportConfig),
+    importConfig: () => ipcRenderer.invoke(McpIpc.ImportConfig),
     onBridgeSyncStart: (callback: () => void) => onPushVoid(McpIpc.BridgeSyncStart, callback),
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) =>
       onPush(McpIpc.BridgeSyncDone, callback),
@@ -729,6 +731,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.PushGitBranch, input),
     switchGitBranch: (input: import('../shared/codingAgent').CodingGitBranchInput) =>
       ipcRenderer.invoke(CodingAgentIpc.SwitchGitBranch, input),
+    createGitBranch: (input: import('../shared/codingAgent').CodingGitBranchInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.CreateGitBranch, input),
     createGitPullRequest: (input: import('../shared/codingAgent').CodingGitPullRequestInput) =>
       ipcRenderer.invoke(CodingAgentIpc.CreateGitPullRequest, input),
     listWorkspaceFiles: (input: import('../shared/codingAgent').CodingWorkspaceFileInput) =>

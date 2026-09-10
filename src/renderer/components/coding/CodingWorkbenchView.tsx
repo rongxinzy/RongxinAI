@@ -16,7 +16,7 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import { Expand, File, FileDiff, FolderGit2, Layers, Minimize2, PanelRight, Settings2, Terminal as TerminalIcon, X } from 'lucide-react';
+import { Expand, File, FileDiff, Layers, Minimize2, PanelRight, Settings2, Terminal as TerminalIcon, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -69,7 +69,6 @@ import {
   CodingSidePanelView,
   CodingUiEvent,
   type CodingCreateSessionEventDetail,
-  type CodingManageAgentsEventDetail,
   type CodingSidePanelView as CodingSidePanelViewType,
 } from './constants';
 import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspaceSidebar';
@@ -203,14 +202,6 @@ export const CodingWorkbenchView = ({
         else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
       });
   }, [selectedLaneId, snapshot, workspaceRoot]);
-  useEffect(() => {
-    const openManager = (event: Event) => {
-      const detail = (event as CustomEvent<CodingManageAgentsEventDetail>).detail;
-      if (detail.workspaceRoot === workspaceRoot) setAgentManagerOpen(true);
-    };
-    window.addEventListener(CodingUiEvent.ManageAgents, openManager);
-    return () => window.removeEventListener(CodingUiEvent.ManageAgents, openManager);
-  }, [workspaceRoot]);
   useEffect(() => {
     const openSessionSetup = (event: Event) => {
       const detail = (event as CustomEvent<CodingCreateSessionEventDetail>).detail;
@@ -860,10 +851,6 @@ export const CodingWorkbenchView = ({
         onToggleSidebar={onToggleSidebar}
         leftContent={
           <>
-            <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-              <FolderGit2 className="size-4 shrink-0" />
-              <span className="truncate">{snapshot.room.name}</span>
-            </span>
             <CodingParticipants
               activeLaneId={activeLane?.id ?? null}
               lanes={activeMissionLanes}

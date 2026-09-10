@@ -11,6 +11,18 @@ function Assert-Path {
   }
 }
 
+function Invoke-Checked {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [string[]]$ArgumentList = @(),
+    [string]$Label = $FilePath
+  )
+  & $FilePath @ArgumentList
+  if ($LASTEXITCODE -ne 0) {
+    throw "$Label failed with exit code $LASTEXITCODE"
+  }
+}
+
 function Invoke-Installer {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
@@ -113,6 +125,10 @@ try {
     throw "Expected exactly one installed application executable; found $($applicationExecutables.Count)"
   }
   Assert-Path $applicationExecutables[0].FullName 'installed application executable'
+  Invoke-Checked 'node' @(
+    (Join-Path $ProjectRoot 'scripts\ci\verify-packaged-acp-resources.mjs'),
+    (Join-Path $installRoot 'resources')
+  ) 'installed ACP registry and bundled bridge verification'
   Assert-Path $timingLog 'cold installation timing log'
 
   $coldLog = Get-Content -LiteralPath $timingLog -Raw -Encoding UTF8

@@ -3699,13 +3699,13 @@
   box-shadow: none;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -11299,13 +11299,13 @@ to {
   box-shadow: none;
 }
 [data-theme="classic-dark"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="classic-dark"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -18910,13 +18910,13 @@ to {
   box-shadow: none;
 }
 [data-theme="daming-light"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="daming-light"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -26510,13 +26510,13 @@ to {
   box-shadow: none;
 }
 [data-theme="daming-dark"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="daming-dark"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -34123,13 +34123,13 @@ to {
   box-shadow: none;
 }
 [data-theme="changan-light"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="changan-light"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -41728,13 +41728,13 @@ to {
   box-shadow: none;
 }
 [data-theme="changan-dark"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="changan-dark"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -49344,13 +49344,13 @@ to {
   box-shadow: none;
 }
 [data-theme="weiyang-light"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="weiyang-light"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;
@@ -56949,13 +56949,13 @@ to {
   box-shadow: none;
 }
 [data-theme="weiyang-dark"] :where(.theme-part-coding-agent-manager-dialog-header-1) {
-  border-bottom-width: 1px;
-  border-color: var(--zy-border);
+  border-bottom-width: 0px;
   padding-inline: 1.5rem;
   padding-block: 1.25rem;
   padding-right: 3.5rem;
 }
 [data-theme="weiyang-dark"] :where(.theme-part-coding-agent-manager-dialog-footer-1) {
+  border-top-width: 0px;
   border-radius: 0px;
   background-color: var(--zy-background);
   padding-inline: 1.5rem;

@@ -3,7 +3,6 @@ import { Button } from '@shared/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -121,16 +120,10 @@ export const CodingAgentManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="theme-control-sizing-4 flex h-[min(44rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-3xl">
+      <DialogContent className="theme-control-sizing-4 flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-xl">
         <DialogHeader className="theme-part-coding-agent-manager-dialog-header-1">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 space-y-2">
-              <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
-              <DialogDescription>
-                {i18nService.t('codingAgentManagerDescription')}
-              </DialogDescription>
-              <p className="text-xs text-muted-foreground">{summary}</p>
-            </div>
+          <div className="flex min-w-0 items-center gap-3">
+            <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
             <Button
               type="button"
               size="sm"
@@ -153,27 +146,29 @@ export const CodingAgentManager = ({
           onValueChange={value => setActiveTab(value as CodingAgentManagerTabValue)}
           className="min-h-0 flex-1 gap-0"
         >
-          <PageTabs
-            bare
-            value={activeTab}
-            className="mx-6 mt-2 shrink-0"
-            items={[
-              {
-                value: CodingAgentManagerTab.Local,
-                label: `${i18nService.t('codingAgentLocalAgents')} (${profiles.length})`,
-              },
-              {
-                value: CodingAgentManagerTab.Custom,
-                label: i18nService.t('codingAgentCustomAgent'),
-              },
-            ]}
-          />
+          <div className="mx-6 mt-2 flex shrink-0 items-center justify-between gap-3">
+            <PageTabs
+              bare
+              value={activeTab}
+              items={[
+                {
+                  value: CodingAgentManagerTab.Local,
+                  label: `${i18nService.t('codingAgentLocalAgents')} (${profiles.length})`,
+                },
+                {
+                  value: CodingAgentManagerTab.Custom,
+                  label: i18nService.t('codingAgentCustomAgent'),
+                },
+              ]}
+            />
+            <p className="truncate text-xs text-muted-foreground">{summary}</p>
+          </div>
 
           <TabsContent value={CodingAgentManagerTab.Local} className="min-h-0">
             <ScrollArea className="h-full">
               <div className="p-6 pt-4">
                 {profiles.length === 0 ? (
-                  <Empty className="theme-scene-coding-empty min-h-80">
+                  <Empty className="theme-scene-coding-empty min-h-40">
                     <EmptyHeader>
                       <EmptyMedia variant="icon">
                         <Bot />
@@ -316,27 +311,28 @@ const AgentRow = ({
     profile.environment[CodingAgentEnvironmentKey.ClaudeCodeExecutable] ??
     profile.command;
   return (
-    <div className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-3 last:border-b-0">
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-        <Bot className="size-4" />
-      </div>
+    <div className="flex min-w-0 items-center gap-3 border-b border-border px-3 py-2 last:border-b-0">
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-sm font-medium">{profile.name}</p>
-          <Badge
-            variant={
-              profile.status === CodingAgentProfileStatus.Incompatible ? 'destructive' : 'secondary'
-            }
-          >
-            {i18nService.t(CodingAgentStatusI18nKey[profile.status])}
-          </Badge>
+          {profile.status !== CodingAgentProfileStatus.Ready && (
+            <Badge
+              variant={
+                profile.status === CodingAgentProfileStatus.Incompatible
+                  ? 'destructive'
+                  : 'secondary'
+              }
+            >
+              {i18nService.t(CodingAgentStatusI18nKey[profile.status])}
+            </Badge>
+          )}
         </div>
         {profile.description && (
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{profile.description}</p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{profile.description}</p>
         )}
         {installedCommand && (
           <p
-            className="mt-1 truncate font-mono text-xs text-muted-foreground"
+            className="mt-0.5 truncate font-mono text-xs text-muted-foreground"
             title={installedCommand}
           >
             {installedCommand}
