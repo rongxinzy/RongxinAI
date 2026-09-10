@@ -322,6 +322,8 @@ test('installer-related pull requests build and exercise the Windows installer',
   assert.match(smoke, /phase=component-cache-hit/);
   assert.doesNotMatch(smoke, /phase=defender-exclusion/);
   assert.match(smoke, /'uninstall'/);
+  assert.match(smoke, /function Invoke-Checked/);
+  assert.match(smoke, /verify-packaged-acp-resources\.mjs/);
 
   const sizeSmoke = readFileSync(
     path.join(root, 'scripts', 'ci', 'windows-installer-size-smoke.ps1'),
