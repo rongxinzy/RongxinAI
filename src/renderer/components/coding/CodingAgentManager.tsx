@@ -3,7 +3,6 @@ import { Button } from '@shared/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -126,9 +125,6 @@ export const CodingAgentManager = ({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-2">
               <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
-              <DialogDescription>
-                {i18nService.t('codingAgentManagerDescription')}
-              </DialogDescription>
             </div>
             <Button
               type="button"
