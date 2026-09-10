@@ -136,6 +136,34 @@ describe('Channel runtime downloader', () => {
     ).toBe(binaryContent);
   });
 
+  test('preserves a verified host-built runtime for development', async () => {
+    const currentDirectory = path.join(rootDir, 'vendor', 'channel-runtime', 'current');
+    fs.mkdirSync(currentDirectory, { recursive: true });
+    fs.writeFileSync(path.join(currentDirectory, binaryName), binaryContent);
+    fs.writeFileSync(
+      path.join(currentDirectory, 'runtime-build-info.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        sourceRepository: 'https://github.com/rongxinzy/pi-connect',
+        sourceRevision: 'b'.repeat(40),
+        binary: binaryName,
+        sha256: checksum,
+      }),
+    );
+    let downloadCount = 0;
+
+    const result = await ensureChannelRuntime(rootDir, targetId, {
+      config,
+      preserveHostBuild: true,
+      downloadRuntime: async () => {
+        downloadCount += 1;
+      },
+    });
+
+    expect(result).toBe(currentDirectory);
+    expect(downloadCount).toBe(0);
+  });
+
   test('redownloads a cache built from a different source revision', async () => {
     writeCachedRuntime(binaryContent, 'b'.repeat(40));
     let downloadCount = 0;
