@@ -122,10 +122,8 @@ export const CodingAgentManager = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="theme-control-sizing-4 flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-xl">
         <DialogHeader className="theme-part-coding-agent-manager-dialog-header-1">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 space-y-2">
-              <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
-            </div>
+          <div className="flex min-w-0 items-center gap-3">
+            <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
             <Button
               type="button"
               size="sm"
