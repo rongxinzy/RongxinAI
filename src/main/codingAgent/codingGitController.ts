@@ -65,6 +65,12 @@ export class CodingGitController {
     return await this.git.getStatus(target.targetRoot, target);
   }
 
+  async createBranch(input: CodingGitBranchInput): Promise<CodingGitStatus> {
+    const target = this.resolveMutableTarget(input);
+    await this.git.createBranch(target.targetRoot, input.branch);
+    return await this.git.getStatus(target.targetRoot, target);
+  }
+
   async createPullRequest(input: CodingGitPullRequestInput): Promise<string> {
     const target = this.resolveMutableTarget(input);
     return await this.git.createPullRequest(target.targetRoot, input);

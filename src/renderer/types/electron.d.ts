@@ -1091,6 +1091,9 @@ interface IElectronAPI {
     switchGitBranch: (
       input: import('../../shared/codingAgent').CodingGitBranchInput,
     ) => Promise<CodingGitStatusResult>;
+    createGitBranch: (
+      input: import('../../shared/codingAgent').CodingGitBranchInput,
+    ) => Promise<CodingGitStatusResult>;
     createGitPullRequest: (
       input: import('../../shared/codingAgent').CodingGitPullRequestInput,
     ) => Promise<{ success: boolean; url?: string; error?: string }>;
