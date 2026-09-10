@@ -7,6 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
+const QQ_BOT_PLATFORM = 'qqbot';
+const QQ_BOT_SMOKE_ACCOUNT = '__zhiyuan_qqbot__';
+
 function protocolHeaders(nonce) {
   return {
     authorization: 'Bearer smoke-secret',
@@ -79,6 +82,18 @@ async function stopChild(child) {
   ]);
 }
 
+function assertOfficialQqBotPlatform(health) {
+  const status = health.platforms.find(
+    item => item?.accountId === QQ_BOT_SMOKE_ACCOUNT && item?.platform === QQ_BOT_PLATFORM,
+  );
+  if (!status) {
+    throw new Error('Channel runtime health did not report the official QQ Bot platform.');
+  }
+  if (/unknown platform/i.test(String(status.lastError ?? ''))) {
+    throw new Error('Channel runtime was built without the official QQ Bot platform.');
+  }
+}
+
 async function main() {
   const rootDir = path.resolve(__dirname, '..');
   const binaryName = process.platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
@@ -146,6 +161,20 @@ async function main() {
     'bridge_token = "smoke-secret"',
     'cron_control_listen = "127.0.0.1:0"',
     '',
+    '[[projects]]',
+    `name = ${JSON.stringify(QQ_BOT_SMOKE_ACCOUNT)}`,
+    '[projects.agent]',
+    'type = "zhiyuan-bridge"',
+    '[projects.agent.options]',
+    `bridge_url = ${JSON.stringify(bridgeUrl)}`,
+    'bridge_token = "smoke-secret"',
+    'cron_control_listen = "127.0.0.1:0"',
+    '[[projects.platforms]]',
+    `type = ${JSON.stringify(QQ_BOT_PLATFORM)}`,
+    '[projects.platforms.options]',
+    'app_id = "smoke-app"',
+    'app_secret = "smoke-secret"',
+    '',
   ].join('\n');
   fs.writeFileSync(configPath, config, 'utf8');
 
@@ -189,6 +218,7 @@ async function main() {
     ) {
       throw new Error(`Unexpected channel runtime health: ${JSON.stringify(health)}`);
     }
+    assertOfficialQqBotPlatform(health);
 
     const replay = await fetch(healthUrl, { headers, signal: AbortSignal.timeout(1_000) });
     if (replay.status !== 401) {
@@ -280,7 +310,11 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  console.error(`[ChannelRuntimeSmoke] ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(`[ChannelRuntimeSmoke] ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { assertOfficialQqBotPlatform };
