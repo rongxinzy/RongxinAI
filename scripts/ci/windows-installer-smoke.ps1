@@ -11,6 +11,18 @@ function Assert-Path {
   }
 }
 
+function Invoke-Checked {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [string[]]$ArgumentList = @(),
+    [string]$Label = $FilePath
+  )
+  & $FilePath @ArgumentList
+  if ($LASTEXITCODE -ne 0) {
+    throw "$Label failed with exit code $LASTEXITCODE"
+  }
+}
+
 function Invoke-Installer {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
