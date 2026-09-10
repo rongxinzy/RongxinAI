@@ -121,7 +121,7 @@ export const CodingAgentManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="theme-control-sizing-4 flex h-[min(38rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-2xl">
+      <DialogContent className="theme-control-sizing-4 flex h-[min(36rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-xl">
         <DialogHeader className="theme-part-coding-agent-manager-dialog-header-1">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-2">
@@ -174,7 +174,7 @@ export const CodingAgentManager = ({
             <ScrollArea className="h-full">
               <div className="p-6 pt-4">
                 {profiles.length === 0 ? (
-                  <Empty className="theme-scene-coding-empty min-h-48">
+                  <Empty className="theme-scene-coding-empty min-h-40">
                     <EmptyHeader>
                       <EmptyMedia variant="icon">
                         <Bot />
@@ -318,19 +318,20 @@ const AgentRow = ({
     profile.command;
   return (
     <div className="flex min-w-0 items-center gap-3 border-b border-border px-3 py-2 last:border-b-0">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <Bot className="size-4" />
-      </div>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-sm font-medium">{profile.name}</p>
-          <Badge
-            variant={
-              profile.status === CodingAgentProfileStatus.Incompatible ? 'destructive' : 'secondary'
-            }
-          >
-            {i18nService.t(CodingAgentStatusI18nKey[profile.status])}
-          </Badge>
+          {profile.status !== CodingAgentProfileStatus.Ready && (
+            <Badge
+              variant={
+                profile.status === CodingAgentProfileStatus.Incompatible
+                  ? 'destructive'
+                  : 'secondary'
+              }
+            >
+              {i18nService.t(CodingAgentStatusI18nKey[profile.status])}
+            </Badge>
+          )}
         </div>
         {profile.description && (
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{profile.description}</p>
