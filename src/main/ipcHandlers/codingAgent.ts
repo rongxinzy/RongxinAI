@@ -395,6 +395,13 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle(CodingAgentIpc.CreateGitBranch, async (_event, input: CodingGitBranchInput) => {
+    try {
+      return { success: true, status: await service.createGitBranch(input) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle(CodingAgentIpc.CreateGitPullRequest, async (_event, input: CodingGitPullRequestInput) => {
     try {
       return { success: true, url: await service.createGitPullRequest(input) };

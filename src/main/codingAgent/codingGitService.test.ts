@@ -162,6 +162,15 @@ test('switches branches and preserves compatible uncommitted changes', async () 
   expect(await readFile(path.join(root, 'tracked.txt'), 'utf8')).toBe('dirty\n');
 });
 
+test('creates and switches to a new branch', async () => {
+  const root = await createRepository();
+  const service = new CodingGitService();
+
+  await service.createBranch(root, 'feature/new-branch');
+
+  expect(await git(root, ['branch', '--show-current'])).toBe('feature/new-branch');
+});
+
 test('returns an explicit empty state outside Git repositories', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'coding-not-git-'));
   const status = await new CodingGitService().getStatus(root, {

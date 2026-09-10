@@ -1141,6 +1141,10 @@ export class CodingRoomService extends EventEmitter {
     return await this.git.switchBranch(input);
   }
 
+  async createGitBranch(input: import('../../shared/codingAgent').CodingGitBranchInput): Promise<CodingGitStatus> {
+    return await this.git.createBranch(input);
+  }
+
   async createGitPullRequest(input: import('../../shared/codingAgent').CodingGitPullRequestInput): Promise<string> {
     return await this.git.createPullRequest(input);
   }
