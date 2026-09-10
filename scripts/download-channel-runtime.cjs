@@ -167,6 +167,21 @@ async function ensureChannelRuntime(rootDir, targetId, options = {}) {
 
   const binaryName = targetId.startsWith('win-') ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
   const runtimeRoot = path.join(rootDir, 'vendor', 'channel-runtime');
+  const currentDirectory = path.join(runtimeRoot, 'current');
+  if (options.preserveHostBuild) {
+    const currentBuildInfo = readBuildInfo(path.join(currentDirectory, 'runtime-build-info.json'));
+    const currentBinary = path.join(currentDirectory, currentBuildInfo?.binary || binaryName);
+    if (
+      currentBuildInfo?.sourceRepository &&
+      currentBuildInfo?.sourceRevision &&
+      currentBuildInfo?.sha256 &&
+      fs.existsSync(currentBinary) &&
+      sha256(currentBinary) === currentBuildInfo.sha256
+    ) {
+      console.log('[ChannelRuntime] Preserving the verified host-built channel runtime for development.');
+      return currentDirectory;
+    }
+  }
   const targetDirectory = path.join(runtimeRoot, targetId);
   const targetBinary = path.join(targetDirectory, binaryName);
   const buildInfoPath = path.join(targetDirectory, 'runtime-build-info.json');
@@ -213,7 +228,6 @@ async function ensureChannelRuntime(rootDir, targetId, options = {}) {
     }
   }
 
-  const currentDirectory = path.join(runtimeRoot, 'current');
   const stagedCurrentDirectory = fs.mkdtempSync(path.join(runtimeRoot, '.current.staging-'));
   try {
     fs.cpSync(targetDirectory, stagedCurrentDirectory, { recursive: true });
@@ -227,7 +241,9 @@ async function ensureChannelRuntime(rootDir, targetId, options = {}) {
 async function main() {
   const rootDir = path.resolve(__dirname, '..');
   const targetId = process.argv[2]?.trim() || resolveHostTargetId();
-  await ensureChannelRuntime(rootDir, targetId);
+  await ensureChannelRuntime(rootDir, targetId, {
+    preserveHostBuild: process.env.ZHIYUAN_PRESERVE_HOST_RUNTIME === '1',
+  });
   console.log(`[ChannelRuntime] Runtime ready for ${targetId}.`);
 }
 
@@ -248,4 +264,5 @@ module.exports = {
   resolveDownloadProxy,
   resolveHostTargetId,
   runtimeMatchesConfig,
+  readBuildInfo,
 };

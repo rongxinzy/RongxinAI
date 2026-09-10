@@ -143,6 +143,27 @@ function ensureBundledChannelRuntime(context) {
   const runtimeBase = path.join(projectRoot, 'vendor', 'channel-runtime');
   const binaryName = platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
   const targetId = `${platform === 'win32' ? 'win' : platform === 'darwin' ? 'mac' : platform}-${arch}`;
+  const currentDirectory = path.join(runtimeBase, 'current');
+  if (process.env.ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME === '1') {
+    const currentBuildInfoPath = path.join(currentDirectory, 'runtime-build-info.json');
+    const currentBuildInfo = existsSync(currentBuildInfoPath)
+      ? JSON.parse(readFileSync(currentBuildInfoPath, 'utf8'))
+      : null;
+    const currentBinary = path.join(
+      currentDirectory,
+      typeof currentBuildInfo?.binary === 'string' ? currentBuildInfo.binary : binaryName,
+    );
+    if (
+      currentBuildInfo?.sourceRepository &&
+      currentBuildInfo?.sourceRevision &&
+      currentBuildInfo?.sha256 &&
+      existsSync(currentBinary) &&
+      sha256File(currentBinary) === currentBuildInfo.sha256
+    ) {
+      console.log('[electron-builder-hooks] Using the verified host-built channel runtime.');
+      return;
+    }
+  }
   const targetDirectory = path.join(runtimeBase, targetId);
   const binaryPath = path.join(targetDirectory, binaryName);
   const buildInfoPath = path.join(targetDirectory, 'runtime-build-info.json');
@@ -171,7 +192,6 @@ function ensureBundledChannelRuntime(context) {
     );
   }
 
-  const currentDirectory = path.join(runtimeBase, 'current');
   const stagedCurrentDirectory = mkdtempSync(path.join(runtimeBase, '.current.packaging-'));
   try {
     rmSync(stagedCurrentDirectory, { recursive: true, force: true });
