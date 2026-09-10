@@ -1104,8 +1104,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentManageAgents: '扫描并管理 Agent',
     codingAgentManageAgentsDescription: '扫描本机 Agent，并管理手动添加的 Agent。',
     codingAgentManagerTitle: 'Agent 管理',
-    codingAgentManagerDescription:
-      '扫描设备上已安装的编程 Agent；Codex 与 Claude Code 安装后即可连接，扫描不会启动外部命令。',
     codingAgentManagerSummary: '已发现 {count} 个，其中 {ready} 个可用',
     codingAgentRescan: '重新扫描',
     codingAgentScanning: '扫描中…',
@@ -4548,8 +4546,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentManageAgents: 'Scan and manage agents',
     codingAgentManageAgentsDescription: 'Scan local agents and manage manually added agents.',
     codingAgentManagerTitle: 'Agent management',
-    codingAgentManagerDescription:
-      'Scan installed coding agents. Codex and Claude Code connect once installed; scanning never starts external commands.',
     codingAgentManagerSummary: '{count} found, {ready} ready',
     codingAgentRescan: 'Scan again',
     codingAgentScanning: 'Scanning…',

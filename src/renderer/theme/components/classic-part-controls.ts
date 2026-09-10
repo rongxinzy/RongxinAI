@@ -5,8 +5,7 @@ export function classicPartControls(dark: boolean) {
   return {
     'part-coding-agent-manager-dialog-header-1': recipe({
       base: {
-        'border-bottom-width': '1px',
-        'border-color': 'var(--zy-border)',
+        'border-bottom-width': '0px',
         'padding-inline': '1.5rem',
         'padding-block': '1.25rem',
         'padding-right': '3.5rem',
@@ -14,6 +13,7 @@ export function classicPartControls(dark: boolean) {
     }),
     'part-coding-agent-manager-dialog-footer-1': recipe({
       base: {
+        'border-top-width': '0px',
         'border-radius': '0px',
         'background-color': 'var(--zy-background)',
         'padding-inline': '1.5rem',

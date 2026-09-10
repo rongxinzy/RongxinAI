@@ -69,7 +69,6 @@ import {
   CodingSidePanelView,
   CodingUiEvent,
   type CodingCreateSessionEventDetail,
-  type CodingManageAgentsEventDetail,
   type CodingSidePanelView as CodingSidePanelViewType,
 } from './constants';
 import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspaceSidebar';
@@ -203,14 +202,6 @@ export const CodingWorkbenchView = ({
         else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
       });
   }, [selectedLaneId, snapshot, workspaceRoot]);
-  useEffect(() => {
-    const openManager = (event: Event) => {
-      const detail = (event as CustomEvent<CodingManageAgentsEventDetail>).detail;
-      if (detail.workspaceRoot === workspaceRoot) setAgentManagerOpen(true);
-    };
-    window.addEventListener(CodingUiEvent.ManageAgents, openManager);
-    return () => window.removeEventListener(CodingUiEvent.ManageAgents, openManager);
-  }, [workspaceRoot]);
   useEffect(() => {
     const openSessionSetup = (event: Event) => {
       const detail = (event as CustomEvent<CodingCreateSessionEventDetail>).detail;
