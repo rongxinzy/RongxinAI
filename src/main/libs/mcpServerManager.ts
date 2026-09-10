@@ -512,40 +512,65 @@ export class McpServerManager {
   }
 
   /**
-   * Start MCP servers and discover their tools.
+   * Reconcile the active MCP runtime with the enabled server records.
+   * Unchanged connections remain alive; only added, removed, or materially
+   * changed records are connected or restarted.
    */
-  async startServers(enabledServers: McpServerRecord[]): Promise<McpToolManifestEntry[]> {
-    if (this.servers.size > 0) {
-      log('INFO', `Restarting ${this.servers.size} existing MCP server connections before refresh`);
-      await this.stopServers();
+  async reconcileServers(enabledServers: McpServerRecord[]): Promise<McpToolManifestEntry[]> {
+    const desiredByName = new Map(enabledServers.map(server => [server.name, server]));
+    const unchangedStatuses = new Map(this._serverStatuses.map(status => [status.name, status]));
+    const serversToStop = [...this.servers.entries()].filter(([name, server]) => {
+      const desired = desiredByName.get(name);
+      return !desired || !this.isRecordCurrent(server.record, desired);
+    });
+
+    if (serversToStop.length > 0) {
+      log('INFO', `Stopping ${serversToStop.length} changed or removed MCP server connection(s)`);
+      await this.stopManagedServers(serversToStop);
     }
 
-    log('INFO', `Starting ${enabledServers.length} MCP servers`);
-    this._serverStatuses = enabledServers.map(server => ({
-      name: server.name,
-      connected: false,
-      toolCount: 0,
-    }));
+    this._serverStatuses = enabledServers.map(server => {
+      const managed = this.servers.get(server.name);
+      const prior = unchangedStatuses.get(server.name);
+      if (managed && prior) return prior;
+      return { name: server.name, connected: false, toolCount: 0 };
+    });
 
+    const serversToStart = enabledServers.filter(server => !this.servers.has(server.name));
+    if (serversToStart.length > 0) {
+      log('INFO', `Starting ${serversToStart.length} new or changed MCP server connection(s)`);
+    }
     const results = await Promise.allSettled(
-      enabledServers.map(server => this.startSingleServer(server)),
+      serversToStart.map(server => this.startSingleServer(server)),
     );
 
-    // Collect tools from all successfully started servers
-    this._toolManifest = [];
-    for (const [i, result] of results.entries()) {
-      if (result.status === 'fulfilled' && result.value) {
-        this._toolManifest.push(...result.value.tools);
-      } else if (result.status === 'rejected') {
+    for (const [index, result] of results.entries()) {
+      if (result.status === 'rejected') {
         const error =
           result.reason instanceof Error ? result.reason.message : String(result.reason);
-        this.updateServerStatus(enabledServers[i].name, { error });
-        log('WARN', `Failed to start MCP server "${enabledServers[i].name}": ${error}`);
+        this.updateServerStatus(serversToStart[index].name, { error });
+        log('WARN', `Failed to start MCP server "${serversToStart[index].name}": ${error}`);
       }
     }
 
+    this.rebuildToolManifest(enabledServers);
     log('INFO', `Discovered ${this._toolManifest.length} tools from ${this.servers.size} servers`);
     return this._toolManifest;
+  }
+
+  /** @deprecated Use reconcileServers() so unchanged servers are preserved. */
+  async startServers(enabledServers: McpServerRecord[]): Promise<McpToolManifestEntry[]> {
+    return this.reconcileServers(enabledServers);
+  }
+
+  private isRecordCurrent(active: McpServerRecord, desired: McpServerRecord): boolean {
+    return JSON.stringify(active) === JSON.stringify(desired);
+  }
+
+  private rebuildToolManifest(enabledServers: McpServerRecord[]): void {
+    this._toolManifest = enabledServers.flatMap(
+      server => this.servers.get(server.name)?.tools ?? [],
+    );
   }
 
   private updateServerStatus(
@@ -813,21 +838,19 @@ export class McpServerManager {
    */
   async stopServers(): Promise<void> {
     log('INFO', `Stopping ${this.servers.size} MCP servers`);
-    const closePromises: Promise<void>[] = [];
-
-    for (const [name, server] of this.servers) {
-      closePromises.push(
-        (async () => {
-          if (await closeClientWithTimeout(server.client, name)) {
-            log('INFO', `Stopped MCP server "${name}"`);
-          }
-        })(),
-      );
-    }
-
-    await Promise.allSettled(closePromises);
-    this.servers.clear();
+    await this.stopManagedServers([...this.servers.entries()]);
     this._toolManifest = [];
     this._serverStatuses = [];
+  }
+
+  private async stopManagedServers(entries: Array<[string, ManagedMcpServer]>): Promise<void> {
+    await Promise.allSettled(
+      entries.map(async ([name, server]) => {
+        if (await closeClientWithTimeout(server.client, name)) {
+          log('INFO', `Stopped MCP server "${name}"`);
+        }
+        this.servers.delete(name);
+      }),
+    );
   }
 }

@@ -2448,6 +2448,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpMarketplace: '市场',
     mcpCustom: '自定义',
     mcpCustomDescription: '手动配置 MCP 服务器',
+    mcpImportConfig: '导入配置',
+    mcpExportConfig: '导出配置',
+    mcpImportFailed: '导入 MCP 配置失败',
+    mcpExportFailed: '导出 MCP 配置失败',
     mcpResetForm: '重置',
     mcpInstall: '安装',
     mcpUse: '使用',
@@ -2872,7 +2876,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksTitle: '自动化',
     scheduledTasksHeroDesc: '按计划自动执行任务，并追踪每一次运行记录',
     scheduledTasksCreateByChat: '通过会话创建',
-    scheduledTasksCreateByChatPrompt: '我想通过对话创建一个定时任务，请先询问我执行内容、执行时间和通知方式，然后帮我完成配置。',
+    scheduledTasksCreateByChatPrompt:
+      '我想通过对话创建一个定时任务，请先询问我执行内容、执行时间和通知方式，然后帮我完成配置。',
     scheduledTasksNewTask: '新建任务',
     scheduledTasksNewTab: '新建',
     taskTemplateSectionTitle: '快速创建定时任务',
@@ -3341,8 +3346,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     todoParsedImportant: '已识别为重要',
   },
   en: {
-    chatStreamInterrupted: 'The response was interrupted. Received content is preserved. Retry or ask to continue.',
-    chatStreamLengthLimit: 'The response reached its output limit and may be incomplete. You can ask to continue.',
+    chatStreamInterrupted:
+      'The response was interrupted. Received content is preserved. Retry or ask to continue.',
+    chatStreamLengthLimit:
+      'The response reached its output limit and may be incomplete. You can ask to continue.',
     operationFailed: 'Operation failed',
     authenticationExpired: 'Authentication expired. Please sign in again',
     apiKeyMissing: 'API key is missing. Check your configuration',
@@ -3456,7 +3463,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceInspectorDefault: 'Default',
     localInferenceInspectorEnabled: 'Enabled',
     localInferenceInspectorDisabled: 'Disabled',
-    localInferenceInspectorLogsDescription: 'View the raw logs from this model\'s most recent launch.',
+    localInferenceInspectorLogsDescription:
+      "View the raw logs from this model's most recent launch.",
     localInferenceInspectorOpenLogs: 'Open Raw Logs',
     localInferenceInspectorResize: 'Resize model inspector',
     localInferenceContextSettingsHint: 'Leave empty to use the default value.',
@@ -4424,7 +4432,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingSessionCreateFailed: 'The agent or model is unavailable. No session was created.',
     codingSessionCollaborator: 'Collaborator',
     codingSessionRemove: 'Delete session',
-    codingSessionRemoveConfirm: 'Delete the current session record. Files on disk are never deleted.',
+    codingSessionRemoveConfirm:
+      'Delete the current session record. Files on disk are never deleted.',
     codingAgentReady: 'Ready',
     codingAgentStop: 'Stop',
     codingAgentEmptyTitle: 'Ready to code',
@@ -4563,7 +4572,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentAddProfile: 'Add agent',
     codingAgentTrustAgent: 'Trust explicitly',
     codingAgentProbeAgent: 'Check connection',
-    codingAgentProbeRequired: 'This local agent has not been checked yet. It will be checked automatically when you send.',
+    codingAgentProbeRequired:
+      'This local agent has not been checked yet. It will be checked automatically when you send.',
     codingAgentAuthenticate: 'Sign in',
     codingAgentPermission: 'Action permission required',
     codingAgentPermissionDescription:
@@ -5934,6 +5944,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpMarketplace: 'Marketplace',
     mcpCustom: 'Custom',
     mcpCustomDescription: 'Manually configure an MCP server',
+    mcpImportConfig: 'Import configuration',
+    mcpExportConfig: 'Export configuration',
+    mcpImportFailed: 'Failed to import MCP configuration',
+    mcpExportFailed: 'Failed to export MCP configuration',
     mcpResetForm: 'Reset',
     mcpInstall: 'Install',
     mcpUse: 'Use',
@@ -6400,7 +6414,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     scheduledTasksTitle: 'Automation',
     scheduledTasksHeroDesc: 'Run tasks automatically on schedule and track every execution.',
     scheduledTasksCreateByChat: 'Create via conversation',
-    scheduledTasksCreateByChatPrompt: 'I want to create a scheduled task through conversation. Please ask me for the task, schedule, and notification method, then help me configure it.',
+    scheduledTasksCreateByChatPrompt:
+      'I want to create a scheduled task through conversation. Please ask me for the task, schedule, and notification method, then help me configure it.',
     scheduledTasksNewTask: 'New Task',
     scheduledTasksNewTab: 'New',
     taskTemplateSectionTitle: 'Quick Setup',
