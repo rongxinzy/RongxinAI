@@ -476,4 +476,11 @@ export class CodingGitService {
     await runGit(targetRoot, ['check-ref-format', '--branch', value]);
     await runGit(targetRoot, ['switch', '--', value]);
   }
+
+  async createBranch(targetRoot: string, branch: string): Promise<void> {
+    const value = branch.trim();
+    if (!value || value.startsWith('-')) throw new Error('Invalid Git branch.');
+    await runGit(targetRoot, ['check-ref-format', '--branch', value]);
+    await runGit(targetRoot, ['switch', '--create', value]);
+  }
 }

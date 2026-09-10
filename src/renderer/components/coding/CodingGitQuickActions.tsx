@@ -5,15 +5,24 @@ import {
   DialogContent,
   DialogDescription,
   DialogFooter,
+  DialogFooterSurface,
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@shared/components/ui/command';
 import { Field, FieldGroup, FieldLabel } from '@shared/components/ui/field';
 import { Input } from '@shared/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Check, ChevronDown, FileDiff, GitBranch, GitPullRequest, Send, SlidersHorizontal, Upload } from 'lucide-react';
+import { Check, ChevronDown, FileDiff, GitBranch, GitPullRequest, Plus, Send, SlidersHorizontal, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -21,6 +30,7 @@ import type { CodingGitStatus, CodingGitTargetInput } from '../../../shared/codi
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
 import { CodingGitQuickActionMode, type CodingGitQuickActionMode as CodingGitQuickActionModeType } from './constants';
+import { buildGitHubComparisonUrl } from './codingGitUrl';
 
 interface CodingGitQuickActionsProps {
   target: CodingGitTargetInput;
@@ -67,7 +77,8 @@ export const CodingGitQuickActions = ({
   const [commitOpen, setCommitOpen] = useState(false);
   const [pullRequestOpen, setPullRequestOpen] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
-  const [branchFilter, setBranchFilter] = useState('');
+  const [createBranchOpen, setCreateBranchOpen] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
   const [pendingBranch, setPendingBranch] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState('');
   const [includeUnstaged, setIncludeUnstaged] = useState(true);
@@ -99,10 +110,7 @@ export const CodingGitQuickActions = ({
     () => status?.files.filter(file => file.worktreeStatus !== null).map(file => file.path) ?? [],
     [status],
   );
-  const branches = useMemo(() => {
-    const query = branchFilter.trim().toLocaleLowerCase();
-    return (status?.localBranches ?? []).filter(branch => !query || branch.toLocaleLowerCase().includes(query));
-  }, [branchFilter, status?.localBranches]);
+  const branches = useMemo(() => status?.localBranches ?? [], [status?.localBranches]);
 
   const openReview = () => {
     setOpen(false);
@@ -134,7 +142,7 @@ export const CodingGitQuickActions = ({
   };
 
   const switchBranch = async (branch: string) => {
-      if (!status || branch === status.branch || !status.canMutate) return;
+    if (!status || branch === status.branch || !status.canMutate) return;
     setPendingBranch(branch);
     try {
       const result = await window.electron.codingAgent.switchGitBranch({ ...target, branch });
@@ -142,6 +150,25 @@ export const CodingGitQuickActions = ({
         setStatus(result.status);
         setBranchOpen(false);
         toast.success(i18nService.t('codingGitBranchSwitched'));
+        return;
+      }
+      toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
+    } finally {
+      setPendingBranch(null);
+    }
+  };
+
+  const createBranch = async () => {
+    const branch = newBranchName.trim();
+    if (!status || !branch || !status.canMutate) return;
+    setPendingBranch(branch);
+    try {
+      const result = await window.electron.codingAgent.createGitBranch({ ...target, branch });
+      if (result.success && result.status) {
+        setStatus(result.status);
+        setNewBranchName('');
+        setCreateBranchOpen(false);
+        toast.success(i18nService.t('codingGitBranchCreated'));
         return;
       }
       toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
@@ -191,9 +218,11 @@ export const CodingGitQuickActions = ({
     }
   };
 
-  const openRepository = async () => {
-    if (!status?.githubRepositoryUrl) return;
-    const result = await window.electron.shell.openExternal(status.githubRepositoryUrl);
+  const openBranchComparison = async () => {
+    if (!status?.githubRepositoryUrl || !status.branch) return;
+    const result = await window.electron.shell.openExternal(
+      buildGitHubComparisonUrl(status.githubRepositoryUrl, status.branch),
+    );
     if (!result.success) toast.error(normalizeError(result.error ?? i18nService.t('codingGitActionFailed')));
   };
 
@@ -245,24 +274,46 @@ export const CodingGitQuickActions = ({
                   <span className="text-xs text-muted-foreground">{status.upstream ?? '—'}</span>
                   <ChevronDown />
                 </PopoverTrigger>
-                <PopoverContent side="left" align="start" className="w-80 p-2">
-                  <Input value={branchFilter} placeholder={i18nService.t('codingGitBranch')} onChange={event => setBranchFilter(event.target.value)} />
-                  <div className="mt-2 space-y-1">
-                    {branches.map(branch => (
-                      <Button key={branch} type="button" variant={branch === status.branch ? 'secondary' : 'ghost'} disabled={branch === status.branch || pendingBranch !== null || !status.canMutate} className="w-full justify-start gap-2" onClick={() => void switchBranch(branch)}>
-                        <GitBranch />
-                        <span className="min-w-0 flex-1 truncate text-left">{branch}</span>
-                        {pendingBranch === branch ? <Spinner /> : branch === status.branch ? <Check /> : null}
-                      </Button>
-                    ))}
-                  </div>
+                <PopoverContent side="left" align="start" className="w-80 p-0">
+                  <Command>
+                    <CommandInput placeholder={i18nService.t('codingGitSearchBranches')} />
+                    <CommandList className="max-h-80">
+                      <CommandEmpty>{i18nService.t('codingGitNoBranches')}</CommandEmpty>
+                      {branches.map(branch => (
+                        <CommandItem
+                          key={branch}
+                          value={branch}
+                          disabled={branch === status.branch || pendingBranch !== null || !status.canMutate}
+                          onSelect={() => void switchBranch(branch)}
+                        >
+                          <GitBranch />
+                          <span className="min-w-0 flex-1 truncate">{branch}</span>
+                          {pendingBranch === branch ? <Spinner /> : branch === status.branch ? <Check /> : null}
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                    <CommandSeparator />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full justify-start gap-2"
+                      disabled={pendingBranch !== null || !status.canMutate}
+                      onClick={() => {
+                        setBranchOpen(false);
+                        setCreateBranchOpen(true);
+                      }}
+                    >
+                      <Plus />
+                      {i18nService.t('codingGitCreateBranch')}
+                    </Button>
+                  </Command>
                 </PopoverContent>
               </Popover>
               <GitMenuRow icon={Send} onClick={openCommit}>
                 {i18nService.t('codingGitCommitOrPush')}
               </GitMenuRow>
-              {status.githubRepositoryUrl ? (
-                <GitMenuRow icon={GitBranch} onClick={() => void openRepository()}>
+              {status.githubRepositoryUrl && status.branch ? (
+                <GitMenuRow icon={GitBranch} onClick={() => void openBranchComparison()}>
                   {i18nService.t('codingGitCompareBranch')}
                 </GitMenuRow>
               ) : null}
@@ -291,7 +342,7 @@ export const CodingGitQuickActions = ({
               <span className={cn('ml-auto text-sm', 'text-muted-foreground')}><span className="text-success">+{status?.additions ?? 0}</span> <span className="text-destructive">−{status?.deletions ?? 0}</span></span>
             </Field>
           </FieldGroup>
-          <DialogFooter>
+          <DialogFooter surface={DialogFooterSurface.Seamless}>
             <Button type="button" variant="outline" disabled={!status?.canMutate || pendingAction !== null || status?.ahead === 0 || !status?.upstream} onClick={() => void push()}>{pendingAction === 'push' ? <Spinner /> : <Upload />}{i18nService.t('codingGitPush')}</Button>
             <Button type="button" variant="outline" disabled={!status?.canMutate || !commitMessage.trim() || pendingAction !== null} onClick={() => void runCommit(false)}>{pendingAction === 'commit' ? <Spinner /> : <Send />}{i18nService.t('codingGitCommit')}</Button>
             <Button type="button" disabled={!status?.canMutate || !commitMessage.trim() || pendingAction !== null || !status?.upstream} onClick={() => void runCommit(true)}>{pendingAction === 'commitAndPush' ? <Spinner /> : <Upload />}{i18nService.t('codingGitCommitAndPush')}</Button>
@@ -309,7 +360,40 @@ export const CodingGitQuickActions = ({
             <Field><FieldLabel htmlFor="coding-git-pr-base">{i18nService.t('codingGitPullRequestBase')}</FieldLabel><Input id="coding-git-pr-base" value={pullRequestBase} onChange={event => setPullRequestBase(event.target.value)} /></Field>
             <Field><FieldLabel htmlFor="coding-git-pr-body">{i18nService.t('codingGitPullRequestBody')}</FieldLabel><Input id="coding-git-pr-body" value={pullRequestBody} onChange={event => setPullRequestBody(event.target.value)} /></Field>
           </FieldGroup>
-          <DialogFooter><Button type="button" variant="outline" onClick={() => setPullRequestOpen(false)}>{i18nService.t('codingGitCancel')}</Button><Button type="button" disabled={pendingAction !== null || !pullRequestTitle.trim()} onClick={() => void createPullRequest()}>{pendingAction === 'pullRequest' ? <Spinner /> : <GitPullRequest />}{i18nService.t('codingGitCreatePullRequest')}</Button></DialogFooter>
+          <DialogFooter surface={DialogFooterSurface.Seamless}><Button type="button" variant="outline" onClick={() => setPullRequestOpen(false)}>{i18nService.t('codingGitCancel')}</Button><Button type="button" disabled={pendingAction !== null || !pullRequestTitle.trim()} onClick={() => void createPullRequest()}>{pendingAction === 'pullRequest' ? <Spinner /> : <GitPullRequest />}{i18nService.t('codingGitCreatePullRequest')}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={createBranchOpen} onOpenChange={setCreateBranchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{i18nService.t('codingGitCreateBranchTitle')}</DialogTitle>
+            <DialogDescription>{i18nService.t('codingGitCreateBranchDescription')}</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="coding-git-new-branch">
+                {i18nService.t('codingGitCreateBranchName')}
+              </FieldLabel>
+              <Input
+                id="coding-git-new-branch"
+                value={newBranchName}
+                onChange={event => setNewBranchName(event.target.value)}
+              />
+            </Field>
+          </FieldGroup>
+          <DialogFooter surface={DialogFooterSurface.Seamless}>
+            <Button type="button" variant="outline" onClick={() => setCreateBranchOpen(false)}>
+              {i18nService.t('codingGitCancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={!newBranchName.trim() || pendingBranch !== null || !status?.canMutate}
+              onClick={() => void createBranch()}
+            >
+              {pendingBranch === newBranchName.trim() ? <Spinner /> : <Plus />}
+              {i18nService.t('codingGitCreateBranch')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
