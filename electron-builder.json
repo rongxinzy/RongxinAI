@@ -120,7 +120,7 @@
       {
         "from": "MCPs",
         "to": "MCPs",
-        "filter": ["**/*", "!feishu/runtime/**/node_modules/.bin/**"]
+        "filter": ["**/*", "!feishu/runtime/**"]
       },
       {
         "from": "SKILLs",
@@ -240,7 +240,7 @@
       {
         "from": "MCPs",
         "to": "MCPs",
-        "filter": ["**/*", "!feishu/runtime/**/node_modules/.bin/**"]
+        "filter": ["**/*", "!feishu/runtime/**"]
       },
       {
         "from": "resources/uv-linux",

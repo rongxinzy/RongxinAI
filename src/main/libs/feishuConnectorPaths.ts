@@ -7,7 +7,6 @@ export const FeishuConnectorPath = {
   CliBinDirectory: 'bin',
   SkillsDirectory: 'skills',
   NodeModulesDirectory: 'node_modules',
-  RuntimeManifestFile: 'runtime-manifest.json',
 } as const;
 
 export function getFeishuCliRoot(userDataPath: string): string {

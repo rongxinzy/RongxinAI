@@ -24,6 +24,7 @@ __pycache__/
 vendor/openclaw-runtime/
 vendor/openclaw-plugins/
 vendor/channel-runtime/
+MCPs/feishu/runtime/
 vendor/llamacpp-runtime/
 vendor/engram-runtime/
 

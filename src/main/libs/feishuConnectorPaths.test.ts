@@ -3,7 +3,6 @@ import path from 'path';
 import { expect, test } from 'vitest';
 
 import {
-  FeishuConnectorPath,
   getFeishuCliBinDirectory,
   getFeishuCliRoot,
   getFeishuConnectorSkillsRoot,
@@ -19,5 +18,4 @@ test('keeps the CLI and Skills in distinct app-owned connector paths', () => {
   expect(getFeishuConnectorSkillsRoot(userDataPath)).toBe(
     path.join(userDataPath, 'MCPs', 'feishu', 'skills'),
   );
-  expect(FeishuConnectorPath.RuntimeManifestFile).toBe('runtime-manifest.json');
 });

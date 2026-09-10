@@ -245,11 +245,11 @@ import {
 } from './libs/ccConnectWeixinSetup';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
 import {
-  FeishuConnectorPath,
   getFeishuCliRoot,
   getFeishuConnectorSkillsRoot,
 } from './libs/feishuConnectorPaths';
 import { getFeishuCliLauncherPath, writeFeishuCliLauncher } from './libs/feishuCliLauncher';
+import { installDownloadedFeishuCli } from './libs/feishuCliDownloader';
 import { McpCredentialVault } from './libs/mcpCredentialVault';
 import { exportMcpConfig, importMcpConfig } from './libs/mcpConfigCodec';
 import {
@@ -1892,18 +1892,15 @@ const runFeishuCliCommand = (
 ): Promise<string> =>
   new Promise((resolve, reject) => {
     const env: Record<string, string | undefined> = { ...process.env };
-    // lark-cli's generated launcher invokes `node` through PATH. Use the
-    // application runtime here as well as for its initial npm installation.
+    // Keep the Agent process environment consistent with the app-managed
+    // connector binary directory.
     applyApplicationRuntimeEnv(env, { includePackageMirrors: true });
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       cwd,
       shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
-      env: {
-        ...env,
-        ...(args[0]?.toLowerCase().endsWith('npm-cli.js') ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
-      },
+      env,
     });
     const outputChunks: Buffer[] = [];
     let settled = false;
@@ -1959,160 +1956,36 @@ const findFeishuCliCommand = async (): Promise<string | null> => {
   return getLocalFeishuCliCommand();
 };
 
-const resolveBundledFeishuCliRuntime = (): string | null => {
-  const target = `${process.platform}-${process.arch}`;
-  const candidates = [
-    path.join(process.resourcesPath, 'MCPs', 'feishu', 'runtime', target),
-    path.join(app.getAppPath(), 'MCPs', 'feishu', 'runtime', target),
-    path.join(process.cwd(), 'MCPs', 'feishu', 'runtime', target),
-  ];
-  return candidates.find(candidate => fs.existsSync(candidate)) || null;
+const installFeishuCli = async (): Promise<void> => {
+  await installDownloadedFeishuCli(app.getPath('userData'));
+  await writeFeishuCliLauncher(app.getPath('userData'));
+  // Pi's bash tool snapshots this process environment. Refresh the managed
+  // PATH now so a connector installed after the first session is usable.
+  applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
 };
 
-const readBundledFeishuCliRuntime = async (
-  runtimeRoot: string,
-): Promise<{
-  packageName: string;
-  packageVersion: string;
-  runtimePackageSha256: string;
-  cliPackageSha256: string;
-  cliBinarySha256: string;
-}> => {
-  const manifestPath = path.join(runtimeRoot, FeishuConnectorPath.RuntimeManifestFile);
-  const packagePath = path.join(runtimeRoot, 'node_modules', '@larksuite', 'cli', 'package.json');
-  const [manifestText, packageText] = await Promise.all([
-    fs.promises.readFile(manifestPath, 'utf8'),
-    fs.promises.readFile(packagePath, 'utf8'),
-  ]);
-  const manifest: unknown = JSON.parse(manifestText);
-  const cliPackage: unknown = JSON.parse(packageText);
-  if (
-    !manifest ||
-    typeof manifest !== 'object' ||
-    !cliPackage ||
-    typeof cliPackage !== 'object' ||
-    !('schemaVersion' in manifest) ||
-    !('packageName' in manifest) ||
-    !('packageVersion' in manifest) ||
-    !('runtimePackageSha256' in manifest) ||
-    !('cliPackageSha256' in manifest) ||
-    !('cliBinarySha256' in manifest) ||
-    !('name' in cliPackage) ||
-    !('version' in cliPackage) ||
-    manifest.schemaVersion !== 1 ||
-    typeof manifest.packageName !== 'string' ||
-    typeof manifest.packageVersion !== 'string' ||
-    typeof manifest.runtimePackageSha256 !== 'string' ||
-    typeof manifest.cliPackageSha256 !== 'string' ||
-    typeof manifest.cliBinarySha256 !== 'string' ||
-    typeof cliPackage.name !== 'string' ||
-    typeof cliPackage.version !== 'string' ||
-    manifest.packageName !== '@larksuite/cli' ||
-    manifest.packageVersion !==
-      OfficialIntegrationManifests[OfficialIntegrationId.Feishu].version ||
-    cliPackage.name !== manifest.packageName ||
-    cliPackage.version !== manifest.packageVersion
-  ) {
-    throw new Error('Bundled Feishu CLI runtime is invalid. Please reinstall the application.');
-  }
-  return {
-    packageName: manifest.packageName,
-    packageVersion: manifest.packageVersion,
-    runtimePackageSha256: manifest.runtimePackageSha256,
-    cliPackageSha256: manifest.cliPackageSha256,
-    cliBinarySha256: manifest.cliBinarySha256,
-  };
-};
-
-const installFeishuCli = async (cliRoot: string): Promise<void> => {
-  const runtimeRoot = resolveBundledFeishuCliRuntime();
-  if (!runtimeRoot)
-    throw new Error('Bundled Feishu CLI runtime is unavailable. Please reinstall the application.');
-  await readBundledFeishuCliRuntime(runtimeRoot);
-
-  const sourceNodeModules = path.join(runtimeRoot, 'node_modules');
-  const sourceManifest = path.join(runtimeRoot, FeishuConnectorPath.RuntimeManifestFile);
-  const targetNodeModules = path.join(cliRoot, 'node_modules');
-  const targetManifest = path.join(cliRoot, FeishuConnectorPath.RuntimeManifestFile);
-  const stagingNodeModules = `${targetNodeModules}.staging-${process.pid}-${Date.now()}`;
-  const backupNodeModules = `${targetNodeModules}.backup-${process.pid}-${Date.now()}`;
-  await fs.promises.mkdir(cliRoot, { recursive: true });
-  try {
-    await fs.promises.cp(sourceNodeModules, stagingNodeModules, { recursive: true, force: true });
-    try {
-      await fs.promises.rename(targetNodeModules, backupNodeModules);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
-    await fs.promises.rename(stagingNodeModules, targetNodeModules);
-    await writeFeishuCliLauncher(app.getPath('userData'));
-    await fs.promises.copyFile(sourceManifest, targetManifest);
-    await fs.promises.rm(backupNodeModules, { recursive: true, force: true });
-    // Pi's bash tool snapshots this process environment. Refresh the managed
-    // PATH now so a connector installed after the first session is usable
-    // without restarting the application.
-    applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
-  } catch (error) {
-    await fs.promises.rm(stagingNodeModules, { recursive: true, force: true });
-    const targetMissing = await fs.promises
-      .access(targetNodeModules)
-      .then(() => false)
-      .catch(() => true);
-    const backupExists = await fs.promises
-      .access(backupNodeModules)
-      .then(() => true)
-      .catch(() => false);
-    if (targetMissing && backupExists) {
-      await fs.promises.rename(backupNodeModules, targetNodeModules);
-    }
-    throw error;
-  }
-};
-
-const isFeishuCliCurrent = async (
-  cliRoot: string,
-  expected: Awaited<ReturnType<typeof readBundledFeishuCliRuntime>>,
-): Promise<boolean> => {
-  try {
-    const installed = await readBundledFeishuCliRuntime(cliRoot);
-    return (
-      installed.packageName === expected.packageName &&
-      installed.packageVersion === expected.packageVersion &&
-      installed.runtimePackageSha256 === expected.runtimePackageSha256 &&
-      installed.cliPackageSha256 === expected.cliPackageSha256 &&
-      installed.cliBinarySha256 === expected.cliBinarySha256
-    );
-  } catch {
-    return false;
-  }
-};
-
-const verifyFeishuCli = async (command: string, cliRoot: string): Promise<void> => {
-  await runFeishuCliCommand(command, ['--version'], cliRoot);
+const verifyFeishuCli = async (command: string): Promise<void> => {
+  await runFeishuCliCommand(command, ['--version'], getCurrentFeishuCliRoot());
 };
 
 const prepareFeishuCli = async (): Promise<void> => {
   let cliCommand = await findFeishuCliCommand();
   const cliRoot = getCurrentFeishuCliRoot();
-  const bundledRuntime = resolveBundledFeishuCliRuntime();
-  if (!bundledRuntime)
-    throw new Error('Bundled Feishu CLI runtime is unavailable. Please reinstall the application.');
-  const bundled = await readBundledFeishuCliRuntime(bundledRuntime);
   await fs.promises.mkdir(cliRoot, { recursive: true });
-  if (cliCommand && (await isFeishuCliCurrent(cliRoot, bundled))) {
+  if (cliCommand) {
     try {
-      await verifyFeishuCli(cliCommand, cliRoot);
+      await verifyFeishuCli(cliCommand);
     } catch (error) {
       console.warn('[Feishu] CLI health check failed, reinstalling the pinned version:', error);
-      await installFeishuCli(cliRoot);
+      await installFeishuCli();
       cliCommand = await findFeishuCliCommand();
     }
   } else {
-    await installFeishuCli(cliRoot);
+    await installFeishuCli();
     cliCommand = await findFeishuCliCommand();
   }
   if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
-  await verifyFeishuCli(cliCommand, cliRoot);
+  await verifyFeishuCli(cliCommand);
 
   try {
     await runFeishuCliCommand(cliCommand, ['config', 'show'], cliRoot);
@@ -2206,14 +2079,14 @@ const verifyFeishuConnector = async (signal?: AbortSignal): Promise<void> => {
   const cliCommand = await findFeishuCliCommand();
   if (!cliCommand) throw new Error('Feishu CLI is not installed.');
   const cliRoot = getCurrentFeishuCliRoot();
-  await verifyFeishuCli(cliCommand, cliRoot);
+  await verifyFeishuCli(cliCommand);
   await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, FEISHU_CLI_TIMEOUT_MS, signal);
 };
 
 const repairFeishuConnector = async (): Promise<void> => {
   const cliRoot = getCurrentFeishuCliRoot();
   await fs.promises.mkdir(cliRoot, { recursive: true });
-  await installFeishuCli(cliRoot);
+  await installFeishuCli();
   await prepareFeishuCli();
 };
 

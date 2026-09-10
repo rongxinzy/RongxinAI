@@ -71,9 +71,10 @@ describe('Windows offline component identity', () => {
 
   test('excludes npm launchers because the connector creates its own launcher', () => {
     expect(shouldExclude('feishu/runtime/node_modules/.bin/lark-cli.cmd')).toBe(true);
+    expect(shouldExclude('feishu/runtime/win32-x64/lark-cli.exe')).toBe(true);
     expect(shouldExclude('SKILLs/example/node_modules/.bin/example.cmd')).toBe(true);
     expect(
-      shouldExclude('feishu/runtime/win32-x64/node_modules/@larksuite/cli/bin/lark-cli.exe'),
+      shouldExclude('feishu/skills/document/SKILL.md'),
     ).toBe(false);
   });
 

@@ -42,7 +42,7 @@ test('each desktop target keeps the private document and Python toolchain resour
     assert.ok(mcpResource);
     assert.deepEqual(
       (mcpResource as { filter?: string[] }).filter?.includes(
-        '!feishu/runtime/**/node_modules/.bin/**',
+        '!feishu/runtime/**',
       ),
       true,
     );
