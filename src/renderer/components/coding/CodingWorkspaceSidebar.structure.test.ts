@@ -29,3 +29,8 @@ test('does not fall back to the static lucide plus icon', () => {
   expect(source).not.toContain('Plus,');
   expect(source).not.toContain('<Plus />');
 });
+
+test('keeps the agent manager entry out of the workspace sidebar header', () => {
+  expect(source).not.toContain('<Settings2 />');
+  expect(source).not.toContain('onManageAgents');
+});
