@@ -213,7 +213,6 @@ import {
   getSkillsRoot,
   probeCoworkModelReadiness,
 } from './libs/coworkUtil';
-import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
 import { createContentSecurityPolicy } from './contentSecurityPolicy';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
@@ -245,6 +244,20 @@ import {
   runCcConnectWeixinSetup,
 } from './libs/ccConnectWeixinSetup';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
+import {
+  FeishuConnectorPath,
+  getFeishuCliRoot,
+  getFeishuConnectorSkillsRoot,
+} from './libs/feishuConnectorPaths';
+import { getFeishuCliLauncherPath, writeFeishuCliLauncher } from './libs/feishuCliLauncher';
+import { McpCredentialVault } from './libs/mcpCredentialVault';
+import { exportMcpConfig, importMcpConfig } from './libs/mcpConfigCodec';
+import {
+  hasVerifiedAgentTools,
+  OfficialIntegrationId,
+  OfficialIntegrationManifests,
+} from './libs/mcpIntegrationManifest';
+import { IntegrationOperation, McpIntegrationRuntime } from './libs/mcpIntegrationRuntime';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
 import { exportLogsZip } from './libs/logExport';
 import {
@@ -1822,7 +1835,12 @@ const getSkillManager = () => {
 const getMcpStore = () => {
   if (!mcpStore) {
     const sqliteStore = getStore();
-    mcpStore = new McpStore(sqliteStore.getDatabase());
+    const nextMcpStore = new McpStore(
+      sqliteStore.getDatabase(),
+      new McpCredentialVault(sqliteStore),
+    );
+    nextMcpStore.migrateLegacyCredentials();
+    mcpStore = nextMcpStore;
   }
   return mcpStore;
 };
@@ -1831,27 +1849,30 @@ const MCP_BUILT_IN_DEFAULTS_DISABLED_KEY = 'mcp_builtin_defaults_disabled_v1';
 
 const ensureBuiltInMcpDefaultsDisabled = (): void => {
   const store = getStore();
-  if (store.get<boolean>(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY)) return;
+  const defaultsAlreadyDisabled = store.get<boolean>(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY) === true;
 
   for (const server of getMcpStore().listServers()) {
-    if (server.isBuiltIn && server.enabled) {
+    const isUnverifiedOfficialConnector =
+      server.registryId === FEISHU_MCP_REGISTRY_ID &&
+      !hasVerifiedAgentTools(OfficialIntegrationManifests[OfficialIntegrationId.Feishu]);
+    if (
+      (isUnverifiedOfficialConnector || (!defaultsAlreadyDisabled && server.isBuiltIn)) &&
+      server.enabled
+    ) {
       getMcpStore().setEnabled(server.id, false);
     }
   }
+  if (defaultsAlreadyDisabled) return;
   store.set(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY, true);
 };
 
 const FEISHU_CLI_TIMEOUT_MS = 120_000;
-const FEISHU_CLI_INSTALL_TIMEOUT_MS = 300_000;
 const FEISHU_CLI_AUTH_TIMEOUT_MS = 600_000;
-const FEISHU_MCP_REGISTRY_ID = 'feishu';
-const FEISHU_CLI_PACKAGE = '@larksuite/cli@1.0.93';
-
-const getFeishuCliRoot = (): string => path.join(app.getPath('userData'), 'MCPs', 'feishu', 'cli');
+const FEISHU_MCP_REGISTRY_ID = OfficialIntegrationId.Feishu;
+const getCurrentFeishuCliRoot = (): string => getFeishuCliRoot(app.getPath('userData'));
 
 const getLocalFeishuCliCommand = (): string | null => {
-  const binName = process.platform === 'win32' ? 'lark-cli.cmd' : 'lark-cli';
-  const command = path.join(getFeishuCliRoot(), 'node_modules', '.bin', binName);
+  const command = getFeishuCliLauncherPath(app.getPath('userData'));
   return fs.existsSync(command) ? command : null;
 };
 
@@ -1938,25 +1959,132 @@ const findFeishuCliCommand = async (): Promise<string | null> => {
   return getLocalFeishuCliCommand();
 };
 
-const installFeishuCli = async (cliRoot: string, force = false): Promise<void> => {
-  const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, [
-    'install',
-    '--prefix',
-    cliRoot,
-    '--no-save',
-    '--no-audit',
-    '--no-fund',
-    ...(force ? ['--force'] : []),
-    FEISHU_CLI_PACKAGE,
+const resolveBundledFeishuCliRuntime = (): string | null => {
+  const target = `${process.platform}-${process.arch}`;
+  const candidates = [
+    path.join(process.resourcesPath, 'MCPs', 'feishu', 'runtime', target),
+    path.join(app.getAppPath(), 'MCPs', 'feishu', 'runtime', target),
+    path.join(process.cwd(), 'MCPs', 'feishu', 'runtime', target),
+  ];
+  return candidates.find(candidate => fs.existsSync(candidate)) || null;
+};
+
+const readBundledFeishuCliRuntime = async (
+  runtimeRoot: string,
+): Promise<{
+  packageName: string;
+  packageVersion: string;
+  runtimePackageSha256: string;
+  cliPackageSha256: string;
+  cliBinarySha256: string;
+}> => {
+  const manifestPath = path.join(runtimeRoot, FeishuConnectorPath.RuntimeManifestFile);
+  const packagePath = path.join(runtimeRoot, 'node_modules', '@larksuite', 'cli', 'package.json');
+  const [manifestText, packageText] = await Promise.all([
+    fs.promises.readFile(manifestPath, 'utf8'),
+    fs.promises.readFile(packagePath, 'utf8'),
   ]);
-  if (!bundledNpm)
-    throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
-  await runFeishuCliCommand(
-    bundledNpm.command,
-    bundledNpm.args,
-    cliRoot,
-    FEISHU_CLI_INSTALL_TIMEOUT_MS,
-  );
+  const manifest: unknown = JSON.parse(manifestText);
+  const cliPackage: unknown = JSON.parse(packageText);
+  if (
+    !manifest ||
+    typeof manifest !== 'object' ||
+    !cliPackage ||
+    typeof cliPackage !== 'object' ||
+    !('schemaVersion' in manifest) ||
+    !('packageName' in manifest) ||
+    !('packageVersion' in manifest) ||
+    !('runtimePackageSha256' in manifest) ||
+    !('cliPackageSha256' in manifest) ||
+    !('cliBinarySha256' in manifest) ||
+    !('name' in cliPackage) ||
+    !('version' in cliPackage) ||
+    manifest.schemaVersion !== 1 ||
+    typeof manifest.packageName !== 'string' ||
+    typeof manifest.packageVersion !== 'string' ||
+    typeof manifest.runtimePackageSha256 !== 'string' ||
+    typeof manifest.cliPackageSha256 !== 'string' ||
+    typeof manifest.cliBinarySha256 !== 'string' ||
+    typeof cliPackage.name !== 'string' ||
+    typeof cliPackage.version !== 'string' ||
+    manifest.packageName !== '@larksuite/cli' ||
+    manifest.packageVersion !==
+      OfficialIntegrationManifests[OfficialIntegrationId.Feishu].version ||
+    cliPackage.name !== manifest.packageName ||
+    cliPackage.version !== manifest.packageVersion
+  ) {
+    throw new Error('Bundled Feishu CLI runtime is invalid. Please reinstall the application.');
+  }
+  return {
+    packageName: manifest.packageName,
+    packageVersion: manifest.packageVersion,
+    runtimePackageSha256: manifest.runtimePackageSha256,
+    cliPackageSha256: manifest.cliPackageSha256,
+    cliBinarySha256: manifest.cliBinarySha256,
+  };
+};
+
+const installFeishuCli = async (cliRoot: string): Promise<void> => {
+  const runtimeRoot = resolveBundledFeishuCliRuntime();
+  if (!runtimeRoot)
+    throw new Error('Bundled Feishu CLI runtime is unavailable. Please reinstall the application.');
+  await readBundledFeishuCliRuntime(runtimeRoot);
+
+  const sourceNodeModules = path.join(runtimeRoot, 'node_modules');
+  const sourceManifest = path.join(runtimeRoot, FeishuConnectorPath.RuntimeManifestFile);
+  const targetNodeModules = path.join(cliRoot, 'node_modules');
+  const targetManifest = path.join(cliRoot, FeishuConnectorPath.RuntimeManifestFile);
+  const stagingNodeModules = `${targetNodeModules}.staging-${process.pid}-${Date.now()}`;
+  const backupNodeModules = `${targetNodeModules}.backup-${process.pid}-${Date.now()}`;
+  await fs.promises.mkdir(cliRoot, { recursive: true });
+  try {
+    await fs.promises.cp(sourceNodeModules, stagingNodeModules, { recursive: true, force: true });
+    try {
+      await fs.promises.rename(targetNodeModules, backupNodeModules);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    await fs.promises.rename(stagingNodeModules, targetNodeModules);
+    await writeFeishuCliLauncher(app.getPath('userData'));
+    await fs.promises.copyFile(sourceManifest, targetManifest);
+    await fs.promises.rm(backupNodeModules, { recursive: true, force: true });
+    // Pi's bash tool snapshots this process environment. Refresh the managed
+    // PATH now so a connector installed after the first session is usable
+    // without restarting the application.
+    applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
+  } catch (error) {
+    await fs.promises.rm(stagingNodeModules, { recursive: true, force: true });
+    const targetMissing = await fs.promises
+      .access(targetNodeModules)
+      .then(() => false)
+      .catch(() => true);
+    const backupExists = await fs.promises
+      .access(backupNodeModules)
+      .then(() => true)
+      .catch(() => false);
+    if (targetMissing && backupExists) {
+      await fs.promises.rename(backupNodeModules, targetNodeModules);
+    }
+    throw error;
+  }
+};
+
+const isFeishuCliCurrent = async (
+  cliRoot: string,
+  expected: Awaited<ReturnType<typeof readBundledFeishuCliRuntime>>,
+): Promise<boolean> => {
+  try {
+    const installed = await readBundledFeishuCliRuntime(cliRoot);
+    return (
+      installed.packageName === expected.packageName &&
+      installed.packageVersion === expected.packageVersion &&
+      installed.runtimePackageSha256 === expected.runtimePackageSha256 &&
+      installed.cliPackageSha256 === expected.cliPackageSha256 &&
+      installed.cliBinarySha256 === expected.cliBinarySha256
+    );
+  } catch {
+    return false;
+  }
 };
 
 const verifyFeishuCli = async (command: string, cliRoot: string): Promise<void> => {
@@ -1965,14 +2093,18 @@ const verifyFeishuCli = async (command: string, cliRoot: string): Promise<void> 
 
 const prepareFeishuCli = async (): Promise<void> => {
   let cliCommand = await findFeishuCliCommand();
-  const cliRoot = getFeishuCliRoot();
-  fs.mkdirSync(cliRoot, { recursive: true });
-  if (cliCommand) {
+  const cliRoot = getCurrentFeishuCliRoot();
+  const bundledRuntime = resolveBundledFeishuCliRuntime();
+  if (!bundledRuntime)
+    throw new Error('Bundled Feishu CLI runtime is unavailable. Please reinstall the application.');
+  const bundled = await readBundledFeishuCliRuntime(bundledRuntime);
+  await fs.promises.mkdir(cliRoot, { recursive: true });
+  if (cliCommand && (await isFeishuCliCurrent(cliRoot, bundled))) {
     try {
       await verifyFeishuCli(cliCommand, cliRoot);
     } catch (error) {
       console.warn('[Feishu] CLI health check failed, reinstalling the pinned version:', error);
-      await installFeishuCli(cliRoot, true);
+      await installFeishuCli(cliRoot);
       cliCommand = await findFeishuCliCommand();
     }
   } else {
@@ -1993,7 +2125,7 @@ const authorizeFeishuCli = async (signal?: AbortSignal): Promise<void> => {
   await prepareFeishuCli();
   const cliCommand = await findFeishuCliCommand();
   if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
-  const cliRoot = getFeishuCliRoot();
+  const cliRoot = getCurrentFeishuCliRoot();
 
   const authOutput = await runFeishuCliCommand(
     cliCommand,
@@ -2032,7 +2164,7 @@ const logoutFeishuCli = async (): Promise<void> => {
   const cliCommand = await findFeishuCliCommand();
   if (!cliCommand) return;
 
-  await runFeishuCliCommand(cliCommand, ['auth', 'logout'], getFeishuCliRoot());
+  await runFeishuCliCommand(cliCommand, ['auth', 'logout'], getCurrentFeishuCliRoot());
   console.log('[Feishu] official CLI authorization removed');
 };
 
@@ -2045,17 +2177,18 @@ const resolveBundledFeishuSkills = (): string | null => {
   return candidates.find(candidate => fs.existsSync(candidate)) || null;
 };
 
-const installFeishuSkills = (): void => {
+const installFeishuSkills = async (): Promise<void> => {
   const source = resolveBundledFeishuSkills();
   if (!source) throw new Error('Bundled Feishu skills were not found');
   // Keep connector-provided skills in the per-user directory. This avoids
   // mutating the checked-out development SKILLs tree while still letting the
   // Agent load them through its user extraDirs configuration.
-  const target = path.join(app.getPath('userData'), 'MCPs', 'feishu', 'skills');
-  fs.mkdirSync(target, { recursive: true });
-  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+  const target = getFeishuConnectorSkillsRoot(app.getPath('userData'));
+  await fs.promises.mkdir(target, { recursive: true });
+  const entries = await fs.promises.readdir(source, { withFileTypes: true });
+  for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    fs.cpSync(path.join(source, entry.name), path.join(target, entry.name), {
+    await fs.promises.cp(path.join(source, entry.name), path.join(target, entry.name), {
       recursive: true,
       force: true,
     });
@@ -2063,10 +2196,51 @@ const installFeishuSkills = (): void => {
   console.log('[Feishu] official CLI skills installed for the Agent');
 };
 
-const removeFeishuSkills = (): void => {
-  const target = path.join(app.getPath('userData'), 'MCPs', 'feishu', 'skills');
-  if (fs.existsSync(target)) fs.rmSync(target, { recursive: true, force: true });
+const removeFeishuSkills = async (): Promise<void> => {
+  const target = getFeishuConnectorSkillsRoot(app.getPath('userData'));
+  await fs.promises.rm(target, { recursive: true, force: true });
   console.log('[Feishu] official CLI skills removed from the Agent');
+};
+
+const verifyFeishuConnector = async (signal?: AbortSignal): Promise<void> => {
+  const cliCommand = await findFeishuCliCommand();
+  if (!cliCommand) throw new Error('Feishu CLI is not installed.');
+  const cliRoot = getCurrentFeishuCliRoot();
+  await verifyFeishuCli(cliCommand, cliRoot);
+  await runFeishuCliCommand(cliCommand, ['auth', 'status'], cliRoot, FEISHU_CLI_TIMEOUT_MS, signal);
+};
+
+const repairFeishuConnector = async (): Promise<void> => {
+  const cliRoot = getCurrentFeishuCliRoot();
+  await fs.promises.mkdir(cliRoot, { recursive: true });
+  await installFeishuCli(cliRoot);
+  await prepareFeishuCli();
+};
+
+let mcpIntegrationRuntime: McpIntegrationRuntime | null = null;
+
+const getMcpIntegrationRuntime = (): McpIntegrationRuntime => {
+  if (mcpIntegrationRuntime) return mcpIntegrationRuntime;
+  const runtime = new McpIntegrationRuntime();
+  runtime.register({
+    manifest: OfficialIntegrationManifests[OfficialIntegrationId.Feishu],
+    provision: () => prepareFeishuCli(),
+    authenticate: async signal => {
+      await authorizeFeishuCli(signal);
+      await installFeishuSkills();
+    },
+    verify: signal => verifyFeishuConnector(signal),
+    repair: () => repairFeishuConnector(),
+    uninstall: async () => {
+      try {
+        await logoutFeishuCli();
+      } finally {
+        await removeFeishuSkills();
+      }
+    },
+  });
+  mcpIntegrationRuntime = runtime;
+  return runtime;
 };
 
 const refreshMcpOAuthHeaders = async <
@@ -2196,15 +2370,14 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
       console.log('[McpBridge] refreshing after config change...');
       broadcastMcpBridgeSync('mcp:bridge:syncStart');
 
-      // 1. Stop existing MCP servers (but keep HTTP callback server alive — port stays the same)
-      if (mcpServerManager) {
-        await mcpServerManager.stopServers();
+      ensureBuiltInMcpDefaultsDisabled();
+      const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
+      if (!mcpServerManager) {
+        mcpServerManager = new McpServerManager();
       }
-      // Invalidate any in-flight discovery promise. The next bridge start must
-      // read the current enabled-server list after a delete/disable operation.
-      mcpInitPromise = null;
-      // Re-discover tools from the new set of enabled servers.
-      const tools = await initMcpServers();
+      // Reconcile preserves healthy, unchanged connections. A change to one
+      // integration must not interrupt every other configured MCP server.
+      const tools = await mcpServerManager.reconcileServers(enabledServers);
       if (generation !== mcpLifecycleGeneration) {
         return { tools: 0, error: 'MCP configuration changed during refresh' };
       }
@@ -3377,12 +3550,13 @@ if (!gotTheLock) {
         return { success: false, error: 'MCP server not found' };
       }
       if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
-        try {
-          await logoutFeishuCli();
-        } catch (error) {
-          console.warn('[Feishu] CLI logout failed while uninstalling the connector:', error);
+        const uninstallStatus = await getMcpIntegrationRuntime().run(
+          OfficialIntegrationId.Feishu,
+          IntegrationOperation.Uninstall,
+        );
+        if (uninstallStatus.error) {
+          return { success: false, error: uninstallStatus.error };
         }
-        removeFeishuSkills();
       }
       getMcpStore().deleteServer(id);
       // OAuth sessions are keyed by the registry id during authorization,
@@ -3391,6 +3565,7 @@ if (!gotTheLock) {
       const oauthKeys = new Set([id, existing.registryId].filter(Boolean));
       for (const oauthKey of oauthKeys) {
         getStore().delete(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
+        new McpCredentialVault(getStore()).deleteValue(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
       }
       const servers = getMcpStore().listServers();
       const refreshResult = await refreshMcpBridge();
@@ -3412,6 +3587,16 @@ if (!gotTheLock) {
         const existing = getMcpStore().getServer(options.id);
         if (!existing) {
           return { success: false, error: 'MCP server not found' };
+        }
+        if (
+          existing.registryId === FEISHU_MCP_REGISTRY_ID &&
+          !hasVerifiedAgentTools(OfficialIntegrationManifests[OfficialIntegrationId.Feishu])
+        ) {
+          return {
+            success: false,
+            error:
+              'Feishu is installed as an official connector, but no verified agent tools are available yet.',
+          };
         }
         if (existing.registryId !== FEISHU_MCP_REGISTRY_ID) {
           const validationError = await validateStoredMcpServerConfig(existing);
@@ -3491,6 +3676,67 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle(McpIpc.ExportConfig, async () => {
+    try {
+      const result = await dialog.showSaveDialog({
+        title: 'Export MCP configuration',
+        defaultPath: 'mcp.json',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (result.canceled || !result.filePath) return { success: true, cancelled: true };
+      const document = exportMcpConfig(getMcpStore().listServers());
+      await fs.promises.writeFile(
+        result.filePath,
+        `${JSON.stringify(document, null, 2)}\n`,
+        'utf8',
+      );
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to export MCP configuration',
+      };
+    }
+  });
+
+  ipcMain.handle(McpIpc.ImportConfig, async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        title: 'Import MCP configuration',
+        properties: ['openFile'],
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      });
+      if (result.canceled || result.filePaths.length === 0)
+        return { success: true, cancelled: true };
+      const input = JSON.parse(await fs.promises.readFile(result.filePaths[0], 'utf8')) as unknown;
+      const servers = importMcpConfig(input);
+      const existingNames = new Set(
+        getMcpStore()
+          .listServers()
+          .map(server => server.name),
+      );
+      for (const server of servers) {
+        if (existingNames.has(server.name)) {
+          return { success: false, error: `MCP server "${server.name}" already exists.` };
+        }
+        const validationError = await validateMcpServerConfig(server);
+        if (validationError) return { success: false, error: validationError };
+      }
+      for (const server of servers) getMcpStore().createServer(server);
+      const refreshed = await refreshMcpBridge();
+      return {
+        success: !refreshed.error,
+        servers: getMcpStore().listServers(),
+        error: refreshed.error,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to import MCP configuration',
+      };
+    }
+  });
+
   ipcMain.handle(McpIpc.CancelAuthorize, (_event, requestId: string) => {
     activeMcpAuthorizations.get(requestId)?.abort();
     return { success: true };
@@ -3503,8 +3749,11 @@ if (!gotTheLock) {
 
   ipcMain.handle(McpIpc.PrepareFeishuCli, async () => {
     try {
-      await prepareFeishuCli();
-      return { success: true };
+      const status = await getMcpIntegrationRuntime().run(
+        OfficialIntegrationId.Feishu,
+        IntegrationOperation.Provision,
+      );
+      return status.error ? { success: false, error: status.error } : { success: true };
     } catch (error) {
       return {
         success: false,
@@ -3527,9 +3776,12 @@ if (!gotTheLock) {
       try {
         ensureNotCancelled();
         if (data.registryId === FEISHU_MCP_REGISTRY_ID) {
-          await authorizeFeishuCli(cancellation?.signal);
-          ensureNotCancelled();
-          installFeishuSkills();
+          const status = await getMcpIntegrationRuntime().run(
+            OfficialIntegrationId.Feishu,
+            IntegrationOperation.Authenticate,
+            cancellation?.signal,
+          );
+          if (status.error) throw new Error(status.error);
           ensureNotCancelled();
           const existingFeishu = getMcpStore()
             .listServers()
@@ -3537,8 +3789,10 @@ if (!gotTheLock) {
           if (!existingFeishu) {
             getMcpStore().createServer({
               name: data.name,
-              description: data.description,
+              description: data.description || 'Official Feishu CLI and Skills connector',
               transportType: 'stdio',
+              // Presentation-only record. The CLI is intentionally not started
+              // by McpServerManager until a verified MCP tool protocol exists.
               command: 'lark-cli',
               isBuiltIn: true,
               registryId: FEISHU_MCP_REGISTRY_ID,
@@ -7055,7 +7309,9 @@ if (!gotTheLock) {
     activityService ??= new ActivityService(getStore().getDatabase());
     const recoveredActivityRuns = activityService.recoverInterruptedRuns();
     if (recoveredActivityRuns > 0) {
-      console.warn(`[Activity] marked ${recoveredActivityRuns} interrupted activity run(s) as failed`);
+      console.warn(
+        `[Activity] marked ${recoveredActivityRuns} interrupted activity run(s) as failed`,
+      );
     }
     const prunedActivityRuns = activityService.pruneExpired();
     if (prunedActivityRuns > 0) {

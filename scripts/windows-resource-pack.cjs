@@ -268,4 +268,5 @@ module.exports = {
   getWindowsResourceArchiveCompression,
   isWindowsResourceComponentReusable,
   sha256File,
+  shouldExclude,
 };

@@ -35,6 +35,7 @@ const {
   ensureSkillPythonRuntimes,
   checkSkillPythonRuntimeHealth,
 } = require('./setup-skill-python-runtime.js');
+const { ensureRuntime: ensureFeishuCliRuntime } = require('./prepare-feishu-cli-runtime.cjs');
 
 const {
   buildWindowsResourceBundleManifest,
@@ -80,6 +81,12 @@ function resolveTargetArch(context) {
   if (process.arch === 'arm64') return 'arm64';
   if (process.arch === 'ia32') return 'ia32';
   return 'x64';
+}
+
+function resolveFeishuCliTarget(context) {
+  const platform = context?.electronPlatformName;
+  if (!platform) throw new Error('[FeishuCliRuntime] Packaging target platform is unavailable.');
+  return `${platform}-${resolveTargetArch(context)}`;
 }
 
 function resolveWindows7zaPath() {
@@ -418,6 +425,7 @@ function installSkillDependencies() {
 async function beforePack(context) {
   configureMacAutoUpdateMetadata(context);
   ensureBundledChannelRuntime(context);
+  ensureFeishuCliRuntime(path.join(__dirname, '..'), resolveFeishuCliTarget(context));
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
 

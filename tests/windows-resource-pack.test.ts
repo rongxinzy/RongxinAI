@@ -12,6 +12,7 @@ import {
   getWindowsResourceArchiveCompression,
   isWindowsResourceComponentReusable,
   sha256File,
+  shouldExclude,
 } from '../scripts/windows-resource-pack.cjs';
 
 const temporaryDirectories: string[] = [];
@@ -66,6 +67,14 @@ describe('Windows offline component identity', () => {
       'skill-python': 'lzma2-mx9-solid-v1',
       uv: 'lzma2-mx9-nonsolid-v1',
     });
+  });
+
+  test('excludes npm launchers because the connector creates its own launcher', () => {
+    expect(shouldExclude('feishu/runtime/node_modules/.bin/lark-cli.cmd')).toBe(true);
+    expect(shouldExclude('SKILLs/example/node_modules/.bin/example.cmd')).toBe(true);
+    expect(
+      shouldExclude('feishu/runtime/win32-x64/node_modules/@larksuite/cli/bin/lark-cli.exe'),
+    ).toBe(false);
   });
 
   test('is stable when only source mtimes change', () => {
