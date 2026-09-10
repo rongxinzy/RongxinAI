@@ -120,7 +120,7 @@
       {
         "from": "MCPs",
         "to": "MCPs",
-        "filter": ["**/*"]
+        "filter": ["**/*", "!feishu/runtime/**"]
       },
       {
         "from": "SKILLs",
@@ -222,9 +222,7 @@
     ]
   },
   "deb": {
-    "fpm": [
-      "--before-install=scripts/linux-before-install.sh"
-    ]
+    "fpm": ["--before-install=scripts/linux-before-install.sh"]
   },
   "linux": {
     "target": ["AppImage", "deb"],
@@ -242,7 +240,7 @@
       {
         "from": "MCPs",
         "to": "MCPs",
-        "filter": ["**/*"]
+        "filter": ["**/*", "!feishu/runtime/**"]
       },
       {
         "from": "resources/uv-linux",

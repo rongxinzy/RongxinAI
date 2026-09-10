@@ -2,7 +2,17 @@ import { Button } from '@shared/components/ui/button';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Switch } from '@shared/components/ui/switch';
-import { Cable, LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  Cable,
+  Download,
+  LoaderCircle,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -476,6 +486,12 @@ const McpManager: React.FC<McpManagerProps> = ({
       setActionError('');
       setIsFeishuCliReady(false);
       setOfficialConnectEntry(entry);
+      if (entry.authType === 'cli') {
+        void mcpService
+          .getFeishuCliStatus()
+          .then(status => setIsFeishuCliReady(status.installed))
+          .catch(() => setIsFeishuCliReady(false));
+      }
       return;
     }
     if (
@@ -702,6 +718,22 @@ const McpManager: React.FC<McpManagerProps> = ({
     setEditingServer(null);
     setInstallingRegistry(null);
     setIsFormOpen(true);
+  };
+
+  const handleImportConfig = async () => {
+    setActionError('');
+    const result = await mcpService.importConfig();
+    if (!result.success) {
+      setActionError(result.error || i18nService.t('mcpImportFailed'));
+      return;
+    }
+    if (result.servers) dispatch(setMcpServers(result.servers));
+  };
+
+  const handleExportConfig = async () => {
+    setActionError('');
+    const result = await mcpService.exportConfig();
+    if (!result.success) setActionError(result.error || i18nService.t('mcpExportFailed'));
   };
 
   const existingNames = useMemo(() => servers.map(s => s.name), [servers]);
@@ -1078,15 +1110,20 @@ const McpManager: React.FC<McpManagerProps> = ({
                   </div>
                 ) : (
                   <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleOpenCreateForm}
-                      className="theme-page-mcp-manager-button-3"
-                    >
-                      <Plus data-icon="inline-start" />
-                      {i18nService.t('addMcpServer')}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" onClick={handleImportConfig}>
+                        <Upload data-icon="inline-start" />
+                        {i18nService.t('mcpImportConfig')}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={handleExportConfig}>
+                        <Download data-icon="inline-start" />
+                        {i18nService.t('mcpExportConfig')}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={handleOpenCreateForm}>
+                        <Plus data-icon="inline-start" />
+                        {i18nService.t('addMcpServer')}
+                      </Button>
+                    </div>
                     {paginatedCustom.map(server => (
                       <div
                         key={server.id}

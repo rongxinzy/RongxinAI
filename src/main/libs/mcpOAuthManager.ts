@@ -1,9 +1,14 @@
 import { auth, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type { OAuthClientInformationMixed, OAuthClientMetadata, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js';
+import type {
+  OAuthClientInformationMixed,
+  OAuthClientMetadata,
+  OAuthTokens,
+} from '@modelcontextprotocol/sdk/shared/auth.js';
 import { session, shell } from 'electron';
 import http from 'http';
 
 import type { SqliteStore } from '../sqliteStore';
+import { McpCredentialVault } from './mcpCredentialVault';
 
 export const MCP_OAUTH_STORE_PREFIX = 'mcp.oauth.';
 const MCP_OAUTH_REQUEST_TIMEOUT_MS = 30_000;
@@ -18,14 +23,18 @@ function getMcpOAuthCallbackPort(serverId: string, offset = 0): number {
   for (const character of serverId) {
     hash = (hash * 31 + character.charCodeAt(0)) | 0;
   }
-  return (
-    MCP_OAUTH_CALLBACK_PORT_BASE +
-    ((hash >>> 0) + offset) % MCP_OAUTH_CALLBACK_PORT_RANGE
-  );
+  return MCP_OAUTH_CALLBACK_PORT_BASE + (((hash >>> 0) + offset) % MCP_OAUTH_CALLBACK_PORT_RANGE);
 }
 
-function getStoredOAuthCallbackPort(store: SqliteStore, serverId: string): number | undefined {
-  const storedRedirectUri = store.get<OAuthSession>(`${MCP_OAUTH_STORE_PREFIX}${serverId}`)?.clientRedirectUri;
+function getStoredOAuthCallbackPort(
+  store: SqliteStore,
+  credentialVault: McpCredentialVault,
+  serverId: string,
+): number | undefined {
+  const key = `${MCP_OAUTH_STORE_PREFIX}${serverId}`;
+  const storedRedirectUri =
+    credentialVault.getValue<OAuthSession>(key)?.clientRedirectUri ??
+    store.get<OAuthSession>(key)?.clientRedirectUri;
   if (!storedRedirectUri) return undefined;
   try {
     const redirectUrl = new URL(storedRedirectUri);
@@ -74,7 +83,10 @@ async function createOAuthCallbackServer(
 }
 
 const electronFetch = (input: string | URL, init?: RequestInit): Promise<Response> =>
-  session.defaultSession.fetch(typeof input === 'string' ? input : input.toString(), init) as unknown as Promise<Response>;
+  session.defaultSession.fetch(
+    typeof input === 'string' ? input : input.toString(),
+    init,
+  ) as unknown as Promise<Response>;
 
 function withTimeout<T>(
   promise: Promise<T>,
@@ -124,10 +136,21 @@ class StoredOAuthProvider implements OAuthClientProvider {
   private readonly redirectUri: string;
   private session: OAuthSession;
 
-  constructor(private readonly store: SqliteStore, serverId: string, redirectUri: string) {
+  constructor(
+    private readonly store: SqliteStore,
+    private readonly credentialVault: McpCredentialVault,
+    serverId: string,
+    redirectUri: string,
+  ) {
     this.key = `${MCP_OAUTH_STORE_PREFIX}${serverId}`;
     this.redirectUri = redirectUri;
-    const storedSession = store.get<OAuthSession>(this.key) || {};
+    const secureSession = credentialVault.getValue<OAuthSession>(this.key);
+    const legacySession = secureSession ? undefined : store.get<OAuthSession>(this.key);
+    const storedSession = secureSession ?? legacySession ?? {};
+    if (legacySession) {
+      credentialVault.setValue(this.key, legacySession);
+      store.delete(this.key);
+    }
     // Dynamic OAuth registrations are bound to the callback URL. Older app
     // versions used a random port for every attempt, so their client records
     // cannot safely be reused with the stable callback URL below.
@@ -147,33 +170,63 @@ class StoredOAuthProvider implements OAuthClientProvider {
   get clientMetadata(): OAuthClientMetadata {
     return { client_name: 'ZhiYuan Agent', redirect_uris: [this.redirectUri] };
   }
-  clientInformation() { return this.session.clientInformation; }
+  clientInformation() {
+    return this.session.clientInformation;
+  }
   saveClientInformation(value: OAuthClientInformationMixed) {
     this.session.clientInformation = value;
     this.session.clientRedirectUri = this.redirectUri;
     this.persist();
   }
-  tokens() { return this.session.tokens; }
-  saveTokens(value: OAuthTokens) { this.session.tokens = value; this.persist(); }
-  redirectToAuthorization(url: URL) { return shell.openExternal(url.toString()); }
-  saveCodeVerifier(value: string) { this.session.codeVerifier = value; this.persist(); }
-  codeVerifier() { if (!this.session.codeVerifier) throw new Error('OAuth code verifier is missing'); return this.session.codeVerifier; }
-  private persist() { this.store.set(this.key, this.session); }
+  tokens() {
+    return this.session.tokens;
+  }
+  saveTokens(value: OAuthTokens) {
+    this.session.tokens = value;
+    this.persist();
+  }
+  redirectToAuthorization(url: URL) {
+    return shell.openExternal(url.toString());
+  }
+  saveCodeVerifier(value: string) {
+    this.session.codeVerifier = value;
+    this.persist();
+  }
+  codeVerifier() {
+    if (!this.session.codeVerifier) throw new Error('OAuth code verifier is missing');
+    return this.session.codeVerifier;
+  }
+  private persist() {
+    this.credentialVault.setValue(this.key, this.session);
+  }
 }
 
 export class McpOAuthManager {
-  constructor(private readonly store: SqliteStore) {}
+  private readonly credentialVault: McpCredentialVault;
+
+  constructor(private readonly store: SqliteStore) {
+    this.credentialVault = new McpCredentialVault(store);
+  }
 
   async authorize(serverId: string, serverUrl: string, signal?: AbortSignal): Promise<string> {
     const deadline = Date.now() + MCP_OAUTH_TOTAL_TIMEOUT_MS;
     const remainingTimeout = () => Math.max(1, deadline - Date.now());
-    const preferredCallbackPort = getStoredOAuthCallbackPort(this.store, serverId);
+    const preferredCallbackPort = getStoredOAuthCallbackPort(
+      this.store,
+      this.credentialVault,
+      serverId,
+    );
     const { callbackPort, callbackServer } = await createOAuthCallbackServer(
       serverId,
       preferredCallbackPort,
     );
     const redirectUri = `http://127.0.0.1:${callbackPort}${MCP_OAUTH_CALLBACK_PATH}`;
-    const provider = new StoredOAuthProvider(this.store, serverId, redirectUri);
+    const provider = new StoredOAuthProvider(
+      this.store,
+      this.credentialVault,
+      serverId,
+      redirectUri,
+    );
 
     try {
       const result = await withTimeout(
@@ -198,7 +251,12 @@ export class McpOAuthManager {
         };
         const abort = () => finish(new Error('MCP authorization was cancelled'));
         const timeout = setTimeout(
-          () => finish(new Error('MCP OAuth authorization timed out. Complete browser authorization and try again.')),
+          () =>
+            finish(
+              new Error(
+                'MCP OAuth authorization timed out. Complete browser authorization and try again.',
+              ),
+            ),
           remainingTimeout(),
         );
         if (signal?.aborted) {
@@ -232,9 +290,12 @@ export class McpOAuthManager {
    * when the session has no refresh token and therefore needs interactive auth.
    */
   async refreshAccessToken(serverId: string, serverUrl: string): Promise<string | null> {
-    const callbackPort = getStoredOAuthCallbackPort(this.store, serverId) ?? getMcpOAuthCallbackPort(serverId);
+    const callbackPort =
+      getStoredOAuthCallbackPort(this.store, this.credentialVault, serverId) ??
+      getMcpOAuthCallbackPort(serverId);
     const provider = new StoredOAuthProvider(
       this.store,
+      this.credentialVault,
       serverId,
       `http://127.0.0.1:${callbackPort}${MCP_OAUTH_CALLBACK_PATH}`,
     );

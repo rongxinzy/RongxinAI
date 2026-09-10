@@ -104,6 +104,7 @@ import {
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
 import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
+import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import {
@@ -125,7 +126,7 @@ import {
 } from './piConversationContext';
 import { getPiBashCommandViolation } from './piBashToolGuidelines';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
-import { PiMcpTool } from './piMcpCapabilityPrompt';
+import { McpPiAdapter } from './mcpPiAdapter';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
 import { buildPiResearchStateTool } from './piResearchStateTool';
 import {
@@ -2236,6 +2237,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
     };
     push(getSkillsRoot());
+    push(getFeishuConnectorSkillsRoot(app.getPath('userData')));
     if (!app.isPackaged) {
       push(path.join(app.getPath('userData'), 'SKILLs'));
     }
@@ -3246,229 +3248,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
     if (!this.mcpServerManager) return null;
-    if (
-      this.mcpServerManager.toolManifest.length === 0 &&
-      this.mcpServerManager.serverStatuses.length === 0
-    ) {
-      return null;
-    }
-
-    const mgr = this.mcpServerManager;
-    const getManifest = () => mgr.toolManifest;
-
-    const buildStatusLine = (): string => {
-      const manifest = this.mcpServerManager?.toolManifest ?? [];
-      const statuses = this.mcpServerManager?.serverStatuses ?? [];
-      const connectedCount = statuses.filter(status => status.connected).length;
-      const summary = `MCP — ${statuses.length} configured server(s), ${connectedCount} connected, ${manifest.length} tool(s)`;
-      if (statuses.length === 0) return summary;
-      return [
-        summary,
-        ...statuses.map(status => {
-          const state = status.connected ? 'connected' : 'unavailable';
-          const error = status.error ? ` — ${status.error}` : '';
-          return `  ${status.name}: ${state}, ${status.toolCount} tool(s)${error}`;
-        }),
-      ].join('\n');
-    };
-
-    return {
-      name: PiMcpTool.Name,
-      label: PiMcpTool.Label,
-      description:
-        'MCP gateway — call MCP tools, search, or describe. ' +
-        'Use {tool, args} to invoke. Use {search} to find tools by name/description. ' +
-        'Use {describe} for parameter schemas. Use {server} to list tools on a server. ' +
-        'Use {} for status overview.',
-      promptSnippet: 'MCP gateway — call MCP tools (use search to discover, tool+args to invoke)',
-      parameters: {
-        type: 'object',
-        properties: {
-          tool: { type: 'string', description: 'Tool name to call (e.g. "read_file")' },
-          args: {
-            type: 'string',
-            description: 'Arguments as JSON string (e.g. {"path":"/tmp/x"})',
-          },
-          server: {
-            type: 'string',
-            description: 'Filter to a specific server, or disambiguate tool calls',
-          },
-          search: {
-            type: 'string',
-            description: 'Search tools by name or description (substring match)',
-          },
-          describe: {
-            type: 'string',
-            description: 'Tool name to describe — returns parameter schema',
-          },
-        },
-        additionalProperties: false,
-      },
-      execute: async (_toolCallId: string, params: Record<string, unknown>) => {
-        // Pi SDK calls execute(toolCallId, params, signal, onUpdate, ctx).
-        // params is the validated parameter object (2nd arg, not 1st).
-        // MUST return AgentToolResult { content, details } — NOT a JSON string.
-        // Returning a string causes createToolResultMessage() to set
-        // content = undefined, which breaks the next LLM turn with
-        // "content is not iterable". See agent-loop.ts createToolResultMessage.
-        try {
-          const manifest = getManifest();
-          const toolIndex = manifest.map(e => ({
-            server: e.server,
-            name: e.name,
-            description: e.description,
-          }));
-          const tool = typeof params.tool === 'string' ? params.tool : undefined;
-          const argsStr = typeof params.args === 'string' ? params.args : undefined;
-          const server = typeof params.server === 'string' ? params.server : undefined;
-          const search = typeof params.search === 'string' ? params.search : undefined;
-          const describe = typeof params.describe === 'string' ? params.describe : undefined;
-
-          // ── tool + args: invoke an MCP tool ──
-          if (tool) {
-            let parsedArgs: Record<string, unknown> | undefined;
-            if (argsStr) {
-              try {
-                parsedArgs = JSON.parse(argsStr);
-                if (!parsedArgs || typeof parsedArgs !== 'object' || Array.isArray(parsedArgs)) {
-                  return {
-                    content: [
-                      { type: 'text', text: 'args must be a JSON object, e.g. {"key":"value"}' },
-                    ],
-                    details: {},
-                  };
-                }
-              } catch {
-                return {
-                  content: [{ type: 'text', text: `Invalid args JSON: ${argsStr}` }],
-                  details: {},
-                };
-              }
-            }
-            let resolvedServer: string | undefined = server;
-            if (!resolvedServer) {
-              const candidates = manifest.filter(e => e.name === tool);
-              if (candidates.length === 0) {
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: `Tool "${tool}" not found. Use mcp({ search: "..." }) to discover tools.`,
-                    },
-                  ],
-                  details: {},
-                };
-              }
-              if (candidates.length > 1) {
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: `Tool "${tool}" exists on multiple servers: ${candidates.map(c => c.server).join(', ')}. Use {server} to disambiguate.`,
-                    },
-                  ],
-                  details: {},
-                };
-              }
-              resolvedServer = candidates[0].server;
-            }
-            const result = await mgr.callTool(resolvedServer, tool, parsedArgs ?? {});
-            return { content: result.content, details: { isError: result.isError } };
-          }
-
-          // ── search: find tools by substring match ──
-          if (search) {
-            const q = search.toLowerCase();
-            const matches = toolIndex.filter(
-              t => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
-            );
-            if (matches.length === 0) {
-              return {
-                content: [{ type: 'text', text: `No tools matching "${search}".` }],
-                details: {},
-              };
-            }
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text:
-                    matches
-                      .slice(0, 30)
-                      .map(t => `[${t.server}] ${t.name}: ${t.description}`)
-                      .join('\n') +
-                    (matches.length > 30 ? `\n... and ${matches.length - 30} more` : ''),
-                },
-              ],
-              details: {},
-            };
-          }
-
-          // ── describe: show tool parameter schema ──
-          if (describe) {
-            const match = manifest.find(e => e.name === describe);
-            if (!match) {
-              return {
-                content: [{ type: 'text', text: `Tool "${describe}" not found.` }],
-                details: {},
-              };
-            }
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `[${match.server}] ${match.name}\n${match.description}\nParameters: ${JSON.stringify(match.inputSchema, null, 2)}`,
-                },
-              ],
-              details: {},
-            };
-          }
-
-          // ── server: list tools on a specific server ──
-          if (server) {
-            const serverTools = manifest.filter(e => e.server === server);
-            if (serverTools.length === 0) {
-              return {
-                content: [{ type: 'text', text: `Server "${server}" not found or has no tools.` }],
-                details: {},
-              };
-            }
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `${server} (${serverTools.length} tools):\n${serverTools.map(t => `  ${t.name}: ${t.description}`).join('\n')}`,
-                },
-              ],
-              details: {},
-            };
-          }
-
-          // ── default: status overview ──
-          return {
-            content: [{ type: 'text', text: buildStatusLine() }],
-            details: {},
-          };
-        } catch (err) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `MCP error: ${err instanceof Error ? err.message : String(err)}`,
-              },
-            ],
-            details: {},
-          };
-        }
-      },
-    };
+    return new McpPiAdapter(this.mcpServerManager).buildGatewayTool();
   }
 
-  /**
-   * Get the pi agents directory where subagent definitions are stored.
-   * Mirrors getPiAgentsDir() in register_expert.js.
-   * Uses PI_CODING_AGENT_DIR env var if set, otherwise defaults to ~/.pi/agent/agents.
-   */
   private getPiAgentsDir(): string {
     const homedir = os.homedir();
     const configDir = process.env.PI_CODING_AGENT_DIR || path.join(homedir, '.pi', 'agent');
