@@ -284,6 +284,9 @@ jobs:
       - name: Verify packaged app version
         shell: bash
         run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare-release.outputs.version }}'
+      - name: Verify packaged ACP registry and bridges
+        shell: bash
+        run: node scripts/ci/verify-packaged-acp-resources.mjs
       - name: Verify Windows Authenticode signatures
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
