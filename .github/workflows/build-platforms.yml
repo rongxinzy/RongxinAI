@@ -134,6 +134,8 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify packaged ACP registry and bridges
+        run: node scripts/ci/verify-packaged-acp-resources.mjs
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
