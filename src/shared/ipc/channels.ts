@@ -53,6 +53,8 @@ export const McpIpc = {
   GetFeishuCliStatus: 'mcp:feishuCliStatus',
   PrepareFeishuCli: 'mcp:prepareFeishuCli',
   LoadIcon: 'mcp:loadIcon',
+  ExportConfig: 'mcp:exportConfig',
+  ImportConfig: 'mcp:importConfig',
   BridgeSyncStart: 'mcp:bridge:syncStart',
   BridgeSyncDone: 'mcp:bridge:syncDone',
 } as const;
@@ -73,10 +75,7 @@ export const PermissionsIpc = {
 export type PermissionsIpc = (typeof PermissionsIpc)[keyof typeof PermissionsIpc];
 
 // ─── Todo ───────────────────────────────────────────────────────────────────
-export {
-  TodoIpc,
-  type TodoIpc as TodoIpcChannel,
-} from '../todo/constants';
+export { TodoIpc, type TodoIpc as TodoIpcChannel } from '../todo/constants';
 
 // ─── Enterprise ─────────────────────────────────────────────────────────────
 export const EnterpriseIpc = {

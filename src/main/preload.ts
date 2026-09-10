@@ -143,6 +143,8 @@ contextBridge.exposeInMainWorld('electron', {
     getFeishuCliStatus: () => ipcRenderer.invoke(McpIpc.GetFeishuCliStatus),
     prepareFeishuCli: () => ipcRenderer.invoke(McpIpc.PrepareFeishuCli),
     loadIcon: (iconPath: string) => ipcRenderer.invoke(McpIpc.LoadIcon, iconPath),
+    exportConfig: () => ipcRenderer.invoke(McpIpc.ExportConfig),
+    importConfig: () => ipcRenderer.invoke(McpIpc.ImportConfig),
     onBridgeSyncStart: (callback: () => void) => onPushVoid(McpIpc.BridgeSyncStart, callback),
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) =>
       onPush(McpIpc.BridgeSyncDone, callback),

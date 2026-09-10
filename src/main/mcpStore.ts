@@ -1,6 +1,14 @@
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 
+import type { McpCredentialPayload } from './libs/mcpCredentialVault';
+
+export interface McpCredentialStore {
+  get(serverId: string): McpCredentialPayload | undefined;
+  set(serverId: string, payload: McpCredentialPayload): void;
+  delete(serverId: string): void;
+}
+
 export interface McpServerRecord {
   id: string;
   name: string;
@@ -60,9 +68,11 @@ interface McpConfigJson {
 
 export class McpStore {
   private db: Database.Database;
+  private credentialStore?: McpCredentialStore;
 
-  constructor(db: Database.Database) {
+  constructor(db: Database.Database, credentialStore?: McpCredentialStore) {
     this.db = db;
+    this.credentialStore = credentialStore;
   }
 
   private deserializeRow(row: McpServerRow): McpServerRecord {
@@ -73,6 +83,7 @@ export class McpStore {
       // Invalid JSON, use defaults
     }
 
+    const credentials = this.credentialStore?.get(row.id);
     return {
       id: row.id,
       name: row.name,
@@ -81,9 +92,9 @@ export class McpStore {
       transportType: row.transport_type as 'stdio' | 'sse' | 'http',
       command: config.command,
       args: config.args,
-      env: config.env,
+      env: credentials?.env ?? config.env,
       url: config.url,
-      headers: config.headers,
+      headers: credentials?.headers ?? config.headers,
       timeout: config.timeout,
       isBuiltIn: config.isBuiltIn === true,
       githubUrl: config.githubUrl,
@@ -97,9 +108,10 @@ export class McpStore {
     const config: McpConfigJson = {};
     if (data.command !== undefined) config.command = data.command;
     if (data.args !== undefined) config.args = data.args;
-    if (data.env !== undefined && Object.keys(data.env).length > 0) config.env = data.env;
+    if (!this.credentialStore && data.env !== undefined && Object.keys(data.env).length > 0)
+      config.env = data.env;
     if (data.url !== undefined) config.url = data.url;
-    if (data.headers !== undefined && Object.keys(data.headers).length > 0)
+    if (!this.credentialStore && data.headers !== undefined && Object.keys(data.headers).length > 0)
       config.headers = data.headers;
     if (data.timeout !== undefined) config.timeout = data.timeout;
     if (data.isBuiltIn) config.isBuiltIn = true;
@@ -132,12 +144,18 @@ export class McpStore {
     const now = Date.now();
     const configJson = this.serializeConfig(data);
 
-    this.db
-      .prepare(
-        `INSERT INTO mcp_servers (id, name, description, enabled, transport_type, config_json, created_at, updated_at)
-       VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
-      )
-      .run(id, data.name, data.description, data.transportType, configJson, now, now);
+    try {
+      this.credentialStore?.set(id, { env: data.env, headers: data.headers });
+      this.db
+        .prepare(
+          `INSERT INTO mcp_servers (id, name, description, enabled, transport_type, config_json, created_at, updated_at)
+         VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+        )
+        .run(id, data.name, data.description, data.transportType, configJson, now, now);
+    } catch (error) {
+      this.credentialStore?.delete(id);
+      throw error;
+    }
 
     return this.getServer(id)!;
   }
@@ -164,6 +182,7 @@ export class McpStore {
 
     const configJson = this.serializeConfig(merged);
 
+    this.credentialStore?.set(id, { env: merged.env, headers: merged.headers });
     this.db
       .prepare(
         `UPDATE mcp_servers SET name = ?, description = ?, transport_type = ?, config_json = ?, updated_at = ? WHERE id = ?`,
@@ -178,7 +197,31 @@ export class McpStore {
     if (!existing) return false;
 
     this.db.prepare('DELETE FROM mcp_servers WHERE id = ?').run(id);
+    this.credentialStore?.delete(id);
     return true;
+  }
+
+  /** Move legacy plaintext config fields to the credential vault. */
+  migrateLegacyCredentials(): void {
+    if (!this.credentialStore) return;
+    const rows = this.db.prepare('SELECT id, config_json FROM mcp_servers').all() as Array<
+      Pick<McpServerRow, 'id' | 'config_json'>
+    >;
+    for (const row of rows) {
+      let config: McpConfigJson;
+      try {
+        config = JSON.parse(row.config_json) as McpConfigJson;
+      } catch {
+        continue;
+      }
+      if (!config.env && !config.headers) continue;
+      this.credentialStore.set(row.id, { env: config.env, headers: config.headers });
+      delete config.env;
+      delete config.headers;
+      this.db
+        .prepare('UPDATE mcp_servers SET config_json = ? WHERE id = ?')
+        .run(JSON.stringify(config), row.id);
+    }
   }
 
   setEnabled(id: string, enabled: boolean): boolean {

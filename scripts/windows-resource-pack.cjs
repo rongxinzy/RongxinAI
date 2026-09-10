@@ -30,6 +30,7 @@ const EXCLUDED_DIRECTORIES = new Set([
 ]);
 
 function shouldExclude(entryPath) {
+  if (/^feishu[/\\]runtime(?:[/\\]|$)/i.test(entryPath)) return true;
   const segments = entryPath.split(/[/\\]/);
   if (segments.some(segment => EXCLUDED_DIRECTORIES.has(segment.toLowerCase()))) return true;
   const basename = path.basename(entryPath);
@@ -268,4 +269,5 @@ module.exports = {
   getWindowsResourceArchiveCompression,
   isWindowsResourceComponentReusable,
   sha256File,
+  shouldExclude,
 };

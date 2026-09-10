@@ -229,7 +229,10 @@ class McpService {
     data: McpServerFormData,
     requestId: string,
   ): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
-    const result = await window.electron.mcp.authorize({ ...data, authorizationRequestId: requestId });
+    const result = await window.electron.mcp.authorize({
+      ...data,
+      authorizationRequestId: requestId,
+    });
     return result.success || !result.error
       ? result
       : { ...result, error: normalizeMcpErrorMessage(result.error) };
@@ -253,6 +256,21 @@ class McpService {
   async loadIcon(iconPath: string): Promise<string | undefined> {
     const result = await window.electron.mcp.loadIcon(iconPath);
     return result.success ? result.data : undefined;
+  }
+
+  async exportConfig(): Promise<{ success: boolean; cancelled?: boolean; error?: string }> {
+    return window.electron.mcp.exportConfig();
+  }
+
+  async importConfig(): Promise<{
+    success: boolean;
+    cancelled?: boolean;
+    servers?: McpServerConfig[];
+    error?: string;
+  }> {
+    const result = await window.electron.mcp.importConfig();
+    if (result.success && result.servers) this.servers = result.servers;
+    return result;
   }
 
   onBridgeSyncStart(callback: () => void): () => void {
