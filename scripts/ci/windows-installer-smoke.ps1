@@ -113,6 +113,10 @@ try {
     throw "Expected exactly one installed application executable; found $($applicationExecutables.Count)"
   }
   Assert-Path $applicationExecutables[0].FullName 'installed application executable'
+  Invoke-Checked 'node' @(
+    (Join-Path $ProjectRoot 'scripts\ci\verify-packaged-acp-resources.mjs'),
+    (Join-Path $installRoot 'resources')
+  ) 'installed ACP registry and bundled bridge verification'
   Assert-Path $timingLog 'cold installation timing log'
 
   $coldLog = Get-Content -LiteralPath $timingLog -Raw -Encoding UTF8

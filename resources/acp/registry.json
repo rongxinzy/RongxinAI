@@ -592,6 +592,7 @@
       "distribution": {
         "uvx": {
           "package": "fast-agent-acp==0.10.1",
+          "executable": "fast-agent",
           "args": [
             "-x"
           ],
@@ -993,6 +994,7 @@
       "distribution": {
         "uvx": {
           "package": "minion-code@0.1.44",
+          "executable": "minion-code",
           "args": [
             "acp"
           ]
