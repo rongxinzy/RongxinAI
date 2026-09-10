@@ -20,6 +20,7 @@ import {
   type MemoryRecordStorageKind as MemoryRecordStorageKindValue,
   type MemorySourceKind,
 } from './constants';
+import { migrateLegacyMemoryTimestamps } from './memoryTimestampMigration';
 
 export interface MemoryProjectionInput {
   title: string;
@@ -114,10 +115,12 @@ type SqlRow = Record<string, unknown>;
 export class MemoryRepository {
   constructor(private readonly db: Database.Database) {
     this.ensureSchema();
+    migrateLegacyMemoryTimestamps(db);
   }
 
   createLink(input: MemoryLinkInput): string {
     const id = input.id ?? randomUUID();
+    const now = new Date().toISOString();
     this.db
       .prepare(
         `INSERT INTO memory_links (
@@ -125,8 +128,8 @@ export class MemoryRepository {
           task_id, run_id, artifact_id, approval_id, status, title, content,
           kind, topic_key, importance, confidence, sensitivity, expires_at,
           promoted_from_link_id, promotion_source_project_id,
-          promotion_source_session_id, metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          promotion_source_session_id, metadata_json, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           memory_id = excluded.memory_id,
           status = excluded.status,
@@ -142,7 +145,7 @@ export class MemoryRepository {
           promotion_source_project_id = excluded.promotion_source_project_id,
           promotion_source_session_id = excluded.promotion_source_session_id,
           metadata_json = excluded.metadata_json,
-          updated_at = datetime('now')`,
+          updated_at = excluded.updated_at`,
       )
       .run(
         id,
@@ -168,12 +171,15 @@ export class MemoryRepository {
         input.promotionSourceProjectId ?? null,
         input.promotionSourceSessionId ?? null,
         JSON.stringify(input.metadata ?? {}),
+        now,
+        now,
       );
     return id;
   }
 
   createPersonalCandidate(input: PersonalMemoryCandidateInput): string {
     const id = input.id ?? randomUUID();
+    const now = new Date().toISOString();
     this.db
       .prepare(
         `INSERT INTO memory_candidates (
@@ -181,8 +187,9 @@ export class MemoryRepository {
           task_id, run_id, artifact_id, approval_id,
           status, title, content, kind, topic_key, importance, confidence,
           sensitivity, expires_at, supersedes_link_id, promoted_from_link_id,
-          promotion_source_project_id, promotion_source_session_id, metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          promotion_source_project_id, promotion_source_session_id, metadata_json,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -209,6 +216,8 @@ export class MemoryRepository {
         input.promotionSourceProjectId ?? null,
         input.promotionSourceSessionId ?? null,
         JSON.stringify(input.metadata ?? {}),
+        now,
+        now,
       );
     return id;
   }
@@ -227,7 +236,7 @@ export class MemoryRepository {
     const result = this.db
       .prepare(
         `UPDATE memory_candidates
-         SET title = ?, content = ?, kind = ?, sensitivity = ?, updated_at = datetime('now')
+         SET title = ?, content = ?, kind = ?, sensitivity = ?, updated_at = ?
          WHERE id = ? AND status = ?`,
       )
       .run(
@@ -235,6 +244,7 @@ export class MemoryRepository {
         input.content,
         input.kind,
         input.sensitivity ?? MemorySensitivity.Normal,
+        new Date().toISOString(),
         id,
         MemoryLifecycleStatus.NeedsReview,
       );
@@ -328,13 +338,7 @@ export class MemoryRepository {
       this.db
         .prepare('DELETE FROM memory_outbox WHERE link_id = ? AND status = ?')
         .run(id, MemoryOutboxStatus.Pending);
-      this.db
-        .prepare(
-          `INSERT INTO memory_import_rejections (id, rejected_at)
-           VALUES (?, datetime('now'))
-           ON CONFLICT(id) DO UPDATE SET rejected_at = excluded.rejected_at`,
-        )
-        .run(id);
+      this.recordImportRejection(id);
       this.db.prepare('DELETE FROM memory_candidates WHERE id = ?').run(id);
     })();
   }
@@ -343,10 +347,10 @@ export class MemoryRepository {
     this.db
       .prepare(
         `INSERT INTO memory_import_rejections (id, rejected_at)
-         VALUES (?, datetime('now'))
+         VALUES (?, ?)
          ON CONFLICT(id) DO UPDATE SET rejected_at = excluded.rejected_at`,
       )
-      .run(id);
+      .run(id, new Date().toISOString());
   }
 
   hasImportRejection(id: string): boolean {
@@ -363,8 +367,8 @@ export class MemoryRepository {
     const id = randomUUID();
     this.db
       .prepare(
-        `INSERT INTO memory_outbox (id, link_id, operation, payload_json, status, available_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO memory_outbox (id, link_id, operation, payload_json, status, available_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -372,6 +376,7 @@ export class MemoryRepository {
         operation,
         JSON.stringify(payload),
         MemoryOutboxStatus.Pending,
+        new Date().toISOString(),
         new Date().toISOString(),
       );
     return id;
@@ -704,8 +709,8 @@ export class MemoryRepository {
         promotion_source_project_id TEXT,
         promotion_source_session_id TEXT,
         metadata_json TEXT NOT NULL DEFAULT '{}',
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
 
       CREATE INDEX IF NOT EXISTS idx_memory_links_project
@@ -738,8 +743,8 @@ export class MemoryRepository {
         promotion_source_project_id TEXT,
         promotion_source_session_id TEXT,
         metadata_json TEXT NOT NULL DEFAULT '{}',
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
 
       CREATE TABLE IF NOT EXISTS memory_outbox (
@@ -751,7 +756,7 @@ export class MemoryRepository {
         attempts INTEGER NOT NULL DEFAULT 0,
         available_at TEXT NOT NULL,
         last_error TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         completed_at TEXT
       );
 
@@ -760,7 +765,7 @@ export class MemoryRepository {
 
       CREATE TABLE IF NOT EXISTS memory_import_rejections (
         id TEXT PRIMARY KEY,
-        rejected_at TEXT NOT NULL DEFAULT (datetime('now'))
+        rejected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
     `);
     this.ensureAddedColumns();
