@@ -19,7 +19,19 @@ export interface BundledNpmRuntime {
 function resolveCliPath(cli: NpmCli): string | null {
   const scriptName = cli === NpmCli.Npx ? 'npx-cli.js' : 'npm-cli.js';
   const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin', scriptName)]
+    ? [
+        // npm's dependency graph is stored in app.asar. Starting its entry point
+        // from app.asar.unpacked prevents Node from resolving those dependencies.
+        path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', scriptName),
+        path.join(
+          process.resourcesPath,
+          'app.asar.unpacked',
+          'node_modules',
+          'npm',
+          'bin',
+          scriptName,
+        ),
+      ]
     : [
         path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', scriptName),
         path.join(process.cwd(), 'node_modules', 'npm', 'bin', scriptName),
@@ -40,4 +52,3 @@ export function resolveBundledNpmRuntime(
     env: { ...env, ELECTRON_RUN_AS_NODE: '1', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' },
   };
 }
-
