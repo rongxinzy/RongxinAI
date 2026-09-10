@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, Folder, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Ellipsis, Folder, Settings2, Trash2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -23,6 +23,10 @@ import {
   AnimatedFolderOpenIcon,
   type AnimatedFolderOpenIconHandle,
 } from '../icons/AnimatedFolderOpenIcon';
+import {
+  AnimatedFolderPlusIcon,
+  type AnimatedFolderPlusIconHandle,
+} from '../icons/AnimatedFolderPlusIcon';
 import {
   SidebarAnimatedMessageCirclePlusIcon,
   type SidebarAnimatedMessageCirclePlusIconHandle,
@@ -81,6 +85,8 @@ export const CodingWorkspaceSidebar = ({
     session: CodingSessionSummary;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const addWorkspaceIconRef = useRef<AnimatedFolderPlusIconHandle>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   const applyWorkspaces = useCallback(
     (next: CodingWorkspaceSummary[]) => {
@@ -264,13 +270,17 @@ export const CodingWorkspaceSidebar = ({
             size="icon-sm"
             className="theme-action-faint"
             aria-label={i18nService.t('codingWorkspaceAdd')}
+            onMouseEnter={() => {
+              if (!prefersReducedMotion) addWorkspaceIconRef.current?.startAnimation();
+            }}
+            onMouseLeave={() => addWorkspaceIconRef.current?.stopAnimation()}
             onClick={() => {
               setError(null);
               setEditingWorkspace(null);
               setWorkspaceDialogOpen(true);
             }}
           >
-            <Plus />
+            <AnimatedFolderPlusIcon ref={addWorkspaceIconRef} />
           </Button>
         </div>
       </div>
