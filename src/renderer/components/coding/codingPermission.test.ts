@@ -1,15 +1,21 @@
 import { expect, test } from 'vitest';
 
-import { CodingEventKind, type CodingEvent } from '../../../shared/codingAgent';
+import {
+  CodingEventKind,
+  CodingPermissionOutcome,
+  type CodingEvent,
+} from '../../../shared/codingAgent';
+import { i18nService } from '../../services/i18n';
 import {
   CodingPermissionOptionKind,
   CodingPermissionResolution,
+  codingPermissionOptionLabel,
   getCodingPermissionResolution,
-  isCommandAllowPermissionOption,
-  isGenericCodingPermissionOption,
   findPendingCodingPermission,
   formatCodingPermissionInput,
   parseCodingPermission,
+  resolveCodingPermissionActions,
+  type CodingPermissionOption,
 } from './codingPermission';
 
 const makeEvent = (payload: Record<string, unknown>): CodingEvent => ({
@@ -98,28 +104,182 @@ test('formats request input for a readable permission preview', () => {
   expect(formatCodingPermissionInput(null)).toBe('');
 });
 
-test('keeps custom permission scopes distinct from generic options', () => {
+test('localizes generic option labels instead of echoing the agent wording', () => {
+  i18nService.setLanguage('zh', { persist: false });
+
   expect(
-    isCommandAllowPermissionOption({
+    codingPermissionOptionLabel({
+      optionId: 'allow-always',
+      name: 'Always Allow',
+      kind: CodingPermissionOptionKind.AllowAlways,
+    }),
+  ).toBe('本会话允许');
+  expect(
+    codingPermissionOptionLabel({
+      optionId: 'allow-once',
+      name: 'Allow',
+      kind: CodingPermissionOptionKind.AllowOnce,
+    }),
+  ).toBe('允许一次');
+  expect(
+    codingPermissionOptionLabel({
+      optionId: 'reject-once',
+      name: 'Deny',
+      kind: CodingPermissionOptionKind.RejectOnce,
+    }),
+  ).toBe('拒绝本次');
+  expect(
+    codingPermissionOptionLabel({ optionId: 'reject', name: 'Deny', kind: null }),
+  ).toBe('拒绝本次');
+  expect(
+    codingPermissionOptionLabel({
       optionId: 'allow-command',
       name: 'Allow Commands Starting With cmd /c echo',
       kind: CodingPermissionOptionKind.AllowAlways,
     }),
-  ).toBe(true);
+  ).toBe('Allow Commands Starting With cmd /c echo');
+
+  i18nService.setLanguage('en', { persist: false });
   expect(
-    isGenericCodingPermissionOption({
-      optionId: 'allow-session',
-      name: 'Allow for Session',
+    codingPermissionOptionLabel({
+      optionId: 'allow-always',
+      name: 'Always Allow',
       kind: CodingPermissionOptionKind.AllowAlways,
     }),
-  ).toBe(true);
-  expect(
-    isGenericCodingPermissionOption({
-      optionId: 'allow-command',
-      name: 'Allow Commands Starting With cmd /c echo',
-      kind: CodingPermissionOptionKind.AllowAlways,
-    }),
-  ).toBe(false);
+  ).toBe('Allow for session');
+});
+
+const option = (
+  optionId: string,
+  name: string,
+  kind: string | null,
+): CodingPermissionOption => ({ optionId, name, kind });
+
+test('folds agent options into a primary action, a secondary action and a menu', () => {
+  const actions = resolveCodingPermissionActions([
+    option('reject-once', 'Reject once', CodingPermissionOptionKind.RejectOnce),
+    option('allow-once', 'Allow once', CodingPermissionOptionKind.AllowOnce),
+    option('allow-always', 'Allow for session', CodingPermissionOptionKind.AllowAlways),
+  ]);
+
+  expect(actions.primary).toMatchObject({
+    outcome: CodingPermissionOutcome.Selected,
+    optionId: 'allow-once',
+  });
+  expect(actions.secondary).toMatchObject({
+    outcome: CodingPermissionOutcome.Selected,
+    optionId: 'reject-once',
+  });
+  expect(actions.more).toEqual([
+    option('allow-always', 'Allow for session', CodingPermissionOptionKind.AllowAlways),
+  ]);
+});
+
+test('keeps custom command scopes in the menu with their agent-provided names', () => {
+  const customScope = option(
+    'allow-command',
+    'Allow Commands Starting With cmd /c echo',
+    CodingPermissionOptionKind.AllowAlways,
+  );
+  const actions = resolveCodingPermissionActions([
+    option('allow-once', 'Allow once', CodingPermissionOptionKind.AllowOnce),
+    customScope,
+    option('reject-once', 'Reject once', CodingPermissionOptionKind.RejectOnce),
+  ]);
+
+  expect(actions.primary).toMatchObject({ optionId: 'allow-once' });
+  expect(actions.secondary).toMatchObject({ optionId: 'reject-once' });
+  expect(actions.more).toEqual([customScope]);
+});
+
+test('orders the menu with long-term grants first and destructive scopes last', () => {
+  const actions = resolveCodingPermissionActions([
+    option('reject-always', 'Always reject', CodingPermissionOptionKind.RejectAlways),
+    option('allow-command', 'Allow Commands Starting With ls', null),
+    option('allow-prefix', 'Allow Commands Starting With pwd', null),
+    option('allow-always', 'Allow for session', CodingPermissionOptionKind.AllowAlways),
+    option('allow-once', 'Allow once', CodingPermissionOptionKind.AllowOnce),
+    option('reject-once', 'Reject once', CodingPermissionOptionKind.RejectOnce),
+  ]);
+
+  expect(actions.more.map(candidate => candidate.optionId)).toEqual([
+    'allow-always',
+    'allow-command',
+    'allow-prefix',
+    'reject-always',
+  ]);
+});
+
+test('ranks a kind-less long-term grant above other scopes', () => {
+  const actions = resolveCodingPermissionActions([
+    option('allow-once', 'Allow', CodingPermissionOptionKind.AllowOnce),
+    option('reject-once', 'Deny', CodingPermissionOptionKind.RejectOnce),
+    option('allow-prefix', 'Allow Commands Starting With pwd', null),
+    option('allow-always', 'Always Allow', null),
+  ]);
+
+  expect(actions.more.map(candidate => candidate.optionId)).toEqual([
+    'allow-always',
+    'allow-prefix',
+  ]);
+});
+
+test('selects without an option id only when the agent offered no options', () => {
+  const builtin = resolveCodingPermissionActions([]);
+  expect(builtin.primary).toEqual({ outcome: CodingPermissionOutcome.Selected, option: null });
+  expect(builtin.secondary).toEqual({
+    outcome: CodingPermissionOutcome.Cancelled,
+    option: null,
+  });
+  expect(builtin.more).toEqual([]);
+
+  const withOptions = resolveCodingPermissionActions([
+    option('allow-once', 'Allow once', CodingPermissionOptionKind.AllowOnce),
+    option('reject-once', 'Reject once', CodingPermissionOptionKind.RejectOnce),
+  ]);
+  expect(withOptions.primary?.outcome).toBe(CodingPermissionOutcome.Selected);
+  expect(withOptions.primary?.optionId).toBe('allow-once');
+  expect(withOptions.secondary.outcome).toBe(CodingPermissionOutcome.Selected);
+  expect(withOptions.secondary.optionId).toBe('reject-once');
+});
+
+test('cancels the request when the agent offered no rejection option', () => {
+  const actions = resolveCodingPermissionActions([
+    option('allow-once', 'Allow once', CodingPermissionOptionKind.AllowOnce),
+  ]);
+
+  expect(actions.primary).toMatchObject({
+    outcome: CodingPermissionOutcome.Selected,
+    optionId: 'allow-once',
+  });
+  expect(actions.secondary).toEqual({
+    outcome: CodingPermissionOutcome.Cancelled,
+    option: null,
+  });
+});
+
+test('never spends one option on both footer actions', () => {
+  const actions = resolveCodingPermissionActions([
+    option('allow-always', 'Allow for session', CodingPermissionOptionKind.AllowAlways),
+    option('reject-always', 'Always reject', CodingPermissionOptionKind.RejectAlways),
+  ]);
+
+  expect(actions.primary?.optionId).toBe('allow-always');
+  expect(actions.secondary.optionId).toBe('reject-always');
+  expect(actions.more).toEqual([]);
+});
+
+test('falls back to a rejection option when no allow option is offered', () => {
+  const actions = resolveCodingPermissionActions([
+    option('reject-once', 'Reject once', CodingPermissionOptionKind.RejectOnce),
+    option('reject-always', 'Always reject', CodingPermissionOptionKind.RejectAlways),
+  ]);
+
+  expect(actions.primary).toBeNull();
+  expect(actions.secondary.optionId).toBe('reject-once');
+  expect(actions.more).toEqual([
+    option('reject-always', 'Always reject', CodingPermissionOptionKind.RejectAlways),
+  ]);
 });
 
 test('finds only permissions that have not been resolved by a later tool call', () => {
