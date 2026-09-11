@@ -17,6 +17,7 @@ interface ArtifactPanelResizeHandleProps {
   disabled?: boolean;
   onReachMaxWidth?: () => void;
   maxWidthOverflowThreshold?: number;
+  onResizeStateChange?: (isResizing: boolean) => void;
 }
 
 const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
@@ -29,6 +30,7 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
   disabled = false,
   onReachMaxWidth,
   maxWidthOverflowThreshold = 0,
+  onResizeStateChange,
 }) => {
   const [isResizing, setIsResizing] = useState(false);
   const isResizingRef = useRef(false);
@@ -44,6 +46,10 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
   useEffect(() => {
     if (!isResizing) latestWidthRef.current = currentWidth;
   }, [currentWidth, isResizing]);
+
+  useEffect(() => {
+    onResizeStateChange?.(isResizing);
+  }, [isResizing, onResizeStateChange]);
 
   const flushResizeFrame = useCallback(() => {
     frameRequestRef.current = null;
@@ -185,7 +191,7 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
       aria-valuemax={Math.round(maxWidth)}
       aria-valuemin={Math.round(minWidth)}
       aria-valuenow={Math.round(currentWidth)}
-      className={`absolute inset-y-0 left-0 z-10 w-3 touch-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
+      className={`absolute inset-y-0 left-0 z-10 w-4 -translate-x-1/2 touch-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${
         disabled ? 'pointer-events-none cursor-default' : 'cursor-col-resize'
       }`}
       data-artifact-resize-handle=""
