@@ -14,7 +14,17 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
-const asarRoot = process.argv[2];
+// Electron forwards Chromium switches (e.g. --no-sandbox) into process.argv,
+// shifting the script off position 1 — locate the asar argument relative to
+// this script's own argv entry instead of a fixed index, and resolve it to an
+// absolute path so require() does not reinterpret it against this module's
+// directory.
+const scriptArgumentIndex = process.argv.findIndex(
+  argument => argument.endsWith('solpi-packaged-smoke.cjs'),
+);
+const asarArgument =
+  scriptArgumentIndex >= 0 ? process.argv[scriptArgumentIndex + 1] : process.argv[2];
+const asarRoot = asarArgument ? path.resolve(asarArgument) : null;
 if (!asarRoot) {
   console.error('Usage: electron solpi-packaged-smoke.cjs <path-to-app.asar>');
   process.exit(2);
