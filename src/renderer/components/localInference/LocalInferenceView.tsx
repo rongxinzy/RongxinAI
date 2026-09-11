@@ -1080,9 +1080,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handleSaveModelContext = useCallback(
     (modelName: string, ctxSize?: number) => {
       void runAction(async () => {
+        const { ctxSize: _previousCtxSize, ...preferenceWithoutContext } =
+          modelPreferences[modelName] ?? {};
         const nextPreferences = await window.electron.llamacpp.setModelPreference({
           modelName,
-          preference: ctxSize ? { ctxSize } : {},
+          preference: { ...preferenceWithoutContext, ...(ctxSize ? { ctxSize } : {}) },
         });
         setModelPreferences(nextPreferences);
         const runningModel = runningModels.find(
@@ -1097,7 +1099,64 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setContextModel(null);
       });
     },
-    [runAction, runningModels, showToast],
+    [modelPreferences, runAction, runningModels, showToast],
+  );
+
+  const handleSaveModelInspectorPreferences = useCallback(
+    async (
+      modelName: string,
+      input: {
+        ctxSize?: number;
+        residency?: NonNullable<LlamaCppModelPreferences[string]['residency']>;
+      },
+    ): Promise<boolean> => {
+      const previousPreference = modelPreferences[modelName];
+      const nextPreference = {
+        ...previousPreference,
+        ...(input.ctxSize !== undefined ? { ctxSize: input.ctxSize } : {}),
+        ...(input.residency ? { residency: input.residency } : {}),
+      };
+      setModelPreferences(current => ({
+        ...current,
+        [modelName]: nextPreference,
+      }));
+      setLoading(true);
+      dismissToast();
+      try {
+        const nextPreferences = await window.electron.llamacpp.setModelPreference({
+          modelName,
+          preference: nextPreference,
+        });
+        setModelPreferences(nextPreferences);
+        const runningModel = runningModels.find(
+          model => model.name === modelName || model.model === modelName,
+        );
+        showToast(
+          input.ctxSize !== undefined && input.ctxSize !== previousPreference?.ctxSize
+            ? runningModel
+              ? i18nService.t('localInferenceContextSavedReloadRequired')
+              : i18nService.t('localInferenceContextSaved')
+            : i18nService.t('localInferenceResidencySaved'),
+          LocalInferenceToastKind.Success,
+        );
+        return true;
+      } catch (error) {
+        setModelPreferences(current => {
+          const { [modelName]: _discarded, ...remaining } = current;
+          return previousPreference
+            ? { ...remaining, [modelName]: previousPreference }
+            : remaining;
+        });
+        showToast(
+          getLocalInferenceUserFacingErrorMessage(error),
+          LocalInferenceToastKind.Error,
+        );
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [dismissToast, modelPreferences, runningModels, showToast],
   );
 
   const handleTabChange = useCallback(
@@ -1320,8 +1379,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             onOpenChange={nextOpen => {
               if (!nextOpen) setInspectorModel(null);
             }}
-            onSaveContext={ctxSize => {
-              if (inspectorModel) handleSaveModelContext(inspectorModel.name, ctxSize);
+            onValidationError={message => showToast(message, LocalInferenceToastKind.Error)}
+            onSavePreferences={input => {
+              if (!inspectorModel) return Promise.resolve(false);
+              return handleSaveModelInspectorPreferences(inspectorModel.name, input);
             }}
             onOpenLogs={modelName => {
               setInspectorModel(null);

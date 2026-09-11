@@ -342,7 +342,18 @@ function getEffectiveProviderModels(
   providerConfig: LocalProviderConfig,
 ): ProviderModelConfig[] {
   if (providerName === ProviderName.LlamaCpp) {
-    return getLlamaCppRunningModels();
+    const configuredModels = normalizeProviderModels(providerName, providerConfig.models, 'openai');
+    const modelsById = new Map(configuredModels.map(model => [model.id, model]));
+
+    for (const runningModel of getLlamaCppRunningModels()) {
+      const configuredModel = modelsById.get(runningModel.id);
+      modelsById.set(
+        runningModel.id,
+        configuredModel ? { ...configuredModel, ...runningModel } : runningModel,
+      );
+    }
+
+    return [...modelsById.values()].sort((left, right) => left.id.localeCompare(right.id));
   }
   const providerDefinition = ProviderRegistry.get(providerName);
   const configuredModels =
@@ -369,7 +380,7 @@ function getAgentEligibleProviderModels(
   if (providerName !== ProviderName.LlamaCpp) {
     return models;
   }
-  return models.filter(model => model.agentEligibility?.eligible === true);
+  return models.filter(model => model.agentEligibility?.eligible !== false);
 }
 
 function shouldUseOpenAICodexOAuth(
@@ -392,11 +403,11 @@ function buildLlamaCppRunningProviderConfig(
   appConfig: AppConfig,
   modelId: string,
 ): LocalProviderConfig | null {
-  if (!findLlamaCppRunningModel(modelId)) {
-    return null;
-  }
-
   const storedProviderConfig = appConfig.providers?.[ProviderName.LlamaCpp];
+  const hasConfiguredModel = (storedProviderConfig?.models ?? []).some(
+    model => model.id.trim() === modelId.trim(),
+  ) || Boolean(findLlamaCppRunningModel(modelId));
+  if (!hasConfiguredModel) return null;
   const providerDefinition = ProviderRegistry.get(ProviderName.LlamaCpp);
 
   return {
