@@ -159,7 +159,8 @@ import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { createPiWorkLoop } from './piWorkLoop';
-import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
+import { PiWriteTokenLimitRecovery, PiAssistantStopReason } from './piWriteTokenLimit';
+import { isPiPureTextTruncation, PiTruncatedAnswerRecovery } from './piTruncatedAnswerRecovery';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import {
   getPiPreparingToolActivity,
@@ -309,6 +310,16 @@ interface ActivePiSession {
   /** Whether this Work session was explicitly started in Goal mode. */
   goalMode: boolean;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
+  /** Bounded recovery for pure-text answers truncated by the output token limit. */
+  truncatedAnswerRecovery: PiTruncatedAnswerRecovery;
+  /**
+   * True when the most recent assistant message ended truncated (stopReason
+   * length, no tool calls). While set, the run's final answer must not be
+   * presented as a complete success without disclosure.
+   */
+  lastAnswerTruncated: boolean;
+  /** Stop reason of the most recent assistant message ('stop' | 'length' | ...). */
+  lastAssistantStopReason: string | null;
   /**
    * Error from the latest failed attempt (message_end with stopReason=error).
    * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
@@ -410,6 +421,15 @@ type PiResolvedModel = {
   capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
+  };
+};
+
+/** Persist the assistant stop reason (and truncation flag) on answer messages. */
+const buildAnswerStopReasonMetadata = (stopReason: string | undefined): Record<string, unknown> => {
+  if (!stopReason) return {};
+  return {
+    stopReason,
+    ...(stopReason === PiAssistantStopReason.Length ? { truncated: true } : {}),
   };
 };
 
@@ -1182,6 +1202,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         productionControlsAvailable,
         goalMode: options.goalMode === true,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
+        truncatedAnswerRecovery: new PiTruncatedAnswerRecovery(),
+        lastAnswerTruncated: false,
+        lastAssistantStopReason: null,
         pendingError: null,
         workbenchRunId,
         workbenchContract,
@@ -1490,6 +1513,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const clearActivity = active.toolActivityTracker.clear();
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
     active.writeTokenLimitRecovery.reset();
+    active.truncatedAnswerRecovery.reset();
+    active.lastAnswerTruncated = false;
+    active.lastAssistantStopReason = null;
     active.pendingError = null;
     active.turnFailed = false;
     active.turnExperts = (this.store?.getSession(sessionId)?.experts ?? [])
@@ -1641,6 +1667,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         harnessVersion: HarnessVersion,
       };
       active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens);
+      active.truncatedAnswerRecovery = new PiTruncatedAnswerRecovery();
+      active.lastAnswerTruncated = false;
+      active.lastAssistantStopReason = null;
       if (active.resourceState.maxOutputTokens !== resolvedModel.maxOutputTokens) {
         active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
         await active.piSession.reload();
@@ -2384,6 +2413,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.thinkingMessageId = null;
         active.answerText = '';
         active.thinkingText = '';
+        active.lastAnswerTruncated = false;
+        active.lastAssistantStopReason = null;
         active.streamAccumulator.reset();
         active.thinkingLifecycle.reset();
         break;
@@ -2445,6 +2476,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       case 'message_end': {
         if (event.message?.role === 'assistant') {
           active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
+          // Pure-text truncation (length, no tool calls): the Pi agent loop ends
+          // the run right after this message. Queue one bounded continuation
+          // steer so the loop re-prompts instead of stopping; if the budget is
+          // exhausted, agent_end discloses the truncation instead of completing
+          // silently.
+          const answerTruncated = isPiPureTextTruncation(event.message);
+          active.lastAnswerTruncated = answerTruncated;
+          active.lastAssistantStopReason = event.message.stopReason ?? null;
+          if (answerTruncated) {
+            active.truncatedAnswerRecovery.queueIfNeeded(event.message, active.piSession);
+          }
           if (event.message.stopReason === 'error') {
             const { text, thinking } = active.streamAccumulator.reconcile(event.message);
             if (thinking && thinking !== active.thinkingText) {
@@ -2492,7 +2534,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           // Finalize the answer bubble on its own id.
           if (finalAnswer.trim()) {
             active.answerText = finalAnswer;
-            this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
+            this.finalizeMessage(
+              sessionId,
+              active,
+              'answer',
+              finalAnswer,
+              buildAnswerStopReasonMetadata(event.message.stopReason),
+            );
             active.lastCompletedAnswerMessageId = active.assistantMessageId;
             active.lastCompletedAnswerText = finalAnswer;
             this.scheduleContextUsageSync(
@@ -2705,6 +2753,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           void this.flushFollowUpQueue(sessionId, active);
           break;
         }
+        // Terminal truncated answer (continuation budget exhausted or steer
+        // unavailable): disclose it instead of presenting the run as a clean
+        // success. Queued Work follow-ups were drained above and continue the
+        // turn, so they never reach this disclosure.
+        if (active.lastAnswerTruncated) {
+          this.discloseTruncatedAnswer(sessionId, active);
+        }
         if (this.store) {
           this.store.updateSession(sessionId, { status: 'idle' });
           try {
@@ -2841,6 +2896,28 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.emit('error', sessionId, pending.classified);
   }
 
+  // ── Private: truncated answer disclosure ──
+
+  /**
+   * Persist and emit an explicit terminal notice when a run ends with a
+   * truncated final answer: the output token limit was hit and the bounded
+   * continuation did not (or could not) run. The run still completes — the
+   * user can continue the conversation — but the truncation stays
+   * distinguishable from a clean finish. Idempotent within the turn.
+   */
+  private discloseTruncatedAnswer(sessionId: string, active: ActivePiSession): void {
+    active.lastAnswerTruncated = false;
+    const seed: CoworkMessage = {
+      id: randomUUID(),
+      type: 'system',
+      content: t('coworkAnswerTruncatedNotice'),
+      timestamp: Date.now(),
+      metadata: { answerTruncated: true, stopReason: PiAssistantStopReason.Length },
+    };
+    const message = this.store ? this.store.addMessage(sessionId, seed) : seed;
+    this.emit('message', sessionId, message);
+  }
+
   // ── Private: assistant message lifecycle ──
 
   /**
@@ -2918,6 +2995,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active: ActivePiSession,
     kind: 'answer' | 'thinking',
     content: string,
+    extraMetadata?: Record<string, unknown>,
   ): void {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.clearPendingMessageUpdate(messageId);
@@ -2935,6 +3013,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             isStreaming: false,
             isFinal: true,
             ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            ...extraMetadata,
           };
     if (this.store) {
       this.store.updateMessage(sessionId, messageId, { content, metadata });
@@ -2960,6 +3039,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       isFinal: true,
       isFinalAnswer: true,
       ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+      ...buildAnswerStopReasonMetadata(active.lastAssistantStopReason ?? undefined),
     };
     if (this.store) {
       const message = this.store

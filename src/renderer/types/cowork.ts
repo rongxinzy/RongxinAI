@@ -56,6 +56,10 @@ export interface CoworkMessageMetadata {
   isFinal?: boolean;
   /** True only for the user-facing final answer of a completed turn. */
   isFinalAnswer?: boolean;
+  /** Assistant stop reason from the agent runtime ('stop' | 'length' | 'error' | ...). */
+  stopReason?: string;
+  /** True when this answer was cut off by the output token limit. */
+  truncated?: boolean;
   isThinking?: boolean;
   /** Runtime-measured duration for this thinking message. */
   thinkingDurationMs?: number;

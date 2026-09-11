@@ -148,6 +148,33 @@ test('queues Pi write recovery and keeps waiting after a truncated subagent writ
   await expect(output).resolves.toMatchObject({ output: 'Completed' });
 });
 
+test('settles with the truncated text when a pure-text answer hits the length limit', async () => {
+  const { session, emit, resolvePrompt } = createSession();
+  const output = runPiSubagent(session, 'Answer briefly', {
+    maxOutputTokens: 4096,
+    hardTimeoutMs: 10_000,
+  });
+
+  emit({
+    type: PiSubagentEventType.MessageEnd,
+    message: {
+      role: PiMessageRole.Assistant,
+      stopReason: PiAssistantStopReason.Length,
+      content: [{ type: PiContentBlockType.Text, text: 'Half an answer' }],
+    },
+  });
+  // No tool call was truncated, so the write-chunking recovery does not steer;
+  // the subagent is bounded by its own turn/timeout budgets instead.
+  expect(session.steer).not.toHaveBeenCalled();
+  emit({ type: PiSubagentEventType.AgentSettled });
+  resolvePrompt();
+
+  await expect(output).resolves.toMatchObject({
+    output: 'Half an answer',
+    terminationReason: 'settled',
+  });
+});
+
 test('returns a subagent error without waiting for agent_end', async () => {
   const { session, emit } = createSession();
   const output = runPiSubagent(session, 'Fail', {

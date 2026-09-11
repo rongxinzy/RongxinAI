@@ -75,6 +75,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorContentFiltered: '内容未通过安全审核，请修改后重试。',
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorEngineNotReady: 'AI 引擎正在启动中，请稍等几秒后重试。',
+    coworkAnswerTruncatedNotice:
+      '回复因达到单次输出长度上限被截断。你可以发送“继续”，让模型从中断处接着写。',
     coworkLlamaCppModelNotRunning:
       '该本地推理模型当前未运行。请先到本地推理页加载模型，或改选其他模型。',
     coworkLlamaCppContextWindowUnknown:
@@ -399,6 +401,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Content did not pass the safety review. Please modify and try again.',
     coworkErrorServerError: 'Server error occurred. Please try again later.',
     coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
+    coworkAnswerTruncatedNotice:
+      'The response was truncated by the single-response output limit. Send "continue" to have the model resume from where it stopped.',
     coworkLlamaCppModelNotRunning:
       'This local inference model is not running. Load it from Local Inference first or choose another model.',
     coworkLlamaCppContextWindowUnknown:
