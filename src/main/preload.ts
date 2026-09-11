@@ -727,6 +727,9 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.UnstageGitPaths, input),
     commitGitChanges: (input: import('../shared/codingAgent').CodingGitCommitInput) =>
       ipcRenderer.invoke(CodingAgentIpc.CommitGitChanges, input),
+    commitAndPushGitChanges: (
+      input: import('../shared/codingAgent').CodingGitCommitAndPushInput,
+    ) => ipcRenderer.invoke(CodingAgentIpc.CommitAndPushGitChanges, input),
     pushGitBranch: (input: import('../shared/codingAgent').CodingGitTargetInput) =>
       ipcRenderer.invoke(CodingAgentIpc.PushGitBranch, input),
     switchGitBranch: (input: import('../shared/codingAgent').CodingGitBranchInput) =>

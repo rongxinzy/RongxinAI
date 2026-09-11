@@ -16,7 +16,7 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import { Expand, File, FileDiff, Layers, Minimize2, PanelRight, Settings2, Terminal as TerminalIcon, X } from 'lucide-react';
+import { Expand, File, FileDiff, Minimize2, PanelRight, Settings2, Terminal as TerminalIcon, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -42,7 +42,6 @@ import {
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
-  togglePanel,
 } from '../../store/slices/artifactSlice';
 import PageHeader from '../PageHeader';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
@@ -870,35 +869,6 @@ export const CodingWorkbenchView = ({
         }
         actions={
           <>
-            {hasInspectorContent && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={i18nService.t('codingAgentInspector')}
-                aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
-                onClick={() => {
-                  openSidePanelTab(CodingSidePanelView.Inspector);
-                  if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-                }}
-              >
-                <TerminalIcon />
-              </Button>
-            )}
-            {artifactSessionKey && laneArtifacts.length > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={i18nService.t('codingAgentArtifacts')}
-                aria-pressed={isArtifactPanelOpen}
-                onClick={() => dispatch(togglePanel())}
-              >
-                <Layers className="mr-1 size-4" />
-                {i18nService.t('codingAgentArtifacts')}
-                <Badge variant="secondary">{laneArtifacts.length}</Badge>
-              </Button>
-            )}
             {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
               <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
                 <FileDiff className="mr-1 size-4" />

@@ -2,6 +2,8 @@ import path from 'path';
 
 import {
   CodingLaneStatus,
+  type CodingGitCommitAndPushInput,
+  type CodingGitCommitAndPushResult,
   type CodingGitCommitInput,
   type CodingGitBranchInput,
   type CodingGitPullRequestInput,
@@ -49,8 +51,17 @@ export class CodingGitController {
 
   async commit(input: CodingGitCommitInput): Promise<CodingGitStatus> {
     const target = this.resolveMutableTarget(input);
-    await this.git.commit(target.targetRoot, input.message);
+    await this.git.commit(target.targetRoot, input.message, input.paths);
     return await this.git.getStatus(target.targetRoot, target);
+  }
+
+  async commitAndPush(input: CodingGitCommitAndPushInput): Promise<CodingGitCommitAndPushResult> {
+    const target = this.resolveMutableTarget(input);
+    const result = await this.git.commitAndPush(target.targetRoot, input.message, input.paths);
+    return {
+      ...result,
+      status: await this.git.getStatus(target.targetRoot, target),
+    };
   }
 
   async push(input: CodingGitTargetInput): Promise<CodingGitStatus> {
@@ -66,13 +77,17 @@ export class CodingGitController {
   }
 
   async createBranch(input: CodingGitBranchInput): Promise<CodingGitStatus> {
-    const target = this.resolveMutableTarget(input);
+    const target = this.resolveBranchCreationTarget(input);
     await this.git.createBranch(target.targetRoot, input.branch);
     return await this.git.getStatus(target.targetRoot, target);
   }
 
   async createPullRequest(input: CodingGitPullRequestInput): Promise<string> {
     const target = this.resolveMutableTarget(input);
+    const status = await this.git.getStatus(target.targetRoot, target);
+    if (!status.githubRepositoryUrl || !status.hasRemoteBranch) {
+      throw new Error('Push the current branch before creating a pull request.');
+    }
     return await this.git.createPullRequest(target.targetRoot, input);
   }
 
@@ -86,6 +101,17 @@ export class CodingGitController {
         'Wait for the active coding agent write operation before changing Git state.',
       );
     }
+    return target;
+  }
+
+  private resolveBranchCreationTarget(input: CodingGitTargetInput): ResolvedGitTarget {
+    const target = this.resolveTarget(input);
+    if (target.isIsolated) {
+      throw new Error('Isolated collaborator worktrees are read-only in the Git panel.');
+    }
+    // `git switch --create` from the current HEAD changes only HEAD and refs;
+    // the worktree contents stay intact, so an active agent can continue its
+    // writes on the newly created branch without a filesystem race.
     return target;
   }
 

@@ -12,8 +12,7 @@ export function classicButtons(dark: boolean): ButtonAppearances {
   const hover = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
   const raised = { 'background-color': 'var(--zy-surface-raised)' };
   const selected = {
-    'border-color': 'var(--border)',
-    'background-color': 'var(--card)',
+    'background-color': 'var(--muted)',
     color: 'var(--foreground)',
   };
   const small = { 'border-radius': 'var(--zy-style-radius-md)' };

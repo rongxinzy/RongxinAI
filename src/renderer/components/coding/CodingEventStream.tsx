@@ -195,7 +195,9 @@ export const CodingEventStream = ({
       }}
     >
       {headerActions ? (
-        <div className="absolute top-3 right-4 z-10 flex items-center gap-1">{headerActions}</div>
+        <div className="absolute top-3 right-4 z-10 flex items-center gap-1 rounded-lg border border-border bg-background/80 p-1 shadow-sm backdrop-blur-sm">
+          {headerActions}
+        </div>
       ) : null}
       <Conversation
         className="h-full"
