@@ -56,6 +56,22 @@ type PendingPermission = {
   reject: (error: Error) => void;
 };
 
+/** Turn watchdog policy: renewed by progress, paused by legitimate waiting. */
+export interface AcpTurnTimeouts {
+  /** Silence budget for one turn; every `session/update` renews it. */
+  inactivityMs: number;
+  /** Hard ceiling for one turn that no progress or approval may extend. */
+  absoluteMs: number;
+}
+
+const DEFAULT_TURN_TIMEOUTS: AcpTurnTimeouts = {
+  inactivityMs: 5 * 60 * 1000,
+  absoluteMs: 60 * 60 * 1000,
+};
+
+/** ACP tool call statuses that mean the agent is still running the tool. */
+const OPEN_TOOL_CALL_STATUSES = new Set(['pending', 'in_progress']);
+
 const DEFAULT_CAPABILITIES: CodingAgentCapabilities = {
   supportsLoadSession: false,
   supportsResumeSession: false,
@@ -295,6 +311,8 @@ export class AcpCodingDriver implements CodingAgentDriver {
   >();
   private readonly sessionTitleListeners = new Set<(sessionId: string, title: string) => void>();
   private readonly permissions = new Map<string, PendingPermission>();
+  private readonly openToolCalls = new Map<string, Set<string>>();
+  private watchdogsHeld = false;
   private readonly fallbackMessageIds = new Map<string, string>();
   private capabilities = DEFAULT_CAPABILITIES;
   private readonly authMethods = new Map<string, AcpAuthMethod>();
@@ -311,6 +329,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
       args: string[];
       environment: Record<string, string | undefined>;
     },
+    private readonly turnTimeouts: AcpTurnTimeouts = DEFAULT_TURN_TIMEOUTS,
   ) {
     this.supervisor.onNotification((method, params) => this.receiveNotification(method, params));
     this.supervisor.onRequest((method, params) => this.receiveRequest(method, params));
@@ -422,10 +441,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
             ...(await promptAttachmentBlocks(input.attachments, this.capabilities)),
           ],
         },
-        // A hung agent must not leave the lane running forever. 5 minutes is
-        // generous for a single turn; the watchdog can be cancelled by the
-        // agent finishing normally or by the user cancelling.
-        { timeoutMs: 5 * 60 * 1000 },
+        // A hung agent must not leave the lane running forever, but a working
+        // one must not be killed for taking long: the watchdog counts silence
+        // only. Progress notifications and running tool calls both pause it,
+        // and the absolute ceiling still caps a turn that never ends.
+        {
+          timeoutMs: this.turnTimeouts.inactivityMs,
+          absoluteTimeoutMs: this.turnTimeouts.absoluteMs,
+        },
       )
       .then(() => {
         console.debug(`[AcpCodingDriver] session prompt completed for ${input.sessionId}`);
@@ -451,8 +474,8 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.finishStream(sessionId, new Error('ACP session prompt was cancelled.'));
     for (const [requestId, pending] of this.permissions) {
       if (pending.streamSessionId !== sessionId) continue;
+      this.releasePermission(requestId);
       pending.resolve({ outcome: { outcome: CodingPermissionOutcome.Cancelled } });
-      this.permissions.delete(requestId);
     }
   }
 
@@ -462,13 +485,13 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (response.outcome === CodingPermissionOutcome.Selected && !response.optionId) {
       throw new Error('An ACP permission selection requires an option ID.');
     }
+    this.releasePermission(response.requestId);
     pending.resolve({
       outcome:
         response.outcome === CodingPermissionOutcome.Cancelled
           ? { outcome: CodingPermissionOutcome.Cancelled }
           : { outcome: CodingPermissionOutcome.Selected, optionId: response.optionId },
     });
-    this.permissions.delete(response.requestId);
     console.debug(`[AcpCodingDriver] received permission response ${response.requestId}`);
   }
 
@@ -524,6 +547,8 @@ export class AcpCodingDriver implements CodingAgentDriver {
       pending.reject(new Error('The ACP connection was disposed.'));
     }
     this.permissions.clear();
+    this.openToolCalls.clear();
+    this.syncTurnWatchdogs();
     this.configOptionsBySession.clear();
     this.availableCommandsBySession.clear();
     this.availableCommandListeners.clear();
@@ -619,6 +644,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
         listener(params.sessionId, update.title.trim());
       }
     }
+    this.trackOpenToolCalls(params.sessionId, update);
+    // Any session update proves the agent is alive; one lane runs one turn at a
+    // time, so renewing every prompt request of this connection is exact.
+    this.supervisor.touchRequestTimeouts(AcpMethod.SessionPrompt);
     for (const event of this.normalizeUpdate(params.sessionId, update))
       this.pushEvent(params.sessionId, event);
   }
@@ -638,6 +667,27 @@ export class AcpCodingDriver implements CodingAgentDriver {
     throw new Error(`Unsupported ACP agent request: ${method}.`);
   }
 
+  /**
+   * Tool calls the agent reported as running. A build or test suite can stay
+   * silent for a long time while it is genuinely working, so the turn watchdog
+   * stays paused until the tool call reports a final status.
+   */
+  private trackOpenToolCalls(sessionId: string, update: Record<string, unknown>): void {
+    const kind = update.sessionUpdate;
+    if (kind !== AcpSessionUpdateKind.ToolCall && kind !== AcpSessionUpdateKind.ToolCallUpdate) {
+      return;
+    }
+    const toolCallId = typeof update.toolCallId === 'string' ? update.toolCallId : null;
+    if (!toolCallId) return;
+    const status = typeof update.status === 'string' ? update.status : null;
+    const open = this.openToolCalls.get(sessionId) ?? new Set<string>();
+    if (status === null || OPEN_TOOL_CALL_STATUSES.has(status)) open.add(toolCallId);
+    else open.delete(toolCallId);
+    if (open.size > 0) this.openToolCalls.set(sessionId, open);
+    else this.openToolCalls.delete(sessionId);
+    this.syncTurnWatchdogs();
+  }
+
   private async requestPermission(
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
@@ -653,6 +703,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     );
     const permission = new Promise<Record<string, unknown>>((resolve, reject) => {
       this.permissions.set(requestId, { streamSessionId, resolve, reject });
+      this.syncTurnWatchdogs();
     });
     if (!this.pushEvent(streamSessionId, {
       kind: CodingEventKind.Permission,
@@ -663,7 +714,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
         options: params.options,
       },
     })) {
-      this.permissions.delete(requestId);
+      this.releasePermission(requestId);
       throw new Error('ACP permission request could not be delivered to the session prompt.');
     }
     console.debug(`[AcpCodingDriver] published permission request ${requestId}`);
@@ -895,6 +946,29 @@ export class AcpCodingDriver implements CodingAgentDriver {
     return messageId;
   }
 
+  /**
+   * Holds the turn watchdog while the agent legitimately stops reporting
+   * progress: waiting for the user's approval or running a tool call. Driven by
+   * state instead of a call counter so no path can unbalance it.
+   */
+  private syncTurnWatchdogs(): void {
+    const held =
+      this.permissions.size > 0 ||
+      [...this.openToolCalls.values()].some(toolCalls => toolCalls.size > 0);
+    if (held === this.watchdogsHeld) return;
+    this.watchdogsHeld = held;
+    if (held) this.supervisor.holdRequestTimeouts();
+    else this.supervisor.releaseRequestTimeouts();
+  }
+
+  private releasePermission(requestId: string): PendingPermission | undefined {
+    const pending = this.permissions.get(requestId);
+    if (!pending) return undefined;
+    this.permissions.delete(requestId);
+    this.syncTurnWatchdogs();
+    return pending;
+  }
+
   private resolvePermissionStreamSessionId(sessionId: string): string | null {
     if (this.streams.has(sessionId)) return sessionId;
     if (this.streams.size !== 1) return null;
@@ -919,10 +993,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     console.debug(
       `[AcpCodingDriver] finished session prompt for ${sessionId}${stream.error ? ' with an error' : ''}`,
     );
+    // A turn that ends mid tool call must not keep the watchdog paused for the
+    // next turn: the agent can no longer report that tool call as finished.
+    this.openToolCalls.delete(sessionId);
+    this.syncTurnWatchdogs();
     for (const [requestId, pending] of this.permissions) {
       if (pending.streamSessionId !== sessionId) continue;
+      this.releasePermission(requestId);
       pending.reject(stream.error ?? new Error('ACP session prompt ended before permission response.'));
-      this.permissions.delete(requestId);
     }
     for (const waiter of stream.waiters.splice(0)) {
       if (stream.error) waiter.reject(stream.error);
