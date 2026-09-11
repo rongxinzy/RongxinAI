@@ -17,7 +17,7 @@ import { AcpProtocolIncompatibleError } from './acp/protocol';
 import type { CodingAgentProfileRepository } from './codingAgentProfileRepository';
 
 const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
-  supportsLoadSession: true,
+  supportsLoadSession: false,
   supportsResumeSession: true,
   supportsPlans: true,
   supportsPermissions: true,

@@ -1,5 +1,7 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
+import { AcpErrorCode, AcpRequestError } from './protocol';
+
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
 const MAX_RESTART_ATTEMPTS = 2;
@@ -180,6 +182,12 @@ export class AcpConnectionSupervisor {
       this.stderrContext = `${this.stderrContext}${text}`.slice(-MAX_STDERR_CONTEXT_BYTES);
       console.debug('[AcpConnection] agent stderr:', text);
     });
+    // An agent that exits mid-write rejects the pending write asynchronously;
+    // without a listener that becomes an unhandled stream error.
+    child.stdin.on('error', error => {
+      if (this.child !== child) return;
+      console.warn('[AcpConnection] agent stdin closed unexpectedly:', error);
+    });
     child.once('exit', (code, signal) => {
       if (this.child !== child) return;
       this.child = null;
@@ -234,7 +242,7 @@ export class AcpConnectionSupervisor {
       // either, otherwise approval wait time leaks back into the budget.
       if (timeoutMs !== null && this.watchdogHoldCount === 0) this.armWatchdog(id, pending);
     });
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    this.writeLine(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`, method);
     return await response;
   }
 
@@ -287,7 +295,7 @@ export class AcpConnectionSupervisor {
 
   notify(method: string, params: Record<string, unknown>): void {
     if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
-    this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
+    this.writeLine(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`, method);
   }
 
   async dispose(): Promise<void> {
@@ -383,15 +391,24 @@ export class AcpConnectionSupervisor {
     params: Record<string, unknown>,
   ): Promise<void> {
     try {
-      if (!this.requestHandler) throw new Error(`Unsupported ACP agent request: ${method}.`);
+      if (!this.requestHandler) {
+        throw new AcpRequestError(
+          AcpErrorCode.MethodNotFound,
+          `Unsupported ACP agent request: ${method}.`,
+        );
+      }
       const result = await this.requestHandler(method, params);
       this.writeMessage({ jsonrpc: '2.0', id, result });
     } catch (error) {
+      const code = error instanceof AcpRequestError ? error.code : AcpErrorCode.InternalError;
+      if (code === AcpErrorCode.InternalError) {
+        console.warn(`[AcpConnection] failed to handle the agent request ${method}:`, error);
+      }
       this.writeMessage({
         jsonrpc: '2.0',
         id,
         error: {
-          code: -32601,
+          code,
           message: error instanceof Error ? error.message : String(error),
         },
       });
@@ -399,7 +416,20 @@ export class AcpConnectionSupervisor {
   }
 
   private writeMessage(message: Record<string, unknown>): void {
-    if (this.child?.stdin.writable) this.child.stdin.write(`${JSON.stringify(message)}\n`);
+    this.writeLine(`${JSON.stringify(message)}\n`, 'response');
+  }
+
+  /**
+   * Writes one newline-delimited JSON-RPC message. The write callback absorbs
+   * EPIPE from an agent that exited mid-write, which would otherwise surface as
+   * an unhandled stream error in the main process.
+   */
+  private writeLine(line: string, label: string): void {
+    const stdin = this.child?.stdin;
+    if (!stdin?.writable) return;
+    stdin.write(line, error => {
+      if (error) console.warn(`[AcpConnection] failed to write ${label} to the agent:`, error);
+    });
   }
 
   private armWatchdog(id: JsonRpcRequestId, pending: PendingRequest): void {

@@ -12,6 +12,7 @@ import {
 import { AcpCodingDriver } from './acpCodingDriver';
 import { AcpConnectionSupervisor } from '../acp/connectionSupervisor';
 import { AcpSessionUpdateKind } from '../acp/protocol';
+import { t } from '../../i18n';
 
 const promptScript = (promptBody: string): string =>
   [
@@ -28,6 +29,56 @@ const sendUpdate = (update: string): string =>
 
 const answerPrompt =
   "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n');";
+
+const answerWithStopReason = (stopReason: string): string =>
+  `process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: '${stopReason}' } }) + '\\n');`;
+
+const TEST_TIMEOUTS = { inactivityMs: 2_000, absoluteMs: 5_000 };
+
+test('surfaces an agent refusal instead of a clean turn end', async () => {
+  const { failure } = await runTurn(promptScript(answerWithStopReason('refusal')), TEST_TIMEOUTS);
+  expect(failure).toBe(t('codingAgentStopRefusal'));
+});
+
+test('surfaces an output limit instead of a clean turn end', async () => {
+  const { failure } = await runTurn(promptScript(answerWithStopReason('max_tokens')), TEST_TIMEOUTS);
+  expect(failure).toBe(t('codingAgentStopMaxTokens'));
+});
+
+test('treats an end turn and a cancellation as a completed prompt', async () => {
+  await expect(
+    runTurn(promptScript(answerWithStopReason('end_turn')), TEST_TIMEOUTS),
+  ).resolves.toMatchObject({ failure: '' });
+  await expect(
+    runTurn(promptScript(answerWithStopReason('cancelled')), TEST_TIMEOUTS),
+  ).resolves.toMatchObject({ failure: '' });
+});
+
+test('accepts an agent that negotiates a newer protocol version', async () => {
+  const { failure } = await runTurn(
+    promptScript(answerPrompt).replace('protocolVersion: 1', 'protocolVersion: 2'),
+    TEST_TIMEOUTS,
+  );
+  expect(failure).toBe('');
+});
+
+test('rejects an agent that negotiates an older protocol version', async () => {
+  const driver = new AcpCodingDriver(
+    {
+      executable: execPath,
+      args: ['-e', promptScript(answerPrompt).replace('protocolVersion: 1', 'protocolVersion: 0')],
+      environment: process.env as Record<string, string>,
+    },
+    TEST_TIMEOUTS,
+  );
+  try {
+    await expect(driver.createSession({ workspaceRoot: process.cwd() })).rejects.toThrow(
+      /protocol version 0/,
+    );
+  } finally {
+    await driver.dispose();
+  }
+});
 
 const runTurn = async (
   script: string,
@@ -181,7 +232,7 @@ test('declares only the client capabilities implemented by the ACP driver', asyn
   const script = [
     "let buffer=''; let capabilitiesValid=false;",
     "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
-    "if (request.method === 'initialize') { const capabilities = request.params.clientCapabilities; capabilitiesValid = capabilities.fs?.readTextFile === true && capabilities.fs?.writeTextFile === true && capabilities.terminal === true && capabilities.plan && capabilities.auth?.terminal === true && capabilities.session?.configOptions?.boolean; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); }",
+    "if (request.method === 'initialize') { const capabilities = request.params.clientCapabilities; capabilitiesValid = capabilities.fs?.readTextFile === true && capabilities.fs?.writeTextFile === true && capabilities.terminal === true && !('plan' in capabilities) && capabilities.auth?.terminal === true && capabilities.session?.configOptions?.boolean; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); }",
     "if (request.method === 'session/new') process.stdout.write(JSON.stringify(capabilitiesValid ? { jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } } : { jsonrpc: '2.0', id: request.id, error: { message: 'missing client capabilities' } }) + '\\n');",
     '} });',
   ].join('');

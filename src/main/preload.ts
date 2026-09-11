@@ -689,6 +689,12 @@ contextBridge.exposeInMainWorld('electron', {
     }) => ipcRenderer.invoke(CodingAgentIpc.ConfirmSessionRecovery, input),
     cancel: (input: { workspaceRoot: string; laneId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.Cancel, input),
+    respondElicitation: (input: {
+      workspaceRoot: string;
+      response: import('../shared/codingAgent').CodingElicitationResponse;
+    }) => ipcRenderer.invoke(CodingAgentIpc.RespondElicitation, input),
+    cancelElicitation: (input: { workspaceRoot: string; requestId: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.CancelElicitation, input),
     previewHandoff: (input: {
       workspaceRoot: string;
       sourceLaneId: string;
