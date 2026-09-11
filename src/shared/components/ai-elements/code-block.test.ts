@@ -1,29 +1,11 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { expect, test } from 'vitest';
 
-import {
-  CodeBlockHeaderSurface,
-  CodeBlockLineNumberMode,
-  normalizeCodeLanguage,
-} from './code-block';
-
-const source = readFileSync(fileURLToPath(new URL('./code-block.tsx', import.meta.url)), 'utf8');
-
-test('exposes a dedicated approval line-number mode without changing the default', () => {
-  expect(CodeBlockLineNumberMode.Default).toBe('default');
-  expect(CodeBlockLineNumberMode.Approval).toBe('approval');
-  expect(source).toContain("'before:justify-start'");
-  expect(source).toContain("'before:bg-muted'");
-  expect(source).toContain("'before:border-border'");
-});
+import { CodeBlockHeaderSurface, normalizeCodeLanguage } from './code-block';
 
 test('exposes a seamless code block header surface without changing the default', () => {
   expect(CodeBlockHeaderSurface.Default).toBe('default');
   expect(CodeBlockHeaderSurface.Seamless).toBe('seamless');
 });
-
 
 test('resolves canonical language ids', () => {
   expect(normalizeCodeLanguage('javascript')).toBe('javascript');

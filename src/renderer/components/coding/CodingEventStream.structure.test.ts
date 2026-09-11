@@ -15,3 +15,8 @@ test('does not render a separate batch tool control outside the thinking group',
   expect(source).not.toContain('toggleAllTools');
   expect(source).not.toContain('ChevronsDownUp');
 });
+
+test('leaves the approval card out of the conversation stream', () => {
+  expect(source).not.toContain('CodingPermissionCard');
+  expect(source).not.toContain('pendingPermission');
+});

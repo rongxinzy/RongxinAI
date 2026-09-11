@@ -112,6 +112,142 @@ test('allows a long-running prompt request to opt out of the short RPC timeout',
   await supervisor.dispose();
 });
 
+test('holds request watchdogs while a tool approval waits for the user', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', 'process.stdin.resume();'],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+  vi.useFakeTimers();
+  try {
+    const prompt = supervisor.request('session/prompt', {}, { timeoutMs: 1_000 });
+    const promptOutcome = prompt.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    await vi.advanceTimersByTimeAsync(900);
+    expect(await Promise.race([promptOutcome, Promise.resolve('pending')])).toBe('pending');
+
+    // Approval wait: neither the running request nor one started during the
+    // hold may spend its budget while the user is thinking.
+    supervisor.holdRequestTimeouts();
+    const control = supervisor.request('fs/read_text_file', {}, { timeoutMs: 500 });
+    const controlOutcome = control.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(await Promise.race([promptOutcome, Promise.resolve('pending')])).toBe('pending');
+    expect(await Promise.race([controlOutcome, Promise.resolve('pending')])).toBe('pending');
+
+    supervisor.releaseRequestTimeouts();
+    await vi.advanceTimersByTimeAsync(101);
+    await expect(promptOutcome).resolves.toBe('ACP request timed out: session/prompt.');
+    expect(await Promise.race([controlOutcome, Promise.resolve('pending')])).toBe('pending');
+    await vi.advanceTimersByTimeAsync(400);
+    await expect(controlOutcome).resolves.toBe('ACP request timed out: fs/read_text_file.');
+  } finally {
+    vi.useRealTimers();
+    await supervisor.dispose();
+  }
+});
+
+test('renews the watchdog while the agent reports progress', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', 'process.stdin.resume();'],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+  vi.useFakeTimers();
+  try {
+    const prompt = supervisor.request('session/prompt', {}, { timeoutMs: 1_000 });
+    const promptOutcome = prompt.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    for (let round = 0; round < 5; round += 1) {
+      await vi.advanceTimersByTimeAsync(900);
+      expect(await Promise.race([promptOutcome, Promise.resolve('pending')])).toBe('pending');
+      supervisor.touchRequestTimeouts('session/prompt');
+    }
+    // Progress stopped: the renewals must not have disabled the watchdog.
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(promptOutcome).resolves.toBe('ACP request timed out: session/prompt.');
+  } finally {
+    vi.useRealTimers();
+    await supervisor.dispose();
+  }
+});
+
+test('renews the budget while held instead of arming the watchdog', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', 'process.stdin.resume();'],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+  vi.useFakeTimers();
+  try {
+    const prompt = supervisor.request('session/prompt', {}, { timeoutMs: 1_000 });
+    const promptOutcome = prompt.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    await vi.advanceTimersByTimeAsync(900);
+    supervisor.holdRequestTimeouts();
+    supervisor.touchRequestTimeouts('session/prompt');
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(await Promise.race([promptOutcome, Promise.resolve('pending')])).toBe('pending');
+
+    // The hold preserved the renewed budget rather than the nearly spent one.
+    supervisor.releaseRequestTimeouts();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(await Promise.race([promptOutcome, Promise.resolve('pending')])).toBe('pending');
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(promptOutcome).resolves.toBe('ACP request timed out: session/prompt.');
+  } finally {
+    vi.useRealTimers();
+    await supervisor.dispose();
+  }
+});
+
+test('enforces an absolute turn ceiling that progress cannot extend', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', 'process.stdin.resume();'],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+  vi.useFakeTimers();
+  try {
+    const prompt = supervisor.request(
+      'session/prompt',
+      {},
+      { timeoutMs: 5_000, absoluteTimeoutMs: 3_000 },
+    );
+    const promptOutcome = prompt.then(
+      () => 'resolved',
+      (error: Error) => error.message,
+    );
+    for (let round = 0; round < 7; round += 1) {
+      await vi.advanceTimersByTimeAsync(500);
+      supervisor.touchRequestTimeouts('session/prompt');
+    }
+    await expect(promptOutcome).resolves.toBe(
+      'ACP request timed out: session/prompt after the maximum turn duration.',
+    );
+  } finally {
+    vi.useRealTimers();
+    await supervisor.dispose();
+  }
+});
+
 test('responds to agent requests that use a string JSON-RPC ID', async () => {
   const supervisor = new AcpConnectionSupervisor();
   supervisor.onRequest(async () => ({ accepted: true }));

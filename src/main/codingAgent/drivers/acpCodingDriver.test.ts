@@ -2,7 +2,7 @@ import { execPath } from 'process';
 import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import {
   CodingEventKind,
@@ -10,7 +10,64 @@ import {
   CodingStreamUpdateMode,
 } from '../../../shared/codingAgent';
 import { AcpCodingDriver } from './acpCodingDriver';
+import { AcpConnectionSupervisor } from '../acp/connectionSupervisor';
 import { AcpSessionUpdateKind } from '../acp/protocol';
+
+const promptScript = (promptBody: string): string =>
+  [
+    "let buffer='';",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+    "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n');",
+    `if (request.method === 'session/prompt') { ${promptBody} }`,
+    '} });',
+  ].join('');
+
+const sendUpdate = (update: string): string =>
+  `process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: ${update} } }) + '\\n');`;
+
+const answerPrompt =
+  "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n');";
+
+const runTurn = async (
+  script: string,
+  timeouts: { inactivityMs: number; absoluteMs: number },
+): Promise<{ events: number; failure: string }> => {
+  const driver = new AcpCodingDriver(
+    {
+      executable: execPath,
+      args: ['-e', script],
+      environment: process.env as Record<string, string>,
+    },
+    timeouts,
+  );
+  try {
+    const session = await driver.createSession({ workspaceRoot: process.cwd() });
+    return await runPrompt(driver, session.id);
+  } finally {
+    await driver.dispose();
+  }
+};
+
+const runPrompt = async (
+  driver: AcpCodingDriver,
+  sessionId: string,
+): Promise<{ events: number; failure: string }> => {
+  let events = 0;
+  let failure = '';
+  try {
+    for await (const event of driver.prompt({
+      sessionId,
+      workspaceRoot: process.cwd(),
+      prompt: 'Run the build.',
+    })) {
+      if (event) events += 1;
+    }
+  } catch (error) {
+    failure = error instanceof Error ? error.message : String(error);
+  }
+  return { events, failure };
+};
 
 test('normalizes ACP session updates into coding events', async () => {
   const script = [
@@ -274,6 +331,127 @@ test('keeps an ACP permission request pending until the selected option is retur
   expect(await iterator.next()).toEqual({ done: true, value: undefined });
   await driver.dispose();
 });
+
+test('stops the prompt watchdog while an approval waits for the user', async () => {
+  const holdWatchdogs = vi.spyOn(AcpConnectionSupervisor.prototype, 'holdRequestTimeouts');
+  const releaseWatchdogs = vi.spyOn(AcpConnectionSupervisor.prototype, 'releaseRequestTimeouts');
+  const script = [
+    "let buffer=''; let promptId=null;",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+    "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n');",
+    "if (request.method === 'session/prompt') { promptId = request.id; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'session/request_permission', params: { sessionId: 'remote-session', toolCall: { toolCallId: 'call-1' }, options: [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }] } }) + '\\n'); }",
+    "if (request.id === 99 && request.result) process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: promptId, result: { stopReason: 'end_turn' } }) + '\\n');",
+    '} });',
+  ].join('');
+  const driver = new AcpCodingDriver({
+    executable: execPath,
+    args: ['-e', script],
+    environment: process.env as Record<string, string>,
+  });
+  try {
+    const session = await driver.createSession({ workspaceRoot: process.cwd() });
+    const iterator = driver
+      .prompt({
+        sessionId: session.id,
+        workspaceRoot: process.cwd(),
+        prompt: 'Run the test.',
+      })
+      [Symbol.asyncIterator]();
+
+    const permission = await iterator.next();
+    const requestId = permission.value!.payload.requestId as string;
+    expect(holdWatchdogs).toHaveBeenCalledTimes(1);
+    expect(releaseWatchdogs).not.toHaveBeenCalled();
+
+    await driver.respondToPermission({
+      requestId,
+      outcome: CodingPermissionOutcome.Selected,
+      optionId: 'allow-once',
+    });
+    expect(releaseWatchdogs).toHaveBeenCalledTimes(1);
+    expect(await iterator.next()).toEqual({ done: true, value: undefined });
+  } finally {
+    holdWatchdogs.mockRestore();
+    releaseWatchdogs.mockRestore();
+    await driver.dispose();
+  }
+});
+
+test('keeps a turn alive while the agent keeps reporting progress', async () => {
+  const script = promptScript(
+    [
+      'let ticks = 0;',
+      `const timer = setInterval(() => { ticks += 1; ${sendUpdate("{ sessionUpdate: 'agent_message_chunk', messageId: 'message-1', content: { type: 'text', text: 'tick ' + ticks + ' ' } }")} }, 25);`,
+      `setTimeout(() => { clearInterval(timer); ${answerPrompt} }, 500);`,
+    ].join(' '),
+  );
+
+  const { events, failure } = await runTurn(script, { inactivityMs: 200, absoluteMs: 30_000 });
+  expect(failure).toBe('');
+  expect(events).toBeGreaterThan(4);
+}, 20_000);
+
+test('keeps a turn alive while a tool call is still running', async () => {
+  const script = promptScript(
+    [
+      sendUpdate(
+        "{ sessionUpdate: 'tool_call', toolCallId: 'tool-1', status: 'in_progress', title: 'Run tests' }",
+      ),
+      `setTimeout(() => { ${sendUpdate("{ sessionUpdate: 'tool_call_update', toolCallId: 'tool-1', status: 'completed' }")} ${answerPrompt} }, 600);`,
+    ].join(' '),
+  );
+
+  const { events, failure } = await runTurn(script, { inactivityMs: 200, absoluteMs: 30_000 });
+  expect(failure).toBe('');
+  expect(events).toBeGreaterThan(1);
+}, 20_000);
+
+test('times out a turn that stops reporting progress', async () => {
+  const { failure } = await runTurn(promptScript(''), { inactivityMs: 250, absoluteMs: 30_000 });
+  expect(failure).toBe('ACP request timed out: session/prompt.');
+}, 20_000);
+
+test('enforces the absolute turn ceiling even while progress continues', async () => {
+  const script = promptScript(
+    [
+      'let ticks = 0;',
+      `setInterval(() => { ticks += 1; ${sendUpdate("{ sessionUpdate: 'agent_message_chunk', messageId: 'message-1', content: { type: 'text', text: 'tick ' + ticks + ' ' } }")} }, 25);`,
+    ].join(' '),
+  );
+
+  const { events, failure } = await runTurn(script, { inactivityMs: 5_000, absoluteMs: 400 });
+  expect(events).toBeGreaterThan(2);
+  expect(failure).toBe('ACP request timed out: session/prompt after the maximum turn duration.');
+}, 20_000);
+
+test('releases the watchdog hold when a turn dies mid tool call', async () => {
+  const script = promptScript(
+    [
+      'globalThis.seen = (globalThis.seen ?? 0) + 1;',
+      `if (globalThis.seen === 1) { ${sendUpdate("{ sessionUpdate: 'tool_call', toolCallId: 'tool-1', status: 'in_progress', title: 'Run tests' }")} process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: { code: -32000, message: 'Agent stopped mid tool.' } }) + '\\n'); }`,
+    ].join(' '),
+  );
+  const driver = new AcpCodingDriver(
+    {
+      executable: execPath,
+      args: ['-e', script],
+      environment: process.env as Record<string, string>,
+    },
+    { inactivityMs: 200, absoluteMs: 30_000 },
+  );
+  try {
+    const session = await driver.createSession({ workspaceRoot: process.cwd() });
+    const failed = await runPrompt(driver, session.id);
+    expect(failed.failure).toContain('Agent stopped mid tool.');
+
+    // The open tool call of the dead turn must not keep the next one unguarded.
+    const silent = await runPrompt(driver, session.id);
+    expect(silent.failure).toBe('ACP request timed out: session/prompt.');
+  } finally {
+    await driver.dispose();
+  }
+}, 20_000);
 
 test('uses an advertised protocol authentication method without exposing credentials', async () => {
   const script = [
