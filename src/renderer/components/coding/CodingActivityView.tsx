@@ -24,6 +24,7 @@ import type { Artifact } from '../../types/artifact';
 import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
 import { CodingDiffView } from './CodingDiffView';
 import { getCodingEventText, type CodingConversationActivity } from './codingEventProjection';
+import { codingToolKindLabel } from './codingToolKind';
 import {
   parsePlanEntries,
   parseToolCallView,
@@ -53,24 +54,8 @@ const TOOL_KIND_ICON: Record<string, ReactNode> = {
   switch_mode: <Repeat className="size-4 text-muted-foreground" />,
 };
 
-const TOOL_KIND_I18N_KEY: Record<string, string> = {
-  read: 'codingAgentToolKindRead',
-  edit: 'codingAgentToolKindEdit',
-  delete: 'codingAgentToolKindDelete',
-  move: 'codingAgentToolKindMove',
-  search: 'codingAgentToolKindSearch',
-  execute: 'codingAgentToolKindExecute',
-  think: 'codingAgentToolKindThink',
-  fetch: 'codingAgentToolKindFetch',
-  switch_mode: 'codingAgentToolKindSwitchMode',
-  other: 'codingAgentToolKindOther',
-};
-
 const toolKindIcon = (kind: string | null): ReactNode =>
   (kind && TOOL_KIND_ICON[kind]) ?? <Wrench className="size-4 text-muted-foreground" />;
-
-const toolKindLabel = (kind: string | null): string | null =>
-  kind ? i18nService.t(TOOL_KIND_I18N_KEY[kind] ?? 'codingAgentToolKindOther') : null;
 
 const activityState = (activity: CodingConversationActivity): CodingToolPartStateType => {
   if (activity.kind === CodingConversationActivityKind.Permission) {
@@ -262,7 +247,7 @@ const activityTitle = (activity: CodingConversationActivity): string => {
     return permissionStatusLabel(activity);
   }
   const view = parseToolCallView(activity.event.payload);
-  return view.title ?? toolKindLabel(view.kind) ?? i18nService.t('codingAgentTool');
+  return view.title ?? codingToolKindLabel(view.kind) ?? i18nService.t('codingAgentTool');
 };
 
 const CodingActivityComponent = ({

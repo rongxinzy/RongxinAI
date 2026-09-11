@@ -67,6 +67,14 @@ type PendingRequest = {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout> | null;
+  /** Watchdog budget in ms; null when the request opted out of a timeout. */
+  watchdogMs: number | null;
+  /** Budget left while the watchdog is held; unused while it is armed. */
+  watchdogRemainingMs: number;
+  /** Wall clock the armed watchdog counts from. */
+  watchdogArmedAt: number;
+  /** Ceiling no progress or hold may extend; null when the request has none. */
+  absoluteTimeout: ReturnType<typeof setTimeout> | null;
 };
 
 type JsonRpcRequestId = number | string;
@@ -95,6 +103,7 @@ export class AcpConnectionSupervisor {
   private disposed = false;
   private connectionGeneration = 0;
   private stderrContext = '';
+  private watchdogHoldCount = 0;
 
   get generation(): number {
     return this.connectionGeneration;
@@ -188,7 +197,7 @@ export class AcpConnectionSupervisor {
   async request<T>(
     method: string,
     params: Record<string, unknown>,
-    options: { timeoutMs?: number | null } = {},
+    options: { timeoutMs?: number | null; absoluteTimeoutMs?: number | null } = {},
   ): Promise<T> {
     if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
     const id = ++this.requestId;
@@ -197,26 +206,83 @@ export class AcpConnectionSupervisor {
     const response = new Promise<T>((resolve, reject) => {
       const timeoutMs =
         options.timeoutMs === undefined ? ACP_REQUEST_TIMEOUT_MS : options.timeoutMs;
-      const timeout =
-        timeoutMs === null
-          ? null
-          : setTimeout(() => {
-              this.pending.delete(id);
-              console.warn(
-                `[AcpConnection] request timed out: ${method} (${id}) after ${Date.now() - startedAt} ms`,
-              );
-              reject(new Error(`ACP request timed out: ${method}.`));
-            }, timeoutMs);
-      this.pending.set(id, {
+      const absoluteTimeoutMs = options.absoluteTimeoutMs ?? null;
+      const pending: PendingRequest = {
         method,
         startedAt,
         resolve: value => resolve(value as T),
         reject,
-        timeout,
-      });
+        timeout: null,
+        watchdogMs: timeoutMs,
+        watchdogRemainingMs: timeoutMs ?? 0,
+        watchdogArmedAt: startedAt,
+        absoluteTimeout: null,
+      };
+      this.pending.set(id, pending);
+      if (absoluteTimeoutMs !== null) {
+        pending.absoluteTimeout = setTimeout(() => {
+          pending.absoluteTimeout = null;
+          if (pending.timeout) clearTimeout(pending.timeout);
+          this.pending.delete(id);
+          console.warn(
+            `[AcpConnection] request exceeded the maximum duration: ${method} (${id}) after ${Date.now() - startedAt} ms`,
+          );
+          reject(new Error(`ACP request timed out: ${method} after the maximum turn duration.`));
+        }, absoluteTimeoutMs);
+      }
+      // A request created while the watchdog is held must not start its clock
+      // either, otherwise approval wait time leaks back into the budget.
+      if (timeoutMs !== null && this.watchdogHoldCount === 0) this.armWatchdog(id, pending);
     });
     this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
     return await response;
+  }
+
+  /**
+   * Stops the watchdog clock of every in-flight request. Tool approvals wait on
+   * the user for an unbounded time, and that think time must not be charged
+   * against the budget that protects a turn from a hung agent.
+   */
+  holdRequestTimeouts(): void {
+    this.watchdogHoldCount += 1;
+    if (this.watchdogHoldCount > 1) return;
+    const now = Date.now();
+    for (const pending of this.pending.values()) {
+      if (!pending.timeout) continue;
+      clearTimeout(pending.timeout);
+      pending.timeout = null;
+      pending.watchdogRemainingMs = Math.max(
+        0,
+        pending.watchdogRemainingMs - (now - pending.watchdogArmedAt),
+      );
+    }
+  }
+
+  /**
+   * Restarts the watchdog budget of in-flight requests for one method. Agents
+   * report progress through notifications, so a turn that keeps working must
+   * never be killed for taking long; only silence is a hang. A request created
+   * while held keeps the renewed budget for its release.
+   */
+  touchRequestTimeouts(method: string): void {
+    for (const [id, pending] of this.pending) {
+      if (pending.method !== method || pending.watchdogMs === null) continue;
+      if (pending.timeout) clearTimeout(pending.timeout);
+      pending.timeout = null;
+      pending.watchdogRemainingMs = pending.watchdogMs;
+      if (this.watchdogHoldCount === 0) this.armWatchdog(id, pending);
+    }
+  }
+
+  /** Resumes the watchdog clock stopped by {@link holdRequestTimeouts}. */
+  releaseRequestTimeouts(): void {
+    if (this.watchdogHoldCount === 0) return;
+    this.watchdogHoldCount -= 1;
+    if (this.watchdogHoldCount > 0) return;
+    for (const [id, pending] of this.pending) {
+      if (pending.timeout || pending.watchdogMs === null) continue;
+      this.armWatchdog(id, pending);
+    }
   }
 
   notify(method: string, params: Record<string, unknown>): void {
@@ -287,6 +353,7 @@ export class AcpConnectionSupervisor {
       if (!pending) return;
       this.pending.delete(message.id);
       if (pending.timeout) clearTimeout(pending.timeout);
+      if (pending.absoluteTimeout) clearTimeout(pending.absoluteTimeout);
       console.debug(
         `[AcpConnection] received response for ${pending.method} (${String(message.id)}) after ${Date.now() - pending.startedAt} ms`,
       );
@@ -335,10 +402,28 @@ export class AcpConnectionSupervisor {
     if (this.child?.stdin.writable) this.child.stdin.write(`${JSON.stringify(message)}\n`);
   }
 
+  private armWatchdog(id: JsonRpcRequestId, pending: PendingRequest): void {
+    pending.watchdogArmedAt = Date.now();
+    pending.timeout = setTimeout(() => {
+      pending.timeout = null;
+      if (pending.absoluteTimeout) clearTimeout(pending.absoluteTimeout);
+      pending.absoluteTimeout = null;
+      this.pending.delete(id);
+      console.warn(
+        `[AcpConnection] request timed out: ${pending.method} (${id}) after ${Date.now() - pending.startedAt} ms`,
+      );
+      pending.reject(new Error(`ACP request timed out: ${pending.method}.`));
+    }, pending.watchdogRemainingMs);
+  }
+
   private failAll(error: Error): void {
+    // A dead connection can no longer settle an approval, so a hold must not
+    // outlive it and silently disable every later watchdog.
+    this.watchdogHoldCount = 0;
     for (const [id, pending] of this.pending) {
       this.pending.delete(id);
       if (pending.timeout) clearTimeout(pending.timeout);
+      if (pending.absoluteTimeout) clearTimeout(pending.absoluteTimeout);
       pending.reject(error);
     }
   }

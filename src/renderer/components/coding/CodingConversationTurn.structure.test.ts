@@ -27,3 +27,8 @@ test('shows completed duration when a turn has no reasoning or tool segments', (
   expect(turnSource).toContain('const seconds = totalSeconds % 60;');
   expect(turnSource).toContain('const minutes = totalMinutes % 60;');
 });
+
+test('does not mount the approval card inside the process group', () => {
+  expect(activitySource).not.toContain('CodingPermissionCard');
+  expect(turnSource).not.toContain('pendingPermissionId');
+});
