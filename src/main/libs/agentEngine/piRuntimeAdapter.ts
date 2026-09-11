@@ -145,6 +145,14 @@ import {
   type PiExtensionFactory,
 } from './piExtensionTypes';
 import { extractPiSubagentExecutionMetadata } from './piSubagentExecution';
+import { buildSolPiRuntime, type SolPiRuntimeParts } from '../solPi/solPiIntegration';
+import { clearSolPiSessionStorage, solPiStorageRoot } from '../solPi/solPiSessionScope';
+import { resolveSolPiProfile } from '../solPi/solPiProfile';
+import type {
+  SolPiThenRunAuthorization,
+  SolPiThenRunCommand,
+} from '../solPi/solPiThenRunGuard';
+import type { SolPiSessionManagerLike } from '../solPi/solPiSessionScope';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
@@ -201,6 +209,15 @@ interface PiSession {
       }
     | undefined;
   subscribe(listener: (event: PiEvent) => void): () => void;
+  /**
+   * SDK sessions do not fire `session_start` for extension factories (only
+   * the CLI modes bind extensions). SoL-Pi registers its tools on that event,
+   * so the app binds extensions explicitly when SoL-Pi is enabled.
+   */
+  bindExtensions?(bindings: {
+    mode?: string;
+    onError?: (error: { extensionPath: string; error: string }) => void;
+  }): Promise<void>;
 }
 
 interface PiContentBlock {
@@ -762,6 +779,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
       }
 
+      // SoL-Pi experiment (default off): replace the plain in-memory manager
+      // with the app-owned storage wrapper and collect its extension factories.
+      // When the profile is off this stays null and nothing below changes.
+      const solPiRuntimePromise: Promise<SolPiRuntimeParts | null> = pi.SessionManager?.inMemory
+        ? buildSolPiRuntime({
+            profile: resolveSolPiProfile(process.env),
+            createInMemorySessionManager: (
+              cwd: string,
+            ): SolPiSessionManagerLike & Record<string, unknown> =>
+              pi.SessionManager!.inMemory(cwd) as unknown as SolPiSessionManagerLike &
+                Record<string, unknown>,
+            cwd: workspaceRoot,
+            sessionId,
+            userDataPath: app.getPath('userData'),
+            authorizeThenRun: (thenRun, context) =>
+              this.authorizeSolPiThenRun(sessionId, workbenchRunId, thenRun, context.toolCallId),
+          })
+        : Promise.resolve(null);
+      const solPiRuntime = await solPiRuntimePromise.catch((error: unknown): null => {
+        console.error('[SolPi] Failed to assemble SoL-Pi runtime; continuing without it:', error);
+        return null;
+      });
+      if (solPiRuntime) {
+        sessionOptions.sessionManager = solPiRuntime.sessionManager;
+      }
+
       // System prompt — user config only. Skills are discovered and appended
       // by the resource loader (additionalSkillPaths), which renders them via
       // pi's formatSkillsForPrompt — no manual injection here to avoid
@@ -876,15 +919,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         typeof resolvedModel.model.contextWindow === 'number'
           ? resolvedModel.model.contextWindow
           : undefined;
-      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
-        sessionId,
-        getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-        settingsManager,
-        getApprovalMode: () =>
-          this.activeSessions.get(sessionId)?.approvalMode ??
-          options.approvalMode ??
-          WorkbenchApprovalMode.Ask,
-      });
+      const resourceLoader = await this.createPiResourceLoader(
+        pi,
+        workspaceRoot,
+        resourceState,
+        {
+          sessionId,
+          getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
+          settingsManager,
+          getApprovalMode: () =>
+            this.activeSessions.get(sessionId)?.approvalMode ??
+            options.approvalMode ??
+            WorkbenchApprovalMode.Ask,
+        },
+        // SoL-Pi factories append after the approval gate and bash-safety
+        // check, so fused edit/write calls are still authorized first.
+        solPiRuntime?.extensionFactories ?? [],
+      );
       this.applyPiCompactionOverrides(settingsManager, contextWindowTokens);
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
@@ -1148,6 +1199,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (!isCurrentInitialization()) {
         void session.abort();
         return;
+      }
+
+      // SoL-Pi registers its tools on Pi's `session_start` event, which SDK
+      // sessions never emit on their own — bind extensions explicitly.
+      if (solPiRuntime && typeof session.bindExtensions === 'function') {
+        await session.bindExtensions({
+          mode: 'print',
+          onError: error => {
+            console.warn(
+              `[SolPi] Extension error in ${error.extensionPath}: ${error.error}`,
+            );
+          },
+        });
       }
 
       const active: ActivePiSession = {
@@ -2095,6 +2159,41 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.activeSessions.delete(sessionId);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
+    // SoL-Pi archives are session-scoped; drop them with the session. No-op
+    // when SoL-Pi never ran (the directory does not exist).
+    clearSolPiSessionStorage(solPiStorageRoot(app.getPath('userData')), sessionId);
+  }
+
+  /**
+   * Route a SoL-Pi fused `then_run` command through the same checks as a
+   * plain `bash` tool call: the static command-safety screen always applies;
+   * workbench authorization applies when a run is active.
+   */
+  private async authorizeSolPiThenRun(
+    sessionId: string,
+    fallbackRunId: string | null,
+    thenRun: SolPiThenRunCommand,
+    toolCallId: string,
+  ): Promise<SolPiThenRunAuthorization> {
+    const violation = getPiBashCommandViolation(thenRun.command);
+    if (violation) return { allow: false, reason: violation };
+    const runId = this.activeSessions.get(sessionId)?.workbenchRunId ?? fallbackRunId;
+    if (!runId || !this.workbenchTaskService) return { allow: true };
+    const authorization = await this.workbenchTaskService.authorizeToolCall({
+      sessionId,
+      runId,
+      toolCallId: `${toolCallId}:then_run`,
+      toolName: 'bash',
+      toolInput: {
+        command: thenRun.command,
+        ...(thenRun.timeout !== undefined ? { timeout: thenRun.timeout } : {}),
+      },
+      approvalMode:
+        this.activeSessions.get(sessionId)?.approvalMode ?? WorkbenchApprovalMode.Ask,
+    });
+    return authorization && !authorization.allow
+      ? { allow: false, reason: authorization.reason || 'The follow-up command was not approved.' }
+      : { allow: true };
   }
 
   // ── Chat mode: direct LLM without agent loop ──
