@@ -82,7 +82,7 @@ function buildManagedLlamaCppProviderConfig(
   const providerDef = ProviderRegistry.get(ProviderName.LlamaCpp);
   const userEnabled = currentProvider?.userEnabled === true;
   const existingModels = currentProvider?.models ?? [];
-  const managedModels = models.map(model => {
+  const refreshedModels = models.map(model => {
     const existing = existingModels.find(
       candidate => candidate.id.trim() === model.id.trim(),
     );
@@ -103,6 +103,12 @@ function buildManagedLlamaCppProviderConfig(
     if (existing.capabilities) nextModel.capabilities = existing.capabilities;
     return nextModel;
   });
+  // A timed-out model remains selectable: the local gateway restores it before inference.
+  const refreshedIds = new Set(refreshedModels.map(model => model.id.trim()));
+  const managedModels = [
+    ...refreshedModels,
+    ...existingModels.filter(model => !refreshedIds.has(model.id.trim())),
+  ];
 
   return {
     ...currentProvider,
@@ -119,12 +125,13 @@ export function upsertLlamaCppProviderInAppConfig(
   current: LlamaCppAgentAppConfig,
   models: NonNullable<ProviderConfig['models']>,
   serviceConfig: LlamaCppServiceConfig = {},
+  providerBaseUrl?: string,
 ): { config: LlamaCppAgentAppConfig; changed: boolean; clearedDefaultModel: boolean } {
   const currentProvider = current.providers?.[ProviderName.LlamaCpp];
   const nextProvider = buildManagedLlamaCppProviderConfig(
     currentProvider,
     models,
-    getLlamaCppProviderBaseUrl(serviceConfig),
+    providerBaseUrl || getLlamaCppProviderBaseUrl(serviceConfig),
   );
   const availableModelIds = new Set(
     (nextProvider.models ?? []).map(model => model.id.trim()).filter(Boolean),

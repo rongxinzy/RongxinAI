@@ -4,6 +4,7 @@ import type {
   LlamaCppModelLaunchLogSessionStatus,
   LlamaCppModelLaunchLogSource,
   LlamaCppMemoryPolicy,
+  LlamaCppModelResidencyMode,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppServiceConfigFieldKey,
@@ -346,6 +347,10 @@ export type LlamaCppModelPreference = {
   ctxSize?: number;
   maxTokens?: number;
   capabilities?: Partial<ModelCapabilities>;
+  residency?: {
+    mode: LlamaCppModelResidencyMode;
+    idleMinutes?: number;
+  };
 };
 
 export type LlamaCppModelPreferences = Record<string, LlamaCppModelPreference>;
