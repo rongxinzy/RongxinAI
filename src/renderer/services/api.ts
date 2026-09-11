@@ -23,6 +23,7 @@ import {
 } from './localInferenceSlotRetry';
 import { probeRuntimeModelCapabilities } from './modelCapabilityProbe';
 import { StreamRequestRegistry } from './streamRequestRegistry';
+import { isToolCallUnsupportedError } from './toolCallUnsupported';
 import { WebSearchToolEventType, type WebSearchToolEventHandler } from './webSearchToolEvents';
 
 export interface ApiConfig {
@@ -127,14 +128,15 @@ class ApiService {
     modelId: string,
     config: ApiConfig,
   ): Promise<Partial<ModelCapabilities>> {
-    if (!this.supportsRuntimeCapabilityProbe(provider)) {
-      return {};
-    }
-
     const key = `${provider}\u0000${modelId}\u0000${config.baseUrl.trim()}`;
+    // Cached verdicts (including optimistic-attempt failures recorded for
+    // providers that are never probed) apply regardless of probe support.
     const cached = this.runtimeCapabilityCache.get(key);
     if (cached) {
       return cached;
+    }
+    if (!this.supportsRuntimeCapabilityProbe(provider)) {
+      return {};
     }
     const pending = this.runtimeCapabilityRequests.get(key);
     if (pending) {
@@ -663,16 +665,28 @@ class ApiService {
       config,
     );
     const supportsImages = capabilities.imageInput === ModelCapabilityStatus.Supported;
-    if (capabilities.toolCalling !== ModelCapabilityStatus.Supported) {
-      const capabilityMessage =
-        capabilities.toolCalling === ModelCapabilityStatus.Unsupported
-          ? `${i18nService.t('toolCapabilityUnsupportedFallback')}\n\n`
-          : `${i18nService.t('toolCapabilityUnknownFallback')}\n\n`;
-      // Keep the request valid for custom, aggregated, and local endpoints. The
-      // regular chat path deliberately contains no `tools` or `tool_choice`.
-      onProgress?.(capabilityMessage);
+    if (capabilities.toolCalling === ModelCapabilityStatus.Unsupported) {
+      // An explicit unsupported verdict (user setting or endpoint metadata) is
+      // honored: no tools are attempted. The regular chat path deliberately
+      // contains no `tools` or `tool_choice`.
+      onProgress?.(`${i18nService.t('toolCapabilityUnsupportedFallback')}\n\n`);
       return this.chat(message, onProgress, history, options, requestId);
     }
+    // Unknown is not a verdict: attempt the native tool loop optimistically and
+    // fall back to plain chat only when the endpoint rejects tool use.
+    const isToolCallingUnverified = capabilities.toolCalling !== ModelCapabilityStatus.Supported;
+    const fallbackToPlainChat = (error: unknown) => {
+      if (!isToolCallingUnverified || !isToolCallUnsupportedError(error)) {
+        throw error;
+      }
+      // Remember the rejection so later requests skip the doomed attempt.
+      this.runtimeCapabilityCache.set(
+        `${provider}\u0000${selectedModel.id}\u0000${config.baseUrl.trim()}`,
+        { toolCalling: ModelCapabilityStatus.Unsupported },
+      );
+      onProgress?.(`${i18nService.t('toolCapabilityUnknownFallback')}\n\n`);
+      return this.chat(message, onProgress, history, options, requestId);
+    };
     const prompt =
       'Use the web_search tool when current, factual, or external information would improve the answer. Cite result URLs when you use search.';
     const system = [
@@ -700,7 +714,7 @@ class ApiService {
         requestId,
         abortSignal,
         onToolEvent,
-      );
+      ).catch(fallbackToPlainChat);
     }
     if (apiFormat === 'gemini') {
       const contents = [...history.filter(item => item.role !== 'system'), userMessage].map(
@@ -726,7 +740,7 @@ class ApiService {
         requestId,
         abortSignal,
         onToolEvent,
-      );
+      ).catch(fallbackToPlainChat);
     }
     if (this.shouldUseOpenAIResponsesApi(provider)) {
       const input = [...history.filter(item => item.role !== 'system'), userMessage]
@@ -741,7 +755,7 @@ class ApiService {
         requestId,
         abortSignal,
         onToolEvent,
-      );
+      ).catch(fallbackToPlainChat);
     }
     const messages = [
       { role: 'system', content: system },
@@ -760,7 +774,7 @@ class ApiService {
       requestId,
       abortSignal,
       onToolEvent,
-    );
+    ).catch(fallbackToPlainChat);
   }
 
   private throwIfAborted(signal?: AbortSignal): void {

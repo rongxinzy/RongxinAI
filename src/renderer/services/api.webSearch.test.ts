@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
 import { store } from '../store';
 import { setAvailableModels, setDefaultSelectedModel } from '../store/slices/modelSlice';
-import { apiService } from './api';
+import { ApiError, apiService } from './api';
 import { configService } from './config';
 import { i18nService } from './i18n';
 import { WebSearchToolEventType, type WebSearchToolEvent } from './webSearchToolEvents';
@@ -20,6 +20,7 @@ test('restores the legacy API config when app bootstrap has not synced it yet', 
     name: 'Custom Bootstrap Race',
     providerKey: 'custom_0',
     supportsImage: false,
+    capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
   };
   store.dispatch(setAvailableModels([model]));
   store.dispatch(setDefaultSelectedModel(model));
@@ -36,7 +37,7 @@ test('restores the legacy API config when app bootstrap has not synced it yet', 
   });
 });
 
-test('unknown tool capability falls back to regular chat without a tool payload', async () => {
+test('unknown tool capability tries tools first and falls back when the endpoint rejects them', async () => {
   const model = {
     id: 'custom-unknown',
     name: 'Custom Unknown',
@@ -47,17 +48,93 @@ test('unknown tool capability falls back to regular chat without a tool payload'
   store.dispatch(setDefaultSelectedModel(model));
   apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
   const regularChat = vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
-  const stream = vi.spyOn(apiService as any, 'streamOpenAIChatResponse');
+  const loop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockRejectedValue(new ApiError('This model does not support tools', 400));
   const progress = vi.fn();
 
   await expect(apiService.chatWithWebSearch('latest news', progress)).resolves.toEqual({
     content: 'plain answer',
   });
 
+  expect(loop).toHaveBeenCalledOnce();
   expect(regularChat).toHaveBeenCalledOnce();
-  expect(stream).not.toHaveBeenCalled();
   expect(progress).toHaveBeenCalledWith(
     '当前模型的工具调用能力尚未确认，已改用普通对话，未执行联网搜索。\n\n',
+  );
+});
+
+test('unknown tool capability keeps the tool loop when the endpoint accepts tools', async () => {
+  const model = {
+    id: 'custom-optimistic',
+    name: 'Custom Optimistic',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  const regularChat = vi.spyOn(apiService, 'chat');
+  const loop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockResolvedValue({ content: 'searched answer' });
+  const progress = vi.fn();
+
+  await expect(apiService.chatWithWebSearch('latest news', progress)).resolves.toEqual({
+    content: 'searched answer',
+  });
+
+  expect(loop).toHaveBeenCalledOnce();
+  expect(regularChat).not.toHaveBeenCalled();
+  expect(progress).not.toHaveBeenCalledWith(
+    expect.stringContaining('尚未确认'),
+  );
+});
+
+test('unknown tool capability does not swallow unrelated tool-loop errors', async () => {
+  const model = {
+    id: 'custom-unknown-500',
+    name: 'Custom Unknown 500',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  const regularChat = vi.spyOn(apiService, 'chat');
+  vi.spyOn(apiService as any, 'runOpenAIWebSearchLoop').mockRejectedValue(
+    new ApiError('Internal server error', 500),
+  );
+
+  await expect(apiService.chatWithWebSearch('latest news')).rejects.toThrow(
+    'Internal server error',
+  );
+  expect(regularChat).not.toHaveBeenCalled();
+});
+
+test('a rejected tool attempt is cached and not retried for the session', async () => {
+  const model = {
+    id: 'custom-cached-verdict',
+    name: 'Custom Cached Verdict',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  const regularChat = vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+  const loop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockRejectedValue(new ApiError('This model does not support tools', 400));
+  const progress = vi.fn();
+
+  await apiService.chatWithWebSearch('latest news', progress);
+  await apiService.chatWithWebSearch('more news', progress);
+
+  expect(loop).toHaveBeenCalledOnce();
+  expect(regularChat).toHaveBeenCalledTimes(2);
+  expect(progress).toHaveBeenLastCalledWith(
+    '当前模型不支持工具调用，已改用普通对话，未执行联网搜索。\n\n',
   );
 });
 
@@ -185,7 +262,7 @@ test('provider hints are resolved from the registry instead of a stale allowlist
   ).toBe(ProviderName.Qianfan);
 });
 
-test('a catalog model absent from the provider support table does not receive tools', async () => {
+test('a catalog model absent from the provider support table falls back after the endpoint rejects tools', async () => {
   const model = {
     id: 'ernie-4.5-8k',
     name: 'ERNIE 4.5 8K',
@@ -200,12 +277,14 @@ test('a catalog model absent from the provider support table does not receive to
     apiFormat: 'openai',
   });
   const regularChat = vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
-  const toolLoop = vi.spyOn(apiService as any, 'runOpenAIWebSearchLoop');
+  const toolLoop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockRejectedValue(new ApiError('tools is not supported', 400));
 
   await apiService.chatWithWebSearch('latest news');
 
+  expect(toolLoop).toHaveBeenCalledOnce();
   expect(regularChat).toHaveBeenCalledOnce();
-  expect(toolLoop).not.toHaveBeenCalled();
 });
 
 test('web-search fallback message follows the selected UI language', async () => {
@@ -220,6 +299,9 @@ test('web-search fallback message follows the selected UI language', async () =>
   store.dispatch(setDefaultSelectedModel(model));
   apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
   vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+  vi.spyOn(apiService as any, 'runOpenAIWebSearchLoop').mockRejectedValue(
+    new ApiError('This model does not support tools', 400),
+  );
   const progress = vi.fn();
 
   await apiService.chatWithWebSearch('latest news', progress);
