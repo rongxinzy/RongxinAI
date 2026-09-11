@@ -36,6 +36,7 @@ interface CodingEventStreamProps {
   isStreaming: boolean;
   scrollAreaRef: RefObject<HTMLDivElement | null>;
   onScrollPositionChange: (scrollPosition: number) => void;
+  onReEditUserMessage: (content: string) => void;
   emptyDescription?: string;
   headerActions?: ReactNode;
   /**
@@ -101,6 +102,7 @@ export const CodingEventStream = ({
   isStreaming,
   scrollAreaRef,
   onScrollPositionChange,
+  onReEditUserMessage,
   emptyDescription,
   headerActions,
   artifactSessionKey = null,
@@ -239,6 +241,7 @@ export const CodingEventStream = ({
                 artifactsByToolCallId={artifactsByToolCallId}
                 expandedActivityIds={expandedActivityIds}
                 onActivityOpenChange={setActivityOpen}
+                onReEditUserMessage={onReEditUserMessage}
               />
             ))
           )}

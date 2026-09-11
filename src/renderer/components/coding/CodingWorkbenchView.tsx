@@ -114,6 +114,7 @@ export const CodingWorkbenchView = ({
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
+  const [composerFocusRequestKey, setComposerFocusRequestKey] = useState(0);
   const [promptAttachments, setPromptAttachments] = useState<CodingPromptAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -556,6 +557,17 @@ export const CodingWorkbenchView = ({
       }, 300);
     },
     [workspaceRoot],
+  );
+
+  const reEditUserMessage = useCallback(
+    (content: string) => {
+      if (!activeLane) return;
+      setDraftState({ laneId: activeLane.id, value: content });
+      setPromptAttachments([]);
+      saveDraft(activeLane.id, content);
+      setComposerFocusRequestKey(current => current + 1);
+    },
+    [activeLane, saveDraft],
   );
 
   const saveScrollPosition = useCallback(
@@ -1037,6 +1049,7 @@ export const CodingWorkbenchView = ({
             onScrollPositionChange={scrollPosition => {
               if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
             }}
+            onReEditUserMessage={reEditUserMessage}
           />
           {artifactSessionKey && isArtifactPanelOpen && (
             <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
@@ -1070,6 +1083,7 @@ export const CodingWorkbenchView = ({
             isSubmitting={isSubmitting}
             hasError={Boolean(error)}
             prompt={prompt}
+            focusRequestKey={composerFocusRequestKey}
             sessionId={
               activeProfile?.driverKind === CodingAgentDriverKind.Acp
                 ? activeLane?.id

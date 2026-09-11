@@ -13,7 +13,7 @@ import { i18nService } from '../../services/i18n';
 import type { Artifact } from '../../types/artifact';
 import { formatMessageDateTime } from '../../utils/tokenFormat';
 import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
-import { CopyButton } from '../cowork/components/CopyButton';
+import { CopyButton, ReEditButton } from '../cowork/components/CopyButton';
 import { CodingActivity } from './CodingActivityView';
 import { CodingAgentWorkingIndicator } from './CodingAgentWorkingIndicator';
 import {
@@ -33,6 +33,7 @@ interface CodingConversationTurnProps {
   artifactsByToolCallId?: ReadonlyMap<string, Artifact[]>;
   expandedActivityIds: ReadonlySet<string>;
   onActivityOpenChange: (activityId: string, open: boolean) => void;
+  onReEditUserMessage: (content: string) => void;
 }
 
 const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
@@ -101,9 +102,11 @@ const TurnExecutionDuration = ({ turn }: { turn: CodingConversationTurnModel }) 
 const CodingUserMessage = ({
   content,
   createdAt,
+  onReEdit,
 }: {
   content: string;
   createdAt: number;
+  onReEdit: () => void;
 }) => (
   <div className="flex flex-col items-end">
     <Message from="user" className="animate-message-in">
@@ -114,6 +117,7 @@ const CodingUserMessage = ({
     <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
       <span>{formatMessageDateTime(createdAt)}</span>
       <CopyButton content={content} visible />
+      <ReEditButton visible onClick={onReEdit} />
     </div>
   </div>
 );
@@ -136,9 +140,10 @@ const CodingAssistantMessage = ({
         {children}
       </MessageContent>
     </Message>
-    <span className="mt-1 text-xs text-muted-foreground">
-      {formatMessageDateTime(createdAt)}
-    </span>
+    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+      <span>{formatMessageDateTime(createdAt)}</span>
+      <CopyButton content={content} visible />
+    </div>
   </div>
 );
 
@@ -150,6 +155,7 @@ const CodingConversationTurnComponent = ({
   artifactsByToolCallId,
   expandedActivityIds,
   onActivityOpenChange,
+  onReEditUserMessage,
 }: CodingConversationTurnProps) => {
   const hasPermission = turn.activities.some(
     activity => activity.kind === CodingConversationActivityKind.Permission,
@@ -186,6 +192,7 @@ const CodingConversationTurnComponent = ({
         <CodingUserMessage
           content={turn.userMessage.content}
           createdAt={turn.userMessage.createdAt}
+          onReEdit={() => onReEditUserMessage(turn.userMessage!.content)}
         />
       )}
 
@@ -354,6 +361,7 @@ const conversationTurnPropsEqual = (
   prev.artifactsByToolCallId === next.artifactsByToolCallId &&
   prev.expandedActivityIds === next.expandedActivityIds &&
   prev.onActivityOpenChange === next.onActivityOpenChange &&
+  prev.onReEditUserMessage === next.onReEditUserMessage &&
   turnContentsEqual(prev.turn, next.turn);
 
 export const CodingConversationTurn = memo(
