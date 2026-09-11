@@ -659,6 +659,7 @@ interface IElectronAPI {
       method: string;
       headers: Record<string, string>;
       body?: string;
+      timeoutMs?: number;
     }) => Promise<ApiResponse>;
     fetchModels: (input: ProviderModelDiscoveryRequest) => Promise<ProviderModelDiscoveryResult>;
     stream: (options: {
