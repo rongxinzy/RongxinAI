@@ -17,6 +17,18 @@
       "filter": ["**/*", "!**/*.map"]
     },
     {
+      "from": "src/main/libs/solPi/vendor",
+      "to": "solpi-vendor",
+      "filter": [
+        "**/*",
+        "!**/*.test.*",
+        "!**/*.spec.*",
+        "!**/tests/**",
+        "!**/test/**",
+        "!**/__tests__/**"
+      ]
+    },
+    {
       "from": "dist-electron",
       "to": "dist-electron",
       "filter": ["**/*", "!**/*.map"]

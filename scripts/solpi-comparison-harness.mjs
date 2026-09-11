@@ -131,7 +131,7 @@ const assistantWithTools = (calls, text = '') => ({
 });
 
 /** App-style then_run guard (static deny-list + scripted authorization). */
-function thenRunGuard(denyCommands) {
+function thenRunGuard(denyCommands, pendingDecision) {
   return extensionApi => {
     extensionApi.on('tool_call', async event => {
       if (event.toolName !== 'edit' && event.toolName !== 'write') return undefined;
@@ -139,6 +139,12 @@ function thenRunGuard(denyCommands) {
       if (!thenRun || typeof thenRun !== 'object') return undefined;
       if (typeof thenRun.command !== 'string' || thenRun.command.length === 0) {
         return { block: true, reason: 'then_run.command must be a non-empty string.' };
+      }
+      if (pendingDecision) {
+        // Hold the authorization open like a pending user approval, then
+        // settle with the provided decision (mirrors the app resolving a
+        // pending approval when the user stops the session).
+        return pendingDecision(thenRun);
       }
       if (denyCommands.includes(thenRun.command)) {
         return { block: true, reason: 'The follow-up command was not approved.' };
@@ -148,7 +154,16 @@ function thenRunGuard(denyCommands) {
   };
 }
 
-async function runVariant({ label, cwd, storageRoot, script, denyCommands, useSolPi }) {
+async function runVariant({
+  label,
+  cwd,
+  storageRoot,
+  script,
+  denyCommands,
+  useSolPi,
+  pendingDecision,
+  onSession,
+}) {
   const metrics = { modelCalls: 0, contextBytesPerCall: [], toolResults: 0, errors: [] };
   const agentDir = path.join(cwd, 'agent');
   await import('node:fs/promises').then(fs => fs.mkdir(agentDir, { recursive: true }));
@@ -156,7 +171,7 @@ async function runVariant({ label, cwd, storageRoot, script, denyCommands, useSo
   const extensionFactories = [];
   if (useSolPi) {
     extensionFactories.push(
-      thenRunGuard(denyCommands),
+      thenRunGuard(denyCommands, pendingDecision),
       vendor.createSolPiExtension(() => conservativeConfig),
     );
   }
@@ -210,6 +225,7 @@ async function runVariant({ label, cwd, storageRoot, script, denyCommands, useSo
           if (event.type === 'agent_settled') resolve();
           if (event.type === 'error') reject(new Error(event.message?.errorMessage ?? 'error'));
         });
+        onSession?.(session);
         void session.prompt('Harness task.').catch(reject);
       })
       .catch(reject);
@@ -302,6 +318,44 @@ async function scenarioDeniedThenRun(baseDir) {
   return report(variant);
 }
 
+/** A pending then_run authorization that settles denied after a user stop. */
+async function scenarioStopDuringPendingApproval(baseDir) {
+  const cwd = mkdtempSync(path.join(baseDir, 'stop-'));
+  const script = [
+    assistantWithTools([
+      {
+        name: 'write',
+        arguments: { path: 'stopped.txt', content: 'X', then_run: { command: 'echo stopped' } },
+      },
+    ]),
+    assistantText('settled after stop'),
+  ];
+  // The authorization stays pending while the run is live; the user stop
+  // aborts the session, and the app-side resolver then settles the pending
+  // approval as denied (what pauseRun does in the real adapter).
+  const pendingDecision = () =>
+    new Promise(resolve => {
+      setTimeout(() => resolve({ block: true, reason: 'The session was stopped by the user.' }), 150);
+    });
+  const variant = await runVariant({
+    label: 'stop/conservative',
+    cwd,
+    storageRoot: mkdtempSync(path.join(baseDir, 'stop-store-')),
+    script,
+    denyCommands: [],
+    useSolPi: true,
+    pendingDecision,
+    onSession: session => {
+      setTimeout(() => void session.abort(), 50);
+    },
+  });
+  // The fused write never executed: no file on disk, and the run settled
+  // instead of hanging on the never-approved command.
+  assert.equal(existsSync(path.join(cwd, 'stopped.txt')), false);
+  assert.ok(variant.modelCalls <= 2, `unexpected model calls ${variant.modelCalls}`);
+  return report(variant);
+}
+
 async function scenarioLargeObservation(baseDir) {
   // A 40 KB tool result that the model references in three later turns.
   const bigCommand = "awk 'BEGIN{s=\"\";for(i=0;i<1000;i++)s=s \"observation-line-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n\";printf \"%s\",s}'";
@@ -357,6 +411,7 @@ const results = {
     'Offline mechanism harness: real pi-coding-agent 0.84.2, scripted fake model, no network. Measures structure (calls, projected context bytes, approval, stop), not real-model savings.',
   fusion: await scenarioFusion(baseDir),
   deniedThenRun: await scenarioDeniedThenRun(baseDir),
+  stopDuringPendingApproval: await scenarioStopDuringPendingApproval(baseDir),
   largeObservation: await scenarioLargeObservation(baseDir),
 };
 rmSync(baseDir, { recursive: true, force: true });

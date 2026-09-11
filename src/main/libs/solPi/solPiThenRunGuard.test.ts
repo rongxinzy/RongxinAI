@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { SolPiThenRunStatus } from './constants';
 import {
   createSolPiThenRunGuardExtensionFactory,
   extractThenRunCommand,
@@ -23,12 +24,14 @@ interface VendorActionFusionModule {
 
 describe('extractThenRunCommand', () => {
   test('ignores non-fused tools and absent then_run', () => {
-    expect(extractThenRunCommand('bash', { command: 'ls' })).toEqual({ status: 'absent' });
+    expect(extractThenRunCommand('bash', { command: 'ls' })).toEqual({
+      status: SolPiThenRunStatus.Absent,
+    });
     expect(extractThenRunCommand('edit', { path: 'a', oldText: 'x', newText: 'y' })).toEqual({
-      status: 'absent',
+      status: SolPiThenRunStatus.Absent,
     });
     expect(extractThenRunCommand('write', { [SOLPI_THEN_RUN_FIELD]: null })).toEqual({
-      status: 'absent',
+      status: SolPiThenRunStatus.Absent,
     });
   });
 
@@ -39,18 +42,36 @@ describe('extractThenRunCommand', () => {
       then_run: { command: 'npm test', timeout: 30 },
     });
     expect(extracted).toEqual({
-      status: 'present',
+      status: SolPiThenRunStatus.Present,
       thenRun: { command: 'npm test', timeout: 30 },
     });
   });
 
   test('rejects malformed then_run payloads', () => {
-    expect(extractThenRunCommand('edit', { then_run: { command: '' } }).status).toBe('malformed');
-    expect(extractThenRunCommand('edit', { then_run: { command: 42 } }).status).toBe('malformed');
-    expect(extractThenRunCommand('edit', { then_run: 'ls' }).status).toBe('malformed');
+    expect(extractThenRunCommand('edit', { then_run: { command: '' } }).status).toBe(
+      SolPiThenRunStatus.Malformed,
+    );
+    expect(extractThenRunCommand('edit', { then_run: { command: 42 } }).status).toBe(
+      SolPiThenRunStatus.Malformed,
+    );
+    expect(extractThenRunCommand('edit', { then_run: 'ls' }).status).toBe(
+      SolPiThenRunStatus.Malformed,
+    );
     expect(
       extractThenRunCommand('edit', { then_run: { command: 'ls', timeout: 'x' } }).status,
-    ).toBe('malformed');
+    ).toBe(SolPiThenRunStatus.Malformed);
+  });
+
+  test('rejects non-finite and non-positive timeout values', () => {
+    for (const timeout of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(extractThenRunCommand('edit', { then_run: { command: 'ls', timeout } }).status).toBe(
+        SolPiThenRunStatus.Malformed,
+      );
+    }
+    expect(extractThenRunCommand('edit', { then_run: { command: 'ls', timeout: 1 } })).toEqual({
+      status: SolPiThenRunStatus.Present,
+      thenRun: { command: 'ls', timeout: 1 },
+    });
   });
 });
 

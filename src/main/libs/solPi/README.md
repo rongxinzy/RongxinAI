@@ -55,6 +55,30 @@ node scripts/solpi-comparison-harness.mjs
 （拒绝即不落盘、会话干净收敛）、40KB 观察（第 4 次请求投影从 ~48K 字节降到
 ~1.6K）。**它证明机制，不证明真实模型收益**。
 
+## 打包路径（app.asar 内可用）
+
+生产主进程是 `dist-electron/main.js` 单文件 bundle（`src/main/libs/solPi` 会被内联），
+`solPiVendor.resolveSolPiVendorEntry()` 按执行布局解析 vendor 入口：
+
+- 打包 app：`<app.asar>/dist-electron` → `<app.asar>/solpi-vendor/sol-pi/index.ts`
+  （electron-builder `files` 把 `src/main/libs/solPi/vendor` 打进 asar 根，与
+  `node_modules` 同级，jiti 的 node 解析可命中 `@earendil-works/*` 与 `typebox`）。
+- dev checkout：`<repo>/dist-electron` → 源码树 vendor。
+- tsc 产物 / vitest 源码执行：各自的历史候选。
+
+vendor 的裸依赖（`@earendil-works/pi-agent-core|pi-ai|pi-coding-agent`、`typebox`、
+`jiti`）因此是生产 `dependencies`（进 asar 的 node_modules）；主 bundle 仍内联自己的
+Pi SDK 副本，两份以结构化接口协作——打包冒烟已验证 fused 写入+命令在包内真实执行。
+
+打包验证：
+
+```bash
+# 打包后校验 vendor 树 / 归属文件 / loader 接线 / 运行时依赖都在 asar 内
+node scripts/ci/verify-packaged-solpi-resources.mjs release
+# 在真实 Electron 主进程内跑 loader + conservative 初始化 + fused 执行
+<raw electron binary> scripts/ci/solpi-packaged-smoke.cjs <app.asar 路径>
+```
+
 ## 真实模型对照（后续验收）
 
 同一模型/输入下交错运行基线与 conservative，任务集建议：PPT 生成、代码修改
@@ -65,7 +89,8 @@ node scripts/solpi-comparison-harness.mjs
 
 ## 已知限制 / 剩余工作
 
-- 打包版 Electron 尚未把 vendor TS 复制进应用包（dev 模式可用）；打包需要
-  electron-builder extraResources 步骤。
 - env var 为进程级开关（所有新会话共享）；按会话粒度开关需要 config/UI 变更。
 - 真实模型收益未测（见上）。
+- 打包版内 vendor 与主 bundle 各持一份 Pi SDK（结构化接口协作，冒烟已验证行为）；
+  若未来要求单实例共享，需把 `@earendil-works/*` 加入主 bundle externals 并重审
+  wasm 资产流。

@@ -4,8 +4,9 @@
  * Upstream ships TypeScript with `.ts` import specifiers and expects to be
  * loaded by Pi's jiti-based extension loader. We mirror that loading strategy:
  * the vendor tree is excluded from tsc/oxlint and loaded at runtime through
- * jiti, which resolves the shared `@earendil-works/*` packages from this
- * repo's node_modules (same ESM instances the adapter's dynamic imports use).
+ * jiti, which resolves the `@earendil-works/*` packages and `typebox` from
+ * node_modules — the repo's tree in dev/vitest, the app.asar's production
+ * `dependencies` in packaged builds (see README.md "打包路径").
  *
  * Vendor provenance: src/main/libs/solPi/vendor/UPSTREAM_COMMIT pins the
  * reviewed upstream revision; LICENSE.MIT and THIRD_PARTY_NOTICES.md carry
@@ -46,11 +47,26 @@ export interface SolPiVendorConfig {
 
 let vendorModulePromise: Promise<SolPiVendorModule> | null = null;
 
-function resolveVendorEntry(): string {
-  // Compiled main process: dist-electron/libs/solPi/ -> <repo>/src/main/libs/solPi/vendor.
-  // Vitest / source execution: src/main/libs/solPi/ -> vendor sibling directory.
+/**
+ * Absolute path of the vendored SoL-Pi entry, resolved for the executing
+ * layout. Exported for packaged-app verification (the packaged smoke must
+ * prove resolution stays inside the app bundle, never a source checkout).
+ */
+export function resolveSolPiVendorEntry(): string {
+  // The Electron main process is a single CJS bundle at dist-electron/main.js
+  // (vite/rolldown, also in `electron:dev`), so __dirname is the bundle
+  // directory in every packaged or development run:
+  //  - packaged app: <app.asar>/dist-electron, vendor packed at the archive
+  //    root next to node_modules so jiti's node resolution finds the shared
+  //    @earendil-works packages;
+  //  - dev checkout: <repo>/dist-electron, vendor in the source tree.
+  // The tsc output layout (dist-electron/libs/solPi) and vitest/source
+  // execution keep the legacy candidates below.
   const candidates = [
+    path.resolve(__dirname, '../solpi-vendor/sol-pi/index.ts'),
+    path.resolve(__dirname, '../src/main/libs/solPi/vendor/sol-pi/index.ts'),
     path.resolve(__dirname, '../../../src/main/libs/solPi/vendor/sol-pi/index.ts'),
+    path.resolve(__dirname, '../../../../solpi-vendor/sol-pi/index.ts'),
     path.resolve(__dirname, 'vendor/sol-pi/index.ts'),
   ];
   return candidates.find(candidate => existsSync(candidate)) ?? candidates[0] ?? '';
@@ -64,7 +80,7 @@ function resolveVendorEntry(): string {
 export function loadSolPiVendor(): Promise<SolPiVendorModule> {
   if (!vendorModulePromise) {
     vendorModulePromise = (async (): Promise<SolPiVendorModule> => {
-      const entry = resolveVendorEntry();
+      const entry = resolveSolPiVendorEntry();
       const jiti = createJiti(__filename, { moduleCache: true });
       const loaded = (await jiti.import(entry)) as Partial<SolPiVendorModule>;
       if (typeof loaded.createSolPiExtension !== 'function') {

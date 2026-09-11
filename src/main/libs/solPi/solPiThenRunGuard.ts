@@ -21,6 +21,7 @@ import {
   type PiToolCallEvent,
   type PiToolCallEventResult,
 } from '../agentEngine/piExtensionTypes';
+import { SolPiThenRunStatus } from './constants';
 
 export const SolPiFusedToolName = {
   Edit: 'edit',
@@ -54,27 +55,48 @@ export interface SolPiThenRunAuthorizationContext {
 export function extractThenRunCommand(
   toolName: string,
   input: unknown,
-): { status: 'absent' } | { status: 'malformed'; reason: string } | { status: 'present'; thenRun: SolPiThenRunCommand } {
-  if (!SOLPI_FUSED_TOOLS.includes(toolName)) return { status: 'absent' };
+):
+  | { status: 'absent' }
+  | { status: 'malformed'; reason: string }
+  | { status: 'present'; thenRun: SolPiThenRunCommand } {
+  if (!SOLPI_FUSED_TOOLS.includes(toolName)) return { status: SolPiThenRunStatus.Absent };
   if (!input || typeof input !== 'object' || !(SOLPI_THEN_RUN_FIELD in input)) {
-    return { status: 'absent' };
+    return { status: SolPiThenRunStatus.Absent };
   }
   const raw = (input as Record<string, unknown>)[SOLPI_THEN_RUN_FIELD];
-  if (raw === undefined || raw === null) return { status: 'absent' };
+  if (raw === undefined || raw === null) return { status: SolPiThenRunStatus.Absent };
   if (typeof raw !== 'object' || Array.isArray(raw)) {
-    return { status: 'malformed', reason: 'then_run must be an object with a command string.' };
+    return {
+      status: SolPiThenRunStatus.Malformed,
+      reason: 'then_run must be an object with a command string.',
+    };
   }
   const record = raw as Record<string, unknown>;
   if (typeof record.command !== 'string' || record.command.trim().length === 0) {
-    return { status: 'malformed', reason: 'then_run.command must be a non-empty string.' };
+    return {
+      status: SolPiThenRunStatus.Malformed,
+      reason: 'then_run.command must be a non-empty string.',
+    };
   }
-  if (record.timeout !== undefined && typeof record.timeout !== 'number') {
-    return { status: 'malformed', reason: 'then_run.timeout must be a number of seconds.' };
+  if (record.timeout !== undefined && !isValidThenRunTimeout(record.timeout)) {
+    return {
+      status: SolPiThenRunStatus.Malformed,
+      reason: 'then_run.timeout must be a finite, positive number of seconds.',
+    };
   }
   return {
-    status: 'present',
+    status: SolPiThenRunStatus.Present,
     thenRun: { command: record.command, timeout: record.timeout as number | undefined },
   };
+}
+
+/**
+ * `timeout` reaches Pi's bash executor as seconds. Reject non-numbers and
+ * non-finite or non-positive values so a malformed model payload can never
+ * degrade into NaN/Infinity millisecond math or an instant-expiry timer.
+ */
+function isValidThenRunTimeout(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
 /**
@@ -90,8 +112,8 @@ export function createSolPiThenRunGuardExtensionFactory(
   return extensionApi => {
     extensionApi.on(PiExtensionEventType.ToolCall, async (event: PiToolCallEvent) => {
       const extracted = extractThenRunCommand(event.toolName, event.input);
-      if (extracted.status === 'absent') return undefined;
-      if (extracted.status === 'malformed') {
+      if (extracted.status === SolPiThenRunStatus.Absent) return undefined;
+      if (extracted.status === SolPiThenRunStatus.Malformed) {
         return { block: true, reason: extracted.reason };
       }
       const authorization = await authorize(extracted.thenRun, { toolCallId: event.toolCallId });
