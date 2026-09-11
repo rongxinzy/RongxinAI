@@ -121,6 +121,7 @@ export const ApiFetchSchema = {
     method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
     headers: z.record(z.string(), z.string()),
     body: z.string().optional(),
+    timeoutMs: z.number().int().positive().max(300_000).optional(),
   }),
   output: z.object({ status: z.number(), data: z.unknown() }).passthrough(),
 };

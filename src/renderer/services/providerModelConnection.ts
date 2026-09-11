@@ -4,6 +4,7 @@ import {
   resolveCodingPlanBaseUrl,
   type ProviderConfig,
 } from '../../shared/providers';
+import { i18nService } from './i18n';
 
 export interface ProviderModelConnectionTarget {
   id: string;
@@ -25,20 +26,24 @@ export type ProviderModelConnectionTestResult =
 export interface ProviderModelConnectionTestResponse {
   ok: boolean;
   status: number;
+  statusText?: string;
   data?: unknown;
+  error?: string;
 }
 
 const CONNECTIVITY_TEST_TOKEN_BUDGET = 64;
+const CONNECTION_TEST_TIMEOUT_MS = 30_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const getResponseErrorMessage = (data: unknown, status: number): string => {
+const getResponseErrorMessage = (data: unknown, status: number, fallback?: string): string => {
   if (isRecord(data)) {
     const error = isRecord(data.error) ? data.error : undefined;
     const message = error?.message ?? data.message;
     if (typeof message === 'string' && message.trim()) return message;
   }
+  if (status === 0 && fallback?.trim()) return fallback;
   return `HTTP ${status}`;
 };
 
@@ -90,9 +95,16 @@ export function getProviderModelConnectionTestResult(
 ): ProviderModelConnectionTestResult {
   if (response.ok) return { success: true };
 
-  const message = getResponseErrorMessage(response.data, response.status);
+  const message = getResponseErrorMessage(
+    response.data,
+    response.status,
+    response.error ?? response.statusText,
+  );
   if (message.toLowerCase().includes('model output limit was reached')) {
     return { success: true };
+  }
+  if (response.status === 0 && /aborted due to timeout|timed out/i.test(message)) {
+    return { success: false, message: i18nService.t('modelConnectionTestTimeout') };
   }
   return { success: false, message };
 }
@@ -128,6 +140,7 @@ export async function testProviderModelConnection(
           max_tokens: CONNECTIVITY_TEST_TOKEN_BUDGET,
           messages: [{ role: 'user', content: 'Hi' }],
         }),
+        timeoutMs: CONNECTION_TEST_TIMEOUT_MS,
       });
       return getProviderModelConnectionTestResult(response);
     }
@@ -168,6 +181,7 @@ export async function testProviderModelConnection(
       method: 'POST',
       headers,
       body: JSON.stringify(body),
+      timeoutMs: CONNECTION_TEST_TIMEOUT_MS,
     });
     return getProviderModelConnectionTestResult(response);
   } catch (error) {
