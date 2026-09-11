@@ -2856,7 +2856,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // unavailable): disclose it instead of presenting the run as a clean
         // success. Queued Work follow-ups were drained above and continue the
         // turn, so they never reach this disclosure.
-        if (active.lastAnswerTruncated) {
+        const answerTruncatedTerminal = active.lastAnswerTruncated;
+        if (answerTruncatedTerminal) {
           this.discloseTruncatedAnswer(sessionId, active);
         }
         if (this.store) {
@@ -2902,6 +2903,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             workspaceRoot: active.workspaceRoot,
             finalAnswer: active.lastCompletedAnswerText,
             finalMessageId: active.lastCompletedAnswerMessageId,
+            // A terminal truncation means the stream did not close cleanly:
+            // verification must land on the existing incomplete semantics
+            // (needs_review) instead of succeeded, so a disclosed truncation
+            // can never also be recorded as a business success. The UI still
+            // goes idle — the user can continue the conversation.
+            streamClosedCleanly: !answerTruncatedTerminal,
             workflowCompleted: active.productionControlsAvailable
               ? active.agentLoop.getState().done
               : undefined,
@@ -3000,9 +3007,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   /**
    * Persist and emit an explicit terminal notice when a run ends with a
    * truncated final answer: the output token limit was hit and the bounded
-   * continuation did not (or could not) run. The run still completes — the
-   * user can continue the conversation — but the truncation stays
-   * distinguishable from a clean finish. Idempotent within the turn.
+   * continuation did not (or could not) run. The session goes idle — the user
+   * can continue the conversation — but the workbench run settles on the
+   * existing incomplete semantics (needs_review, never succeeded), so the
+   * truncation stays distinguishable from a clean finish at the business
+   * level too. Idempotent within the turn.
    */
   private discloseTruncatedAnswer(sessionId: string, active: ActivePiSession): void {
     active.lastAnswerTruncated = false;

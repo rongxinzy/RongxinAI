@@ -114,3 +114,59 @@ test('does not guard normal non-reminder assistant replies', () => {
   expect(analysis.guardApplied).toBe(false);
   expect(analysis.text).toBe('今天上海多云，气温 18 到 24 度。');
 });
+
+test('appends the truncation disclosure so a truncated answer is not read as finished', () => {
+  const analysis = analyzeIMReply([
+    {
+      id: 'assistant-1',
+      type: 'assistant',
+      content: '以下是报告的前半部分',
+      timestamp: Date.now(),
+      metadata: { stopReason: 'length', truncated: true },
+    },
+    {
+      id: 'system-1',
+      type: 'system',
+      content: '回答因输出长度限制被截断，可继续提问以补全。',
+      timestamp: Date.now(),
+      metadata: { answerTruncated: true, stopReason: 'length' },
+    },
+  ]);
+
+  expect(analysis.text).toBe('以下是报告的前半部分\n\n回答因输出长度限制被截断，可继续提问以补全。');
+});
+
+test('ignores unrelated system messages and keeps a single disclosure notice', () => {
+  const analysis = analyzeIMReply([
+    {
+      id: 'system-1',
+      type: 'system',
+      content: '用户已停止本次会话。',
+      timestamp: Date.now(),
+      metadata: { interruption: { cause: 'user_stop' } },
+    },
+    {
+      id: 'assistant-1',
+      type: 'assistant',
+      content: '部分回答',
+      timestamp: Date.now(),
+      metadata: {},
+    },
+    {
+      id: 'system-2',
+      type: 'system',
+      content: '第一条披露',
+      timestamp: Date.now(),
+      metadata: { answerTruncated: true, stopReason: 'length' },
+    },
+    {
+      id: 'system-3',
+      type: 'system',
+      content: '第二条披露',
+      timestamp: Date.now(),
+      metadata: { answerTruncated: true, stopReason: 'length' },
+    },
+  ]);
+
+  expect(analysis.text).toBe('部分回答\n\n第一条披露');
+});

@@ -87,6 +87,7 @@ export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
   const successfulCronAddIds = new Set<string>();
   let attemptedCronAdds = 0;
   let lastCronAddError: string | null = null;
+  let truncatedNotice: string | null = null;
 
   for (const message of messages) {
     if (message.type === 'assistant' && message.content && !message.metadata?.isThinking) {
@@ -94,6 +95,18 @@ export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
       if (normalized) {
         assistantParts.push(normalized);
       }
+      continue;
+    }
+
+    // Terminal truncation disclosure: the answer above is incomplete. Append
+    // the notice so an IM user cannot read a truncated reply as finished.
+    if (
+      message.type === 'system' &&
+      message.metadata?.answerTruncated === true &&
+      message.content.trim() &&
+      truncatedNotice === null
+    ) {
+      truncatedNotice = message.content.trim();
       continue;
     }
 
@@ -131,6 +144,9 @@ export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
     text = lastCronAddError ? FAILED_REMINDER_FAILURE_REPLY : UNSCHEDULED_REMINDER_FAILURE_REPLY;
   } else if (assistantText === DEFAULT_IM_EMPTY_REPLY && successfulCronAdds > 0) {
     text = '已创建定时任务。';
+  }
+  if (truncatedNotice !== null) {
+    text = `${text}\n\n${truncatedNotice}`;
   }
 
   return {
