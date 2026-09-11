@@ -1,4 +1,4 @@
-﻿import { configService } from './config';
+import { configService } from './config';
 
 // 支持的语言类型
 export type LanguageType = 'zh' | 'en';
@@ -863,6 +863,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     connectionFailed: '连接失败',
     modelConnectionTestSummary: '已测试 {total} 个模型：{success} 个连接成功，{failure} 个连接失败',
     modelConnectionTestSuccessSummary: '{success} 个模型连接成功',
+    modelConnectionTestTimeout: '连接测试超时，请检查服务是否可用',
     noModelsConfigured: '请先添加模型',
     clearApiKeyConfirmTitle: '清除 API Key',
     clearApiKeyConfirmDescription: '确定要清除当前 API Key 吗？',
@@ -4263,6 +4264,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelConnectionTestSummary:
       'Tested {total} models: {success} connected successfully, {failure} failed',
     modelConnectionTestSuccessSummary: '{success} models connected successfully',
+    modelConnectionTestTimeout: 'Connection test timed out. Check that the service is reachable',
     noModelsConfigured: 'Please add a model first',
     clearApiKeyConfirmTitle: 'Clear API Key',
     clearApiKeyConfirmDescription: 'Clear the current API key?',

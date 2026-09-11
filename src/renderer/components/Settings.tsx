@@ -2561,59 +2561,63 @@ const Settings: React.FC<SettingsProps> = ({
       },
     }));
 
-    const results = await testProviderModelsSequentially({
-      providerId: provider,
-      provider: nextProviderConfig,
-      baseUrl: resolveBaseUrl(
-        provider,
-        nextProviderConfig.baseUrl,
-        getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
-      ),
-      apiFormat: getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
-      models: modelsToTest,
-    });
-    if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return true;
-
-    const statuses = Object.fromEntries(
-      results.map(({ model, result }) => [
-        model.id,
-        result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
-      ]),
-    );
-    setProviderModelConnectionStatuses(provider, statuses);
-
-    const successCount = results.filter(({ result }) => result.success).length;
-    const failureCount = results.length - successCount;
-    if (successCount > 0) {
-      try {
-        await persistTestedProviderConfiguration(provider, nextProviderConfig);
-        if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
-      } catch (error) {
-        console.error('[Settings] failed to save auto-tested provider configuration:', error);
-        showConnectionTestNotification(
-          { success: false, message: i18nService.t('failedToSaveSettings') },
+    // Run connection tests in the background so the discovery button stops
+    // loading once the model list is merged; per-model status dots show progress.
+    void (async () => {
+      const results = await testProviderModelsSequentially({
+        providerId: provider,
+        provider: nextProviderConfig,
+        baseUrl: resolveBaseUrl(
           provider,
-        );
-        return true;
-      }
-    }
+          nextProviderConfig.baseUrl,
+          getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+        ),
+        apiFormat: getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+        models: modelsToTest,
+      });
+      if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return;
 
-    const summary = i18nService
-      .t(failureCount === 0 ? 'modelConnectionTestSuccessSummary' : 'modelConnectionTestSummary')
-      .replace('{total}', String(results.length))
-      .replace('{success}', String(successCount))
-      .replace('{failure}', String(failureCount));
-    window.dispatchEvent(
-      new CustomEvent('app:showToast', {
-        detail: {
-          message: summary,
-          isError: failureCount > 0,
-          isSuccess: failureCount === 0,
-          autoClose: true,
-          durationMs: failureCount > 0 ? 5_000 : undefined,
-        },
-      }),
-    );
+      const statuses = Object.fromEntries(
+        results.map(({ model, result }) => [
+          model.id,
+          result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
+        ]),
+      );
+      setProviderModelConnectionStatuses(provider, statuses);
+
+      const successCount = results.filter(({ result }) => result.success).length;
+      const failureCount = results.length - successCount;
+      if (successCount > 0) {
+        try {
+          await persistTestedProviderConfiguration(provider, nextProviderConfig);
+          if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
+        } catch (error) {
+          console.error('[Settings] failed to save auto-tested provider configuration:', error);
+          showConnectionTestNotification(
+            { success: false, message: i18nService.t('failedToSaveSettings') },
+            provider,
+          );
+          return;
+        }
+      }
+
+      const summary = i18nService
+        .t(failureCount === 0 ? 'modelConnectionTestSuccessSummary' : 'modelConnectionTestSummary')
+        .replace('{total}', String(results.length))
+        .replace('{success}', String(successCount))
+        .replace('{failure}', String(failureCount));
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: {
+            message: summary,
+            isError: failureCount > 0,
+            isSuccess: failureCount === 0,
+            autoClose: true,
+            durationMs: failureCount > 0 ? 5_000 : undefined,
+          },
+        }),
+      );
+    })();
     return true;
   };
 
