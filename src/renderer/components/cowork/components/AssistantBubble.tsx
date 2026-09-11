@@ -2,6 +2,7 @@ import { Message, MessageContent } from '@shared/components/ai-elements/message'
 import React, { useState } from 'react';
 
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
+import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { CopyButton } from './CopyButton';
 import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
@@ -36,16 +37,11 @@ export const AssistantBubble: React.FC<{
           <StreamingMarkdownResponse content={rawContent} isStreaming={isStreaming} />
         </MessageContent>
       </Message>
-      {modelLabel && (
-        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-          <span>{modelLabel}</span>
-        </div>
-      )}
-      {showCopyButton && (
-        <div className="flex items-center gap-1 mt-2">
-          <CopyButton content={message.content} visible={isHovered} />
-        </div>
-      )}
+      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{formatMessageDateTime(message.timestamp)}</span>
+        {modelLabel && <span>{modelLabel}</span>}
+        {showCopyButton && <CopyButton content={message.content} visible={isHovered} />}
+      </div>
       {expandedImage && (
         <ImagePreviewModal image={expandedImage} onClose={() => setExpandedImage(null)} />
       )}

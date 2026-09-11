@@ -183,6 +183,7 @@ export const CodingAgentIpc = {
   StageGitPaths: 'codingAgent:stageGitPaths',
   UnstageGitPaths: 'codingAgent:unstageGitPaths',
   CommitGitChanges: 'codingAgent:commitGitChanges',
+  CommitAndPushGitChanges: 'codingAgent:commitAndPushGitChanges',
   PushGitBranch: 'codingAgent:pushGitBranch',
   SwitchGitBranch: 'codingAgent:switchGitBranch',
   CreateGitBranch: 'codingAgent:createGitBranch',

@@ -35,6 +35,7 @@ interface CodingComposerProps {
   isSubmitting?: boolean;
   hasError?: boolean;
   prompt: string;
+  focusRequestKey?: number;
   attachments: CodingPromptAttachment[];
   canAttachFiles: boolean;
   leadingTools?: ReactNode;
@@ -62,6 +63,7 @@ export const CodingComposer = ({
   isSubmitting = false,
   hasError = false,
   prompt,
+  focusRequestKey = 0,
   attachments,
   canAttachFiles,
   leadingTools,
@@ -106,6 +108,14 @@ export const CodingComposer = ({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (focusRequestKey === 0 || disabled) return;
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(prompt.length, prompt.length);
+    });
+  }, [disabled, focusRequestKey, prompt.length]);
 
   const selectCommand = (command: CodingAgentAvailableCommand) => {
     const nextPrompt = slashCommandPrompt(command);
