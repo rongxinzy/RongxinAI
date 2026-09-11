@@ -5,6 +5,7 @@ import {
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppMemoryPolicy,
+  LlamaCppModelResidencyMode,
 } from '../../shared/llamacpp';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import type { LlamaCppManager } from '../libs/llamacppManager';
@@ -17,6 +18,7 @@ import {
   hasRecoveredVram,
   sanitizeLlamaCppServiceConfig,
   sanitizeLlamaCppModelPreference,
+  shouldRefreshLlamaCppModelBindings,
   waitForLlamaCppModelUnloadConfirmation,
   waitForLlamaCppStartupModelBindings,
   registerLlamaCppIpcHandlers,
@@ -58,6 +60,32 @@ test('sanitizeLlamaCppModelPreference drops invalid maximum output and capabilit
       capabilities: { toolCalling: 'yes' },
     }),
   ).toBeNull();
+});
+
+test('sanitizeLlamaCppModelPreference retains a timed residency policy', () => {
+  expect(
+    sanitizeLlamaCppModelPreference({
+      residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 30 },
+    }),
+  ).toEqual({ residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 30 } });
+});
+
+test('does not refresh model bindings when only residency changes', () => {
+  expect(
+    shouldRefreshLlamaCppModelBindings(
+      { residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 30 } },
+      { residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 60 } },
+    ),
+  ).toBe(false);
+});
+
+test('refreshes model bindings when a binding field changes', () => {
+  expect(
+    shouldRefreshLlamaCppModelBindings(
+      { ctxSize: 8192, capabilities: { toolCalling: ModelCapabilityStatus.Unsupported } },
+      { ctxSize: 16_384, capabilities: { toolCalling: ModelCapabilityStatus.Supported } },
+    ),
+  ).toBe(true);
 });
 
 const electronMocks = vi.hoisted(() => ({

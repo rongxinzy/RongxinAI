@@ -31,6 +31,7 @@ import {
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppMemoryPolicy,
+  LlamaCppModelResidencyMode,
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
 import {
@@ -58,7 +59,13 @@ import {
   LlamaCppModelLoadFailureReason,
 } from '../libs/llamacppModelLoadErrors';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
+import { createLlamaCppModelGateway, type LlamaCppModelGateway } from '../libs/llamacppModelGateway';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
+import {
+  LlamaCppModelResidencyManager,
+  LlamaCppModelResidencyState,
+  type LlamaCppModelResidencySnapshot,
+} from '../libs/llamacppModelResidencyManager';
 import { createLlamaCppRuntimeInstallState } from '../libs/llamacppRuntimeInstallState';
 import {
   buildLlamaCppRunningModelBinding,
@@ -106,6 +113,13 @@ type LlamaCppModelBindingRefreshResult = {
   changed: boolean;
   hasRunningModels: boolean;
 };
+
+function broadcastLlamaCppModelResidencyState(
+  broadcast: (channel: string, payload: unknown) => void,
+  snapshot: LlamaCppModelResidencySnapshot,
+): void {
+  broadcast(LlamaCppIpcChannel.ModelResidencyChanged, snapshot);
+}
 
 export async function waitForLlamaCppStartupModelBindings(input: {
   refresh: () => Promise<boolean>;
@@ -331,6 +345,7 @@ export function registerLlamaCppIpcHandlers(
       current,
       bindingModels,
       getLlamaCppServiceConfig(store),
+      modelGateway?.baseUrl() ?? undefined,
     );
     if (appConfigUpdate.changed) {
       store.set('app_config', appConfigUpdate.config);
@@ -358,6 +373,13 @@ export function registerLlamaCppIpcHandlers(
         // Router health can precede automatic model loading; do not erase bindings during that gap.
         return { changed: false, hasRunningModels: false };
       }
+      for (const model of runningModels) {
+        const modelName = (model.name || model.model || model.id || '').trim();
+        const snapshot = modelName ? residency.getSnapshot(modelName) : undefined;
+        if (modelName && (!snapshot || snapshot.state === LlamaCppModelResidencyState.Unloaded)) {
+          residency.markReady(modelName);
+        }
+      }
       return {
         changed: await updateRunningModelBindings(runningModels),
         hasRunningModels: runningModels.length > 0,
@@ -381,6 +403,27 @@ export function registerLlamaCppIpcHandlers(
   });
   const loadModelLock = new LlamaCppModelLoadLock();
   let activeModelLoad: { modelName: string; controller: AbortController } | null = null;
+  let modelGateway: LlamaCppModelGateway | null = null;
+  let loadModelCore: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
+  const residency = new LlamaCppModelResidencyManager({
+    getPolicy: modelName => {
+      const serviceStatus =
+        typeof manager.getStatus === 'function' ? manager.getStatus() : undefined;
+      if (serviceStatus?.managedByApp === false) {
+        return { mode: LlamaCppModelResidencyMode.Forever };
+      }
+      return getLlamaCppModelPreferences(options.getStore())[modelName]?.residency;
+    },
+    unload: async modelName => {
+      await (await manager.client()).unloadModel(modelName);
+      const confirmation = await waitForLlamaCppModelUnloadConfirmation({
+        modelName,
+        listRunningModels: () => manager.listRunningModels(),
+      });
+      await updateRunningModelBindings(confirmation.runningModels);
+    },
+    onStateChanged: snapshot => broadcastLlamaCppModelResidencyState(broadcast, snapshot),
+  });
   const serviceTransitionLock = new LlamaCppServiceTransitionLock();
   const runServiceTransition = async <T>(action: () => Promise<T>): Promise<T> =>
     await serviceTransitionLock.runExclusive(
@@ -664,7 +707,13 @@ export function registerLlamaCppIpcHandlers(
     const current = getLlamaCppModelPreferences(store);
     const next = sanitizeUpdatedModelPreferences(current, input);
     store.set(LLAMACPP_MODEL_PREFERENCES_KEY, next);
-    await refreshRunningModelBindings();
+    const modelName = getLlamaCppModelPreferenceInputName(input);
+    if (
+      modelName &&
+      shouldRefreshLlamaCppModelBindings(current[modelName], next[modelName])
+    ) {
+      await refreshRunningModelBindings();
+    }
     return next;
   });
   ipcMain.handle(LlamaCppIpcChannel.ImportModelFiles, async (_event, input: unknown) => {
@@ -689,7 +738,7 @@ export function registerLlamaCppIpcHandlers(
     };
     return result;
   });
-  ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
+  loadModelCore = async (input: LlamaCppModelLaunchInput) => {
     const modelName = input.model.trim();
     const launchLogger = createLlamaCppModelLaunchLogger({
       modelName,
@@ -845,6 +894,23 @@ export function registerLlamaCppIpcHandlers(
         return new Error(t('llamacppModelLoadInProgress'));
       },
     );
+  };
+  modelGateway = createLlamaCppModelGateway({
+    acquireModel: async modelName =>
+      await residency.acquire(modelName, async () => {
+        await loadModelCore({ model: modelName });
+      }),
+    getUpstreamBaseUrl: () => manager.getBaseUrl(),
+  });
+  void modelGateway.start().then(() => refreshRunningModelBindings()).catch(error => {
+    console.error('[LlamaCppGateway] failed to start local model gateway:', error);
+  });
+  ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
+    let result: LlamaCppModelLaunchResult | undefined;
+    await residency.ensureReady(input.model, async () => {
+      result = await loadModelCore(input);
+    });
+    return result ?? { success: true, runningModels: await manager.listRunningModels() };
   });
   ipcMain.handle(LlamaCppIpcChannel.CancelModelLoad, async (_event, input: unknown) => {
     const activeLoad = activeModelLoad;
@@ -878,6 +944,7 @@ export function registerLlamaCppIpcHandlers(
       modelName,
       listRunningModels: () => manager.listRunningModels(),
     });
+    residency.markUnloaded(modelName);
     await updateRunningModelBindings(confirmation.runningModels);
     for (const clearedModelName of getLlamaCppModelLogClearNames(modelName, unloadingModel)) {
       clearModelLaunchLog(clearedModelName);
@@ -1073,6 +1140,25 @@ function sanitizeUpdatedModelPreferences(
   };
 }
 
+function getLlamaCppModelPreferenceInputName(input: unknown): string | null {
+  if (!input || typeof input !== 'object') return null;
+  const modelName = (input as LlamaCppSetModelPreferenceInput).modelName;
+  const normalizedModelName = typeof modelName === 'string' ? modelName.trim() : '';
+  return normalizedModelName || null;
+}
+
+export function shouldRefreshLlamaCppModelBindings(
+  previous: LlamaCppModelPreference | undefined,
+  next: LlamaCppModelPreference | undefined,
+): boolean {
+  if (previous?.ctxSize !== next?.ctxSize || previous?.maxTokens !== next?.maxTokens) {
+    return true;
+  }
+  return LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS.some(
+    key => previous?.capabilities?.[key] !== next?.capabilities?.[key],
+  );
+}
+
 export function sanitizeLlamaCppModelPreference(
   preference: unknown,
 ): LlamaCppModelPreference | null {
@@ -1084,6 +1170,7 @@ export function sanitizeLlamaCppModelPreference(
     ctxSize?: unknown;
     maxTokens?: unknown;
     capabilities?: Record<string, unknown>;
+    residency?: { mode?: unknown; idleMinutes?: unknown };
   };
   const parsedCtxSize =
     typeof candidate.ctxSize === 'number'
@@ -1123,12 +1210,26 @@ export function sanitizeLlamaCppModelPreference(
         : [];
     }),
   ) as Partial<ModelCapabilities>;
+  const residency =
+    candidate.residency?.mode === LlamaCppModelResidencyMode.Forever
+      ? { mode: LlamaCppModelResidencyMode.Forever }
+      : candidate.residency?.mode === LlamaCppModelResidencyMode.Timed &&
+          typeof candidate.residency.idleMinutes === 'number' &&
+          Number.isSafeInteger(candidate.residency.idleMinutes) &&
+          candidate.residency.idleMinutes >= 0 &&
+          candidate.residency.idleMinutes <= 10_080
+        ? {
+            mode: LlamaCppModelResidencyMode.Timed,
+            idleMinutes: candidate.residency.idleMinutes,
+          }
+        : undefined;
 
-  return ctxSize || maxTokens || Object.keys(capabilities).length > 0
+  return ctxSize || maxTokens || Object.keys(capabilities).length > 0 || residency
     ? {
         ...(ctxSize ? { ctxSize } : {}),
         ...(maxTokens ? { maxTokens } : {}),
         ...(Object.keys(capabilities).length > 0 ? { capabilities } : {}),
+        ...(residency ? { residency } : {}),
       }
     : null;
 }

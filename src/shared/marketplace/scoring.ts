@@ -1,5 +1,6 @@
 import type { MarketplaceFit, MarketplaceModel, MarketplaceScore, MarketplaceTaskFilter } from './types';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../hardware/types';
+import { estimateLlamaCppModelMemory } from '../llamacpp/modelMemoryEstimate';
 
 export const MARKETPLACE_SCORE_VERSION = '2026-08-01-v2';
 
@@ -59,9 +60,16 @@ function modelFileSizeMiB(model: MarketplaceModel): number | undefined {
 function modelRequiredMemory(model: MarketplaceModel, contextSize: number): { vramMiB?: number; systemMiB?: number } {
   const fileMiB = modelFileSizeMiB(model);
   if (!fileMiB) return {};
-  const contextMiB = Math.max(256, Math.round(contextSize / 1024) * 256);
-  // GGUF weights may be split between VRAM and system memory; reserve headroom for KV cache and runtime buffers.
-  return { vramMiB: Math.round(fileMiB * 0.82 + contextMiB), systemMiB: Math.round(fileMiB * 0.28 + contextMiB * 1.2) };
+  const estimate = estimateLlamaCppModelMemory({
+    modelSizeBytes: fileMiB * 1024 * 1024,
+    contextSize,
+  });
+  return estimate
+    ? {
+        vramMiB: estimate.estimatedVramMiB,
+        systemMiB: estimate.estimatedSystemMemoryMiB,
+      }
+    : {};
 }
 
 function fitModel(model: MarketplaceModel, hardware: MarketplaceHardwareProfile | undefined, contextSize: number): { fit: MarketplaceFit; score: number } {

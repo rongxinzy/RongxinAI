@@ -1,11 +1,20 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs, FluidTabsSize } from '@shared/components/ui/fluid-tabs';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { cn } from '@shared/lib/utils';
 import { ScrollText, X } from 'lucide-react';
 import {
   useEffect,
   useRef,
   useState,
+  type ReactNode,
   type PointerEvent as ReactPointerEvent,
   type TransitionEvent as ReactTransitionEvent,
 } from 'react';
@@ -16,13 +25,26 @@ import type {
   LlamaCppRunningModel,
   LlamaCppServiceConfig,
 } from '../../../../shared/llamacpp';
+import {
+  estimateLlamaCppModelMemory,
+  LLAMACPP_MEMORY_ESTIMATE_MIB,
+  LlamaCppModelResidencyMode,
+} from '../../../../shared/llamacpp';
 import { ModelCapabilityStatus } from '../../../../shared/providers';
 import { i18nService } from '../../../services/i18n';
 import { LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS } from '../constants';
 import { formatBytes } from '../utils/progress';
 import {
+  ContextSizeControl,
+  formatContextKInput,
+  getContextPresets,
+  getCustomContextError,
+  getInitialContextValue,
+  ModelContextEditorMode,
   ModelContextSettingsModal,
   ModelContextSettingsPresentation,
+  parseCustomContextValue,
+  type ModelContextEditorState,
 } from './ModelContextSettingsModal';
 import { formatModelInspectorContext } from './modelInspectorViewModel';
 
@@ -39,6 +61,28 @@ const MODEL_INSPECTOR_SIDEBAR_MAX_WIDTH = 560;
 const MODEL_INSPECTOR_MAIN_CONTENT_MIN_WIDTH = 520;
 const MODEL_INSPECTOR_COMPACT_BREAKPOINT = 900;
 
+const InspectorRowId = {
+  ConfiguredContext: 'configured-context',
+  KeepAlive: 'keep-alive',
+} as const;
+type InspectorRowId = (typeof InspectorRowId)[keyof typeof InspectorRowId];
+
+const ModelResidencySelectValue = {
+  FiveMinutes: '5',
+  ThirtyMinutes: '30',
+  OneHour: '60',
+  Forever: 'forever',
+} as const;
+type ModelResidencySelectValue =
+  (typeof ModelResidencySelectValue)[keyof typeof ModelResidencySelectValue];
+
+type ModelResidency = NonNullable<LlamaCppModelPreference['residency']>;
+
+type ModelInspectorSaveInput = {
+  ctxSize?: number;
+  residency?: ModelResidency;
+};
+
 type ModelInspectorSidebarProps = {
   open: boolean;
   model: LlamaCppModel | null;
@@ -46,13 +90,16 @@ type ModelInspectorSidebarProps = {
   preference?: LlamaCppModelPreference;
   serviceConfig: LlamaCppServiceConfig;
   onOpenChange: (open: boolean) => void;
-  onSaveContext: (ctxSize: number) => void;
+  onSavePreferences: (input: ModelInspectorSaveInput) => Promise<boolean>;
+  onValidationError: (message: string) => void;
   onOpenLogs: (modelName: string) => void;
 };
 
 type InspectorRow = {
+  id?: InspectorRowId;
   label: string;
   value: string;
+  control?: ReactNode;
 };
 
 type InspectorSnapshot = {
@@ -69,7 +116,8 @@ export function ModelInspectorSidebar({
   preference,
   serviceConfig,
   onOpenChange,
-  onSaveContext,
+  onSavePreferences,
+  onValidationError,
   onOpenLogs,
 }: ModelInspectorSidebarProps) {
   const [activeTab, setActiveTab] = useState<ModelInspectorTab>(ModelInspectorTab.Overview);
@@ -82,6 +130,8 @@ export function ModelInspectorSidebar({
   const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
   const resizeFrameRef = useRef(0);
   const pendingResizeWidthRef = useRef(0);
+  const [contextDraft, setContextDraft] = useState<ModelContextEditorState | null>(null);
+  const [residencyDraft, setResidencyDraft] = useState<ModelResidency | null>(null);
   const [snapshot, setSnapshot] = useState<InspectorSnapshot | null>(
     model
       ? {
@@ -102,6 +152,11 @@ export function ModelInspectorSidebar({
       setSnapshot({ model, runningModel, preference, serviceConfig });
     }
   }, [model, open, preference, runningModel, serviceConfig]);
+
+  useEffect(() => {
+    setContextDraft(null);
+    setResidencyDraft(null);
+  }, [model?.name, open]);
 
   useEffect(() => {
     const container = sidebarRef.current?.parentElement;
@@ -151,7 +206,11 @@ export function ModelInspectorSidebar({
     if (!open) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onOpenChange(false);
+      if (event.key === 'Escape') {
+        setContextDraft(null);
+        setResidencyDraft(null);
+        onOpenChange(false);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -159,21 +218,82 @@ export function ModelInspectorSidebar({
   }, [onOpenChange, open]);
 
   if (!isPresent || !activeSnapshot || !inspectedModel) return null;
+  const trainedContextLimit =
+    inspectedModel.trained_context_length ?? inspectedModel.details?.context_length;
+  const contextPresets = getContextPresets(trainedContextLimit);
+  const baseContextSize = getInitialContextValue(
+    activeSnapshot.preference?.ctxSize,
+    activeSnapshot.runningModel?.runtime_context_length ?? activeSnapshot.runningModel?.context_length,
+    contextPresets,
+    trainedContextLimit,
+  );
+  const contextEditorState =
+    contextDraft ?? {
+      contextSize: baseContextSize,
+      mode: contextPresets.includes(baseContextSize)
+        ? ModelContextEditorMode.Preset
+        : ModelContextEditorMode.Custom,
+      customContextValue: contextPresets.includes(baseContextSize)
+        ? ''
+        : formatContextKInput(baseContextSize),
+    };
+  const contextError =
+    contextEditorState.mode === ModelContextEditorMode.Custom
+      ? getCustomContextError(
+          parseCustomContextValue(contextEditorState.customContextValue),
+          contextEditorState.customContextValue,
+          trainedContextLimit,
+        )
+      : null;
+  const preferenceWithDraft = {
+    ...activeSnapshot.preference,
+    ...(contextDraft ? { ctxSize: contextDraft.contextSize } : {}),
+    ...(residencyDraft ? { residency: residencyDraft } : {}),
+  };
   const overviewRows = getOverviewRows(
     inspectedModel,
-    activeSnapshot.preference,
+    preferenceWithDraft,
     activeSnapshot.serviceConfig,
   );
   const fixedParameterRows = getFixedParameterRows(
-    activeSnapshot.preference,
+    inspectedModel,
+    activeSnapshot.runningModel,
+    preferenceWithDraft,
     activeSnapshot.serviceConfig,
   );
   const runtimeConfigRows = [
     ...overviewRows.slice(0, 2),
-    ...fixedParameterRows.slice(0, 2),
     ...overviewRows.slice(2),
+    ...fixedParameterRows.slice(0, 2),
     ...fixedParameterRows.slice(2),
-  ];
+  ].map(row =>
+    row.id === InspectorRowId.ConfiguredContext
+      ? {
+          ...row,
+          control: (
+            <div className="flex min-w-0 flex-col items-end gap-1">
+              <ContextSizeControl
+                model={inspectedModel}
+                editorState={contextEditorState}
+                onEditorStateChange={setContextDraft}
+                className="w-32 max-w-full"
+              />
+              {contextError ? <span className="text-xs text-destructive">{contextError}</span> : null}
+            </div>
+          ),
+        }
+      : row.id === InspectorRowId.KeepAlive
+      ? {
+          ...row,
+          control: (
+            <ModelResidencySelect
+              preference={preferenceWithDraft}
+              onChange={setResidencyDraft}
+            />
+          ),
+        }
+      : row,
+  );
   const completeCloseTransition = () => {
     if (!isClosing || open) return;
     setIsPresent(false);
@@ -277,7 +397,11 @@ export function ModelInspectorSidebar({
             variant="ghost"
             size="icon-sm"
             aria-label={i18nService.t('close')}
-            onClick={() => onOpenChange(false)}
+            onClick={() => {
+              setContextDraft(null);
+              setResidencyDraft(null);
+              onOpenChange(false);
+            }}
           >
             <X />
           </Button>
@@ -301,14 +425,37 @@ export function ModelInspectorSidebar({
               <ModelContextSettingsModal
                 isOpen={open}
                 model={inspectedModel}
-                savedContextSize={activeSnapshot.preference?.ctxSize}
+                savedContextSize={preferenceWithDraft?.ctxSize}
                 runningContextSize={
                   activeSnapshot.runningModel?.runtime_context_length ??
                   activeSnapshot.runningModel?.context_length
                 }
-                onClose={() => onOpenChange(false)}
-                onSave={ctxSize => {
-                  if (ctxSize !== undefined) onSaveContext(ctxSize);
+                hideContextEditor
+                onClose={() => {
+                  setContextDraft(null);
+                  setResidencyDraft(null);
+                  onOpenChange(false);
+                }}
+                onSave={(_ctxSize, _contextChanged) => {
+                  if (contextEditorState.mode === ModelContextEditorMode.Custom) {
+                    if (!contextEditorState.customContextValue.trim()) {
+                      onValidationError(i18nService.t('localInferenceContextInvalid'));
+                      return;
+                    }
+                    if (contextError) {
+                      onValidationError(contextError);
+                      return;
+                    }
+                  }
+                  void onSavePreferences({
+                    ...(contextDraft ? { ctxSize: contextEditorState.contextSize } : {}),
+                    ...(residencyDraft ? { residency: residencyDraft } : {}),
+                  }).then(saved => {
+                    if (saved) {
+                      setContextDraft(null);
+                      setResidencyDraft(null);
+                    }
+                  });
                 }}
                 presentation={ModelContextSettingsPresentation.Inline}
               />
@@ -391,7 +538,7 @@ function InspectorRuntimeConfig({ rows }: { rows: InspectorRow[] }) {
               {row.label}
             </dt>
             <dd className="max-w-full truncate text-right text-sm font-medium text-foreground" title={row.value}>
-              {row.value}
+              {row.control ?? row.value}
             </dd>
           </div>
         ))}
@@ -411,10 +558,11 @@ function getOverviewRows(
       value: model.details?.quantization_level || i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
-      label: i18nService.t('localInferenceSize'),
+      label: i18nService.t('localInferenceStorageUsage'),
       value: model.size ? formatBytes(model.size) : i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
+      id: InspectorRowId.ConfiguredContext,
       label: i18nService.t('localInferenceInspectorConfiguredContext'),
       value:
         formatModelInspectorContext(preference?.ctxSize) ??
@@ -425,17 +573,40 @@ function getOverviewRows(
 }
 
 function getFixedParameterRows(
+  model: LlamaCppModel,
+  runningModel: LlamaCppRunningModel | undefined,
   preference: LlamaCppModelPreference | undefined,
   serviceConfig: LlamaCppServiceConfig,
 ): InspectorRow[] {
+  const estimatedMemory = estimateLlamaCppModelMemory({
+    modelSizeBytes: model.size,
+    contextSize: getEffectiveContextSize(runningModel, preference, serviceConfig),
+  });
+  const actualVramBytes = runningModel?.size_vram;
   return [
     {
+      id: InspectorRowId.KeepAlive,
+      label: i18nService.t('localInferenceInspectorKeepAlive'),
+      value: formatResidencyValue(preference),
+    },
+    {
       label: i18nService.t('localInferenceInspectorEstimatedVram'),
-      value: i18nService.t('localInferenceInspectorUnavailable'),
+      value:
+        actualVramBytes && actualVramBytes > 0
+          ? formatMemoryValue(actualVramBytes)
+          : estimatedMemory
+            ? formatMemoryValue(
+                estimatedMemory.estimatedVramMiB * LLAMACPP_MEMORY_ESTIMATE_MIB,
+              )
+            : i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
       label: i18nService.t('localInferenceInspectorEstimatedMemory'),
-      value: i18nService.t('localInferenceInspectorUnavailable'),
+      value: estimatedMemory
+        ? formatMemoryValue(
+            estimatedMemory.estimatedSystemMemoryMiB * LLAMACPP_MEMORY_ESTIMATE_MIB,
+          )
+        : i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
       label: i18nService.t('localInferenceServiceConfigGpuLayersLabel'),
@@ -450,10 +621,6 @@ function getFixedParameterRows(
       value: getMmapValue(serviceConfig.noMmap),
     },
     {
-      label: i18nService.t('localInferenceInspectorKeepAlive'),
-      value: i18nService.t('localInferenceInspectorUnavailable'),
-    },
-    {
       label: i18nService.t('capabilityToolCalling'),
       value: getCapabilityValue(preference?.capabilities?.toolCalling),
     },
@@ -466,6 +633,127 @@ function getFixedParameterRows(
       value: getServiceConfigValue(serviceConfig.timeout),
     },
   ];
+}
+
+function ModelResidencySelect({
+  preference,
+  onChange,
+}: {
+  preference: LlamaCppModelPreference | undefined;
+  onChange: (residency: ModelResidency) => void;
+}) {
+  const persistedValue = getModelResidencySelectValue(preference);
+  const items = getModelResidencySelectItems();
+
+  return (
+    <Select
+      items={items}
+      value={persistedValue}
+      onValueChange={nextValue => {
+        if (!nextValue) return;
+        const residency = resolveModelResidency(nextValue as ModelResidencySelectValue);
+        if (!residency) return;
+        onChange(residency);
+      }}
+    >
+      <SelectTrigger
+        size="sm"
+        aria-label={i18nService.t('localInferenceInspectorKeepAlive')}
+        className="w-32 max-w-full"
+      >
+        <SelectValue>
+          {() => formatResidencyValue(preference)}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent align="end">
+        <SelectGroup>
+          <SelectItem value={ModelResidencySelectValue.FiveMinutes}>
+            {i18nService.t('localInferenceResidencyFiveMinutes')}
+          </SelectItem>
+          <SelectItem value={ModelResidencySelectValue.ThirtyMinutes}>
+            {i18nService.t('localInferenceResidencyThirtyMinutes')}
+          </SelectItem>
+          <SelectItem value={ModelResidencySelectValue.OneHour}>
+            {i18nService.t('localInferenceResidencyOneHour')}
+          </SelectItem>
+          <SelectItem value={ModelResidencySelectValue.Forever}>
+            {i18nService.t('localInferenceResidencyForever')}
+          </SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function getModelResidencySelectItems(): Record<ModelResidencySelectValue, string> {
+  return {
+    [ModelResidencySelectValue.FiveMinutes]: i18nService.t('localInferenceResidencyFiveMinutes'),
+    [ModelResidencySelectValue.ThirtyMinutes]: i18nService.t('localInferenceResidencyThirtyMinutes'),
+    [ModelResidencySelectValue.OneHour]: i18nService.t('localInferenceResidencyOneHour'),
+    [ModelResidencySelectValue.Forever]: i18nService.t('localInferenceResidencyForever'),
+  };
+}
+
+function getModelResidencySelectValue(
+  preference: LlamaCppModelPreference | undefined,
+): ModelResidencySelectValue {
+  if (preference?.residency?.mode === LlamaCppModelResidencyMode.Forever) {
+    return ModelResidencySelectValue.Forever;
+  }
+  switch (preference?.residency?.idleMinutes ?? 30) {
+    case 5:
+      return ModelResidencySelectValue.FiveMinutes;
+    case 30:
+      return ModelResidencySelectValue.ThirtyMinutes;
+    case 60:
+      return ModelResidencySelectValue.OneHour;
+    default:
+      return ModelResidencySelectValue.ThirtyMinutes;
+  }
+}
+
+function resolveModelResidency(
+  value: ModelResidencySelectValue,
+): NonNullable<LlamaCppModelPreference['residency']> | null {
+  if (value === ModelResidencySelectValue.Forever) {
+    return { mode: LlamaCppModelResidencyMode.Forever };
+  }
+  const minutesByValue = {
+    [ModelResidencySelectValue.FiveMinutes]: 5,
+    [ModelResidencySelectValue.ThirtyMinutes]: 30,
+    [ModelResidencySelectValue.OneHour]: 60,
+  } as const;
+  const idleMinutes = minutesByValue[value as keyof typeof minutesByValue];
+  return idleMinutes === undefined ? null : { mode: LlamaCppModelResidencyMode.Timed, idleMinutes };
+}
+
+function formatResidencyValue(preference: LlamaCppModelPreference | undefined): string {
+  if (preference?.residency?.mode === LlamaCppModelResidencyMode.Forever) {
+    return i18nService.t('localInferenceResidencyForever');
+  }
+  if (preference?.residency?.idleMinutes === 0) {
+    return i18nService.t('localInferenceResidencyImmediate');
+  }
+  return i18nService
+    .t('localInferenceResidencyThirtyMinutes')
+    .replace('30', String(preference?.residency?.idleMinutes ?? 30));
+}
+
+function getEffectiveContextSize(
+  runningModel: LlamaCppRunningModel | undefined,
+  preference: LlamaCppModelPreference | undefined,
+  serviceConfig: LlamaCppServiceConfig,
+): number | undefined {
+  return (
+    runningModel?.runtime_context_length ??
+    runningModel?.context_length ??
+    preference?.ctxSize ??
+    (serviceConfig.ctxSize ? Number(serviceConfig.ctxSize) : undefined)
+  );
+}
+
+function formatMemoryValue(valueBytes: number): string {
+  return formatBytes(valueBytes);
 }
 
 function getServiceConfigValue(value?: string): string {
