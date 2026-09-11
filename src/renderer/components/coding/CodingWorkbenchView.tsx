@@ -16,7 +16,16 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import { Expand, File, FileDiff, Minimize2, PanelRight, Settings2, Terminal as TerminalIcon, X } from 'lucide-react';
+import {
+  Expand,
+  File,
+  FileDiff,
+  Minimize2,
+  PanelRight,
+  Settings2,
+  Terminal as TerminalIcon,
+  X,
+} from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -75,6 +84,8 @@ import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspa
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
 import { findPendingCodingPermission } from './codingPermission';
+import { resolveCodingSidePanelMaxWidth } from './codingSidePanelSizing';
+import { useCodingSidePanelTransition } from './useCodingSidePanelTransition';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
@@ -82,7 +93,6 @@ const profileStatusText = (status: CodingAgentProfileStatus): string =>
 const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
 const CODING_PANEL_MIN_WIDTH = 280;
 const CODING_PANEL_DEFAULT_WIDTH = 560;
-const CODING_PANEL_EXPAND_DRAG_OVERFLOW = 160;
 
 const ArtifactPanelFrame = lazy(() =>
   import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
@@ -125,6 +135,7 @@ export const CodingWorkbenchView = ({
   const [sidePanelHidden, setSidePanelHidden] = useState(false);
   const [sidePanelWidth, setSidePanelWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [sidePanelExpanded, setSidePanelExpanded] = useState(false);
+  const [isSidePanelResizing, setIsSidePanelResizing] = useState(false);
   const [gitRefreshVersion, setGitRefreshVersion] = useState(0);
   const [sidePanelMaxWidth, setSidePanelMaxWidth] = useState(CODING_PANEL_DEFAULT_WIDTH);
   const [isNarrowViewport, setIsNarrowViewport] = useState(() => window.innerWidth < 1024);
@@ -147,6 +158,7 @@ export const CodingWorkbenchView = ({
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
   const workbenchRef = useRef<HTMLDivElement | null>(null);
+  const sidePanelFrameRef = useRef<HTMLElement | null>(null);
   const transientSidePanelWidthRef = useRef<number | null>(null);
   const sessionSetupSelectionKeyRef = useRef<string | null>(null);
   const selectionKey = `${workspaceRoot}:${selectedLaneId ?? ''}:${draftSession?.id ?? ''}`;
@@ -389,6 +401,25 @@ export const CodingWorkbenchView = ({
     !sidePanelHidden &&
     sidePanelView !== null &&
     (sidePanelView !== CodingSidePanelView.Inspector || hasInspectorContent);
+  const {
+    completeClose: completeSidePanelClose,
+    hide: hideSidePanel,
+    isClosing: isSidePanelClosing,
+    isEntering: isSidePanelEntering,
+    isPresent: isSidePanelPresent,
+    reset: resetSidePanelTransition,
+    show: showSidePanel,
+  } = useCodingSidePanelTransition({
+    isNarrowViewport,
+    onCloseComplete: () => {
+      setSidePanelExpanded(false);
+      setSidePanelHidden(true);
+    },
+  });
+  const requestHideSidePanel = useCallback(() => {
+    setSidePanelExpanded(false);
+    hideSidePanel();
+  }, [hideSidePanel]);
   const resolvedSidePanelWidth = clampArtifactPanelWidth(
     sidePanelWidth,
     CODING_PANEL_MIN_WIDTH,
@@ -410,9 +441,7 @@ export const CodingWorkbenchView = ({
         sidePanelMaxWidth,
       );
       transientSidePanelWidthRef.current = nextWidth;
-      if (workbenchRef.current) {
-        workbenchRef.current.style.gridTemplateColumns = `minmax(0, 1fr) ${nextWidth}px`;
-      }
+      setSidePanelWidth(nextWidth);
     },
     [sidePanelMaxWidth],
   );
@@ -434,7 +463,7 @@ export const CodingWorkbenchView = ({
     const root = workbenchRef.current;
     if (!root) return;
     const updateMaxWidth = () => {
-      const maxWidth = resolveArtifactPanelMaxWidth(root.clientWidth, CODING_PANEL_MIN_WIDTH);
+      const maxWidth = resolveCodingSidePanelMaxWidth(root.clientWidth, CODING_PANEL_MIN_WIDTH);
       setSidePanelMaxWidth(maxWidth);
       setSidePanelWidth(current => clampArtifactPanelWidth(current, CODING_PANEL_MIN_WIDTH, maxWidth));
     };
@@ -496,9 +525,11 @@ export const CodingWorkbenchView = ({
     setSidePanelTabs([]);
     setSidePanelHidden(false);
     setSidePanelSheetOpen(false);
-  }, [activeLane?.id]);
+    resetSidePanelTransition();
+  }, [activeLane?.id, resetSidePanelTransition]);
 
   const openSidePanelTab = useCallback((view: CodingSidePanelViewType) => {
+    showSidePanel();
     setSidePanelHidden(false);
     if (view === CodingSidePanelView.Launcher) {
       setSidePanelTabs([]);
@@ -507,27 +538,29 @@ export const CodingWorkbenchView = ({
     }
     setSidePanelTabs(current => (current.includes(view) ? current : [...current, view]));
     setSidePanelView(view);
-  }, []);
+  }, [showSidePanel]);
 
   const restoreSidePanel = useCallback(() => {
+    showSidePanel();
     setSidePanelHidden(false);
     setSidePanelView(current => current ?? CodingSidePanelView.Launcher);
-  }, []);
+  }, [showSidePanel]);
 
   const closeSidePanelTab = useCallback(
     (view: CodingSidePanelViewType) => {
       const nextTabs = sidePanelTabs.filter(tab => tab !== view);
       setSidePanelTabs(nextTabs);
       if (nextTabs.length === 0) {
-        setSidePanelView(null);
         setSidePanelSheetOpen(false);
+        setSidePanelView(CodingSidePanelView.Launcher);
+        requestHideSidePanel();
         return;
       }
       setSidePanelView(active =>
         active === view ? nextTabs.at(-1)! : active,
       );
     },
-    [sidePanelTabs],
+    [requestHideSidePanel, sidePanelTabs],
   );
 
   const prompt = draftSession
@@ -857,7 +890,6 @@ export const CodingWorkbenchView = ({
 
   return (
     <div
-      ref={workbenchRef}
       data-page-canvas
       className="flex h-full min-h-0 flex-col bg-background"
     >
@@ -891,10 +923,11 @@ export const CodingWorkbenchView = ({
         }
       />
       <div
+        ref={workbenchRef}
         className="relative grid min-h-0 min-w-0 flex-1 grid-cols-1"
         style={
-          desktopSidePanelOpen
-            ? { gridTemplateColumns: `minmax(0, 1fr) ${renderedSidePanelWidth}px` }
+          isSidePanelPresent
+            ? { gridTemplateColumns: 'minmax(0, 1fr) auto' }
             : undefined
         }
       >
@@ -1202,20 +1235,43 @@ export const CodingWorkbenchView = ({
         ) : null}
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
-      {desktopSidePanelOpen && (
-        <aside className={cn('relative flex min-h-0 flex-col border-l border-border-subtle max-lg:hidden', sidePanelExpanded && 'absolute inset-0 z-20 bg-background')}>
+      {isSidePanelPresent && (
+        <aside
+          ref={sidePanelFrameRef}
+          onTransitionEnd={event => {
+            if (event.target === event.currentTarget && event.propertyName === 'width') {
+              completeSidePanelClose();
+            }
+          }}
+          aria-hidden={!desktopSidePanelOpen || isSidePanelEntering || isSidePanelClosing}
+          className={cn(
+            'relative flex min-h-0 min-w-0 shrink-0 flex-col overflow-visible border-l border-border-subtle max-lg:hidden',
+            !isSidePanelResizing &&
+              'transition-[width] duration-200 ease-out motion-reduce:transition-none',
+            (isSidePanelEntering || isSidePanelClosing) && 'pointer-events-none',
+            sidePanelExpanded && 'absolute inset-0 z-20 bg-background',
+          )}
+          style={{
+            width:
+              sidePanelExpanded
+                ? '100%'
+                : desktopSidePanelOpen && !isSidePanelEntering && !isSidePanelClosing
+                ? `${renderedSidePanelWidth}px`
+                : '0px',
+          }}
+          >
           <ArtifactPanelResizeHandle
             ariaLabel={i18nService.t('codingAgentSidePanel')}
             currentWidth={resolvedSidePanelWidth}
             minWidth={CODING_PANEL_MIN_WIDTH}
             maxWidth={sidePanelMaxWidth}
-            disabled={sidePanelExpanded}
+            disabled={sidePanelExpanded || isSidePanelEntering || isSidePanelClosing}
             onResizeFrame={applySidePanelFrameWidth}
             onResizeComplete={completeSidePanelResize}
-            onReachMaxWidth={() => setSidePanelExpanded(true)}
-            maxWidthOverflowThreshold={CODING_PANEL_EXPAND_DRAG_OVERFLOW}
+            onResizeStateChange={setIsSidePanelResizing}
           />
-          <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-2">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 items-center gap-1 border-b border-border px-1 py-2">
               {visibleSidePanelTabs.map(tab => {
                 const isReview = tab === CodingSidePanelView.Review;
                 const isInspector = tab === CodingSidePanelView.Inspector;
@@ -1262,6 +1318,8 @@ export const CodingWorkbenchView = ({
               <CodingSidePanelAddMenu
                 onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
                 onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
+                onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
+                hasInspectorContent={hasInspectorContent}
               />
               <div className="ml-auto flex shrink-0 items-center gap-1">
                 <Button
@@ -1282,8 +1340,7 @@ export const CodingWorkbenchView = ({
                   size="icon-sm"
                   aria-label={i18nService.t('codingAgentSidePanel')}
                   onClick={() => {
-                    setSidePanelExpanded(false);
-                    setSidePanelHidden(true);
+                    requestHideSidePanel();
                   }}
                 >
                   <PanelRight />
@@ -1314,6 +1371,7 @@ export const CodingWorkbenchView = ({
                 refreshKey={gitRefreshKey}
               />
             )}
+          </div>
           </div>
         </aside>
       )}
