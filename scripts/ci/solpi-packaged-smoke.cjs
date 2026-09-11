@@ -51,6 +51,23 @@ const fail = message => {
     fail(`unexpected vendor entry: ${entry}`);
   }
 
+  // The production main bundle (dist-electron/main.js) inlines the same
+  // resolver but cannot be required standalone without booting the whole
+  // app. Its packaged candidate is relative to the bundle's own directory,
+  // so mirror that arithmetic here and confirm the candidate exists through
+  // the asar-patched fs — the bundle embedding the candidate string itself
+  // is asserted by verify-packaged-solpi-resources.mjs.
+  const bundleCandidate = path.resolve(
+    path.join(asarRoot, 'dist-electron'),
+    '../solpi-vendor/sol-pi/index.ts',
+  );
+  if (!bundleCandidate.startsWith(asarRoot + path.sep)) {
+    fail(`main bundle vendor candidate resolved outside the archive: ${bundleCandidate}`);
+  }
+  if (!require('node:fs').existsSync(bundleCandidate)) {
+    fail(`main bundle vendor candidate does not exist in the archive: ${bundleCandidate}`);
+  }
+
   const vendor = await vendorModule.loadSolPiVendor();
   if (typeof vendor.createSolPiExtension !== 'function') {
     fail('vendor entry did not export the extension factory');
