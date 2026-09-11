@@ -21,6 +21,8 @@ import {
   type CodingLaneConfigOptionInput,
   type CodingLaneChangePreview,
   type CodingGitCommitInput,
+  type CodingGitCommitAndPushInput,
+  type CodingGitCommitAndPushResult,
   type CodingGitDiffInput,
   type CodingGitPathActionInput,
   type CodingGitStatus,
@@ -1131,6 +1133,12 @@ export class CodingRoomService extends EventEmitter {
 
   async commitGitChanges(input: CodingGitCommitInput): Promise<CodingGitStatus> {
     return await this.git.commit(input);
+  }
+
+  async commitAndPushGitChanges(
+    input: CodingGitCommitAndPushInput,
+  ): Promise<CodingGitCommitAndPushResult> {
+    return await this.git.commitAndPush(input);
   }
 
   async pushGitBranch(input: CodingGitTargetInput): Promise<CodingGitStatus> {

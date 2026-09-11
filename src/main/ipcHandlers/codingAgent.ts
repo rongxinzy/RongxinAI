@@ -4,6 +4,7 @@ import {
   CodingAgentIpc,
   type AddCodingAgentProfileInput,
   type CodingGitCommitInput,
+  type CodingGitCommitAndPushInput,
   type CodingGitBranchInput,
   type CodingGitPullRequestInput,
   type CodingGitDiffInput,
@@ -376,11 +377,29 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   );
   ipcMain.handle(CodingAgentIpc.CommitGitChanges, async (_event, input: CodingGitCommitInput) => {
     try {
+      console.debug(
+        `[CodingGit] received a commit request with ${input.paths.length} selected path(s)`,
+      );
       return { success: true, status: await service.commitGitChanges(input) };
     } catch (error) {
+      console.error('[CodingGit] commit request failed:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle(
+    CodingAgentIpc.CommitAndPushGitChanges,
+    async (_event, input: CodingGitCommitAndPushInput) => {
+      try {
+        console.debug(
+          `[CodingGit] received a commit and push request with ${input.paths.length} selected path(s)`,
+        );
+        return { success: true, result: await service.commitAndPushGitChanges(input) };
+      } catch (error) {
+        console.error('[CodingGit] commit and push request failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
   ipcMain.handle(CodingAgentIpc.PushGitBranch, async (_event, input: CodingGitTargetInput) => {
     try {
       return { success: true, status: await service.pushGitBranch(input) };

@@ -17,7 +17,7 @@ export const CodingSidePanelLauncher = ({
   hasInspectorContent,
 }: CodingSidePanelLauncherProps) => (
   <div className="flex h-full min-h-0 flex-col items-center justify-center">
-    <div className="flex flex-col gap-2 p-3">
+    <div className="flex flex-col gap-3 p-3">
       <Button type="button" variant="navigation" size="navigation" className="gap-2" onClick={onOpenReview}>
         <FileDiff />
         {i18nService.t('codingAgentReview')}

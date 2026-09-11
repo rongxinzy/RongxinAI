@@ -292,6 +292,7 @@ export interface CodingGitPullRequestInput extends CodingGitTargetInput {
   title: string;
   body: string;
   base: string;
+  draft?: boolean;
 }
 
 export interface CodingGitFileChange {
@@ -309,6 +310,12 @@ export interface CodingGitStatus {
   repositoryRoot: string | null;
   /** Canonical GitHub repository URL when the origin remote is hosted on GitHub. */
   githubRepositoryUrl: string | null;
+  /** Whether the repository has an origin remote for first-time branch pushes. */
+  hasOrigin: boolean;
+  /** Whether the current HEAD is known to be present on the origin branch. */
+  hasRemoteBranch: boolean;
+  /** The locally known default branch for the origin remote. */
+  defaultBranch: string | null;
   branch: string | null;
   localBranches: string[];
   head: string | null;
@@ -357,6 +364,18 @@ export interface CodingWorkspaceFileWriteInput extends CodingWorkspaceFileInput 
 
 export interface CodingGitCommitInput extends CodingGitTargetInput {
   message: string;
+  /** Unstaged paths explicitly included from the commit dialog. */
+  paths: string[];
+}
+
+/** A single main-process transaction for the commit dialog's primary action. */
+export type CodingGitCommitAndPushInput = CodingGitCommitInput;
+
+/** Outcome for a non-atomic commit-and-push operation. */
+export interface CodingGitCommitAndPushResult {
+  status: CodingGitStatus;
+  pushed: boolean;
+  pushError?: string;
 }
 
 export interface CreateCodingCollaborationPresetInput {

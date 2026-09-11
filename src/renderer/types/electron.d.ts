@@ -97,6 +97,11 @@ interface CodingGitStatusResult {
   status?: import('../../shared/codingAgent').CodingGitStatus;
   error?: string;
 }
+interface CodingGitCommitAndPushActionResult {
+  success: boolean;
+  result?: import('../../shared/codingAgent').CodingGitCommitAndPushResult;
+  error?: string;
+}
 interface CodingGitDiffResult {
   success: boolean;
   diff?: string;
@@ -1123,6 +1128,9 @@ interface IElectronAPI {
     commitGitChanges: (
       input: import('../../shared/codingAgent').CodingGitCommitInput,
     ) => Promise<CodingGitStatusResult>;
+    commitAndPushGitChanges: (
+      input: import('../../shared/codingAgent').CodingGitCommitAndPushInput,
+    ) => Promise<CodingGitCommitAndPushActionResult>;
     pushGitBranch: (
       input: import('../../shared/codingAgent').CodingGitTargetInput,
     ) => Promise<CodingGitStatusResult>;

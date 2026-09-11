@@ -32,3 +32,11 @@ test('does not mount the approval card inside the process group', () => {
   expect(activitySource).not.toContain('CodingPermissionCard');
   expect(turnSource).not.toContain('pendingPermissionId');
 });
+
+test('shows timestamps for coding user and assistant messages', () => {
+  expect(turnSource).toContain('const CodingUserMessage = ({');
+  expect(turnSource).toContain('<CopyButton content={content} visible />');
+  expect(turnSource).toContain('<ReEditButton visible onClick={onReEdit} />');
+  expect(turnSource).toContain('const CodingAssistantMessage = ({');
+  expect(turnSource).toContain('formatMessageDateTime(createdAt)');
+});

@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { readFile, stat } from 'fs/promises';
+import { lstat, readFile, stat } from 'fs/promises';
 import path from 'path';
 
 import {
@@ -93,7 +93,11 @@ const runCommand = async (
         if (acceptedExitCodes.includes(exitCode)) {
           resolve({ stdout, stderr, exitCode });
         } else {
-          reject(new Error(stderr.trim() || `${command} ${args[0]} failed with exit code ${exitCode}.`));
+          reject(
+            new Error(
+              stderr.trim() || stdout.trim() || `${command} ${args[0]} failed with exit code ${exitCode}.`,
+            ),
+          );
         }
       });
     });
@@ -280,12 +284,15 @@ const requireRelativePaths = (paths: string[]): string[] => {
   if (!values.length) throw new Error('Select at least one Git path.');
   if (values.length > MAX_PATHS_PER_ACTION) throw new Error('Too many Git paths were selected.');
   for (const value of values) {
-    if (path.isAbsolute(value) || value.split(/[\\/]/).includes('..')) {
+    if (value === '.' || path.isAbsolute(value) || value.split(/[\\/]/).includes('..')) {
       throw new Error('Git paths must stay inside the selected repository.');
     }
   }
   return values;
 };
+
+const isMissingFileError = (error: unknown): boolean =>
+  error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
 const countUntrackedLines = async (
   repositoryRoot: string,
@@ -326,10 +333,17 @@ export class CodingGitService {
     const title = input.title.trim();
     const base = input.base.trim();
     if (!title || !base) throw new Error('A pull request title and base branch are required.');
+    const args = ['pr', 'create', '--base', base, '--title', title];
+    if (input.body.trim()) {
+      args.push('--body', input.body);
+    } else {
+      args.push('--fill');
+    }
+    if (input.draft) args.push('--draft');
     const result = await runCommand(
       'gh',
       targetRoot,
-      ['pr', 'create', '--base', base, '--title', title, '--body', input.body],
+      args,
       { env: { GH_PROMPT_DISABLED: '1' }, maxOutputBytes: MAX_GIT_OUTPUT_BYTES },
     );
     const url = result.stdout.trim().split(/\s+/).find(value => value.startsWith('https://'));
@@ -350,6 +364,9 @@ export class CodingGitService {
         targetRoot,
         repositoryRoot: null,
         githubRepositoryUrl: null,
+        hasOrigin: false,
+        hasRemoteBranch: false,
+        defaultBranch: null,
         branch: null,
         localBranches: [],
         head: null,
@@ -369,7 +386,7 @@ export class CodingGitService {
     const statusOutput = (await runGit(targetRoot, ['status', '--porcelain=v2', '--branch', '-z']))
       .stdout;
     const parsed = parsePorcelainStatus(statusOutput);
-    const [stagedOutput, unstagedOutput, originRemoteOutput, localBranchesOutput] = await Promise.all([
+    const [stagedOutput, unstagedOutput, originRemoteOutput, localBranchesOutput, originHeadOutput] = await Promise.all([
       runGit(targetRoot, ['diff', '--no-ext-diff', '--cached', '--numstat', '-z']).then(
         result => result.stdout,
       ),
@@ -382,9 +399,24 @@ export class CodingGitService {
       runGit(targetRoot, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/']).then(
         result => result.stdout,
       ),
+      runGit(targetRoot, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], {
+        acceptedExitCodes: [0, 1, 128],
+      }).then(result => result.stdout),
     ]);
     const numStats = parseNumStat(stagedOutput);
     mergeNumStats(numStats, parseNumStat(unstagedOutput));
+    const remoteTrackingHead =
+      Boolean(originRemoteOutput.trim()) && Boolean(parsed.branch)
+        ? await runGit(
+            targetRoot,
+            ['rev-parse', '--verify', `refs/remotes/origin/${parsed.branch}`],
+            { acceptedExitCodes: [0, 128] },
+          ).then(result => (result.exitCode === 0 ? result.stdout.trim() : null))
+        : null;
+    const hasRemoteBranch = remoteTrackingHead !== null && remoteTrackingHead === parsed.head;
+    const localBranches = localBranchesOutput.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    const defaultBranch = originHeadOutput.trim().replace(/^origin\//, '') ||
+      (localBranches.includes('main') ? 'main' : localBranches.includes('master') ? 'master' : null);
 
     await Promise.all(
       parsed.files.map(async file => {
@@ -407,8 +439,11 @@ export class CodingGitService {
       targetRoot,
       repositoryRoot,
       githubRepositoryUrl: toGitHubRepositoryUrl(originRemoteOutput),
+      hasOrigin: Boolean(originRemoteOutput.trim()),
+      hasRemoteBranch,
+      defaultBranch,
       branch: parsed.branch,
-      localBranches: localBranchesOutput.split(/\r?\n/).map(value => value.trim()).filter(Boolean),
+      localBranches,
       head: parsed.head,
       detached: parsed.detached,
       upstream: parsed.upstream,
@@ -444,7 +479,25 @@ export class CodingGitService {
   }
 
   async stage(targetRoot: string, paths: string[]): Promise<void> {
-    await runGit(targetRoot, ['add', '--', ...requireRelativePaths(paths)]);
+    const safePaths = requireRelativePaths(paths);
+    await runGit(targetRoot, ['add', '--', ...safePaths]);
+    for (const safePath of safePaths) {
+      const staged = await runGit(targetRoot, ['diff', '--cached', '--name-only', '-z', '--', safePath]);
+      if (staged.stdout.split('\0').some(value => value === safePath)) continue;
+      const absolutePath = path.resolve(targetRoot, safePath);
+      try {
+        const fileStat = await lstat(absolutePath);
+        if (!fileStat.isFile()) {
+          throw new Error('Git could not safely stage the selected non-file path.');
+        }
+        const mode = (fileStat.mode & 0o111) !== 0 ? '100755' : '100644';
+        const hash = (await runGit(targetRoot, ['hash-object', '-w', '--', safePath])).stdout.trim();
+        await runGit(targetRoot, ['update-index', '--add', '--cacheinfo', `${mode},${hash},${safePath}`]);
+      } catch (error) {
+        if (!isMissingFileError(error)) throw error;
+        await runGit(targetRoot, ['update-index', '--force-remove', '--', safePath]);
+      }
+    }
   }
 
   async unstage(targetRoot: string, paths: string[]): Promise<void> {
@@ -458,16 +511,54 @@ export class CodingGitService {
     );
   }
 
-  async commit(targetRoot: string, message: string): Promise<void> {
+  async commit(targetRoot: string, message: string, paths: string[]): Promise<void> {
     const value = message.trim();
     if (!value) throw new Error('A Git commit message is required.');
     if (value.length > 10_000) throw new Error('The Git commit message is too long.');
+    if (paths.length > 0) {
+      await this.stage(targetRoot, paths);
+      const stagedPaths = await runGit(targetRoot, ['diff', '--cached', '--name-only']);
+      console.debug(
+        `[CodingGit] staged ${stagedPaths.stdout.trim() || 'no paths'} in ${targetRoot}`,
+      );
+    }
     await runGit(targetRoot, ['commit', '-m', value]);
   }
 
+  async commitAndPush(
+    targetRoot: string,
+    message: string,
+    paths: string[],
+  ): Promise<{ pushed: boolean; pushError?: string }> {
+    await this.commit(targetRoot, message, paths);
+    try {
+      await this.push(targetRoot);
+      return { pushed: true };
+    } catch (error) {
+      console.error('[CodingGit] push failed after the local commit completed:', error);
+      return {
+        pushed: false,
+        pushError: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   async push(targetRoot: string): Promise<void> {
-    await runGit(targetRoot, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']);
-    await runGit(targetRoot, ['push']);
+    const origin = await runGit(targetRoot, ['remote', 'get-url', 'origin'], {
+      acceptedExitCodes: [0, 2],
+    });
+    if (origin.exitCode !== 0) {
+      throw new Error('No origin remote is configured for the current repository.');
+    }
+
+    const branch = (await runGit(targetRoot, ['branch', '--show-current'])).stdout.trim();
+    if (!branch) {
+      throw new Error('The detached HEAD cannot be pushed without selecting a branch.');
+    }
+    // Establish the upstream on the first push. Git then owns the remote-tracking
+    // ref; a local cache update must never turn a successful remote push into a
+    // reported failure.
+    await runGit(targetRoot, ['push', '--set-upstream', 'origin', branch]);
   }
 
   async switchBranch(targetRoot: string, branch: string): Promise<void> {

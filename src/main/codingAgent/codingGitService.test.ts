@@ -57,6 +57,7 @@ test('reports structured staged, unstaged, and untracked Git state', async () =>
   expect(status.isRepository).toBe(true);
   expect(status.branch).toBe('main');
   expect(status.canMutate).toBe(true);
+  expect(status.hasRemoteBranch).toBe(false);
   expect(status.files).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -136,8 +137,7 @@ test('commits staged changes and pushes through the configured upstream', async 
   await writeFile(path.join(root, 'tracked.txt'), 'committed\n');
 
   const service = new CodingGitService();
-  await service.stage(root, ['tracked.txt']);
-  await service.commit(root, 'test: commit from panel');
+  await service.commit(root, 'test: commit from panel', ['tracked.txt']);
   await service.push(root);
 
   expect(await git(root, ['log', '-1', '--pretty=%s'])).toBe('test: commit from panel');
@@ -145,6 +145,66 @@ test('commits staged changes and pushes through the configured upstream', async 
     'test: commit from panel',
   );
   expect(await readFile(path.join(root, 'tracked.txt'), 'utf8')).toBe('committed\n');
+});
+
+test('safely falls back when Git accepts add without updating the index', async () => {
+  const root = await createRepository();
+  const service = new CodingGitService();
+  await git(root, ['update-index', '--assume-unchanged', 'tracked.txt']);
+  await writeFile(path.join(root, 'tracked.txt'), 'fallback staged\n');
+
+  await service.stage(root, ['tracked.txt']);
+
+  expect(await git(root, ['diff', '--cached', '--name-only'])).toBe('tracked.txt');
+  expect(await git(root, ['diff', '--cached'])).toContain('+fallback staged');
+});
+
+test('pushes a branch to origin without requiring an upstream', async () => {
+  const root = await createRepository();
+  const remote = await mkdtemp(path.join(tmpdir(), 'coding-git-first-push-'));
+  await git(remote, ['init', '--bare']);
+  await git(root, ['remote', 'add', 'origin', remote]);
+  await git(root, ['switch', '--create', 'feature/first-push']);
+
+  await new CodingGitService().push(root);
+
+  expect(await git(remote, ['show-ref', '--verify', 'refs/heads/feature/first-push'])).not.toBe('');
+  expect(await git(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])).toBe(
+    'origin/feature/first-push',
+  );
+});
+
+test('stages, commits, and pushes a first-time branch to origin', async () => {
+  const root = await createRepository();
+  const remote = await mkdtemp(path.join(tmpdir(), 'coding-git-commit-and-push-'));
+  await git(remote, ['init', '--bare']);
+  await git(root, ['remote', 'add', 'origin', remote]);
+  await git(root, ['switch', '--create', 'fix/whz-test']);
+  await writeFile(path.join(root, 'tracked.txt'), 'committed and pushed\n');
+
+  const service = new CodingGitService();
+  const result = await service.commitAndPush(root, 'test', ['tracked.txt']);
+
+  expect(result.pushed).toBe(true);
+  expect(await git(root, ['log', '-1', '--pretty=%s'])).toBe('test');
+  expect(await git(remote, ['log', '-1', '--pretty=%s', 'refs/heads/fix/whz-test'])).toBe(
+    'test',
+  );
+  expect((await service.getStatus(root, { isIsolated: false, isBusy: false })).hasRemoteBranch).toBe(
+    true,
+  );
+});
+
+test('keeps a completed local commit recoverable when push fails', async () => {
+  const root = await createRepository();
+  await git(root, ['remote', 'add', 'origin', path.join(root, 'missing-remote.git')]);
+  await writeFile(path.join(root, 'tracked.txt'), 'committed locally\n');
+
+  const result = await new CodingGitService().commitAndPush(root, 'test: local commit', ['tracked.txt']);
+
+  expect(result).toMatchObject({ pushed: false });
+  expect(result.pushError).toBeTruthy();
+  expect(await git(root, ['log', '-1', '--pretty=%s'])).toBe('test: local commit');
 });
 
 test('switches branches and preserves compatible uncommitted changes', async () => {
