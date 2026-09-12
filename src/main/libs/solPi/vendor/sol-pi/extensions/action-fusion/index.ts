@@ -162,8 +162,8 @@ export {
 	THEN_RUN_SUCCEEDED,
 } from "./then-run.ts";
 
-export function registerActionFusion(pi: ExtensionAPI): void {
-	createActionFusionExtension()(pi);
+export function registerActionFusion(pi: ExtensionAPI, options: ActionFusionOptions = {}): void {
+	createActionFusionExtension(options)(pi);
 }
 
 export default registerActionFusion;

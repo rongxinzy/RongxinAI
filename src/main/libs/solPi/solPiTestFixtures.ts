@@ -20,30 +20,48 @@ export interface FakeToolDefinition {
   renderResult?: (result: unknown, options: unknown, theme: unknown, context: unknown) => unknown;
 }
 
-export type FakeToolCallHandler = (
-  event: { type: 'tool_call'; toolCallId: string; toolName: string; input?: unknown },
-) => { block: boolean; reason: string } | undefined | Promise<{ block: boolean; reason: string } | undefined>;
+export type FakeToolCallHandler = (event: {
+  type: 'tool_call';
+  toolCallId: string;
+  toolName: string;
+  input?: unknown;
+}) =>
+  | { block: boolean; reason: string }
+  | undefined
+  | Promise<{ block: boolean; reason: string } | undefined>;
 
 export class FakeExtensionApi {
   readonly tools = new Map<string, FakeToolDefinition>();
   readonly toolCallHandlers: FakeToolCallHandler[] = [];
   readonly contextHandlers: Array<
-    (
-      event: { messages: unknown[] },
-      ctx?: unknown,
-    ) => Promise<{ messages: unknown[] } | void>
+    (event: { messages: unknown[] }, ctx?: unknown) => Promise<{ messages: unknown[] } | void>
   > = [];
   readonly sessionStartHandlers: Array<
     (event: { type: 'session_start' }, ctx: unknown) => void | Promise<void>
   > = [];
+  /**
+   * Errors thrown by context handlers during emitContext, in emission order.
+   * Mirrors how Pi's ExtensionRunner turns a throwing handler into an emitted
+   * error event instead of breaking the chain; tests assert on this record.
+   */
+  readonly contextHandlerErrors: unknown[] = [];
 
   registerTool(tool: FakeToolDefinition): void {
     this.tools.set(tool.name, tool);
   }
 
   on(event: 'tool_call', handler: FakeToolCallHandler): void;
-  on(event: 'context', handler: (event: { messages: unknown[] }, ctx?: unknown) => Promise<{ messages: unknown[] } | void>): void;
-  on(event: 'session_start', handler: (event: { type: 'session_start' }, ctx: unknown) => void | Promise<void>): void;
+  on(
+    event: 'context',
+    handler: (
+      event: { messages: unknown[] },
+      ctx?: unknown,
+    ) => Promise<{ messages: unknown[] } | void>,
+  ): void;
+  on(
+    event: 'session_start',
+    handler: (event: { type: 'session_start' }, ctx: unknown) => void | Promise<void>,
+  ): void;
   on(event: string, handler: unknown): void {
     if (event === 'tool_call') {
       this.toolCallHandlers.push(handler as FakeToolCallHandler);
@@ -85,12 +103,21 @@ export class FakeExtensionApi {
     return result;
   }
 
-  /** Mirror Pi's chained context projection; handlers also receive the ctx. */
+  /**
+   * Mirror Pi's chained context projection (ExtensionRunner.emitContext): the
+   * incoming messages are cloned once so handlers can never mutate the
+   * caller's originals, a throwing handler is recorded as an error instead of
+   * breaking the chain, and handlers also receive the ctx.
+   */
   async emitContext(messages: unknown[], ctx: unknown): Promise<unknown[]> {
-    let current = messages;
+    let current = structuredClone(messages);
     for (const handler of this.contextHandlers) {
-      const result = await handler({ messages: current }, ctx);
-      if (result && result.messages) current = result.messages;
+      try {
+        const result = await handler({ messages: current }, ctx);
+        if (result && result.messages) current = result.messages;
+      } catch (error) {
+        this.contextHandlerErrors.push(error);
+      }
     }
     return current;
   }
@@ -105,10 +132,7 @@ export interface FakeExtensionContext {
   };
 }
 
-export function createFakeExtensionContext(
-  cwd: string,
-  sessionDir: string,
-): FakeExtensionContext {
+export function createFakeExtensionContext(cwd: string, sessionDir: string): FakeExtensionContext {
   return {
     cwd,
     sessionManager: {

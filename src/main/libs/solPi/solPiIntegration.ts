@@ -14,20 +14,25 @@
  * The reducer and online context compaction are never enabled by this module.
  */
 import type { PiExtensionFactory } from '../agentEngine/piExtensionTypes';
+import { resolveGitBashPathForPi } from '../coworkUtil';
 import type { SolPiSessionManagerLike } from './solPiSessionScope';
 import {
   createSolPiSessionManager,
   solPiSessionStorageDir,
   solPiStorageRoot,
 } from './solPiSessionScope';
-import { conservativeSolPiConfig, SolPiProfile, type SolPiProfile as SolPiProfileType } from './solPiProfile';
+import {
+  conservativeSolPiConfig,
+  SolPiProfile,
+  type SolPiProfile as SolPiProfileType,
+} from './solPiProfile';
 import {
   createSolPiThenRunGuardExtensionFactory,
   type SolPiThenRunAuthorization,
   type SolPiThenRunAuthorizationContext,
   type SolPiThenRunCommand,
 } from './solPiThenRunGuard';
-import { loadSolPiVendor } from './solPiVendor';
+import { loadSolPiVendor, type SolPiVendorOptions } from './solPiVendor';
 
 export type AuthorizeSolPiThenRun = (
   thenRun: SolPiThenRunCommand,
@@ -52,6 +57,32 @@ export interface BuildSolPiRuntimeOptions {
   /** Application data directory (app.getPath('userData')). */
   userDataPath: string;
   authorizeThenRun: AuthorizeSolPiThenRun;
+  /**
+   * Bash overrides for Action Fusion's fused follow-up commands. Without this,
+   * the fused `then_run` commands would build their bash tool from defaults
+   * while the app's plain `bash` calls run through the resolved shell — on
+   * Windows that means the bundled PortableGit git-bash. See
+   * {@link resolveEffectiveBashOptions} for the win32 default.
+   */
+  bashOptions?: { shellPath?: string; commandPrefix?: string };
+}
+
+/**
+ * Resolve the bash options the vendored extension should run fused commands
+ * with. An explicit caller value always wins. Otherwise, on Windows only, the
+ * app's git-bash resolution (same source the real Pi session's settings
+ * override uses) becomes the default, so fused commands and plain `bash` calls
+ * agree on one shell. Non-Windows platforms get no default override.
+ */
+function resolveEffectiveBashOptions(
+  bashOptions: BuildSolPiRuntimeOptions['bashOptions'],
+): { shellPath?: string; commandPrefix?: string } | undefined {
+  if (bashOptions) return bashOptions;
+  if (process.platform === 'win32') {
+    const shellPath = resolveGitBashPathForPi();
+    if (shellPath) return { shellPath };
+  }
+  return undefined;
 }
 
 /**
@@ -66,7 +97,11 @@ export async function buildSolPiRuntime(
 
   const vendor = await loadSolPiVendor();
   const config = conservativeSolPiConfig();
-  const solPiFactory = vendor.createSolPiExtension(() => config);
+  const effectiveBashOptions = resolveEffectiveBashOptions(options.bashOptions);
+  const vendorOptions: SolPiVendorOptions | undefined = effectiveBashOptions
+    ? { bashOptions: effectiveBashOptions }
+    : undefined;
+  const solPiFactory = vendor.createSolPiExtension(() => config, vendorOptions);
 
   const storageRoot = solPiStorageRoot(options.userDataPath);
   const storageDir = solPiSessionStorageDir(storageRoot, options.sessionId);

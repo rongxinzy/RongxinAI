@@ -16,12 +16,27 @@ import { existsSync } from 'node:fs';
 import { createJiti } from 'jiti';
 import path from 'node:path';
 
+/**
+ * Structural slice of the vendored SolPiRuntimeOptions (index.ts). Defined
+ * locally, like the other shapes below, so this module keeps avoiding Pi
+ * type declarations: only the fields the app actually threads are mirrored.
+ */
+export interface SolPiVendorOptions {
+  bashOptions?: { shellPath?: string; commandPrefix?: string };
+  archiveBudgetBytes?: number;
+}
+
 /** Structural shape of the vendored SoL-Pi entry module (index.ts). */
 export interface SolPiVendorModule {
   createSolPiExtension: (
     loadConfig: (ctx: SolPiVendorExtensionContext) => SolPiVendorConfig,
+    options?: SolPiVendorOptions,
   ) => (pi: unknown) => void;
-  registerConfiguredFeatures: (pi: unknown, config: SolPiVendorConfig) => void;
+  registerConfiguredFeatures: (
+    pi: unknown,
+    config: SolPiVendorConfig,
+    options?: SolPiVendorOptions,
+  ) => void;
 }
 
 /**
