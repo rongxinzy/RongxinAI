@@ -377,5 +377,109 @@ describe('PiRuntimeAdapter truncated answer terminal state', () => {
       expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
       expect(currentRun()!.status).toBe(WorkbenchRunStatus.Succeeded);
     });
+
+    it('discloses a terminal truncation even when a queued follow-up drains at agent_end', async () => {
+      await adapter.startSession('work-session', 'Write the long report', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+
+      // First truncated answer queues the (bounded) continuation steer; the
+      // second exhausts the budget, so the final answer stays truncated.
+      truncatedAnswer('First truncated attempt ');
+      const queued = adapter.enqueuePendingMessage('work-session', 'Then summarize it');
+      expect(queued.success).toBe(true);
+      truncatedAnswer('Second truncated attempt');
+
+      listener!({ type: 'agent_end' });
+
+      // The disclosure is persisted synchronously on the agent_end path even
+      // though the queued follow-up continues the turn.
+      const disclosureIndex = mockStore.addMessage.mock.calls.findIndex(
+        ([, message]) =>
+          (message as { metadata?: { answerTruncated?: boolean } }).metadata?.answerTruncated ===
+          true,
+      );
+      expect(disclosureIndex).toBeGreaterThanOrEqual(0);
+
+      // The queued follow-up is flushed and takes over the turn, so the run
+      // settles later by its own outcome (no complete event yet).
+      await vi.waitFor(() => {
+        expect(hoisted.mockSession.prompt).toHaveBeenCalledWith('Then summarize it', {
+          streamingBehavior: 'followUp',
+        });
+      });
+      expect(completes).toEqual([]);
+
+      // The disclosure landed before the follow-up prompt went out.
+      const followUpPromptIndex = hoisted.mockSession.prompt.mock.calls.findIndex(
+        ([text]) => text === 'Then summarize it',
+      );
+      expect(
+        mockStore.addMessage.mock.invocationCallOrder[disclosureIndex],
+      ).toBeLessThan(hoisted.mockSession.prompt.mock.invocationCallOrder[followUpPromptIndex]);
+    });
+  });
+
+  describe('chat contract terminal state (real service)', () => {
+    let db: InstanceType<typeof Database>;
+    let service: RealWorkbenchTaskService;
+
+    const currentRun = () => {
+      const detail = service.getCurrent('chat-session')!;
+      expect(detail).not.toBeNull();
+      return (
+        detail.runs.find(candidate => candidate.id === detail.task.activeRunId) ??
+        detail.runs[detail.runs.length - 1] ??
+        null
+      );
+    };
+
+    beforeEach(() => {
+      db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+    });
+
+    afterEach(() => {
+      db.close();
+    });
+
+    it('settles a disclosed Chat truncation as needs_review with stream_closed_cleanly failed', async () => {
+      await adapter.startSession('chat-session', 'Tell me the long story', {
+        sessionMode: 'chat',
+      });
+
+      truncatedAnswer('First truncated attempt ');
+      truncatedAnswer('Second truncated attempt');
+      listener!({ type: 'agent_end' });
+
+      // The chat baseline includes stream_closed_cleanly, so a disclosed
+      // truncation must never settle the Chat run as succeeded.
+      const detail = service.getCurrent('chat-session')!;
+      expect(detail.task.contract.kind).toBe('chat');
+      expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
+      expect(currentRun()!.status).toBe(WorkbenchRunStatus.NeedsReview);
+      expect(currentRun()!.verificationResult?.outcome).toBe('failed');
+      expect(
+        currentRun()!.verificationResult?.checks.some(
+          (check: { name: string; status: string }) =>
+            check.name === 'stream_closed_cleanly' && check.status === 'failed',
+        ),
+      ).toBe(true);
+
+      // The session itself stays idle and continuable, with the disclosure
+      // persisted for the user.
+      expect(mockStore.updateSession).toHaveBeenCalledWith('chat-session', { status: 'idle' });
+      expect(completes).toEqual(['chat-session']);
+      expect(
+        mockStore.addMessage.mock.calls.some(
+          ([, message]) =>
+            (message as { metadata?: Record<string, unknown> }).metadata?.answerTruncated === true,
+        ),
+      ).toBe(true);
+    });
   });
 });

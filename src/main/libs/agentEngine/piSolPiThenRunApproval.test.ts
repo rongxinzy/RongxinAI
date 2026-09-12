@@ -34,6 +34,7 @@ const hoisted = vi.hoisted(() => {
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn().mockReturnValue(() => {}),
+    bindExtensions: vi.fn().mockResolvedValue(undefined),
   };
   const mockCompleteSimple = vi.fn().mockResolvedValue({
     content: [{ type: 'text', text: 'Hello from Pi' }],
@@ -359,6 +360,13 @@ describe('PiRuntimeAdapter fused then_run authorization wiring', () => {
       });
       const api = buildExtensionApi();
 
+      // The SoL-Pi profile is enabled: the SDK session (which never emits
+      // `session_start` on its own) must have the extensions bound explicitly.
+      expect(hoisted.mockSession.bindExtensions).toHaveBeenCalledTimes(1);
+      expect(hoisted.mockSession.bindExtensions).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'print' }),
+      );
+
       // No approval gate is installed without a run; a clean then_run command
       // passes the same way a bare bash call would.
       const fused = await api.emitToolCall({
@@ -385,6 +393,26 @@ describe('PiRuntimeAdapter fused then_run authorization wiring', () => {
         block: true,
         reason: 'then_run.command must be a non-empty string.',
       });
+    });
+
+    it('warns instead of silently skipping when the SDK session lacks bindExtensions', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // A session object from an SDK build without session.bindExtensions.
+      hoisted.mockCreateAgentSession.mockResolvedValueOnce({
+        session: { ...hoisted.mockSession, bindExtensions: undefined },
+      });
+
+      await adapter.startSession('thenrun-nobind', 'Patch the file', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+
+      // The session still starts, but the missing extension binding is loud,
+      // not a silent skip that would leave SoL-Pi tools unregistered.
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[SolPi] session.bindExtensions is unavailable on this SDK build; SoL-Pi extensions cannot register.',
+      );
+      warnSpy.mockRestore();
     });
   });
 });

@@ -1212,6 +1212,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             );
           },
         });
+      } else if (solPiRuntime) {
+        console.warn(
+          '[SolPi] session.bindExtensions is unavailable on this SDK build; SoL-Pi extensions cannot register.',
+        );
       }
 
       const active: ActivePiSession = {
@@ -2159,9 +2163,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.activeSessions.delete(sessionId);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
-    // SoL-Pi archives are session-scoped; drop them with the session. No-op
-    // when SoL-Pi never ran (the directory does not exist).
-    clearSolPiSessionStorage(solPiStorageRoot(app.getPath('userData')), sessionId);
+    // SoL-Pi archives are session-scoped; drop them with the session. Cleanup
+    // is best-effort and asynchronous so session teardown never blocks on disk
+    // IO; it is a no-op when SoL-Pi never ran (the directory does not exist).
+    void clearSolPiSessionStorage(solPiStorageRoot(app.getPath('userData')), sessionId);
   }
 
   /**
@@ -2849,13 +2854,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
           this.pendingMessageQueue.hasPendingFollowUp(sessionId)
         ) {
+          // A queued follow-up continues the turn, but the truncated final
+          // answer still happened: disclose it first (idempotent) so the
+          // truncation stays user-visible. The follow-up run then settles by
+          // its own outcome.
+          if (active.lastAnswerTruncated) this.discloseTruncatedAnswer(sessionId, active);
           void this.flushFollowUpQueue(sessionId, active);
           break;
         }
         // Terminal truncated answer (continuation budget exhausted or steer
         // unavailable): disclose it instead of presenting the run as a clean
-        // success. Queued Work follow-ups were drained above and continue the
-        // turn, so they never reach this disclosure.
+        // success. Queued Work follow-ups were drained above and disclose any
+        // truncation themselves, so this branch only runs for turns that
+        // genuinely end the session turn.
         const answerTruncatedTerminal = active.lastAnswerTruncated;
         if (answerTruncatedTerminal) {
           this.discloseTruncatedAnswer(sessionId, active);

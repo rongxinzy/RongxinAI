@@ -151,3 +151,39 @@ test('an async steer rejection rolls the attempt back after the promise settles'
   expect(recovery.queueIfNeeded({ ...truncated }, healthySession)).toBe(true);
   expect(healthySession.steer).toHaveBeenCalledOnce();
 });
+
+test('a stale-generation rejection does not roll back the new generation budget', async () => {
+  let deferredReject: ((error: Error) => void) | undefined;
+  const stalledSession: PiSteeringSession = {
+    steer: vi.fn(
+      () =>
+        new Promise<void>((_, reject) => {
+          deferredReject = reject;
+        }),
+    ),
+  };
+  const recovery = new PiTruncatedAnswerRecovery();
+  const truncated = {
+    stopReason: PiAssistantStopReason.Length,
+    content: [{ type: PiContentBlockType.Text, text: 'partial' }],
+  };
+
+  // Generation 1: queue a steer whose rejection we hold back.
+  expect(recovery.queueIfNeeded(truncated, stalledSession)).toBe(true);
+
+  // The turn ends and a new turn (generation 2) starts, which queues its own
+  // continuation and consumes its own budget.
+  recovery.reset();
+  const nextSession = createSession();
+  expect(recovery.queueIfNeeded({ ...truncated }, nextSession)).toBe(true);
+  expect(nextSession.steer).toHaveBeenCalledOnce();
+
+  // The generation-1 rejection settles late. It must not decrement
+  // generation 2's budget: the rollback guard compares generations.
+  deferredReject?.(new Error('stale steer rejected'));
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  // Generation 2's budget stays exhausted (1/1), not double-restored.
+  expect(recovery.queueIfNeeded({ ...truncated }, nextSession)).toBe(false);
+  expect(nextSession.steer).toHaveBeenCalledOnce();
+});
