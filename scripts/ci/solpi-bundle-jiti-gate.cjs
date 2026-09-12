@@ -86,20 +86,20 @@ const EXTERNALIZED_JITI_REQUIRE = /require\(\s*(['"])jiti\1\s*\)/;
 
 function assertBundleExternalizesJiti(bundlePath) {
   if (!fs.existsSync(bundlePath)) {
-    fail(`main bundle not found: ${bundlePath}`);
+    fail(`bundle not found: ${bundlePath}`);
   }
   const source = fs.readFileSync(bundlePath, 'utf8');
   const fingerprint = source.match(INLINED_JITI_BABEL_FINGERPRINT);
   if (fingerprint) {
     fail(
-      `main bundle inlines jiti's lazy babel transform (string literal ${fingerprint[0]}): ` +
+      `bundle inlines jiti's lazy babel transform (string literal ${fingerprint[0]}): ` +
         `the helper resolves relative to the bundle and breaks in packaged layouts - ` +
         `keep 'jiti' in ELECTRON_MAIN_EXTERNALS (${bundlePath})`,
     );
   }
   if (!EXTERNALIZED_JITI_REQUIRE.test(source)) {
     fail(
-      `main bundle does not contain an externalized require of the jiti package - ` +
+      `bundle does not contain an externalized require of the jiti package - ` +
         `'jiti' must stay in ELECTRON_MAIN_EXTERNALS (${bundlePath})`,
     );
   }

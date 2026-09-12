@@ -50,7 +50,9 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
       - name: Gate SoL-Pi jiti bundle wiring
-        run: node scripts/ci/solpi-bundle-jiti-gate.cjs --static dist-electron/main.js
+        run: |
+          node scripts/ci/solpi-bundle-jiti-gate.cjs --static dist-electron/main.js
+          node scripts/ci/solpi-bundle-jiti-gate.cjs --static dist-electron/solPiComputeWorker.js
       - run: bun run compile:electron
 
       - name: Verify Build Structure
@@ -65,7 +67,7 @@ jobs:
           echo "? dist/ structure verified"
 
           echo "=== Verifying dist-electron/ structure ==="
-          for f in dist-electron/main.js dist-electron/preload.js; do
+          for f in dist-electron/main.js dist-electron/preload.js dist-electron/solPiComputeWorker.js; do
             if [ ! -f "$f" ]; then
               echo "? $f not found"
               exit 1

@@ -6,8 +6,9 @@
  *
  * Exercises the compiled loader module from the packaged archive: the vendor
  * entry must resolve inside the archive (never a source checkout), jiti must
- * load the vendored TS graph against the archive's node_modules, and the
- * conservative profile must initialize the vendored extension factory.
+ * load the vendored TS graph against the archive's node_modules, the
+ * conservative profile must initialize the vendored extension factory, and
+ * the compute pool must spawn its worker from the archive member path.
  */
 'use strict';
 
@@ -120,11 +121,30 @@ const fail = message => {
     fail('fused write did not produce the expected file content');
   }
 
+  // Spawn the real compute pool from the packaged layout. The worker bundle
+  // must load from the app.asar archive member (see resolveWorkerScript) and
+  // round-trip one hashing job — this is the executed proof that the worker
+  // path SoL-Pi's offload depends on works in packaged builds.
+  const computePool = require(
+    path.join(asarRoot, 'dist-electron', 'main', 'libs', 'solPi', 'solPiComputePool.js'),
+  );
+  const compute = computePool.getSolPiCompute();
+  if (!compute) {
+    fail('compute pool unavailable in the packaged app (worker bundle not found)');
+  }
+  const probe = Buffer.from('solpi-packaged-compute-probe');
+  const expectedHash = require('node:crypto').createHash('sha256').update(probe).digest('hex');
+  const hashed = await compute.hashBuffer(probe);
+  if (hashed !== expectedHash) {
+    fail(`packaged compute pool hash mismatch: ${hashed} != ${expectedHash}`);
+  }
+  await computePool.disposeSolPiComputePool();
+
   console.log(
     `[SolPiPackagedSmoke] OK entry=${entry} tools=${toolNames.join(',')} fused=${fusedText
       .split('\n')
       .filter(line => line.includes('then_run'))
-      .join('|')}`,
+      .join('|')} computeHash=${hashed.slice(0, 12)}`,
   );
   process.exit(0);
 })().catch(error => {
