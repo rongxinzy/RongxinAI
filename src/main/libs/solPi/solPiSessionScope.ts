@@ -48,13 +48,17 @@ const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 const RECONCILABLE_SESSION_DIR_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._%-]*$/;
 
 /**
- * Filesystem-safe, injective encoding of a cowork session id: every character
- * outside [a-zA-Z0-9._-] (including `%` itself) becomes `%XX`. Pure-safe ids
- * encode to themselves, so existing directories keep resolving.
+ * Filesystem-safe, injective encoding of a cowork session id: every UTF-16
+ * code unit outside [a-zA-Z0-9._-] (including `%` itself) becomes `%` plus
+ * exactly four uppercase hex digits. Fixed four-digit escapes keep the
+ * mapping injective for any id — shorter variable-length escapes would let
+ * distinct ids collide (e.g. 'Ā', U+0100, and '\\u0010' + '0' both encode to
+ * '%100'). Pure-safe ids encode to themselves, so existing directories keep
+ * resolving.
  */
 export function encodeSolPiSessionId(sessionId: string): string {
   return sessionId.replace(/[^a-zA-Z0-9._-]/g, character =>
-    `%${character.codePointAt(0)!.toString(16).toUpperCase().padStart(2, '0')}`,
+    `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
   );
 }
 
