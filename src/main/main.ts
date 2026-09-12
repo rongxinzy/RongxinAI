@@ -4705,6 +4705,14 @@ if (!gotTheLock) {
 
       // Clean up IM session mappings for deleted sessions
       if (deletedSessionIds.length > 0) {
+        // Purge runtime state (pending queues, workbench tasks, SoL-Pi
+        // archives) exactly like the single/batch session-delete paths, so
+        // cascade-deleted sessions do not linger until archive reconciliation.
+        const runtime = getPiRuntimeAdapter();
+        for (const sessionId of deletedSessionIds) {
+          runtime.onSessionDeleted(sessionId);
+        }
+
         try {
           const imStore = getIMGatewayManager()?.getIMStore();
           if (imStore) {
