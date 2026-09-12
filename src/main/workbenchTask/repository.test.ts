@@ -39,6 +39,25 @@ test('rolls back all repository writes when a transaction fails', () => {
   }
 });
 
+test('breaks created_at ties in the latest-task lookup by insert order', () => {
+  const { db, repository } = createRepository();
+  try {
+    const superseded = repository.createTask('session', 'first goal', contract);
+    const superseding = repository.createTask('session', 'second goal', contract);
+    // Same-millisecond creation: the LIMIT 1 tie must resolve to the task
+    // inserted later (higher rowid), not to whichever row SQLite happens to
+    // visit first.
+    db.prepare('UPDATE workbench_tasks SET created_at = ? WHERE id IN (?, ?)').run(
+      12345,
+      superseded.id,
+      superseding.id,
+    );
+    expect(repository.getLatestTaskForSession('session')?.id).toBe(superseding.id);
+  } finally {
+    db.close();
+  }
+});
+
 test('increments attempts and run event sequences while enforcing uniqueness', () => {
   const { db, repository } = createRepository();
   try {
