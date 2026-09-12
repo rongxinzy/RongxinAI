@@ -43,6 +43,13 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
       payload_json TEXT NOT NULL, created_at INTEGER NOT NULL, UNIQUE(lane_id, sequence)
     );
     CREATE INDEX IF NOT EXISTS idx_coding_events_lane_sequence ON coding_events(lane_id, sequence);
+    CREATE TABLE IF NOT EXISTS coding_elicitations (
+      id TEXT PRIMARY KEY, lane_id TEXT NOT NULL, question TEXT NOT NULL, status TEXT NOT NULL,
+      created_at INTEGER NOT NULL, answer TEXT, cancel_reason TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_coding_elicitations_lane_status ON coding_elicitations(lane_id, status);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_coding_elicitations_one_pending_lane
+      ON coding_elicitations(lane_id) WHERE status = 'pending';
     CREATE TABLE IF NOT EXISTS coding_workspace_leases (
       room_id TEXT PRIMARY KEY, lane_id TEXT, acquired_at INTEGER
     );

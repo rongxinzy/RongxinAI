@@ -3,6 +3,7 @@ import type {
   CodingAgentProfileStatus,
   CodingAssignmentStatus,
   CodingEventKind,
+  CodingElicitationStatus,
   CodingGitDiffScope,
   CodingGitFileStatus,
   CodingWorkspaceFileKind,
@@ -153,6 +154,22 @@ export interface CodingPermissionResponse {
   optionId?: string;
 }
 
+/** A coding-only free-text question the agent paused on. */
+export interface CodingElicitation {
+  id: string;
+  laneId: string;
+  question: string;
+  status: CodingElicitationStatus;
+  createdAt: number;
+  answer: string | null;
+  cancelReason: string | null;
+}
+
+export interface CodingElicitationResponse {
+  requestId: string;
+  answer: string;
+}
+
 export interface CodingWorkspaceLease {
   roomId: string;
   sourceRoot: string;
@@ -176,6 +193,7 @@ export interface CodingRoomSnapshot {
   lanes: CodingAgentLane[];
   assignments: CodingAssignment[];
   events: CodingEvent[];
+  elicitations: CodingElicitation[];
 }
 
 export interface CodingPendingMessagesChangedEvent {

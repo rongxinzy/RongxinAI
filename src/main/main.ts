@@ -930,6 +930,8 @@ const getCodingRoomService = (): CodingRoomService => {
           modelOverride,
           thinkingLevel,
           permissionMode,
+          goalMode,
+          planMode,
         }) => {
           const approvalMode =
             permissionMode === WorkbenchApprovalMode.Auto ||
@@ -951,14 +953,30 @@ const getCodingRoomService = (): CodingRoomService => {
             );
           }
           coworkStoreInstance.updateSession(sessionId, { status: 'running' });
-          await runtime.startSession(sessionId, prompt, {
-            skipInitialUserMessage: true,
+          const sharedOptions = {
             workspaceRoot,
-            sessionMode: 'work',
-            confirmationMode: 'modal',
+            sessionMode: 'work' as const,
             approvalMode,
+            planTool: true,
+            codingElicitation: true,
             ...(modelOverride ? { modelOverride } : {}),
             ...(thinkingLevel ? { thinkingLevel: thinkingLevel as PiThinkingLevel } : {}),
+            ...(goalMode ? { goalMode: true } : {}),
+            ...(planMode ? { planMode: true } : {}),
+          };
+          // One lane keeps one Pi transcript: reusing the live session preserves
+          // the earlier turns that startSession would discard.
+          if (runtime.isSessionActive(sessionId)) {
+            await runtime.continueSession(sessionId, prompt, {
+              ...sharedOptions,
+              _skipUserMessage: true,
+            });
+            return;
+          }
+          await runtime.startSession(sessionId, prompt, {
+            ...sharedOptions,
+            confirmationMode: 'modal',
+            skipInitialUserMessage: true,
           });
         },
         setBuiltinApprovalMode: (sessionId, mode) =>
@@ -969,6 +987,15 @@ const getCodingRoomService = (): CodingRoomService => {
             thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
           }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
+        respondBuiltinElicitation: (requestId, answer) =>
+          runtime.respondToCodingElicitation(requestId, answer),
+        cancelBuiltinElicitation: (requestId, reason) =>
+          runtime.cancelCodingElicitation(requestId, reason),
+        compactBuiltinSession: sessionId => runtime.compactSession(sessionId),
+        enqueueBuiltinControlAction: (sessionId, action) =>
+          runtime.enqueueControlAction(sessionId, action),
+        isBuiltinSessionRunning: sessionId => runtime.isSessionRunning(sessionId),
+        isBuiltinSessionActive: sessionId => runtime.isSessionActive(sessionId),
         enqueueBuiltinMessage: (sessionId, prompt) =>
           runtime.enqueuePendingMessage(sessionId, prompt),
         steerBuiltinMessage: async (sessionId, prompt) => {
@@ -1124,6 +1151,17 @@ const getCodingRoomService = (): CodingRoomService => {
         request,
       });
     });
+    runtime.on('plan', (sessionId: string, plan: { entries?: unknown }) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Plan, {
+        entries: Array.isArray(plan?.entries) ? plan.entries : [],
+      });
+    });
+    runtime.on(
+      'codingElicitationRequest',
+      (sessionId: string, request: { requestId: string; question: string }) => {
+        codingRoomService?.recordBuiltinElicitation(sessionId, request);
+      },
+    );
     runtime.on('complete', (sessionId: string) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnComplete, {});
     });

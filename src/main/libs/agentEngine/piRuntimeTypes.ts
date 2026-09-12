@@ -6,6 +6,7 @@ import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQ
 import type { ProductionLoopMode } from '../../../shared/productionLoop';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
+import type { PiPlanEntry } from './piPlanTool';
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -47,6 +48,13 @@ export interface PiRuntimeEvents {
   toolActivity: (sessionId: string, event: CoworkToolActivityEvent) => void;
   permissionRequest: (sessionId: string, request: PiPermissionRequest) => void;
   permissionDismiss: (requestId: string) => void;
+  /** The built-in coding agent asked the user a free-text question and is waiting. */
+  codingElicitationRequest: (
+    sessionId: string,
+    request: { requestId: string; question: string },
+  ) => void;
+  /** A plan-mode turn published its structured plan. */
+  plan: (sessionId: string, plan: { entries: PiPlanEntry[] }) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
   sessionStopped: (sessionId: string) => void;
@@ -82,6 +90,8 @@ export type PiStartOptions = {
   skillIds?: string[];
   systemPrompt?: string;
   approvalMode?: WorkbenchApprovalMode;
+  /** Enables the built-in coding-only free-text elicitation tool. */
+  codingElicitation?: boolean;
   /** No foreground user is available to answer questions during this run. */
   unattended?: boolean;
   workspaceRoot?: string;
@@ -89,6 +99,10 @@ export type PiStartOptions = {
   /** UI session mode, used to apply Work-only execution controls. */
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
+  /** Read-only planning turn: excludes workspace-mutating tools and requires plan_write. */
+  planMode?: boolean;
+  /** Registers plan_write for the whole session, so plan mode also works on a live session. */
+  planTool?: boolean;
   productionLoopMode?: ProductionLoopMode;
   imageAttachments?: PiImageAttachment[];
   fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
@@ -113,6 +127,10 @@ export type PiContinueOptions = {
   /** UI session mode, preserved when a skill change recreates the Pi session. */
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
+  /** Read-only planning turn, forwarded when the runtime recreates the session. */
+  planMode?: boolean;
+  /** Registers plan_write when the runtime has to recreate the session. */
+  planTool?: boolean;
   productionLoopMode?: ProductionLoopMode;
   imageAttachments?: PiImageAttachment[];
   fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
@@ -125,6 +143,8 @@ export type PiContinueOptions = {
   thinkingLevel?: PiThinkingLevel;
   /** Forwarded to startSession when the runtime has to recreate the session. */
   approvalMode?: WorkbenchApprovalMode;
+  /** Forwarded when a dormant session is recreated. */
+  codingElicitation?: boolean;
   /** No foreground user is available to answer questions during this run. */
   unattended?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
@@ -156,6 +176,13 @@ export interface PiRuntime {
   respondToPermission(requestId: string, result: PiPermissionResult): void;
   isSessionActive(sessionId: string): boolean;
   isSessionRunning(sessionId: string): boolean;
+  /** Compacts an idle Pi session without turning the action into model input. */
+  compactSession(sessionId: string): Promise<{ cancelled: boolean }>;
+  /** Runs an application-owned action after already queued Work prompts settle. */
+  enqueueControlAction(
+    sessionId: string,
+    action: () => Promise<void>,
+  ): { success: boolean; error?: string };
   listPendingMessages(sessionId: string): CoworkPendingMessage[];
   enqueuePendingMessage(
     sessionId: string,

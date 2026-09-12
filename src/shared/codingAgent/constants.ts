@@ -45,6 +45,7 @@ export const CodingMissionStatus = {
   Draft: 'draft',
   Running: 'running',
   WaitingApproval: 'waiting_approval',
+  WaitingElicitation: 'waiting_elicitation',
   NeedsReview: 'needs_review',
   Completed: 'completed',
   Failed: 'failed',
@@ -56,6 +57,7 @@ export const CodingAssignmentStatus = {
   Planned: 'planned',
   Running: 'running',
   WaitingApproval: 'waiting_approval',
+  WaitingElicitation: 'waiting_elicitation',
   NeedsReview: 'needs_review',
   Completed: 'completed',
   Failed: 'failed',
@@ -75,6 +77,7 @@ export const CodingLaneStatus = {
   Idle: 'idle',
   Running: 'running',
   WaitingApproval: 'waiting_approval',
+  WaitingElicitation: 'waiting_elicitation',
   NeedsAuth: 'needs_auth',
   Disconnected: 'disconnected',
   Completed: 'completed',
@@ -89,6 +92,7 @@ export const CodingEventKind = {
   Plan: 'plan',
   ToolCall: 'tool_call',
   Permission: 'permission',
+  Elicitation: 'elicitation',
   FileChange: 'file_change',
   Terminal: 'terminal',
   Usage: 'usage',
@@ -118,6 +122,14 @@ export const CodingPermissionOutcome = {
 } as const;
 export type CodingPermissionOutcome =
   (typeof CodingPermissionOutcome)[keyof typeof CodingPermissionOutcome];
+
+export const CodingElicitationStatus = {
+  Pending: 'pending',
+  Answered: 'answered',
+  Cancelled: 'cancelled',
+} as const;
+export type CodingElicitationStatus =
+  (typeof CodingElicitationStatus)[keyof typeof CodingElicitationStatus];
 
 export const CodingGitFileStatus = {
   Added: 'added',
@@ -201,6 +213,8 @@ export const CodingAgentIpc = {
   ResizeAuthTerminal: 'codingAgent:resizeAuthTerminal',
   CancelAuthTerminal: 'codingAgent:cancelAuthTerminal',
   RespondPermission: 'codingAgent:respondPermission',
+  RespondElicitation: 'codingAgent:respondElicitation',
+  CancelElicitation: 'codingAgent:cancelElicitation',
   Changed: 'codingAgent:changed',
   AuthTerminalData: 'codingAgent:authTerminalData',
   AuthTerminalExit: 'codingAgent:authTerminalExit',

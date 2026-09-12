@@ -16,18 +16,36 @@ import type {
   CodingAgentDriver,
   CodingAgentSession,
 } from './codingAgentDriver';
+import {
+  buildBuiltinCodingCommandList,
+  parseBuiltinCodingPrompt,
+  resolveBuiltinCodingTurnMode,
+} from './builtinCodingCommands';
 
 export const BuiltinCodingConfigId = {
   ThinkingLevel: 'thinking-level',
   PermissionMode: 'permission-mode',
+  PlanMode: 'plan-mode',
 } as const;
 export type BuiltinCodingConfigId =
   (typeof BuiltinCodingConfigId)[keyof typeof BuiltinCodingConfigId];
+
+/** Session mode: execute directly, or plan read-only until the user approves. */
+export const BuiltinCodingPlanMode = {
+  Execute: 'execute',
+  Plan: 'plan',
+} as const;
+export type BuiltinCodingPlanMode =
+  (typeof BuiltinCodingPlanMode)[keyof typeof BuiltinCodingPlanMode];
 
 export interface BuiltinCodingSessionStartOptions {
   modelOverride?: string | null;
   thinkingLevel?: string;
   permissionMode?: WorkbenchApprovalMode;
+  /** Start (or keep) the long-horizon goal loop for this turn. */
+  goalMode?: boolean;
+  /** Run this turn as a read-only planning turn. */
+  planMode?: boolean;
 }
 
 export interface BuiltinCodingRuntime {
@@ -48,7 +66,9 @@ export interface BuiltinCodingRuntime {
 }
 
 const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
-  supportsLoadSession: true,
+  // The in-process runtime owns its transcript and cannot re-attach to a
+  // session id after a restart, so it never claims load-session support.
+  supportsLoadSession: false,
   supportsResumeSession: true,
   supportsPlans: true,
   supportsPermissions: true,
@@ -69,6 +89,9 @@ const isValidThinkingLevel = (value: string): value is PiThinkingLevel =>
 
 const isValidApprovalMode = (value: string): value is WorkbenchApprovalMode =>
   (Object.values(WorkbenchApprovalMode) as string[]).includes(value);
+
+const isValidPlanMode = (value: string): value is BuiltinCodingPlanMode =>
+  (Object.values(BuiltinCodingPlanMode) as string[]).includes(value);
 
 export class BuiltinCodingDriver implements CodingAgentDriver {
   private readonly sessionConfigOptions = new Map<string, CodingAgentConfigOption[]>();
@@ -96,18 +119,11 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
       id,
       remoteSessionId: null,
       configOptions,
-      availableCommands: [],
+      availableCommands: buildBuiltinCodingCommandList(),
     };
   }
-  async loadSession(input: { remoteSessionId: string }): Promise<CodingAgentSession> {
-    const configOptions = this.buildOptions();
-    this.sessionConfigOptions.set(input.remoteSessionId, configOptions);
-    return {
-      id: input.remoteSessionId,
-      remoteSessionId: null,
-      configOptions,
-      availableCommands: [],
-    };
+  async loadSession(_input: { remoteSessionId: string }): Promise<CodingAgentSession> {
+    throw new Error('The built-in coding agent does not load remote sessions.');
   }
   /** Options a new session would start with, without binding them to a session. */
   getDefaultConfigOptions(): CodingAgentConfigOption[] {
@@ -120,10 +136,14 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     modelOverride?: string | null;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>> {
     const thinkingLevel = this.currentThinkingLevel(input.sessionId);
-    await this.runtime.start(input.sessionId, input.workspaceRoot, input.prompt, {
+    const parsed = parseBuiltinCodingPrompt(input.prompt);
+    const turnMode = resolveBuiltinCodingTurnMode(parsed, this.currentPlanMode(input.sessionId));
+    await this.runtime.start(input.sessionId, input.workspaceRoot, parsed.prompt, {
       ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
       permissionMode: this.currentPermissionMode(input.sessionId),
+      goalMode: turnMode.goalMode,
+      planMode: turnMode.planMode,
     });
     // The in-process runtime emits streaming events after start() returns. The
     // CodingRoomService subscribes to that runtime directly, which avoids
@@ -165,7 +185,7 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     return this.sessionConfigOptions.get(sessionId) ?? [];
   }
   getSessionAvailableCommands(_sessionId: string): CodingAgentAvailableCommand[] {
-    return [];
+    return buildBuiltinCodingCommandList();
   }
   onAvailableCommandsChanged(
     _listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,
@@ -188,6 +208,9 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     )?.currentValue;
     const persistedPermissionMode = existing?.find(
       candidate => candidate.id === BuiltinCodingConfigId.PermissionMode,
+    )?.currentValue;
+    const persistedPlanMode = existing?.find(
+      candidate => candidate.id === BuiltinCodingConfigId.PlanMode,
     )?.currentValue;
     return [
       {
@@ -215,6 +238,19 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
           { value: WorkbenchApprovalMode.AllowAll, name: t('codingAgentPermissionModeAllowAll') },
         ],
       },
+      {
+        id: BuiltinCodingConfigId.PlanMode,
+        name: t('codingAgentConfigPlanMode'),
+        type: 'select',
+        currentValue:
+          typeof persistedPlanMode === 'string' && isValidPlanMode(persistedPlanMode)
+            ? persistedPlanMode
+            : BuiltinCodingPlanMode.Execute,
+        options: [
+          { value: BuiltinCodingPlanMode.Execute, name: t('codingAgentPlanModeExecute') },
+          { value: BuiltinCodingPlanMode.Plan, name: t('codingAgentPlanModePlan') },
+        ],
+      },
     ];
   }
 
@@ -234,5 +270,12 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     return typeof option?.currentValue === 'string' && isValidApprovalMode(option.currentValue)
       ? option.currentValue
       : WorkbenchApprovalMode.Ask;
+  }
+
+  private currentPlanMode(sessionId: string): boolean {
+    const option = this.sessionConfigOptions
+      .get(sessionId)
+      ?.find(candidate => candidate.id === BuiltinCodingConfigId.PlanMode);
+    return option?.currentValue === BuiltinCodingPlanMode.Plan;
   }
 }

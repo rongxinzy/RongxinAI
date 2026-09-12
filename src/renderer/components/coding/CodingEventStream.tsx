@@ -14,7 +14,7 @@ import { Code2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { CodingEvent } from '../../../shared/codingAgent';
+import type { CodingElicitation, CodingEvent } from '../../../shared/codingAgent';
 import { detectArtifactsFromMessages } from '../../services/artifactParser';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
@@ -22,6 +22,7 @@ import { addArtifact, selectSessionArtifacts } from '../../store/slices/artifact
 import { isBinaryArtifactFile, type Artifact } from '../../types/artifact';
 import type { CoworkMessage } from '../../types/cowork';
 import { CodingConversationTurn } from './CodingConversationTurn';
+import { CodingElicitationCard } from './CodingElicitationCard';
 import {
   collectCodingFileArtifacts,
   resolveArtifactFilePath,
@@ -47,6 +48,10 @@ interface CodingEventStreamProps {
   artifactSessionKey?: string | null;
   /** Base directory used to resolve relative artifact paths for disk reads. */
   artifactBaseDir?: string | null;
+  /** A question the agent is waiting on for this lane. */
+  elicitation?: CodingElicitation | null;
+  onRespondElicitation?: (answer: string) => Promise<boolean>;
+  onCancelElicitation?: () => Promise<boolean>;
 }
 
 const toDetectableMessages = (turns: TurnModel[]): CoworkMessage[] =>
@@ -107,6 +112,9 @@ export const CodingEventStream = ({
   headerActions,
   artifactSessionKey = null,
   artifactBaseDir = null,
+  elicitation = null,
+  onRespondElicitation,
+  onCancelElicitation,
 }: CodingEventStreamProps) => {
   const dispatch = useDispatch();
   const turns = useMemo(() => projectCodingEvents(events), [events]);
@@ -245,6 +253,13 @@ export const CodingEventStream = ({
               />
             ))
           )}
+          {elicitation && onRespondElicitation && onCancelElicitation ? (
+            <CodingElicitationCard
+              elicitation={elicitation}
+              onRespond={onRespondElicitation}
+              onCancel={onCancelElicitation}
+            />
+          ) : null}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
