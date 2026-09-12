@@ -1,7 +1,18 @@
 name: Electron Verify
 
 on:
+  # The static SoL-Pi jiti gate needs the vite main bundle, which no ci.yml job
+  # produces (its compile:electron is tsc-only). Running here keeps the gate on
+  # every PR and main push without duplicating the build elsewhere.
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: electron-verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
