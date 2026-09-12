@@ -18,11 +18,16 @@ import {
 import { AcpConnectionSupervisor } from '../acp/connectionSupervisor';
 import {
   ACP_CLIENT_CAPABILITIES,
+  ACP_MINIMUM_PROTOCOL_VERSION,
   ACP_PROTOCOL_VERSION,
+  AcpErrorCode,
   AcpMethod,
   AcpProtocolIncompatibleError,
+  AcpRequestError,
   AcpSessionUpdateKind,
+  AcpStopReason,
 } from '../acp/protocol';
+import { t } from '../../i18n';
 import { TerminalBroker } from '../terminalBroker';
 import { WorkspaceBroker } from '../workspaceBroker';
 import type {
@@ -450,8 +455,21 @@ export class AcpCodingDriver implements CodingAgentDriver {
           absoluteTimeoutMs: this.turnTimeouts.absoluteMs,
         },
       )
-      .then(() => {
-        console.debug(`[AcpCodingDriver] session prompt completed for ${input.sessionId}`);
+      .then(response => {
+        const stopReason = asRecord(response).stopReason;
+        if (stopReason === AcpStopReason.Refusal) {
+          console.warn(`[AcpCodingDriver] session prompt refused for ${input.sessionId}`);
+          this.finishStream(input.sessionId, new Error(t('codingAgentStopRefusal')));
+          return;
+        }
+        if (stopReason === AcpStopReason.MaxTokens) {
+          console.warn(`[AcpCodingDriver] session prompt hit the output limit for ${input.sessionId}`);
+          this.finishStream(input.sessionId, new Error(t('codingAgentStopMaxTokens')));
+          return;
+        }
+        console.debug(
+          `[AcpCodingDriver] session prompt completed for ${input.sessionId} (${String(stopReason)})`,
+        );
         this.finishStream(input.sessionId);
       })
       .catch(error => {
@@ -610,7 +628,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
       },
       { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
     );
-    if (response.protocolVersion !== ACP_PROTOCOL_VERSION) {
+    if (
+      typeof response.protocolVersion !== 'number' ||
+      response.protocolVersion < ACP_MINIMUM_PROTOCOL_VERSION
+    ) {
       throw new AcpProtocolIncompatibleError(response.protocolVersion);
     }
     this.capabilities = normalizeCapabilities(response);
@@ -664,7 +685,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (method === AcpMethod.TerminalWaitForExit) return await this.waitForTerminal(params);
     if (method === AcpMethod.TerminalKill) return this.killTerminal(params);
     if (method === AcpMethod.TerminalRelease) return this.releaseTerminal(params);
-    throw new Error(`Unsupported ACP agent request: ${method}.`);
+    throw new AcpRequestError(
+      AcpErrorCode.MethodNotFound,
+      `Unsupported ACP agent request: ${method}.`,
+    );
   }
 
   /**
@@ -691,12 +715,19 @@ export class AcpCodingDriver implements CodingAgentDriver {
   private async requestPermission(
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    if (typeof params.sessionId !== 'string')
-      throw new Error('ACP permission request has no session ID.');
+    if (typeof params.sessionId !== 'string') {
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        'ACP permission request has no session ID.',
+      );
+    }
     const requestId = randomUUID();
     const streamSessionId = this.resolvePermissionStreamSessionId(params.sessionId);
     if (!streamSessionId) {
-      throw new Error('ACP permission request has no active session prompt.');
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        'ACP permission request has no active session prompt.',
+      );
     }
     console.debug(
       `[AcpCodingDriver] received permission request for ${params.sessionId}; delivering it to ${streamSessionId}`,
@@ -725,7 +756,12 @@ export class AcpCodingDriver implements CodingAgentDriver {
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     const target = await this.resolveWorkspacePath(params.path);
-    const content = await readFile(target, 'utf8');
+    const content = await readFile(target, 'utf8').catch(error => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new AcpRequestError(AcpErrorCode.ResourceNotFound, `File not found: ${target}.`);
+      }
+      throw error;
+    });
     this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, {
       action: 'read',
       path: target,
@@ -748,7 +784,12 @@ export class AcpCodingDriver implements CodingAgentDriver {
   private async writeWorkspaceFile(
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
-    if (typeof params.content !== 'string') throw new Error('ACP file write has no text content.');
+    if (typeof params.content !== 'string') {
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        'ACP file write has no text content.',
+      );
+    }
     const target = await this.resolveWorkspacePath(params.path);
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, params.content, 'utf8');
@@ -761,7 +802,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   private async createTerminal(params: Record<string, unknown>): Promise<Record<string, unknown>> {
     if (typeof params.command !== 'string' || !params.command) {
-      throw new Error('ACP terminal creation has no command.');
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        'ACP terminal creation has no command.',
+      );
     }
     const cwd = await this.resolveWorkspacePath(
       typeof params.cwd === 'string' ? params.cwd : this.workspaceRoot,
@@ -811,9 +855,21 @@ export class AcpCodingDriver implements CodingAgentDriver {
   }
 
   private async resolveWorkspacePath(value: unknown): Promise<string> {
-    if (typeof value !== 'string' || !value) throw new Error('ACP filesystem request has no path.');
+    if (typeof value !== 'string' || !value) {
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        'ACP filesystem request has no path.',
+      );
+    }
     if (!this.workspaceBroker) throw new Error('ACP workspace broker is unavailable.');
-    return await this.workspaceBroker.resolveTarget(value);
+    try {
+      return await this.workspaceBroker.resolveTarget(value);
+    } catch (error) {
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   private terminalEnvironment(value: unknown): Record<string, string> {
@@ -846,14 +902,20 @@ export class AcpCodingDriver implements CodingAgentDriver {
   }
 
   private requireTerminalId(value: unknown): string {
-    if (typeof value !== 'string' || !value)
-      throw new Error('ACP terminal request has no terminal ID.');
+    if (typeof value !== 'string' || !value) {
+      throw new AcpRequestError(
+        AcpErrorCode.InvalidParams,
+        'ACP terminal request has no terminal ID.',
+      );
+    }
     return value;
   }
 
   private requireTerminal(value: unknown) {
     const terminal = this.terminalBroker.output(this.requireTerminalId(value));
-    if (!terminal) throw new Error('The ACP terminal was not found.');
+    if (!terminal) {
+      throw new AcpRequestError(AcpErrorCode.ResourceNotFound, 'The ACP terminal was not found.');
+    }
     return terminal;
   }
 
