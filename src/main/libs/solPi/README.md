@@ -5,8 +5,9 @@
 
 ## 事实来源与归属
 
-- `vendor/sol-pi/`：上游源码原样拷贝，锁定 commit 见 `vendor/UPSTREAM_COMMIT`（审阅基于该提交）。
-- `vendor/LICENSE.MIT`、`vendor/THIRD_PARTY_NOTICES.md`：上游归属。
+- `vendor/sol-pi/`：上游源码 + **少量本地补丁**。锁定 commit 见 `vendor/UPSTREAM_COMMIT`（审阅基于该提交）；
+  相对该提交的每一处本地偏离及其理由记录在 `VENDOR_PATCHES.md`——vendor 树不再与上游逐字节一致。
+- `vendor/LICENSE.MIT`、`vendor/THIRD_PARTY_NOTICES.md`：上游归属（保持上游原样）。
 - 不读取、不修改用户全局 Pi 安装（`~/.pi/agent/sol-pi.json` 的上游配置发现被
   app 内配置加载器替换，见 `solPiIntegration.ts`）。
 - 运行时通过 jiti 加载 vendor（与 Pi 官方扩展加载同一策略），不经 tsc/oxlint 编译。
@@ -36,7 +37,12 @@ reducer（额外模型调用）与 online context compaction 在本接入中**�
    `SessionManager.inMemory`（其 session dir 为空串）。`solPiSessionScope` 用原型
    委托包装 in-memory manager，把 `getSessionDir()` 指向 app 自有的
    `<userData>/solPi/sessions/<sessionId>/`；Pi 会话日志仍只在内存，不产生第二套
-   canonical 任务状态。归档按内容寻址落在该目录，`onSessionDeleted` 时清理。
+   canonical 任务状态。归档按内容寻址落在 `<sessionDir>/sol-pi/`（**稳定根**，
+   不随 Pi incarnation 变化，stop/continue 不再复制子树），生命周期为：
+   会话删除时异步清理（不阻塞 IPC）+ 启动时对账（清掉 cowork_sessions 已不存在
+   且 >24h 未变的孤儿目录）+ 每会话 256MiB 归档预算（超预算停止新归档、结果
+   保持全文，被引用的归档永不删除）。上下文投影带进程内缓存：稳态每请求
+   0 次对象读、0 字节重哈希（首次入档的哈希一次性发生）。
 3. **会话启动**：Pi SDK 的 `createAgentSession` 不触发 `session_start`（只有 CLI
    模式调用 `bindExtensions`），而 SoL-Pi 在该事件上注册工具。启用时适配器显式
    调用 `session.bindExtensions({mode:'print', onError})`。
@@ -69,6 +75,10 @@ node scripts/solpi-comparison-harness.mjs
 vendor 的裸依赖（`@earendil-works/pi-agent-core|pi-ai|pi-coding-agent`、`typebox`、
 `jiti`）因此是生产 `dependencies`（进 asar 的 node_modules）；主 bundle 仍内联自己的
 Pi SDK 副本，两份以结构化接口协作——打包冒烟已验证 fused 写入+命令在包内真实执行。
+**`jiti` 本身保持 external**（`ELECTRON_MAIN_EXTERNALS`）：内联副本会把 babel 助手
+惰性解析到相对 bundle 的 `<asar>/dist/babel.cjs`（不存在）——打包生产路径确定性
+加载失败（深度验收 d1-f1）；external 后 bundle 运行时 require 归档内
+`node_modules/jiti`，其解析锚定包自身目录，冷缓存亦通过。
 
 打包验证：
 
@@ -77,6 +87,11 @@ Pi SDK 副本，两份以结构化接口协作——打包冒烟已验证 fused 
 node scripts/ci/verify-packaged-solpi-resources.mjs release
 # 在真实 Electron 主进程内跑 loader + conservative 初始化 + fused 执行
 <raw electron binary> scripts/ci/solpi-packaged-smoke.cjs <app.asar 路径>
+# 冷缓存回归 gate：静态断言 bundle 外部化 jiti + 包内 Electron 真实执行
+# vendor 初始化与 fused 命令（强制冷 jiti 缓存）；--static 模式已接入
+# electron-verify CI（build 后立即运行）
+node scripts/ci/solpi-bundle-jiti-gate.cjs --static dist-electron/main.js
+<raw electron binary> scripts/ci/solpi-bundle-jiti-gate.cjs <app.asar 路径>
 ```
 
 ## 真实模型对照（后续验收）
@@ -91,6 +106,17 @@ node scripts/ci/verify-packaged-solpi-resources.mjs release
 
 - env var 为进程级开关（所有新会话共享）；按会话粒度开关需要 config/UI 变更。
 - 真实模型收益未测（见上）。
+- 观察缓存按扩展实例（Pi incarnation）计：进程内重建会话（stop/继续/拓扑变更）
+  后的首次请求会对每个已归档观察重付一次 EEXIST 校验（有界：≤256MiB 预算内的
+  读+哈希，一次性），稳态仍为零读零哈希。
+- Cowork Continue IPC 在 cowork_sessions 无对应行时不拒绝（其余进入路径均先落
+  库）：此类"僵尸续跑"的归档目录会在 >24h 后被启动对账当作孤儿回收——按定义
+  该会话已删除，属正确 GC；如需收紧应在 Continue 处 persist-or-reject。
+- Windows/Linux 未做端到端验证：`then_run` 内层 bash 的 shell 选项接线已按平台无关
+  fixture 验证（commandPrefix/shellPath 真实生效 + win32 默认解析单测），但没有在
+  Windows 机器上跑过真实 git-bash 路径。
 - 打包版内 vendor 与主 bundle 各持一份 Pi SDK（结构化接口协作，冒烟已验证行为）；
   若未来要求单实例共享，需把 `@earendil-works/*` 加入主 bundle externals 并重审
   wasm 资产流。
+- ObservationPack 首次入档的 sha256（~10ms/MiB，每观察每进程一次）仍在 agent-stream
+  路径上；稳态已零读零哈希（见 VENDOR_PATCHES.md 的实测数字）。
