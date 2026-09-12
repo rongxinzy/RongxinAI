@@ -11,9 +11,12 @@
  * archives (ObservationPack objects/ledgers) land under
  * `<userData>/solPi/sessions/<sessionId>/` and stay isolated per session.
  */
+import { existsSync } from 'node:fs';
 import { readdir, rm, stat } from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import path from 'node:path';
+
+import { loadSolPiVendor } from './solPiVendor';
 
 /** Minimal structural type for the Pi SessionManager instances we wrap. */
 export interface SolPiSessionManagerLike {
@@ -23,21 +26,65 @@ export interface SolPiSessionManagerLike {
 
 export const SOLPI_STORAGE_DIR_NAME = 'solPi';
 
-/** Session-id shape enforced for every directory under the storage root. */
-const SESSION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+/**
+ * Session-id shape every storage directory name must satisfy after encoding.
+ * Raw cowork session ids may contain characters that are unsafe as directory
+ * names on some platform (e.g. `:` in `scheduled-task:<id>` on Windows), so
+ * {@link encodeSolPiSessionId} percent-encodes everything outside the safe
+ * alphabet instead of rejecting the id; the encoded output adds `%` to the
+ * alphabet. The pattern is a belt-and-suspenders guard — encoding produces
+ * matching names by construction.
+ */
+const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9._%-]+$/;
 
 /** Orphaned session dirs younger than this are never reconciled away. */
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Reconcile eligibility: encoded session names that also start with an
+ * alphanumeric character. A leading dot keeps hidden/OS directories out of
+ * reconciliation's reach, exactly like the pre-encoding behavior.
+ */
+const RECONCILABLE_SESSION_DIR_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._%-]*$/;
+
+/**
+ * Filesystem-safe, injective encoding of a cowork session id: every character
+ * outside [a-zA-Z0-9._-] (including `%` itself) becomes `%XX`. Pure-safe ids
+ * encode to themselves, so existing directories keep resolving.
+ */
+export function encodeSolPiSessionId(sessionId: string): string {
+  return sessionId.replace(/[^a-zA-Z0-9._-]/g, character =>
+    `%${character.codePointAt(0)!.toString(16).toUpperCase().padStart(2, '0')}`,
+  );
+}
 
 export function solPiStorageRoot(userDataPath: string): string {
   return path.join(userDataPath, SOLPI_STORAGE_DIR_NAME, 'sessions');
 }
 
 export function solPiSessionStorageDir(storageRoot: string, sessionId: string): string {
-  if (!SESSION_ID_PATTERN.test(sessionId)) {
+  const encoded = encodeSolPiSessionId(sessionId);
+  if (!SAFE_SESSION_ID_PATTERN.test(encoded) || encoded === '.' || encoded === '..') {
     throw new Error('SoL-Pi storage requires a safe session id');
   }
-  return path.join(storageRoot, sessionId);
+  return path.join(storageRoot, encoded);
+}
+
+/**
+ * Drop the vendored observation pack's cached archive budget for a session's
+ * runtime root, so a session recreated in the same process re-measures from
+ * disk instead of inheriting the deleted directory's byte count. Lazy: the
+ * vendor module is only loaded when the session actually has an archive.
+ */
+async function releaseArchiveBudgetFor(sessionDir: string): Promise<void> {
+  try {
+    const runtimeRoot = path.join(sessionDir, 'sol-pi');
+    if (!existsSync(runtimeRoot)) return;
+    const vendor = await loadSolPiVendor();
+    vendor.releaseArchiveBudget?.(runtimeRoot);
+  } catch (error) {
+    console.warn('[SolPi] Failed to release the archive budget during cleanup:', error);
+  }
 }
 
 /**
@@ -68,6 +115,11 @@ export async function clearSolPiSessionStorage(
 ): Promise<void> {
   try {
     const sessionDir = solPiSessionStorageDir(storageRoot, sessionId);
+    // Release the in-process archive budget before the directory disappears
+    // (a same-process recreation of this session id must re-measure from
+    // disk). Startup reconciliation needs no release: a fresh process has an
+    // empty budget map.
+    await releaseArchiveBudgetFor(sessionDir);
     await rm(sessionDir, { recursive: true, force: true });
   } catch (error) {
     console.warn(`[SolPi] Failed to clean session storage for ${sessionId}:`, error);
@@ -86,7 +138,9 @@ export async function reconcileSolPiSessionStorage(
   liveSessionIds: readonly string[],
 ): Promise<string[]> {
   const storageRoot = solPiStorageRoot(userDataPath);
-  const live = new Set(liveSessionIds);
+  // Directory names are encoded session ids (see encodeSolPiSessionId), so
+  // liveness is compared on the encoded form.
+  const live = new Set(liveSessionIds.map(encodeSolPiSessionId));
   const removed: string[] = [];
 
   let entries: Dirent[];
@@ -100,7 +154,7 @@ export async function reconcileSolPiSessionStorage(
 
   const cutoff = Date.now() - ORPHAN_GRACE_MS;
   for (const entry of entries) {
-    if (!entry.isDirectory() || !SESSION_ID_PATTERN.test(entry.name)) continue;
+    if (!entry.isDirectory() || !RECONCILABLE_SESSION_DIR_PATTERN.test(entry.name)) continue;
     if (live.has(entry.name)) continue;
 
     const sessionDir = path.join(storageRoot, entry.name);

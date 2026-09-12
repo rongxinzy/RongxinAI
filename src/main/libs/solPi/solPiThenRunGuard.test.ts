@@ -208,3 +208,60 @@ describe('then_run synthetic id contract', () => {
     expect(buildSolPiThenRunToolCallId('call-x')).toBe('call-x:then_run');
   });
 });
+
+describe('injected fileHash (worker-backed interference check)', () => {
+  const loadFusedToolsWithFileHash = async (
+    fileHash: (path: string) => Promise<string>,
+  ): Promise<FakeExtensionApi> => {
+    const vendor = await loadVendorModule<VendorActionFusionModule>(
+      'extensions/action-fusion/index.ts',
+    );
+    const api = new FakeExtensionApi();
+    vendor.createActionFusionExtension({ fileHash })(api);
+    return api;
+  };
+
+  test('the injected hash replaces both interference hashes; equal hashes run the command', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'solpi-fusehash-'));
+    const file = path.join(dir, 'fused.txt');
+    const calls: string[] = [];
+    const api = await loadFusedToolsWithFileHash(async filePath => {
+      calls.push(filePath);
+      return 'stable-hash';
+    });
+
+    const write = api.tools.get('write')!;
+    const result = await write.execute(
+      'fuse-hash-1',
+      { path: file, content: 'A\n', then_run: { command: 'wc -c < fused.txt' } },
+      undefined,
+      undefined,
+      { cwd: dir, sessionManager: { getSessionDir: () => dir, getSessionId: () => 's', getSessionFile: () => null } },
+    );
+    const text = result.content.map(block => block.text ?? '').join('\n');
+    expect(text).toContain('[then_run:succeeded]');
+    // Exactly two hashes per fused run (the interference check's double read).
+    expect(calls).toEqual([file, file]);
+  });
+
+  test('differing injected hashes skip the command exactly like the in-process check', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'solpi-fusehash2-'));
+    const file = path.join(dir, 'fused.txt');
+    let toggle = 0;
+    const api = await loadFusedToolsWithFileHash(async () => {
+      toggle += 1;
+      return toggle === 1 ? 'first-hash' : 'second-hash';
+    });
+
+    const write = api.tools.get('write')!;
+    await expect(
+      write.execute(
+        'fuse-hash-2',
+        { path: file, content: 'A\n', then_run: { command: 'wc -c < fused.txt' } },
+        undefined,
+        undefined,
+        { cwd: dir, sessionManager: { getSessionDir: () => dir, getSessionId: () => 's', getSessionFile: () => null } },
+      ),
+    ).rejects.toThrow('[then_run:skipped]');
+  });
+});

@@ -170,3 +170,44 @@ describe.skipIf(!nativeSqliteLoads)('CoworkStore.listSessionIds', () => {
     expect(store.listSessionIds()).toEqual([]);
   });
 });
+
+describe('session id encoding', () => {
+  test('scheduled-task ids map to filesystem-safe encoded directories', () => {
+    const root = solPiStorageRoot(mkdtempSync(path.join(tmpdir(), 'solpi-enc-')));
+    // ':' is unsafe in Windows filenames and outside the safe set.
+    expect(solPiSessionStorageDir(root, 'scheduled-task:task-1')).toBe(
+      path.join(root, 'scheduled-task%3Atask-1'),
+    );
+    // Already-safe ids encode to themselves (existing dirs keep resolving).
+    expect(solPiSessionStorageDir(root, 'plain-session_1.2-x')).toBe(
+      path.join(root, 'plain-session_1.2-x'),
+    );
+    // Percent itself is encoded, keeping the mapping injective.
+    expect(solPiSessionStorageDir(root, 'a%2Fb')).toBe(path.join(root, 'a%252Fb'));
+    // Traversal-shaped ids become inert names, and pure dot ids are refused.
+    expect(solPiSessionStorageDir(root, '../escape')).toBe(path.join(root, '..%2Fescape'));
+    expect(() => solPiSessionStorageDir(root, '..')).toThrow('safe session id');
+    expect(() => solPiSessionStorageDir(root, '.')).toThrow('safe session id');
+  });
+
+  test('reconcile removes encoded orphan dirs of dead scheduled-task sessions and keeps live ones', async () => {
+    const userData = mkdtempSync(path.join(tmpdir(), 'solpi-enc-rec-'));
+    const storageRootDir = solPiStorageRoot(userData);
+    mkdirSync(storageRootDir, { recursive: true });
+    const makeDir = (name: string): string => {
+      const dir = path.join(storageRootDir, name);
+      mkdirSync(path.join(dir, 'sol-pi'), { recursive: true });
+      return dir;
+    };
+    const orphan = makeDir('scheduled-task%3Atask-gone');
+    const live = makeDir('scheduled-task%3Atask-live');
+    const when = new Date(Date.now() - (DAY_MS + 1000));
+    utimesSync(orphan, when, when);
+    utimesSync(live, when, when);
+
+    const removed = await reconcileSolPiSessionStorage(userData, ['scheduled-task:task-live']);
+    expect(removed).toEqual(['scheduled-task%3Atask-gone']);
+    expect(existsSync(orphan)).toBe(false);
+    expect(existsSync(live)).toBe(true);
+  });
+});
