@@ -286,6 +286,27 @@ describe('PiRuntimeAdapter truncated answer terminal state', () => {
       expect(systemMessages()).toHaveLength(1);
       expect(completes).toEqual(['test', 'test']);
     });
+
+    it('discloses an empty-text length stop without persisting an answer message', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      // A length stop whose visible answer text is empty: no assistant
+      // message with content is persisted (empty final text never becomes an
+      // answer), but the disclosure is still persisted before completing.
+      // The scheduled executor's notice-only truncation branch depends on
+      // exactly this contract.
+      truncatedAnswer('');
+      listener!({ type: 'agent_end' });
+
+      expect(disclosureCount()).toBe(1);
+      const persistedAnswers = mockStore.addMessage.mock.calls.filter(
+        ([, message]) =>
+          (message as { type: string; content?: string }).type === 'assistant' &&
+          Boolean((message as { content?: string }).content?.trim()),
+      );
+      expect(persistedAnswers).toHaveLength(0);
+      expect(completes).toEqual(['test']);
+    });
   });
 
   describe('workbench terminal state (real service)', () => {
