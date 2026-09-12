@@ -2833,6 +2833,7 @@ describe('PiRuntimeAdapter', () => {
           isStreaming: false,
           isFinal: true,
           isFinalAnswer: true,
+          stopReason: 'stop',
         },
       });
     });
@@ -3410,6 +3411,260 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(1);
       expect(completes).toHaveLength(0);
       expect(mockStore.updateSession).not.toHaveBeenCalledWith('test', { status: 'completed' });
+    });
+  });
+
+  describe('truncated answer recovery', () => {
+    let listener: ((event: unknown) => void) | null = null;
+    let mockStore: {
+      updateSession: ReturnType<typeof vi.fn>;
+      updateMessage: ReturnType<typeof vi.fn>;
+      addMessage: ReturnType<typeof vi.fn>;
+      getSession: ReturnType<typeof vi.fn>;
+      getAgent: ReturnType<typeof vi.fn>;
+      listAgents: ReturnType<typeof vi.fn>;
+    };
+    let errors: CoworkError[];
+    let completes: string[];
+    let emittedMessages: Array<Record<string, unknown>>;
+    let messageUpdates: Array<{ content: string; metadata?: Record<string, unknown> }>;
+
+    const truncatedAnswer = (text: string) => {
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+      });
+      listener!({
+        type: 'message_end',
+        message: { role: 'assistant', content: [{ type: 'text', text }], stopReason: 'length' },
+      });
+      listener!({ type: 'turn_end' });
+    };
+
+    const completeAnswer = (text: string) => {
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+      });
+      listener!({
+        type: 'message_end',
+        message: { role: 'assistant', content: [{ type: 'text', text }], stopReason: 'stop' },
+      });
+      listener!({ type: 'turn_end' });
+    };
+
+    const systemMessages = () =>
+      mockStore.addMessage.mock.calls.filter(
+        ([, message]) => (message as { type: string }).type === 'system',
+      );
+
+    beforeEach(() => {
+      listener = null;
+      mockSession.steer.mockReset();
+      mockSession.steer.mockResolvedValue(undefined);
+      mockSession.subscribe.mockImplementation((cb: (event: unknown) => void) => {
+        listener = cb;
+        return () => {};
+      });
+      mockStore = {
+        updateSession: vi.fn(),
+        updateMessage: vi.fn(
+          (_sessionId: string, messageId: string, patch: Record<string, unknown>) => ({
+            id: messageId,
+            ...patch,
+          }),
+        ),
+        addMessage: vi.fn((_sessionId: string, message: Record<string, unknown>) => ({
+          ...message,
+          id: (message.id as string) ?? 'stored-id',
+        })),
+        getSession: vi.fn(() => undefined),
+        getAgent: vi.fn(() => undefined),
+        listAgents: vi.fn(() => []),
+      };
+      adapter.setCoworkStore(mockStore as unknown as CoworkStore);
+      errors = [];
+      completes = [];
+      emittedMessages = [];
+      messageUpdates = [];
+      adapter.on('message', (_sid, message) =>
+        emittedMessages.push(message as unknown as Record<string, unknown>),
+      );
+      adapter.on('messageUpdate', (_sid, _messageId, content, metadata) =>
+        messageUpdates.push({ content, metadata }),
+      );
+      adapter.on('error', (_sid, error) => errors.push(error as CoworkError));
+      adapter.on('complete', sessionId => completes.push(sessionId));
+    });
+
+    it('steers once for a pure-text truncated answer and completes cleanly when the continuation finishes', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      truncatedAnswer('Long answer part one ');
+      completeAnswer('Long answer part two');
+
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('output token limit'));
+      // The recovered run completes like a normal one: no disclosure, no error.
+      listener!({ type: 'agent_end' });
+      expect(systemMessages()).toHaveLength(0);
+      expect(errors).toHaveLength(0);
+      expect(completes).toEqual(['test']);
+      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'idle' });
+      // Both assistant answers persist their stop reason.
+      const finalizeMetadata = messageUpdates
+        .filter(update => update.metadata?.isFinal === true)
+        .map(update => update.metadata);
+      expect(finalizeMetadata).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ stopReason: 'length', truncated: true }),
+          expect.objectContaining({ stopReason: 'stop' }),
+        ]),
+      );
+      // The final promoted answer is not flagged truncated.
+      const finalAnswer = messageUpdates.find(update => update.metadata?.isFinalAnswer === true);
+      expect(finalAnswer?.metadata?.truncated).toBeUndefined();
+    });
+
+    it('discloses an explicit terminal reason when the continuation budget is exhausted', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      truncatedAnswer('First truncated attempt ');
+      truncatedAnswer('Second truncated attempt');
+      listener!({ type: 'agent_end' });
+
+      // Only the bounded single continuation steer — no repeated prompting.
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      expect(errors).toHaveLength(0);
+      // A structured system notice was persisted and emitted before completion.
+      expect(systemMessages()).toHaveLength(1);
+      const disclosure = systemMessages()[0][1] as Record<string, unknown>;
+      expect(disclosure.metadata).toEqual(
+        expect.objectContaining({ answerTruncated: true, stopReason: 'length' }),
+      );
+      expect((disclosure.content as string).trim().length).toBeGreaterThan(0);
+      expect(emittedMessages[emittedMessages.length - 1]).toMatchObject({
+        type: 'system',
+        metadata: expect.objectContaining({ answerTruncated: true }),
+      });
+      expect(completes).toEqual(['test']);
+      // The final answer itself is flagged truncated, not presented as clean.
+      const finalAnswer = messageUpdates.find(update => update.metadata?.isFinalAnswer === true);
+      expect(finalAnswer?.metadata).toEqual(
+        expect.objectContaining({ truncated: true, stopReason: 'length' }),
+      );
+    });
+
+    it('discloses the truncation when the steer cannot be queued at all', async () => {
+      mockSession.steer.mockImplementation(() => {
+        throw new Error('not streaming');
+      });
+      await adapter.startSession('test', 'Hi');
+
+      truncatedAnswer('Truncated once');
+      listener!({ type: 'agent_end' });
+
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      expect(systemMessages()).toHaveLength(1);
+      expect(completes).toEqual(['test']);
+    });
+
+    it('does not steer or disclose for a normal no-tool natural end', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      completeAnswer('All done');
+      listener!({ type: 'agent_end' });
+
+      expect(mockSession.steer).not.toHaveBeenCalled();
+      expect(systemMessages()).toHaveLength(0);
+      expect(errors).toHaveLength(0);
+      expect(completes).toEqual(['test']);
+      const finalAnswer = messageUpdates.find(update => update.metadata?.isFinalAnswer === true);
+      expect(finalAnswer?.metadata?.truncated).toBeUndefined();
+      expect(finalAnswer?.metadata?.stopReason).toBe('stop');
+    });
+
+    it('uses write recovery, not answer recovery, when a truncated message carries a write call', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          stopReason: 'length',
+          content: [
+            { type: 'text', text: 'Writing file' },
+            {
+              type: 'toolCall',
+              id: 'call-1',
+              name: PiBuiltinFileToolName.Write,
+              arguments: { path: 'big.js', content: 'partial' },
+            },
+          ],
+        },
+      });
+      completeAnswer('File written in chunks');
+      listener!({ type: 'agent_end' });
+
+      // Exactly one steer: the write chunking guidance, never the answer continuation.
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('chunk'));
+      expect(systemMessages()).toHaveLength(0);
+      expect(completes).toEqual(['test']);
+    });
+
+    it('does not re-run or misreport when the user stops after a queued continuation', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      truncatedAnswer('Truncated before stop');
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      adapter.stopSession('test');
+
+      // Late agent_end (SDK finishing the abort) must not disclose or complete.
+      listener!({ type: 'agent_end' });
+
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+      // The only system message is the user-stop interruption record — never
+      // a truncation disclosure or a terminal error.
+      const systemMetadatas = systemMessages().map(
+        ([, message]) => (message as { metadata?: Record<string, unknown> }).metadata,
+      );
+      expect(systemMetadatas).toEqual([
+        expect.objectContaining({ interruption: expect.anything() }),
+      ]);
+      expect(
+        systemMetadatas.some(metadata => metadata?.answerTruncated === true),
+      ).toBe(false);
+      expect(completes).toHaveLength(0);
+      expect(errors).toHaveLength(0);
+    });
+
+    it('does not misreport an error when a truncated turn recovers through an auto-retry', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      truncatedAnswer('Truncated attempt ');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_end',
+        message: { role: 'assistant', content: '', stopReason: 'error', errorMessage: '429' },
+      });
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'auto_retry_start' });
+      completeAnswer('Recovered full answer');
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'auto_retry_end', success: true, attempt: 1 });
+      listener!({ type: 'agent_settled' });
+
+      // One continuation steer + one recovered run, no error, no truncation disclosure.
+      expect(mockSession.steer).toHaveBeenCalledOnce();
+      expect(systemMessages()).toHaveLength(0);
+      expect(errors).toHaveLength(0);
+      expect(completes).toEqual(['test']);
+      const finalAnswer = messageUpdates.find(update => update.metadata?.isFinalAnswer === true);
+      expect(finalAnswer?.metadata?.truncated).toBeUndefined();
     });
   });
 

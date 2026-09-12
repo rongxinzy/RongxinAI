@@ -155,6 +155,15 @@ import {
   type PiExtensionFactory,
 } from './piExtensionTypes';
 import { extractPiSubagentExecutionMetadata } from './piSubagentExecution';
+import { buildSolPiRuntime, type SolPiRuntimeParts } from '../solPi/solPiIntegration';
+import { buildSolPiThenRunToolCallId } from '../solPi/constants';
+import { clearSolPiSessionStorage, solPiStorageRoot } from '../solPi/solPiSessionScope';
+import { resolveSolPiProfile } from '../solPi/solPiProfile';
+import type {
+  SolPiThenRunAuthorization,
+  SolPiThenRunCommand,
+} from '../solPi/solPiThenRunGuard';
+import type { SolPiSessionManagerLike } from '../solPi/solPiSessionScope';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
@@ -169,7 +178,8 @@ import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { createPiWorkLoop } from './piWorkLoop';
-import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
+import { PiWriteTokenLimitRecovery, PiAssistantStopReason } from './piWriteTokenLimit';
+import { isPiPureTextTruncation, PiTruncatedAnswerRecovery } from './piTruncatedAnswerRecovery';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import {
   getPiPreparingToolActivity,
@@ -211,6 +221,15 @@ interface PiSession {
       }
     | undefined;
   subscribe(listener: (event: PiEvent) => void): () => void;
+  /**
+   * SDK sessions do not fire `session_start` for extension factories (only
+   * the CLI modes bind extensions). SoL-Pi registers its tools on that event,
+   * so the app binds extensions explicitly when SoL-Pi is enabled.
+   */
+  bindExtensions?(bindings: {
+    mode?: string;
+    onError?: (error: { extensionPath: string; error: string }) => void;
+  }): Promise<void>;
 }
 
 interface PiContentBlock {
@@ -305,6 +324,12 @@ interface ActivePiSession {
   aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
+  /**
+   * Fused toolCallId → runId under which its synthetic `${id}:then_run` bash
+   * approval was created, so the approval can be settled when the fused tool
+   * execution ends (the inner bash never emits its own tool_execution_end).
+   */
+  solPiThenRunApprovalRunIds: Map<string, string>;
   toolStartedAtByCallId: Map<string, number>;
   preparingToolCallIdByContentIndex: Map<number, string>;
   toolActivityTracker: ToolActivityTracker;
@@ -322,6 +347,24 @@ interface ActivePiSession {
   /** Whether the current turn runs in read-only plan mode. */
   planMode: boolean;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
+  /** Bounded recovery for pure-text answers truncated by the output token limit. */
+  truncatedAnswerRecovery: PiTruncatedAnswerRecovery;
+  /**
+   * True when the most recent assistant message ended truncated (stopReason
+   * length, no tool calls). While set, the run's final answer must not be
+   * presented as a complete success without disclosure.
+   */
+  lastAnswerTruncated: boolean;
+  /**
+   * Settlement owed by a turn that broke out of agent_end to drain its queued
+   * follow-ups: null once settled. Set only in the drain branch; a follow-up
+   * turn clears it by settling itself, and flushFollowUpQueue settles it when
+   * the queue drains without leaving a running turn (queued control actions
+   * never start one).
+   */
+  deferredTurnSettlement: { truncated: boolean } | null;
+  /** Stop reason of the most recent assistant message ('stop' | 'length' | ...). */
+  lastAssistantStopReason: string | null;
   /**
    * Error from the latest failed attempt (message_end with stopReason=error).
    * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
@@ -423,6 +466,15 @@ type PiResolvedModel = {
   capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
+  };
+};
+
+/** Persist the assistant stop reason (and truncation flag) on answer messages. */
+const buildAnswerStopReasonMetadata = (stopReason: string | undefined): Record<string, unknown> => {
+  if (!stopReason) return {};
+  return {
+    stopReason,
+    ...(stopReason === PiAssistantStopReason.Length ? { truncated: true } : {}),
   };
 };
 
@@ -765,6 +817,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
       }
 
+      // SoL-Pi experiment (default off): replace the plain in-memory manager
+      // with the app-owned storage wrapper and collect its extension factories.
+      // When the profile is off this stays null and nothing below changes.
+      const solPiRuntimePromise: Promise<SolPiRuntimeParts | null> = pi.SessionManager?.inMemory
+        ? buildSolPiRuntime({
+            profile: resolveSolPiProfile(process.env),
+            createInMemorySessionManager: (
+              cwd: string,
+            ): SolPiSessionManagerLike & Record<string, unknown> =>
+              pi.SessionManager!.inMemory(cwd) as unknown as SolPiSessionManagerLike &
+                Record<string, unknown>,
+            cwd: workspaceRoot,
+            sessionId,
+            userDataPath: app.getPath('userData'),
+            authorizeThenRun: (thenRun, context) =>
+              this.authorizeSolPiThenRun(sessionId, workbenchRunId, thenRun, context.toolCallId),
+          })
+        : Promise.resolve(null);
+      const solPiRuntime = await solPiRuntimePromise.catch((error: unknown): null => {
+        console.error('[SolPi] Failed to assemble SoL-Pi runtime; continuing without it:', error);
+        return null;
+      });
+      if (solPiRuntime) {
+        sessionOptions.sessionManager = solPiRuntime.sessionManager;
+      }
+
       // System prompt — user config only. Skills are discovered and appended
       // by the resource loader (additionalSkillPaths), which renders them via
       // pi's formatSkillsForPrompt — no manual injection here to avoid
@@ -879,15 +957,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         typeof resolvedModel.model.contextWindow === 'number'
           ? resolvedModel.model.contextWindow
           : undefined;
-      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
-        sessionId,
-        getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-        settingsManager,
-        getApprovalMode: () =>
-          this.activeSessions.get(sessionId)?.approvalMode ??
-          options.approvalMode ??
-          WorkbenchApprovalMode.Ask,
-      });
+      const resourceLoader = await this.createPiResourceLoader(
+        pi,
+        workspaceRoot,
+        resourceState,
+        {
+          sessionId,
+          getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
+          settingsManager,
+          getApprovalMode: () =>
+            this.activeSessions.get(sessionId)?.approvalMode ??
+            options.approvalMode ??
+            WorkbenchApprovalMode.Ask,
+        },
+        // SoL-Pi factories append after the approval gate and bash-safety
+        // check, so fused edit/write calls are still authorized first.
+        solPiRuntime?.extensionFactories ?? [],
+      );
       this.applyPiCompactionOverrides(settingsManager, contextWindowTokens);
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
@@ -1169,6 +1255,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         return;
       }
 
+      // SoL-Pi registers its tools on Pi's `session_start` event, which SDK
+      // sessions never emit on their own — bind extensions explicitly.
+      if (solPiRuntime && typeof session.bindExtensions === 'function') {
+        await session.bindExtensions({
+          mode: 'print',
+          onError: error => {
+            console.warn(
+              `[SolPi] Extension error in ${error.extensionPath}: ${error.error}`,
+            );
+          },
+        });
+      } else if (solPiRuntime) {
+        console.warn(
+          '[SolPi] session.bindExtensions is unavailable on this SDK build; SoL-Pi extensions cannot register.',
+        );
+      }
+
       const active: ActivePiSession = {
         sessionId,
         piSession: session,
@@ -1211,6 +1314,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         unsubscribe: () => {},
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
+        solPiThenRunApprovalRunIds: new Map(),
         toolStartedAtByCallId: new Map(),
         preparingToolCallIdByContentIndex: new Map(),
         toolActivityTracker: new ToolActivityTracker(),
@@ -1222,6 +1326,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         goalMode: options.goalMode === true,
         planMode: options.planMode === true,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
+        truncatedAnswerRecovery: new PiTruncatedAnswerRecovery(),
+        lastAnswerTruncated: false,
+        deferredTurnSettlement: null,
+        lastAssistantStopReason: null,
         pendingError: null,
         workbenchRunId,
         workbenchContract,
@@ -1536,6 +1644,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const clearActivity = active.toolActivityTracker.clear();
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
     active.writeTokenLimitRecovery.reset();
+    active.truncatedAnswerRecovery.reset();
+    active.lastAnswerTruncated = false;
+    active.lastAssistantStopReason = null;
     active.pendingError = null;
     active.turnFailed = false;
     active.turnExperts = (this.store?.getSession(sessionId)?.experts ?? [])
@@ -1690,6 +1801,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         harnessVersion: HarnessVersion,
       };
       active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens);
+      active.truncatedAnswerRecovery = new PiTruncatedAnswerRecovery();
+      active.lastAnswerTruncated = false;
+      active.lastAssistantStopReason = null;
       if (active.resourceState.maxOutputTokens !== resolvedModel.maxOutputTokens) {
         active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
         await active.piSession.reload();
@@ -2179,6 +2293,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         !active.isRunning
       ) {
         void this.flushFollowUpQueue(sessionId, active);
+      } else if (
+        active.deferredTurnSettlement &&
+        !retryAfterFailure &&
+        !hasNextFollowUp &&
+        this.activeSessions.get(sessionId) === active &&
+        !active.aborted &&
+        !active.isRunning &&
+        !active.pendingError &&
+        !active.turnFailed
+      ) {
+        // The queue drained without leaving a running turn — no follow-up
+        // agent_end will ever fire (queued control actions never start a
+        // turn), so settle the turn that deferred here. A follow-up turn that
+        // ran already settled itself and cleared the record; the identity and
+        // error guards keep aborted/deleted/failed turns on their own paths.
+        const record = active.deferredTurnSettlement;
+        active.deferredTurnSettlement = null;
+        this.settleSessionTurn(sessionId, active, record.truncated, true);
       }
     }
   }
@@ -2193,6 +2325,48 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.activeSessions.delete(sessionId);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
+    // SoL-Pi archives are session-scoped; drop them with the session. Cleanup
+    // is best-effort and asynchronous so session teardown never blocks on disk
+    // IO; it is a no-op when SoL-Pi never ran (the directory does not exist).
+    void clearSolPiSessionStorage(solPiStorageRoot(app.getPath('userData')), sessionId);
+  }
+
+  /**
+   * Route a SoL-Pi fused `then_run` command through the same checks as a
+   * plain `bash` tool call: the static command-safety screen always applies;
+   * workbench authorization applies when a run is active.
+   */
+  private async authorizeSolPiThenRun(
+    sessionId: string,
+    fallbackRunId: string | null,
+    thenRun: SolPiThenRunCommand,
+    toolCallId: string,
+  ): Promise<SolPiThenRunAuthorization> {
+    const violation = getPiBashCommandViolation(thenRun.command);
+    if (violation) return { allow: false, reason: violation };
+    const runId = this.activeSessions.get(sessionId)?.workbenchRunId ?? fallbackRunId;
+    if (!runId || !this.workbenchTaskService) return { allow: true };
+    const authorization = await this.workbenchTaskService.authorizeToolCall({
+      sessionId,
+      runId,
+      toolCallId: buildSolPiThenRunToolCallId(toolCallId),
+      toolName: 'bash',
+      toolInput: {
+        command: thenRun.command,
+        ...(thenRun.timeout !== undefined ? { timeout: thenRun.timeout } : {}),
+      },
+      approvalMode:
+        this.activeSessions.get(sessionId)?.approvalMode ?? WorkbenchApprovalMode.Ask,
+    });
+    // Remember where the synthetic approval lives so the fused tool's
+    // execution end can settle it (approved executions would otherwise stay
+    // "executing" in the workbench ledger forever). A denied authorization
+    // never reaches the Executing effect status, so recording it is harmless —
+    // the settle call below no-ops on non-Executing approvals.
+    this.activeSessions.get(sessionId)?.solPiThenRunApprovalRunIds.set(toolCallId, runId);
+    return authorization && !authorization.allow
+      ? { allow: false, reason: authorization.reason || 'The follow-up command was not approved.' }
+      : { allow: true };
   }
 
   // ── Chat mode: direct LLM without agent loop ──
@@ -2526,6 +2700,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.thinkingMessageId = null;
         active.answerText = '';
         active.thinkingText = '';
+        active.lastAnswerTruncated = false;
+        active.lastAssistantStopReason = null;
         active.streamAccumulator.reset();
         active.thinkingLifecycle.reset();
         break;
@@ -2587,6 +2763,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       case 'message_end': {
         if (event.message?.role === 'assistant') {
           active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
+          // Pure-text truncation (length, no tool calls): the Pi agent loop ends
+          // the run right after this message. Queue one bounded continuation
+          // steer so the loop re-prompts instead of stopping; if the budget is
+          // exhausted, agent_end discloses the truncation instead of completing
+          // silently.
+          const answerTruncated = isPiPureTextTruncation(event.message);
+          active.lastAnswerTruncated = answerTruncated;
+          active.lastAssistantStopReason = event.message.stopReason ?? null;
+          if (answerTruncated) {
+            active.truncatedAnswerRecovery.queueIfNeeded(event.message, active.piSession);
+          }
           if (event.message.stopReason === 'error') {
             const { text, thinking } = active.streamAccumulator.reconcile(event.message);
             if (thinking && thinking !== active.thinkingText) {
@@ -2634,7 +2821,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           // Finalize the answer bubble on its own id.
           if (finalAnswer.trim()) {
             active.answerText = finalAnswer;
-            this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
+            this.finalizeMessage(
+              sessionId,
+              active,
+              'answer',
+              finalAnswer,
+              buildAnswerStopReasonMetadata(event.message.stopReason),
+            );
             active.lastCompletedAnswerMessageId = active.assistantMessageId;
             active.lastCompletedAnswerText = finalAnswer;
             this.scheduleContextUsageSync(
@@ -2715,6 +2908,25 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             Boolean(event.isError),
           );
         }
+        // A fused SoL-Pi edit/write carries an embedded then_run bash whose
+        // approval was recorded under a synthetic id; the inner bash emits no
+        // tool_execution_end of its own, so settle it from the outer event.
+        // isError tracks the fused outcome: the vendor only reports success
+        // when the embedded command ran successfully. The recorded runId keeps
+        // the settlement on the run that authorized it even if the active run
+        // has since moved on. No synthetic approval (plain edit/write, no
+        // then_run, or the approval was never created) → recordToolResult
+        // no-ops on the missing or non-Executing approval.
+        const thenRunRunId = active.solPiThenRunApprovalRunIds.get(event.toolCallId);
+        if (thenRunRunId) {
+          active.solPiThenRunApprovalRunIds.delete(event.toolCallId);
+          this.workbenchTaskService?.recordToolResult(
+            thenRunRunId,
+            buildSolPiThenRunToolCallId(event.toolCallId),
+            event.result,
+            Boolean(event.isError),
+          );
+        }
         if (event.toolName) {
           active.productionLoop?.recordToolResult(
             event.toolCallId,
@@ -2783,6 +2995,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
         active.toolStartedAtByCallId.clear();
+        active.solPiThenRunApprovalRunIds.clear();
         const clearActivity = active.toolActivityTracker.clear();
         if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
         // Failed attempt (deferred error pending): do not continue the agent
@@ -2845,65 +3058,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           (this.pendingMessageQueue.hasPendingFollowUp(sessionId) ||
             (this.queuedControlActions.get(sessionId)?.length ?? 0) > 0)
         ) {
+          // A queued follow-up continues the turn, but the truncated final
+          // answer still happened: disclose it first (idempotent) so the
+          // truncation stays user-visible, and defer this turn's settlement
+          // to the queue drain. A follow-up turn settles the new run by its
+          // own outcome; when the queue drains without starting another turn
+          // (only queued control actions never start one), the deferred
+          // record settles this turn instead — a disclosed truncation can
+          // never be silently swallowed by breaking out of agent_end.
+          const truncationDisclosed = active.lastAnswerTruncated;
+          if (truncationDisclosed) this.discloseTruncatedAnswer(sessionId, active);
+          active.deferredTurnSettlement = { truncated: truncationDisclosed };
           void this.flushFollowUpQueue(sessionId, active);
           break;
         }
-        if (this.store) {
-          this.store.updateSession(sessionId, { status: 'idle' });
-          try {
-            this.store.refreshSessionArtifacts(sessionId);
-          } catch (error) {
-            console.error(
-              `[PiRuntimeAdapter] Failed to refresh artifacts for session ${sessionId}:`,
-              error,
-            );
-          }
-        }
-        if (active.workbenchRunId && this.workbenchTaskService) {
-          const domainWorkflowSnapshot = active.researchRun
-            ? active.researchRun.getSnapshot()
-            : active.shortcutWorkflow
-              ? active.shortcutWorkflow.getSnapshot()
-              : null;
-          const workflowSnapshot = composeWorkbenchWorkflowSnapshot({
-            production:
-              active.productionControlsAvailable && active.productionLoop
-                ? active.productionLoop.getSnapshot()
-                : null,
-            domain: domainWorkflowSnapshot,
-          });
-          // Deliver-phase artifacts are preserved regardless of review
-          // outcome: a reviewer pass marks them Verified, a lightweight skip
-          // leaves them Pending so user acceptance can elevate them
-          // (markArtifactsVerified on accept).
-          const deliveryArtifacts = active.productionLoop?.getDeliveryArtifacts().map(artifact => ({
-            path: artifact.reference,
-            kind: artifact.kind,
-            role: artifact.kind,
-            source: WorkbenchArtifactCandidateSource.ProductionInspection,
-            verificationStatus: active.productionLoop?.getReviewOutcome().skipped
-              ? WorkbenchArtifactVerificationStatus.Pending
-              : WorkbenchArtifactVerificationStatus.Verified,
-          }));
-          this.workbenchTaskService.completeRun({
-            sessionId,
-            runId: active.workbenchRunId,
-            workspaceRoot: active.workspaceRoot,
-            finalAnswer: active.lastCompletedAnswerText,
-            finalMessageId: active.lastCompletedAnswerMessageId,
-            workflowCompleted: active.productionControlsAvailable
-              ? active.agentLoop.getState().done
-              : undefined,
-            workflowSnapshot,
-            artifactCandidates: deliveryArtifacts,
-          });
-        }
-        void this.runPostTurnMemoryMaintenance(
-          sessionId,
-          active.workspaceRoot,
-          this.createSessionMemoryCompletion(active),
-        );
-        this.emit('complete', sessionId, null);
+        this.settleSessionTurn(sessionId, active);
         break;
       }
 
@@ -2984,6 +3153,123 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.emit('error', sessionId, pending.classified);
   }
 
+  // ── Private: truncated answer disclosure ──
+
+  /**
+   * Terminal settlement of one session turn: truncation disclosure, idle
+   * status, workbench run completion (needs_review on truncation), post-turn
+   * memory maintenance and the complete event.
+   *
+   * Called from agent_end's fall-through, and — via the deferred record set in
+   * the follow-up drain branch — from flushFollowUpQueue once the queue has
+   * drained without leaving a running turn. `truncatedOverride` carries the
+   * disclosed-truncation state of the turn that deferred settlement (the flag
+   * itself was cleared by the disclosure); `disclosurePersisted` marks that
+   * the drain branch already persisted the notice, so the deferred settlement
+   * must not disclose a second time.
+   */
+  private settleSessionTurn(
+    sessionId: string,
+    active: ActivePiSession,
+    truncatedOverride?: boolean,
+    disclosurePersisted = false,
+  ): void {
+    active.deferredTurnSettlement = null;
+    // Terminal truncated answer (continuation budget exhausted or steer
+    // unavailable): disclose it instead of presenting the run as a clean
+    // success. Queued Work follow-ups were drained above and disclose any
+    // truncation themselves, so this branch only runs for turns that
+    // genuinely end the session turn.
+    const answerTruncatedTerminal = truncatedOverride ?? active.lastAnswerTruncated;
+    if (answerTruncatedTerminal && !disclosurePersisted) {
+      this.discloseTruncatedAnswer(sessionId, active);
+    }
+    if (this.store) {
+      this.store.updateSession(sessionId, { status: 'idle' });
+      try {
+        this.store.refreshSessionArtifacts(sessionId);
+      } catch (error) {
+        console.error(
+          `[PiRuntimeAdapter] Failed to refresh artifacts for session ${sessionId}:`,
+          error,
+        );
+      }
+    }
+    if (active.workbenchRunId && this.workbenchTaskService) {
+      const domainWorkflowSnapshot = active.researchRun
+        ? active.researchRun.getSnapshot()
+        : active.shortcutWorkflow
+          ? active.shortcutWorkflow.getSnapshot()
+          : null;
+      const workflowSnapshot = composeWorkbenchWorkflowSnapshot({
+        production:
+          active.productionControlsAvailable && active.productionLoop
+            ? active.productionLoop.getSnapshot()
+            : null,
+        domain: domainWorkflowSnapshot,
+      });
+      // Deliver-phase artifacts are preserved regardless of review
+      // outcome: a reviewer pass marks them Verified, a lightweight skip
+      // leaves them Pending so user acceptance can elevate them
+      // (markArtifactsVerified on accept).
+      const deliveryArtifacts = active.productionLoop?.getDeliveryArtifacts().map(artifact => ({
+        path: artifact.reference,
+        kind: artifact.kind,
+        role: artifact.kind,
+        source: WorkbenchArtifactCandidateSource.ProductionInspection,
+        verificationStatus: active.productionLoop?.getReviewOutcome().skipped
+          ? WorkbenchArtifactVerificationStatus.Pending
+          : WorkbenchArtifactVerificationStatus.Verified,
+      }));
+      this.workbenchTaskService.completeRun({
+        sessionId,
+        runId: active.workbenchRunId,
+        workspaceRoot: active.workspaceRoot,
+        finalAnswer: active.lastCompletedAnswerText,
+        finalMessageId: active.lastCompletedAnswerMessageId,
+        // A terminal truncation means the stream did not close cleanly:
+        // verification must land on the existing incomplete semantics
+        // (needs_review) instead of succeeded, so a disclosed truncation
+        // can never also be recorded as a business success. The UI still
+        // goes idle — the user can continue the conversation.
+        streamClosedCleanly: !answerTruncatedTerminal,
+        workflowCompleted: active.productionControlsAvailable
+          ? active.agentLoop.getState().done
+          : undefined,
+        workflowSnapshot,
+        artifactCandidates: deliveryArtifacts,
+      });
+    }
+    void this.runPostTurnMemoryMaintenance(
+      sessionId,
+      active.workspaceRoot,
+      this.createSessionMemoryCompletion(active),
+    );
+    this.emit('complete', sessionId, null);
+  }
+
+  /**
+   * Persist and emit an explicit terminal notice when a run ends with a
+   * truncated final answer: the output token limit was hit and the bounded
+   * continuation did not (or could not) run. The session goes idle — the user
+   * can continue the conversation — but the workbench run settles on the
+   * existing incomplete semantics (needs_review, never succeeded), so the
+   * truncation stays distinguishable from a clean finish at the business
+   * level too. Idempotent within the turn.
+   */
+  private discloseTruncatedAnswer(sessionId: string, active: ActivePiSession): void {
+    active.lastAnswerTruncated = false;
+    const seed: CoworkMessage = {
+      id: randomUUID(),
+      type: 'system',
+      content: t('coworkAnswerTruncatedNotice'),
+      timestamp: Date.now(),
+      metadata: { answerTruncated: true, stopReason: PiAssistantStopReason.Length },
+    };
+    const message = this.store ? this.store.addMessage(sessionId, seed) : seed;
+    this.emit('message', sessionId, message);
+  }
+
   // ── Private: assistant message lifecycle ──
 
   /**
@@ -3061,6 +3347,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active: ActivePiSession,
     kind: 'answer' | 'thinking',
     content: string,
+    extraMetadata?: Record<string, unknown>,
   ): void {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.clearPendingMessageUpdate(messageId);
@@ -3078,6 +3365,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             isStreaming: false,
             isFinal: true,
             ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            ...extraMetadata,
           };
     if (this.store) {
       this.store.updateMessage(sessionId, messageId, { content, metadata });
@@ -3103,6 +3391,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       isFinal: true,
       isFinalAnswer: true,
       ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+      ...buildAnswerStopReasonMetadata(active.lastAssistantStopReason ?? undefined),
     };
     if (this.store) {
       const message = this.store

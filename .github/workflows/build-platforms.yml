@@ -86,6 +86,8 @@ jobs:
             ~/.npm
             ~/.cache/electron
             ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
@@ -136,6 +138,21 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Verify packaged ACP registry and bridges
         run: node scripts/ci/verify-packaged-acp-resources.mjs
+      # bun install --ignore-scripts skips electron's postinstall, so the
+      # packaged smoke and cold-cache gate have no node_modules Electron
+      # binary to run under (same bootstrap as memory-regression.yml).
+      - name: Install Electron runtime
+        if: ${{ matrix.platform == 'macos' }}
+        run: node node_modules/electron/install.js
+      - name: Verify packaged SoL-Pi resources, smoke, and cold-cache jiti gate
+        if: ${{ matrix.platform == 'macos' }}
+        run: |
+          node scripts/ci/verify-packaged-solpi-resources.mjs release
+          ASAR="$(find release -name app.asar -print -quit)"
+          node_modules/electron/dist/Electron.app/Contents/MacOS/Electron \
+            scripts/ci/solpi-packaged-smoke.cjs "$(pwd)/${ASAR#./}"
+          node_modules/electron/dist/Electron.app/Contents/MacOS/Electron \
+            scripts/ci/solpi-bundle-jiti-gate.cjs "$(pwd)/${ASAR#./}"
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell

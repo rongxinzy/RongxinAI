@@ -7,6 +7,8 @@ import path from 'node:path';
 import { prerelease } from 'semver';
 import { test } from 'vitest';
 
+import { ELECTRON_MAIN_EXTERNALS } from '../scripts/electron-runtime-dependencies.mjs';
+
 const root = path.resolve(__dirname, '..');
 
 function resourceSources(config: { extraResources?: Array<{ from?: string }> }): string[] {
@@ -65,15 +67,17 @@ test('unpacks AnyDoc native bindings from the application archive', () => {
   assert.ok(config.asarUnpack?.includes('node_modules/@firecrawl/**'));
 
   const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
-  const runtimeDependencies = readFileSync(
-    path.join(root, 'scripts', 'electron-runtime-dependencies.mjs'),
-    'utf8',
-  );
   assert.match(viteConfig, /ELECTRON_MAIN_EXTERNALS\.includes\(id\)/);
-  assert.match(
-    runtimeDependencies,
-    /ELECTRON_MAIN_EXTERNALS\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/,
-  );
+  // Assert on the imported arrays, not on raw source: a regex over the module
+  // source cannot tell the two arrays apart (both contain these entries), so
+  // it would stay green when an entry drifts out of one array only.
+  assert.ok(ELECTRON_MAIN_EXTERNALS.includes('@firecrawl/anydoc'));
+  // jiti must stay externalized in the main bundle: an inlined copy resolves
+  // its babel helper relative to the bundle file and dies with
+  // MODULE_NOT_FOUND in packaged layouts (deep-acceptance finding d1-f1).
+  // The build-time allowlist check cannot catch this direction (an inlined
+  // jiti produces no external root), so it is pinned here.
+  assert.ok(ELECTRON_MAIN_EXTERNALS.includes('jiti'));
 });
 
 test('unpacks npm for connector installation without a system Node.js runtime', () => {

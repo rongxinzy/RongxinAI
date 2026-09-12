@@ -390,6 +390,113 @@ test('async reminder turns on channel-synced sessions are tracked lazily and rel
   handler.destroy();
 });
 
+test('async reminder turns with a truncated answer relay back with the truncation disclosure', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const relayedReplies: Array<{ platform: string; conversationId: string; text: string }> = [];
+
+  const session = coworkStore.createSession('IM-dingtalk', process.cwd(), '', 'auto');
+  imStore.createSessionMapping('default:user-42', 'dingtalk', session.id as string);
+
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore,
+    sendAsyncReply: async (platform: string, conversationId: string, text: string) => {
+      relayedReplies.push({ platform, conversationId, text });
+      return true;
+    },
+  });
+
+  runtime.emit('message', session.id as string, {
+    id: 'system-1',
+    type: 'system',
+    content: '⏰ 提醒：开会',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('message', session.id as string, {
+    id: 'assistant-1',
+    type: 'assistant',
+    content: '时间到了，记得开会。会议议程第一项……',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  const disclosure = '回复因达到单次输出长度上限被截断，内容可能不完整。';
+  runtime.emit('message', session.id as string, {
+    id: 'system-truncated',
+    type: 'system',
+    content: disclosure,
+    timestamp: Date.now(),
+    metadata: { answerTruncated: true, stopReason: 'length' },
+  });
+  runtime.emit('complete', session.id as string, null);
+
+  await new Promise(resolve => setImmediate(resolve));
+
+  expect(relayedReplies).toEqual([
+    {
+      platform: 'dingtalk',
+      conversationId: 'default:user-42',
+      text: `时间到了，记得开会。会议议程第一项……\n\n${disclosure}`,
+    },
+  ]);
+
+  handler.destroy();
+});
+
+test('a truncated-but-empty reminder turn relays the disclosure alone instead of being suppressed', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const relayedReplies: Array<{ platform: string; conversationId: string; text: string }> = [];
+
+  const session = coworkStore.createSession('IM-dingtalk', process.cwd(), '', 'auto');
+  imStore.createSessionMapping('default:user-42', 'dingtalk', session.id as string);
+
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore,
+    sendAsyncReply: async (platform: string, conversationId: string, text: string) => {
+      relayedReplies.push({ platform, conversationId, text });
+      return true;
+    },
+  });
+
+  const disclosure = '回复因达到单次输出长度上限被截断，内容可能不完整。';
+  runtime.emit('message', session.id as string, {
+    id: 'system-1',
+    type: 'system',
+    content: '⏰ 提醒：开会',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('message', session.id as string, {
+    id: 'system-truncated',
+    type: 'system',
+    content: disclosure,
+    timestamp: Date.now(),
+    metadata: { answerTruncated: true, stopReason: 'length' },
+  });
+  runtime.emit('complete', session.id as string, null);
+
+  await new Promise(resolve => setImmediate(resolve));
+
+  // The composed reply (default empty text + notice) no longer equals the
+  // bare empty marker, so the suppression gate passes it through.
+  expect(relayedReplies).toEqual([
+    {
+      platform: 'dingtalk',
+      conversationId: 'default:user-42',
+      text: `处理完成，但没有生成回复。\n\n${disclosure}`,
+    },
+  ]);
+
+  handler.destroy();
+});
+
 test('replaces every mapped IM session title with the platform default when loading conversations', () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();

@@ -192,8 +192,67 @@ test('persists delivery separately after Pi completes without changing Run succe
     expect.objectContaining({ id: task.id }),
     expect.objectContaining({ status: 'success' }),
     'done',
+    false,
   );
   expect(store.listRuns(task.id)[0]).toMatchObject({ status: 'success' });
+});
+
+test('a truncated execution settles the Run as needs_review and delivers the disclosed content', async () => {
+  const { store, task, client } = setup();
+  const dispatch = vi.fn(async () => undefined);
+  const activityService = { upsertBestEffort: vi.fn() };
+  const runtime = new CcConnectSchedulerRuntime(
+    store,
+    client,
+    async () => ({
+      sessionId: 'pi-run',
+      output: 'partial answer',
+      answerTruncated: true,
+      truncationNotice: '回复因达到单次输出长度上限被截断，内容可能不完整。',
+    }),
+    { dispatch } as never,
+    activityService as never,
+  );
+  await runtime.runNow(task.id);
+
+  expect(store.listRuns(task.id)[0]).toMatchObject({ status: TaskStatus.NeedsReview });
+  expect(dispatch).toHaveBeenCalledWith(
+    expect.objectContaining({ id: task.id }),
+    expect.objectContaining({ status: TaskStatus.NeedsReview }),
+    'partial answer\n\n回复因达到单次输出长度上限被截断，内容可能不完整。',
+    true,
+  );
+  expect(activityService.upsertBestEffort).toHaveBeenCalledWith(
+    expect.objectContaining({
+      status: 'completed',
+      replyPreview: 'partial answer\n\n回复因达到单次输出长度上限被截断，内容可能不完整。',
+    }),
+  );
+});
+
+test('a truncated execution with no assistant text still delivers the disclosure alone', async () => {
+  const { store, task, client } = setup();
+  const dispatch = vi.fn(async () => undefined);
+  const runtime = new CcConnectSchedulerRuntime(
+    store,
+    client,
+    async () => ({
+      sessionId: 'pi-run',
+      output: null,
+      answerTruncated: true,
+      truncationNotice: '回复因达到单次输出长度上限被截断，内容可能不完整。',
+    }),
+    { dispatch } as never,
+  );
+  await runtime.runNow(task.id);
+
+  expect(store.listRuns(task.id)[0]).toMatchObject({ status: TaskStatus.NeedsReview });
+  expect(dispatch).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.anything(),
+    '回复因达到单次输出长度上限被截断，内容可能不完整。',
+    true,
+  );
 });
 
 test('finishes a claimed Run as error when Pi terminates unexpectedly', async () => {

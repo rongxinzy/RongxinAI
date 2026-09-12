@@ -157,6 +157,30 @@ export default defineConfig(async ({ command }) => {
                   }
                 },
               },
+              {
+                // SoL-Pi compute worker: same externals as the main bundle so
+                // the worker's jiti require stays externalized (the packaged
+                // jiti gate guards exactly this class of bug) and the worker
+                // resolves the vendor tree identically to the main process.
+                entry: 'src/main/workers/solPiComputeWorker.ts',
+                vite: {
+                  build: {
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: {
+                      external:
+                        command === 'serve'
+                          ? isElectronDevelopmentExternal
+                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                      output: {
+                        codeSplitting: false,
+                      },
+                    },
+                  },
+                },
+                onstart() {},
+              },
             ]),
           ]),
       ...(process.env.VITE_SKIP_ELECTRON ? [] : [renderer()]),

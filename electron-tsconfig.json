@@ -21,6 +21,9 @@
   "exclude": [
     "src/**/*.test.*",
     "src/**/*.spec.*",
+    // Vendored SoL-Pi upstream source: loaded at runtime via jiti (same
+    // strategy Pi uses for extension packages), never compiled by tsc.
+    "src/main/libs/solPi/vendor/**",
     // Renderer-only chat UI; never imported by the main process. Excluding
     // it lets the renderer use extensionless dynamic imports that NodeNext
     // resolution would otherwise reject.

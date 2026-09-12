@@ -17,6 +17,18 @@
       "filter": ["**/*", "!**/*.map"]
     },
     {
+      "from": "src/main/libs/solPi/vendor",
+      "to": "solpi-vendor",
+      "filter": [
+        "**/*",
+        "!**/*.test.*",
+        "!**/*.spec.*",
+        "!**/tests/**",
+        "!**/test/**",
+        "!**/__tests__/**"
+      ]
+    },
+    {
       "from": "dist-electron",
       "to": "dist-electron",
       "filter": ["**/*", "!**/*.map"]
@@ -346,7 +358,8 @@
     "node_modules/@firecrawl/**",
     "node_modules/better-sqlite3/**",
     "node_modules/node-pty/**",
-    "node_modules/npm/**"
+    "node_modules/npm/**",
+    "dist-electron/solPiComputeWorker.js"
   ],
   "asar": true
 }

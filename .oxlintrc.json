@@ -13,7 +13,8 @@
     "build/",
     "SKILLs/",
     "sandbox/",
-    "scripts/"
+    "scripts/",
+    "src/main/libs/solPi/vendor/"
   ],
   "categories": {
     "correctness": "error"

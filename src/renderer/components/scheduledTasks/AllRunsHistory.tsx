@@ -15,6 +15,7 @@ import { Clock, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import { TaskStatus } from '../../../scheduledTask/constants';
 import type {
   RunFilter,
   ScheduledTask,
@@ -35,6 +36,7 @@ const statusLabelKeys: Record<string, string> = {
   error: 'scheduledTasksStatusError',
   skipped: 'scheduledTasksStatusSkipped',
   running: 'scheduledTasksStatusRunning',
+  [TaskStatus.NeedsReview]: 'scheduledTasksStatusNeedsReview',
 };
 
 function applyClientFilter(
@@ -159,7 +161,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
             onValueChange={status =>
               handleFilterChange({ ...filter, status: status || undefined })
             }
-            items={(['success', 'error', 'skipped', 'running'] as const)
+            items={(['success', TaskStatus.NeedsReview, 'error', 'skipped', 'running'] as const)
               .filter(s => showRunning || s !== 'running')
               .map(s => ({ value: s as string, label: i18nService.t(statusLabelKeys[s]) }))}
           />

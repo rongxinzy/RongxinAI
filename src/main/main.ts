@@ -281,6 +281,9 @@ import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenc
 import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
+import { reconcileSolPiSessionStorage } from './libs/solPi/solPiSessionScope';
+import { disposeSolPiComputePool } from './libs/solPi/solPiComputePool';
+import { teardownCascadeDeletedSessions } from './libs/coworkSessionTeardown';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
 import {
@@ -1246,6 +1249,9 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     // Live team member definitions must read the same bundled truth as the
     // main-session preset snapshot, not the userData skills copy.
     piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
+    // One-time SoL-Pi archive reconciliation: drop orphaned session dirs (>24h
+    // old and no cowork_sessions row) without blocking startup.
+    void reconcileSolPiSessionStorage(app.getPath('userData'), getCoworkStore().listSessionIds());
     // MCP initialization runs asynchronously, so late injection may still be needed.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
   }
@@ -3880,6 +3886,21 @@ if (!gotTheLock) {
       console.log(
         `[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`,
       );
+      // Cascade-deleted sessions need the same runtime purge (pending queues,
+      // workbench tasks, SoL-Pi archives) and IM mapping cleanup as the
+      // per-session delete paths, or they linger until archive reconciliation.
+      teardownCascadeDeletedSessions(deletedSessionIds, {
+        onSessionDeleted: sessionId => getPiRuntimeAdapter().onSessionDeleted(sessionId),
+        deleteImMapping: sessionId => {
+          getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+        },
+      });
+      if (deletedSessionIds.length > 0) {
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (win.isDestroyed()) continue;
+          win.webContents.send(CoworkStreamIpc.SessionsChanged, { deletedSessionIds });
+        }
+      }
       return { success: true, deletedSessionIds };
     } catch (error) {
       return {
@@ -4739,16 +4760,16 @@ if (!gotTheLock) {
 
       // Clean up IM session mappings for deleted sessions
       if (deletedSessionIds.length > 0) {
-        try {
-          const imStore = getIMGatewayManager()?.getIMStore();
-          if (imStore) {
-            for (const sessionId of deletedSessionIds) {
-              imStore.deleteSessionMappingByCoworkSessionId(sessionId);
-            }
-          }
-        } catch {
-          // IM store may not be initialised yet; safe to ignore.
-        }
+        // Purge runtime state (pending queues, workbench tasks, SoL-Pi
+        // archives) and IM mappings exactly like the single/batch
+        // session-delete paths, so cascade-deleted sessions do not linger
+        // until archive reconciliation. Individual failures are contained.
+        teardownCascadeDeletedSessions(deletedSessionIds, {
+          onSessionDeleted: sessionId => getPiRuntimeAdapter().onSessionDeleted(sessionId),
+          deleteImMapping: sessionId => {
+            getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+          },
+        });
 
         // Notify renderer to refresh session lists
         const windows = BrowserWindow.getAllWindows();
@@ -7037,6 +7058,11 @@ if (!gotTheLock) {
     sqliteBackupManager?.stopPeriodicBackupLoop();
     todoReminderScheduler?.stop();
     todoReminderScheduler = null;
+
+    // Terminate the SoL-Pi compute pool so packaged apps do not hold threads.
+    await disposeSolPiComputePool().catch(error => {
+      console.error('[SolPi] Failed to dispose the compute pool on quit:', error);
+    });
 
     // Close the SQLite database to flush the WAL and release the file lock.
     try {

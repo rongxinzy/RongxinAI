@@ -31,7 +31,7 @@ test("uses the sidecar-native session key instead of the display destination", a
     listSessionMappings: () => [],
   });
   transport.attach("account", { send });
-  await transport.send({ task, run: {} as never, content: "completed" });
+  await transport.send({ task, run: {} as never, content: "completed", truncated: false });
   expect(getCcConnectSessionKey).toHaveBeenCalledWith(
     "account",
     "qqbot",
@@ -51,7 +51,7 @@ test("refuses to guess a route or account", async () => {
     listSessionMappings: () => [],
   });
   await expect(
-    transport.send({ task, run: {} as never, content: "completed" }),
+    transport.send({ task, run: {} as never, content: "completed", truncated: false }),
   ).rejects.toThrow("unavailable");
 });
 
@@ -82,4 +82,47 @@ test('recovers the account for a legacy delivery without accountId', async () =>
     sessionKey: 'weixin:dm:user',
     content: 'completed',
   });
+});
+
+test('persists the write-back with the delivery source marker and truncation flag', async () => {
+  const send = vi.fn(async () => undefined);
+  const addMessage = vi.fn();
+  const conversationId = JSON.stringify(['account', 'conversation']);
+  const transport = new CcConnectDeliveryTransport(
+    {
+      getCcConnectSessionKey: () => 'qqbot:group:opaque',
+      listSessionMappings: () => [
+        { imConversationId: `cc-connect:${btoa(conversationId)}`, platform: 'qq', coworkSessionId: 'cowork-1' } as never,
+      ],
+    },
+    { addMessage } as never,
+  );
+  transport.attach('account', { send });
+  await transport.send({
+    task,
+    run: {} as never,
+    content: 'partial answer\n\n截断披露',
+    truncated: true,
+  });
+  expect(addMessage).toHaveBeenCalledWith(
+    'cowork-1',
+    expect.objectContaining({
+      type: 'assistant',
+      content: 'partial answer\n\n截断披露',
+      metadata: expect.objectContaining({
+        source: 'scheduled_task_delivery',
+        answerTruncated: true,
+      }),
+    }),
+  );
+
+  addMessage.mockClear();
+  await transport.send({ task, run: {} as never, content: 'clean answer', truncated: false });
+  expect(addMessage).toHaveBeenCalledWith(
+    'cowork-1',
+    expect.objectContaining({
+      metadata: expect.objectContaining({ source: 'scheduled_task_delivery' }),
+    }),
+  );
+  expect(addMessage.mock.calls[0]?.[1]).not.toHaveProperty('metadata.answerTruncated');
 });

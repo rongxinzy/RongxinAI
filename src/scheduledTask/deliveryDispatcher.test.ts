@@ -63,3 +63,20 @@ test('records the sidecar receipt or error against the same pending Delivery', a
   });
   expect(store.listDeliveries(run.id)).toHaveLength(2);
 });
+
+test('forwards the truncation flag to the channel transport', async () => {
+  const { store, task, run, transport } = setup(DeliveryMode.Announce);
+  const dispatcher = new ScheduledTaskDeliveryDispatcher(store, transport);
+  await expect(dispatcher.dispatch(task, run, 'partial\n\n(截断披露)', true)).resolves.toMatchObject({
+    status: DeliveryStatus.Success,
+  });
+  expect(transport.send).toHaveBeenCalledWith(
+    expect.objectContaining({ content: 'partial\n\n(截断披露)', truncated: true }),
+  );
+  await expect(dispatcher.dispatch(task, run, 'clean')).resolves.toMatchObject({
+    status: DeliveryStatus.Success,
+  });
+  expect(transport.send).toHaveBeenLastCalledWith(
+    expect.objectContaining({ content: 'clean', truncated: false }),
+  );
+});
