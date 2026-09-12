@@ -75,7 +75,18 @@ async function readAsar(archivePath) {
   return files;
 }
 
-const archives = await findAppArchives(path.resolve(packageRootArgument));
+const packageRoot = path.resolve(packageRootArgument);
+let archives;
+try {
+  archives = await findAppArchives(packageRoot);
+} catch (error) {
+  if (error?.code === 'ENOENT') {
+    throw new Error(
+      `Packaged release directory not found: ${packageRoot}. Build a package first (e.g. bun run dist:mac) or pass the unpacked release directory as the argument.`,
+    );
+  }
+  throw error;
+}
 if (archives.length !== 1) {
   throw new Error(`Expected one packaged app.asar, found ${archives.length}`);
 }
