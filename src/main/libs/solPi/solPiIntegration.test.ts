@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -6,6 +6,29 @@ import { buildSolPiRuntime } from './solPiIntegration';
 import { SolPiProfile } from './solPiProfile';
 import type { SolPiSessionManagerLike } from './solPiSessionScope';
 import { FakeExtensionApi } from './solPiTestFixtures';
+
+// Marker compute hooks: pin that buildSolPiRuntime actually threads the pool
+// API into the vendored projection path (a dropped hook would silently
+// revert that observation to main-thread hashing with every other test
+// green). Null return mirrors the pool's fail-open contract.
+const markers = vi.hoisted(() => {
+  const calls: Array<{ runtimeRoot: string; bytes: number }> = [];
+  return {
+    calls,
+    compute: {
+      prepareObservation: async (
+        message: { content: Array<{ type: string; text: string }> },
+        runtimeRoot: string,
+      ): Promise<null> => {
+        calls.push({ runtimeRoot, bytes: message.content[0]?.text.length ?? 0 });
+        return null;
+      },
+      fileHash: async (): Promise<string> => 'marker-file-hash',
+      hashBuffer: async (): Promise<string> => 'marker-buffer-hash',
+    },
+  };
+});
+vi.mock('./solPiComputePool', () => ({ getSolPiCompute: () => markers.compute }));
 
 const fakeInMemoryManager = (): SolPiSessionManagerLike & Record<string, unknown> => {
   const manager = {
@@ -83,5 +106,36 @@ describe('buildSolPiRuntime', () => {
     expect(api.tools.get('obs_recall')).toBeDefined();
     // No tools from disabled mechanisms.
     expect([...api.tools.keys()].sort()).toEqual(['edit', 'obs_recall', 'write']);
+  });
+
+  test('threads the compute pool hooks into the vendored projection path', async () => {
+    const userData = mkdtempSync(path.join(tmpdir(), 'solpi-int-'));
+    const parts = await buildSolPiRuntime({
+      ...baseOptions,
+      profile: SolPiProfile.Conservative,
+      userDataPath: userData,
+    });
+    expect(parts).not.toBeNull();
+    const api = new FakeExtensionApi();
+    parts!.extensionFactories.forEach(factory => factory(api as never));
+    await api.emitSessionStart(undefined);
+    const ctx = { cwd: baseOptions.cwd, sessionManager: parts!.sessionManager };
+
+    const big = `${'0123456789abcdef\n'.repeat(4096)}`;
+    const message = {
+      role: 'toolResult',
+      toolCallId: 'call-big',
+      toolName: 'bash',
+      isError: false,
+      content: [{ type: 'text', text: big }],
+    };
+    const projected = (await api.emitContext([message], ctx)) as typeof message[];
+
+    // The marker hook ran, against the app-owned runtime root.
+    expect(markers.calls.length).toBeGreaterThanOrEqual(1);
+    expect(markers.calls[0].runtimeRoot).toBe(path.join(parts!.storageDir, 'sol-pi'));
+    expect(markers.calls[0].bytes).toBe(big.length);
+    // Null (pool fail-open) keeps the full text in context.
+    expect((projected[0].content[0] as { text: string }).text).toBe(big);
   });
 });

@@ -198,10 +198,25 @@ export function createWorkerPool(
     if (job.job.signal?.aborted) {
       poolWorker.busy = null;
       settle(job, fail(job, { message: 'Job cancelled before it started', code: 'CANCELLED' }));
+      scheduleIdleShutdown(poolWorker);
       pump();
       return;
     }
-    poolWorker.worker.postMessage(send, job.job.transfer ?? []);
+    try {
+      poolWorker.worker.postMessage(send, job.job.transfer ?? []);
+    } catch (error) {
+      // A synchronous postMessage failure (uncloneable payload field,
+      // mismatched transfer list) must settle the job and free the slot —
+      // letting it propagate would wedge the worker as permanently busy and
+      // two such failures would starve the capped pool.
+      poolWorker.busy = null;
+      settle(job, fail(job, {
+        message: error instanceof Error ? error.message : String(error),
+        code: 'WORKER_POST_FAILED',
+      }));
+      scheduleIdleShutdown(poolWorker);
+      pump();
+    }
   };
 
   const pump = (): void => {

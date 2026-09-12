@@ -128,6 +128,24 @@ describe('createWorkerPool', () => {
     })) as { sha256: string };
     expect(result.sha256).toBe(createHash('sha256').update(copy).digest('hex'));
   });
+
+  test('a synchronous postMessage failure settles the job structurally and keeps the pool usable', async () => {
+    const pool = fixturePool();
+    // Functions are not structured-cloneable: postMessage throws
+    // synchronously instead of reaching the worker.
+    await expect(
+      pool.run({ kind: 'hash-buffer', payload: { buffer: new ArrayBuffer(16), fn: () => 1 } }),
+    ).rejects.toMatchObject({ code: 'WORKER_POST_FAILED' });
+    // The worker slot recovered instead of wedging busy: a follow-up valid
+    // job runs on the same pool and hashes correctly.
+    const buffer = Buffer.alloc(64, 3);
+    const result = (await pool.run({
+      kind: 'hash-buffer',
+      payload: { buffer: Uint8Array.from(buffer).buffer },
+    })) as { sha256: string };
+    expect(result.sha256).toBe(createHash('sha256').update(buffer).digest('hex'));
+    expect(pool.stats().running).toBe(0);
+  });
 });
 
 describe('worker-boundary event-loop evidence', () => {

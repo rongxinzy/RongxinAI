@@ -4,10 +4,15 @@
  * Moves the vendored extensions' blocking CPU work — first-sight observation
  * hashing/excerpt splitting and the fused-command interference hashes — off
  * the Electron main event loop. The injected functions keep the vendored
- * contracts byte-identical: the worker loads the same vendored module graph,
- * and failures (worker unavailable, queue overflow, worker crash) reject so
- * callers can fall back to the vendored in-process default — matching the
- * extension's own fail-open semantics.
+ * contracts byte-identical: the worker loads the same vendored module graph.
+ *
+ * Two degradation modes, kept distinct on purpose: when no worker bundle is
+ * available (source-mode execution), the hooks stay undefined and the vendored
+ * in-process defaults apply unchanged; when a hooked call fails at runtime
+ * (spawn failure, queue overflow, worker crash, job error), the rejection
+ * flows into the vendor's own fail-open — the observation stays in full
+ * context and the fused-command interference check is skipped for that call —
+ * the same semantics the vendored code already applies to its own errors.
  */
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -23,10 +28,28 @@ import {
 let pool: WorkerPool | null = null;
 let poolUnavailable = false;
 
-/** Worker bundle location (built next to the main bundle by vite). */
+/**
+ * Worker bundle location (built next to the main bundle by vite).
+ *
+ * In packaged builds the resolved path is the app.asar archive member, which
+ * is deliberate and verified: worker threads on the pinned Electron load
+ * asar-member scripts and resolve their bare specifiers (require('jiti'))
+ * against the archive's own node_modules — confirmed empirically against the
+ * real archive layout (scripts/ci/solpi-packaged-smoke.cjs exercises the
+ * spawn in every packaged gate run). The app.asar.unpacked sibling would NOT
+ * work: bare-specifier resolution from outside the archive never reaches
+ * app.asar/node_modules (MODULE_NOT_FOUND for jiti). Do not "fix" this to the
+ * unpacked convention used for spawned child processes.
+ */
 function resolveWorkerScript(): string | null {
   const candidates = [
+    // vite bundle layout (packaged app and electron:dev): __dirname is the
+    // bundle directory dist-electron/.
     path.resolve(__dirname, 'solPiComputeWorker.js'),
+    // tsc layout (dist-electron/main/libs/solPi): used by the packaged smoke
+    // scripts, which require the compiled module directly.
+    path.resolve(__dirname, '../../../solPiComputeWorker.js'),
+    // source-mode layout (vitest running from src/main/libs/solPi).
     path.resolve(__dirname, '../dist-electron/solPiComputeWorker.js'),
   ];
   return candidates.find(candidate => existsSync(candidate)) ?? null;
