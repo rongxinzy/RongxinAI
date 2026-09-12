@@ -74,6 +74,12 @@ test('unpacks AnyDoc native bindings from the application archive', () => {
     runtimeDependencies,
     /ELECTRON_MAIN_EXTERNALS\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/,
   );
+  // jiti must stay externalized in the main bundle: an inlined copy resolves
+  // its babel helper relative to the bundle file and dies with
+  // MODULE_NOT_FOUND in packaged layouts (deep-acceptance finding d1-f1).
+  // The build-time allowlist check cannot catch this direction (an inlined
+  // jiti produces no external root), so it is pinned here.
+  assert.match(runtimeDependencies, /ELECTRON_MAIN_EXTERNALS\s*=\s*\[[\s\S]*['"]jiti['"]/);
 });
 
 test('unpacks npm for connector installation without a system Node.js runtime', () => {

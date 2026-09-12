@@ -31,12 +31,16 @@
  * the package.
  *
  * Fingerprint choice: the gate fails on the quoted string literal
- * ../dist/babel.cjs (single or double quotes, enforced with a backreference).
- * Bundler region comments such as `//#region node_modules/jiti/dist/babel.cjs`
- * legitimately survive bundling and even remain in the post-fix bundle; they
- * contain `dist/babel.cjs` without the `../` prefix and without surrounding
- * quotes, so matching only the quoted `../dist/babel.cjs` literal reliably
- * distinguishes the executable lazy-require path from comments.
+ * ../dist/babel.cjs (single quotes, double quotes, or backticks, enforced
+ * with a backreference). Bundler region comments such as
+ * `//#region node_modules/jiti/dist/babel.cjs` legitimately survive bundling
+ * and even remain in the post-fix bundle; they contain `dist/babel.cjs`
+ * without the `../` prefix and without surrounding quotes, so matching only
+ * the quoted `../dist/babel.cjs` literal reliably distinguishes the
+ * executable lazy-require path from comments. Path concatenation
+ * ('..' + '/dist/babel.cjs') and other minified spellings remain outside a
+ * syntactic gate's reach — the packaged cold-cache mode below is the
+ * execution-level backstop for those.
  *
  * The assertions are deliberately coupled to the externalization strategy: a
  * loader change (e.g. switching solPiVendor to 'jiti/static', whose inlined
@@ -76,7 +80,7 @@ const usage = () => {
 };
 
 // Quoted lazy-require literal of the inlined jiti ESM wrapper (see header).
-const INLINED_JITI_BABEL_FINGERPRINT = /(['"])\.\.\/dist\/babel\.cjs\1/;
+const INLINED_JITI_BABEL_FINGERPRINT = /(['"`])\.\.\/dist\/babel\.cjs\1/;
 // Externalized jiti require as emitted by rolldown's CJS output.
 const EXTERNALIZED_JITI_REQUIRE = /require\(\s*(['"])jiti\1\s*\)/;
 
