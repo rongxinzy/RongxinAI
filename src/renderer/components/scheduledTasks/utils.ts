@@ -460,6 +460,7 @@ export function getStatusTextClass(status: TaskLastStatus | string | null | unde
   if (status === 'success') return 'text-success';
   if (status === 'error') return 'text-destructive';
   if (status === 'running') return 'text-primary';
+  if (status === 'needs_review') return 'text-warning';
   return 'text-muted-foreground';
 }
 
@@ -468,5 +469,6 @@ export function getStatusLabelKey(status: TaskLastStatus): string {
   if (status === 'error') return 'scheduledTasksStatusError';
   if (status === 'skipped') return 'scheduledTasksStatusSkipped';
   if (status === 'running') return 'scheduledTasksStatusRunning';
+  if (status === 'needs_review') return 'scheduledTasksStatusNeedsReview';
   return 'scheduledTasksStatusIdle';
 }

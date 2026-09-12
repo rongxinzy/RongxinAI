@@ -90,6 +90,13 @@ export const TaskStatus = {
   Error: 'error',
   Skipped: 'skipped',
   Running: 'running',
+  /**
+   * The run finished but its final answer was truncated (the model hit the
+   * output length limit and the bounded continuation did not complete it).
+   * Mirrors the workbench needs_review semantics: a disclosed truncation is
+   * never recorded as a business success.
+   */
+  NeedsReview: 'needs_review',
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
@@ -100,6 +107,18 @@ export const DeliveryStatus = {
   Skipped: 'skipped',
 } as const;
 export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus];
+
+// ─── Message provenance ─────────────────────────────────────────────────────
+/**
+ * Metadata marker for cowork messages written back by the scheduled-task
+ * delivery transport. Consumers picking "the run's assistant output" out of a
+ * session transcript must exclude these write-backs, or an earlier delivery
+ * gets re-delivered as a later run's output.
+ */
+export const ScheduledTaskMessageSource = {
+  Delivery: 'scheduled_task_delivery',
+} as const;
+export type ScheduledTaskMessageSource = (typeof ScheduledTaskMessageSource)[keyof typeof ScheduledTaskMessageSource];
 
 // ─── Default Agent ID ───────────────────────────────────────────────────────
 

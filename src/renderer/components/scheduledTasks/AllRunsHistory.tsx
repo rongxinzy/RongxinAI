@@ -35,6 +35,7 @@ const statusLabelKeys: Record<string, string> = {
   error: 'scheduledTasksStatusError',
   skipped: 'scheduledTasksStatusSkipped',
   running: 'scheduledTasksStatusRunning',
+  needs_review: 'scheduledTasksStatusNeedsReview',
 };
 
 function applyClientFilter(
@@ -159,7 +160,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
             onValueChange={status =>
               handleFilterChange({ ...filter, status: status || undefined })
             }
-            items={(['success', 'error', 'skipped', 'running'] as const)
+            items={(['success', 'needs_review', 'error', 'skipped', 'running'] as const)
               .filter(s => showRunning || s !== 'running')
               .map(s => ({ value: s as string, label: i18nService.t(statusLabelKeys[s]) }))}
           />

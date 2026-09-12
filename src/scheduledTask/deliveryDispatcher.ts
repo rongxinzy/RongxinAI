@@ -7,6 +7,8 @@ export type SchedulerDeliveryTransport = {
     task: ScheduledTask;
     run: ScheduledTaskRun;
     content: string;
+    /** True when the content ends with a truncation disclosure. */
+    truncated: boolean;
   }): Promise<{ receiptId?: string | null }>;
 };
 
@@ -24,6 +26,7 @@ export class ScheduledTaskDeliveryDispatcher {
     task: ScheduledTask,
     run: ScheduledTaskRun,
     output: string | null,
+    truncated = false,
   ): Promise<ScheduledTaskDeliveryRecord> {
     const delivery = this.store.createDelivery({
       runId: run.id,
@@ -54,7 +57,7 @@ export class ScheduledTaskDeliveryDispatcher {
       });
     }
     try {
-      const receipt = await this.transport.send({ task, run, content: output });
+      const receipt = await this.transport.send({ task, run, content: output, truncated });
       return this.store.finishDelivery(delivery.id, {
         status: DeliveryStatus.Success,
         deliveredAt: new Date().toISOString(),

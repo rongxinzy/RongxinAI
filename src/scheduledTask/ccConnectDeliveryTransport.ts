@@ -3,6 +3,7 @@ import { tryParseCcConnectScopedConversationId } from "../main/im/ccConnectConve
 import type { CoworkStore } from "../main/coworkStore";
 
 import type { CcConnectDeliveryClient } from "./ccConnectDeliveryClient";
+import { ScheduledTaskMessageSource } from "./constants";
 import type { SchedulerDeliveryTransport } from "./deliveryDispatcher";
 
 type DeliveryClient = Pick<CcConnectDeliveryClient, "send">;
@@ -56,7 +57,7 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
     }
     await client.send({ accountId, platform, sessionKey, content: input.content });
     try {
-      this.persistAssistantMessage(platform, accountId, conversationId, input.content);
+      this.persistAssistantMessage(platform, accountId, conversationId, input.content, input.truncated);
     } catch (error) {
       // Delivery has already succeeded. Do not turn an outbound notification
       // into a failed delivery merely because its local context projection
@@ -71,6 +72,7 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
     accountId: string,
     conversationId: string,
     content: string,
+    truncated: boolean,
   ): void {
     if (!this.coworkStore || !content.trim()) return;
     const scopedConversationId = JSON.stringify([accountId, conversationId]);
@@ -86,7 +88,11 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
     this.coworkStore.addMessage(mapping.coworkSessionId, {
       type: 'assistant',
       content,
-      metadata: { source: 'scheduled_task_delivery', scopedConversationId },
+      metadata: {
+        source: ScheduledTaskMessageSource.Delivery,
+        scopedConversationId,
+        ...(truncated ? { answerTruncated: true } : {}),
+      },
     });
   }
 

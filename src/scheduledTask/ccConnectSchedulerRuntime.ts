@@ -12,6 +12,16 @@ type TriggerClient = {
   remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void>;
 };
 
+/** What one scheduled execution reports back to the scheduler. */
+export interface SchedulerExecutionResult {
+  sessionId?: string | null;
+  output?: string | null;
+  /** True when the run's final answer was truncated and disclosed. */
+  answerTruncated?: boolean;
+  /** The localized disclosure text, when the answer was truncated. */
+  truncationNotice?: string | null;
+}
+
 /**
  * The only scheduler runtime allowed for cc-connect. It persists and claims
  * work locally; the sidecar is a disposable clock that can only emit triggers.
@@ -20,7 +30,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   constructor(
     private readonly store: SqliteScheduledTaskStore,
     private readonly client: TriggerClient,
-    private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<{ sessionId?: string | null; output?: string | null }>,
+    private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<SchedulerExecutionResult>,
     private readonly deliveryDispatcher?: ScheduledTaskDeliveryDispatcher,
     private readonly activityService?: ActivityService,
   ) {}
@@ -78,12 +88,25 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Running, startedAt: Date.parse(run.startedAt), taskName: task.name, inputPreview: task.payload.kind === 'agentTurn' ? task.payload.message : task.payload.text });
     try {
       const result = await this.execute(task, run);
-      const completedRun = this.store.finishRun(run.id, { status: TaskStatus.Success, sessionId: result.sessionId ?? null });
-      this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Completed, taskName: task.name, sessionId: result.sessionId ?? undefined, replyPreview: result.output ?? undefined });
+      // A disclosed truncation is not a clean finish: the Run settles on
+      // needs_review instead of success (mirroring the workbench contract),
+      // and the delivery carries the disclosure so the unattended user sees
+      // the answer was incomplete.
+      const truncated = result.answerTruncated === true;
+      const deliveredContent = truncated
+        ? [result.output?.trim() || null, result.truncationNotice?.trim() || null]
+            .filter(part => part !== null)
+            .join('\n\n') || null
+        : result.output ?? null;
+      const completedRun = this.store.finishRun(run.id, {
+        status: truncated ? TaskStatus.NeedsReview : TaskStatus.Success,
+        sessionId: result.sessionId ?? null,
+      });
+      this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Completed, taskName: task.name, sessionId: result.sessionId ?? undefined, replyPreview: deliveredContent ?? undefined });
       // Delivery is independently durable and best effort: a channel failure
       // must not turn a Pi-successful Run into an execution failure.
       try {
-        await this.deliveryDispatcher?.dispatch(task, completedRun, result.output ?? null);
+        await this.deliveryDispatcher?.dispatch(task, completedRun, deliveredContent, truncated);
       } catch (error) {
         console.error(`[Scheduler] Failed to persist Delivery for run ${run.id}:`, error);
       }
