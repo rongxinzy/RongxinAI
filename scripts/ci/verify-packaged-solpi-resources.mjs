@@ -132,10 +132,12 @@ if (JSON.stringify(sourceFiles) !== JSON.stringify(packagedVendorFiles)) {
 }
 
 // The main bundle must embed the packaged candidate so the runtime loader can
-// resolve the vendor without a source checkout.
+// resolve the vendor without a source checkout. Since the worker split the
+// loader embeds the vendored ROOT candidates and joins the entry file at
+// runtime, so the check pins the root candidate literal itself.
 const mainBundle = files.get('dist-electron/main.js').read().toString('utf8');
-if (!mainBundle.includes('solpi-vendor/sol-pi/index.ts')) {
-  throw new Error('Electron main bundle does not reference the packaged solpi-vendor entry');
+if (!mainBundle.includes('../solpi-vendor/sol-pi')) {
+  throw new Error('Electron main bundle does not reference the packaged solpi-vendor root');
 }
 
 console.log(
