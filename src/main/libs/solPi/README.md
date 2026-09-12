@@ -118,5 +118,5 @@ node scripts/ci/solpi-bundle-jiti-gate.cjs --static dist-electron/main.js
 - 打包版内 vendor 与主 bundle 各持一份 Pi SDK（结构化接口协作，冒烟已验证行为）；
   若未来要求单实例共享，需把 `@earendil-works/*` 加入主 bundle externals 并重审
   wasm 资产流。
-- ObservationPack 首次入档的 sha256（~10ms/MiB，每观察每进程一次）仍在 agent-stream
-  路径上；稳态已零读零哈希（见 VENDOR_PATCHES.md 的实测数字）。
+- ObservationPack 首次入档的 sha256（~10ms/MiB，每观察每扩展实例一次）仍在
+  agent-stream 路径上；稳态已零读零哈希（见 VENDOR_PATCHES.md 的实测数字）。

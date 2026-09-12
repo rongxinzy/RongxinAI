@@ -146,8 +146,13 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 		// O(content blocks), never touches the text itself: string length is
 		// metadata in V8, so the per-request guard stays cheap no matter how
 		// large the archived results are. Same discriminator strength as a
-		// byte-length check — both only catch size changes, which is all the
-		// reuse guard needs (ids embed the content hash).
+		// byte-length check — both catch only size changes. A same-length
+		// content change under a reused tool-call id is NOT detected and would
+		// be served the old projection (whose id embeds the old content hash);
+		// that is an accepted bound because the Pi SDK mints a fresh
+		// tool-call id per provider tool_use and nothing in this app or the
+		// vendored extensions rewrites an archived toolResult's content in
+		// place, so id reuse with mutated content does not occur today.
 		const contentUnits = (message: ToolResultMessage): number => {
 			let units = message.content.length - 1;
 			for (const block of message.content) units += block.text.length;

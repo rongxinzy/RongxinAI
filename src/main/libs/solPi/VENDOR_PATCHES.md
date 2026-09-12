@@ -40,11 +40,17 @@ them deliberately; never overwrite the tree blindly.
   per extension instance — i.e. per Pi-session incarnation, so the first
   provider request after an in-process session rebuild (app restart, stop,
   topology-change recreation) re-pays the EEXIST verify once per archived
-  observation instead of on every request. New archives are bounded by a
-  per-runtime-root byte budget (`DEFAULT_ARCHIVE_BUDGET_BYTES` = 256 MiB,
-  overridable via options); when the budget is reached, new large results
-  simply stay in full context (fail-open, one warn per root, referenced
-  archives are never deleted).
+  observation instead of on every request. The reuse guard compares only the
+  text's UTF-16 unit total: a same-length content change under a reused
+  tool-call id would be served the old projection. That is accepted because
+  the Pi SDK mints a fresh tool-call id per provider tool_use and nothing
+  rewrites an archived toolResult's content in place; if a future extension
+  does mutate tool results via the message_end replacement hook, the guard
+  must be strengthened (e.g. key the cache by content hash). New archives are
+  bounded by a per-runtime-root byte budget (`DEFAULT_ARCHIVE_BUDGET_BYTES`
+  = 256 MiB, overridable via options); when the budget is reached, new large
+  results simply stay in full context (fail-open, one warn per root,
+  referenced archives are never deleted).
 - **Measured:** steady state per provider request (10 x 1MiB archived results)
   went from 99.19ms / ~20MiB re-hashed / 2 object reads per message to 0
   hashed bytes and 0 object reads; extension cost under the real runner
