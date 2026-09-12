@@ -263,7 +263,7 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 						eof: chunk.eof,
 					});
 				} catch (error) {
-					console.error(`[observationpack] fail-open for recall ledger: ${String(error)}`);
+					console.error('[observationpack] fail-open for recall ledger:', error);
 				}
 				return {
 					content: [{ type: "text", text: content }],
@@ -437,7 +437,7 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 				try {
 					await ledgerFor(ctx)(ledgerEntries);
 				} catch (error) {
-					console.error(`[observationpack] fail-open for ledger batch: ${String(error)}`);
+					console.error('[observationpack] fail-open for ledger batch:', error);
 				}
 			}
 			return { messages: projected };

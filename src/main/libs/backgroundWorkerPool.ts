@@ -237,7 +237,12 @@ export function createWorkerPool(
         }
       }
       const job = claimNextJob();
-      if (!job) return;
+      if (!job) {
+        // Every queued job was cancelled between the queue check and here; a
+        // worker spawned for them must not linger idle without a shutdown.
+        scheduleIdleShutdown(target);
+        return;
+      }
       startJob(target, job);
     }
   };

@@ -135,7 +135,8 @@ export async function clearSolPiSessionStorage(
  * longer exist in the cowork store. A directory is only removed when it has a
  * safe session-id shape, is absent from `liveSessionIds`, and has not been
  * modified for over 24 hours (belt-and-suspenders against a session being
- * recreated while we list). Never throws; returns the removed session ids.
+ * recreated while we list). Never throws; returns the removed encoded session
+ * directory names (the on-disk form, not raw session ids).
  */
 export async function reconcileSolPiSessionStorage(
   userDataPath: string,

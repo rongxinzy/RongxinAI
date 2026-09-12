@@ -36,10 +36,15 @@ let poolUnavailable = false;
  * asar-member scripts and resolve their bare specifiers (require('jiti'))
  * against the archive's own node_modules — confirmed empirically against the
  * real archive layout (scripts/ci/solpi-packaged-smoke.cjs exercises the
- * spawn in every packaged gate run). The app.asar.unpacked sibling would NOT
- * work: bare-specifier resolution from outside the archive never reaches
- * app.asar/node_modules (MODULE_NOT_FOUND for jiti). Do not "fix" this to the
- * unpacked convention used for spawned child processes.
+ * spawn in the macOS packaged gate run). The app.asar.unpacked sibling (kept
+ * by asarUnpack) would NOT work as the spawn path: bare-specifier resolution
+ * from outside the archive never reaches app.asar/node_modules
+ * (MODULE_NOT_FOUND for jiti). Do not "fix" this to the unpacked convention
+ * used for spawned child processes.
+ *
+ * Source-mode execution (vitest, straight from src/) has no candidate that
+ * resolves, so the pool latches unavailable there and the vendored
+ * in-process defaults apply.
  */
 function resolveWorkerScript(): string | null {
   const candidates = [
@@ -49,8 +54,6 @@ function resolveWorkerScript(): string | null {
     // tsc layout (dist-electron/main/libs/solPi): used by the packaged smoke
     // scripts, which require the compiled module directly.
     path.resolve(__dirname, '../../../solPiComputeWorker.js'),
-    // source-mode layout (vitest running from src/main/libs/solPi).
-    path.resolve(__dirname, '../dist-electron/solPiComputeWorker.js'),
   ];
   return candidates.find(candidate => existsSync(candidate)) ?? null;
 }

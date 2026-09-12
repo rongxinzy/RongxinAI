@@ -20,6 +20,14 @@ interface VendorLedgerModule {
   ) => (entry: Record<string, unknown> | Record<string, unknown>[]) => Promise<void>;
 }
 
+interface VendorObservationModule {
+  FULL_SENDS: number;
+}
+
+const FULL_SENDS = await loadVendorModule<VendorObservationModule>(
+  'extensions/observation-pack/observation.ts',
+).then(module => module.FULL_SENDS);
+
 describe('vendored observation-pack ledger', () => {
   test('a failed append rejects its caller but never poisons later appends', async () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'solpi-ledger-'));
@@ -111,9 +119,11 @@ describe('vendored observation-pack with a broken ledger path', () => {
       content: [{ type: 'text', text: original }],
     } as const;
 
-    // Three sends pass the full text (FULL_SENDS), the fourth projects the
-    // placeholder — all while every ledger append fails.
-    for (let i = 0; i < 3; i += 1) await api.emitContext([message], ctx);
+    // The first FULL_SENDS sends pass the full text, later ones project the
+    // placeholder — all while every ledger append fails. The loop runs one
+    // send past FULL_SENDS so the placeholder branch is guaranteed reached
+    // without depending on the constant's value.
+    for (let i = 0; i < FULL_SENDS + 1; i += 1) await api.emitContext([message], ctx);
     const projected = (await api.emitContext([message], ctx)) as unknown as typeof message[];
     const placeholderText = (projected[0].content[0] as { text: string }).text;
     expect(placeholderText).toMatch(/^\[large tool result replaced/);
