@@ -131,7 +131,8 @@ export class PiScheduledTaskExecutor {
 }
 
 interface FinalAssistantOutput {
-  text: string;
+  /** Null when the truncated turn produced no persisted assistant text. */
+  text: string | null;
   truncated: boolean;
   notice: string | null;
 }
@@ -158,18 +159,26 @@ function finalAssistantOutput(turnMessages: readonly CoworkMessage[]): FinalAssi
         // run's answer; without the filter they re-deliver as new output.
         message.metadata?.source !== ScheduledTaskMessageSource.Delivery,
     );
-  const last = candidates[candidates.length - 1];
-  if (!last) return null;
-  const text = last.message.content.trim();
-  const notice =
+  const disclosureNoticeFrom = (fromIndex: number): string | null =>
     turnMessages
-      .slice(last.index + 1)
+      .slice(fromIndex)
       .find(
         message =>
           message.type === 'system' &&
           message.metadata?.answerTruncated === true &&
           message.content.trim(),
       )?.content.trim() ?? null;
+  const last = candidates[candidates.length - 1];
+  if (!last) {
+    // A length stop can end a turn with no persisted assistant text (empty
+    // final content is never persisted as an answer). The disclosure the
+    // runtime persists before completing is then the run's only output, and
+    // the surface must not report a clean success for it.
+    const orphanNotice = disclosureNoticeFrom(0);
+    return orphanNotice ? { text: null, truncated: true, notice: orphanNotice } : null;
+  }
+  const text = last.message.content.trim();
+  const notice = disclosureNoticeFrom(last.index + 1);
   return {
     text,
     truncated: last.message.metadata?.truncated === true || notice !== null,

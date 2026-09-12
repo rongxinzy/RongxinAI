@@ -346,6 +346,76 @@ test('a run without new assistant output never re-delivers a prior delivery writ
   });
 });
 
+test('a delivery write-back persisted inside the run boundary is never the run output', async () => {
+  const { session, messages, store } = createCoworkStore();
+  const runtime = Object.assign(new EventEmitter(), {
+    isSessionActive: () => false,
+    startSession: async (id: string) => {
+      // The previous delivery lands while this run is executing (the per-task
+      // lock is released before the scheduler dispatches), so the write-back
+      // is INSIDE this run's boundary and arrives after the real answer.
+      messages.push(
+        { id: 'user-prompt', type: 'user', content: 'run', timestamp: 1 },
+        { id: 'answer', type: 'assistant', content: 'this run answer', timestamp: 2 },
+        {
+          id: 'write-back',
+          type: 'assistant',
+          content: 'previous run answer (delivered again)',
+          timestamp: 3,
+          metadata: { source: ScheduledTaskMessageSource.Delivery, answerTruncated: false },
+        },
+      );
+      queueMicrotask(() => runtime.emit('complete', id, null));
+    },
+    continueSession: async () => undefined,
+    stopSession: () => undefined,
+  });
+
+  await expect(
+    new PiScheduledTaskExecutor(runtime as never, store as never).execute(task, run),
+  ).resolves.toEqual({
+    sessionId: session.id,
+    output: 'this run answer',
+    answerTruncated: false,
+    truncationNotice: null,
+  });
+});
+
+test('a length stop with no persisted answer text still reports the disclosure', async () => {
+  const { session, messages, store } = createCoworkStore();
+  const runtime = Object.assign(new EventEmitter(), {
+    isSessionActive: () => false,
+    startSession: async (id: string) => {
+      // Mirror the adapter contract for an empty-text length stop: no
+      // assistant message is persisted (empty final content never becomes an
+      // answer), but the runtime still persists the disclosure before
+      // completing.
+      messages.push(
+        { id: 'user-prompt', type: 'user', content: 'run', timestamp: 1 },
+        {
+          id: 'disclosure',
+          type: 'system',
+          content: '回复因达到单次输出长度上限被截断，内容可能不完整。',
+          timestamp: 2,
+          metadata: { answerTruncated: true, stopReason: 'length' },
+        },
+      );
+      queueMicrotask(() => runtime.emit('complete', id, null));
+    },
+    continueSession: async () => undefined,
+    stopSession: () => undefined,
+  });
+
+  await expect(
+    new PiScheduledTaskExecutor(runtime as never, store as never).execute(task, run),
+  ).resolves.toEqual({
+    sessionId: session.id,
+    output: null,
+    answerTruncated: true,
+    truncationNotice: '回复因达到单次输出长度上限被截断，内容可能不完整。',
+  });
+});
+
 test('a truncated terminal answer reports the persisted disclosure', async () => {
   const { session, messages, store } = createCoworkStore();
   const runtime = Object.assign(new EventEmitter(), {
