@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: MIT
  */
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { type FileHandle, lstat, mkdir, open } from "node:fs/promises";
+import { constants, type Dirent } from "node:fs";
+import { type FileHandle, lstat, mkdir, open, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { TextContent, ToolResultMessage } from "@earendil-works/pi-ai";
@@ -73,7 +73,7 @@ export function isPureTextResult(message: AgentMessage): message is ToolResultMe
 	);
 }
 
-function textFromResult(message: ToolResultMessage): string {
+export function textFromResult(message: ToolResultMessage): string {
 	return (message.content as TextContent[]).map((block) => block.text).join("\n");
 }
 
@@ -153,6 +153,48 @@ export async function ensureStored(observation: Observation): Promise<void> {
 	} finally {
 		await handle?.close();
 	}
+}
+
+/**
+ * Size of one stored object, or undefined when it does not exist yet (or is
+ * not a regular file). Lets the caller tell a fresh archive write from an
+ * EEXIST verify so archive budget accounting only counts new bytes.
+ */
+export async function objectSize(path: string): Promise<number | undefined> {
+	try {
+		const stats = await lstat(path);
+		return stats.isFile() ? stats.size : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Total bytes of archived objects under one runtime root (async fs only; no
+ * recursion beyond the objects directory itself). A missing directory counts
+ * as zero; any other failure rejects.
+ */
+export async function archiveBytes(root: string): Promise<number> {
+	const objectsDir = join(root, "observation-pack", "objects");
+	let entries: Dirent[];
+	try {
+		entries = await readdir(objectsDir, { withFileTypes: true });
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return 0;
+		throw error;
+	}
+
+	let bytes = 0;
+	for (const entry of entries) {
+		if (!entry.isFile()) continue;
+		try {
+			const stats = await lstat(join(objectsDir, entry.name));
+			if (stats.isFile()) bytes += stats.size;
+		} catch {
+			// An object removed while summing must not abort the measurement.
+		}
+	}
+	return bytes;
 }
 
 function completeLineExcerpt(text: string, budgetBytes: number, fromEnd: boolean): string {

@@ -11,7 +11,8 @@
  * archives (ObservationPack objects/ledgers) land under
  * `<userData>/solPi/sessions/<sessionId>/` and stay isolated per session.
  */
-import { rmSync } from 'node:fs';
+import { readdir, rm, stat } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 
 /** Minimal structural type for the Pi SessionManager instances we wrap. */
@@ -22,12 +23,18 @@ export interface SolPiSessionManagerLike {
 
 export const SOLPI_STORAGE_DIR_NAME = 'solPi';
 
+/** Session-id shape enforced for every directory under the storage root. */
+const SESSION_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+
+/** Orphaned session dirs younger than this are never reconciled away. */
+const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+
 export function solPiStorageRoot(userDataPath: string): string {
   return path.join(userDataPath, SOLPI_STORAGE_DIR_NAME, 'sessions');
 }
 
 export function solPiSessionStorageDir(storageRoot: string, sessionId: string): string {
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(sessionId)) {
+  if (!SESSION_ID_PATTERN.test(sessionId)) {
     throw new Error('SoL-Pi storage requires a safe session id');
   }
   return path.join(storageRoot, sessionId);
@@ -51,14 +58,65 @@ export function createSolPiSessionManager(
 }
 
 /**
- * Lifecycle cleanup: remove a session's SoL-Pi archives. Best effort — a
- * failure to delete must never fail the session teardown that calls it.
+ * Lifecycle cleanup: remove a session's SoL-Pi archives. Async fs only (this
+ * runs off the request path), best effort — a failure to delete must never
+ * fail the session teardown that calls it, so this never rejects.
  */
-export function clearSolPiSessionStorage(storageRoot: string, sessionId: string): void {
-  const sessionDir = solPiSessionStorageDir(storageRoot, sessionId);
+export async function clearSolPiSessionStorage(
+  storageRoot: string,
+  sessionId: string,
+): Promise<void> {
   try {
-    rmSync(sessionDir, { recursive: true, force: true });
+    const sessionDir = solPiSessionStorageDir(storageRoot, sessionId);
+    await rm(sessionDir, { recursive: true, force: true });
   } catch (error) {
-    console.warn(`[SolPi] Failed to clean session storage ${sessionDir}:`, error);
+    console.warn(`[SolPi] Failed to clean session storage for ${sessionId}:`, error);
   }
+}
+
+/**
+ * Startup reconciliation: remove archive directories of sessions that no
+ * longer exist in the cowork store. A directory is only removed when it has a
+ * safe session-id shape, is absent from `liveSessionIds`, and has not been
+ * modified for over 24 hours (belt-and-suspenders against a session being
+ * recreated while we list). Never throws; returns the removed session ids.
+ */
+export async function reconcileSolPiSessionStorage(
+  userDataPath: string,
+  liveSessionIds: readonly string[],
+): Promise<string[]> {
+  const storageRoot = solPiStorageRoot(userDataPath);
+  const live = new Set(liveSessionIds);
+  const removed: string[] = [];
+
+  let entries: Dirent[];
+  try {
+    entries = await readdir(storageRoot, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return removed;
+    console.warn(`[SolPi] Failed to list session storage ${storageRoot}:`, error);
+    return removed;
+  }
+
+  const cutoff = Date.now() - ORPHAN_GRACE_MS;
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !SESSION_ID_PATTERN.test(entry.name)) continue;
+    if (live.has(entry.name)) continue;
+
+    const sessionDir = path.join(storageRoot, entry.name);
+    try {
+      const stats = await stat(sessionDir);
+      if (stats.mtimeMs > cutoff) continue;
+      await rm(sessionDir, { recursive: true, force: true });
+      removed.push(entry.name);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      console.warn(`[SolPi] Failed to reconcile session storage ${sessionDir}:`, error);
+    }
+  }
+
+  if (removed.length > 0) {
+    console.log(`[SolPi] Removed ${removed.length} orphaned session archive dir(s): ${removed.join(', ')}`);
+  }
+  return removed;
 }

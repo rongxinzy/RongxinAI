@@ -1244,6 +1244,12 @@ export class CoworkStore {
     }));
   }
 
+  /** Every persisted session id; used for SoL-Pi archive reconciliation. */
+  listSessionIds(): string[] {
+    const rows = this.getAll<{ id: string }>('SELECT id FROM cowork_sessions');
+    return rows.map(row => row.id);
+  }
+
   resetRunningSessions(): number {
     const now = Date.now();
     const result = this.db

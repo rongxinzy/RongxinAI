@@ -281,6 +281,7 @@ import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenc
 import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
+import { reconcileSolPiSessionStorage } from './libs/solPi/solPiSessionScope';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
 import {
@@ -1208,6 +1209,9 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     // Live team member definitions must read the same bundled truth as the
     // main-session preset snapshot, not the userData skills copy.
     piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
+    // One-time SoL-Pi archive reconciliation: drop orphaned session dirs (>24h
+    // old and no cowork_sessions row) without blocking startup.
+    void reconcileSolPiSessionStorage(app.getPath('userData'), getCoworkStore().listSessionIds());
     // MCP initialization runs asynchronously, so late injection may still be needed.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
   }

@@ -15,16 +15,24 @@
  * recall keeps working after native compaction or a session resume.
  *
  * Storage lives under the active Pi session directory.
+ *
+ * The projection runs on every provider request, so each extension instance
+ * caches its per-message projection (no full text retained) and skips the
+ * hash/archive work for messages it has already seen. Archiving new objects is
+ * additionally bounded by a per-root archive budget shared across instances in
+ * this process; over-budget results simply stay in full context.
  */
 
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
+import type { ToolResultMessage } from "@earendil-works/pi-ai";
 import { runtimeRoot } from "../../runtime-paths.ts";
 import { formatSavingsCount, renderSolPiTool, showSolPiSavings } from "../../tui.ts";
 import { createLedger, type Ledger } from "./ledger.ts";
 import {
+	archiveBytes,
 	countLines,
 	createObservation,
 	ensureStored,
@@ -32,6 +40,7 @@ import {
 	FULL_SENDS,
 	isObservationId,
 	isPureTextResult,
+	objectSize,
 	observationPath,
 	placeholderFor,
 	type RecallChunk,
@@ -48,7 +57,70 @@ const RECALL_LIMITS = {
 	maxLines: RECALL_MAX_LINES - RECALL_HEADER_LINES,
 };
 
-export function createObservationPackExtension(): ExtensionFactory {
+/** Upper bound for archived observation objects per session runtime root. */
+export const DEFAULT_ARCHIVE_BUDGET_BYTES = 256 * 1024 * 1024;
+/** Entry cap for the by-tool-call-id projection cache (FIFO eviction). */
+const PROJECTION_CACHE_MAX_ENTRIES = 1024;
+
+export interface ObservationPackOptions {
+	/** Archived-bytes ceiling per runtime root; defaults to DEFAULT_ARCHIVE_BUDGET_BYTES. */
+	readonly archiveBudgetBytes?: number;
+}
+
+interface ProjectionMeta {
+	readonly id: string;
+	readonly contentHash: string;
+	readonly toolName: string;
+	readonly bytes: number;
+	readonly textUnits: number;
+	readonly lines: number;
+	readonly tokens: number;
+}
+
+interface ArchivedProjection extends ProjectionMeta {
+	readonly archived: true;
+	readonly placeholder: string;
+	readonly placeholderTokens: number;
+}
+
+interface SkippedProjection extends ProjectionMeta {
+	readonly archived: false;
+}
+
+type Projection = ArchivedProjection | SkippedProjection;
+
+interface ArchiveBudget {
+	readonly limit: number;
+	bytes: number;
+	initialized: Promise<void>;
+	warned: boolean;
+}
+
+/** Shared per process so every extension instance on one root counts the same bytes. */
+const archiveBudgets = new Map<string, ArchiveBudget>();
+
+const budgetTrackerFor = (root: string, limit: number): ArchiveBudget => {
+	const existing = archiveBudgets.get(root);
+	if (existing) return existing;
+
+	const budget: ArchiveBudget = { limit, bytes: 0, initialized: Promise.resolve(), warned: false };
+	budget.initialized = archiveBytes(root).then(
+		(bytes) => {
+			budget.bytes = bytes;
+		},
+		(error) => {
+			// Fail open: an unmeasurable archive must not break the context path.
+			console.error(
+				`[observationpack] failed to measure archive bytes: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		},
+	);
+	archiveBudgets.set(root, budget);
+	return budget;
+};
+
+export function createObservationPackExtension(options: ObservationPackOptions = {}): ExtensionFactory {
+	const archiveBudgetBytes = options.archiveBudgetBytes ?? DEFAULT_ARCHIVE_BUDGET_BYTES;
 	return (pi: ExtensionAPI) => {
 		const sentCounts = new Map<string, number>();
 		const ledgers = new Map<string, Ledger>();
@@ -60,6 +132,49 @@ export function createObservationPackExtension(): ExtensionFactory {
 				ledgers.set(root, ledger);
 			}
 			return ledger;
+		};
+
+		// Steady-state projections skip hashing and archiving entirely. The
+		// WeakMap covers repeated requests with the same message object; the
+		// tool-call-id map survives message objects being rebuilt (resume,
+		// incarnation rebuild, the runner cloning messages per request) with a
+		// cheap text-size guard against id reuse.
+		const projectionsByMessage = new WeakMap<object, Projection>();
+		const projectionsByToolCallId = new Map<string, Projection>();
+
+		// UTF-16 unit total of the joined text (blocks plus "\n" separators).
+		// O(content blocks), never touches the text itself: string length is
+		// metadata in V8, so the per-request guard stays cheap no matter how
+		// large the archived results are. Same discriminator strength as a
+		// byte-length check — both only catch size changes, which is all the
+		// reuse guard needs (ids embed the content hash).
+		const contentUnits = (message: ToolResultMessage): number => {
+			let units = message.content.length - 1;
+			for (const block of message.content) units += block.text.length;
+			return units;
+		};
+
+		const cacheLookup = (message: ToolResultMessage): Projection | undefined => {
+			const byIdentity = projectionsByMessage.get(message);
+			if (byIdentity) return byIdentity;
+			const key = message.toolCallId;
+			if (!key) return undefined;
+			const candidate = projectionsByToolCallId.get(key);
+			if (!candidate) return undefined;
+			if (contentUnits(message) !== candidate.textUnits) return undefined;
+			projectionsByMessage.set(message, candidate);
+			return candidate;
+		};
+
+		const cacheStore = (message: ToolResultMessage, projection: Projection): void => {
+			projectionsByMessage.set(message, projection);
+			const key = message.toolCallId;
+			if (!key) return;
+			if (projectionsByToolCallId.size >= PROJECTION_CACHE_MAX_ENTRIES) {
+				const oldest = projectionsByToolCallId.keys().next().value;
+				if (oldest !== undefined) projectionsByToolCallId.delete(oldest);
+			}
+			projectionsByToolCallId.set(key, projection);
 		};
 
 		pi.registerTool({
@@ -137,6 +252,7 @@ export function createObservationPackExtension(): ExtensionFactory {
 		pi.on("context", async (event, ctx: ExtensionContext) => {
 			const projected = [...event.messages];
 			const root = runtimeRoot(ctx);
+			const budget = budgetTrackerFor(root, archiveBudgetBytes);
 			// How many provider requests each message has already been part of,
 			// counted by the assistant messages that follow it.
 			const priorAssistantCounts = new Array<number>(event.messages.length);
@@ -153,40 +269,83 @@ export function createObservationPackExtension(): ExtensionFactory {
 				if (!message || !isPureTextResult(message)) continue;
 
 				try {
-					const observation = createObservation(message, root);
-					if (!observation) continue;
-					await ensureStored(observation);
+					let projection = cacheLookup(message);
+					if (!projection) {
+						const observation = createObservation(message, root);
+						if (!observation) continue;
+						const textUnits = contentUnits(message);
 
-					const sendCountKey = `${root}\0${observation.id}`;
+						await budget.initialized;
+						if (budget.bytes + observation.bytes > budget.limit) {
+							// Over budget: never archive, never placeholder, never
+							// count sends — the result simply stays in full context.
+							if (!budget.warned) {
+								budget.warned = true;
+								console.warn(
+									`[observationpack] archive budget of ${budget.limit} bytes reached; new large tool results stay in full context`,
+								);
+							}
+							projection = {
+								archived: false,
+								id: observation.id,
+								contentHash: observation.contentHash,
+								toolName: observation.toolName,
+								bytes: observation.bytes,
+								textUnits,
+								lines: observation.lines,
+								tokens: observation.tokens,
+							};
+						} else {
+							const existingSize = await objectSize(observation.filePath);
+							await ensureStored(observation);
+							if (existingSize === undefined) budget.bytes += observation.bytes;
+							const placeholder = placeholderFor(observation);
+							projection = {
+								archived: true,
+								id: observation.id,
+								contentHash: observation.contentHash,
+								toolName: observation.toolName,
+								bytes: observation.bytes,
+								textUnits,
+								lines: observation.lines,
+								tokens: observation.tokens,
+								placeholder,
+								placeholderTokens: estimateTokens(placeholder),
+							};
+						}
+						cacheStore(message, projection);
+					}
+					if (!projection.archived) continue;
+
+					const sendCountKey = `${root}\0${projection.id}`;
 					const previousSends = sentCounts.get(sendCountKey) ?? priorAssistantCounts[index] ?? 0;
 					if (previousSends < FULL_SENDS) {
 						await ledgerFor(ctx)({
 							event: "full",
-							id: observation.id,
+							id: projection.id,
 							request: requestIndex,
-							tool: observation.toolName,
-							originalBytes: observation.bytes,
-							originalLines: observation.lines,
-							originalTokens: observation.tokens,
-							contentHash: observation.contentHash,
+							tool: projection.toolName,
+							originalBytes: projection.bytes,
+							originalLines: projection.lines,
+							originalTokens: projection.tokens,
+							contentHash: projection.contentHash,
 						});
 						sentCounts.set(sendCountKey, previousSends + 1);
 						continue;
 					}
 
-					const placeholder = placeholderFor(observation);
-					const placeholderTokens = estimateTokens(placeholder);
-					const removedTokens = Math.max(0, observation.tokens - placeholderTokens);
+					const placeholderTokens = projection.placeholderTokens;
+					const removedTokens = Math.max(0, projection.tokens - placeholderTokens);
 					await ledgerFor(ctx)({
 						event: "placeholder",
-						id: observation.id,
+						id: projection.id,
 						request: requestIndex,
 						sendNumber: previousSends + 1,
-						tool: observation.toolName,
-						originalBytes: observation.bytes,
-						originalLines: observation.lines,
-						originalTokens: observation.tokens,
-						placeholderBytes: Buffer.byteLength(placeholder, "utf8"),
+						tool: projection.toolName,
+						originalBytes: projection.bytes,
+						originalLines: projection.lines,
+						originalTokens: projection.tokens,
+						placeholderBytes: Buffer.byteLength(projection.placeholder, "utf8"),
 						placeholderTokens,
 						removedTokens,
 					});
@@ -197,7 +356,7 @@ export function createObservationPackExtension(): ExtensionFactory {
 							formatSavingsCount(removedTokens, "context tokens avoided"),
 						);
 					}
-					projected[index] = { ...message, content: [{ type: "text", text: placeholder }] };
+					projected[index] = { ...message, content: [{ type: "text", text: projection.placeholder }] };
 					sentCounts.set(sendCountKey, previousSends + 1);
 				} catch (error) {
 					// Fail open: a packing failure must never cost the agent its observation.
@@ -220,8 +379,8 @@ export {
 	THRESHOLD_BYTES,
 } from "./observation.ts";
 
-export function registerObservationPack(pi: ExtensionAPI): void {
-	createObservationPackExtension()(pi);
+export function registerObservationPack(pi: ExtensionAPI, options: ObservationPackOptions = {}): void {
+	createObservationPackExtension(options)(pi);
 }
 
 export default registerObservationPack;
