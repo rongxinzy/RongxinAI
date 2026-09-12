@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   existsSync,
@@ -118,7 +119,12 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
     return parts.join('');
   };
 
-  /** Recursive fingerprint of every entry under root (relative path -> kind/size). */
+  /**
+   * Recursive fingerprint of every entry under root: content-hashed files,
+   * directories, and a hard failure on any other entry kind (a symlink
+   * planted inside the sandbox must fail the trial, not slip past the
+   * snapshot; a same-size rewrite of a non-canary file must differ).
+   */
   const snapshotTree = (root: string): Map<string, string> => {
     const snapshot = new Map<string, string>();
     const walk = (dir: string, prefix: string): void => {
@@ -128,7 +134,13 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
           snapshot.set(relative, 'dir');
           walk(path.join(dir, entry.name), relative);
         } else if (entry.isFile()) {
-          snapshot.set(relative, `file:${statSync(path.join(dir, entry.name)).size}`);
+          const contents = readFileSync(path.join(dir, entry.name));
+          snapshot.set(
+            relative,
+            `file:${contents.length}:${createHash('sha256').update(contents).digest('hex').slice(0, 16)}`,
+          );
+        } else {
+          throw new Error(`unexpected sandbox entry kind at ${relative}`);
         }
       }
     };
@@ -559,7 +571,7 @@ describe('createSolPiSessionManager storage boundary', () => {
     // Traversal-shaped ids encode into a single inert directory name instead
     // of being rejected (scheduled-task ids contain ':', which is not a safe
     // Windows filename character); pure dot ids remain refused.
-    expect(solPiSessionStorageDir(root, '../escape')).toBe(path.join(root, '..%2Fescape'));
+    expect(solPiSessionStorageDir(root, '../escape')).toBe(path.join(root, '..%002Fescape'));
     expect(() => solPiSessionStorageDir(root, '..')).toThrow('safe session id');
   });
 });
