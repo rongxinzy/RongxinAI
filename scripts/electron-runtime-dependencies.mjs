@@ -3,6 +3,12 @@ export const ELECTRON_MAIN_EXTERNALS = [
   '@firecrawl/anydoc',
   'better-sqlite3',
   'bufferutil',
+  // Inlined jiti lazily resolves its babel transform helper via a require
+  // anchored at the bundle file (../dist/babel.cjs), which does not exist in
+  // packaged layouts. Keep jiti external so the bundle loads the shipped
+  // node_modules copy, whose helper resolution stays anchored inside the
+  // package itself.
+  'jiti',
   'node-pty',
   'utf-8-validate',
 ];

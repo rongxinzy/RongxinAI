@@ -37,6 +37,8 @@ jobs:
       - run: bun run build
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+      - name: Gate SoL-Pi jiti bundle wiring
+        run: node scripts/ci/solpi-bundle-jiti-gate.cjs --static dist-electron/main.js
       - run: bun run compile:electron
 
       - name: Verify Build Structure
