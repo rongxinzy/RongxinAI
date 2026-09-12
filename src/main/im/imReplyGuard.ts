@@ -81,13 +81,37 @@ export function hasUnbackedReminderCommitment(text: string): boolean {
   return REMINDER_COMMITMENT_PATTERNS.some(pattern => pattern.test(text));
 }
 
+/**
+ * First persisted terminal-truncation disclosure in the message list, or null.
+ * Shared by the interactive and background IM reply paths so both surfaces
+ * compose the exact same notice text.
+ */
+export function findAnswerTruncationNotice(messages: CoworkMessage[]): string | null {
+  for (const message of messages) {
+    if (
+      message.type === 'system' &&
+      message.metadata?.answerTruncated === true &&
+      message.content.trim()
+    ) {
+      return message.content.trim();
+    }
+  }
+  return null;
+}
+
+/** Append the truncation disclosure (when present) to an IM reply text. */
+export function appendAnswerTruncationNotice(text: string, messages: CoworkMessage[]): string {
+  const notice = findAnswerTruncationNotice(messages);
+  return notice === null ? text : `${text}\n\n${notice}`;
+}
+
 export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
   const assistantParts: string[] = [];
   const cronAddToolUseIds = new Set<string>();
   const successfulCronAddIds = new Set<string>();
   let attemptedCronAdds = 0;
   let lastCronAddError: string | null = null;
-  let truncatedNotice: string | null = null;
+  const truncatedNotice = findAnswerTruncationNotice(messages);
 
   for (const message of messages) {
     if (message.type === 'assistant' && message.content && !message.metadata?.isThinking) {
@@ -98,15 +122,10 @@ export function analyzeIMReply(messages: CoworkMessage[]): IMReplyAnalysis {
       continue;
     }
 
-    // Terminal truncation disclosure: the answer above is incomplete. Append
-    // the notice so an IM user cannot read a truncated reply as finished.
-    if (
-      message.type === 'system' &&
-      message.metadata?.answerTruncated === true &&
-      message.content.trim() &&
-      truncatedNotice === null
-    ) {
-      truncatedNotice = message.content.trim();
+    // Terminal truncation disclosure: handled up front by the shared helper
+    // (findAnswerTruncationNotice) so background deliveries compose the same
+    // notice; other system messages are irrelevant here.
+    if (message.type === 'system') {
       continue;
     }
 

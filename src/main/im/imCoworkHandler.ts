@@ -18,7 +18,7 @@ import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelat
 import { serializeForLog } from '../libs/sanitizeForLog';
 import { buildIMMediaInstruction } from './imMediaInstruction';
 import { toPiAttachments } from './imPiAttachments';
-import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
+import { analyzeIMReply, appendAnswerTruncationNotice, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
 import {
   type IMScheduledTaskCreationResult,
   type IMScheduledTaskRequestDetector,
@@ -1262,6 +1262,8 @@ export class IMCoworkHandler extends EventEmitter {
    * Extract raw assistant text from accumulated messages, bypassing the
    * reminder-commitment guard.  Used for cron-triggered background deliveries
    * where the reply IS the scheduled reminder, not a promise to create one.
+   * Terminal truncation disclosures are still appended: a background IM user
+   * must not read a truncated reply as finished either.
    */
   private formatReplyRaw(messages: CoworkMessage[]): string {
     const parts: string[] = [];
@@ -1271,7 +1273,7 @@ export class IMCoworkHandler extends EventEmitter {
         if (text) parts.push(text);
       }
     }
-    return parts.join('\n\n') || DEFAULT_IM_EMPTY_REPLY;
+    return appendAnswerTruncationNotice(parts.join('\n\n') || DEFAULT_IM_EMPTY_REPLY, messages);
   }
 
   /**
