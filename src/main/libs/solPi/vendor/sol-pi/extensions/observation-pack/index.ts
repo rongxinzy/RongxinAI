@@ -41,6 +41,7 @@ import {
 	isObservationId,
 	isPureTextResult,
 	objectSize,
+	type Observation,
 	observationPath,
 	placeholderFor,
 	type RecallChunk,
@@ -61,10 +62,36 @@ const RECALL_LIMITS = {
 export const DEFAULT_ARCHIVE_BUDGET_BYTES = 256 * 1024 * 1024;
 /** Entry cap for the by-tool-call-id projection cache (FIFO eviction). */
 const PROJECTION_CACHE_MAX_ENTRIES = 1024;
+/**
+ * Ledger rotation ceiling per runtime root. The ledger is diagnostics-only
+ * (recall reads objects, never the ledger), so bounding it by rotation loses
+ * no references — archived objects and placeholders are untouched.
+ */
+export const DEFAULT_LEDGER_MAX_BYTES = 1024 * 1024;
 
 export interface ObservationPackOptions {
 	/** Archived-bytes ceiling per runtime root; defaults to DEFAULT_ARCHIVE_BUDGET_BYTES. */
 	readonly archiveBudgetBytes?: number;
+	/** Ledger rotation ceiling per runtime root; defaults to DEFAULT_LEDGER_MAX_BYTES. */
+	readonly ledgerMaxBytes?: number;
+	/**
+	 * Off-thread computation of createObservation + placeholderFor (the
+	 * embedding app moves the first-sight full-text hashing/splitting off
+	 * its event loop). Must return results identical to the vendored
+	 * functions; absent keeps the in-process default. Returning null means
+	 * "compute unavailable" and the result simply stays in full context
+	 * (same fail-open as the archive budget).
+	 */
+	readonly prepareObservation?: (
+		message: ToolResultMessage,
+		runtimeRoot: string,
+	) => Promise<{ observation: Observation | undefined; placeholder: string } | null>;
+	/**
+	 * Off-thread sha256 over a transferred buffer, used only by the EEXIST
+	 * content verify (whole-file re-hash of an already-archived object).
+	 * Absent keeps the in-process hash.
+	 */
+	readonly hashBuffer?: (buffer: Buffer) => Promise<string>;
 }
 
 interface ProjectionMeta {
@@ -119,8 +146,19 @@ const budgetTrackerFor = (root: string, limit: number): ArchiveBudget => {
 	return budget;
 };
 
+/**
+ * Drop the cached archive budget for one runtime root (session teardown /
+ * orphan reconciliation). Without this, a session recreated in the same
+ * process would inherit the stale byte count and warning state of the
+ * directory that was just deleted.
+ */
+export function releaseArchiveBudget(root: string): boolean {
+	return archiveBudgets.delete(root);
+}
+
 export function createObservationPackExtension(options: ObservationPackOptions = {}): ExtensionFactory {
 	const archiveBudgetBytes = options.archiveBudgetBytes ?? DEFAULT_ARCHIVE_BUDGET_BYTES;
+	const ledgerMaxBytes = options.ledgerMaxBytes ?? DEFAULT_LEDGER_MAX_BYTES;
 	return (pi: ExtensionAPI) => {
 		const sentCounts = new Map<string, number>();
 		const ledgers = new Map<string, Ledger>();
@@ -128,7 +166,7 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 			const root = runtimeRoot(ctx);
 			let ledger = ledgers.get(root);
 			if (!ledger) {
-				ledger = createLedger(join(root, "observation-pack", "ledger.jsonl"));
+				ledger = createLedger(join(root, "observation-pack", "ledger.jsonl"), { maxBytes: ledgerMaxBytes });
 				ledgers.set(root, ledger);
 			}
 			return ledger;
@@ -258,6 +296,10 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 			const projected = [...event.messages];
 			const root = runtimeRoot(ctx);
 			const budget = budgetTrackerFor(root, archiveBudgetBytes);
+			// Ledger entries are collected for the whole request and appended in
+			// one write (the previous per-message append made the request path
+			// O(archived observations) syscalls).
+			const ledgerEntries: Array<Record<string, unknown>> = [];
 			// How many provider requests each message has already been part of,
 			// counted by the assistant messages that follow it.
 			const priorAssistantCounts = new Array<number>(event.messages.length);
@@ -276,8 +318,22 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 				try {
 					let projection = cacheLookup(message);
 					if (!projection) {
-						const observation = createObservation(message, root);
-						if (!observation) continue;
+						// First sight: the full-text hashing and excerpt splitting may
+						// run off-thread via the injected compute hook (embedding app
+						// keeps its event loop responsive); null means the hook was
+						// unavailable and the result stays in full context.
+						let observation: Observation | undefined;
+						let placeholder: string | undefined;
+						if (options.prepareObservation) {
+							const prepared = await options.prepareObservation(message, root);
+							if (!prepared) continue;
+							observation = prepared.observation;
+							placeholder = prepared.placeholder;
+						} else {
+							observation = createObservation(message, root);
+							placeholder = observation ? placeholderFor(observation) : undefined;
+						}
+						if (!observation || placeholder === undefined) continue;
 						const textUnits = contentUnits(message);
 
 						await budget.initialized;
@@ -302,9 +358,8 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 							};
 						} else {
 							const existingSize = await objectSize(observation.filePath);
-							await ensureStored(observation);
+							await ensureStored(observation, options.hashBuffer);
 							if (existingSize === undefined) budget.bytes += observation.bytes;
-							const placeholder = placeholderFor(observation);
 							projection = {
 								archived: true,
 								id: observation.id,
@@ -325,7 +380,7 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 					const sendCountKey = `${root}\0${projection.id}`;
 					const previousSends = sentCounts.get(sendCountKey) ?? priorAssistantCounts[index] ?? 0;
 					if (previousSends < FULL_SENDS) {
-						await ledgerFor(ctx)({
+						ledgerEntries.push({
 							event: "full",
 							id: projection.id,
 							request: requestIndex,
@@ -341,7 +396,7 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 
 					const placeholderTokens = projection.placeholderTokens;
 					const removedTokens = Math.max(0, projection.tokens - placeholderTokens);
-					await ledgerFor(ctx)({
+					ledgerEntries.push({
 						event: "placeholder",
 						id: projection.id,
 						request: requestIndex,
@@ -370,6 +425,7 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 				}
 			}
 
+			if (ledgerEntries.length > 0) await ledgerFor(ctx)(ledgerEntries);
 			return { messages: projected };
 		});
 	};

@@ -54,11 +54,12 @@ async function fileSha256(path: string): Promise<string> {
 export async function assertUnchangedBeforeCommand(
 	path: string,
 	yieldForInterference: () => Promise<void> = () => new Promise<void>((resolve) => setImmediate(resolve)),
+	hashFile: (path: string) => Promise<string> = fileSha256,
 ): Promise<void> {
 	try {
-		const mutationHash = await fileSha256(path);
+		const mutationHash = await hashFile(path);
 		await yieldForInterference();
-		const commandHash = await fileSha256(path);
+		const commandHash = await hashFile(path);
 		if (mutationHash !== commandHash) {
 			throw new Error("target content changed after the fused mutation");
 		}
@@ -74,6 +75,10 @@ export async function assertUnchangedBeforeCommand(
  * Both steps run inside one SoL-Pi queue slot for `absolutePath`, so another
  * fused mutation of the same file cannot interleave. Pi's built-in mutation
  * tool keeps its own queue; the two queues are not nested.
+ *
+ * `fileHash` optionally moves the two interference hashes off the caller's
+ * thread (the embedding app injects a worker-backed hash); it must agree
+ * with the local fileSha256 on every input.
  */
 export async function executeMutationThenRun<TDetails>({
 	toolCallId,
@@ -83,6 +88,7 @@ export async function executeMutationThenRun<TDetails>({
 	bashOptions,
 	signal,
 	ctx,
+	fileHash,
 }: {
 	toolCallId: string;
 	absolutePath: string;
@@ -91,6 +97,7 @@ export async function executeMutationThenRun<TDetails>({
 	bashOptions: BashToolOptions | undefined;
 	signal: AbortSignal | undefined;
 	ctx: ExtensionContext;
+	fileHash?: (path: string) => Promise<string>;
 }): Promise<AgentToolResult<TDetails>> {
 	return withFusedFileQueue(absolutePath, async () => {
 		let mutationResult: AgentToolResult<TDetails>;
@@ -107,7 +114,7 @@ export async function executeMutationThenRun<TDetails>({
 			return mutationResult;
 		}
 
-		await assertUnchangedBeforeCommand(absolutePath);
+		await assertUnchangedBeforeCommand(absolutePath, undefined, fileHash);
 		const bash = createBashToolDefinition(ctx.cwd, bashOptions);
 		try {
 			const bashResult = await bash.execute(`${toolCallId}:then_run`, thenRun, signal, undefined, ctx);

@@ -358,7 +358,8 @@
     "node_modules/@firecrawl/**",
     "node_modules/better-sqlite3/**",
     "node_modules/node-pty/**",
-    "node_modules/npm/**"
+    "node_modules/npm/**",
+    "dist-electron/solPiComputeWorker.js"
   ],
   "asar": true
 }

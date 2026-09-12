@@ -26,6 +26,7 @@ const REQUIRED_ENTRIES = [
   'solpi-vendor/THIRD_PARTY_NOTICES.md',
   'solpi-vendor/UPSTREAM_COMMIT',
   'dist-electron/main.js',
+  'dist-electron/solPiComputeWorker.js',
   'node_modules/jiti/package.json',
   'node_modules/@earendil-works/pi-agent-core/package.json',
   'node_modules/@earendil-works/pi-ai/package.json',

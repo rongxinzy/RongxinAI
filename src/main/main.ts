@@ -282,6 +282,7 @@ import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { reconcileSolPiSessionStorage } from './libs/solPi/solPiSessionScope';
+import { disposeSolPiComputePool } from './libs/solPi/solPiComputePool';
 import { teardownCascadeDeletedSessions } from './libs/coworkSessionTeardown';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
@@ -7019,6 +7020,11 @@ if (!gotTheLock) {
     sqliteBackupManager?.stopPeriodicBackupLoop();
     todoReminderScheduler?.stop();
     todoReminderScheduler = null;
+
+    // Terminate the SoL-Pi compute pool so packaged apps do not hold threads.
+    await disposeSolPiComputePool().catch(error => {
+      console.error('[SolPi] Failed to dispose the compute pool on quit:', error);
+    });
 
     // Close the SQLite database to flush the WAL and release the file lock.
     try {

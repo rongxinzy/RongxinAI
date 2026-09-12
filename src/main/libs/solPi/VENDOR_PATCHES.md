@@ -92,3 +92,53 @@ them deliberately; never overwrite the tree blindly.
 Authored in the solpi-dynamic-remediation round (2026-09-12) from the
 deep-acceptance findings d2-f1/d4-f1/d4-f2; recorded per repo policy that
 vendored trees carry an explicit divergence ledger instead of silent edits.
+
+## 6. `extensions/observation-pack/index.ts` — off-thread compute + ledger batching/rotation + budget release
+
+- **Local:** `ObservationPackOptions` gained additive `prepareObservation?`,
+  `hashBuffer?` and `ledgerMaxBytes?`. When `prepareObservation` is present,
+  the first-sight `createObservation` + `placeholderFor` move off the
+  embedding app's event loop (a bounded worker pool loads the same vendored
+  module via jiti, so ids/hashes/excerpts stay byte-identical); returning
+  `null` fails open exactly like the archive budget. `hashBuffer` moves the
+  EEXIST content re-hash off-thread. The per-request ledger writes are
+  collected and appended in ONE call (previously one append per archived
+  observation per request), and the ledger rotates at `ledgerMaxBytes`
+  (default 1 MiB, one `.1` generation). `releaseArchiveBudget(root)` drops
+  the module-level budget entry so a recreated session root re-measures from
+  disk (session teardown calls it through the app's storage scope).
+- **Why:** the repository's Main Process / Worker Boundary rules forbid
+  whole-file hashing/CPU-bound transforms on the agent-stream path
+  (cross-review P2-2), and the unbounded, unbudgeted per-request ledger
+  growth was P2-3. Rotation loses no references: the ledger is
+  diagnostics-only — recall reads objects, never the ledger.
+- **Boundaries:** crash between projection and the batched append loses that
+  request's diagnostic lines only. Worker unavailability keeps the vendored
+  in-process defaults (behavior-identical, just on the main thread).
+
+## 7. `extensions/observation-pack/observation.ts` — injectable verify hash
+
+- **Local:** `ensureStored(observation, verifyHash?)` optionally routes the
+  EEXIST whole-file re-hash through the caller's (worker-backed) hash;
+  defaults keep the local sync hash.
+
+## 8. `extensions/observation-pack/ledger.ts` — memoized mkdir, batched append, rotation
+
+- **Local:** the ledger closure memoizes its directory creation, accepts one
+  entry or an array (single appendFile per call), serializes writes, tracks
+  bytes and rotates at the ceiling (see patch 6).
+
+## 9. `extensions/action-fusion/then-run.ts` + `index.ts` — injectable interference hash
+
+- **Local:** `assertUnchangedBeforeCommand(path, yield?, hashFile?)` and
+  `executeMutationThenRun({..., fileHash?})` / `ActionFusionOptions.fileHash`
+  optionally route the two interference hashes through the caller's
+  (worker-backed) sha256; defaults keep the local implementation. The double
+  read stays — it IS the interference check (cross-review P2-2 asked for it
+  to leave the main thread, not to disappear).
+
+## Patch provenance (continued)
+
+Patches 6-9 authored in the pr762-claude-fix round (2026-09-12) from
+cross-review findings P2-2/P2-3; same additive-only policy — every option is
+optional and absent options reproduce the previous vendored behavior.

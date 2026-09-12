@@ -24,6 +24,13 @@ import path from 'node:path';
 export interface SolPiVendorOptions {
   bashOptions?: { shellPath?: string; commandPrefix?: string };
   archiveBudgetBytes?: number;
+  /** Worker-backed compute hooks (see solPiComputePool.ts for the app side). */
+  prepareObservation?: (
+    message: unknown,
+    runtimeRoot: string,
+  ) => Promise<{ observation: unknown; placeholder: string } | null>;
+  hashBuffer?: (buffer: Buffer) => Promise<string>;
+  fileHash?: (path: string) => Promise<string>;
 }
 
 /** Structural shape of the vendored SoL-Pi entry module (index.ts). */
@@ -37,6 +44,7 @@ export interface SolPiVendorModule {
     config: SolPiVendorConfig,
     options?: SolPiVendorOptions,
   ) => void;
+  releaseArchiveBudget?: (root: string) => boolean;
 }
 
 /**
@@ -63,11 +71,11 @@ export interface SolPiVendorConfig {
 let vendorModulePromise: Promise<SolPiVendorModule> | null = null;
 
 /**
- * Absolute path of the vendored SoL-Pi entry, resolved for the executing
- * layout. Exported for packaged-app verification (the packaged smoke must
- * prove resolution stays inside the app bundle, never a source checkout).
+ * Absolute path of the vendored SoL-Pi root directory, resolved for the
+ * executing layout. Shared by the main-process loader and the SoL-Pi compute
+ * worker so both load the exact same vendored module graph.
  */
-export function resolveSolPiVendorEntry(): string {
+export function resolveSolPiVendorRoot(): string {
   // The Electron main process is a single CJS bundle at dist-electron/main.js
   // (vite/rolldown, also in `electron:dev`), so __dirname is the bundle
   // directory in every packaged or development run:
@@ -78,13 +86,22 @@ export function resolveSolPiVendorEntry(): string {
   // The tsc output layout (dist-electron/libs/solPi) and vitest/source
   // execution keep the legacy candidates below.
   const candidates = [
-    path.resolve(__dirname, '../solpi-vendor/sol-pi/index.ts'),
-    path.resolve(__dirname, '../src/main/libs/solPi/vendor/sol-pi/index.ts'),
-    path.resolve(__dirname, '../../../src/main/libs/solPi/vendor/sol-pi/index.ts'),
-    path.resolve(__dirname, '../../../../solpi-vendor/sol-pi/index.ts'),
-    path.resolve(__dirname, 'vendor/sol-pi/index.ts'),
+    path.resolve(__dirname, '../solpi-vendor/sol-pi'),
+    path.resolve(__dirname, '../src/main/libs/solPi/vendor/sol-pi'),
+    path.resolve(__dirname, '../../../src/main/libs/solPi/vendor/sol-pi'),
+    path.resolve(__dirname, '../../../../solpi-vendor/sol-pi'),
+    path.resolve(__dirname, 'vendor/sol-pi'),
   ];
   return candidates.find(candidate => existsSync(candidate)) ?? candidates[0] ?? '';
+}
+
+/**
+ * Absolute path of the vendored SoL-Pi entry, resolved for the executing
+ * layout. Exported for packaged-app verification (the packaged smoke must
+ * prove resolution stays inside the app bundle, never a source checkout).
+ */
+export function resolveSolPiVendorEntry(): string {
+  return path.join(resolveSolPiVendorRoot(), 'index.ts');
 }
 
 /**

@@ -33,6 +33,7 @@ import {
   type SolPiThenRunCommand,
 } from './solPiThenRunGuard';
 import { loadSolPiVendor, type SolPiVendorOptions } from './solPiVendor';
+import { getSolPiCompute } from './solPiComputePool';
 
 export type AuthorizeSolPiThenRun = (
   thenRun: SolPiThenRunCommand,
@@ -98,9 +99,25 @@ export async function buildSolPiRuntime(
   const vendor = await loadSolPiVendor();
   const config = conservativeSolPiConfig();
   const effectiveBashOptions = resolveEffectiveBashOptions(options.bashOptions);
-  const vendorOptions: SolPiVendorOptions | undefined = effectiveBashOptions
-    ? { bashOptions: effectiveBashOptions }
-    : undefined;
+  // Move the vendored extensions' blocking CPU work (first-sight observation
+  // hashing/splitting, EEXIST verify, fused-command interference hashes) onto
+  // the bounded compute pool. When no worker bundle is available (source-mode
+  // execution), the hooks stay undefined and the vendored in-process default
+  // applies — behavior-identical, just on the main thread.
+  const compute = getSolPiCompute();
+  const vendorOptions: SolPiVendorOptions | undefined =
+    effectiveBashOptions || compute
+      ? {
+          ...(effectiveBashOptions ? { bashOptions: effectiveBashOptions } : {}),
+          ...(compute
+            ? {
+                prepareObservation: compute.prepareObservation as SolPiVendorOptions['prepareObservation'],
+                hashBuffer: compute.hashBuffer,
+                fileHash: compute.fileHash,
+              }
+            : {}),
+        }
+      : undefined;
   const solPiFactory = vendor.createSolPiExtension(() => config, vendorOptions);
 
   const storageRoot = solPiStorageRoot(options.userDataPath);

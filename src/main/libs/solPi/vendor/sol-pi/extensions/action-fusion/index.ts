@@ -45,6 +45,12 @@ const WRITE_THEN_RUN_DESCRIPTION =
 export interface ActionFusionOptions {
 	/** Optional programmatic bash overrides, primarily for tests and embedded runtimes. */
 	readonly bashOptions?: BashToolOptions;
+	/**
+	 * Off-thread file hash for the fused-command interference check (the
+	 * embedding app injects a worker-backed sha256); must agree with the
+	 * local fileSha256 on every input. Absent keeps the in-process hash.
+	 */
+	readonly fileHash?: (path: string) => Promise<string>;
 	/** Overrides for the underlying built-in `edit` tool. */
 	readonly editOptions?: EditToolOptions;
 	/** Overrides for the underlying built-in `write` tool. */
@@ -95,6 +101,7 @@ export function createActionFusionExtension(options: ActionFusionOptions = {}): 
 					bashOptions: options.bashOptions,
 					signal,
 					ctx,
+					fileHash: options.fileHash,
 					mutate: () => baseEdit(ctx.cwd).execute(toolCallId, editInput, signal, onUpdate, ctx),
 				});
 				if (
@@ -129,6 +136,7 @@ export function createActionFusionExtension(options: ActionFusionOptions = {}): 
 					bashOptions: options.bashOptions,
 					signal,
 					ctx,
+					fileHash: options.fileHash,
 					mutate: () => baseWrite(ctx.cwd).execute(toolCallId, writeInput, signal, onUpdate, ctx),
 				});
 				if (

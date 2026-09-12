@@ -119,8 +119,15 @@ export function createObservation(message: ToolResultMessage, runtimeRoot: strin
 /**
  * Write the payload to its content-addressed path, refusing symlinks and
  * verifying an existing object byte for byte before reusing it.
+ *
+ * `verifyHash` optionally moves the whole-file re-hash off the caller's
+ * thread (the embedding app injects a worker-backed hash); it must agree with
+ * the local `hash` on every input.
  */
-export async function ensureStored(observation: Observation): Promise<void> {
+export async function ensureStored(
+	observation: Observation,
+	verifyHash?: (buffer: Buffer) => Promise<string>,
+): Promise<void> {
 	const directoryPath = dirname(observation.filePath);
 	await mkdir(directoryPath, { recursive: true, mode: 0o700 });
 	const directoryStats = await lstat(directoryPath);
@@ -144,7 +151,8 @@ export async function ensureStored(observation: Observation): Promise<void> {
 				throw new Error(`Content-addressed observation size mismatch for ${observation.id}`);
 			}
 			const existingContent = await existingHandle.readFile();
-			if (hash(existingContent) !== observation.contentHash) {
+			const existingHash = verifyHash ? await verifyHash(existingContent) : hash(existingContent);
+			if (existingHash !== observation.contentHash) {
 				throw new Error(`Content-addressed observation hash mismatch for ${observation.id}`);
 			}
 		} finally {
