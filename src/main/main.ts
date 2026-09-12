@@ -282,6 +282,7 @@ import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { reconcileSolPiSessionStorage } from './libs/solPi/solPiSessionScope';
+import { teardownCascadeDeletedSessions } from './libs/coworkSessionTeardown';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
 import { createLogger } from './libs/structuredLog';
 import {
@@ -3846,6 +3847,21 @@ if (!gotTheLock) {
       console.log(
         `[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`,
       );
+      // Cascade-deleted sessions need the same runtime purge (pending queues,
+      // workbench tasks, SoL-Pi archives) and IM mapping cleanup as the
+      // per-session delete paths, or they linger until archive reconciliation.
+      teardownCascadeDeletedSessions(deletedSessionIds, {
+        onSessionDeleted: sessionId => getPiRuntimeAdapter().onSessionDeleted(sessionId),
+        deleteImMapping: sessionId => {
+          getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+        },
+      });
+      if (deletedSessionIds.length > 0) {
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (win.isDestroyed()) continue;
+          win.webContents.send(CoworkStreamIpc.SessionsChanged, { deletedSessionIds });
+        }
+      }
       return { success: true, deletedSessionIds };
     } catch (error) {
       return {
@@ -4706,23 +4722,15 @@ if (!gotTheLock) {
       // Clean up IM session mappings for deleted sessions
       if (deletedSessionIds.length > 0) {
         // Purge runtime state (pending queues, workbench tasks, SoL-Pi
-        // archives) exactly like the single/batch session-delete paths, so
-        // cascade-deleted sessions do not linger until archive reconciliation.
-        const runtime = getPiRuntimeAdapter();
-        for (const sessionId of deletedSessionIds) {
-          runtime.onSessionDeleted(sessionId);
-        }
-
-        try {
-          const imStore = getIMGatewayManager()?.getIMStore();
-          if (imStore) {
-            for (const sessionId of deletedSessionIds) {
-              imStore.deleteSessionMappingByCoworkSessionId(sessionId);
-            }
-          }
-        } catch {
-          // IM store may not be initialised yet; safe to ignore.
-        }
+        // archives) and IM mappings exactly like the single/batch
+        // session-delete paths, so cascade-deleted sessions do not linger
+        // until archive reconciliation. Individual failures are contained.
+        teardownCascadeDeletedSessions(deletedSessionIds, {
+          onSessionDeleted: sessionId => getPiRuntimeAdapter().onSessionDeleted(sessionId),
+          deleteImMapping: sessionId => {
+            getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+          },
+        });
 
         // Notify renderer to refresh session lists
         const windows = BrowserWindow.getAllWindows();
