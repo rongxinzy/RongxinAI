@@ -418,6 +418,63 @@ describe('PiRuntimeAdapter truncated answer terminal state', () => {
       expect(
         mockStore.addMessage.mock.invocationCallOrder[disclosureIndex],
       ).toBeLessThan(hoisted.mockSession.prompt.mock.invocationCallOrder[followUpPromptIndex]);
+
+      // The follow-up turn then settles the session exactly once, by its own
+      // (clean) outcome.
+      completeAnswer('The summary');
+      listener!({ type: 'agent_end' });
+      expect(completes).toEqual(['work-session']);
+      const detail = service.getCurrent('work-session')!;
+      expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+      expect(currentRun()!.status).toBe(WorkbenchRunStatus.Succeeded);
+    });
+
+    it('settles a deferred truncation when the drain leaves no running turn (queued-control shape)', async () => {
+      await adapter.startSession('work-session', 'Write the long report', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+
+      // Post-merge shape of the follow-up drain (see #760): the agent_end
+      // drain branch ran — disclosure persisted, settlement deferred — and
+      // the queue then drained WITHOUT starting another turn (queued control
+      // actions never call prompt()). Without the deferred settlement the
+      // turn would hang Running forever and never emit complete. Reproduce
+      // the drain branch's deferred state directly on a fresh, never-settled
+      // run so the assertions below can only be satisfied by the deferred
+      // settlement itself.
+      const internals = adapter as unknown as {
+        activeSessions: Map<
+          string,
+          {
+            deferredTurnSettlement: { truncated: boolean } | null;
+            isRunning: boolean;
+          }
+        >;
+        flushFollowUpQueue: (sessionId: string, active: unknown) => Promise<void>;
+      };
+      const active = internals.activeSessions.get('work-session')!;
+      truncatedAnswer('Truncated with a drained control-action queue');
+      active.isRunning = false;
+      active.deferredTurnSettlement = { truncated: true };
+      expect(completes).toEqual([]);
+
+      await internals.flushFollowUpQueue('work-session', active);
+
+      // The deferred settlement fired: complete event, idle session, and the
+      // run lands on needs_review with the stream check failed.
+      expect(completes).toEqual(['work-session']);
+      expect(mockStore.updateSession).toHaveBeenCalledWith('work-session', { status: 'idle' });
+      const detail = service.getCurrent('work-session')!;
+      expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
+      const run = currentRun()!;
+      expect(run.status).toBe(WorkbenchRunStatus.NeedsReview);
+      expect(
+        run.verificationResult?.checks.some(
+          (check: { name: string; status: string }) =>
+            check.name === 'stream_closed_cleanly' && check.status === 'failed',
+        ),
+      ).toBe(true);
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { SolPiThenRunStatus } from './constants';
+import { buildSolPiThenRunToolCallId, SolPiThenRunStatus } from './constants';
 import {
   createSolPiThenRunGuardExtensionFactory,
   extractThenRunCommand,
@@ -190,5 +190,21 @@ describe('then_run guard with the vendored Action Fusion extension', () => {
       input: writeToolInput('a', 'x', 'npm test'),
     });
     expect(markers).toEqual({ authorized: ['call-5:npm test'] });
+  });
+});
+
+describe('then_run synthetic id contract', () => {
+  test('the app-side suffix matches the vendored inner-bash id literal', () => {
+    // The adapter authorizes (and settles) the embedded command under
+    // `${toolCallId}${SOLPI_THEN_RUN_ID_SUFFIX}`; the vendored Action Fusion
+    // executes the inner bash under the same id (then-run.ts). The vendor
+    // tree cannot import app code, so the two spellings are pinned equal by
+    // test instead of by shared import.
+    const vendorSource = readFileSync(
+      path.join(__dirname, 'vendor/sol-pi/extensions/action-fusion/then-run.ts'),
+      'utf8',
+    );
+    expect(vendorSource).toContain('`${toolCallId}:then_run`');
+    expect(buildSolPiThenRunToolCallId('call-x')).toBe('call-x:then_run');
   });
 });

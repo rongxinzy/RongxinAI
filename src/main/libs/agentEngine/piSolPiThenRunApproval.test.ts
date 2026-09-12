@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SOLPI_PROFILE_ENV, SolPiProfile } from '../solPi/solPiProfile';
 import { FakeExtensionApi } from '../solPi/solPiTestFixtures';
 import type { CoworkStore } from '../../coworkStore';
+import { WorkbenchApprovalEffectStatus } from '../../../shared/workbenchTask';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { initializeProductionLoopSchema } from '../../productionLoop/schema';
@@ -300,6 +301,122 @@ describe('PiRuntimeAdapter fused then_run authorization wiring', () => {
       adapter.respondToPermission(permissionRequests[1].requestId, { behavior: 'allow' });
 
       await expect(decision).resolves.toBeUndefined();
+    });
+
+    /** Emit a runtime event into the adapter through the session subscription. */
+    const emitSessionEvent = (event: Record<string, unknown>): void => {
+      const listener = hoisted.mockSession.subscribe.mock.calls.at(-1)?.[0] as
+        | ((event: Record<string, unknown>) => void)
+        | undefined;
+      expect(listener).toBeTypeOf('function');
+      listener!(event);
+    };
+
+    it('settles the synthetic then_run approval as succeeded when the fused tool ends cleanly', async () => {
+      await adapter.startSession('thenrun-session', 'Patch the file and verify', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+      const api = buildExtensionApi();
+
+      const decision = api.emitToolCall({
+        toolCallId: 'fused-7',
+        toolName: 'write',
+        input: fusedWriteInput('out.txt', 'echo fused-ran'),
+      });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(1));
+      adapter.respondToPermission(permissionRequests[0].requestId, { behavior: 'allow' });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(2));
+      adapter.respondToPermission(permissionRequests[1].requestId, { behavior: 'allow' });
+      await expect(decision).resolves.toBeUndefined();
+
+      emitSessionEvent({
+        type: 'tool_execution_end',
+        toolCallId: 'fused-7',
+        toolName: 'write',
+        result: { content: [{ type: 'text', text: 'wrote out.txt\n[then_run:succeeded]\nfused-ran' }] },
+        isError: false,
+      });
+
+      const effectStatus = (toolCallId: string): string | undefined =>
+        (
+          db
+            .prepare('SELECT effect_status FROM workbench_approvals WHERE tool_call_id = ?')
+            .get(toolCallId) as { effect_status?: string } | undefined
+        )?.effect_status;
+      expect(effectStatus('fused-7:then_run')).toBe(WorkbenchApprovalEffectStatus.Succeeded);
+      expect(effectStatus('fused-7')).toBe(WorkbenchApprovalEffectStatus.Succeeded);
+    });
+
+    it('settles the synthetic then_run approval as failed when the fused tool errors', async () => {
+      await adapter.startSession('thenrun-session', 'Patch the file and verify', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+      const api = buildExtensionApi();
+
+      const decision = api.emitToolCall({
+        toolCallId: 'fused-8',
+        toolName: 'write',
+        input: fusedWriteInput('out.txt', 'exit 3'),
+      });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(1));
+      adapter.respondToPermission(permissionRequests[0].requestId, { behavior: 'allow' });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(2));
+      adapter.respondToPermission(permissionRequests[1].requestId, { behavior: 'allow' });
+      await expect(decision).resolves.toBeUndefined();
+
+      emitSessionEvent({
+        type: 'tool_execution_end',
+        toolCallId: 'fused-8',
+        toolName: 'write',
+        result: { content: [{ type: 'text', text: '[then_run:failed]\nexit code 3' }] },
+        isError: true,
+      });
+
+      const effectStatus = (
+        db
+          .prepare('SELECT effect_status FROM workbench_approvals WHERE tool_call_id = ?')
+          .get('fused-8:then_run') as { effect_status?: string } | undefined
+      )?.effect_status;
+      expect(effectStatus).toBe(WorkbenchApprovalEffectStatus.Failed);
+    });
+
+    it('leaves a denied then_run approval unsettled (settlement never flips a denial)', async () => {
+      await adapter.startSession('thenrun-session', 'Patch the file and verify', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+      const api = buildExtensionApi();
+
+      const decision = api.emitToolCall({
+        toolCallId: 'fused-9',
+        toolName: 'write',
+        input: fusedWriteInput('out.txt', 'echo fused-ran'),
+      });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(1));
+      adapter.respondToPermission(permissionRequests[0].requestId, { behavior: 'allow' });
+      await vi.waitFor(() => expect(permissionRequests).toHaveLength(2));
+      adapter.respondToPermission(permissionRequests[1].requestId, {
+        behavior: 'deny',
+        message: 'Not on my machine.',
+      });
+      await expect(decision).resolves.toEqual({ block: true, reason: 'Not on my machine.' });
+
+      // A late tool_execution_end for the blocked fused call must not
+      // misreport the denied command as executed, let alone succeeded.
+      emitSessionEvent({
+        type: 'tool_execution_end',
+        toolCallId: 'fused-9',
+        toolName: 'write',
+        result: { content: [{ type: 'text', text: 'blocked' }] },
+        isError: true,
+      });
+      const row = db
+        .prepare('SELECT effect_status, decision FROM workbench_approvals WHERE tool_call_id = ?')
+        .get('fused-9:then_run') as { effect_status?: string; decision?: string } | undefined;
+      expect(row?.decision).toBe('denied');
+      expect(row?.effect_status).not.toBe(WorkbenchApprovalEffectStatus.Succeeded);
     });
 
     it('blocks the fused call before the guard when the write approval itself is denied', async () => {
