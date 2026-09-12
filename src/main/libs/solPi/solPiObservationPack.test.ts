@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -97,6 +106,74 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
     return parts.join('');
   };
 
+  /** Recursive fingerprint of every entry under root (relative path -> kind/size). */
+  const snapshotTree = (root: string): Map<string, string> => {
+    const snapshot = new Map<string, string>();
+    const walk = (dir: string, prefix: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          snapshot.set(relative, 'dir');
+          walk(path.join(dir, entry.name), relative);
+        } else if (entry.isFile()) {
+          snapshot.set(relative, `file:${statSync(path.join(dir, entry.name)).size}`);
+        }
+      }
+    };
+    walk(root, '');
+    return snapshot;
+  };
+
+  /**
+   * Behavioral traversal trial inside an isolated sandbox root: the archive
+   * lives at <sandbox>/session/sol-pi, so anything escaping the objects dir
+   * must land inside the sandbox where a before/after snapshot can see it.
+   * Canaries pin the concrete escape targets (including an `etc/passwd`-shaped
+   * path one level above the session dir) byte-for-byte.
+   */
+  const runMaliciousIdTrial = async (parentDir: string): Promise<void> => {
+    const sandbox = mkdtempSync(path.join(parentDir, 'solpi-obs-sandbox-'));
+    const dir = path.join(sandbox, 'session');
+    mkdirSync(dir, { recursive: true });
+    const { api, ctx } = await loadPack(dir);
+    const original = bigResultText(12 * 1024);
+    const message = toolResultMessage(original);
+    for (let i = 0; i < 3; i += 1) await api.emitContext([message], ctx);
+    const projected = (await api.emitContext([message], ctx)) as typeof message[];
+    const realId = ((projected[0].content[0] as { text: string }).text.match(/id: (obs_[a-f0-9]+)/) ?? [])[1];
+
+    // Plant canaries at the exact paths traversal ids would reach.
+    const canaries: Array<[string, string]> = [
+      [path.join(sandbox, 'etc', 'passwd'), 'sandbox-canary:etc-passwd\n'],
+      [path.join(sandbox, 'escape'), 'sandbox-canary:escape\n'],
+      [path.join(dir, 'escape'), 'session-canary:escape\n'],
+    ];
+    for (const [canaryPath, content] of canaries) {
+      mkdirSync(path.dirname(canaryPath), { recursive: true });
+      writeFileSync(canaryPath, content, { encoding: 'utf8' });
+    }
+
+    const before = snapshotTree(sandbox);
+
+    const recall = api.tools.get('obs_recall')!;
+    for (const badId of ['', 'obs_short', '../escape', '../../etc/passwd', 'obs_000000000000000000000000']) {
+      // Rejection with `Unknown observation id` is also the read-safety proof:
+      // the id never resolves to a path, so no file is ever opened.
+      await expect(
+        recall.execute('recall-bad', { id: badId, offset: 0 }, undefined, undefined, ctx),
+      ).rejects.toThrow(`Unknown observation id: ${badId}`);
+    }
+
+    // No out-of-root write or tampering anywhere in the sandbox.
+    expect(snapshotTree(sandbox)).toEqual(before);
+    for (const [canaryPath, content] of canaries) {
+      expect(readFileSync(canaryPath, 'utf8')).toBe(content);
+    }
+
+    // The tool still serves the genuine id after the malformed attempts.
+    expect(await recallAll(recall, ctx, realId!)).toBe(original);
+  };
+
   test('archives the original verbatim, replaces it only after two full sends, and recalls pages exactly', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'solpi-obs-'));
     const { api, ctx } = await loadPack(dir);
@@ -164,28 +241,13 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
   });
 
   test('obs_recall rejects malformed and traversal ids without touching anything outside the root', async () => {
-    const dir = mkdtempSync(path.join(tmpdir(), 'solpi-obs-'));
-    const { api, ctx } = await loadPack(dir);
-    const original = bigResultText(12 * 1024);
-    const message = toolResultMessage(original);
-    for (let i = 0; i < 3; i += 1) await api.emitContext([message], ctx);
-    const projected = (await api.emitContext([message], ctx)) as typeof message[];
-    const realId = ((projected[0].content[0] as { text: string }).text.match(/id: (obs_[a-f0-9]+)/) ?? [])[1];
-
-    const recall = api.tools.get('obs_recall')!;
-    for (const badId of ['', 'obs_short', '../escape', '../../etc/passwd', 'obs_000000000000000000000000']) {
-      await expect(
-        recall.execute('recall-bad', { id: badId, offset: 0 }, undefined, undefined, ctx),
-      ).rejects.toThrow(`Unknown observation id: ${badId}`);
+    // The trial must not depend on how deep os.tmpdir() sits: probe both the
+    // default tmpdir and a shallow '/tmp' root (the Linux CI shape, where a
+    // dir/../../etc-style probe would resolve to the real /etc).
+    await runMaliciousIdTrial(tmpdir());
+    if (process.platform !== 'win32' && existsSync('/tmp') && path.resolve('/tmp') !== path.resolve(tmpdir())) {
+      await runMaliciousIdTrial('/tmp');
     }
-
-    // No traversal artifact next to (or above) the archive root.
-    expect(existsSync(path.join(dir, 'escape'))).toBe(false);
-    expect(existsSync(path.join(dir, '..', 'escape'))).toBe(false);
-    expect(existsSync(path.join(dir, '..', '..', 'etc'))).toBe(false);
-
-    // The tool still serves the genuine id after the malformed attempts.
-    expect(await recallAll(recall, ctx, realId!)).toBe(original);
   });
 
   test('fail-open: an unwritable archive root keeps messages full and recovers after restore', async () => {
