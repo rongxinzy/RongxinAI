@@ -71,10 +71,12 @@ them deliberately; never overwrite the tree blindly.
 
 ## 4. `index.ts` (vendor root) — runtime options plumbing
 
-- **Local:** `SolPiRuntimeOptions { archiveBudgetBytes?, bashOptions? }` and
-  optional `options` parameters on `createSolPiExtension(loadConfig?, options?)`
-  and `registerConfiguredFeatures(pi, config, options?)`, threaded to the
-  observation-pack (budget) and action-fusion (bash options) registrars.
+- **Local:** `SolPiRuntimeOptions { archiveBudgetBytes?, bashOptions?,
+  prepareObservation?, hashBuffer?, fileHash? }` (compute hooks added by
+  patches 6/9) and optional `options` parameters on
+  `createSolPiExtension(loadConfig?, options?)` and
+  `registerConfiguredFeatures(pi, config, options?)`, threaded to the
+  observation-pack and action-fusion registrars.
 - **Why:** the embedding app must pass app-owned settings into the vendored
   extensions; upstream only discovers config from `sol-pi.json` files, which
   this app deliberately bypasses. `bashOptions` carries the app's resolved
@@ -140,5 +142,7 @@ vendored trees carry an explicit divergence ledger instead of silent edits.
 ## Patch provenance (continued)
 
 Patches 6-9 authored in the pr762-claude-fix round (2026-09-12) from
-cross-review findings P2-2/P2-3; same additive-only policy — every option is
-optional and absent options reproduce the previous vendored behavior.
+cross-review findings P2-2/P2-3. Options stay additive and absent options keep
+the previous compute paths, with one deliberate behavioral change: the ledger
+now batches appends and rotates by default (patch 8) — the previous unbounded
+per-observation append shape is intentionally not reproducible.

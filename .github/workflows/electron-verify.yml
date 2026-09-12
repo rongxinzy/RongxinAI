@@ -14,6 +14,7 @@ concurrency:
   group: electron-verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

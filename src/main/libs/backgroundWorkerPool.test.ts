@@ -181,9 +181,11 @@ describe('worker-boundary event-loop evidence', () => {
     });
 
     // The in-process pass must show a real block (the workload is big enough
-    // to matter), and the pool pass must stay well under it — with a hard
-    // responsiveness ceiling so the assertion means something on fast hosts.
-    expect(inProcessGap).toBeGreaterThanOrEqual(20);
-    expect(poolGap).toBeLessThan(Math.max(25, inProcessGap / 2));
+    // to matter), and the pool pass must stay strictly under half of it — a
+    // purely relative bound so the assertion stays discriminating on any
+    // host speed (a secretly-main-thread pool would measure the same gap and
+    // fail the ratio).
+    expect(inProcessGap).toBeGreaterThanOrEqual(10);
+    expect(poolGap).toBeLessThan(inProcessGap / 2);
   });
 });

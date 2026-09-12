@@ -2183,7 +2183,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // error guards keep aborted/deleted/failed turns on their own paths.
         const record = active.deferredTurnSettlement;
         active.deferredTurnSettlement = null;
-        this.settleSessionTurn(sessionId, active, record.truncated);
+        this.settleSessionTurn(sessionId, active, record.truncated, true);
       }
     }
   }
@@ -3021,12 +3021,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    * the follow-up drain branch — from flushFollowUpQueue once the queue has
    * drained without leaving a running turn. `truncatedOverride` carries the
    * disclosed-truncation state of the turn that deferred settlement (the flag
-   * itself was cleared by the disclosure).
+   * itself was cleared by the disclosure); `disclosurePersisted` marks that
+   * the drain branch already persisted the notice, so the deferred settlement
+   * must not disclose a second time.
    */
   private settleSessionTurn(
     sessionId: string,
     active: ActivePiSession,
     truncatedOverride?: boolean,
+    disclosurePersisted = false,
   ): void {
     active.deferredTurnSettlement = null;
     // Terminal truncated answer (continuation budget exhausted or steer
@@ -3035,7 +3038,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // truncation themselves, so this branch only runs for turns that
     // genuinely end the session turn.
     const answerTruncatedTerminal = truncatedOverride ?? active.lastAnswerTruncated;
-    if (answerTruncatedTerminal) {
+    if (answerTruncatedTerminal && !disclosurePersisted) {
       this.discloseTruncatedAnswer(sessionId, active);
     }
     if (this.store) {

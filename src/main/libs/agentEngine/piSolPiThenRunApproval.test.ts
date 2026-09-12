@@ -416,7 +416,9 @@ describe('PiRuntimeAdapter fused then_run authorization wiring', () => {
         .prepare('SELECT effect_status, decision FROM workbench_approvals WHERE tool_call_id = ?')
         .get('fused-9:then_run') as { effect_status?: string; decision?: string } | undefined;
       expect(row?.decision).toBe('denied');
-      expect(row?.effect_status).not.toBe(WorkbenchApprovalEffectStatus.Succeeded);
+      // A denial never started executing; settlement must leave it exactly
+      // there — not "failed", and certainly not "succeeded".
+      expect(row?.effect_status).toBe(WorkbenchApprovalEffectStatus.NotStarted);
     });
 
     it('blocks the fused call before the guard when the write approval itself is denied', async () => {

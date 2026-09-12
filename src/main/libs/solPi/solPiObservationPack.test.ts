@@ -140,8 +140,8 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
    * Behavioral traversal trial inside an isolated sandbox root: the archive
    * lives at <sandbox>/session/sol-pi, so anything escaping the objects dir
    * must land inside the sandbox where a before/after snapshot can see it.
-   * Canaries pin the concrete escape targets (including an `etc/passwd`-shaped
-   * path one level above the session dir) byte-for-byte.
+   * Canaries pin byte-for-byte the escape targets reachable from the session
+   * dir and sandbox bases; the full recursive snapshot covers everything else.
    */
   const runMaliciousIdTrial = async (parentDir: string): Promise<void> => {
     const sandbox = mkdtempSync(path.join(parentDir, 'solpi-obs-sandbox-'));
@@ -154,7 +154,8 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
     const projected = (await api.emitContext([message], ctx)) as typeof message[];
     const realId = ((projected[0].content[0] as { text: string }).text.match(/id: (obs_[a-f0-9]+)/) ?? [])[1];
 
-    // Plant canaries at the exact paths traversal ids would reach.
+    // Plant canaries at the escape targets reachable from the session dir
+    // and archive-root bases (belt-and-suspenders next to the snapshot).
     const canaries: Array<[string, string]> = [
       [path.join(sandbox, 'etc', 'passwd'), 'sandbox-canary:etc-passwd\n'],
       [path.join(sandbox, 'escape'), 'sandbox-canary:escape\n'],
@@ -169,8 +170,9 @@ describe('vendored ObservationPack with an app-owned storage root', () => {
 
     const recall = api.tools.get('obs_recall')!;
     for (const badId of ['', 'obs_short', '../escape', '../../etc/passwd', 'obs_000000000000000000000000']) {
-      // Rejection with `Unknown observation id` is also the read-safety proof:
-      // the id never resolves to a path, so no file is ever opened.
+      // Rejection with `Unknown observation id` for pattern-invalid ids: the
+      // OBSERVATION_ID_PATTERN gate (hex-only) means traversal ids never
+      // reach path resolution, so no traversal read can occur.
       await expect(
         recall.execute('recall-bad', { id: badId, offset: 0 }, undefined, undefined, ctx),
       ).rejects.toThrow(`Unknown observation id: ${badId}`);

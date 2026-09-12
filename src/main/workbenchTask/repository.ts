@@ -171,7 +171,10 @@ export class WorkbenchTaskRepository {
   getLatestTaskForSession(sessionId: string): WorkbenchTask | null {
     const row = this.db
       .prepare(
-        'SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+        // rowid breaks created_at ties (millisecond stamps collide when a
+        // superseding task is created in the same tick); without it the LIMIT 1
+        // can hand back the superseded task.
+        'SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1',
       )
       .get(sessionId) as TaskRow | undefined;
     return row ? this.mapTask(row) : null;

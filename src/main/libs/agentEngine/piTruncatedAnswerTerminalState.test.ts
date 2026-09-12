@@ -190,6 +190,13 @@ describe('PiRuntimeAdapter truncated answer terminal state', () => {
       ([, message]) => (message as { type: string }).type === 'system',
     );
 
+  const disclosureCount = () =>
+    mockStore.addMessage.mock.calls.filter(
+      ([, message]) =>
+        (message as { metadata?: { answerTruncated?: boolean } }).metadata?.answerTruncated ===
+        true,
+    ).length;
+
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.mockModelRuntimeCreate.mockResolvedValue(hoisted.mockModelRuntime);
@@ -451,15 +458,23 @@ describe('PiRuntimeAdapter truncated answer terminal state', () => {
             isRunning: boolean;
           }
         >;
+        discloseTruncatedAnswer: (sessionId: string, active: unknown) => void;
         flushFollowUpQueue: (sessionId: string, active: unknown) => Promise<void>;
       };
       const active = internals.activeSessions.get('work-session')!;
       truncatedAnswer('Truncated with a drained control-action queue');
       active.isRunning = false;
+      // Replay the drain branch exactly: disclose first (idempotent flag
+      // cleared), then defer settlement.
+      internals.discloseTruncatedAnswer('work-session', active);
       active.deferredTurnSettlement = { truncated: true };
       expect(completes).toEqual([]);
 
       await internals.flushFollowUpQueue('work-session', active);
+
+      // Exactly one disclosure survives — the deferred settlement must not
+      // repeat the notice.
+      expect(disclosureCount()).toBe(1);
 
       // The deferred settlement fired: complete event, idle session, and the
       // run lands on needs_review with the stream check failed.
