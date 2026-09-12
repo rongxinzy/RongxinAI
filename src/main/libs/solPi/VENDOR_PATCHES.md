@@ -106,7 +106,10 @@ vendored trees carry an explicit divergence ledger instead of silent edits.
   EEXIST content re-hash off-thread. The per-request ledger writes are
   collected and appended in ONE call (previously one append per archived
   observation per request), and the ledger rotates at `ledgerMaxBytes`
-  (default 1 MiB, one `.1` generation). `releaseArchiveBudget(root)` drops
+  (default 1 MiB, one `.1` generation). Both ledger call sites (the batched
+  projection append and the recall record) fail open: the ledger is
+  diagnostics-only, so an append error is logged and must never fail the
+  projection or the recall. `releaseArchiveBudget(root)` drops
   the module-level budget entry so a recreated session root re-measures from
   disk (session teardown calls it through the app's storage scope).
 - **Why:** the repository's Main Process / Worker Boundary rules forbid
@@ -124,11 +127,15 @@ vendored trees carry an explicit divergence ledger instead of silent edits.
   EEXIST whole-file re-hash through the caller's (worker-backed) hash;
   defaults keep the local sync hash.
 
-## 8. `extensions/observation-pack/ledger.ts` — memoized mkdir, batched append, rotation
+## 8. `extensions/observation-pack/ledger.ts` — memoized mkdir, batched append, rotation, chain resilience
 
 - **Local:** the ledger closure memoizes its directory creation, accepts one
   entry or an array (single appendFile per call), serializes writes, tracks
-  bytes and rotates at the ceiling (see patch 6).
+  bytes and rotates at the ceiling (see patch 6). The serialization chain is
+  failure-isolated: the awaiting caller observes its own append's error, but
+  the chain itself continues from a settled state, so one transient append
+  failure (ENOSPC, vanished directory) cannot poison every later append for
+  the rest of the session.
 
 ## 9. `extensions/action-fusion/then-run.ts` + `index.ts` — injectable interference hash
 
@@ -142,7 +149,10 @@ vendored trees carry an explicit divergence ledger instead of silent edits.
 ## Patch provenance (continued)
 
 Patches 6-9 authored in the pr762-claude-fix round (2026-09-12) from
-cross-review findings P2-2/P2-3. Options stay additive and absent options keep
-the previous compute paths, with one deliberate behavioral change: the ledger
-now batches appends and rotates by default (patch 8) — the previous unbounded
-per-observation append shape is intentionally not reproducible.
+cross-review findings P2-2/P2-3; the ledger chain-resilience and fail-open
+call-site guards (patches 6/8) were added in the pr762-claude-verify round the
+same day after adversarial re-review found a single failed append could poison
+the serialized chain for the session. Options stay additive and absent options
+keep the previous compute paths, with one deliberate behavioral change: the
+ledger now batches appends and rotates by default (patch 8) — the previous
+unbounded per-observation append shape is intentionally not reproducible.

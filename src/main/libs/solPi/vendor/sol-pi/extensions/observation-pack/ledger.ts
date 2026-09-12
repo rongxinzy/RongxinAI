@@ -73,13 +73,17 @@ export function createLedger(path: string, options: LedgerOptions = {}): Ledger 
 			.map((record) => JSON.stringify({ timestamp: new Date().toISOString(), ...record }))
 			.join("\n")}\n`;
 		// Serialize writes so batched appends keep their order and the byte
-		// accounting stays exact.
-		writeChain = writeChain.then(async () => {
+		// accounting stays exact. The awaiting caller observes the attempt's
+		// failure, but the chain itself continues from a settled state — one
+		// rejected append (ENOSPC, vanished directory) must not poison every
+		// later append for the rest of the session.
+		const attempt = writeChain.then(async () => {
 			await ensureDirectory();
 			await rotateIfNeeded();
 			await appendFile(path, block, "utf8");
 			bytesWritten = (bytesWritten ?? 0) + Buffer.byteLength(block, "utf8");
 		});
-		await writeChain;
+		writeChain = attempt.catch(() => undefined);
+		await attempt;
 	};
 }

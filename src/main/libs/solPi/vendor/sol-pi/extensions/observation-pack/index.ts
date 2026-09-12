@@ -250,15 +250,21 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 				if (Buffer.byteLength(content, "utf8") > RECALL_MAX_BYTES || countLines(content) > RECALL_MAX_LINES) {
 					throw new Error("Recall output exceeded its hard limit");
 				}
-				await ledgerFor(ctx)({
-					event: "recall",
-					id: params.id,
-					offset,
-					bytes: chunk.bytes,
-					lines: chunk.lines,
-					nextOffset: chunk.nextOffset,
-					eof: chunk.eof,
-				});
+				// The ledger is diagnostics-only; a failing append must never
+				// fail the recall itself.
+				try {
+					await ledgerFor(ctx)({
+						event: "recall",
+						id: params.id,
+						offset,
+						bytes: chunk.bytes,
+						lines: chunk.lines,
+						nextOffset: chunk.nextOffset,
+						eof: chunk.eof,
+					});
+				} catch (error) {
+					console.error(`[observationpack] fail-open for recall ledger: ${String(error)}`);
+				}
 				return {
 					content: [{ type: "text", text: content }],
 					details: {
@@ -425,7 +431,15 @@ export function createObservationPackExtension(options: ObservationPackOptions =
 				}
 			}
 
-			if (ledgerEntries.length > 0) await ledgerFor(ctx)(ledgerEntries);
+			if (ledgerEntries.length > 0) {
+				// Diagnostics again: a ledger failure (full disk, vanished
+				// directory) must not cost the agent its projections.
+				try {
+					await ledgerFor(ctx)(ledgerEntries);
+				} catch (error) {
+					console.error(`[observationpack] fail-open for ledger batch: ${String(error)}`);
+				}
+			}
 			return { messages: projected };
 		});
 	};
