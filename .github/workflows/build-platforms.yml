@@ -136,6 +136,12 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Verify packaged ACP registry and bridges
         run: node scripts/ci/verify-packaged-acp-resources.mjs
+      # bun install --ignore-scripts skips electron's postinstall, so the
+      # packaged smoke and cold-cache gate have no node_modules Electron
+      # binary to run under (same bootstrap as memory-regression.yml).
+      - name: Install Electron runtime
+        if: ${{ matrix.platform == 'macos' }}
+        run: node node_modules/electron/install.js
       - name: Verify packaged SoL-Pi resources, smoke, and cold-cache jiti gate
         if: ${{ matrix.platform == 'macos' }}
         run: |
