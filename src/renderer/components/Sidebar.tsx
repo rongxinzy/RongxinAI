@@ -398,13 +398,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className={cn('pt-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
             <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
-              <div
-                className={cn(
-                  'flex items-center gap-2',
-                  isMac && 'pl-[68px]',
-                  workMode === WorkMode.Chat && 'invisible',
-                )}
-              >
+              <div className={cn('flex items-center gap-2', isMac && 'pl-[68px]')}>
                 <img
                   src="zhiyuan-logo-light.svg"
                   alt="知远"
