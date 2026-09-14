@@ -273,23 +273,22 @@ export function formatNextRunRelative(nextRunAtMs: number | null): string | null
   const diffMs = nextRunAtMs - Date.now();
   if (diffMs <= 0) return null;
 
-  const lang = i18nService.getLanguage();
-  const isChinese = lang === 'zh';
-
-  const minutes = Math.round(diffMs / 60_000);
-  const hours = Math.round(diffMs / 3_600_000);
-  const days = Math.round(diffMs / 86_400_000);
-
   if (diffMs < 60_000) {
-    return isChinese ? '不到 1 分钟后' : 'in < 1 min';
+    return i18nService.t('scheduledTasksNextRunSoon');
   }
   if (diffMs < 3_600_000) {
-    return isChinese ? `${minutes} 分钟后` : `in ${minutes} min`;
+    return tpl(i18nService.t('scheduledTasksNextRunMinutes'), {
+      n: String(Math.round(diffMs / 60_000)),
+    });
   }
   if (diffMs < 86_400_000) {
-    return isChinese ? `${hours} 小时后` : `in ${hours} h`;
+    return tpl(i18nService.t('scheduledTasksNextRunHours'), {
+      n: String(Math.round(diffMs / 3_600_000)),
+    });
   }
-  return isChinese ? `${days} 天后` : `in ${days} d`;
+  return tpl(i18nService.t('scheduledTasksNextRunDays'), {
+    n: String(Math.round(diffMs / 86_400_000)),
+  });
 }
 
 export function formatPayloadLabel(payload: ScheduledTaskPayload): string {

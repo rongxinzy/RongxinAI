@@ -37,6 +37,7 @@ import { CcConnectDeliveryTransport } from '../scheduledTask/ccConnectDeliveryTr
 import { ScheduledTaskDeliveryDispatcher } from '../scheduledTask/deliveryDispatcher';
 import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
+import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { ActivityService } from './activity/activityService';
 import { registerActivityIpcHandlers } from './activity/ipcHandlers';
 import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from './communityAuthSession';
@@ -1318,6 +1319,26 @@ const attachCcConnectCronControl = async (
   await canonicalSchedulerRuntime!.reconcile(await getCanonicalScheduledTaskService().listJobs());
   return health;
 };
+/**
+ * Pushes canonical scheduler Run/status changes to every renderer window.
+ * Scheduled Runs are started by the sidecar clock, so without this push the
+ * task list and run history would keep showing pre-Run state until the next
+ * user action.
+ */
+const broadcastScheduledTaskEvent = (
+  channel: (typeof ScheduledTaskIpc)[keyof typeof ScheduledTaskIpc],
+  data: Record<string, unknown>,
+): void => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue;
+    try {
+      win.webContents.send(channel, data);
+    } catch (error) {
+      console.error('[Scheduler] failed to broadcast a scheduled task event:', error);
+    }
+  }
+};
+
 const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!canonicalScheduledTaskService) {
     const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
@@ -1334,6 +1355,14 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
       executor.execute.bind(executor),
       new ScheduledTaskDeliveryDispatcher(taskStore, ccConnectDeliveryTransport),
       activityService,
+      {
+        runUpdated: (run, taskName) =>
+          broadcastScheduledTaskEvent(ScheduledTaskIpc.RunUpdate, {
+            run: { ...run, taskName },
+          }),
+        taskStateChanged: (taskId, state) =>
+          broadcastScheduledTaskEvent(ScheduledTaskIpc.StatusUpdate, { taskId, state }),
+      },
     );
     canonicalScheduledTaskService = new CanonicalScheduledTaskService(
       taskStore,

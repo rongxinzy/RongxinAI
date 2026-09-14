@@ -251,9 +251,10 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
           <FieldError>{errors.payloadText}</FieldError>
         </Field>
 
-        <Field>
+        <Field data-invalid={Boolean(errors.notifyTo) || undefined}>
           <FieldTitle>{i18nService.t('scheduledTasksFormNotifyChannel')}</FieldTitle>
           {notificationControl}
+          <FieldError>{errors.notifyTo}</FieldError>
         </Field>
       </FieldGroup>
     </div>

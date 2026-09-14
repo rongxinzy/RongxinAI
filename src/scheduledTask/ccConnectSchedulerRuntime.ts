@@ -5,12 +5,21 @@ import { SchedulerClockAccount, type CcConnectCronTask } from './ccConnectCronCl
 import type { ScheduledTaskDeliveryDispatcher } from './deliveryDispatcher';
 import type { SchedulerRuntime } from './schedulerRuntime';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
-import type { ScheduledTask, ScheduledTaskRun } from './types';
+import type { ScheduledTask, ScheduledTaskRun, TaskState } from './types';
 
 type TriggerClient = {
   upsert(task: CcConnectCronTask): Promise<void>;
   remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void>;
 };
+
+/**
+ * Renderer-facing projection of canonical Run/state changes. The scheduler
+ * never polls, so every transition it makes must be pushed.
+ */
+export interface SchedulerEventSink {
+  runUpdated(run: ScheduledTaskRun, taskName: string): void;
+  taskStateChanged(taskId: string, state: TaskState): void;
+}
 
 /**
  * The only scheduler runtime allowed for cc-connect. It persists and claims
@@ -23,6 +32,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<{ sessionId?: string | null; output?: string | null }>,
     private readonly deliveryDispatcher?: ScheduledTaskDeliveryDispatcher,
     private readonly activityService?: ActivityService,
+    private readonly events?: SchedulerEventSink,
   ) {}
 
   async reconcile(tasks: readonly ScheduledTask[]): Promise<void> {
@@ -55,11 +65,16 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   async runNow(taskId: string): Promise<void> {
     const task = this.store.get(taskId);
     if (!task) throw new Error(`Scheduled task not found: ${taskId}`);
-    const run = this.store.claimTrigger({
-      taskId, scheduleVersion: task.scheduleVersion ?? '',
-      // Manual invocations need a fresh identity while keeping the same canonical path.
-      scheduledAt: `${new Date().toISOString()}:manual:${crypto.randomUUID()}`,
-    });
+    const run = this.store.claimTrigger(
+      {
+        taskId,
+        scheduleVersion: task.scheduleVersion ?? '',
+        // Manual invocations need a fresh identity while keeping the same canonical path.
+        scheduledAt: `${new Date().toISOString()}:manual:${crypto.randomUUID()}`,
+      },
+      // A paused task may still be run once by hand from the task list.
+      { allowDisabled: true },
+    );
     if (!run) throw new Error(`Unable to claim scheduled task: ${taskId}`);
     await this.executeAndFinish(task, run);
   }
@@ -76,9 +91,11 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   private async executeAndFinish(task: ScheduledTask, run: ScheduledTaskRun): Promise<void> {
     this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Running, startedAt: Date.parse(run.startedAt), taskName: task.name, inputPreview: task.payload.kind === 'agentTurn' ? task.payload.message : task.payload.text });
+    this.publishRun(run, task.name);
     try {
       const result = await this.execute(task, run);
       const completedRun = this.store.finishRun(run.id, { status: TaskStatus.Success, sessionId: result.sessionId ?? null });
+      this.publishRun(completedRun, task.name);
       this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Completed, taskName: task.name, sessionId: result.sessionId ?? undefined, replyPreview: result.output ?? undefined });
       // Delivery is independently durable and best effort: a channel failure
       // must not turn a Pi-successful Run into an execution failure.
@@ -89,12 +106,25 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.store.finishRun(run.id, {
+      const failedRun = this.store.finishRun(run.id, {
         status: TaskStatus.Error,
         error: message,
       });
+      this.publishRun(failedRun, task.name);
       this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Failed, taskName: task.name, errorMessage: message });
       throw error;
+    }
+  }
+
+  /** Pushes the Run and the task state it produced; renderer staleness is a bug. */
+  private publishRun(run: ScheduledTaskRun, taskName: string): void {
+    if (!this.events) return;
+    try {
+      this.events.runUpdated(run, taskName);
+      const state = this.store.get(run.taskId)?.state;
+      if (state) this.events.taskStateChanged(run.taskId, state);
+    } catch (error) {
+      console.warn(`[Scheduler] failed to publish run ${run.id} to the renderer:`, error);
     }
   }
 

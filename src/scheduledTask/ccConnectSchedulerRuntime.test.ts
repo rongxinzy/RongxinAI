@@ -213,3 +213,27 @@ test('finishes a claimed Run as error when Pi terminates unexpectedly', async ()
     error: 'Pi session stopped before completion',
   });
 });
+
+test('publishes each Run transition together with the task state it produced', async () => {
+  const { store, task, client } = setup();
+  const events = { runUpdated: vi.fn(), taskStateChanged: vi.fn() };
+  const runtime = new CcConnectSchedulerRuntime(
+    store,
+    client,
+    async () => ({ sessionId: 'pi-run' }),
+    undefined,
+    undefined,
+    events,
+  );
+
+  await runtime.runNow(task.id);
+
+  expect(events.runUpdated).toHaveBeenCalledTimes(2);
+  expect(events.runUpdated.mock.calls[0][0]).toMatchObject({ status: TaskStatus.Running });
+  expect(events.runUpdated.mock.calls[1][0]).toMatchObject({ status: TaskStatus.Success });
+  expect(events.runUpdated.mock.calls[0][1]).toBe(task.name);
+  expect(events.taskStateChanged).toHaveBeenLastCalledWith(
+    task.id,
+    expect.objectContaining({ runningAtMs: null, lastStatus: TaskStatus.Success }),
+  );
+});

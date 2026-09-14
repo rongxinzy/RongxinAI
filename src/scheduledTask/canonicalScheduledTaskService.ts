@@ -91,10 +91,18 @@ export class CanonicalScheduledTaskService implements ScheduledTaskService {
 }
 
 function filterRuns<T extends ScheduledTaskRun>(runs: readonly T[], filter?: RunFilter): T[] {
+  // Run timestamps are stored in UTC but rendered in local time, so the
+  // calendar-day bounds must be local days too: `2026-09-14` means local
+  // midnight through local 23:59:59.999, not the UTC day.
+  const startMs = filter?.startDate ? Date.parse(`${filter.startDate}T00:00:00`) : NaN;
+  const endMs = filter?.endDate ? Date.parse(`${filter.endDate}T23:59:59.999`) : NaN;
   return runs.filter(run => {
     if (filter?.status && run.status !== filter.status) return false;
-    if (filter?.startDate && run.startedAt < `${filter.startDate}T00:00:00`) return false;
-    if (filter?.endDate && run.startedAt > `${filter.endDate}T23:59:59.999Z`) return false;
+    if (!Number.isFinite(startMs) && !Number.isFinite(endMs)) return true;
+    const startedMs = Date.parse(run.startedAt);
+    if (!Number.isFinite(startedMs)) return false;
+    if (Number.isFinite(startMs) && startedMs < startMs) return false;
+    if (Number.isFinite(endMs) && startedMs > endMs) return false;
     return true;
   });
 }

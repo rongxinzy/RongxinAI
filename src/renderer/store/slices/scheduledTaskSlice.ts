@@ -114,7 +114,7 @@ const scheduledTaskSlice = createSlice({
       }
       state.runsHasMore[taskId] = hasMore;
     },
-    addOrUpdateRun(state, action: PayloadAction<ScheduledTaskRun>) {
+    addOrUpdateRun(state, action: PayloadAction<ScheduledTaskRunWithName>) {
       const { taskId } = action.payload;
       if (!state.runs[taskId]) {
         state.runs[taskId] = [];
@@ -124,6 +124,14 @@ const scheduledTaskSlice = createSlice({
         state.runs[taskId][existingIndex] = action.payload;
       } else {
         state.runs[taskId].unshift(action.payload);
+      }
+      // The history panel renders `allRuns`, so a pushed Run must land in both
+      // projections or a Run started in the background stays invisible there.
+      const allIndex = state.allRuns.findIndex(r => r.id === action.payload.id);
+      if (allIndex !== -1) {
+        state.allRuns[allIndex] = action.payload;
+      } else {
+        state.allRuns.unshift(action.payload);
       }
     },
     setAllRuns(
