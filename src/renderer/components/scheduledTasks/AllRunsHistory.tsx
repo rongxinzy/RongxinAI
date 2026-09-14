@@ -24,7 +24,7 @@ import type {
 import { cn } from '@shared/lib/utils';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
-import { RootState, store } from '../../store';
+import { RootState } from '../../store';
 import DateInput from './DateInput';
 import FailureDetailModal from './FailureDetailModal';
 import RunSessionModal from './RunSessionModal';
@@ -36,18 +36,6 @@ const statusLabelKeys: Record<string, string> = {
   skipped: 'scheduledTasksStatusSkipped',
   running: 'scheduledTasksStatusRunning',
 };
-
-function applyClientFilter(
-  runs: ScheduledTaskRunWithName[],
-  filter: RunFilter,
-): ScheduledTaskRunWithName[] {
-  return runs.filter(run => {
-    if (filter.status && run.status !== filter.status) return false;
-    if (filter.startDate && run.startedAt < filter.startDate + 'T00:00:00') return false;
-    if (filter.endDate && run.startedAt > filter.endDate + 'T23:59:59') return false;
-    return true;
-  });
-}
 
 const EMPTY_FILTER: RunFilter = {};
 const EMPTY_TASK_RUNS: ScheduledTaskRun[] = [];
@@ -94,11 +82,6 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
 
   const hasActiveFilter = Boolean(filter.startDate || filter.endDate || filter.status);
 
-  const displayedRuns = useMemo(
-    () => (hasActiveFilter ? applyClientFilter(runs, filter) : runs),
-    [filter, hasActiveFilter, runs],
-  );
-
   const loadInitial = useCallback(
     (f: RunFilter) => {
       if (taskId) {
@@ -112,13 +95,10 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
 
   useEffect(() => {
     setFilter(EMPTY_FILTER);
-    // Cache-aware: switching tabs remounts this panel; skip the refetch when
-    // the store already holds runs so tab switches stay instant.
-    const state = store.getState().scheduledTask;
-    const hasCached = taskId ? (state.runs[taskId]?.length ?? 0) > 0 : state.allRuns.length > 0;
-    if (!hasCached) {
-      loadInitial(EMPTY_FILTER);
-    }
+    // Switching tabs remounts this panel while the store keeps the previous
+    // (possibly filtered) subset, so the unfiltered list must be refetched even
+    // when cached rows exist. Rows already in the store keep the switch instant.
+    loadInitial(EMPTY_FILTER);
   }, [loadInitial, taskId]);
 
   const handleFilterChange = (newFilter: RunFilter) => {
@@ -146,7 +126,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
     }
   };
 
-  const isEmpty = displayedRuns.length === 0;
+  const isEmpty = runs.length === 0;
 
   return (
     <ScrollArea className="theme-scene-history min-h-0 flex-1">
@@ -224,7 +204,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displayedRuns.map(run => {
+              {runs.map(run => {
                 const hasSession = run.sessionId || run.sessionKey;
                 const isClickable = hasSession || (run.status === 'error' && run.error);
                 return (

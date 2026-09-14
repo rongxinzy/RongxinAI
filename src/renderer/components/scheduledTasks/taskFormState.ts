@@ -1,9 +1,12 @@
 import { PlatformRegistry } from '@shared/platform';
 
 import {
+  DeliveryMode,
   ManagedSessionKeyPrefix,
+  PayloadKind,
   SessionBindingStrategy,
   SessionTarget,
+  WakeMode,
   type SessionBindingStrategy as SessionBindingStrategyType,
 } from '../../../scheduledTask/constants';
 import type {
@@ -220,6 +223,53 @@ export function buildScheduleInput(form: FormState): ScheduledTaskInput['schedul
   }
 
   return { kind: 'cron', expr: `${min} ${hr} ${form.monthDay} * *` };
+}
+
+/**
+ * Builds the canonical task payload from the form.
+ *
+ * Edit mode must not rewrite fields the form does not own: `enabled` belongs to
+ * the task-list switch and `description` belongs to templates and legacy
+ * imports, so both are carried over instead of being reset.
+ */
+export function buildTaskInput(
+  form: FormState,
+  context: { mode: 'create' | 'edit'; task?: ScheduledTask; prefill?: TaskTemplateValues },
+): ScheduledTaskInput {
+  const { mode, task, prefill } = context;
+  return {
+    name: form.name.trim(),
+    description: mode === 'create' ? (prefill?.description ?? '') : (task?.description ?? ''),
+    enabled: mode === 'create' ? true : (task?.enabled ?? true),
+    // An "advanced" schedule has no editable fields, so it is carried over as is.
+    schedule: form.planType === 'advanced' && task ? task.schedule : buildScheduleInput(form),
+    sessionTarget:
+      form.sessionBinding === SessionBindingStrategy.Task
+        ? SessionTarget.Task
+        : form.sessionBinding === SessionBindingStrategy.Existing
+          ? SessionTarget.Main
+          : SessionTarget.Isolated,
+    sessionKey:
+      form.sessionBinding === SessionBindingStrategy.Existing && form.boundSessionId
+        ? `${ManagedSessionKeyPrefix.Zhiyuan}${form.boundSessionId}`
+        : null,
+    wakeMode: WakeMode.Now,
+    workspaceId: form.workspaceId,
+    payload: {
+      kind: PayloadKind.AgentTurn,
+      message: form.payloadText.trim(),
+      ...(form.modelId ? { model: form.modelId } : {}),
+    },
+    delivery:
+      form.notifyChannel === 'none'
+        ? { mode: DeliveryMode.None }
+        : {
+            mode: DeliveryMode.Announce,
+            channel: form.notifyChannel,
+            ...(form.notifyTo ? { to: form.notifyTo } : {}),
+            ...(form.notifyAccountId ? { accountId: form.notifyAccountId } : {}),
+          },
+  };
 }
 
 // Returns the human-readable cron description, or null if the expression is

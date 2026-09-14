@@ -16,16 +16,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import {
-  ManagedSessionKeyPrefix,
   SessionBindingStrategy,
-  SessionTarget,
   type SessionBindingStrategy as SessionBindingStrategyType,
 } from '../../../scheduledTask/constants';
 import type {
   ScheduledTask,
   ScheduledTaskChannelOption,
   ScheduledTaskConversationOption,
-  ScheduledTaskInput,
 } from '../../../scheduledTask/types';
 import type { Workspace } from '../../../shared/workspace';
 import { CoworkSessionSource } from '../../../shared/cowork/constants';
@@ -54,7 +51,7 @@ import {
   TASK_NAME_MAX_LENGTH,
   WEEKDAY_SHORT_LABELS_EN,
   WEEKDAY_SHORT_LABELS_ZH,
-  buildScheduleInput,
+  buildTaskInput,
   createFormState,
   formsEqual,
   getNotifyChannelLabel,
@@ -366,7 +363,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
         form.minute,
         form.second,
       );
-      if (runAt.getTime() <= Date.now()) {
+      // A cleared date field produces an Invalid Date, which must fail here
+      // instead of reaching toISOString() in the submit path.
+      if (!Number.isFinite(runAt.getTime()) || runAt.getTime() <= Date.now()) {
         nextErrors.schedule = i18nService.t('scheduledTasksFormValidationDatetimeFuture');
       }
     }
@@ -396,6 +395,13 @@ const TaskForm: React.FC<TaskFormProps> = ({
       nextErrors.schedule = i18nService.t('scheduledTasksFormValidationWeekdayRequired');
     }
 
+    // An announce delivery without a destination cannot be routed at run time.
+    // Only the IM channels with a conversation selector are checked: legacy
+    // tasks may carry a channel this form cannot enumerate a target for.
+    if (isIMChannel(form.notifyChannel) && !form.notifyTo.trim()) {
+      nextErrors.notifyTo = i18nService.t('scheduledTasksFormValidationNotifyTargetRequired');
+    }
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -420,40 +426,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const schedule = isAdvanced && task ? task.schedule : buildScheduleInput(form);
-
-      const input: ScheduledTaskInput = {
-        name: form.name.trim(),
-        description: '',
-        enabled: true,
-        schedule,
-        sessionTarget:
-          form.sessionBinding === SessionBindingStrategy.Task
-            ? SessionTarget.Task
-            : form.sessionBinding === SessionBindingStrategy.Existing
-              ? SessionTarget.Main
-              : SessionTarget.Isolated,
-        sessionKey:
-          form.sessionBinding === SessionBindingStrategy.Existing && form.boundSessionId
-            ? `${ManagedSessionKeyPrefix.Zhiyuan}${form.boundSessionId}`
-            : null,
-        wakeMode: 'now',
-        workspaceId: form.workspaceId,
-        payload: {
-          kind: 'agentTurn',
-          message: form.payloadText.trim(),
-          ...(form.modelId ? { model: form.modelId } : {}),
-        },
-        delivery:
-          form.notifyChannel === 'none'
-            ? { mode: 'none' }
-            : {
-                mode: 'announce',
-                channel: form.notifyChannel,
-                ...(form.notifyTo ? { to: form.notifyTo } : {}),
-                ...(form.notifyAccountId ? { accountId: form.notifyAccountId } : {}),
-              },
-      };
+      const input = buildTaskInput(form, { mode, task, prefill });
 
       if (mode === 'create') {
         const newId = await scheduledTaskService.createTask(input);
@@ -560,8 +533,12 @@ const TaskForm: React.FC<TaskFormProps> = ({
             type="date"
             value={dateValue}
             onChange={e => {
+              // Clearing the native date field must not write NaN components
+              // into the form; keep the last valid date instead.
               const [y, mo, d] = e.target.value.split('-').map(Number);
-              if (!Number.isNaN(y)) updateForm({ year: y, month: mo, day: d });
+              if (!e.target.value || !Number.isInteger(y) || !Number.isInteger(mo)) return;
+              if (!Number.isInteger(d)) return;
+              updateForm({ year: y, month: mo, day: d });
             }}
             className="flex-1 min-w-0"
           />
