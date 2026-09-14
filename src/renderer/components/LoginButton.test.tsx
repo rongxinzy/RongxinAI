@@ -13,6 +13,7 @@ const communityLogout = vi.fn();
 const sessionGateEntrypoint = vi.fn();
 const enterpriseSnapshot = vi.fn();
 const enterpriseLogout = vi.fn();
+const openExternal = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -34,6 +35,7 @@ beforeEach(() => {
           logout: enterpriseLogout,
         },
       },
+      shell: { openExternal },
     },
   });
 });
@@ -52,6 +54,22 @@ describe('LoginButton account isolation', () => {
     expect(getCommunityUser).toHaveBeenCalledOnce();
     expect(onCommunityCallback).toHaveBeenCalledOnce();
     expect(enterpriseSnapshot).not.toHaveBeenCalled();
+  });
+
+  test('opens the Zhiyuan docs site from the account menu', async () => {
+    sessionGateEntrypoint.mockResolvedValue(null);
+    getCommunityUser.mockResolvedValue({
+      success: true,
+      user: { id: 'community-1', email: 'community@example.com' },
+    });
+    openExternal.mockResolvedValue({ success: true });
+
+    render(<LoginButton onShowSettings={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'community@example.com' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '帮助中心' }));
+
+    expect(openExternal).toHaveBeenCalledWith('https://www.rongxzyai.com/docs/');
   });
 
   test('ignores a persisted community login and uses only the enterprise identity', async () => {
