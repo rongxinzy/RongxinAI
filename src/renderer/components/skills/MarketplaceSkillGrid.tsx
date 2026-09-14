@@ -3,6 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Card } from '@shared/components/ui/card';
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -28,6 +29,9 @@ interface MarketplaceSkillGridProps {
   onInstall: (skill: MarketplaceSkill) => void;
   installProgress: number;
   isDetailOpen?: boolean;
+  searchQuery: string;
+  isSearching?: boolean;
+  onClearSearch: () => void;
 }
 
 export function MarketplaceSkillGrid({
@@ -40,8 +44,33 @@ export function MarketplaceSkillGrid({
   onInstall,
   installProgress,
   isDetailOpen = false,
+  searchQuery,
+  isSearching = false,
+  onClearSearch,
 }: MarketplaceSkillGridProps) {
   if (skills.length === 0) {
+    if (searchQuery.trim()) {
+      return (
+        <Empty className="min-h-48 border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PlusMenuSkillsIcon />
+            </EmptyMedia>
+            <EmptyTitle>{i18nService.t('noMatchingSkills')}</EmptyTitle>
+            <EmptyDescription>
+              {isSearching
+                ? i18nService.t('loading')
+                : i18nService.t('skillMarketplaceSearchEmptyDescription')}
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button type="button" size="sm" variant="outline" onClick={onClearSearch}>
+              {i18nService.t('skillFilterClear')}
+            </Button>
+          </EmptyContent>
+        </Empty>
+      );
+    }
     return (
       <Empty className="min-h-48 border border-dashed">
         <EmptyHeader>

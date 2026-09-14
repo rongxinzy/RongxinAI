@@ -1023,6 +1023,7 @@ const App: React.FC = () => {
                       onToggleSidebar={handleToggleSidebar}
                       onNewChat={handleNewChat}
                       updateBadge={null}
+                      onShowScheduledTasks={handleShowScheduledTasks}
                     />
                   ) : mainView === 'mcp' ? (
                     <McpView

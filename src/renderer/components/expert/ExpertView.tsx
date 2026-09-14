@@ -2,7 +2,7 @@ import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
 import { Users } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import McpManager from '../mcp/McpManager';
@@ -48,6 +48,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<ExpertTab>(initialTab ?? EXPERT_TAB.Experts);
   const [tabDirection, setTabDirection] = useState(1);
+  const detailContainerRef = useRef<HTMLDivElement>(null);
   const expertTabs = [
     { value: EXPERT_TAB.Experts, label: i18nService.t('expert') },
     { value: EXPERT_TAB.Skills, label: i18nService.t('skills') },
@@ -106,12 +107,15 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           className="min-h-0 flex-1 overflow-hidden px-6 py-4"
           contentClassName="h-full"
         >
-          <div className="mx-auto h-full w-full max-w-4xl">
-            <SkillsManager
-              readOnly={readOnly}
-              onCreateByChat={onCreateSkillByChat}
-              onTrySkill={onTrySkill}
-            />
+          <div ref={detailContainerRef} className="relative h-full min-h-0">
+            <div className="mx-auto h-full w-full max-w-4xl">
+              <SkillsManager
+                readOnly={readOnly}
+                onCreateByChat={onCreateSkillByChat}
+                onTrySkill={onTrySkill}
+                detailContainerRef={detailContainerRef}
+              />
+            </div>
           </div>
         </LayeredTabsContent>
 

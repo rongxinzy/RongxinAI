@@ -118,6 +118,8 @@ export function classicInteractiveSurfaces(dark: boolean) {
     }),
     'surface-activity-expandable': recipe({
       hover: { 'background-color': 'var(--zy-surface-raised)' },
+      focus,
+      pressed,
     }),
     'surface-agent-row': recipe({
       base: {

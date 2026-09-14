@@ -201,11 +201,14 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
 
     if (transportType === 'stdio') {
       data.command = validatedCommand;
-      if (args.length > 0) data.args = args;
-      if (Object.keys(env).length > 0) data.env = env;
+      // Always send args/env, even when empty: the update path merges
+      // undefined fields with the stored row, so omitting them makes it
+      // impossible to clear every row from the form.
+      data.args = args;
+      data.env = env;
     } else {
       data.url = validatedUrl;
-      if (Object.keys(headers).length > 0) data.headers = headers;
+      data.headers = headers;
     }
 
     if (isRegistry && registryEntry) {

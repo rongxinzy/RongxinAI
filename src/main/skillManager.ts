@@ -1712,7 +1712,7 @@ export class SkillManager {
       '- If exactly one skill clearly applies: read its SKILL.md at <location> with the Read tool, then follow it.',
       '- If multiple could apply: choose the most specific one, then read/follow it.',
       '- If none clearly apply: do not read any SKILL.md.',
-      '- IMPORTANT: If a description contains "Do NOT use" constraints, strictly respect them. If the user\'s request falls into a "Do NOT" category, treat that skill as non-matching 鈥?do NOT read its SKILL.md.',
+      '- IMPORTANT: If a description contains "Do NOT use" constraints, strictly respect them. If the user\'s request falls into a "Do NOT" category, treat that skill as non-matching — do NOT read its SKILL.md.',
       '- For the selected skill, treat <location> as the canonical SKILL.md path.',
       '- Resolve relative paths mentioned by that SKILL.md against its directory (dirname(<location>)), not the workspace root.',
       'Constraints: never read more than one skill up front; only read additional skills if the first one explicitly references them.',
@@ -2120,7 +2120,7 @@ export class SkillManager {
         };
       }
 
-      // Safe or scan failed 鈥?install directly
+      // Safe or scan failed — install directly
       console.log(`[SkillManager] Skill is safe (or scan failed), installing directly`);
       const duplicateSkillNameBeforeInstall = findDuplicateSkillName(
         skillDirs,
@@ -2306,7 +2306,7 @@ export class SkillManager {
           } catch (cloneErr: unknown) {
             const cloneMsg = cloneErr instanceof Error ? cloneErr.message : String(cloneErr);
             // If clone fails with a redirect error, fall back to fetching inside the
-            // existing repo 鈥?its on-disk remote URL may survive a redirect that a
+            // existing repo — its on-disk remote URL may survive a redirect that a
             // fresh clone cannot handle.
             if (
               /unable to update url base from redirection/i.test(cloneMsg) ||
@@ -2400,7 +2400,7 @@ export class SkillManager {
         return { success: true, auditReport, pendingInstallId: pendingId };
       }
 
-      // Safe 鈥?perform upgrade
+      // Safe — perform upgrade
       this.performSkillUpgrade(matchingSkillDir, existingSkillDir);
 
       cleanupPathSafely(cleanupPath);

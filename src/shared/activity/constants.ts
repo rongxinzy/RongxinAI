@@ -16,6 +16,16 @@ export const ActivityIpc = {
   Updated: 'activity:updated',
 } as const;
 
+/**
+ * Sentinel stored in `ActivityRun.errorMessage` when startup recovery closes a
+ * run whose process died. It is a code, not prose: the renderer localizes it,
+ * so it must never be displayed as-is.
+ */
+export const ActivityErrorCode = {
+  Interrupted: 'activity:interrupted',
+} as const;
+export type ActivityErrorCode = (typeof ActivityErrorCode)[keyof typeof ActivityErrorCode];
+
 /** Activity snapshots remain available after their source task is removed. */
 export const ActivityRetention = {
   Days: 180,
