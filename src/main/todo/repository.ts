@@ -53,6 +53,15 @@ type TodoStepRow = {
 
 const toBoolean = (value: number): boolean => value === 1;
 
+// Local-calendar YYYY-MM-DD, matching the renderer's todayDateKey format; the
+// UTC ISO date would disagree with local my_day_date values around midnight.
+const localDateKey = (date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export class TodoRepository {
   constructor(private readonly db: Database.Database) {}
 
@@ -71,7 +80,7 @@ export class TodoRepository {
 
     if (input.view === TodoView.MyDay) {
       conditions.push('t.my_day_date = ?');
-      params.push(input.referenceDate ?? new Date().toISOString().slice(0, 10));
+      params.push(input.referenceDate ?? localDateKey());
     } else if (input.view === TodoView.Important) {
       conditions.push('t.important = 1');
     } else if (input.view === TodoView.Planned) {
@@ -178,6 +187,11 @@ export class TodoRepository {
     if (input.remindAt !== undefined) {
       fields.push('remind_at = ?');
       values.push(input.remindAt);
+      // The scheduler reads remind_notified_at < remind_at as "this reminder
+      // was already delivered", so a changed reminder time must clear the
+      // delivered state. Without this a reminder moved to an earlier time can
+      // never fire again.
+      if (input.remindAt !== current.remindAt) fields.push('remind_notified_at = NULL');
     }
     if (input.listId !== undefined) {
       fields.push('list_id = ?');

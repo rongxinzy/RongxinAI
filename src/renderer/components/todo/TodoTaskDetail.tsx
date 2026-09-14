@@ -97,7 +97,12 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
 
   const saveDetails = async (): Promise<void> => {
     const trimmedTitle = title.trim();
-    if (dirtyFieldsRef.current.has('title') && !trimmedTitle) return;
+    if (dirtyFieldsRef.current.has('title') && !trimmedTitle) {
+      // An empty title cannot be persisted; drop only that field and restore
+      // the saved value, so a dirty note or date still saves in this pass.
+      dirtyFieldsRef.current.delete('title');
+      setTitle(todo.title);
+    }
     // Send only the fields the user actually edited, with their current local
     // values. A full-snapshot write here could clobber newer server values for
     // untouched fields (e.g. an immediate date update from another window).

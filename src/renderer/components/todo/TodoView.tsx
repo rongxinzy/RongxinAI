@@ -71,15 +71,17 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
 
-  // Look up the selected task in the completed snapshot as well: completing a
-  // task moves it out of the active list, and losing the lookup would close
-  // the detail sheet mid-interaction.
+  // Look the selected task up in the other snapshots as well: completing a task
+  // moves it out of the active list and un-completing moves it out of the
+  // completed list, and losing the lookup would close the detail sheet
+  // mid-interaction.
   const selectedTodo = useMemo(
     () =>
       todos.find(todo => todo.id === selectedTodoId) ??
       completedTodos.find(todo => todo.id === selectedTodoId) ??
+      allTodos.find(todo => todo.id === selectedTodoId) ??
       null,
-    [selectedTodoId, todos, completedTodos],
+    [selectedTodoId, todos, completedTodos, allTodos],
   );
 
   const activeList = useMemo(
@@ -265,7 +267,10 @@ const TodoView: React.FC<TodoViewProps> = ({
     : activeView === TodoViewFilter.MyDay
       ? formatTodoDate(Date.now(), language)
       : i18nService.t(viewDescriptionKeys[activeView]);
-  const activeCount = activeListId ? (listCounts.get(activeListId) ?? 0) : activeCounts[activeView];
+  const viewCount = activeListId ? (listCounts.get(activeListId) ?? 0) : activeCounts[activeView];
+  // A search narrows the visible rows, so the header count has to follow the
+  // filtered list instead of the unfiltered view totals.
+  const activeCount = query.trim() ? todos.length : viewCount;
   const parsedNewTodo = parseTodoInput(newTodoTitle);
 
   return (

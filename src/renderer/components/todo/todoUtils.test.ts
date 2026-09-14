@@ -24,6 +24,25 @@ test('checks day-after-tomorrow before the shorter English token', () => {
   expect(parsed.dueAt).toBe(new Date(2026, 8, 5, 23, 59, 59, 999).getTime());
 });
 
+test('resolves 下周X and next weekday to the following week, not today', () => {
+  // 2026-09-03 is a Thursday: the plain rule resolves 周四 to today, while
+  // 下周四 must land on Thursday of the following week.
+  expect(parseTodoInput('下周四交报告', now).dueAt).toBe(
+    new Date(2026, 8, 10, 23, 59, 59, 999).getTime(),
+  );
+  expect(parseTodoInput('下周日', now).dueAt).toBe(
+    new Date(2026, 8, 13, 23, 59, 59, 999).getTime(),
+  );
+  expect(parseTodoInput('下个周五', now).dueAt).toBe(
+    new Date(2026, 8, 11, 23, 59, 59, 999).getTime(),
+  );
+  expect(parseTodoInput('next thu', now).dueAt).toBe(
+    new Date(2026, 8, 10, 23, 59, 59, 999).getTime(),
+  );
+  // Without the prefix the next occurrence (today, for 周四) is kept.
+  expect(parseTodoInput('周四', now).dueAt).toBe(new Date(2026, 8, 3, 23, 59, 59, 999).getTime());
+});
+
 test('rejects invalid calendar dates instead of rolling them forward', () => {
   expect(fromDateInputValue('2026-02-31')).toBeNull();
 });
