@@ -621,8 +621,9 @@ const McpManager: React.FC<McpManagerProps> = ({
     const entry = tokenConnectEntry;
     setIsTokenConnecting(true);
     setInstallingRegistryId(entry.id);
-    setTokenConnectEntry(null);
     setTokenConnectError('');
+    // Keep the dialog open until the credentials are verified: closing it up
+    // front discarded the typed token and reported failures as a page banner.
     const data: McpServerFormData = {
       name: entry.name,
       description: getRegistryEntryDescription(entry),
@@ -635,25 +636,20 @@ const McpManager: React.FC<McpManagerProps> = ({
     try {
       const probe = await mcpService.testConnection(data);
       if (!probe.success) {
-        const error = probe.error || i18nService.t('mcpCreateFailed');
-        setTokenConnectError(error);
-        setActionError(error);
+        setTokenConnectError(probe.error || i18nService.t('mcpCreateFailed'));
         return;
       }
       const result = await mcpService.createServer(data);
       if (!result.success || !result.servers) {
-        const error = result.error || i18nService.t('mcpCreateFailed');
-        setTokenConnectError(error);
-        setActionError(error);
+        setTokenConnectError(result.error || i18nService.t('mcpCreateFailed'));
         return;
       }
-      const servers = result.servers;
-      dispatch(setMcpServers(servers));
+      dispatch(setMcpServers(result.servers));
+      setTokenConnectEntry(null);
     } catch (error) {
       setTokenConnectError(
         error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'),
       );
-      setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
     } finally {
       setIsTokenConnecting(false);
       setInstallingRegistryId(null);
@@ -935,7 +931,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                             registryEntry.requiredEnvKeys.length > 0 && (
                               <>
                                 <span className="shrink-0">·</span>
-                                <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                                <span className="shrink-0 text-warning">
                                   {registryEntry.requiredEnvKeys.length} key
                                   {registryEntry.requiredEnvKeys.length > 1 ? 's' : ''}
                                 </span>
@@ -992,7 +988,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                           className="mt-1 line-clamp-1 text-xs text-muted-foreground"
                         />
                         {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
-                          <span className="mt-1 block text-xs text-amber-500 dark:text-amber-400">
+                          <span className="mt-1 block text-xs text-warning">
                             {entry.requiredEnvKeys.length} key
                             {entry.requiredEnvKeys.length > 1 ? 's' : ''}
                           </span>
@@ -1010,7 +1006,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                           {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
                             <>
                               <span className="shrink-0">·</span>
-                              <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                              <span className="shrink-0 text-warning">
                                 {entry.requiredEnvKeys.length} key
                                 {entry.requiredEnvKeys.length > 1 ? 's' : ''}
                               </span>
@@ -1075,7 +1071,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                         {entry.requiredEnvKeys && entry.requiredEnvKeys.length > 0 && (
                           <>
                             <span className="shrink-0">·</span>
-                            <span className="shrink-0 text-amber-500 dark:text-amber-400">
+                            <span className="shrink-0 text-warning">
                               {entry.requiredEnvKeys.length} key
                               {entry.requiredEnvKeys.length > 1 ? 's' : ''}
                             </span>

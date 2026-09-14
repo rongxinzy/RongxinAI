@@ -1,5 +1,13 @@
 import { Button } from '@shared/components/ui/button';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
 import { Input } from '@shared/components/ui/input';
 import {
   Popover,
@@ -33,12 +41,14 @@ import {
   SkillToolbarPlacement,
 } from './constants';
 import type { SkillToolbarPlacement as SkillToolbarPlacementType } from './constants';
+import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import { InstalledSkillGrid } from './InstalledSkillGrid';
 import { MarketplaceSkillGrid } from './MarketplaceSkillGrid';
 import { SkillDocumentDialog } from './SkillDocumentDialog';
 import { MarketplaceSkillDocumentDialog } from './MarketplaceSkillDocumentDialog';
 import SkillSecurityReport from './SkillSecurityReport';
 import { SkillsPageToolbar } from './SkillsPageToolbar';
+import { useMarketplaceSearchPool } from './useMarketplaceSearchPool';
 
 type DirectImportSource = 'zip' | 'folder' | 'remote';
 
@@ -107,11 +117,22 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       setMarketplaceSkills(page.skills);
       setMarketplacePageNumber(1);
       setMarketplaceHasMore(page.hasMore);
+      setSkillActionError('');
       return page.skills;
+    } catch (error) {
+      setSkillActionError(
+        error instanceof Error ? error.message : i18nService.t('skillMarketplaceLoadFailed'),
+      );
+      throw error;
     } finally {
       setIsLoadingMarketplace(false);
     }
   }, []);
+
+  const { searchPool, isLoadingSearchPool } = useMarketplaceSearchPool(
+    activeTab,
+    skillSearchQuery,
+  );
 
   const loadMarketplacePage = useCallback(
     async (pageNumber: number) => {
@@ -343,7 +364,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
   const filteredMarketplaceSkills = useMemo(() => {
     const query = skillSearchQuery.trim().replace(/\s+/g, ' ').toLowerCase();
-    let results = marketplaceSkills;
+    // A query loads a bounded window of pages (see useMarketplaceSearchPool),
+    // because the listing is paged server side.
+    const sourceSkills =
+      query && searchPool && searchPool.length > 0 ? searchPool : marketplaceSkills;
+    let results = sourceSkills;
     if (query) {
       results = results.filter(skill => {
         return (
@@ -353,7 +378,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       });
     }
     return results;
-  }, [marketplaceSkills, skillSearchQuery]);
+  }, [marketplaceSkills, searchPool, skillSearchQuery]);
 
   const handleToggleSkill = async (skillId: string) => {
     const targetSkill = skills.find(skill => skill.id === skillId);
@@ -399,17 +424,19 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     if (skillsPendingDelete.length === 0 || isDeletingSkill) return;
     setIsDeletingSkill(true);
     setSkillActionError('');
-    let latestSkills: Skill[] | undefined;
+    const deletedSkillIds = new Set<string>();
     try {
       for (const skill of skillsPendingDelete) {
         const result = await skillService.deleteSkill(skill.id);
         if (!result.success) {
           throw new Error(result.error || i18nService.t('skillDeleteFailed'));
         }
-        latestSkills = result.skills;
-      }
-      if (latestSkills) {
-        dispatch(setSkills(latestSkills));
+        deletedSkillIds.add(skill.id);
+        // Publish every successful deletion right away: a later failure must
+        // never leave an already-removed skill listed as installed.
+        if (result.skills) {
+          dispatch(setSkills(result.skills));
+        }
       }
       if (selectedSkill && skillsPendingDelete.some(skill => skill.id === selectedSkill.id)) {
         setSelectedSkill(null);
@@ -428,6 +455,16 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       setSkillActionError(
         error instanceof Error ? error.message : i18nService.t('skillDeleteFailed'),
       );
+      // Keep the pending list actionable, otherwise retrying would try to
+      // delete skills that are already gone and fail on the first one.
+      if (deletedSkillIds.size > 0) {
+        setSkillsPendingDelete(current =>
+          current.filter(skill => !deletedSkillIds.has(skill.id)),
+        );
+        setSelectedInstalledIds(
+          current => new Set([...current].filter(id => !deletedSkillIds.has(id))),
+        );
+      }
     } finally {
       setIsDeletingSkill(false);
     }
@@ -440,17 +477,6 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     setSkillActionError('');
     const result = await skillService.downloadSkill(trimmedSource);
     setIsDownloadingSkill(false);
-    console.log(
-      '[SkillsManager] downloadSkill result:',
-      JSON.stringify({
-        success: result.success,
-        error: result.error,
-        hasAuditReport: !!result.auditReport,
-        pendingInstallId: result.pendingInstallId,
-        riskLevel: result.auditReport?.riskLevel,
-        findingsCount: result.auditReport?.findings?.length,
-      }),
-    );
     if (!result.success) {
       setSkillActionError(result.error || i18nService.t('skillDownloadFailed'));
       return;
@@ -889,17 +915,52 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 ref={installedGridScrollRef}
                 className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable"
               >
-                <InstalledSkillGrid
-                  skills={paginatedInstalledSkills}
-                  readOnly={readOnly}
-                  onSelect={setSelectedSkill}
-                  onToggle={handleToggleSkill}
-                  onTrySkill={onTrySkill}
-                  resolveName={resolveSkillName}
-                  selectedIds={isBatchMode ? selectedVisibleIds : new Set()}
-                  onSelectToggle={toggleInstalledSelection}
-                  batchMode={isBatchMode}
-                />
+                {filteredInstalledSkills.length === 0 ? (
+                  <Empty className="min-h-48 border border-dashed">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <PlusMenuSkillsIcon />
+                      </EmptyMedia>
+                      <EmptyTitle>
+                        {installedSkills.length === 0
+                          ? i18nService.t('skillInstalledEmpty')
+                          : i18nService.t('noMatchingSkills')}
+                      </EmptyTitle>
+                      <EmptyDescription>
+                        {installedSkills.length === 0
+                          ? i18nService.t('skillInstalledEmptyDescription')
+                          : i18nService.t('skillInstalledNoMatchDescription')}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                    {installedSkills.length > 0 && (
+                      <EmptyContent>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSkillSearchQuery('');
+                            setSkillCategory(SkillCategory.All);
+                          }}
+                        >
+                          {i18nService.t('skillFilterClear')}
+                        </Button>
+                      </EmptyContent>
+                    )}
+                  </Empty>
+                ) : (
+                  <InstalledSkillGrid
+                    skills={paginatedInstalledSkills}
+                    readOnly={readOnly}
+                    onSelect={setSelectedSkill}
+                    onToggle={handleToggleSkill}
+                    onTrySkill={onTrySkill}
+                    resolveName={resolveSkillName}
+                    selectedIds={isBatchMode ? selectedVisibleIds : new Set()}
+                    onSelectToggle={toggleInstalledSelection}
+                    batchMode={isBatchMode}
+                  />
+                )}
               </div>
               <ListPagination
                 page={installedPageNumber}
@@ -928,6 +989,9 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                     onInstall={handleInstallMarketplaceSkill}
                     installProgress={installProgress}
                     isDetailOpen={Boolean(selectedMarketplaceSkill)}
+                    searchQuery={skillSearchQuery}
+                    isSearching={isLoadingSearchPool}
+                    onClearSearch={() => setSkillSearchQuery('')}
                   />
                   {isLoadingMoreMarketplace && (
                     <div className="py-4 text-center text-sm text-muted-foreground">
@@ -935,13 +999,15 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                     </div>
                   )}
                 </div>
-                <ListPagination
-                  page={marketplacePageNumber}
-                  hasNext={marketplaceHasMore}
-                  disabled={isLoadingMoreMarketplace}
-                  className="shrink-0 py-4"
-                  onPageChange={page => void loadMarketplacePage(page)}
-                />
+                {!skillSearchQuery.trim() && (
+                  <ListPagination
+                    page={marketplacePageNumber}
+                    hasNext={marketplaceHasMore}
+                    disabled={isLoadingMoreMarketplace}
+                    className="shrink-0 py-4"
+                    onPageChange={page => void loadMarketplacePage(page)}
+                  />
+                )}
               </div>
             ))}
         </div>
@@ -1063,7 +1129,9 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
               <p className="text-xs text-muted-foreground">
                 {i18nService.t('remoteSkillImportExamples')}
               </p>
-              {skillActionError && <div className="text-xs text-red-500">{skillActionError}</div>}
+              {skillActionError && (
+                <div className="text-xs text-destructive">{skillActionError}</div>
+              )}
               <Button
                 type="button"
                 onClick={handleImportFromDialog}
