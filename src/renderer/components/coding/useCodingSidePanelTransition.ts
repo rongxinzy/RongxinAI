@@ -51,6 +51,7 @@ export const useCodingSidePanelTransition = ({
   const show = useCallback(() => {
     if (isNarrowViewport) return;
     cancelEntryFrame();
+    cancelCloseFallback();
     setIsClosing(false);
     if (isPresent) return;
 
@@ -60,7 +61,7 @@ export const useCodingSidePanelTransition = ({
       entryFrameRef.current = null;
       setIsEntering(false);
     });
-  }, [cancelEntryFrame, isNarrowViewport, isPresent]);
+  }, [cancelCloseFallback, cancelEntryFrame, isNarrowViewport, isPresent]);
 
   const hide = useCallback(() => {
     cancelEntryFrame();
