@@ -57,6 +57,10 @@ const skillCategoryIds: Record<Exclude<SkillCategory, 'all'>, ReadonlySet<string
     'ecom-copy-assistant',
     'customer-reply-craft',
     'xindaya-translator',
+    'viral-writer',
+    'docx',
+    'pdf',
+    'presentation-studio',
   ]),
   marketing: new Set([
     'campaign-plan',
@@ -76,8 +80,9 @@ const skillCategoryIds: Record<Exclude<SkillCategory, 'all'>, ReadonlySet<string
     'programming-tutor',
     'smart-commit-gen',
     'web-security-audit',
+    'frontend-design',
   ]),
-  data: new Set(['database-inspector', 'sql-tutor', 'regression-insight']),
+  data: new Set(['database-inspector', 'sql-tutor', 'regression-insight', 'xlsx']),
   research: new Set([
     'content-research-writer',
     'research-writer',
@@ -85,6 +90,8 @@ const skillCategoryIds: Record<Exclude<SkillCategory, 'all'>, ReadonlySet<string
     'scientific-problem-selection',
     'paper-review-coach',
     'research-paper-refiner',
+    'deep-research',
+    'deli-autoresearch',
   ]),
   collaboration: new Set([
     'imap-smtp-email',

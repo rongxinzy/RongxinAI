@@ -7,7 +7,7 @@ import { ActivitySource, ActivityStatus } from '../../../shared/activity/constan
 import { PlatformRegistry, type Platform } from '../../../shared/platform';
 import { i18nService } from '../../services/i18n';
 import type { ActivityRun } from '../../../shared/activity/types';
-import { formatActivityClockTime } from './utils';
+import { formatActivityClockTime, formatActivityError } from './utils';
 
 interface ActivityRunRowProps {
   run: ActivityRun;
@@ -30,6 +30,9 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
   const isRunning = run.status === ActivityStatus.Running;
   const isFailed = run.status === ActivityStatus.Failed;
   const hasExpandableError = isFailed && Boolean(run.errorMessage);
+  // The reply is the outcome of the run; until one exists (still running, or a
+  // reply that produced no text) the trigger text is the only useful summary.
+  const previewText = run.replyPreview || run.inputPreview;
   const TriggerIcon = run.source === ActivitySource.ScheduledTask ? CalendarClock : MessageSquare;
   const platform =
     run.source === ActivitySource.Channel &&
@@ -98,8 +101,8 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
             {formatActivityClockTime(run.updatedAt)}
           </span>
         </div>
-        {run.replyPreview && !isFailed && (
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{run.replyPreview}</p>
+        {previewText && !isFailed && (
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">{previewText}</p>
         )}
         {isFailed && (
           <div className="mt-0.5 flex items-start gap-1">
@@ -109,7 +112,7 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
                 !errorExpanded && 'truncate',
               )}
             >
-              {run.errorMessage || i18nService.t('activityStatusFailed')}
+              {formatActivityError(run.errorMessage)}
             </p>
             {hasExpandableError && (
               <ChevronDown

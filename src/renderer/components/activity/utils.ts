@@ -1,3 +1,4 @@
+import { ActivityErrorCode } from '../../../shared/activity/constants';
 import { i18nService } from '../../services/i18n';
 
 /** Simple template: replace `{key}` placeholders with values. */
@@ -40,6 +41,19 @@ export const formatActivityClockTime = (timestampMs: number): string => {
     minute: '2-digit',
     hour12: lang !== 'zh',
   });
+};
+
+/**
+ * Resolves the user-visible error line of a failed run. Runs recovered at
+ * startup persist a sentinel code instead of prose, so the row can follow the
+ * current UI language instead of freezing one language into the database.
+ */
+export const formatActivityError = (errorMessage?: string): string => {
+  if (!errorMessage) return i18nService.t('activityStatusFailed');
+  if (errorMessage === ActivityErrorCode.Interrupted) {
+    return i18nService.t('activityErrorInterrupted');
+  }
+  return errorMessage;
 };
 
 const startOfDay = (timestampMs: number): number => {
