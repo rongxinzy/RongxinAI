@@ -35,6 +35,51 @@ test('creates todos and filters the core views', () => {
   }
 });
 
+test('defaults the My Day reference date to the local calendar day', () => {
+  const { db, repository } = createRepository();
+  try {
+    const today = new Date();
+    const localDateKey =
+      `${today.getFullYear()}-` +
+      `${String(today.getMonth() + 1).padStart(2, '0')}-` +
+      `${String(today.getDate()).padStart(2, '0')}`;
+    repository.create({ title: 'Plan the sprint', myDayDate: localDateKey });
+
+    expect(repository.list({ view: TodoView.MyDay })).toHaveLength(1);
+  } finally {
+    db.close();
+  }
+});
+
+test('re-arms a reminder when its time changes and keeps it delivered otherwise', () => {
+  const { db, repository } = createRepository();
+  try {
+    const reminderAt = new Date(2026, 8, 14, 10, 0).getTime();
+    const todo = repository.create({ title: 'Call the vendor', remindAt: reminderAt });
+    const readNotifiedAt = (): number | null =>
+      (
+        db.prepare('SELECT remind_notified_at FROM todos WHERE id = ?').get(todo.id) as {
+          remind_notified_at: number | null;
+        }
+      ).remind_notified_at;
+
+    // Simulate the scheduler having delivered this reminder already.
+    const deliveredAt = reminderAt + 40;
+    db.prepare('UPDATE todos SET remind_notified_at = ? WHERE id = ?').run(deliveredAt, todo.id);
+
+    // Re-saving the same time must not re-arm an already delivered reminder.
+    repository.update(todo.id, { remindAt: reminderAt });
+    expect(readNotifiedAt()).toBe(deliveredAt);
+
+    // Moving the reminder before the delivered moment must clear the delivered
+    // state, otherwise the scheduler skips the new time forever.
+    repository.update(todo.id, { remindAt: reminderAt - 60_000 });
+    expect(readNotifiedAt()).toBeNull();
+  } finally {
+    db.close();
+  }
+});
+
 test('persists notes, lists, and ordered checklist steps', () => {
   const { db, repository } = createRepository();
   try {
