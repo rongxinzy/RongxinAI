@@ -24,6 +24,7 @@ export interface McpServerRecord {
   isBuiltIn: boolean;
   githubUrl?: string;
   registryId?: string;
+  credentialsError?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -83,7 +84,14 @@ export class McpStore {
       // Invalid JSON, use defaults
     }
 
-    const credentials = this.credentialStore?.get(row.id);
+    let credentials: McpCredentialPayload | undefined;
+    let credentialsError = false;
+    try {
+      credentials = this.credentialStore?.get(row.id);
+    } catch (error) {
+      credentialsError = true;
+      console.warn('[McpStore] stored credentials could not be read; keeping the server entry:', error);
+    }
     return {
       id: row.id,
       name: row.name,
@@ -99,6 +107,7 @@ export class McpStore {
       isBuiltIn: config.isBuiltIn === true,
       githubUrl: config.githubUrl,
       registryId: config.registryId,
+      ...(credentialsError ? { credentialsError: true } : {}),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -193,7 +202,7 @@ export class McpStore {
   }
 
   deleteServer(id: string): boolean {
-    const existing = this.getServer(id);
+    const existing = this.db.prepare('SELECT id FROM mcp_servers WHERE id = ?').get(id);
     if (!existing) return false;
 
     this.db.prepare('DELETE FROM mcp_servers WHERE id = ?').run(id);

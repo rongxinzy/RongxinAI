@@ -16,6 +16,12 @@ import {
 import { i18nService } from '../../services/i18n';
 import MarkdownContent from '../MarkdownContent';
 import { CodingWorkspaceFileView } from './constants';
+import {
+  detectWorkspaceLineEnding,
+  normalizeWorkspaceFileContent,
+  serializeWorkspaceFileContent,
+  WorkspaceLineEnding,
+} from './workspaceFileContent';
 import { resolveWorkspaceMarkdownLink } from './workspaceFileLink';
 
 interface CodingWorkspaceFileBrowserProps {
@@ -110,6 +116,9 @@ export const CodingWorkspaceFileBrowser = ({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [selectedContent, setSelectedContent] = useState<string | null>(null);
   const [draftContent, setDraftContent] = useState('');
+  const [selectedLineEnding, setSelectedLineEnding] = useState<WorkspaceLineEnding>(
+    WorkspaceLineEnding.Lf,
+  );
   const [selectedSha256, setSelectedSha256] = useState<string | null>(null);
   const [loadingFile, setLoadingFile] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -220,8 +229,9 @@ export const CodingWorkspaceFileBrowser = ({
           return;
         }
         setError(null);
-        setSelectedContent(result.file.content);
-        setDraftContent(result.file.content);
+        setSelectedContent(normalizeWorkspaceFileContent(result.file.content));
+        setDraftContent(normalizeWorkspaceFileContent(result.file.content));
+        setSelectedLineEnding(detectWorkspaceLineEnding(result.file.content));
         setSelectedSha256(result.file.sha256);
       } catch (cause) {
         if (fileRequestId.current !== requestId) return;
@@ -242,15 +252,16 @@ export const CodingWorkspaceFileBrowser = ({
         workspaceRoot,
         sourceRoot,
         path: selectedPath,
-        content: draftContent,
+        content: serializeWorkspaceFileContent(draftContent, selectedLineEnding),
         expectedSha256: selectedSha256,
       });
       if (!result.success || !result.file) {
         setError(result.error ?? i18nService.t('codingAgentFileSaveFailed'));
         return;
       }
-      setSelectedContent(result.file.content);
-      setDraftContent(result.file.content);
+      setSelectedContent(normalizeWorkspaceFileContent(result.file.content));
+      setDraftContent(normalizeWorkspaceFileContent(result.file.content));
+      setSelectedLineEnding(detectWorkspaceLineEnding(result.file.content));
       setSelectedSha256(result.file.sha256);
       setError(null);
       onFileSaved?.();
@@ -259,7 +270,16 @@ export const CodingWorkspaceFileBrowser = ({
     } finally {
       setIsSaving(false);
     }
-  }, [draftContent, isDirty, onFileSaved, selectedPath, selectedSha256, sourceRoot, workspaceRoot]);
+  }, [
+    draftContent,
+    isDirty,
+    onFileSaved,
+    selectedLineEnding,
+    selectedPath,
+    selectedSha256,
+    sourceRoot,
+    workspaceRoot,
+  ]);
 
   const normalizedFilter = filter.trim().toLocaleLowerCase();
   const visibleNodes = useMemo(

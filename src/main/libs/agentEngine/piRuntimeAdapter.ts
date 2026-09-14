@@ -135,6 +135,7 @@ import {
   calculatePiConversationHistoryCharLimit,
 } from './piConversationContext';
 import { getPiBashCommandViolation } from './piBashToolGuidelines';
+import { PiBuiltinFileToolName } from './piWriteTokenLimit';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { McpPiAdapter } from './mcpPiAdapter';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
@@ -2330,7 +2331,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           : []),
         (extensionApi: PiExtensionApi) => {
           extensionApi.on(PiExtensionEventType.ToolCall, event => {
-            if (event.toolName !== 'bash' || !event.input || typeof event.input !== 'object') {
+            if (
+              event.toolName !== PiBuiltinFileToolName.Bash ||
+              !event.input ||
+              typeof event.input !== 'object'
+            ) {
               return undefined;
             }
             const command = (event.input as Record<string, unknown>).command;
@@ -2344,6 +2349,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             const planSessionId = approvalContext?.sessionId;
             if (!planSessionId) return undefined;
             if (this.activeSessions.get(planSessionId)?.planMode !== true) return undefined;
+            if (event.toolName === PiBuiltinFileToolName.Bash) {
+              return {
+                block: true as const,
+                reason:
+                  'Plan mode is read-only: bash is refused because shell commands can modify the workspace. ' +
+                  'Use read-only tools, publish the plan with plan_write, and end the turn before implementing.',
+              };
+            }
             return isPlanModeBlockedTool(event.toolName)
               ? {
                   block: true as const,

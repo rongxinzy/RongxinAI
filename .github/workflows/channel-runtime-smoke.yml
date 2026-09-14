@@ -1,0 +1,28 @@
+name: Channel runtime smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  channel-runtime-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Download the pinned channel runtime
+        run: npm run channel:runtime:linux-x64
+      - name: Verify channel transport and QQ Bot support
+        run: npm run channel:runtime:smoke

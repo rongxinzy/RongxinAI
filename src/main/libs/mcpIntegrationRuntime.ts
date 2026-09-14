@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import type { OfficialIntegrationManifest } from './mcpIntegrationManifest';
 
 export const IntegrationOperation = {
@@ -39,6 +40,17 @@ export interface OfficialConnector {
   uninstall(signal?: AbortSignal): Promise<void>;
 }
 
+const getBusyStatus = (
+  integrationId: string,
+  runningOperation: IntegrationOperation,
+  requestedOperation: IntegrationOperation,
+): IntegrationRuntimeStatus => ({
+  integrationId,
+  phase: getRunningPhase(runningOperation),
+  error: t('mcpIntegrationOperationBusy'),
+  nextOperation: requestedOperation,
+});
+
 const getRunningPhase = (operation: IntegrationOperation): IntegrationRuntimePhase => {
   switch (operation) {
     case IntegrationOperation.Provision:
@@ -74,7 +86,10 @@ const getFailureStatus = (
 export class McpIntegrationRuntime {
   private readonly connectors = new Map<string, OfficialConnector>();
   private readonly statuses = new Map<string, IntegrationRuntimeStatus>();
-  private readonly operations = new Map<string, Promise<IntegrationRuntimeStatus>>();
+  private readonly operations = new Map<
+    string,
+    { operation: IntegrationOperation; promise: Promise<IntegrationRuntimeStatus> }
+  >();
 
   register(connector: OfficialConnector): void {
     this.connectors.set(connector.manifest.id, connector);
@@ -98,12 +113,16 @@ export class McpIntegrationRuntime {
     const connector = this.connectors.get(integrationId);
     if (!connector) throw new Error(`Official integration "${integrationId}" is not registered.`);
     const running = this.operations.get(integrationId);
-    if (running) return running;
+    if (running) {
+      return running.operation === operation
+        ? running.promise
+        : getBusyStatus(integrationId, running.operation, operation);
+    }
 
     const task = this.runOperation(connector, operation, signal).finally(() => {
       this.operations.delete(integrationId);
     });
-    this.operations.set(integrationId, task);
+    this.operations.set(integrationId, { operation, promise: task });
     return task;
   }
 
