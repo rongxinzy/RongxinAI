@@ -6,7 +6,7 @@ import { expect, test } from 'vitest';
 const source = readFileSync(
   fileURLToPath(new URL('./PresetExpertList.tsx', import.meta.url)),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 test('installs an expert before allowing the conversation action', () => {
   expect(source).toContain('agent.source === CoworkSessionExpertSource.Package');
@@ -18,7 +18,7 @@ test('installs an expert before allowing the conversation action', () => {
 
 test('does not enter a conversation after installing an expert', () => {
   const start = source.indexOf('const handleInstallExpert = useCallback');
-  const end = source.indexOf('\n\n  if (experts.length === 0)', start);
+  const end = source.indexOf('\n\n  if (isLoading) {', start);
 
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
 import {
+  ActivityErrorCode,
   ActivityRetention,
   ActivitySource,
   ActivityStatus,
@@ -51,14 +52,16 @@ test('recovers interrupted running snapshots during startup', async () => {
   service.upsert({ id: 'stale', source: ActivitySource.ScheduledTask, status: ActivityStatus.Running, updatedAt: 10 });
   service.upsert({ id: 'done', source: ActivitySource.Channel, status: ActivityStatus.Completed, updatedAt: 11 });
 
-  expect(service.recoverInterruptedRuns(20)).toBe(1);
+  expect(service.recoverInterruptedRuns()).toBe(1);
+  // Recovery keeps the run's own timestamp: a run that died days ago must not
+  // jump to the top of today's feed just because the app restarted.
   expect(service.list()).toEqual([
+    expect.objectContaining({ id: 'done', status: ActivityStatus.Completed, updatedAt: 11 }),
     expect.objectContaining({
       id: 'stale',
       status: ActivityStatus.Failed,
-      updatedAt: 20,
-      errorMessage: 'Run was interrupted when the application closed.',
+      updatedAt: 10,
+      errorMessage: ActivityErrorCode.Interrupted,
     }),
-    expect.objectContaining({ id: 'done', status: ActivityStatus.Completed, updatedAt: 11 }),
   ]);
 });
