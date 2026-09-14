@@ -81,6 +81,16 @@ const dateForWeekday = (now: Date, weekday: number): Date => {
   return date;
 };
 
+// 下周X means the weekday in the week after the current one (Monday-based);
+// the plain "next occurrence" rule would resolve 下周一 to today when run on a
+// Monday.
+const dateForNextWeekWeekday = (now: Date, weekday: number): Date => {
+  const date = startOfDay(now);
+  const daysToNextMonday = 7 - ((date.getDay() + 6) % 7);
+  date.setDate(date.getDate() + daysToNextMonday + ((weekday + 6) % 7));
+  return date;
+};
+
 const dateAfterDays = (now: Date, days: number): Date => {
   const date = new Date(now);
   date.setDate(date.getDate() + days);
@@ -98,10 +108,11 @@ export const parseTodoInput = (value: string, now = new Date()): ParsedTodoInput
     dueAt = endOfDay(dateAfterDays(now, 1));
   } else {
     const weekdayMatch = normalized.match(
-      /(?:周|星期)(日|天|一|二|三|四|五|六)|\b(mon|tue|wed|thu|fri|sat|sun)\b/,
+      /(下个|下)?(?:周|星期)(日|天|一|二|三|四|五|六)|\b(next\s+)?(mon|tue|wed|thu|fri|sat|sun)\b/,
     );
     if (weekdayMatch) {
-      const weekdayName = weekdayMatch[1] ?? weekdayMatch[2];
+      const weekdayName = weekdayMatch[2] ?? weekdayMatch[4];
+      const nextWeek = Boolean(weekdayMatch[1] ?? weekdayMatch[3]);
       const weekday = weekdayName
         ? (
             {
@@ -123,7 +134,11 @@ export const parseTodoInput = (value: string, now = new Date()): ParsedTodoInput
             } as Record<string, number>
           )[weekdayName]
         : undefined;
-      if (weekday !== undefined) dueAt = endOfDay(dateForWeekday(now, weekday));
+      if (weekday !== undefined) {
+        dueAt = endOfDay(
+          nextWeek ? dateForNextWeekWeekday(now, weekday) : dateForWeekday(now, weekday),
+        );
+      }
     }
   }
 

@@ -50,6 +50,37 @@ const renderDetail = (
   );
 };
 
+test('an emptied title is reverted to the saved value instead of saving nothing', async () => {
+  const update = vi.fn().mockResolvedValue({ success: true });
+  const { container } = renderDetail(update);
+
+  const titleInput = container.querySelector<HTMLInputElement>(
+    '.theme-page-todo-task-detail-input-1',
+  )!;
+  fireEvent.change(titleInput, { target: { value: '   ' } });
+  fireEvent.blur(titleInput);
+
+  await waitFor(() => expect(titleInput.value).toBe(todo.title));
+  expect(update).not.toHaveBeenCalled();
+});
+
+test('an emptied title does not drop a dirty note from the same save', async () => {
+  const update = vi.fn().mockResolvedValue({ success: true });
+  const { container } = renderDetail(update);
+
+  const titleInput = container.querySelector<HTMLInputElement>(
+    '.theme-page-todo-task-detail-input-1',
+  )!;
+  const noteInput = container.querySelector<HTMLTextAreaElement>('textarea')!;
+  fireEvent.change(titleInput, { target: { value: '   ' } });
+  fireEvent.change(noteInput, { target: { value: 'Keep this note' } });
+  fireEvent.blur(noteInput);
+
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+  expect(update).toHaveBeenCalledWith({ todoId: todo.id, note: 'Keep this note' });
+  expect(titleInput.value).toBe(todo.title);
+});
+
 test('saves only the edited fields with their current local values', async () => {
   const update = vi.fn().mockResolvedValue({ success: true });
   const { container } = renderDetail(update);
