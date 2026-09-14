@@ -79,6 +79,7 @@ import {
   SkillsIpc,
   WeixinLoginErrorCode,
   WeixinInstallIpc,
+  WindowIpc,
 } from '../shared/ipc/channels';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
 import { EnterpriseRendererIpc } from '../shared/enterpriseRenderer';
@@ -3327,8 +3328,37 @@ if (!gotTheLock) {
       showSystemMenu(position);
     },
   );
+  /** 2026/09/14 lisa  打开开发调试面板 **/
+
+  const canUseDevTools = () => isDev || !app.isPackaged;
+  const openDevToolsWindow = (webContents: WebContents) => {
+    // Docked mode is more discoverable than a detached window that can open
+    // off-screen on multi-monitor Windows setups.
+    webContents.openDevTools({ mode: 'right', activate: true });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  };
+  const toggleDevToolsForSender = (webContents?: WebContents | null) => {
+    if (!canUseDevTools()) return false;
+    const target = webContents && !webContents.isDestroyed() ? webContents : mainWindow?.webContents;
+    if (!target || target.isDestroyed()) return false;
+    if (target.isDevToolsOpened()) target.closeDevTools();
+    else openDevToolsWindow(target);
+    return true;
+  };
+  ipcMain.handle(WindowIpc.ToggleDevTools, event => toggleDevToolsForSender(event.sender));
+  ipcMain.handle(WindowIpc.OpenDevTools, event => {
+    if (!canUseDevTools()) return false;
+    const target = event.sender?.isDestroyed?.() ? mainWindow?.webContents : event.sender;
+    if (!target || target.isDestroyed()) return false;
+    openDevToolsWindow(target);
+    return true;
+  });
 
   ipcMain.handle(AppIpc.GetVersion, () => app.getVersion());
+  ipcMain.handle(AppIpc.IsDev, () => canUseDevTools()); // 开发环境打开调试面板
   ipcMain.handle(AppIpc.GetSystemLocale, () => app.getLocale());
   ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
     consumePendingLocalInferenceInstall(app.getPath('userData')),
@@ -7243,8 +7273,24 @@ if (!gotTheLock) {
 
       tryLoadURL();
 
-      // 打开开发者工具
-      mainWindow.webContents.openDevTools();
+      // 开发环境默认在窗口右侧打开 DevTools；关闭后可用 F12 / Ctrl+Shift+I
+      const openDevToolsIfNeeded = () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        openDevToolsWindow(mainWindow.webContents);
+      };
+      // Wait until the page is ready so the docked panel is attached to a live view.
+      mainWindow.webContents.once('did-finish-load', () => {
+        setTimeout(openDevToolsIfNeeded, 300);
+      });
+      mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return;
+        const isToggleShortcut =
+          input.key === 'F12' ||
+          ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
+        if (!isToggleShortcut) return;
+        event.preventDefault();
+        toggleDevToolsForSender(mainWindow?.webContents);
+      });
     } else {
       // 生产环境
       mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

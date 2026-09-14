@@ -124,6 +124,8 @@ export const WindowIpc = {
   IsMaximized: 'window:isMaximized',
   ShowSystemMenu: 'window:showSystemMenu',
   StateChanged: 'window:state-changed',
+  ToggleDevTools: 'window:toggleDevTools',
+  OpenDevTools: 'window:openDevTools',
 } as const;
 export type WindowIpc = (typeof WindowIpc)[keyof typeof WindowIpc];
 
@@ -249,6 +251,7 @@ export const AppIpc = {
   GetPreventSleep: 'app:getPreventSleep',
   SetPreventSleep: 'app:setPreventSleep',
   GetVersion: 'app:getVersion',
+  IsDev: 'app:isDev',
   GetSystemLocale: 'app:getSystemLocale',
   ConsumePendingLocalInferenceInstall: 'app:consumePendingLocalInferenceInstall',
   Relaunch: 'app:relaunch',

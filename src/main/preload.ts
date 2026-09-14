@@ -376,6 +376,8 @@ contextBridge.exposeInMainWorld('electron', {
     isMaximized: () => ipcRenderer.invoke(WindowIpc.IsMaximized),
     showSystemMenu: (position: { x: number; y: number }) =>
       ipcRenderer.send(WindowIpc.ShowSystemMenu, position),
+    toggleDevTools: () => ipcRenderer.invoke(WindowIpc.ToggleDevTools), // 切换调试面板
+    openDevTools: () => ipcRenderer.invoke(WindowIpc.OpenDevTools), 
     onStateChanged: (
       callback: (state: {
         isMaximized: boolean;
@@ -875,6 +877,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   appInfo: {
     getVersion: () => ipcRenderer.invoke(AppIpc.GetVersion),
+    isDev: () => ipcRenderer.invoke(AppIpc.IsDev),
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
     consumePendingLocalInferenceInstall: () =>
       ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
