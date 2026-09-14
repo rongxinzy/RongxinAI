@@ -54,6 +54,21 @@ test('claims each scheduled trigger once and persists its completed Run', () => 
   expect(store.listRuns(task.id)).toHaveLength(1);
 });
 
+test('lets a manual invocation run a paused task exactly once', () => {
+  const store = new SqliteScheduledTaskStore(new Database(':memory:'));
+  const task = createTask(store);
+  const paused = store.update(task.id, { enabled: false });
+  const trigger = {
+    taskId: task.id,
+    scheduleVersion: paused.scheduleVersion!,
+    scheduledAt: '2026-08-11T06:00:00.000Z',
+  };
+
+  expect(store.claimTrigger(trigger)).toBeNull();
+  expect(store.claimTrigger(trigger, { allowDisabled: true })?.status).toBe(TaskStatus.Running);
+  expect(store.claimTrigger(trigger, { allowDisabled: true })).toBeNull();
+});
+
 test('persists Delivery attempts beside the canonical Run', () => {
   const store = new SqliteScheduledTaskStore(new Database(':memory:'));
   const task = createTask(store);

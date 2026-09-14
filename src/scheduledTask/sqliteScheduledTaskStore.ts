@@ -172,14 +172,23 @@ export class SqliteScheduledTaskStore {
     ).map(row => this.fromRow(row));
   }
 
-  /** Atomically rejects a duplicate sidecar trigger before a Pi Run is created. */
-  claimTrigger(input: {
-    taskId: string;
-    scheduleVersion: string;
-    scheduledAt: string;
-  }): ScheduledTaskRun | null {
+  /**
+   * Atomically rejects a duplicate sidecar trigger before a Pi Run is created.
+   * Manual invocations may run a paused task exactly once, so they opt out of
+   * the enabled guard while still taking a unique Run slot.
+   */
+  claimTrigger(
+    input: {
+      taskId: string;
+      scheduleVersion: string;
+      scheduledAt: string;
+    },
+    options: { allowDisabled?: boolean } = {},
+  ): ScheduledTaskRun | null {
     const task = this.get(input.taskId);
-    if (!task || !task.enabled || task.scheduleVersion !== input.scheduleVersion) return null;
+    if (!task) return null;
+    if (!task.enabled && !options.allowDisabled) return null;
+    if (task.scheduleVersion !== input.scheduleVersion) return null;
     const run: ScheduledTaskRun = {
       id: randomUUID(),
       taskId: task.id,

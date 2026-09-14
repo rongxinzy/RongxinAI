@@ -12,7 +12,7 @@ import { Switch } from '@shared/components/ui/switch';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { CircleAlert, Clock, EllipsisVertical, RefreshCw } from 'lucide-react';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import type { ScheduledTask } from '../../../scheduledTask/types';
@@ -25,6 +25,7 @@ import {
   getStatusLabelKey,
   getStatusTextClass,
 } from './utils';
+import { computeNextRunAtMs } from './nextRun';
 
 // ── TaskListItem ──
 
@@ -34,14 +35,53 @@ interface TaskListItemProps {
   onRequestEdit: (taskId: string) => void;
 }
 
+/**
+ * Last notification failure of a task, or null.
+ *
+ * A Run can succeed while its push silently fails, and the run history shows
+ * no delivery column, so the task card has to report it.
+ */
+const DELIVERY_RECHECK_DELAYS_MS = [3000, 10000];
+
+function useDeliveryFailure(task: ScheduledTask): string | null {
+  const deliverable = task.delivery.mode === 'announce' && Boolean(task.delivery.channel);
+  const lastRunAtMs = task.state.lastRunAtMs;
+  const [failure, setFailure] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!deliverable) {
+      setFailure(null);
+      return;
+    }
+    let cancelled = false;
+    const check = () => {
+      void scheduledTaskService.preflight(task.id).then(result => {
+        if (cancelled) return;
+        const latest = result?.latestDelivery;
+        setFailure(latest && latest.status === 'error' ? latest.error || '' : null);
+      });
+    };
+    check();
+    // The finished Run is published before the channel round trip persists its
+    // Delivery, so re-check while that call is still in flight.
+    const timers = DELIVERY_RECHECK_DELAYS_MS.map(delay => setTimeout(check, delay));
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
+  }, [deliverable, lastRunAtMs, task.id]);
+
+  return failure;
+}
+
 const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRequestEdit }) => {
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
   const statusLabel = i18nService.t(getStatusLabelKey(displayStatus));
-  const nextRunLabel =
-    task.enabled && task.state.nextRunAtMs !== null
-      ? formatNextRunRelative(task.state.nextRunAtMs)
-      : null;
+  const nextRunLabel = task.enabled
+    ? formatNextRunRelative(computeNextRunAtMs(task.schedule, Date.now()))
+    : null;
+  const deliveryFailure = useDeliveryFailure(task);
 
   return (
     <Card className="theme-page-task-list-card-1 flex-row items-center">
@@ -65,6 +105,16 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
         <Badge className={getStatusTextClass(displayStatus)} variant="outline">
           {statusLabel}
         </Badge>
+
+        {deliveryFailure !== null && (
+          <Badge
+            variant="outline"
+            className={cn('shrink-0', getStatusTextClass('error'))}
+            title={deliveryFailure || i18nService.t('scheduledTasksDeliveryFailed')}
+          >
+            {i18nService.t('scheduledTasksDeliveryFailed')}
+          </Badge>
+        )}
 
         <div
           onClick={e => e.stopPropagation()}
