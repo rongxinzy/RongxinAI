@@ -10,11 +10,13 @@ import {
   CodingAgentProfileStatus,
   CodingAgentProfileId,
   CodingAssignmentStatus,
+  CodingElicitationStatus,
   CodingEventKind,
   CodingLaneStatus,
   CodingMissionStatus,
   CodingPermissionOutcome,
   CodingWorkflowStage,
+  type CodingAgentConfigOption,
 } from '../../shared/codingAgent';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
@@ -24,6 +26,7 @@ import { AcpSessionUpdateKind } from './acp/protocol';
 import { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
 import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 import { BuiltinCodingConfigId } from './drivers/builtinCodingDriver';
+import { BuiltinCodingControlCommand } from './drivers/builtinCodingCommands';
 import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
 
 let db: Database.Database | undefined;
@@ -227,6 +230,513 @@ test('routes a builtin lane through its driver and projects runtime completion',
     CodingEventKind.Message,
     CodingEventKind.TurnComplete,
   ]);
+});
+
+test('advertises the builtin commands for a lane whose row predates them', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Legacy lane',
+  });
+  const lane = created.lanes[0];
+  // Lanes created before the built-in agent advertised commands only have the
+  // persisted empty snapshot.
+  expect(created.lanes[0].availableCommands).toEqual([]);
+
+  const snapshot = await service.prepareLane(workspaceRoot, lane.id);
+
+  expect(snapshot.lanes[0].availableCommands.map(command => command.name)).toEqual([
+    'plan',
+    'goal',
+    'compact',
+    'status',
+  ]);
+});
+
+test('refreshes stale builtin commands and config options when the lane is prepared', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Stale lane',
+  });
+  const lane = created.lanes[0];
+  // A lane written by an older build keeps retired commands and the config
+  // options that predate planning mode, including the user's own selections.
+  const legacyOptions: CodingAgentConfigOption[] = [
+    {
+      id: BuiltinCodingConfigId.ThinkingLevel,
+      name: 'Thinking level',
+      type: 'select',
+      currentValue: PiThinkingLevel.High,
+      options: [{ value: PiThinkingLevel.High, name: 'High' }],
+    },
+    {
+      id: BuiltinCodingConfigId.PermissionMode,
+      name: 'Permission mode',
+      type: 'select',
+      currentValue: WorkbenchApprovalMode.AllowAll,
+    },
+  ];
+  repository.updateLaneConfigOptions(lane.id, legacyOptions);
+  repository.updateLaneAvailableCommands(lane.id, [
+    { name: 'compact', description: 'Compress the current session.' },
+  ]);
+
+  const snapshot = await service.prepareLane(workspaceRoot, lane.id);
+
+  expect(snapshot.lanes[0].availableCommands.map(command => command.name)).toEqual([
+    'plan',
+    'goal',
+    'compact',
+    'status',
+  ]);
+  expect(snapshot.lanes[0].configOptions).toEqual([
+    expect.objectContaining({
+      id: BuiltinCodingConfigId.ThinkingLevel,
+      currentValue: PiThinkingLevel.High,
+    }),
+    expect.objectContaining({
+      id: BuiltinCodingConfigId.PermissionMode,
+      currentValue: WorkbenchApprovalMode.AllowAll,
+    }),
+    expect.objectContaining({ id: BuiltinCodingConfigId.PlanMode }),
+  ]);
+});
+
+test('re-projects builtin commands for an already bound lane on the next prompt', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Bound lane',
+  });
+  const lane = created.lanes[0];
+  await service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'First turn' });
+  await Promise.resolve();
+  service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.TurnComplete, {});
+  // Simulate a row that lost its command snapshot while the driver session
+  // stays bound, which is the state legacy lanes are in.
+  repository.updateLaneAvailableCommands(lane.id, []);
+
+  await service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Second turn' });
+  await Promise.resolve();
+
+  expect(service.bootstrap(workspaceRoot).lanes[0].availableCommands.map(c => c.name)).toEqual([
+    'plan',
+    'goal',
+    'compact',
+    'status',
+  ]);
+});
+
+test('forwards the goal command to the builtin runtime as goal mode', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Ship the migration',
+  });
+  const lane = created.lanes[0];
+
+  await service.prompt(workspaceRoot, {
+    laneId: lane.id,
+    prompt: '/goal ship the migration end to end',
+  });
+  await Promise.resolve();
+
+  expect(startBuiltinSession).toHaveBeenCalledWith(
+    expect.objectContaining({
+      sessionId: lane.localSessionId,
+      prompt: 'ship the migration end to end',
+      goalMode: true,
+    }),
+  );
+});
+
+test('forwards the plan command to the builtin runtime as a planning turn', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Plan the migration',
+  });
+  const lane = created.lanes[0];
+
+  await service.prompt(workspaceRoot, {
+    laneId: lane.id,
+    prompt: '/plan migrate the auth flow',
+  });
+  await Promise.resolve();
+
+  expect(startBuiltinSession).toHaveBeenCalledWith(
+    expect.objectContaining({
+      sessionId: lane.localSessionId,
+      prompt: 'migrate the auth flow',
+      planMode: true,
+    }),
+  );
+});
+
+test('reacquires the workspace writer lease before resuming a builtin elicitation', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const respondBuiltinElicitation = vi.fn(() => true);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    respondBuiltinElicitation,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-elicitation-lease-'));
+  tempDirectories.push(workspaceRoot);
+  const [workspace] = service.createWorkspace({
+    name: 'Elicitation lease',
+    sourceFolders: [workspaceRoot],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const created = await service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Implement the requested change.',
+  });
+  const lane = created.lanes[0];
+  service.recordBuiltinElicitation(lane.localSessionId, {
+    requestId: 'elicitation-lease',
+    question: 'Which API version should I use?',
+  });
+
+  expect(repository.getWriterLease(created.room.id, lane.sourceRoot)).toBeNull();
+
+  await service.respondElicitation(workspaceRoot, {
+    requestId: 'elicitation-lease',
+    answer: 'Use v2.',
+  });
+
+  expect(respondBuiltinElicitation).toHaveBeenCalledWith('elicitation-lease', 'Use v2.');
+  expect(repository.getWriterLease(created.room.id, lane.sourceRoot)).toBe(lane.id);
+});
+
+test('blocks builtin prompts while an elicitation awaits an answer', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/elicitation-prompt-block';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Await clarification',
+  });
+  const lane = created.lanes[0];
+  await service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Start the work.' });
+  await Promise.resolve();
+  service.recordBuiltinElicitation(lane.localSessionId, {
+    requestId: 'elicitation-block',
+    question: 'Which endpoint should I change?',
+  });
+  startBuiltinSession.mockClear();
+
+  await expect(
+    service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Just continue anyway.' }),
+  ).rejects.toThrow('请先回答或取消当前问题，再发送新消息。');
+  expect(startBuiltinSession).not.toHaveBeenCalled();
+});
+
+test('cancels a stale question and frees its lane after an application restart', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/elicitation-restart';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Resume after restart',
+  });
+  const lane = created.lanes[0];
+  await service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Start the work.' });
+  await Promise.resolve();
+  service.recordBuiltinElicitation(lane.localSessionId, {
+    requestId: 'elicitation-restart',
+    question: 'Which endpoint should I change?',
+  });
+  expect(service.bootstrap(workspaceRoot).lanes[0].status).toBe(CodingLaneStatus.WaitingElicitation);
+
+  // A restart drops the in-process Pi session but keeps the persisted question.
+  expect(service.recoverInterruptedState()).toBe(1);
+
+  const recovered = service.bootstrap(workspaceRoot);
+  expect(recovered.lanes[0].status).toBe(CodingLaneStatus.Idle);
+  expect(recovered.elicitations).toEqual([
+    expect.objectContaining({
+      status: CodingElicitationStatus.Cancelled,
+      cancelReason: '应用已重启，因此取消了此问题。',
+    }),
+  ]);
+  await expect(
+    service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Continue the work.' }),
+  ).resolves.toBeTruthy();
+});
+
+test('cancels a pending elicitation before stopping its session and blocks deletion while waiting', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const cancelBuiltinElicitation = vi.fn(() => true);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    cancelBuiltinElicitation,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-elicitation-cancel-'));
+  tempDirectories.push(workspaceRoot);
+  const [workspace] = service.createWorkspace({
+    name: 'Elicitation cancellation',
+    sourceFolders: [workspaceRoot],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const created = await service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Implement the requested change.',
+  });
+  const lane = created.lanes[0];
+  service.recordBuiltinElicitation(lane.localSessionId, {
+    requestId: 'elicitation-cancel',
+    question: 'Should I preserve the legacy endpoint?',
+  });
+
+  expect(() => service.deleteSession(workspaceRoot, lane.id)).toThrow(
+    'Stop the running coding session',
+  );
+  expect(() => service.deleteWorkspace(workspace.id)).toThrow('Stop all running coding sessions');
+
+  await service.cancel(workspaceRoot, lane.id);
+
+  expect(cancelBuiltinElicitation).toHaveBeenCalledWith(
+    'elicitation-cancel',
+    '会话已停止，因此取消了此问题。',
+  );
+  expect(service.bootstrap(workspaceRoot).elicitations).toEqual([
+    expect.objectContaining({ status: CodingElicitationStatus.Cancelled }),
+  ]);
+});
+
+test('runs builtin control commands locally instead of forwarding them to the agent', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const compactBuiltinSession = vi.fn(async () => ({ cancelled: false }));
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    compactBuiltinSession,
+    isBuiltinSessionRunning: () => false,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/commands';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+  });
+  const lane = created.lanes[0];
+  const prepared = await service.prepareLane(workspaceRoot, lane.id);
+  expect(prepared.lanes[0].availableCommands.map(command => command.name)).toEqual([
+    'plan',
+    'goal',
+    BuiltinCodingControlCommand.Compact,
+    BuiltinCodingControlCommand.Status,
+  ]);
+
+  await service.prompt(workspaceRoot, {
+    laneId: lane.id,
+    prompt: `/${BuiltinCodingControlCommand.Status}`,
+  });
+  await service.prompt(workspaceRoot, {
+    laneId: lane.id,
+    prompt: `/${BuiltinCodingControlCommand.Compact}`,
+  });
+
+  expect(startBuiltinSession).not.toHaveBeenCalled();
+  expect(compactBuiltinSession).toHaveBeenCalledWith(lane.localSessionId);
+  const events = service.bootstrap(workspaceRoot).events;
+  expect(events).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: CodingEventKind.Message,
+        payload: expect.objectContaining({ role: 'system' }),
+      }),
+    ]),
+  );
+  expect(events.some(event => event.payload.role === 'user')).toBe(false);
+});
+
+test('treats a too-small builtin compaction as a no-op instead of a failure', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    compactBuiltinSession: async () => {
+      throw new Error('Nothing to compact (session too small)');
+    },
+    isBuiltinSessionRunning: () => false,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/compact-noop';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+  });
+
+  await service.prompt(workspaceRoot, {
+    laneId: created.lanes[0].id,
+    prompt: `/${BuiltinCodingControlCommand.Compact}`,
+  });
+
+  const event = service.bootstrap(workspaceRoot).events.at(-1);
+  expect(event?.payload.content).toBe('当前会话内容不足，无需压缩。');
+});
+
+test('reports a missing builtin session instead of failing to compact', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const compactBuiltinSession = vi.fn(async () => ({ cancelled: false }));
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    compactBuiltinSession,
+    isBuiltinSessionRunning: () => false,
+    isBuiltinSessionActive: () => false,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/compact-no-session';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+  });
+
+  await service.prompt(workspaceRoot, {
+    laneId: created.lanes[0].id,
+    prompt: `/${BuiltinCodingControlCommand.Compact}`,
+  });
+
+  expect(compactBuiltinSession).not.toHaveBeenCalled();
+  const event = service.bootstrap(workspaceRoot).events.at(-1);
+  expect(event?.payload.content).toBe('当前没有可压缩的会话上下文。');
+});
+
+test('queues a builtin control command while the session is running', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const compactBuiltinSession = vi.fn(async () => ({ cancelled: false }));
+  let queued: (() => Promise<void>) | null = null;
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    compactBuiltinSession,
+    isBuiltinSessionRunning: () => true,
+    enqueueBuiltinControlAction: (_sessionId, action) => {
+      queued = action;
+      return { success: true };
+    },
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/queued-command';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+  });
+  const lane = created.lanes[0];
+
+  await service.prompt(workspaceRoot, {
+    laneId: lane.id,
+    prompt: `/${BuiltinCodingControlCommand.Compact}`,
+  });
+  expect(compactBuiltinSession).not.toHaveBeenCalled();
+
+  await queued!();
+  expect(compactBuiltinSession).toHaveBeenCalledWith(lane.localSessionId);
 });
 
 test('does not create a mission when the selected agent needs model configuration', async () => {

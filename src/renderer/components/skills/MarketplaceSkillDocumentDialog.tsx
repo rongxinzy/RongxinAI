@@ -150,7 +150,7 @@ export function MarketplaceSkillDocumentDialog({
 
         <div className="flex shrink-0 items-center justify-end gap-4 px-6 pb-6 pt-4">
           {isInstalled ? (
-            <div className="flex items-center justify-center gap-1.5 rounded-xl bg-green-500/10 py-2.5 text-sm font-medium text-green-600 dark:text-green-400">
+            <div className="flex items-center justify-center gap-1.5 rounded-xl bg-success/10 py-2.5 text-sm font-medium text-success">
               <CheckCircle className="h-4 w-4" />
               {i18nService.t('skillAlreadyInstalled')}
             </div>

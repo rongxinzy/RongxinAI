@@ -59,6 +59,7 @@ const statusClassName: Record<CodingLaneStatus, string> = {
   [CodingLaneStatus.Idle]: 'bg-muted-foreground/40',
   [CodingLaneStatus.Running]: 'bg-primary',
   [CodingLaneStatus.WaitingApproval]: 'bg-warning',
+  [CodingLaneStatus.WaitingElicitation]: 'bg-warning',
   [CodingLaneStatus.NeedsAuth]: 'bg-warning',
   [CodingLaneStatus.Disconnected]: 'bg-destructive',
   [CodingLaneStatus.Completed]: 'bg-success',

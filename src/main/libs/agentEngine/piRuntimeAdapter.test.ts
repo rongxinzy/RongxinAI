@@ -43,6 +43,7 @@ const hoisted = vi.hoisted(() => {
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
+    compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
   };
 
@@ -1465,7 +1466,76 @@ describe('PiRuntimeAdapter', () => {
       // Should not throw; falls back to creating new session
       expect(mockSession.subscribe).toHaveBeenCalled();
     });
+  });
 
+  describe('builtin control actions', () => {
+    const subscribeListener = () =>
+      mockSession.subscribe.mock.calls[0]?.[0] as (event: { type: string }) => void;
+
+    it('compacts an idle session and refuses one with a turn in flight', async () => {
+      await adapter.startSession('compact-session', 'Start work', { sessionMode: 'work' });
+      await expect(adapter.compactSession('compact-session')).rejects.toThrow(/still running/);
+
+      subscribeListener()({ type: 'agent_end' });
+
+      await expect(adapter.compactSession('compact-session')).resolves.toEqual({
+        cancelled: false,
+      });
+      expect(mockSession.compact).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs a queued control action once the current turn settles', async () => {
+      await adapter.startSession('queue-session', 'Start work', { sessionMode: 'work' });
+      const action = vi.fn(async () => undefined);
+
+      expect(adapter.enqueueControlAction('queue-session', action)).toEqual({ success: true });
+      expect(action).not.toHaveBeenCalled();
+
+      subscribeListener()({ type: 'agent_end' });
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops queued control actions when the current turn is stopped', async () => {
+      await adapter.startSession('stopped-session', 'Start work', { sessionMode: 'work' });
+      const action = vi.fn(async () => undefined);
+      expect(adapter.enqueueControlAction('stopped-session', action)).toEqual({ success: true });
+
+      adapter.stopSession('stopped-session');
+
+      const queuedControlActions = (
+        adapter as unknown as { queuedControlActions: Map<string, Array<() => Promise<void>>> }
+      ).queuedControlActions;
+      expect(queuedControlActions.has('stopped-session')).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it('drops queued control actions when the current turn failed', async () => {
+      await adapter.startSession('failed-session', 'Start work', { sessionMode: 'work' });
+      const action = vi.fn(async () => undefined);
+      expect(adapter.enqueueControlAction('failed-session', action)).toEqual({ success: true });
+
+      const sessions = (
+        adapter as unknown as {
+          activeSessions: Map<string, { turnFailed: boolean }>;
+          flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
+          queuedControlActions: Map<string, Array<() => Promise<void>>>;
+        }
+      );
+      const active = sessions.activeSessions.get('failed-session');
+      if (!active) throw new Error('The test session was not registered.');
+      // Pi sets turnFailed when a settled run surfaces a deferred error.
+      active.turnFailed = true;
+
+      await sessions.flushFollowUpQueue('failed-session', active);
+
+      expect(sessions.queuedControlActions.has('failed-session')).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('continueSession', () => {
     it('should reuse existing session for continuation', async () => {
       await adapter.startSession('test', 'First');
       await adapter.continueSession('test', 'Second');
@@ -1735,6 +1805,111 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenLastCalledWith(
         expect.stringContaining('Loop started. Iteration 1. Goal: Second goal'),
       );
+    });
+
+    it('runs a plan-mode turn read-only and registers the plan tool', async () => {
+      await adapter.startSession('plan-mode', 'Plan the migration', {
+        sessionMode: 'work',
+        planMode: true,
+      });
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions.customTools?.map(tool => tool.name)).toContain('plan_write');
+      const initialPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
+      expect(initialPrompt).toContain('## Plan Mode');
+      expect(initialPrompt).toContain('This turn is read-only planning');
+      expect(initialPrompt.endsWith('Plan the migration')).toBe(true);
+    });
+
+    it('prepends the plan-mode instruction when a live session plans again', async () => {
+      const published: unknown[] = [];
+      adapter.on('plan', (_sessionId, plan) => published.push(plan));
+      await adapter.startSession('plan-live', 'First task', {
+        sessionMode: 'work',
+        planTool: true,
+      });
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{
+          name: string;
+          execute: (toolCallId: string, params: unknown) => Promise<unknown>;
+        }>;
+      };
+      const planTool = sessionOptions.customTools?.find(tool => tool.name === 'plan_write');
+      await planTool?.execute('plan-call', {
+        entries: [{ content: 'Extract the auth module', priority: 'high' }],
+      });
+      expect(published).toEqual([
+        {
+          entries: [
+            { content: 'Extract the auth module', status: 'pending', priority: 'high' },
+          ],
+        },
+      ]);
+
+      await adapter.continueSession('plan-live', 'Plan the next step', {
+        sessionMode: 'work',
+        planMode: true,
+      });
+
+      const continuedPrompt = mockSession.prompt.mock.calls[1]?.[0] as string;
+      expect(continuedPrompt).toContain('## Plan Mode');
+      expect(continuedPrompt.endsWith('Plan the next step')).toBe(true);
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+    });
+
+    it('keeps workspace mutations available outside plan mode', async () => {
+      await adapter.startSession('work-mode', 'Ship it', { sessionMode: 'work' });
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions.customTools?.map(tool => tool.name) ?? []).not.toContain('plan_write');
+    });
+
+    it('refuses workspace-mutating tools only while a plan-mode turn runs', async () => {
+      await adapter.startSession('plan-guard', 'Plan the migration', {
+        sessionMode: 'work',
+        planMode: true,
+      });
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+        >;
+      };
+      let toolCallHandler: ((event: unknown) => unknown) | undefined;
+      for (const factory of loaderOptions.extensionFactories ?? []) {
+        factory({
+          on: (event, handler) => {
+            if (event === PiExtensionEventType.ToolCall) toolCallHandler = handler;
+          },
+        });
+      }
+
+      const blockedWrite = await toolCallHandler?.({
+        toolCallId: 'w',
+        toolName: 'write',
+        input: { path: 'a.txt' },
+      });
+      expect(blockedWrite).toEqual(
+        expect.objectContaining({ block: true, reason: expect.stringContaining('Plan mode') }),
+      );
+      const allowedRead = await toolCallHandler?.({
+        toolCallId: 'r',
+        toolName: 'read',
+        input: { path: 'a.txt' },
+      });
+      expect(allowedRead).toBeUndefined();
+
+      await adapter.continueSession('plan-guard', 'Now implement it', { sessionMode: 'work' });
+      const allowedEdit = await toolCallHandler?.({
+        toolCallId: 'w2',
+        toolName: 'edit',
+        input: { path: 'a.txt' },
+      });
+      expect(allowedEdit).toBeUndefined();
     });
 
     it('keeps skill execution controls when a skill is added to Work', async () => {

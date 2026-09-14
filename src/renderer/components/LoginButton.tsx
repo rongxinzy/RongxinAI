@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { Separator } from '@shared/components/ui/separator';
-import { LogIn, LogOut, Settings, UserRound } from 'lucide-react';
+import { CircleHelp, LogIn, LogOut, Settings, UserRound } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
@@ -22,6 +22,8 @@ interface CommunityUser {
 interface LoginButtonProps {
   onShowSettings: () => void;
 }
+
+const HELP_CENTER_URL = 'https://www.rongxzyai.com/docs/';
 
 const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -131,6 +133,11 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
     onShowSettings();
   };
 
+  const handleHelpCenter = () => {
+    setShowMenu(false);
+    void window.electron.shell.openExternal(HELP_CENTER_URL);
+  };
+
   const accountLabel =
     enterpriseIdentity?.user.displayName ||
     (isEnterpriseManaged
@@ -182,6 +189,17 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
                 : i18nService.t('accountLoginZhiyuan')}
             </Button>
           ) : null}
+
+          <Button
+            type="button"
+            variant="ghost"
+            role="menuitem"
+            onClick={handleHelpCenter}
+            className="theme-action-row w-full justify-start gap-2"
+          >
+            <CircleHelp data-icon="inline-start" />
+            {i18nService.t('helpCenter')}
+          </Button>
 
           <Button
             type="button"

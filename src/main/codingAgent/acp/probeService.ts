@@ -1,6 +1,7 @@
 import type { CodingAgentAuthMethod, CodingAgentCapabilities } from '../../../shared/codingAgent';
 import { AcpConnectionSupervisor } from './connectionSupervisor';
 import {
+  ACP_MINIMUM_PROTOCOL_VERSION,
   ACP_PROBE_CLIENT_CAPABILITIES,
   ACP_PROTOCOL_VERSION,
   AcpMethod,
@@ -81,7 +82,10 @@ export class AcpProbeService {
           setTimeout(() => reject(new Error('ACP probe timed out.')), PROBE_TIMEOUT_MS),
         ),
       ]);
-      if (response.protocolVersion !== ACP_PROTOCOL_VERSION) {
+      if (
+        typeof response.protocolVersion !== 'number' ||
+        response.protocolVersion < ACP_MINIMUM_PROTOCOL_VERSION
+      ) {
         throw new AcpProtocolIncompatibleError(response.protocolVersion);
       }
       const capabilities = response.agentCapabilities ?? response.capabilities ?? {};

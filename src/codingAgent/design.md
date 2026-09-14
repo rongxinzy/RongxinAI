@@ -252,6 +252,63 @@ Codex 与 Claude Code 作为首批一等外部 Agent，采用“用户安装 Age
 - 这些配置不复制给外部 Agent。
 - 外部 Agent 只使用自己的账号、模型、工具和 ACP Config Options。
 
+### 7.4 内置斜杠命令
+
+内置 Agent 与外部 Agent 共用同一套命令通道：会话创建时通过 `availableCommands` 声明命令，
+Composer 输入 `/` 后展示，选中只回填 `/name ` 文本。内置 Agent 自己解析命令，因为发送路径
+（`BuiltinCodingDriver.prompt`）是唯一能同时改变本轮运行模式的地方。
+
+| 命令              | 语义                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `/plan <任务>`    | 只读规划轮：本轮拒绝 `write`、`edit` 工具，模型用 `plan_write` 产出结构化计划条目。  |
+| `/goal <目标>`    | 目标模式：接入既有 `goalMode` 长程循环，模型自行迭代直到目标完成。                    |
+| `/compact`        | 压缩当前会话上下文，不产生模型轮次，只追加一条系统消息汇报结果。                      |
+| `/status`         | 汇报本地会话状态（运行中/空闲、模型、思考等级、上下文压缩是否可用）。                 |
+
+- 规划模式同时是内置 Agent 的会话模式（Config Option `plan-mode`，取值 `execute` / `plan`），
+  与 ACP Agent 通过 `config_option_update` 发布的模式共用同一套 UI 和持久化通道：Composer 的
+  配置控件渲染它，选择结果随 Lane 持久化。命令是单轮快捷方式，会话模式是长期默认值。
+- 两者冲突时命令优先：`/goal` 明确要求执行，因此会清除该轮的只读规划模式，避免目标循环被
+  只读限制卡住；`/plan` 只影响当前轮。
+- 命令只在整条输入以 `/name` 开头且带正文时生效；裸 `/goal`、`/goals` 或正文中提到的命令原样
+  透传给模型，避免产生空 Prompt。
+- `/compact` 与 `/status` 是控制命令：它们必须独占整条输入（`/compact 登录模块` 仍是普通
+  Prompt），由 `CodingRoomService` 在进入模型之前拦截，永不进入模型上下文。会话有轮次在跑时
+  它们排进 `enqueueControlAction` 队列，等已排队的用户消息处理完再执行；显式停止会话会丢弃
+  队列，避免控制副作用落到之后复用同一 session id 的会话上。
+- `/plan` 的只读限制按轮生效，下一条普通消息自动恢复写工具；`plan_write` 在会话内常驻注册，
+  因此规划轮复用同一个会话上下文，而不是重建会话。
+- 计划条目通过统一事件 `plan` 落到 Lane，由 Renderer 的计划面板渲染，与 ACP Agent 的 Plan
+  事件同一契约（`payload.entries`，字段 `content`、`status`、`priority`）。
+- 同一 Lane 的空闲后续轮次复用仍在运行的 Pi 会话（`continueSession`），因此跨轮上下文、
+  计划与结论都不会像 `startSession` 那样被丢弃。
+- Lane 里的 `availableCommands` 与 Config Options 都是 driver 代码的投影：每次打开内置
+  Lane 都会从 driver 重新投影一次（内存内、幂等，仅在内容变化时写库），所以旧 Lane 也能
+  拿到新命令，同时保留用户已选的思考等级、权限模式与规划模式。
+- 已知边界：会话运行中发送的命令进入待发队列，队列项只携带文本，不会改变目标/规划模式；
+  需要时再为队列项补充模式字段。
+
+### 7.5 内置 Agent 反问（Elicitation）
+
+内置 Agent 可以在信息不足时暂停本轮，向用户提出一个问题，拿到回答后继续同一轮。
+这条通道只在内置 Agent 上实现（`supportsElicitation: true`），外部 ACP Agent 仍按各自协议处理。
+
+- 模型侧工具名是 `RequestCodingInput`，参数只有 `question`；运行时把它变成一个挂起的 Promise，
+  通过 `codingElicitationRequest` 事件把 `requestId` 与问题交给主进程。
+- 问题落库在 `coding_elicitations`，状态为 `pending` / `answered` / `cancelled`，并追加一条
+  `elicitation` 事件；同一 Lane 同时只允许一个 `pending` 问题（部分唯一索引保证）。
+- Lane、Mission、Assignment 同时进入 `waiting_elicitation`，界面用警告色标记；等待回答期间
+  发送新消息会被拒绝，必须先回答或取消，避免用户输入绕过挂起的问题。
+- 回答走 `respondBuiltinElicitation`：会话还活着就直接 resolve 挂起的 Promise；会话已消失则用
+  回答作为上下文重新启动那一轮。等待期间 Lane 不再持有工作区写租约，恢复前重新获取。
+- 取消或停止会话时先取消挂起的问题并回传原因，再取消轮次，保证模型侧 Promise 一定被 resolve，
+  不会留下永久挂起的会话。
+- 提问只存在于提问它的进程里：应用重启后 `recoverInterruptedState()` 先把所有残留的 `pending`
+  问题标为已取消并补一条事件，再把 `waiting_elicitation` 的 Lane 复位为 `idle`，避免 Lane 卡在
+  既不能发消息也不能删除的状态。
+- 界面用 `CodingElicitationCard` 渲染在会话流末尾，回答与取消分别走
+  `codingAgent:respondElicitation`、`codingAgent:cancelElicitation`。
+
 ## 8. 外部 ACP Agent
 
 ### 8.1 ACP 映射
@@ -319,6 +376,8 @@ Codex 与 Claude Code 作为首批一等外部 Agent，采用“用户安装 Age
 - 不参加本机扫描。
 - 不依赖 ACP Probe。
 - 状态只取决于知远自身模型和运行时是否可用。
+- 不声明 `supportsLoadSession`：会话记录只存在于当前进程内，重启后无法按远端会话 id 重挂，
+  只能新建会话。
 
 ### 9.2 外部 Agent 两阶段发现
 

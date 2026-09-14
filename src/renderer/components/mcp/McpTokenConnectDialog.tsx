@@ -9,7 +9,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
 import { Eye, EyeOff, ExternalLink, LoaderCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { McpRegistryEntry } from '../../types/mcp';
@@ -25,6 +25,12 @@ interface McpTokenConnectDialogProps {
 export function McpTokenConnectDialog({ entry, isSaving, error, onClose, onSave }: McpTokenConnectDialogProps) {
   const [token, setToken] = useState('');
   const [visible, setVisible] = useState(false);
+  // This component stays mounted between providers, so a token typed for one
+  // service must never survive into another service form.
+  useEffect(() => {
+    setToken('');
+    setVisible(false);
+  }, [entry?.id]);
   const isOpen = entry !== null;
   const name = entry?.presentation?.name || entry?.name || '';
   const tokenInputId = `${entry?.id || 'mcp'}-access-token`;

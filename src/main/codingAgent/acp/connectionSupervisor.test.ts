@@ -5,7 +5,45 @@ import { tmpdir } from 'os';
 import path from 'path';
 
 import { AcpConnectionSupervisor, terminateProcessTree } from './connectionSupervisor';
-import { AcpMethod } from './protocol';
+import { AcpErrorCode, AcpMethod, AcpRequestError } from './protocol';
+
+test('reports handler failures with the ACP error code the handler chose', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  supervisor.onRequest(async method => {
+    if (method === 'fs/read_text_file') {
+      throw new AcpRequestError(AcpErrorCode.ResourceNotFound, 'File not found.');
+    }
+    throw new Error('boom');
+  });
+  const script = [
+    "let buffer=''; let initId=null; const answers=[];",
+    "const send = message => process.stdout.write(JSON.stringify(message) + '\\n');",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const message = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (message.method === 'initialize') { initId = message.id; send({ jsonrpc: '2.0', method: 'fs/read_text_file', id: 901, params: { sessionId: 's', path: '/missing' } }); send({ jsonrpc: '2.0', method: 'fs/write_text_file', id: 902, params: {} }); }",
+    "if (message.id === 901 || message.id === 902) { answers.push({ id: message.id, code: message.error.code, message: message.error.message }); if (answers.length === 2) send({ jsonrpc: '2.0', id: initId, result: { answers } }); }",
+    '} });',
+  ].join('');
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', script],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+  const result = await supervisor.request<{
+    answers: Array<{ id: number; code: number; message: string }>;
+  }>(AcpMethod.Initialize, {});
+  expect(result.answers.find(answer => answer.id === 901)).toEqual({
+    id: 901,
+    code: AcpErrorCode.ResourceNotFound,
+    message: 'File not found.',
+  });
+  expect(result.answers.find(answer => answer.id === 902)).toEqual({
+    id: 902,
+    code: AcpErrorCode.InternalError,
+    message: 'boom',
+  });
+  await supervisor.dispose();
+});
 
 test('handles fragmented responses and session update notifications', async () => {
   const supervisor = new AcpConnectionSupervisor();

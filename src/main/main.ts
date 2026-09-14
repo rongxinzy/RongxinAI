@@ -37,6 +37,7 @@ import { CcConnectDeliveryTransport } from '../scheduledTask/ccConnectDeliveryTr
 import { ScheduledTaskDeliveryDispatcher } from '../scheduledTask/deliveryDispatcher';
 import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
+import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { ActivityService } from './activity/activityService';
 import { registerActivityIpcHandlers } from './activity/ipcHandlers';
 import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from './communityAuthSession';
@@ -930,6 +931,8 @@ const getCodingRoomService = (): CodingRoomService => {
           modelOverride,
           thinkingLevel,
           permissionMode,
+          goalMode,
+          planMode,
         }) => {
           const approvalMode =
             permissionMode === WorkbenchApprovalMode.Auto ||
@@ -951,14 +954,30 @@ const getCodingRoomService = (): CodingRoomService => {
             );
           }
           coworkStoreInstance.updateSession(sessionId, { status: 'running' });
-          await runtime.startSession(sessionId, prompt, {
-            skipInitialUserMessage: true,
+          const sharedOptions = {
             workspaceRoot,
-            sessionMode: 'work',
-            confirmationMode: 'modal',
+            sessionMode: 'work' as const,
             approvalMode,
+            planTool: true,
+            codingElicitation: true,
             ...(modelOverride ? { modelOverride } : {}),
             ...(thinkingLevel ? { thinkingLevel: thinkingLevel as PiThinkingLevel } : {}),
+            ...(goalMode ? { goalMode: true } : {}),
+            ...(planMode ? { planMode: true } : {}),
+          };
+          // One lane keeps one Pi transcript: reusing the live session preserves
+          // the earlier turns that startSession would discard.
+          if (runtime.isSessionActive(sessionId)) {
+            await runtime.continueSession(sessionId, prompt, {
+              ...sharedOptions,
+              _skipUserMessage: true,
+            });
+            return;
+          }
+          await runtime.startSession(sessionId, prompt, {
+            ...sharedOptions,
+            confirmationMode: 'modal',
+            skipInitialUserMessage: true,
           });
         },
         setBuiltinApprovalMode: (sessionId, mode) =>
@@ -969,6 +988,15 @@ const getCodingRoomService = (): CodingRoomService => {
             thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
           }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
+        respondBuiltinElicitation: (requestId, answer) =>
+          runtime.respondToCodingElicitation(requestId, answer),
+        cancelBuiltinElicitation: (requestId, reason) =>
+          runtime.cancelCodingElicitation(requestId, reason),
+        compactBuiltinSession: sessionId => runtime.compactSession(sessionId),
+        enqueueBuiltinControlAction: (sessionId, action) =>
+          runtime.enqueueControlAction(sessionId, action),
+        isBuiltinSessionRunning: sessionId => runtime.isSessionRunning(sessionId),
+        isBuiltinSessionActive: sessionId => runtime.isSessionActive(sessionId),
         enqueueBuiltinMessage: (sessionId, prompt) =>
           runtime.enqueuePendingMessage(sessionId, prompt),
         steerBuiltinMessage: async (sessionId, prompt) => {
@@ -1124,6 +1152,17 @@ const getCodingRoomService = (): CodingRoomService => {
         request,
       });
     });
+    runtime.on('plan', (sessionId: string, plan: { entries?: unknown }) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Plan, {
+        entries: Array.isArray(plan?.entries) ? plan.entries : [],
+      });
+    });
+    runtime.on(
+      'codingElicitationRequest',
+      (sessionId: string, request: { requestId: string; question: string }) => {
+        codingRoomService?.recordBuiltinElicitation(sessionId, request);
+      },
+    );
     runtime.on('complete', (sessionId: string) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnComplete, {});
     });
@@ -1280,6 +1319,26 @@ const attachCcConnectCronControl = async (
   await canonicalSchedulerRuntime!.reconcile(await getCanonicalScheduledTaskService().listJobs());
   return health;
 };
+/**
+ * Pushes canonical scheduler Run/status changes to every renderer window.
+ * Scheduled Runs are started by the sidecar clock, so without this push the
+ * task list and run history would keep showing pre-Run state until the next
+ * user action.
+ */
+const broadcastScheduledTaskEvent = (
+  channel: (typeof ScheduledTaskIpc)[keyof typeof ScheduledTaskIpc],
+  data: Record<string, unknown>,
+): void => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed()) continue;
+    try {
+      win.webContents.send(channel, data);
+    } catch (error) {
+      console.error('[Scheduler] failed to broadcast a scheduled task event:', error);
+    }
+  }
+};
+
 const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!canonicalScheduledTaskService) {
     const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
@@ -1296,6 +1355,14 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
       executor.execute.bind(executor),
       new ScheduledTaskDeliveryDispatcher(taskStore, ccConnectDeliveryTransport),
       activityService,
+      {
+        runUpdated: (run, taskName) =>
+          broadcastScheduledTaskEvent(ScheduledTaskIpc.RunUpdate, {
+            run: { ...run, taskName },
+          }),
+        taskStateChanged: (taskId, state) =>
+          broadcastScheduledTaskEvent(ScheduledTaskIpc.StatusUpdate, { taskId, state }),
+      },
     );
     canonicalScheduledTaskService = new CanonicalScheduledTaskService(
       taskStore,
@@ -4780,7 +4847,13 @@ if (!gotTheLock) {
         // failing on the duplicate name — preset updates (system prompt,
         // skills, workflow) must reach already-installed experts.
         const existing = agentManager.getAgent(request.id);
-        if (existing) {
+        // Only an expert package agent may be upgraded in place. A user-created
+        // agent can own the same derived id (ids come from names), and updating
+        // it here would silently rename it and replace its system prompt.
+        const isExpertAgent =
+          existing?.source === CoworkSessionExpertSource.Package ||
+          existing?.source === CoworkSessionExpertSource.Member;
+        if (existing && isExpertAgent) {
           agentManager.updateAgent(existing.id, {
             name: request.name,
             description: request.description,

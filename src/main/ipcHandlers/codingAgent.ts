@@ -15,6 +15,7 @@ import {
   type CodingLaneViewStateInput,
   type CodingLaneConfigOptionInput,
   type CodingPermissionResponse,
+  type CodingElicitationResponse,
   type CodingPendingMessagesChangedEvent,
   type CreateCodingCollaborationPresetInput,
   type CodingPromptInput,
@@ -605,6 +606,32 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
         return {
           success: true,
           snapshot: await service.respondToPermission(input.workspaceRoot, input.response),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+  ipcMain.handle(
+    CodingAgentIpc.RespondElicitation,
+    async (_event, input: { workspaceRoot: string; response: CodingElicitationResponse }) => {
+      try {
+        return {
+          success: true,
+          snapshot: await service.respondElicitation(input.workspaceRoot, input.response),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+  ipcMain.handle(
+    CodingAgentIpc.CancelElicitation,
+    async (_event, input: { workspaceRoot: string; requestId: string }) => {
+      try {
+        return {
+          success: true,
+          snapshot: await service.cancelElicitation(input.workspaceRoot, input.requestId),
         };
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };

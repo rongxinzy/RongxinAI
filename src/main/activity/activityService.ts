@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import type Database from 'better-sqlite3';
 
 import {
+  ActivityErrorCode,
   ActivityIpc,
   ActivityRetention,
   ActivityStatus,
@@ -45,21 +46,17 @@ export class ActivityService {
   /**
    * A force-closed app cannot emit a terminal event. Clear those stale
    * in-progress projections during startup so the sidebar indicator reflects
-   * work that is actually running in this process.
+   * work that is actually running in this process. `updated_at` is deliberately
+   * left untouched so a recovered run keeps its real position in the feed.
    */
-  recoverInterruptedRuns(nowMs = Date.now()): number {
+  recoverInterruptedRuns(): number {
     return this.db
       .prepare(
         `UPDATE zhiyuan_activity_runs
-         SET status = ?, updated_at = ?, error_message = COALESCE(error_message, ?)
+         SET status = ?, error_message = COALESCE(error_message, ?)
          WHERE status = ?`,
       )
-      .run(
-        ActivityStatus.Failed,
-        nowMs,
-        'Run was interrupted when the application closed.',
-        ActivityStatus.Running,
-      ).changes;
+      .run(ActivityStatus.Failed, ActivityErrorCode.Interrupted, ActivityStatus.Running).changes;
   }
 
   upsert(update: ActivityRunUpdate): ActivityRun {

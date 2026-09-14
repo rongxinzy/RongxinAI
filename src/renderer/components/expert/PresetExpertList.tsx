@@ -22,15 +22,35 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
   const [installingExpertIds, setInstallingExpertIds] = useState<Set<string>>(() => new Set());
   const installingExpertIdsRef = useRef(new Set<string>());
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const agents = useSelector((state: RootState) => state.agent.agents);
 
   const isZh = i18nService.getLanguage() === 'zh';
 
-  useEffect(() => {
-    window.electron?.agents?.getPresetExperts().then(result => {
-      if (result?.experts) setExperts(result.experts);
-    });
+  const loadPresetExperts = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const result = await window.electron?.agents?.getPresetExperts();
+      if (result?.error) {
+        setExperts([]);
+        setLoadError(result.error);
+        return;
+      }
+      setExperts(result?.experts ?? []);
+    } catch (error) {
+      setLoadError(
+        error instanceof Error ? error.message : i18nService.t('expertPresetsLoadFailed'),
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadPresetExperts();
+  }, [loadPresetExperts]);
 
   const handleInstallExpert = useCallback(async (expert: PresetExpertSummary) => {
     if (installingExpertIdsRef.current.has(expert.name)) return;
@@ -64,6 +84,29 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
       });
     }
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <Spinner className="size-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{i18nService.t('loading')}</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <AlertCircle className="size-10 text-destructive" />
+        <p className="text-sm text-muted-foreground">
+          {i18nService.t('expertPresetsLoadFailed')}
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={() => void loadPresetExperts()}>
+          {i18nService.t('expertPresetsRetry')}
+        </Button>
+      </div>
+    );
+  }
 
   if (experts.length === 0) {
     return (

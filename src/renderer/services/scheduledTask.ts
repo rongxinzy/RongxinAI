@@ -254,13 +254,17 @@ export class ScheduledTaskService {
       const result = await execution;
       if (!result?.success) {
         rollbackOptimisticState();
-        store.dispatch(setError(result?.error || i18nService.t('scheduledTasksRunFailed')));
-        showToast(i18nService.t('scheduledTasksRunFailed'));
+        // Surface the scheduler's own reason: a generic toast hides why the
+        // Run was rejected (stale schedule version, tool failure, timeout).
+        const reason = result?.error || i18nService.t('scheduledTasksRunFailed');
+        store.dispatch(setError(reason));
+        showToast(reason);
       }
     } catch (err: unknown) {
       rollbackOptimisticState();
-      store.dispatch(setError(err instanceof Error ? err.message : String(err)));
-      showToast(i18nService.t('scheduledTasksRunFailed'));
+      const reason = err instanceof Error ? err.message : String(err);
+      store.dispatch(setError(reason));
+      showToast(reason || i18nService.t('scheduledTasksRunFailed'));
     } finally {
       await Promise.all([
         this.loadTasks({ revalidate: true }),
@@ -332,6 +336,7 @@ export class ScheduledTaskService {
       }
     } catch (err: unknown) {
       store.dispatch(setError(err instanceof Error ? err.message : String(err)));
+      showToast(i18nService.t('scheduledTasksLoadFailedHint'));
     }
   }
 
@@ -355,6 +360,7 @@ export class ScheduledTaskService {
       }
     } catch (err: unknown) {
       store.dispatch(setError(err instanceof Error ? err.message : String(err)));
+      showToast(i18nService.t('scheduledTasksLoadFailedHint'));
     }
   }
 
