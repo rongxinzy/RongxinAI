@@ -87,6 +87,137 @@ test('advertises config option support', async () => {
   await expect(driver.getCapabilities()).resolves.toMatchObject({ supportsConfigOptions: true });
 });
 
+test('advertises installed skills, experts and MCP servers on every projection', async () => {
+  const runtime = createRuntime({
+    listCommandChoices: () => ({
+      skills: [{ id: 'pdf', name: 'PDF toolkit', description: 'Fill PDF forms.' }],
+      experts: [{ id: 'expert-1', name: 'Staff engineer', description: 'Reviews designs.' }],
+      mcpServers: [{ id: 'github', name: 'github', description: 'GitHub tools.' }],
+    }),
+  });
+  const driver = new BuiltinCodingDriver(runtime);
+
+  const session = await driver.createSession({ workspaceRoot: '/workspace' });
+  const names = session.availableCommands.map(command => command.name);
+  expect(names).toContain('skill');
+  expect(names).toContain('expert');
+  expect(names).toContain('mcp');
+  expect(driver.getSessionAvailableCommands(session.id).map(command => command.name)).toEqual(
+    names,
+  );
+});
+
+test('reads the installed choices when a session is created, not per projection', async () => {
+  const listCommandChoices = vi.fn(() => ({
+    skills: [{ id: 'pdf', name: 'PDF toolkit', description: '' }],
+    experts: [],
+    mcpServers: [],
+  }));
+  const driver = new BuiltinCodingDriver(createRuntime({ listCommandChoices }));
+  const session = await driver.createSession({ workspaceRoot: '/workspace' });
+
+  driver.getSessionAvailableCommands(session.id);
+  driver.getSessionAvailableCommands(session.id);
+  expect(listCommandChoices).toHaveBeenCalledTimes(1);
+});
+
+test('re-reads the installed choices once the runtime bumps the catalog generation', async () => {
+  let generation = 0;
+  const listCommandChoices = vi.fn(() => ({
+    skills: generation === 0 ? [] : [{ id: 'slides', name: 'Slide builder', description: '' }],
+    experts: [],
+    mcpServers: [],
+  }));
+  const driver = new BuiltinCodingDriver(
+    createRuntime({ listCommandChoices, commandCatalogGeneration: () => generation }),
+  );
+  const session = await driver.createSession({ workspaceRoot: '/workspace' });
+  expect(driver.getSessionAvailableCommands(session.id).map(command => command.name)).not.toContain(
+    'skill',
+  );
+
+  generation += 1;
+  expect(driver.getSessionAvailableCommands(session.id).map(command => command.name)).toContain(
+    'skill',
+  );
+  expect(listCommandChoices).toHaveBeenCalledTimes(2);
+});
+
+test('projects the default commands before any session exists', () => {
+  const driver = new BuiltinCodingDriver(
+    createRuntime({
+      listCommandChoices: () => ({
+        skills: [{ id: 'pdf', name: 'PDF toolkit', description: '' }],
+        experts: [],
+        mcpServers: [],
+      }),
+    }),
+  );
+
+  const names = driver.getDefaultAvailableCommands().map(command => command.name);
+  expect(names).toEqual(
+    expect.arrayContaining(['plan', 'goal', 'skill', 'compact', 'status', 'mcp']),
+  );
+  // No expert is installed, so that command stays out of the menu.
+  expect(names).not.toContain('expert');
+});
+
+test('carries the selected skill and expert into the runtime options', async () => {
+  const runtime = createRuntime({
+    listCommandChoices: () => ({
+      skills: [{ id: 'pdf', name: 'PDF toolkit', description: '' }],
+      experts: [{ id: 'expert-1', name: 'Staff engineer', description: '' }],
+      mcpServers: [],
+    }),
+  });
+  const driver = new BuiltinCodingDriver(runtime);
+  const session = await driver.createSession({ workspaceRoot: '/workspace' });
+
+  for await (const _event of driver.prompt({
+    sessionId: session.id,
+    workspaceRoot: '/workspace',
+    prompt: '/skill pdf fill the form',
+  })) {
+    // Draining starts the runtime.
+  }
+  for await (const _event of driver.prompt({
+    sessionId: session.id,
+    workspaceRoot: '/workspace',
+    prompt: '/expert expert-1 review it',
+  })) {
+    // Draining starts the runtime.
+  }
+  for await (const _event of driver.prompt({
+    sessionId: session.id,
+    workspaceRoot: '/workspace',
+    prompt: '/skill off plain turns again',
+  })) {
+    // Draining starts the runtime.
+  }
+
+  expect(runtime.start).toHaveBeenNthCalledWith(
+    1,
+    session.id,
+    '/workspace',
+    'fill the form',
+    expect.objectContaining({ skillIds: ['pdf'] }),
+  );
+  expect(runtime.start).toHaveBeenNthCalledWith(
+    2,
+    session.id,
+    '/workspace',
+    'review it',
+    expect.objectContaining({ expertIds: ['expert-1'] }),
+  );
+  expect(runtime.start).toHaveBeenNthCalledWith(
+    3,
+    session.id,
+    '/workspace',
+    'plain turns again',
+    expect.objectContaining({ skillIds: [] }),
+  );
+});
+
 test('createSession exposes the thinking-level option with a medium default', async () => {
   const driver = new BuiltinCodingDriver(createRuntime());
   const session = await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
@@ -291,16 +422,18 @@ test('createSession advertises the built-in prompt and control commands', async 
     'goal',
     'compact',
     'status',
+    'mcp',
   ]);
   for (const command of session.availableCommands) {
     expect(command).toEqual(expect.objectContaining({ description: expect.any(String) }));
   }
-  // Only the prompt-shaped commands accept a body; control commands run locally.
+  // Only commands that take a body carry a hint; /mcp is the one control
+  // command with an argument, the rest run locally on the bare name.
   expect(
     session.availableCommands
       .filter(command => command.input?.hint)
       .map(command => command.name),
-  ).toEqual(['plan', 'goal']);
+  ).toEqual(['plan', 'goal', 'mcp']);
   expect(driver.getSessionAvailableCommands('s1')).toEqual(session.availableCommands);
 });
 

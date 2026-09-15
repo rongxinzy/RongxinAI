@@ -21,8 +21,15 @@ import type {
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
 import { CodingComposerConfigControls } from './CodingComposerConfigControls';
-import { CodingSlashCommandMenu } from './CodingSlashCommandMenu';
-import { filterSlashCommands, slashCommandPrompt, slashCommandQuery } from './codingSlashCommands';
+import { CodingSlashCommandMenu, type CodingSlashCommandMenuItem } from './CodingSlashCommandMenu';
+import {
+  filterCommandOptions,
+  filterSlashCommands,
+  slashCommandArgument,
+  slashCommandPrompt,
+  slashCommandQuery,
+  slashCommandSelectionPrompt,
+} from './codingSlashCommands';
 import { CodingComposerStatus } from './constants';
 import PendingMessageQueue from '../cowork/PendingMessageQueue';
 import type { coworkQueueService } from '../../services/coworkQueue';
@@ -88,18 +95,56 @@ export const CodingComposer = ({
     query: string | null;
     name: string;
   }>({ query: null, name: '' });
+  const [choiceSelection, setChoiceSelection] = useState<{
+    argument: string | null;
+    value: string;
+  }>({ argument: null, value: '' });
   const [dismissedPrompt, setDismissedPrompt] = useState<string | null>(null);
   const query = slashCommandQuery(prompt);
   const matchingCommands = query === null ? [] : filterSlashCommands(availableCommands, query);
+  const argument = slashCommandArgument(prompt);
+  const argumentCommand = argument
+    ? availableCommands.find(command => command.name === argument.name)
+    : undefined;
+  const argumentOptions = argumentCommand?.input?.options ?? [];
+  const matchingOptions = argument ? filterCommandOptions(argumentOptions, argument.query) : [];
   const selectedCommandName = commandSelection.query === query ? commandSelection.name : '';
   const selectedCommand =
     matchingCommands.find(command => command.name === selectedCommandName) ?? matchingCommands[0];
+  const selectedChoiceValue =
+    choiceSelection.argument === (argument?.query ?? null) ? choiceSelection.value : '';
+  const selectedChoice =
+    matchingOptions.find(option => option.value === selectedChoiceValue) ?? matchingOptions[0];
+  const commandMenuDismissed = dismissedPrompt === prompt;
+  // A command that takes a selection swaps the same menu to its choices.
+  const choiceMenuOpen =
+    !disabled &&
+    !isRunning &&
+    argument !== null &&
+    argumentOptions.length > 0 &&
+    !commandMenuDismissed;
   const commandMenuOpen =
     !disabled &&
     !isRunning &&
     query !== null &&
     availableCommands.length > 0 &&
-    dismissedPrompt !== prompt;
+    !commandMenuDismissed;
+  const menuOpen = choiceMenuOpen || commandMenuOpen;
+  const menuItems: CodingSlashCommandMenuItem[] = choiceMenuOpen
+    ? matchingOptions.map(option => ({
+        key: option.value,
+        token: option.label,
+        ...(option.description ? { description: option.description } : {}),
+      }))
+    : matchingCommands.map(command => ({
+        key: command.name,
+        token: `/${command.name}`,
+        description: command.description,
+        ...(command.input?.hint ? { hint: command.input.hint } : {}),
+      }));
+  const activeMenuItemKey = choiceMenuOpen
+    ? (selectedChoice?.value ?? '')
+    : (selectedCommand?.name ?? '');
 
   useEffect(() => {
     const element = composerRootRef.current;
@@ -119,14 +164,39 @@ export const CodingComposer = ({
     });
   }, [disabled, focusRequestKey]);
 
-  const selectCommand = (command: CodingAgentAvailableCommand) => {
-    const nextPrompt = slashCommandPrompt(command);
-    setDismissedPrompt(nextPrompt);
+  const applyPrompt = (nextPrompt: string, options?: { openChoices?: boolean }) => {
+    // A dismissal normally remembers the text the user just accepted, so the
+    // menu does not bounce back open. Commands that take a selection are the
+    // exception: the menu swaps to their candidates instead of closing.
+    setDismissedPrompt(options?.openChoices ? null : nextPrompt);
     onChange(nextPrompt);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(nextPrompt.length, nextPrompt.length);
     });
+  };
+
+  const selectCommand = (command: CodingAgentAvailableCommand) => {
+    applyPrompt(slashCommandPrompt(command), {
+      openChoices: (command.input?.options?.length ?? 0) > 0,
+    });
+  };
+
+  const selectMenuChoice = (key: string) => {
+    if (choiceMenuOpen) {
+      if (argumentCommand) applyPrompt(slashCommandSelectionPrompt(argumentCommand.name, key));
+      return;
+    }
+    const command = matchingCommands.find(candidate => candidate.name === key);
+    if (command) selectCommand(command);
+  };
+
+  const setMenuSelection = (key: string) => {
+    if (choiceMenuOpen) {
+      setChoiceSelection({ argument: argument?.query ?? '', value: key });
+      return;
+    }
+    setCommandSelection({ query, name: key });
   };
 
   const insertNewlineAtCursor = () => {
@@ -153,12 +223,12 @@ export const CodingComposer = ({
             queueService={queueService}
           />
         ) : null}
-        {commandMenuOpen ? (
+        {menuOpen ? (
           <CodingSlashCommandMenu
-            commands={matchingCommands}
-            selectedName={selectedCommand?.name ?? ''}
-            onSelectedNameChange={name => setCommandSelection({ query, name })}
-            onSelect={selectCommand}
+            items={menuItems}
+            selectedKey={activeMenuItemKey}
+            onSelectedKeyChange={setMenuSelection}
+            onSelect={selectMenuChoice}
           />
         ) : null}
         <PromptInput
@@ -198,30 +268,46 @@ export const CodingComposer = ({
                   insertNewlineAtCursor();
                   return;
                 }
-                if (!commandMenuOpen) return;
+                if (!menuOpen) return;
                 if (event.key === 'Escape') {
                   event.preventDefault();
                   setDismissedPrompt(prompt);
                   return;
                 }
-                if (!selectedCommand) return;
-                const selectedIndex = matchingCommands.indexOf(selectedCommand);
+                if (menuItems.length === 0) return;
+                const selectedIndex = menuItems.findIndex(item => item.key === activeMenuItemKey);
                 if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                   event.preventDefault();
                   const offset = event.key === 'ArrowDown' ? 1 : -1;
                   const nextIndex =
-                    (selectedIndex + offset + matchingCommands.length) % matchingCommands.length;
-                  setCommandSelection({ query, name: matchingCommands[nextIndex].name });
+                    (Math.max(selectedIndex, 0) + offset + menuItems.length) % menuItems.length;
+                  setMenuSelection(menuItems[nextIndex].key);
                   return;
                 }
                 if (event.key === 'Tab') {
                   event.preventDefault();
-                  selectCommand(selectedCommand);
+                  selectMenuChoice(activeMenuItemKey);
                   return;
                 }
                 if (event.key === 'Enter') {
-                  const commandPrompt = slashCommandPrompt(selectedCommand);
-                  if (!selectedCommand.input?.hint && prompt === commandPrompt) {
+                  if (choiceMenuOpen) {
+                    if (!argumentCommand) return;
+                    if (
+                      prompt ===
+                      slashCommandSelectionPrompt(argumentCommand.name, activeMenuItemKey)
+                    ) {
+                      setDismissedPrompt(prompt);
+                      return;
+                    }
+                    event.preventDefault();
+                    selectMenuChoice(activeMenuItemKey);
+                    return;
+                  }
+                  if (!selectedCommand) return;
+                  if (
+                    prompt === slashCommandPrompt(selectedCommand) &&
+                    !selectedCommand.input?.hint
+                  ) {
                     setDismissedPrompt(prompt);
                     return;
                   }
@@ -232,8 +318,8 @@ export const CodingComposer = ({
               placeholder={i18nService.t('codingAgentPromptPlaceholder')}
               aria-label={i18nService.t('codingAgentPromptPlaceholder')}
               aria-autocomplete="list"
-              aria-controls={commandMenuOpen ? 'coding-agent-command-menu' : undefined}
-              aria-expanded={commandMenuOpen}
+              aria-controls={menuOpen ? 'coding-agent-command-menu' : undefined}
+              aria-expanded={menuOpen}
               disabled={disabled}
               className="max-h-48 min-h-20"
             />
