@@ -1,6 +1,7 @@
 import {
   ApiFormat,
   buildAnthropicMessagesUrl,
+  ProviderModelConnectionFailureKind,
   resolveCodingPlanBaseUrl,
   type ProviderConfig,
 } from '../../shared/providers';
@@ -21,7 +22,11 @@ export interface ProviderModelConnectionTestInput {
 
 export type ProviderModelConnectionTestResult =
   | { success: true }
-  | { success: false; message: string };
+  | {
+      success: false;
+      message: string;
+      failureKind: ProviderModelConnectionFailureKind;
+    };
 
 export interface ProviderModelConnectionTestResponse {
   ok: boolean;
@@ -90,6 +95,34 @@ const shouldUseMaxCompletionTokensForOpenAI = (provider: string, modelId: string
   );
 };
 
+const MODEL_UNAVAILABLE_MESSAGE_PATTERN =
+  /(model[\s_-]*(?:not[\s_-]*found|does[\s_-]*not[\s_-]*exist|is[\s_-]*not[\s_-]*available|not[\s_-]*available)|invalid[\s_-]*model|unknown[\s_-]*model|unsupported[\s_-]*model|model_not_found|not_found_error)/i;
+
+function classifyConnectionFailure(
+  status?: number,
+  message = '',
+): ProviderModelConnectionFailureKind {
+  if (status === 401 || status === 403) {
+    return ProviderModelConnectionFailureKind.Auth;
+  }
+  if (status === 429) {
+    return ProviderModelConnectionFailureKind.RateLimit;
+  }
+  if (status !== undefined && status >= 500) {
+    return ProviderModelConnectionFailureKind.Server;
+  }
+  if (
+    (status === 400 || status === 404) &&
+    MODEL_UNAVAILABLE_MESSAGE_PATTERN.test(message)
+  ) {
+    return ProviderModelConnectionFailureKind.Model;
+  }
+  if (status === undefined) {
+    return ProviderModelConnectionFailureKind.Network;
+  }
+  return ProviderModelConnectionFailureKind.Unknown;
+}
+
 export function getProviderModelConnectionTestResult(
   response: ProviderModelConnectionTestResponse,
 ): ProviderModelConnectionTestResult {
@@ -104,10 +137,17 @@ export function getProviderModelConnectionTestResult(
     return { success: true };
   }
   if (response.status === 0 && /aborted due to timeout|timed out/i.test(message)) {
-    return { success: false, message: i18nService.t('modelConnectionTestTimeout') };
+    return {
+      success: false,
+      message: i18nService.t('modelConnectionTestTimeout'),
+      failureKind: ProviderModelConnectionFailureKind.Network,
+    };
   }
-  return { success: false, message };
-}
+  return {
+    success: false,
+    message,
+    failureKind: classifyConnectionFailure(response.status, message),
+  };}
 
 export async function testProviderModelConnection(
   input: ProviderModelConnectionTestInput,
@@ -185,14 +225,18 @@ export async function testProviderModelConnection(
     });
     return getProviderModelConnectionTestResult(response);
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Connection test failed';
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Connection test failed',
+      message,
+      failureKind: classifyConnectionFailure(undefined, message),
     };
   }
 }
 
-export async function testProviderModelsSequentially(
+export const PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY = 4;
+
+export async function testProviderModelsConcurrently(
   input: Omit<ProviderModelConnectionTestInput, 'model'> & {
     models: readonly ProviderModelConnectionTarget[];
   },
@@ -200,10 +244,27 @@ export async function testProviderModelsSequentially(
   const results: Array<{
     model: ProviderModelConnectionTarget;
     result: ProviderModelConnectionTestResult;
-  }> = [];
-  for (const model of input.models) {
-    const result = await testProviderModelConnection({ ...input, model });
-    results.push({ model, result });
-  }
+  }> = new Array(input.models.length);
+  let nextModelIndex = 0;
+
+  const runWorker = async (): Promise<void> => {
+    while (nextModelIndex < input.models.length) {
+      const modelIndex = nextModelIndex;
+      nextModelIndex += 1;
+      const model = input.models[modelIndex];
+      if (!model) break;
+
+      const result = await testProviderModelConnection({ ...input, model });
+      results[modelIndex] = { model, result };
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY, input.models.length) },
+      () => runWorker(),
+    ),
+  );
+
   return results;
 }

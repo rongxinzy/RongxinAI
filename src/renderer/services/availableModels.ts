@@ -5,6 +5,8 @@ import {
   type ManagedProviderAccessPolicy,
 } from '../../shared/managedProviders';
 import {
+  createProviderConnectionTestSignature,
+  isCurrentModelAvailableTest,
   isProviderEnabled,
   ProviderName,
   ProviderRegistry,
@@ -26,6 +28,7 @@ const sameModelIdentity = (modelA: ModelLike, modelB: ModelLike): boolean =>
 export function buildConfiguredAvailableModels(
   config: AppConfig,
   allowedProviderKeys?: ReadonlySet<string>,
+  hiddenModelKeys?: ReadonlySet<string>,
 ): Model[] {
   const models: Model[] = [];
 
@@ -63,6 +66,11 @@ export function buildConfiguredAvailableModels(
         : configuredApiFormat;
 
     configuredModels.forEach(model => {
+      const modelKey = `${providerName}::${model.id}`;
+      if (hiddenModelKeys?.has(modelKey)) {
+        return;
+      }
+
       const supportsImage = ProviderRegistry.resolveModelSupportsImage(
         providerName,
         model.id,
@@ -161,11 +169,64 @@ export function mergeAvailableModels(
   return merged;
 }
 
+async function buildHiddenConfiguredModelKeys(
+  config: AppConfig,
+  allowedProviderKeys?: ReadonlySet<string>,
+): Promise<Set<string>> {
+  const hiddenModelKeys = new Set<string>();
+  if (!config.providers) return hiddenModelKeys;
+
+  for (const [providerName, providerConfig] of Object.entries(config.providers)) {
+    if (allowedProviderKeys && !allowedProviderKeys.has(providerName)) continue;
+    if (
+      providerName === ProviderName.LlamaCpp ||
+      providerName === ProviderName.Zhiyuan ||
+      !isProviderEnabled(providerName, providerConfig)
+    ) {
+      continue;
+    }
+
+    const providerDefinition = ProviderRegistry.get(providerName);
+    const configuredModels =
+      providerConfig.codingPlanEnabled && providerDefinition?.codingPlanModels
+        ? providerDefinition.codingPlanModels
+        : providerConfig.models;
+    if (!configuredModels?.length) continue;
+
+    const configuredApiFormat =
+      providerConfig.apiFormat ?? providerDefinition?.defaultApiFormat ?? 'anthropic';
+    const effectiveApiFormat =
+      providerConfig.codingPlanEnabled &&
+      (configuredApiFormat === 'anthropic' || configuredApiFormat === 'openai')
+        ? resolveCodingPlanBaseUrl(providerName, true, configuredApiFormat, providerConfig.baseUrl)
+            .effectiveFormat
+        : configuredApiFormat;
+    const signature = await createProviderConnectionTestSignature({
+      providerId: providerName,
+      baseUrl: providerConfig.baseUrl,
+      apiFormat: effectiveApiFormat,
+      provider: providerConfig,
+    });
+
+    configuredModels.forEach(model => {
+      const connectionTest = 'connectionTest' in model ? model.connectionTest : undefined;
+      if (!isCurrentModelAvailableTest({ connectionTest }, signature)) {
+        hiddenModelKeys.add(`${providerName}::${model.id}`);
+      }
+    });
+  }
+
+  return hiddenModelKeys;
+}
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
   const policy = await getManagedProviderAccessPolicy();
+  const allowedProviderKeys =
+    policy.mode === ManagedProviderAccessMode.Exclusive ? new Set(policy.providerKeys) : undefined;
+  const hiddenModelKeys = await buildHiddenConfiguredModelKeys(config, allowedProviderKeys);
   const configuredModels = buildConfiguredAvailableModels(
     config,
-    policy.mode === ManagedProviderAccessMode.Exclusive ? new Set(policy.providerKeys) : undefined,
+    allowedProviderKeys,
+    hiddenModelKeys,
   );
 
   if (policy.mode === ManagedProviderAccessMode.Exclusive) return configuredModels;

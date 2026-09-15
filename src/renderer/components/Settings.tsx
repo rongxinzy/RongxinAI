@@ -34,10 +34,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector } from 'react-redux';
 
 import {
+  applyProviderModelConnectionTestResults,
+  createProviderConnectionTestSignature,
   isProviderEnabled,
   ModelCapabilityStatus,
   type ModelCapabilities,
   type DiscoveredProviderModel,
+  type ProviderModelConnectionFailureKind,
   type ProviderModelPiRuntimeConfig,
   ProviderName,
   ProviderRegistry,
@@ -78,7 +81,7 @@ import { reconcileDefaultModelConfig } from '../services/modelConfigReconciliati
 import { mergeDiscoveredProviderModels } from '../services/providerModelDiscovery';
 import {
   testProviderModelConnection,
-  testProviderModelsSequentially,
+  testProviderModelsConcurrently,
 } from '../services/providerModelConnection';
 import { buildAppSettingsSavePatch, getSettingsSaveErrorMessage } from '../services/settingsSave';
 import { formatShortcutLabel } from '../services/shortcutLabel';
@@ -2388,6 +2391,34 @@ const Settings: React.FC<SettingsProps> = ({
     );
   };
 
+  const persistProviderModelConnectionResults = async (
+    provider: ProviderType,
+    outcomes: ReadonlyArray<{
+      modelId: string;
+      success: boolean;
+      failureKind?: ProviderModelConnectionFailureKind;
+    }>,
+    signature: string,
+  ): Promise<void> => {
+    if (provider === ProviderName.LlamaCpp) return;
+
+    const currentConfig = configService.getConfig();
+    const currentProviderConfig = currentConfig.providers?.[provider];
+    if (!currentProviderConfig || !isProviderEnabled(provider, currentProviderConfig)) return;
+
+    const testedProviderConfig = applyProviderModelConnectionTestResults(
+      currentProviderConfig,
+      outcomes,
+      signature,
+    );
+    if (testedProviderConfig === currentProviderConfig) return;
+
+    const nextProviders = {
+      ...(currentConfig.providers ?? {}),
+      [provider]: testedProviderConfig,
+    } as ProvidersConfig;
+    await configService.updateConfig({ providers: nextProviders });
+  };
   const persistTestedProviderConfiguration = async (
     provider: ProviderType,
     providerConfig: ProviderConfig,
@@ -2499,17 +2530,21 @@ const Settings: React.FC<SettingsProps> = ({
       firstModel.id = defaultQwenModel?.id || 'qwen3.5-plus';
     }
 
+    const testingApiFormat = getEffectiveApiFormat(testingProvider, providerConfig.apiFormat);
+    const testingBaseUrl = resolveBaseUrl(testingProvider, providerConfig.baseUrl, testingApiFormat);
+    const connectionSignature = await createProviderConnectionTestSignature({
+      providerId: testingProvider,
+      baseUrl: testingBaseUrl,
+      apiFormat: testingApiFormat,
+      provider: providerConfig,
+    });
     const requestId = (modelConnectionTestRequestIdRef.current[testingProvider] ?? 0) + 1;
     modelConnectionTestRequestIdRef.current[testingProvider] = requestId;
     const result = await testProviderModelConnection({
       providerId: testingProvider,
       provider: providerConfig,
-      baseUrl: resolveBaseUrl(
-        testingProvider,
-        providerConfig.baseUrl,
-        getEffectiveApiFormat(testingProvider, providerConfig.apiFormat),
-      ),
-      apiFormat: getEffectiveApiFormat(testingProvider, providerConfig.apiFormat),
+      baseUrl: testingBaseUrl,
+      apiFormat: testingApiFormat,
       model: firstModel,
     });
     if (modelConnectionTestRequestIdRef.current[testingProvider] !== requestId) return;
@@ -2519,9 +2554,28 @@ const Settings: React.FC<SettingsProps> = ({
       firstModel.id,
       result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
     );
+    const testedProviderConfig = applyProviderModelConnectionTestResults(
+      providerConfig,
+      [{
+        modelId: firstModel.id,
+        success: result.success,
+        failureKind: result.success ? undefined : result.failureKind,
+      }],
+      connectionSignature,
+    );
+    setProviders(previous => ({
+      ...previous,
+      [testingProvider]: testedProviderConfig,
+    }));
+
     if (result.success) {
-      await completeSuccessfulConnectionTest(testingProvider, providerConfig, firstModel);
+      await completeSuccessfulConnectionTest(testingProvider, testedProviderConfig, firstModel);
     } else {
+      await persistProviderModelConnectionResults(
+        testingProvider,
+        [{ modelId: firstModel.id, success: false }],
+        connectionSignature,
+      );
       showConnectionTestNotification(
         { success: false, message: result.message },
         testingProvider,
@@ -2564,18 +2618,40 @@ const Settings: React.FC<SettingsProps> = ({
     // Run connection tests in the background so the discovery button stops
     // loading once the model list is merged; per-model status dots show progress.
     void (async () => {
-      const results = await testProviderModelsSequentially({
+      const testingApiFormat = getEffectiveApiFormat(provider, nextProviderConfig.apiFormat);
+      const testingBaseUrl = resolveBaseUrl(provider, nextProviderConfig.baseUrl, testingApiFormat);
+      const connectionSignature = await createProviderConnectionTestSignature({
+        providerId: provider,
+        baseUrl: testingBaseUrl,
+        apiFormat: testingApiFormat,
+        provider: nextProviderConfig,
+      });
+      const results = await testProviderModelsConcurrently({
         providerId: provider,
         provider: nextProviderConfig,
-        baseUrl: resolveBaseUrl(
-          provider,
-          nextProviderConfig.baseUrl,
-          getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
-        ),
-        apiFormat: getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+        baseUrl: testingBaseUrl,
+        apiFormat: testingApiFormat,
         models: modelsToTest,
       });
       if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return;
+
+      const outcomes = results.map(({ model, result }) => ({
+        modelId: model.id,
+        success: result.success,
+        failureKind: result.success ? undefined : result.failureKind,
+      }));
+      const testedProviderConfig = applyProviderModelConnectionTestResults(
+        nextProviderConfig,
+        outcomes,
+        connectionSignature,
+      );
+      setProviders(current => ({
+        ...current,
+        [provider]: {
+          ...current[provider],
+          models: testedProviderConfig.models,
+        },
+      }));
 
       const statuses = Object.fromEntries(
         results.map(({ model, result }) => [
@@ -2589,7 +2665,7 @@ const Settings: React.FC<SettingsProps> = ({
       const failureCount = results.length - successCount;
       if (successCount > 0) {
         try {
-          await persistTestedProviderConfiguration(provider, nextProviderConfig);
+          await persistTestedProviderConfiguration(provider, testedProviderConfig);
           if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
         } catch (error) {
           console.error('[Settings] failed to save auto-tested provider configuration:', error);
@@ -2599,6 +2675,8 @@ const Settings: React.FC<SettingsProps> = ({
           );
           return;
         }
+      } else {
+        await persistProviderModelConnectionResults(provider, outcomes, connectionSignature);
       }
 
       const summary = i18nService
@@ -5391,8 +5469,8 @@ const Settings: React.FC<SettingsProps> = ({
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-background p-4">
                 <Button
                   type="button"
-                  variant="outline"
-                  className={localInferenceCompactButtonClass}
+                  variant="ghost"
+                  className="theme-confirm-cancel min-w-16"
                   onClick={onClose}
                   disabled={isSaving}
                 >
