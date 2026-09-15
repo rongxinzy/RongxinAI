@@ -109,7 +109,7 @@ async function forwardRequest(
     const upstreamResponse = await fetch(`${upstreamBaseUrl}${request.url ?? ''}`, {
       method: request.method,
       headers: copyRequestHeaders(request.headers),
-      body: body.length > 0 ? body : undefined,
+      body: body.length > 0 ? new Uint8Array(body) : undefined,
       signal: controller.signal,
     });
     response.statusCode = upstreamResponse.status;
