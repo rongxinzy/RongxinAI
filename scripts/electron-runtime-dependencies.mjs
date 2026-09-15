@@ -19,6 +19,7 @@ export const ELECTRON_RUNTIME_DEPENDENCIES = [
   'better-sqlite3',
   'bufferutil',
   'debug',
+  'electron-debug',
   'electron-updater',
   'google-auth-library',
   'node-pty',
