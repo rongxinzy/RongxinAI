@@ -18,8 +18,11 @@ import type {
 } from './codingAgentDriver';
 import {
   buildBuiltinCodingCommandList,
+  EMPTY_BUILTIN_CODING_COMMAND_CHOICES,
   parseBuiltinCodingPrompt,
   resolveBuiltinCodingTurnMode,
+  type BuiltinCodingCommandChoices,
+  type ParsedBuiltinCodingSelection,
 } from './builtinCodingCommands';
 
 export const BuiltinCodingConfigId = {
@@ -46,6 +49,10 @@ export interface BuiltinCodingSessionStartOptions {
   goalMode?: boolean;
   /** Run this turn as a read-only planning turn. */
   planMode?: boolean;
+  /** Skills the lane runs with; an empty list clears the current selection. */
+  skillIds?: string[];
+  /** Experts the lane runs with; an empty list clears the current selection. */
+  expertIds?: string[];
 }
 
 export interface BuiltinCodingRuntime {
@@ -56,6 +63,10 @@ export interface BuiltinCodingRuntime {
     options?: BuiltinCodingSessionStartOptions,
   ): Promise<void>;
   cancel(sessionId: string): Promise<void>;
+  /** Installed skills and experts advertised with the command snapshot. */
+  listCommandChoices?(): BuiltinCodingCommandChoices;
+  /** Bumped when those installed choices change; a newer value re-reads them. */
+  commandCatalogGeneration?(): number;
   /** Applies thinking-level changes to a live Pi session. */
   patchSession?(
     sessionId: string,
@@ -93,8 +104,30 @@ const isValidApprovalMode = (value: string): value is WorkbenchApprovalMode =>
 const isValidPlanMode = (value: string): value is BuiltinCodingPlanMode =>
   (Object.values(BuiltinCodingPlanMode) as string[]).includes(value);
 
+/**
+ * `/skill` and `/expert` carry the selected id into the runtime options. An
+ * explicit empty list clears the selection; an absent field keeps it.
+ */
+const selectionOptions = (
+  selection: ParsedBuiltinCodingSelection | undefined,
+): Partial<BuiltinCodingSessionStartOptions> => {
+  if (!selection) return {};
+  const ids = selection.id ? [selection.id] : [];
+  return selection.kind === 'skill' ? { skillIds: ids } : { expertIds: ids };
+};
+
 export class BuiltinCodingDriver implements CodingAgentDriver {
   private readonly sessionConfigOptions = new Map<string, CodingAgentConfigOption[]>();
+  /**
+   * The room re-projects the command snapshot before every turn and installed
+   * skills are read from disk, so the choices are cached instead of read per
+   * projection. The runtime bumps a generation whenever the catalog changes
+   * (skill installed, expert imported, MCP server added), and a newer
+   * generation re-reads them, so an open lane picks the change up on its next
+   * turn instead of keeping the snapshot it was opened with.
+   */
+  private commandChoices: BuiltinCodingCommandChoices | null = null;
+  private commandChoicesGeneration = -1;
 
   constructor(private readonly runtime: BuiltinCodingRuntime) {}
 
@@ -115,11 +148,12 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     const id = input.localSessionId ?? randomUUID();
     const configOptions = this.buildOptions(input.existingConfigOptions);
     this.sessionConfigOptions.set(id, configOptions);
+    this.refreshCommandChoices();
     return {
       id,
       remoteSessionId: null,
       configOptions,
-      availableCommands: buildBuiltinCodingCommandList(),
+      availableCommands: buildBuiltinCodingCommandList(this.commandChoices),
     };
   }
   async loadSession(_input: { remoteSessionId: string }): Promise<CodingAgentSession> {
@@ -129,6 +163,10 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
   getDefaultConfigOptions(): CodingAgentConfigOption[] {
     return this.buildOptions();
   }
+  /** Commands a new session would start with, without binding them to a session. */
+  getDefaultAvailableCommands(): CodingAgentAvailableCommand[] {
+    return buildBuiltinCodingCommandList(this.cachedCommandChoices());
+  }
   async *prompt(input: {
     sessionId: string;
     workspaceRoot: string;
@@ -136,11 +174,12 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     modelOverride?: string | null;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>> {
     const thinkingLevel = this.currentThinkingLevel(input.sessionId);
-    const parsed = parseBuiltinCodingPrompt(input.prompt);
+    const parsed = parseBuiltinCodingPrompt(input.prompt, this.cachedCommandChoices());
     const turnMode = resolveBuiltinCodingTurnMode(parsed, this.currentPlanMode(input.sessionId));
     await this.runtime.start(input.sessionId, input.workspaceRoot, parsed.prompt, {
       ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
+      ...selectionOptions(parsed.selection),
       permissionMode: this.currentPermissionMode(input.sessionId),
       goalMode: turnMode.goalMode,
       planMode: turnMode.planMode,
@@ -185,7 +224,27 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     return this.sessionConfigOptions.get(sessionId) ?? [];
   }
   getSessionAvailableCommands(_sessionId: string): CodingAgentAvailableCommand[] {
-    return buildBuiltinCodingCommandList();
+    return buildBuiltinCodingCommandList(this.cachedCommandChoices());
+  }
+  private readCommandChoices(): BuiltinCodingCommandChoices {
+    return this.runtime.listCommandChoices?.() ?? EMPTY_BUILTIN_CODING_COMMAND_CHOICES;
+  }
+  private currentCatalogGeneration(): number {
+    return this.runtime.commandCatalogGeneration?.() ?? 0;
+  }
+  private refreshCommandChoices(): BuiltinCodingCommandChoices {
+    this.commandChoices = this.readCommandChoices();
+    this.commandChoicesGeneration = this.currentCatalogGeneration();
+    return this.commandChoices;
+  }
+  private cachedCommandChoices(): BuiltinCodingCommandChoices {
+    if (
+      this.commandChoices === null ||
+      this.commandChoicesGeneration !== this.currentCatalogGeneration()
+    ) {
+      return this.refreshCommandChoices();
+    }
+    return this.commandChoices;
   }
   onAvailableCommandsChanged(
     _listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,

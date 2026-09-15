@@ -53,6 +53,8 @@ export interface CodingAgentDriver {
   respondToPermission(response: CodingPermissionResponse): Promise<void>;
   /** Options a session of this driver would start with (built-in driver only). */
   getDefaultConfigOptions?(): CodingAgentConfigOption[];
+  /** Commands a session of this driver would start with (built-in driver only). */
+  getDefaultAvailableCommands?(): CodingAgentAvailableCommand[];
   setConfigOption(
     sessionId: string,
     configId: string,

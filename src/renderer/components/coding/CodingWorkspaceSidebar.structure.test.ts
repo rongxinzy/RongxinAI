@@ -3,10 +3,12 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
+// Normalise line endings: the multi-line assertions below are written with \n
+// and the checked-out source uses CRLF on Windows.
 const source = readFileSync(
   fileURLToPath(new URL('./CodingWorkspaceSidebar.tsx', import.meta.url)),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 
 test('uses the animated folder-plus icon for the add workspace action', () => {
   expect(source).toContain(

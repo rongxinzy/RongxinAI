@@ -51,6 +51,17 @@ const renderStatefulComposer = ({
         { name: 'mcp', description: 'List configured MCP tools.' },
         { name: 'skills', description: 'List available skills.' },
         { name: '$react', description: 'A React skill.' },
+        {
+          name: 'skill',
+          description: 'Apply an installed skill.',
+          input: {
+            hint: 'Skill name',
+            options: [
+              { value: 'pdf', label: 'PDF toolkit', description: 'Fill PDF forms.' },
+              { value: 'off', label: 'No skill' },
+            ],
+          },
+        },
       ],
       configOptions: [],
       attachments: [],
@@ -148,6 +159,55 @@ test('reopens command discovery when the same text is retyped after a dismissal'
   fireEvent.change(textbox, { target: { value: '' } });
   fireEvent.change(textbox, { target: { value: '/' } });
   expect(textbox).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('lists the command choices while the argument is being typed', () => {
+  renderStatefulComposer({ initialPrompt: '/skill ' });
+
+  expect(screen.getByRole('textbox')).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('PDF toolkit')).toBeTruthy();
+  expect(screen.getByText('Fill PDF forms.')).toBeTruthy();
+  expect(screen.getByText('No skill')).toBeTruthy();
+});
+
+test('opens the choice menu right after a command with choices is picked', () => {
+  renderStatefulComposer({ initialPrompt: '' });
+  const textbox = screen.getByRole('textbox');
+
+  fireEvent.change(textbox, { target: { value: '/' } });
+  // The list is [plan, mcp, skills, $react, skill]; walk down to the last one,
+  // which is the only command carrying choices.
+  for (let step = 0; step < 4; step += 1) {
+    fireEvent.keyDown(textbox, { key: 'ArrowDown' });
+  }
+  fireEvent.keyDown(textbox, { key: 'Enter' });
+
+  expect(textbox).toHaveValue('/skill ');
+  expect(textbox).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('PDF toolkit')).toBeTruthy();
+});
+
+test('filters the command choices by the typed argument', () => {
+  renderStatefulComposer({ initialPrompt: '/skill pd' });
+
+  expect(screen.getByText('PDF toolkit')).toBeTruthy();
+  expect(screen.queryByText('No skill')).toBeNull();
+});
+
+test('replaces the typed argument with the selected choice', () => {
+  renderStatefulComposer({ initialPrompt: '/skill pd' });
+  const textbox = screen.getByRole('textbox');
+
+  fireEvent.keyDown(textbox, { key: 'Enter' });
+
+  expect(textbox).toHaveValue('/skill pdf ');
+  expect(textbox).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('closes the choice menu once the command carries a full argument', () => {
+  renderStatefulComposer({ initialPrompt: '/skill pdf fill the form' });
+
+  expect(screen.getByRole('textbox')).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('requests prompt submission with Enter', () => {

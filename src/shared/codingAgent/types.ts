@@ -56,8 +56,19 @@ export interface CodingAgentConfigOption {
   options?: CodingAgentConfigOptionValue[];
 }
 
+/** One value the composer can append after a command that takes a selection. */
+export interface CodingAgentAvailableCommandOption {
+  /** Text inserted after the command name. */
+  value: string;
+  /** Localized label shown in the selection menu. */
+  label: string;
+  description?: string;
+}
+
 export interface CodingAgentAvailableCommandInput {
   hint: string;
+  /** Choices offered as a second-level menu once the command is typed. */
+  options?: CodingAgentAvailableCommandOption[];
 }
 
 /** Full ACP command snapshot advertised for one Agent session. */

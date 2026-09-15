@@ -261,6 +261,7 @@ test('advertises the builtin commands for a lane whose row predates them', async
     'goal',
     'compact',
     'status',
+    'mcp',
   ]);
 });
 
@@ -311,6 +312,7 @@ test('refreshes stale builtin commands and config options when the lane is prepa
     'goal',
     'compact',
     'status',
+    'mcp',
   ]);
   expect(snapshot.lanes[0].configOptions).toEqual([
     expect.objectContaining({
@@ -359,6 +361,7 @@ test('re-projects builtin commands for an already bound lane on the next prompt'
     'goal',
     'compact',
     'status',
+    'mcp',
   ]);
 });
 
@@ -620,6 +623,7 @@ test('runs builtin control commands locally instead of forwarding them to the ag
     'goal',
     BuiltinCodingControlCommand.Compact,
     BuiltinCodingControlCommand.Status,
+    BuiltinCodingControlCommand.Mcp,
   ]);
 
   await service.prompt(workspaceRoot, {
@@ -639,6 +643,59 @@ test('runs builtin control commands locally instead of forwarding them to the ag
       expect.objectContaining({
         kind: CodingEventKind.Message,
         payload: expect.objectContaining({ role: 'system' }),
+      }),
+    ]),
+  );
+  expect(events.some(event => event.payload.role === 'user')).toBe(false);
+});
+
+test('answers the mcp command from the runtime instead of the agent', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const describeBuiltinMcp = vi.fn((target?: string) => ({
+    gatewayAvailable: true,
+    target: target ?? null,
+    servers: [{ name: 'github', enabled: true, connected: true, toolCount: 1 }],
+    tools: [{ server: 'github', name: 'create_issue' }],
+  }));
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    describeBuiltinMcp,
+    isBuiltinSessionRunning: () => false,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/mcp-command';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: CodingAgentProfileId.Builtin,
+  });
+  await service.prepareLane(workspaceRoot, created.lanes[0].id);
+  await service.prompt(workspaceRoot, {
+    laneId: created.lanes[0].id,
+    prompt: `/${BuiltinCodingControlCommand.Mcp}`,
+  });
+  await service.prompt(workspaceRoot, {
+    laneId: created.lanes[0].id,
+    prompt: `/${BuiltinCodingControlCommand.Mcp} github`,
+  });
+
+  expect(startBuiltinSession).not.toHaveBeenCalled();
+  // A bare command reports on everything; the menu narrows it to one server.
+  expect(describeBuiltinMcp).toHaveBeenNthCalledWith(1, undefined);
+  expect(describeBuiltinMcp).toHaveBeenNthCalledWith(2, 'github');
+  const events = service.bootstrap(workspaceRoot).events;
+  expect(events).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: CodingEventKind.Message,
+        payload: expect.objectContaining({
+          role: 'system',
+          content: expect.stringContaining('create_issue'),
+        }),
       }),
     ]),
   );
@@ -1601,6 +1658,25 @@ test('getProfileConfigOptions returns defaults for the builtin profile only', ()
     expect.arrayContaining([expect.objectContaining({ id: BuiltinCodingConfigId.ThinkingLevel })]),
   );
   expect(service.getProfileConfigOptions('unknown-profile')).toEqual([]);
+});
+
+test('getProfileAvailableCommands returns the builtin command list without a session', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const names = service
+    .getProfileAvailableCommands(CodingAgentProfileId.Builtin)
+    .map(command => command.name);
+  expect(names).toContain('plan');
+  expect(names).toContain('mcp');
+  expect(service.getProfileAvailableCommands('unknown-profile')).toEqual([]);
 });
 
 test('setLaneModelOverride persists the model and patches the live builtin session', async () => {

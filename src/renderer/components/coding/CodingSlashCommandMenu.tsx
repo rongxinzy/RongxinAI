@@ -7,20 +7,29 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { useEffect, useRef } from 'react';
 
-import type { CodingAgentAvailableCommand } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
 
+/** One row of the composer command menu: a command, or a command's choice. */
+export interface CodingSlashCommandMenuItem {
+  /** Stable key: the command name, or the value inserted after the command. */
+  key: string;
+  /** Monospace token shown first, e.g. `/mcp`. */
+  token: string;
+  description?: string;
+  hint?: string;
+}
+
 interface CodingSlashCommandMenuProps {
-  commands: CodingAgentAvailableCommand[];
-  selectedName: string;
-  onSelectedNameChange: (name: string) => void;
-  onSelect: (command: CodingAgentAvailableCommand) => void;
+  items: CodingSlashCommandMenuItem[];
+  selectedKey: string;
+  onSelectedKeyChange: (key: string) => void;
+  onSelect: (key: string) => void;
 }
 
 export const CodingSlashCommandMenu = ({
-  commands,
-  selectedName,
-  onSelectedNameChange,
+  items,
+  selectedKey,
+  onSelectedKeyChange,
   onSelect,
 }: CodingSlashCommandMenuProps) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -31,54 +40,53 @@ export const CodingSlashCommandMenu = ({
   // later, so the highlight is matched by the item's own `data-value` (written
   // when that item commits) rather than by querying the selected attribute.
   useEffect(() => {
-    if (!selectedName) return;
-    const items = Array.from(
+    if (!selectedKey) return;
+    const candidates = Array.from(
       rootRef.current?.querySelectorAll<HTMLElement>('[cmdk-item]') ?? [],
     );
-    const active = items.find(item => item.getAttribute('data-value') === selectedName);
+    const active = candidates.find(item => item.getAttribute('data-value') === selectedKey);
     if (!active) return;
-    if (active.parentElement?.firstElementChild === active) {
-      active
-        .closest('[cmdk-group=""]')
-        ?.querySelector('[cmdk-group-heading=""]')
-        ?.scrollIntoView({ block: 'nearest' });
-    }
     active.scrollIntoView({ block: 'nearest' });
-  }, [selectedName]);
+  }, [selectedKey]);
 
   return (
     <PromptInputCommand
       ref={rootRef}
       id="coding-agent-command-menu"
       shouldFilter={false}
-      value={selectedName}
-      onValueChange={onSelectedNameChange}
+      value={selectedKey}
+      onValueChange={onSelectedKeyChange}
       className="absolute inset-x-0 bottom-full mb-2 h-auto! w-full! rounded-xl border border-border bg-popover p-1 shadow-md"
     >
       <PromptInputCommandList className="max-h-72">
-        {commands.length === 0 ? (
+        {items.length === 0 ? (
           <PromptInputCommandEmpty>
             {i18nService.t('codingAgentCommandNoMatches')}
           </PromptInputCommandEmpty>
         ) : (
-          <PromptInputCommandGroup heading={i18nService.t('codingAgentCommands')}>
-            {commands.map(command => (
+          <PromptInputCommandGroup>
+            {items.map(item => (
               <PromptInputCommandItem
-                key={command.name}
-                value={command.name}
-                onSelect={() => onSelect(command)}
-                className="items-start gap-2 bg-transparent px-3 py-2 transition-colors data-[selected=true]:bg-muted data-[selected=true]:text-foreground"
+                key={item.key}
+                value={item.key}
+                onSelect={() => onSelect(item.key)}
+                className="items-center gap-2 bg-transparent px-3 py-2 transition-colors data-[selected=true]:bg-muted data-[selected=true]:text-foreground"
               >
                 <code className="shrink-0 text-sm text-foreground group-data-[selected=true]/command-item:font-semibold">
-                  /{command.name}
+                  {item.token}
                 </code>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm text-muted-foreground group-data-[selected=true]/command-item:text-foreground">
-                    {command.description}
-                  </span>
-                  {command.input?.hint ? (
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {command.input.hint}
+                {/* One line per row: the argument hint keeps its own width and
+                    the description truncates first, so the row height never
+                    changes with the copy length. */}
+                <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                  {item.description ? (
+                    <span className="min-w-0 truncate text-sm text-muted-foreground group-data-[selected=true]/command-item:text-foreground">
+                      {item.description}
+                    </span>
+                  ) : null}
+                  {item.hint ? (
+                    <span className="max-w-48 shrink-0 truncate text-xs text-muted-foreground">
+                      {item.hint}
                     </span>
                   ) : null}
                 </span>

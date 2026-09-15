@@ -30,6 +30,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useDispatch, useSelector } from 'react-redux';
 
 import type {
+  CodingAgentAvailableCommand,
   CodingAgentConfigOption,
   CodingPromptAttachment,
   CodingRoomSnapshot,
@@ -317,6 +318,9 @@ export const CodingWorkbenchView = ({
   }, [activeLaneId, updateArtifactPanelMaxWidth]);
   const activeDriverKind = activeProfile?.driverKind ?? null;
   const [draftConfigOptions, setDraftConfigOptions] = useState<CodingAgentConfigOption[]>([]);
+  const [draftAvailableCommands, setDraftAvailableCommands] = useState<
+    CodingAgentAvailableCommand[]
+  >([]);
   const [draftConfigOverrides, setDraftConfigOverrides] = useState<Record<string, string>>({});
   useEffect(() => {
     const needsPrepare =
@@ -358,6 +362,25 @@ export const CodingWorkbenchView = ({
       .getProfileConfigOptions(draftProfileId)
       .then(result => {
         if (!cancelled && result.success) setDraftConfigOptions(result.configOptions ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [draftSession?.id, draftProfileId, activeDriverKind]);
+  // A draft has no driver session yet, so the lane snapshot carries no commands
+  // and the slash menu would stay empty until the first turn creates a lane.
+  // Project the profile defaults instead, exactly like the config options above.
+  useEffect(() => {
+    if (!draftProfileId || activeDriverKind !== CodingAgentDriverKind.Builtin) {
+      setDraftAvailableCommands([]);
+      return;
+    }
+    let cancelled = false;
+    void window.electron.codingAgent
+      .getProfileAvailableCommands(draftProfileId)
+      .then(result => {
+        if (!cancelled && result.success) setDraftAvailableCommands(result.commands ?? []);
       })
       .catch(() => undefined);
     return () => {
@@ -1146,7 +1169,7 @@ export const CodingWorkbenchView = ({
         </div>
         <div className="relative shrink-0">
           <CodingComposer
-            availableCommands={activeLane?.availableCommands ?? []}
+            availableCommands={activeLane ? activeLane.availableCommands : draftAvailableCommands}
             configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}
             disabled={
               draftSession
