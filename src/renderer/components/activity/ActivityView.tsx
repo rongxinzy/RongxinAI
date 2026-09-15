@@ -99,7 +99,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         updateBadge={updateBadge}
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-8">
+      <div className="flex min-h-0 w-full flex-1 flex-col px-8">
         {/* Hero */}
         <section className="animate-fade-in-up shrink-0 pt-8 pb-6">
           <div className="flex items-center gap-4">
