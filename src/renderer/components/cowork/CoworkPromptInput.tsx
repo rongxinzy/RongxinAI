@@ -1197,7 +1197,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             </PromptInputHeader>
           )}
           {/* 2026/09/15 lixiang  Override display:contents so vertical padding on the prompt body actually applies */}
-          <PromptInputBody className="flex w-full min-w-0 flex-col py-3 pr-[3px]">
+          <PromptInputBody className="flex w-full min-w-0 flex-col pt-2.5 pb-0 pr-px">
             <InlineSkillPromptEditor
               ref={textareaRef}
               value={value}
@@ -1206,7 +1206,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               onChange={setValue}
-              className={size === 'large' ? 'max-h-48 overflow-y-auto' : undefined}
+              className={cn(
+                'py-0 pr-1.5',
+                size === 'large' ? 'max-h-48 overflow-y-auto' : undefined,
+              )}
             />
           </PromptInputBody>
           <PromptInputFooter className="flex-nowrap">
