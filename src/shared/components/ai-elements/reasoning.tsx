@@ -20,8 +20,9 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Streamdown } from 'streamdown';
+import { Streamdown, type StreamdownProps } from 'streamdown';
 
+import { LinkSafetyModal } from './linkSafetyModal';
 import { Shimmer } from './shimmer';
 import {
   isPlainTextStreamingTail,
@@ -208,6 +209,12 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
 
 const basePlugins = { cjk };
 
+// 2026/09/15 lixiang  外链确认弹窗换为 portal 到 body 的自定义弹窗，避免被消息祖先节点裁剪（见 linkSafetyModal.tsx）
+const linkSafety: StreamdownProps['linkSafety'] = {
+  enabled: true,
+  renderModal: props => <LinkSafetyModal {...props} />,
+};
+
 // Fenced code, math or mermaid content needs the rich plugin pipeline.
 const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4,}|\t+)\S/;
 
@@ -218,10 +225,14 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const { committed, tail } = useStreamingTextSegments(text, isStreaming);
   const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
   const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
-  const base = <Streamdown plugins={basePlugins}>{text}</Streamdown>;
+  const base = <Streamdown plugins={basePlugins} linkSafety={linkSafety}>{text}</Streamdown>;
   const streamingContent = (
     <>
-      {committed && <Streamdown plugins={basePlugins}>{committed}</Streamdown>}
+      {committed && (
+        <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
+          {committed}
+        </Streamdown>
+      )}
       {revealedTail && <div className="whitespace-pre-wrap wrap-break-word">{revealedTail}</div>}
     </>
   );

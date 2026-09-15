@@ -7,11 +7,18 @@ import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import type { ComponentProps } from 'react';
 import React from 'react';
-import { Streamdown } from 'streamdown';
+import { Streamdown, type StreamdownProps } from 'streamdown';
 
 import { AiPre } from './streamdown-code-block';
+import { LinkSafetyModal } from './linkSafetyModal';
 
 const richPlugins = { cjk, code, math, mermaid };
+
+// 2026/09/15 lixiang  外链确认弹窗换为 portal 到 body 的自定义弹窗，避免被消息祖先节点裁剪（见 linkSafetyModal.tsx）
+const linkSafety: StreamdownProps['linkSafety'] = {
+  enabled: true,
+  renderModal: props => <LinkSafetyModal {...props} />,
+};
 
 /**
  * Full Streamdown pipeline with code/math/mermaid plugins. This module is
@@ -26,6 +33,7 @@ const RichMessageResponse: React.FC<ComponentProps<typeof Streamdown>> = ({
     className={cn('size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}
     plugins={richPlugins}
     components={{ pre: AiPre }}
+    linkSafety={linkSafety}
     {...props}
   />
 );
