@@ -945,6 +945,7 @@ const App: React.FC = () => {
           <Toast message={toastMessage} isError={isToastError} isSuccess={isToastSuccess} />
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* 2026/09/15 lixiang  左侧导航栏 start*/}
           <Sidebar
             onShowSettings={handleShowSettings}
             activeView={mainView}
@@ -967,6 +968,9 @@ const App: React.FC = () => {
             managedModelsOnly={managedModelsOnly}
             onPrefetchView={prefetchFeatureView}
           />
+          {/* 2026/09/15 lixiang  左侧导航栏 end */}
+          
+          {/* 2026/09/15 lixiang  主内容区域 start */}
           <div
             className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
           >
@@ -1095,6 +1099,8 @@ const App: React.FC = () => {
               </LazyChunkErrorBoundary>
             </div>
           </div>
+          {/* 2026/09/15 lixiang  主内容区域 end */}
+
         </div>
 
         {/* 璁剧疆绐楀彛鏄剧ず鍦ㄦ墍鏈変富鍐呭涔嬩笂锛屼絾涓嶅奖鍝嶄富鐣岄潰鐨勪氦浜?*/}
