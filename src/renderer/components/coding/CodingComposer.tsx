@@ -82,6 +82,8 @@ export const CodingComposer = ({
   const composerRootRef = useRef<HTMLDivElement | null>(null);
   const [isTightToolbar, setIsTightToolbar] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const promptRef = useRef(prompt);
+  promptRef.current = prompt;
   const [commandSelection, setCommandSelection] = useState<{
     query: string | null;
     name: string;
@@ -113,9 +115,9 @@ export const CodingComposer = ({
     if (focusRequestKey === 0 || disabled) return;
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
-      textareaRef.current?.setSelectionRange(prompt.length, prompt.length);
+      textareaRef.current?.setSelectionRange(promptRef.current.length, promptRef.current.length);
     });
-  }, [disabled, focusRequestKey, prompt.length]);
+  }, [disabled, focusRequestKey]);
 
   const selectCommand = (command: CodingAgentAvailableCommand) => {
     const nextPrompt = slashCommandPrompt(command);

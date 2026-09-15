@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
+import { t } from '../i18n';
 import {
   IntegrationOperation,
   IntegrationRuntimePhase,
@@ -60,4 +61,29 @@ test('returns repair diagnostics instead of throwing connector failures', async 
     error: 'CLI is unavailable',
     nextOperation: IntegrationOperation.Repair,
   });
+});
+
+test('reports a busy integration instead of reusing another operation', async () => {
+  const runtime = new McpIntegrationRuntime();
+  const connector = createConnector();
+  let releaseProvision!: () => void;
+  vi.mocked(connector.provision).mockImplementation(
+    () => new Promise<void>(resolve => {
+      releaseProvision = resolve;
+    }),
+  );
+  runtime.register(connector);
+
+  const provision = runtime.run('example', IntegrationOperation.Provision);
+  const uninstall = await runtime.run('example', IntegrationOperation.Uninstall);
+
+  expect(uninstall).toMatchObject({
+    phase: IntegrationRuntimePhase.Installing,
+    error: t('mcpIntegrationOperationBusy'),
+    nextOperation: IntegrationOperation.Uninstall,
+  });
+  expect(connector.uninstall).not.toHaveBeenCalled();
+
+  releaseProvision();
+  await provision;
 });

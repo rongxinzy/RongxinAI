@@ -145,6 +145,33 @@ test('inserts a newline at the cursor with Control Enter without submitting', ()
   expect(onSend).not.toHaveBeenCalled();
 });
 
+test('does not move the cursor again when the prompt changes', () => {
+  const setSelectionRange = vi.spyOn(HTMLTextAreaElement.prototype, 'setSelectionRange');
+  const createComposer = (prompt: string) =>
+    createElement(CodingComposer, {
+      availableCommands: [],
+      configOptions: [],
+      attachments: [],
+      canAttachFiles: false,
+      disabled: false,
+      focusRequestKey: 1,
+      isRunning: false,
+      prompt,
+      onChange: vi.fn(),
+      onAddAttachments: vi.fn(),
+      onConfigOptionChange: vi.fn(),
+      onRemoveAttachment: vi.fn(),
+      onSend: vi.fn(),
+      onStop: vi.fn(),
+    });
+  const { rerender } = render(createComposer('hello'));
+
+  expect(setSelectionRange).toHaveBeenCalledTimes(1);
+  rerender(createComposer('hello world'));
+
+  expect(setSelectionRange).toHaveBeenCalledTimes(1);
+});
+
 test('steers a running agent with Control S', () => {
   const onSteer = vi.fn();
   render(
