@@ -122,7 +122,7 @@ type ModelsPanelProps = {
   onConfigureContext: (model: LlamaCppModel) => void;
   onOpenInspector?: (model: LlamaCppModel) => void;
   onOpenMarketplace?: () => void;
-  onOpenLaunchLog?: (modelName: string) => void;
+  onOpenLaunchLog?: (model: LlamaCppModel) => void;
   renderLoadButton?: (
     model: LlamaCppModel,
     props: { disabled: boolean; onClick: () => void },
@@ -155,7 +155,7 @@ type ModelCardProps = {
     model: LlamaCppModel,
     props: { disabled: boolean; onClick: () => void },
   ) => React.ReactNode;
-  onOpenLaunchLog: (modelName: string) => void;
+  onOpenLaunchLog: (model: LlamaCppModel) => void;
 };
 
 type ModelCardEntry = {
@@ -475,7 +475,7 @@ const ModelCard = memo(function ModelCard({
   const modifiedDate = model.modified_at ? formatModelCardDate(model.modified_at) : null;
   const handleLoadModel = () => onLoadModel(model);
   const handleOpenLaunchLog = () => {
-    onOpenLaunchLog(model.name);
+    onOpenLaunchLog(model);
   };
 
   return (

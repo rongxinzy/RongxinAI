@@ -494,10 +494,17 @@ select::-ms-expand {
 }
 
 [data-local-inference-log-viewer] .log-number {
+  width: 28px;
+  min-width: 28px;
+  margin: 0;
+  padding: 0 4px 0 4px;
+  text-align: center;
+  border-right: 1px solid var(--zy-border-subtle);
   color: var(--zy-text-muted) !important;
 }
 
 [data-local-inference-log-viewer] .log-content {
+  margin-left: 4px;
   color: inherit;
 }
 
