@@ -2952,7 +2952,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityStatusCompleted: '成功',
     activityStatusFailed: '失败',
     activityEmpty: '暂无渠道或定时任务运行记录',
+<<<<<<< HEAD
     activityEmptyAction: '查看定时任务',
+=======
+>>>>>>> dea0c403 (feat(activity): 修改【活动页面】布局。)
     activityFilterEmpty: '暂无相关活动数据',
     activityFilterClear: '清除筛选条件',
     activityGroupToday: '今天',
@@ -6531,7 +6534,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityStatusCompleted: 'Completed',
     activityStatusFailed: 'Failed',
     activityEmpty: 'No channel or scheduled task runs yet',
-    activityEmptyAction: 'View scheduled tasks',
     activityFilterEmpty: 'No related activity data',
     activityFilterClear: 'Clear filters',
     activityGroupToday: 'Today',
