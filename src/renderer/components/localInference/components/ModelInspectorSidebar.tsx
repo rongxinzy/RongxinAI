@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { cn } from '@shared/lib/utils';
-import { ScrollText, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import {
   useEffect,
   useRef,
@@ -46,6 +46,7 @@ import {
   parseCustomContextValue,
   type ModelContextEditorState,
 } from './ModelContextSettingsModal';
+import { ModelInspectorLogsPanel } from './ModelInspectorLogsPanel';
 import { formatModelInspectorContext } from './modelInspectorViewModel';
 
 export const ModelInspectorTab = {
@@ -89,10 +90,10 @@ type ModelInspectorSidebarProps = {
   runningModel?: LlamaCppRunningModel;
   preference?: LlamaCppModelPreference;
   serviceConfig: LlamaCppServiceConfig;
+  initialTab?: ModelInspectorTab;
   onOpenChange: (open: boolean) => void;
   onSavePreferences: (input: ModelInspectorSaveInput) => Promise<boolean>;
   onValidationError: (message: string) => void;
-  onOpenLogs: (modelName: string) => void;
 };
 
 type InspectorRow = {
@@ -115,10 +116,10 @@ export function ModelInspectorSidebar({
   runningModel,
   preference,
   serviceConfig,
+  initialTab = ModelInspectorTab.Overview,
   onOpenChange,
   onSavePreferences,
   onValidationError,
-  onOpenLogs,
 }: ModelInspectorSidebarProps) {
   const [activeTab, setActiveTab] = useState<ModelInspectorTab>(ModelInspectorTab.Overview);
   const [isPresent, setIsPresent] = useState(open);
@@ -157,6 +158,10 @@ export function ModelInspectorSidebar({
     setContextDraft(null);
     setResidencyDraft(null);
   }, [model?.name, open]);
+
+  useEffect(() => {
+    if (open) setActiveTab(initialTab);
+  }, [initialTab, model?.name, open]);
 
   useEffect(() => {
     const container = sidebarRef.current?.parentElement;
@@ -276,7 +281,7 @@ export function ModelInspectorSidebar({
                 model={inspectedModel}
                 editorState={contextEditorState}
                 onEditorStateChange={setContextDraft}
-                className="w-32 max-w-full"
+                className="w-28 max-w-full"
               />
               {contextError ? <span className="text-xs text-destructive">{contextError}</span> : null}
             </div>
@@ -463,20 +468,7 @@ export function ModelInspectorSidebar({
           ) : null}
 
           {activeTab === ModelInspectorTab.Logs ? (
-            <div className="mt-5 flex flex-col gap-4 rounded-lg border border-border-subtle bg-muted/20 p-3">
-              <p className="text-sm leading-6 text-muted-foreground">
-                {i18nService.t('localInferenceInspectorLogsDescription')}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => onOpenLogs(inspectedModel.name)}
-              >
-                <ScrollText data-icon="inline-start" />
-                {i18nService.t('localInferenceInspectorOpenLogs')}
-              </Button>
-            </div>
+            <ModelInspectorLogsPanel modelName={inspectedModel.name} />
           ) : null}
         </div>
       </div>
@@ -659,7 +651,7 @@ function ModelResidencySelect({
       <SelectTrigger
         size="sm"
         aria-label={i18nService.t('localInferenceInspectorKeepAlive')}
-        className="w-32 max-w-full"
+        className="w-28 max-w-full"
       >
         <SelectValue>
           {() => formatResidencyValue(preference)}

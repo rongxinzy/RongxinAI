@@ -1,6 +1,12 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
+import {
+  createProviderConnectionTestSignature,
+  ProviderModelConnectionFailureKind,
+  ProviderModelConnectionTestStatus,
+  ModelCapabilityStatus,
+  ProviderName,
+} from '../../shared/providers';
 import { ManagedProviderAccessMode } from '../../shared/managedProviders';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
@@ -39,6 +45,27 @@ function createConfig(): AppConfig {
   };
 }
 
+async function markProviderModelTestSuccess(
+  config: AppConfig,
+  providerKey: string,
+  modelId: string,
+): Promise<void> {
+  const providerConfig = config.providers?.[providerKey];
+  const model = providerConfig?.models?.find(item => item.id === modelId);
+  if (!providerConfig || !model) throw new Error(`Model ${providerKey}::${modelId} is not configured`);
+  const signature = await createProviderConnectionTestSignature({
+    providerId: providerKey,
+    baseUrl: providerConfig.baseUrl,
+    apiFormat: providerConfig.apiFormat ?? 'anthropic',
+    provider: providerConfig,
+  });
+  model.connectionTest = {
+    status: ProviderModelConnectionTestStatus.Success,
+    signature,
+    testedAt: 1,
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -60,7 +87,7 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
 
   expect(listRunningModels).toHaveBeenCalledTimes(1);
   expect(models.some(model => model.providerKey === ProviderName.LlamaCpp)).toBe(true);
-  expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
+  expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(false);
 });
 
 test('exposes the managed free model only when the account is entitled to it', async () => {
@@ -98,7 +125,7 @@ test('does not expose the managed free model when the account has no entitlement
   const models = await collectAvailableModels(createConfig());
 
   expect(models.some(model => model.providerKey === ProviderName.Zhiyuan)).toBe(false);
-  expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
+  expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(false);
 });
 
 test('exclusive managed policy exposes only the synchronized custom provider', async () => {
@@ -114,6 +141,7 @@ test('exclusive managed policy exposes only the synchronized custom provider', a
       models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
     },
   };
+  await markProviderModelTestSuccess(config, 'custom_enterprise', 'enterprise-chat');
   const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
   vi.stubGlobal('window', {
     electron: {
@@ -286,4 +314,118 @@ test('uses the canonical coding-plan catalog instead of stale saved provider mod
   expect(models.map(model => [model.id, model.name])).toEqual([
     ['kimi-for-coding', 'Kimi for Coding'],
   ]);
+});
+
+test('shows a provider model only after a current successful connection test', async () => {
+  const config = createConfig();
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const untestedModels = await collectAvailableModels(config);
+  expect(
+    untestedModels.some(
+      model => model.providerKey === ProviderName.DeepSeek && model.id === 'deepseek-chat',
+    ),
+  ).toBe(false);
+
+  await markProviderModelTestSuccess(config, ProviderName.DeepSeek, 'deepseek-chat');
+  const testedModels = await collectAvailableModels(config);
+  expect(
+    testedModels.some(
+      model => model.providerKey === ProviderName.DeepSeek && model.id === 'deepseek-chat',
+    ),
+  ).toBe(true);
+});
+
+test('hides a current failed connection test', async () => {
+  const config = createConfig();
+  const deepSeekConfig = config.providers![ProviderName.DeepSeek];
+  const signature = await createProviderConnectionTestSignature({
+    providerId: ProviderName.DeepSeek,
+    baseUrl: deepSeekConfig.baseUrl,
+    apiFormat: 'anthropic',
+    provider: deepSeekConfig,
+  });
+  deepSeekConfig.models![0].connectionTest = {
+    status: ProviderModelConnectionTestStatus.Failure,
+    signature,
+    failureKind: ProviderModelConnectionFailureKind.Model,
+    testedAt: 1,
+  };
+
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => [{ name: 'qwen-local' }]) },
+    },
+  });
+
+  const models = await collectAvailableModels(config);
+  expect(
+    models.some(
+      model => model.providerKey === ProviderName.DeepSeek && model.id === 'deepseek-chat',
+    ),
+  ).toBe(false);
+  expect(models.some(model => model.providerKey === ProviderName.LlamaCpp)).toBe(true);
+});
+
+test('hides stale connection metadata', async () => {
+  const config = createConfig();
+  const deepSeekConfig = config.providers![ProviderName.DeepSeek];
+  const staleSignature = await createProviderConnectionTestSignature({
+    providerId: ProviderName.DeepSeek,
+    baseUrl: deepSeekConfig.baseUrl,
+    apiFormat: 'anthropic',
+    provider: { ...deepSeekConfig, apiKey: 'old-key' },
+  });
+  deepSeekConfig.models![0].connectionTest = {
+    status: ProviderModelConnectionTestStatus.Success,
+    signature: staleSignature,
+    testedAt: 1,
+  };
+
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const models = await collectAvailableModels(config);
+  expect(
+    models.some(
+      model => model.providerKey === ProviderName.DeepSeek && model.id === 'deepseek-chat',
+    ),
+  ).toBe(false);
+});
+
+test('hides provider-level failures', async () => {
+  const config = createConfig();
+  const deepSeekConfig = config.providers![ProviderName.DeepSeek];
+  const signature = await createProviderConnectionTestSignature({
+    providerId: ProviderName.DeepSeek,
+    baseUrl: deepSeekConfig.baseUrl,
+    apiFormat: 'anthropic',
+    provider: deepSeekConfig,
+  });
+  deepSeekConfig.models![0].connectionTest = {
+    status: ProviderModelConnectionTestStatus.Failure,
+    failureKind: ProviderModelConnectionFailureKind.Server,
+    signature,
+    testedAt: 1,
+  };
+
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const models = await collectAvailableModels(config);
+  expect(
+    models.some(
+      model => model.providerKey === ProviderName.DeepSeek && model.id === 'deepseek-chat',
+    ),
+  ).toBe(false);
 });
