@@ -32,6 +32,8 @@ import { coworkQueueService } from '../../services/coworkQueue';
 import { DirectChatTurnState } from '../../services/directChatTurnState';
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
+// 2026/09/15 lixiang  Write Direct Chat failures as canonical terminal errors
+import { createDirectChatTerminalErrorMessage } from '../../services/coworkTerminalError';
 import { quickActionService } from '../../services/quickAction';
 import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
 import { workspaceService } from '../../services/workspace';
@@ -789,17 +791,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             );
           }
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
+          // 2026/09/15 lixiang  Direct Chat failure: show error.message as a terminal error, not under "Working"
           dispatch(
             addMessage({
               sessionId: tempSessionId,
-              message: {
-                id: `error-${Date.now()}`,
-                type: 'system',
-                content: i18nService
-                  .t('chatErrorMessage')
-                  .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-                timestamp: Date.now(),
-              },
+              message: createDirectChatTerminalErrorMessage(error),
             }),
           );
           if (persistTimer) clearTimeout(persistTimer);
@@ -1329,17 +1325,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           );
         }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
+        // 2026/09/15 lixiang  Direct Chat continue failure: same terminal-error path, show error.message
         dispatch(
           addMessage({
             sessionId: currentSession.id,
-            message: {
-              id: `error-${Date.now()}`,
-              type: 'system',
-              content: i18nService
-                .t('chatErrorMessage')
-                .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-              timestamp: Date.now(),
-            },
+            message: createDirectChatTerminalErrorMessage(error),
           }),
         );
         if (persistTimer) clearTimeout(persistTimer);

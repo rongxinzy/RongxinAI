@@ -9,8 +9,7 @@ import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Info, RotateCcw, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
 
-import type { CoworkErrorKind } from '../../../../common/coworkError';
-import { getUserErrorI18nKey } from '../../../../common/coworkError';
+import { CoworkErrorKind, getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
 import type { CoworkMessageExpertIdentity } from '../../../../shared/cowork/sessionExperts';
 import {
@@ -19,7 +18,11 @@ import {
 } from '../../../../shared/cowork/interruption';
 import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 import { i18nService } from '../../../services/i18n';
-import { isCoworkTerminalErrorMessage } from '../../../services/coworkTerminalError';
+import {
+  // 2026/09/15 lixiang  Resolve terminal error display text
+  getTerminalErrorDisplayText,
+  isCoworkTerminalErrorMessage,
+} from '../../../services/coworkTerminalError';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
@@ -114,17 +117,24 @@ const TurnBlockComponent: React.FC<{
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
     const isError = isCoworkTerminalErrorMessage(message);
     const errorKind = message.metadata?.errorKind as CoworkErrorKind | undefined;
-    const i18nKey = isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
+    // 2026/09/15 lixiang  Unknown errors show the concrete message instead of a generic i18n fallback
+    const i18nKey =
+      isError && errorKind && errorKind !== CoworkErrorKind.Unknown
+        ? getUserErrorI18nKey(errorKind)
+        : null;
     const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
     const rawContent = interruption
       ? getInterruptionMessage(interruption)
       : i18nMessage
         ? i18nMessage
-        : hasText(message.content)
-          ? message.content
-          : typeof message.metadata?.error === 'string'
-            ? message.metadata.error
-            : '';
+        : isError
+          ? // 2026/09/15 lixiang  Resolve terminal error text (including legacy content payloads)
+            getTerminalErrorDisplayText(message)
+          : hasText(message.content)
+            ? message.content
+            : typeof message.metadata?.error === 'string'
+              ? message.metadata.error
+              : '';
     const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
     const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
     if (!content.trim()) return null;
@@ -419,7 +429,7 @@ const TurnBlockComponent: React.FC<{
             <Shimmer duration={1}>{getExecutionStatusText(currentStatus)}</Shimmer>
           ) : (
             <Shimmer duration={1}>{i18nService.t('coworkIntermediateProcess')}</Shimmer>
-          )}
+          )}     
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
           {group.items.map((item, idx) =>
