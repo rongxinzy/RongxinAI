@@ -170,6 +170,7 @@ import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerCodingAgentIpcHandlers } from './ipcHandlers/codingAgent';
 import { CodingRoomRepository } from './codingAgent/codingRoomRepository';
 import { CodingRoomService } from './codingAgent/codingRoomService';
+import { resolveCodingExpertSelection } from './codingAgent/builtinCodingExpertSelection';
 import { resolveAcpAdapterRoot } from './codingAgent/acp/adapterRoot';
 import { CodingAgentRegistry } from './codingAgent/codingAgentRegistry';
 import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRepository';
@@ -906,7 +907,28 @@ const getWorkbenchTaskService = (): WorkbenchTaskService => {
   return workbenchTaskService;
 };
 
+/**
+ * The built-in coding agent advertises installed skills, experts and MCP servers
+ * as slash-command candidates. An open lane re-reads that catalog only when this
+ * generation moves, so every path that changes one of the three bumps it: skill
+ * installs and removals, expert imports, agent edits, MCP configuration.
+ */
+let codingCommandCatalogGeneration = 0;
+const bumpCodingCommandCatalog = (): void => {
+  codingCommandCatalogGeneration += 1;
+};
+
+let codingCommandCatalogWatchInstalled = false;
+const ensureCodingCommandCatalogWatch = (): void => {
+  if (codingCommandCatalogWatchInstalled) return;
+  codingCommandCatalogWatchInstalled = true;
+  // Skills are watched on disk, so a skill dropped into the skills folder also
+  // reaches open lanes through this notification.
+  getSkillManager().onSkillsChanged(bumpCodingCommandCatalog);
+};
+
 const getCodingRoomService = (): CodingRoomService => {
+  ensureCodingCommandCatalogWatch();
   if (!codingRoomService) {
     const runtime = getPiRuntimeAdapter();
     codingRoomService = new CodingRoomService(
@@ -933,6 +955,8 @@ const getCodingRoomService = (): CodingRoomService => {
           permissionMode,
           goalMode,
           planMode,
+          skillIds,
+          expertIds,
         }) => {
           const approvalMode =
             permissionMode === WorkbenchApprovalMode.Auto ||
@@ -953,6 +977,14 @@ const getCodingRoomService = (): CodingRoomService => {
               sessionId,
             );
           }
+          const expertSelection = expertIds
+            ? resolveCodingExpertSelection({
+                expertIds,
+                resolveSnapshots: resolveSessionExpertSnapshots,
+              })
+            : null;
+          // Resolving comes first: a stale expert id throws, and the lane must
+          // not be left marked as running when the turn never starts.
           coworkStoreInstance.updateSession(sessionId, { status: 'running' });
           const sharedOptions = {
             workspaceRoot,
@@ -964,6 +996,10 @@ const getCodingRoomService = (): CodingRoomService => {
             ...(thinkingLevel ? { thinkingLevel: thinkingLevel as PiThinkingLevel } : {}),
             ...(goalMode ? { goalMode: true } : {}),
             ...(planMode ? { planMode: true } : {}),
+            ...(skillIds ? { skillIds } : {}),
+            ...(expertSelection
+              ? { expertIds: expertSelection.expertIds, systemPrompt: expertSelection.systemPrompt }
+              : {}),
           };
           // One lane keeps one Pi transcript: reusing the live session preserves
           // the earlier turns that startSession would discard.
@@ -988,11 +1024,72 @@ const getCodingRoomService = (): CodingRoomService => {
             thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
           }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
+        commandCatalogGeneration: () => codingCommandCatalogGeneration,
+        listCommandChoices: () => ({
+          skills: getSkillManager()
+            .listSkills()
+            .filter(skill => skill.enabled)
+            .map(skill => ({
+              id: skill.id,
+              name: skill.displayName?.trim() || skill.name,
+              description: skill.displayDescription?.trim() || skill.description,
+            })),
+          experts: getAgentManager()
+            .listAgents()
+            .filter(
+              agent =>
+                agent.source === CoworkSessionExpertSource.Package ||
+                agent.source === CoworkSessionExpertSource.Member,
+            )
+            .map(agent => ({
+              id: agent.id,
+              name: agent.name,
+              description: agent.description,
+            })),
+          mcpServers: getMcpStore()
+            .listServers()
+            // `/mcp <name>` carries the name as a single token, so a configured
+            // name containing whitespace cannot be addressed from the composer.
+            // Disabled servers stay listed: the scoped report names them and
+            // reports that they are off, which is usually the answer people want.
+            .filter(server => !/\s/u.test(server.name))
+            .map(server => ({
+              id: server.name,
+              name: server.name,
+              description: server.description,
+            })),
+        }),
         respondBuiltinElicitation: (requestId, answer) =>
           runtime.respondToCodingElicitation(requestId, answer),
         cancelBuiltinElicitation: (requestId, reason) =>
           runtime.cancelCodingElicitation(requestId, reason),
         compactBuiltinSession: sessionId => runtime.compactSession(sessionId),
+        describeBuiltinMcp: (target?: string) => {
+          const statuses = new Map(
+            (mcpServerManager?.serverStatuses ?? []).map(status => [status.name, status] as const),
+          );
+          const manifest = mcpServerManager?.toolManifest ?? [];
+          return {
+            gatewayAvailable: piRuntimeAdapter?.hasMcpServerManager() ?? false,
+            target: target ?? null,
+            servers: getMcpStore()
+              .listServers()
+              .filter(server => !target || server.name === target)
+              .map(server => {
+                const status = statuses.get(server.name);
+                return {
+                  name: server.name,
+                  enabled: server.enabled,
+                  connected: status?.connected ?? false,
+                  toolCount: status?.toolCount ?? 0,
+                  ...(status?.error ? { error: status.error } : {}),
+                };
+              }),
+            tools: manifest
+              .filter(entry => !target || entry.server === target)
+              .map(entry => ({ server: entry.server, name: entry.name })),
+          };
+        },
         enqueueBuiltinControlAction: (sessionId, action) =>
           runtime.enqueueControlAction(sessionId, action),
         isBuiltinSessionRunning: sessionId => runtime.isSessionRunning(sessionId),
@@ -2251,6 +2348,7 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
       }
       console.log(`[McpInit] MCP servers started: ${tools.length} tools discovered`);
       syncPiMcpToolManifest();
+      bumpCodingCommandCatalog();
       return tools;
     } catch (err) {
       console.error('[McpInit] Failed to start MCP servers:', err);
@@ -2323,6 +2421,7 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
       }
       const toolCount = tools.length;
       console.log(`[McpBridge] refresh: ${toolCount} tools discovered`);
+      bumpCodingCommandCatalog();
 
       // Pi's custom tool topology is captured when a session is created.
       // Mark live sessions stale after discovery so their next user turn is
@@ -4733,6 +4832,7 @@ if (!gotTheLock) {
     async (_event, request: import('./coworkStore').CreateAgentRequest) => {
       try {
         const agent = getAgentManager().createAgent(request, resolveDefaultAgentModelRef());
+        bumpCodingCommandCatalog();
         return { success: true, agent };
       } catch (error) {
         return {
@@ -4748,6 +4848,7 @@ if (!gotTheLock) {
     async (_event, id: string, updates: import('./coworkStore').UpdateAgentRequest) => {
       try {
         const agent = getAgentManager().updateAgent(id, updates);
+        bumpCodingCommandCatalog();
         return { success: true, agent };
       } catch (error) {
         return {
@@ -4761,6 +4862,7 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.Delete, async (_event, id: string) => {
     try {
       const result = getAgentManager().deleteAgent(id);
+      if (result) bumpCodingCommandCatalog();
 
       // Cascade delete all Cowork sessions belonging to the deleted agent
       const coworkStore = getCoworkStore();
@@ -4868,6 +4970,7 @@ if (!gotTheLock) {
           agentIds.push(agent.id);
         }
       }
+      bumpCodingCommandCatalog();
 
       // Bundled presets are file-sourced (方案A): they never enter the
       // registry. The single registry service (register_expert.js) enforces
