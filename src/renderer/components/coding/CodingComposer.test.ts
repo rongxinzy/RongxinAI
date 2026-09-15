@@ -103,6 +103,20 @@ test('shows a distinct selected command and moves it with arrow keys', () => {
   expect(reviewItem).toHaveAttribute('data-selected', 'true');
 });
 
+test('scrolls the keyboard-selected command into view', () => {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  renderStatefulComposer({ initialPrompt: '/' });
+  const textbox = screen.getByRole('textbox');
+  const mcpItem = screen.getByText('/mcp').closest('[data-slot="command-item"]');
+
+  scrollIntoView.mockClear();
+  fireEvent.keyDown(textbox, { key: 'ArrowDown' });
+
+  expect(mcpItem).toHaveAttribute('data-selected', 'true');
+  expect(scrollIntoView.mock.contexts).toContain(mcpItem);
+});
+
 test('uses keyboard selection without submitting a partial slash query', () => {
   const { onChange } = renderComposer('/rev');
 
@@ -119,6 +133,21 @@ test('resets keyboard selection when the slash query changes', () => {
   fireEvent.keyDown(textbox, { key: 'Enter' });
 
   expect(textbox).toHaveValue('/skills');
+});
+
+test('reopens command discovery when the same text is retyped after a dismissal', () => {
+  renderStatefulComposer({ initialPrompt: '' });
+  const textbox = screen.getByRole('textbox');
+
+  fireEvent.change(textbox, { target: { value: '/' } });
+  expect(textbox).toHaveAttribute('aria-expanded', 'true');
+
+  fireEvent.keyDown(textbox, { key: 'Escape' });
+  expect(textbox).toHaveAttribute('aria-expanded', 'false');
+
+  fireEvent.change(textbox, { target: { value: '' } });
+  fireEvent.change(textbox, { target: { value: '/' } });
+  expect(textbox).toHaveAttribute('aria-expanded', 'true');
 });
 
 test('requests prompt submission with Enter', () => {

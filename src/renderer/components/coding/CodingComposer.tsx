@@ -172,7 +172,14 @@ export const CodingComposer = ({
             <PromptInputTextarea
               ref={textareaRef}
               value={prompt}
-              onChange={event => onChange(event.target.value)}
+              onChange={event => {
+                // A dismissal applies to the text that was on screen when the
+                // user closed the menu. Clearing it on every edit means typing
+                // the same text again (for example a lone "/") reopens the
+                // menu instead of staying dismissed forever.
+                setDismissedPrompt(null);
+                onChange(event.target.value);
+              }}
               onKeyDown={event => {
                 if (event.nativeEvent.isComposing) return;
                 if (
