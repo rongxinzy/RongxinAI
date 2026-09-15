@@ -200,6 +200,7 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
           </FieldDescription>
           {sessionBinding === SessionBindingStrategy.Existing && (
             <Select
+              items={sessionOptions}
               value={boundSessionId}
               onValueChange={value => onBoundSessionChange(value ?? '')}
             >
