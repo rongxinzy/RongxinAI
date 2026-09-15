@@ -1,2 +1,9 @@
+# Keep text files stable across Windows and Unix checkouts.
+* text=auto eol=lf
+
 # Force LF line endings for shell scripts (required for bash on all platforms)
 *.sh text eol=lf
+
+# Preserve native line endings for Windows command scripts.
+*.bat text eol=crlf
+*.cmd text eol=crlf
