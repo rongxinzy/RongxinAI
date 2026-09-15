@@ -70,19 +70,22 @@ export const CodingSlashCommandMenu = ({
                 key={item.key}
                 value={item.key}
                 onSelect={() => onSelect(item.key)}
-                className="items-start gap-2 bg-transparent px-3 py-2 transition-colors data-[selected=true]:bg-muted data-[selected=true]:text-foreground"
+                className="items-center gap-2 bg-transparent px-3 py-2 transition-colors data-[selected=true]:bg-muted data-[selected=true]:text-foreground"
               >
                 <code className="shrink-0 text-sm text-foreground group-data-[selected=true]/command-item:font-semibold">
                   {item.token}
                 </code>
-                <span className="min-w-0 flex-1">
+                {/* One line per row: the argument hint keeps its own width and
+                    the description truncates first, so the row height never
+                    changes with the copy length. */}
+                <span className="flex min-w-0 flex-1 items-baseline gap-2">
                   {item.description ? (
-                    <span className="block truncate text-sm text-muted-foreground group-data-[selected=true]/command-item:text-foreground">
+                    <span className="min-w-0 truncate text-sm text-muted-foreground group-data-[selected=true]/command-item:text-foreground">
                       {item.description}
                     </span>
                   ) : null}
                   {item.hint ? (
-                    <span className="block truncate text-xs text-muted-foreground">
+                    <span className="max-w-48 shrink-0 truncate text-xs text-muted-foreground">
                       {item.hint}
                     </span>
                   ) : null}

@@ -257,7 +257,8 @@ Codex 与 Claude Code 作为首批一等外部 Agent，采用“用户安装 Age
 ### 7.4 内置斜杠命令
 
 内置 Agent 与外部 Agent 共用同一套命令通道：会话创建时通过 `availableCommands` 声明命令，
-Composer 输入 `/` 后展示，选中只回填 `/name ` 文本。内置 Agent 自己解析命令，因为发送路径
+Composer 输入 `/` 后展示，选中只回填 `/name ` 文本。菜单每行固定单行：命令名、描述与参数提示
+同行排布，超出部分用省略号截断，行高不随文案长度变化。内置 Agent 自己解析命令，因为发送路径
 （`BuiltinCodingDriver.prompt`）是唯一能同时改变本轮运行模式的地方。
 
 | 命令              | 语义                                                                                 |

@@ -170,6 +170,23 @@ test('lists the command choices while the argument is being typed', () => {
   expect(screen.getByText('No skill')).toBeTruthy();
 });
 
+test('opens the choice menu right after a command with choices is picked', () => {
+  renderStatefulComposer({ initialPrompt: '' });
+  const textbox = screen.getByRole('textbox');
+
+  fireEvent.change(textbox, { target: { value: '/' } });
+  // The list is [plan, mcp, skills, $react, skill]; walk down to the last one,
+  // which is the only command carrying choices.
+  for (let step = 0; step < 4; step += 1) {
+    fireEvent.keyDown(textbox, { key: 'ArrowDown' });
+  }
+  fireEvent.keyDown(textbox, { key: 'Enter' });
+
+  expect(textbox).toHaveValue('/skill ');
+  expect(textbox).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByText('PDF toolkit')).toBeTruthy();
+});
+
 test('filters the command choices by the typed argument', () => {
   renderStatefulComposer({ initialPrompt: '/skill pd' });
 

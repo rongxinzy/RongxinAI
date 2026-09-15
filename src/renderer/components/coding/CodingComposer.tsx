@@ -164,8 +164,11 @@ export const CodingComposer = ({
     });
   }, [disabled, focusRequestKey]);
 
-  const applyPrompt = (nextPrompt: string) => {
-    setDismissedPrompt(nextPrompt);
+  const applyPrompt = (nextPrompt: string, options?: { openChoices?: boolean }) => {
+    // A dismissal normally remembers the text the user just accepted, so the
+    // menu does not bounce back open. Commands that take a selection are the
+    // exception: the menu swaps to their candidates instead of closing.
+    setDismissedPrompt(options?.openChoices ? null : nextPrompt);
     onChange(nextPrompt);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -174,7 +177,9 @@ export const CodingComposer = ({
   };
 
   const selectCommand = (command: CodingAgentAvailableCommand) => {
-    applyPrompt(slashCommandPrompt(command));
+    applyPrompt(slashCommandPrompt(command), {
+      openChoices: (command.input?.options?.length ?? 0) > 0,
+    });
   };
 
   const selectMenuChoice = (key: string) => {
