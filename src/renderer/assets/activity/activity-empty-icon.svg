@@ -1,0 +1,10 @@
+<!-- 2026/09/15 lixiang  活动页空状态图标，来自 Figma 设计稿导出 -->
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="EmptyStateIcon">
+<path id="Vector" d="M52 14H12C9.79086 14 8 15.7909 8 18V46C8 48.2091 9.79086 50 12 50H52C54.2091 50 56 48.2091 56 46V18C56 15.7909 54.2091 14 52 14Z" stroke="#D1A0A0" stroke-width="1.5" stroke-dasharray="4 3"/>
+<path id="Vector_2" d="M20 32H24L27 26L32 38L36 29L39 32H44" stroke="#C87070" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M50 25C53.866 25 57 21.866 57 18C57 14.134 53.866 11 50 11C46.134 11 43 14.134 43 18C43 21.866 46.134 25 50 25Z" fill="#FDF0F0" stroke="#D1A0A0" stroke-width="1.5"/>
+<path id="Vector_4" d="M50 15.5V18.5" stroke="#C87070" stroke-width="1.5" stroke-linecap="round"/>
+<path id="Vector_5" d="M50 21.25C50.4142 21.25 50.75 20.9142 50.75 20.5C50.75 20.0858 50.4142 19.75 50 19.75C49.5858 19.75 49.25 20.0858 49.25 20.5C49.25 20.9142 49.5858 21.25 50 21.25Z" fill="#C87070"/>
+</g>
+</svg>

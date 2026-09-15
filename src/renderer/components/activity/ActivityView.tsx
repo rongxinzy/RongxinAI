@@ -1,14 +1,22 @@
-import { Button } from '@shared/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from '@shared/components/ui/empty';
 import { PageTabs } from '@shared/components/ui/page-tabs';
-import { Activity, CalendarClock, X } from 'lucide-react';
+import { cn } from '@shared/lib/utils';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import activityEmptyIcon from '../../assets/activity/activity-empty-icon.svg';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import { selectActivityRuns } from '../../store/selectors/activitySelectors';
 import type { ActivityRun } from '../../../shared/activity/types';
 import PageHeader from '../PageHeader';
+import ActivityHero from './ActivityHero';
 import ActivityRunRow from './ActivityRunRow';
 import { ActivityStatusFilter, ActivityTriggerFilter } from './constants';
 import { formatActivityDayLabel } from './utils';
@@ -37,7 +45,10 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   const [triggerFilter, setTriggerFilter] = useState<ActivityTriggerFilter>(
     ActivityTriggerFilter.All,
   );
-  const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>(ActivityStatusFilter.All);
+  // 2026/09/15 lixiang  状态筛选默认高亮「进行中」
+  const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>(
+    ActivityStatusFilter.Started,
+  );
 
   // Only runs arriving after the view opened play the entrance spring;
   // the initial render lands quietly.
@@ -80,6 +91,14 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   }, [currentTime, filteredRuns, language]);
 
   const hasAnyRun = runs.length > 0;
+  // 2026/09/15 lixiang  清除筛选仅判断来源 Tab，不把状态筛选算作可清除条件
+  const hasActiveFilters = triggerFilter !== ActivityTriggerFilter.All;
+  const isFilterEmpty = hasAnyRun && dayGroups.length === 0;
+
+  // 2026/09/15 lixiang  清除筛选条件只切回「全部」，下方状态筛选保持不变
+  const clearFilters = () => {
+    setTriggerFilter(ActivityTriggerFilter.All);
+  };
 
   const statusOptions = [
     { value: ActivityStatusFilter.All, labelKey: 'activityFilterAll' },
@@ -104,95 +123,103 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         updateBadge={updateBadge}
       />
 
-      <div className="flex min-h-0 w-full flex-1 flex-col px-8">
-        {/* Hero */}
-        <section className="animate-fade-in-up shrink-0 pt-8 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-              <Activity className="size-6 text-primary" />
-            </div>
-            <p className="min-w-0 text-sm text-muted-foreground">
-              {i18nService.t('activityHeroDesc')}
-            </p>
+      {/* 2026/09/15 lixiang  内容区底部留白，避免贴边 */}
+      <div className="flex min-h-0 w-full flex-1 flex-col px-8 pb-[20px]">
+        <ActivityHero />
+
+        {/* 2026/09/15 lixiang  按设计稿重构活动内容区：来源 Tab + 状态胶囊 + 列表/空态 */}
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-sm">
+          {/* Source tabs */}
+          {/* 2026/09/15 lixiang  仅 Tab 行保留表面色，下半区透出页面底色 */}
+          <div className="flex shrink-0 items-center border-b border-border bg-surface px-6">
+            <PageTabs
+              value={triggerFilter}
+              onValueChange={setTriggerFilter}
+              items={triggerOptions.map(option => ({
+                value: option.value,
+                label: i18nService.t(option.labelKey),
+              }))}
+            />
           </div>
-        </section>
 
-        {/* Filters: trigger on the left, status on the right. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 pb-4">
-          <PageTabs
-            value={triggerFilter}
-            onValueChange={setTriggerFilter}
-            items={triggerOptions.map(option => ({
-              value: option.value,
-              label: i18nService.t(option.labelKey),
-            }))}
-          />
-          <PageTabs
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-            items={statusOptions.map(option => ({
-              value: option.value,
-              label: i18nService.t(option.labelKey),
-            }))}
-          />
-        </div>
+          {/* Status filter pills */}
+          <div className="flex shrink-0 items-center gap-1 px-6 py-2.5">
+            {statusOptions.map(option => {
+              const active = statusFilter === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    setStatusFilter(active ? ActivityStatusFilter.All : option.value)
+                  }
+                  className={cn(
+                    'rounded-full px-2.5 py-1 text-xs leading-4 transition-colors',
+                    active
+                      ? 'bg-primary-muted font-medium text-primary'
+                      : 'font-normal text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {i18nService.t(option.labelKey)}
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
-          <div className="pb-10">
-            {/* Feed */}
+          {/* Feed / empty */}
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
             {!hasAnyRun || dayGroups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                  <Activity className="size-6 text-muted-foreground" aria-hidden="true" />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {i18nService.t(hasAnyRun ? 'activityFilterEmpty' : 'activityEmpty')}
-                </p>
-                {hasAnyRun ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => {
-                      setTriggerFilter(ActivityTriggerFilter.All);
-                      setStatusFilter(ActivityStatusFilter.All);
-                    }}
-                  >
-                    <X />
-                    {i18nService.t('activityFilterClear')}
-                  </Button>
-                ) : onShowScheduledTasks ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-2"
-                    onClick={onShowScheduledTasks}
-                  >
-                    <CalendarClock />
-                    {i18nService.t('activityEmptyAction')}
-                  </Button>
+              // 2026/09/15 lixiang  活动页空态收紧图标与文案间距，不改全局 Empty 组件
+              <Empty className="min-h-[18rem] gap-2 px-6 py-20">
+                <EmptyHeader className="gap-1">
+                  <EmptyMedia className="mb-0 size-16 overflow-clip">
+                    <img
+                      src={activityEmptyIcon}
+                      alt=""
+                      className="size-full"
+                      width={64}
+                      height={64}
+                      aria-hidden="true"
+                    />
+                  </EmptyMedia>
+                  <EmptyDescription className="text-sm text-muted-foreground">
+                    {i18nService.t(hasAnyRun ? 'activityFilterEmpty' : 'activityEmpty')}
+                  </EmptyDescription>
+                </EmptyHeader>
+                {isFilterEmpty && hasActiveFilters ? (
+                  <EmptyContent>
+                    <button
+                      type="button"
+                      onClick={clearFilters}
+                      className="text-xs text-primary transition-colors hover:text-primary-hover"
+                    >
+                      {i18nService.t('activityFilterClear')}
+                    </button>
+                  </EmptyContent>
                 ) : null}
-              </div>
+              </Empty>
             ) : (
-              dayGroups.map(group => (
-                <section key={group.label} className="pb-4">
-                  <h2 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
-                    {group.label}
-                  </h2>
-                  <div className="flex flex-col">
-                    {group.runs.map(run => (
-                      <ActivityRunRow
-                        key={run.id}
-                        run={run}
-                        animateEntrance={run.updatedAt > openedAtRef.current}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))
+              <div className="px-3 pb-6 pt-2">
+                {dayGroups.map(group => (
+                  <section key={group.label} className="pb-4">
+                    <h2 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                      {group.label}
+                    </h2>
+                    <div className="flex flex-col">
+                      {group.runs.map(run => (
+                        <ActivityRunRow
+                          key={run.id}
+                          run={run}
+                          animateEntrance={run.updatedAt > openedAtRef.current}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
