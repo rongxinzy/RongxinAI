@@ -8,7 +8,8 @@ import { allThemes } from '../themes/index';
 const css = generateAllThemesCSS(allThemes);
 const outPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'css', 'themes.css');
 if (process.argv.includes('--check')) {
-  if (readFileSync(outPath, 'utf8') !== css)
+  const checkedInCss = readFileSync(outPath, 'utf8').replace(/\r\n?/g, '\n');
+  if (checkedInCss !== css)
     throw new Error('Generated theme CSS is stale. Run theme:generate.');
 } else {
   writeFileSync(outPath, css, 'utf-8');
