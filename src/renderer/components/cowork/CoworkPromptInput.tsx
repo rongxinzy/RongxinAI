@@ -10,6 +10,7 @@ import {
   usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1146,6 +1147,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     // keep the minimal read-only layout (model picker + thinking toggle only).
     const isPlusToolbar = !remoteManaged;
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
+    // 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip
+    const isSubmitEmpty = !value.trim() && attachments.length === 0 && !resumeTaskActive;
+    const showEmptySubmitHint = isSubmitEmpty && !isStreaming;
     return (
       <div ref={promptRootRef} className="relative">
         {imageVisionHint && (
@@ -1192,7 +1196,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               />
             </PromptInputHeader>
           )}
-          <PromptInputBody>
+          {/* 2026/09/15 lixiang  Override display:contents so vertical padding on the prompt body actually applies */}
+          <PromptInputBody className="flex w-full min-w-0 flex-col py-3 pr-[3px]">
             <InlineSkillPromptEditor
               ref={textareaRef}
               value={value}
@@ -1341,11 +1346,42 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   )}
                 </div>
               )}
-            <PromptInputSubmit
-              disabled={sessionContextPending}
-              status={isStreaming ? 'streaming' : 'ready'}
-              onStop={isStreaming ? onStop : undefined}
-            />
+            {/* 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip */}
+            {showEmptySubmitHint ? (
+              <TooltipProvider delay={0}>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        className="inline-flex cursor-not-allowed"
+                        aria-label={i18nService.t('chatSubmitEmptyHint')}
+                      />
+                    }
+                  >
+                    <PromptInputSubmit
+                      type="button"
+                      status="ready"
+                      aria-disabled="true"
+                      tabIndex={-1}
+                      onClick={event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      className="cursor-not-allowed opacity-40"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {i18nService.t('chatSubmitEmptyHint')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <PromptInputSubmit
+                disabled={sessionContextPending}
+                status={isStreaming ? 'streaming' : 'ready'}
+                onStop={isStreaming ? onStop : undefined}
+              />
+            )}
           </PromptInputFooter>
         </PromptInput>
         <SessionStatsLine messages={currentSession?.messages ?? []} />
