@@ -98,3 +98,28 @@ test('migrates legacy plaintext MCP credentials out of config_json', () => {
 
   db.close();
 });
+
+test('keeps listing and deleting a server when its credential blob is unreadable', () => {
+  const db = createTestDb();
+  const id = 'corrupt-server';
+  db.prepare(
+    `INSERT INTO mcp_servers (id, name, description, enabled, transport_type, config_json, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, 'Corrupt MCP', 'example', 0, 'stdio', JSON.stringify({ command: 'node' }), 1, 1);
+  const credentialStore: McpCredentialStore = {
+    get: () => {
+      throw new Error('credential blob is corrupt');
+    },
+    set: () => undefined,
+    delete: () => undefined,
+  };
+  const store = new McpStore(db, credentialStore);
+
+  expect(store.listServers()).toEqual([
+    expect.objectContaining({ id, credentialsError: true, command: 'node' }),
+  ]);
+  expect(store.deleteServer(id)).toBe(true);
+  expect(store.listServers()).toEqual([]);
+
+  db.close();
+});

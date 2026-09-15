@@ -1879,16 +1879,21 @@ describe('PiRuntimeAdapter', () => {
           (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
         >;
       };
-      let toolCallHandler: ((event: unknown) => unknown) | undefined;
+      const toolCallHandlers: Array<(event: unknown) => unknown> = [];
+      const invokeToolCall = async (event: unknown) => {
+        const results = await Promise.all(toolCallHandlers.map(handler => handler(event)));
+        return results.find(value => value !== undefined);
+      };
       for (const factory of loaderOptions.extensionFactories ?? []) {
         factory({
           on: (event, handler) => {
-            if (event === PiExtensionEventType.ToolCall) toolCallHandler = handler;
+            if (event !== PiExtensionEventType.ToolCall) return;
+            toolCallHandlers.push(handler);
           },
         });
       }
 
-      const blockedWrite = await toolCallHandler?.({
+      const blockedWrite = await invokeToolCall({
         toolCallId: 'w',
         toolName: 'write',
         input: { path: 'a.txt' },
@@ -1896,7 +1901,15 @@ describe('PiRuntimeAdapter', () => {
       expect(blockedWrite).toEqual(
         expect.objectContaining({ block: true, reason: expect.stringContaining('Plan mode') }),
       );
-      const allowedRead = await toolCallHandler?.({
+      const blockedBash = await invokeToolCall({
+        toolCallId: 'b',
+        toolName: 'bash',
+        input: { command: 'echo unsafe > a.txt' },
+      });
+      expect(blockedBash).toEqual(
+        expect.objectContaining({ block: true, reason: expect.stringContaining('Plan mode') }),
+      );
+      const allowedRead = await invokeToolCall({
         toolCallId: 'r',
         toolName: 'read',
         input: { path: 'a.txt' },
@@ -1904,7 +1917,7 @@ describe('PiRuntimeAdapter', () => {
       expect(allowedRead).toBeUndefined();
 
       await adapter.continueSession('plan-guard', 'Now implement it', { sessionMode: 'work' });
-      const allowedEdit = await toolCallHandler?.({
+      const allowedEdit = await invokeToolCall({
         toolCallId: 'w2',
         toolName: 'edit',
         input: { path: 'a.txt' },
@@ -2381,21 +2394,26 @@ describe('PiRuntimeAdapter', () => {
           (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
         >;
       };
-      let toolCallHandler: ((event: unknown) => unknown) | undefined;
+      const toolCallHandlers: Array<(event: unknown) => unknown> = [];
       for (const factory of loaderOptions.extensionFactories ?? []) {
         factory({
           on: (event, handler) => {
-            if (event === PiExtensionEventType.ToolCall) toolCallHandler = handler;
+            if (event === PiExtensionEventType.ToolCall) toolCallHandlers.push(handler);
           },
         });
       }
 
-      expect(toolCallHandler).toBeDefined();
-      const result = await toolCallHandler?.({
-        toolCallId: 'bash-guard-call',
-        toolName: 'bash',
-        input: { command: 'dir "C:\\workspace" /s' },
-      });
+      const results = await Promise.all(
+        toolCallHandlers.map(handler =>
+          handler({
+            toolCallId: 'bash-guard-call',
+            toolName: 'bash',
+            input: { command: 'dir "C:\\workspace" /s' },
+          }),
+        ),
+      );
+      const result = results.find(value => value !== undefined);
+      expect(toolCallHandlers.length).toBeGreaterThan(0);
       if (process.platform === 'win32') {
         expect(result).toEqual(
           expect.objectContaining({ block: true, reason: expect.stringContaining('Git Bash') }),
