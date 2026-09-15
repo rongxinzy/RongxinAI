@@ -2,22 +2,41 @@ import { Button } from '@shared/components/ui/button';
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
   InputGroupText,
 } from '@shared/components/ui/input-group';
-import { Slider } from '@shared/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { cn } from '@shared/lib/utils';
+import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { LlamaCppModel } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
-import { localInferenceMutedTextClass } from '../constants';
 
-const CONTEXT_SLIDER_DEFAULT_VALUE = 32768;
-const CONTEXT_SLIDER_DEFAULT_MAX = 131072;
+const CONTEXT_DEFAULT_VALUE = 32768;
+const CONTEXT_DEFAULT_MAX = 131072;
 const TOKENS_PER_K = 1024;
 const CONTEXT_PRESETS = [4096, 8192, 16384, 32768, 65536, 131072] as const;
+
+const ContextSelectValue = {
+  Custom: 'custom',
+} as const;
+
+export const ModelContextEditorMode = {
+  Preset: 'preset',
+  Custom: 'custom',
+} as const;
+export type ModelContextEditorMode =
+  (typeof ModelContextEditorMode)[keyof typeof ModelContextEditorMode];
 
 export const ModelContextSettingsPresentation = {
   Modal: 'modal',
@@ -32,11 +51,122 @@ type ModelContextSettingsModalProps = {
   savedContextSize?: number;
   runningContextSize?: number;
   onClose: () => void;
-  onSave: (ctxSize?: number) => void;
+  onSave: (ctxSize?: number, contextChanged?: boolean) => void;
   onValidationError?: (message: string) => void;
   presentation?: ModelContextSettingsPresentation;
   inlineClassName?: string;
+  hideContextEditor?: boolean;
 };
+
+export type ModelContextEditorState = {
+  contextSize: number;
+  mode: ModelContextEditorMode;
+  customContextValue: string;
+};
+
+type ContextSizeControlProps = {
+  model: LlamaCppModel;
+  editorState: ModelContextEditorState;
+  onEditorStateChange: (state: ModelContextEditorState) => void;
+  className?: string;
+};
+
+export function ContextSizeControl({
+  model,
+  editorState,
+  onEditorStateChange,
+  className,
+}: ContextSizeControlProps) {
+  const trainedLimit = model.trained_context_length ?? model.details?.context_length;
+  const contextPresets = useMemo(() => getContextPresets(trainedLimit), [trainedLimit]);
+  const { contextSize, customContextValue, mode } = editorState;
+
+  return mode === ModelContextEditorMode.Custom ? (
+    <InputGroup className={cn('theme-control-sizing-22 w-full', className)}>
+      <InputGroupInput
+        type="number"
+        min={1}
+        step={1}
+        value={customContextValue}
+        aria-invalid={Boolean(
+          getCustomContextError(
+            parseCustomContextValue(customContextValue),
+            customContextValue,
+            trainedLimit,
+          ),
+        )}
+        className="theme-part-model-context-settings-modal-input-group-input-1 appearance-none text-left [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        onChange={event => {
+          const nextValue = event.target.value;
+          const nextParsedValue = parseCustomContextValue(nextValue);
+          onEditorStateChange({
+            ...editorState,
+            customContextValue: nextValue,
+            ...(getCustomContextError(nextParsedValue, nextValue, trainedLimit) || !nextParsedValue
+              ? {}
+              : { contextSize: nextParsedValue }),
+          });
+        }}
+      />
+      <InputGroupAddon align="inline-end">
+        <InputGroupText className="theme-part-model-context-settings-modal-input-group-text-1">
+          K
+        </InputGroupText>
+        <InputGroupButton
+          size="icon-xs"
+          aria-label={i18nService.t('localInferenceConfigureContext')}
+          onClick={() =>
+            onEditorStateChange({
+              ...editorState,
+              mode: ModelContextEditorMode.Preset,
+            })
+          }
+        >
+          <ChevronDown />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
+  ) : (
+    <Select
+      value={String(contextSize)}
+      onValueChange={value => {
+        if (!value) return;
+        if (value === ContextSelectValue.Custom) {
+          onEditorStateChange({
+            ...editorState,
+            mode: ModelContextEditorMode.Custom,
+            customContextValue: formatContextKInput(contextSize),
+          });
+          return;
+        }
+        const nextContextSize = Number(value);
+        if (Number.isSafeInteger(nextContextSize)) {
+          onEditorStateChange({
+            contextSize: nextContextSize,
+            mode: ModelContextEditorMode.Preset,
+            customContextValue: '',
+          });
+        }
+      }}
+    >
+      <SelectTrigger size="sm" className={cn('w-full', className)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {contextPresets.map(preset => (
+            <SelectItem key={preset} value={String(preset)}>
+              {formatContextPreset(preset)}
+            </SelectItem>
+          ))}
+          <SelectItem value={ContextSelectValue.Custom}>
+            {i18nService.t('localInferenceContextCustom')}
+          </SelectItem>
+        </SelectGroup>
+      </SelectContent>
+    </Select>
+  );
+}
 
 export function ModelContextSettingsModal({
   isOpen,
@@ -48,43 +178,43 @@ export function ModelContextSettingsModal({
   onValidationError,
   presentation = ModelContextSettingsPresentation.Modal,
   inlineClassName,
+  hideContextEditor = false,
 }: ModelContextSettingsModalProps) {
-  const [contextSize, setContextSize] = useState(CONTEXT_SLIDER_DEFAULT_VALUE);
-  const [customContextValue, setCustomContextValue] = useState<string | null>(null);
+  const [editorState, setEditorState] = useState<ModelContextEditorState>({
+    contextSize: CONTEXT_DEFAULT_VALUE,
+    mode: ModelContextEditorMode.Preset,
+    customContextValue: '',
+  });
 
   const trainedLimit = model?.trained_context_length ?? model?.details?.context_length;
   const contextPresets = useMemo(() => getContextPresets(trainedLimit), [trainedLimit]);
-  const selectedPresetIndex = contextPresets.indexOf(contextSize);
-  const customSliderIndex = contextPresets.length;
-  const sliderLabelCount = contextPresets.length + 1;
-  const sliderValue =
-    customContextValue !== null ? customSliderIndex : Math.max(0, selectedPresetIndex);
-  const parsedCustomContextK = customContextValue?.trim()
-    ? Number(customContextValue.trim())
-    : undefined;
-  const parsedCustomContextValue =
-    parsedCustomContextK !== undefined && Number.isFinite(parsedCustomContextK)
-      ? Math.round(parsedCustomContextK * TOKENS_PER_K)
-      : undefined;
-  const customContextError = getCustomContextError(
-    parsedCustomContextValue,
-    customContextValue,
+  const initialContextSize = getInitialContextValue(
+    savedContextSize,
+    runningContextSize,
+    contextPresets,
     trainedLimit,
   );
+  const customContextError =
+    editorState.mode === ModelContextEditorMode.Custom
+      ? getCustomContextError(
+          parseCustomContextValue(editorState.customContextValue),
+          editorState.customContextValue,
+          trainedLimit,
+        )
+      : null;
 
   useEffect(() => {
     if (!isOpen) return;
-    const initialContextSize = getInitialContextValue(
-      savedContextSize,
-      runningContextSize,
-      contextPresets,
-      trainedLimit,
-    );
-    setContextSize(initialContextSize);
-    setCustomContextValue(
-      contextPresets.includes(initialContextSize) ? null : formatContextKInput(initialContextSize),
-    );
-  }, [contextPresets, isOpen, runningContextSize, savedContextSize, trainedLimit]);
+    setEditorState({
+      contextSize: initialContextSize,
+      mode: contextPresets.includes(initialContextSize)
+        ? ModelContextEditorMode.Preset
+        : ModelContextEditorMode.Custom,
+      customContextValue: contextPresets.includes(initialContextSize)
+        ? ''
+        : formatContextKInput(initialContextSize),
+    });
+  }, [contextPresets, initialContextSize, isOpen, model?.name]);
 
   if (!model) return null;
 
@@ -101,112 +231,21 @@ export function ModelContextSettingsModal({
         </div>
       ) : null}
 
-        <div className="flex flex-col gap-3">
+        {!hideContextEditor ? <div className="flex flex-col gap-3">
           <div className="flex min-h-7 items-center gap-0">
             <span className="text-sm font-medium text-muted-foreground">
               {i18nService.t('localInferenceServiceConfigCtxSizeLabel')}：
             </span>
-            {customContextValue !== null ? (
-              <InputGroup className="theme-control-sizing-22 w-fit">
-                <InputGroupInput
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={customContextValue}
-                  aria-invalid={Boolean(customContextError)}
-                  className="theme-part-model-context-settings-modal-input-group-input-1 flex-none appearance-none text-left [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  onChange={event => {
-                    const nextValue = event.target.value;
-                    setCustomContextValue(nextValue);
-                    const nextParsedK = nextValue.trim() ? Number(nextValue.trim()) : undefined;
-                    const nextParsedValue =
-                      nextParsedK !== undefined && Number.isFinite(nextParsedK)
-                        ? Math.round(nextParsedK * TOKENS_PER_K)
-                        : undefined;
-                    if (
-                      !getCustomContextError(nextParsedValue, nextValue, trainedLimit) &&
-                      nextParsedValue
-                    ) {
-                      setContextSize(nextParsedValue);
-                    }
-                  }}
-                />
-                <InputGroupAddon align="inline-end">
-                  <InputGroupText className="theme-part-model-context-settings-modal-input-group-text-1">
-                    K
-                  </InputGroupText>
-                </InputGroupAddon>
-              </InputGroup>
-            ) : (
-              <output className="inline-flex h-7 items-center text-sm font-semibold leading-5 text-foreground">
-                {formatContextPreset(contextSize)}
-              </output>
-            )}
-          </div>
-          {customContextValue !== null && customContextError ? (
-            <p className="text-xs text-destructive">{customContextError}</p>
-          ) : null}
-          <div className="relative">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 top-[calc(50%+4px)] z-0"
-            >
-              {contextPresets.map((preset, index) => (
-                <span
-                  key={preset}
-                  className={cn(
-                    'absolute h-3 w-0.5 -translate-x-1/2',
-                    customContextValue === null && index === selectedPresetIndex
-                      ? 'bg-primary'
-                      : 'bg-border',
-                  )}
-                  style={{ left: `${getContextPresetPosition(index, sliderLabelCount)}%` }}
-                />
-              ))}
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'absolute h-3 w-0.5 -translate-x-1/2',
-                  customContextValue !== null ? 'bg-primary' : 'bg-border',
-                )}
-                style={{ left: '100%' }}
-              />
-            </div>
-            <Slider
-              aria-label={i18nService.t('localInferenceConfigureContext')}
-              min={0}
-              max={customSliderIndex}
-              step={1}
-              value={sliderValue}
-              className="relative z-10"
-              onValueChange={nextPresetIndex => {
-                if (nextPresetIndex === customSliderIndex) {
-                  setCustomContextValue(customContextValue ?? formatContextKInput(contextSize));
-                  return;
-                }
-                setContextSize(contextPresets[nextPresetIndex] ?? contextPresets[0]);
-                setCustomContextValue(null);
-              }}
+            <ContextSizeControl
+              model={model}
+              editorState={editorState}
+              onEditorStateChange={setEditorState}
             />
           </div>
-          <div className={`relative h-4 text-xs ${localInferenceMutedTextClass}`}>
-            {contextPresets.map((preset, index) => (
-              <span
-                key={preset}
-                className={cn(
-                  'absolute whitespace-nowrap',
-                  index === 0 ? 'translate-x-0' : '-translate-x-1/2',
-                )}
-                style={{ left: `${getContextPresetPosition(index, sliderLabelCount)}%` }}
-              >
-                {formatContextPreset(preset)}
-              </span>
-            ))}
-            <span className="absolute -translate-x-full whitespace-nowrap" style={{ left: '100%' }}>
-              {i18nService.t('localInferenceContextCustom')}
-            </span>
-          </div>
-        </div>
+          {editorState.mode === ModelContextEditorMode.Custom && customContextError ? (
+            <p className="text-xs text-destructive">{customContextError}</p>
+          ) : null}
+        </div> : null}
 
         {runningContextSize ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-subtle pt-3 text-xs">
@@ -228,8 +267,8 @@ export function ModelContextSettingsModal({
             variant="default"
             className="min-w-16"
             onClick={() => {
-              if (customContextValue !== null) {
-                if (!customContextValue.trim()) {
+              if (editorState.mode === ModelContextEditorMode.Custom) {
+                if (!editorState.customContextValue.trim()) {
                   onValidationError?.(i18nService.t('localInferenceContextInvalid'));
                   return;
                 }
@@ -238,7 +277,10 @@ export function ModelContextSettingsModal({
                   return;
                 }
               }
-              onSave(contextSize);
+              onSave(
+                editorState.contextSize,
+                editorState.contextSize !== initialContextSize,
+              );
             }}
           >
             {i18nService.t('save')}
@@ -261,7 +303,6 @@ export function ModelContextSettingsModal({
     </Modal>
   );
 }
-
 function formatContextPreset(value: number): string {
   if (value >= 1024) {
     const normalized = value / 1024;
@@ -271,17 +312,17 @@ function formatContextPreset(value: number): string {
   return String(value);
 }
 
-function formatContextKInput(value: number): string {
+export function formatContextKInput(value: number): string {
   return String(Number((value / TOKENS_PER_K).toFixed(2)));
 }
 
-function getContextPresets(trainedLimit?: number): readonly number[] {
-  const limit = trainedLimit ?? CONTEXT_SLIDER_DEFAULT_MAX;
+export function getContextPresets(trainedLimit?: number): readonly number[] {
+  const limit = trainedLimit ?? CONTEXT_DEFAULT_MAX;
   const presets = CONTEXT_PRESETS.filter(preset => preset <= limit);
   return presets.length > 0 ? presets : [Math.max(1, limit)];
 }
 
-function getInitialContextValue(
+export function getInitialContextValue(
   preferredContextSize: number | undefined,
   fallbackContextSize: number | undefined,
   contextPresets: readonly number[],
@@ -296,13 +337,13 @@ function getInitialContextValue(
   ) {
     return candidate;
   }
-  const nearestCandidate = candidate ?? CONTEXT_SLIDER_DEFAULT_VALUE;
+  const nearestCandidate = candidate ?? CONTEXT_DEFAULT_VALUE;
   return contextPresets.reduce((closest, preset) =>
     Math.abs(preset - nearestCandidate) < Math.abs(closest - nearestCandidate) ? preset : closest,
   );
 }
 
-function getCustomContextError(
+export function getCustomContextError(
   parsedValue: number | undefined,
   rawValue: string | null,
   trainedLimit?: number,
@@ -321,7 +362,8 @@ function getCustomContextError(
   return null;
 }
 
-function getContextPresetPosition(index: number, count: number): number {
-  if (count <= 1) return 50;
-  return (index / (count - 1)) * 100;
+export function parseCustomContextValue(value: string | null): number | undefined {
+  if (!value?.trim()) return undefined;
+  const parsedK = Number(value.trim());
+  return Number.isFinite(parsedK) ? Math.round(parsedK * TOKENS_PER_K) : undefined;
 }

@@ -35,6 +35,7 @@ export const LlamaCppIpcChannel = {
   GetRuntimeCapabilities: 'llamacpp:runtime:get-capabilities',
   StatusChanged: 'llamacpp:status-changed',
   ModelBindingsChanged: 'llamacpp:model-bindings-changed',
+  ModelResidencyChanged: 'llamacpp:model-residency-changed',
   InstallProgress: 'llamacpp:install-progress',
   ModelLaunchLog: 'llamacpp:model-launch-log',
   ModelLaunchLogCleared: 'llamacpp:model-launch-log:cleared',
@@ -88,6 +89,14 @@ export const LlamaCppMemoryPolicy = {
 
 export type LlamaCppMemoryPolicy =
   (typeof LlamaCppMemoryPolicy)[keyof typeof LlamaCppMemoryPolicy];
+
+export const LlamaCppModelResidencyMode = {
+  Timed: 'timed',
+  Forever: 'forever',
+} as const;
+
+export type LlamaCppModelResidencyMode =
+  (typeof LlamaCppModelResidencyMode)[keyof typeof LlamaCppModelResidencyMode];
 
 export const LlamaCppBackendError = {
   CudaRequiresNvidiaGpu: 'cuda-requires-nvidia-gpu',

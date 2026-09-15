@@ -49,10 +49,9 @@ import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
-import { ModelInspectorSidebar } from './components/ModelInspectorSidebar';
+import { ModelInspectorSidebar, ModelInspectorTab } from './components/ModelInspectorSidebar';
 import { MarketplaceDownloadSidebar } from './components/MarketplaceDownloadSidebar';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
-import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
 import { RuntimeInstallCard } from './components/RuntimeInstallCard';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
@@ -67,7 +66,6 @@ import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
 import { useLocalInferenceMemorySettings } from './hooks/useLocalInferenceMemorySettings';
 import { useMarketplaceRecommendations } from './hooks/useMarketplaceRecommendations';
-import { shouldCloseLaunchLogPanelForModel, useModelLaunchLogs } from './hooks/useModelLaunchLogs';
 import { useRuntimeInstallBackgroundNotifications } from './hooks/useRuntimeInstallBackgroundNotifications';
 import { useRuntimeInstallProgress } from './hooks/useRuntimeInstallProgress';
 import { MarketplacePanel } from './panels/MarketplacePanel';
@@ -199,6 +197,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [draftModelsDir, setDraftModelsDir] = useState('');
   const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
   const [inspectorModel, setInspectorModel] = useState<OllamaModel | null>(null);
+  const [inspectorInitialTab, setInspectorInitialTab] = useState<ModelInspectorTab>(
+    ModelInspectorTab.Overview,
+  );
   const [loading, setLoading] = useState(false);
   const [loadingModelName, setLoadingModelName] = useState<string | null>(null);
   const [cancellingModelLoad, setCancellingModelLoad] = useState(false);
@@ -231,17 +232,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceHardware, setMarketplaceHardware] = useState<MarketplaceHardwareProfile>();
   const [marketplaceHardwareChecked, setMarketplaceHardwareChecked] = useState(false);
   useI18nLanguage();
-  const launchLogs = useModelLaunchLogs();
-  // Destructure the stable (useCallback-backed) controls so memoized children
-  // and hook dependency arrays can reference them without the unstable wrapper object.
-  const { state: launchLogState, closePanel: closeLaunchLogPanel } = launchLogs;
   const runtimeInstallProgress = useRuntimeInstallProgress();
   const { notifyBackgroundContinuation } = useRuntimeInstallBackgroundNotifications({
     isVisible,
     snapshot: runtimeInstallProgress.snapshot,
     refresh: runtimeInstallProgress.refresh,
   });
-  const [launchLogFullscreen, setLaunchLogFullscreen] = useState(false);
   const marketplaceSearchRef = useRef<number>(0);
   const marketplaceRequestIdRef = useRef<string | null>(null);
   const marketplacePrefetchRequestIdsRef = useRef<Set<string>>(new Set());
@@ -338,9 +334,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 
   const openMarketplaceDownloadPanel = useCallback(() => {
-    closeLaunchLogPanel();
     setMarketplaceDownloadPanelVisible(true);
-  }, [closeLaunchLogPanel]);
+  }, []);
 
   useEffect(() => {
     if (activePullProgress) setMarketplaceDownloadPanelProgress(activePullProgress);
@@ -908,7 +903,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       loadingModelNameRef.current = modelName;
       cancelledModelLoadRef.current = false;
       setLoadingModelName(modelName);
-      launchLogs.beginModelLaunch(modelName, { visible: false });
       void runAction(async () => {
         try {
           const input: LlamaCppModelLaunchInput = {
@@ -917,7 +911,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           };
           const result = await window.electron.llamacpp.loadModel(input);
           setRunningModels(result.runningModels);
-          launchLogs.markModelLaunchSucceeded();
           notifyLlamaCppRunningModelsChanged();
           // Only direct user launches prompt for configuration; background restoration remains silent.
           setStartedModelName(modelName);
@@ -925,7 +918,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             showToast(result.warning, LocalInferenceToastKind.Info);
           }
         } catch (loadError) {
-          launchLogs.markModelLaunchFailed();
           if (cancelledModelLoadRef.current) {
             await refreshRunningModels();
             notifyLlamaCppRunningModelsChanged();
@@ -940,7 +932,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         }
       });
     },
-    [launchLogs, refreshRunningModels, runAction, showToast],
+    [refreshRunningModels, runAction, showToast],
   );
 
   const handleCancelModelLoad = useCallback(() => {
@@ -969,9 +961,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
       const unloadStartedAtMs = Date.now();
       setUnloadingModelName(modelName);
-      if (shouldCloseLaunchLogPanelForModel(launchLogState, modelName)) {
-        closeLaunchLogPanel();
-      }
       void runAction(async () => {
         try {
           const result = await window.electron.llamacpp.unloadModel(modelName);
@@ -1005,8 +994,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       });
     },
     [
-      closeLaunchLogPanel,
-      launchLogState,
       runAction,
       showToast,
       unloadingModelName,
@@ -1080,9 +1067,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handleSaveModelContext = useCallback(
     (modelName: string, ctxSize?: number) => {
       void runAction(async () => {
+        const { ctxSize: _previousCtxSize, ...preferenceWithoutContext } =
+          modelPreferences[modelName] ?? {};
         const nextPreferences = await window.electron.llamacpp.setModelPreference({
           modelName,
-          preference: ctxSize ? { ctxSize } : {},
+          preference: { ...preferenceWithoutContext, ...(ctxSize ? { ctxSize } : {}) },
         });
         setModelPreferences(nextPreferences);
         const runningModel = runningModels.find(
@@ -1097,14 +1086,70 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setContextModel(null);
       });
     },
-    [runAction, runningModels, showToast],
+    [modelPreferences, runAction, runningModels, showToast],
+  );
+
+  const handleSaveModelInspectorPreferences = useCallback(
+    async (
+      modelName: string,
+      input: {
+        ctxSize?: number;
+        residency?: NonNullable<LlamaCppModelPreferences[string]['residency']>;
+      },
+    ): Promise<boolean> => {
+      const previousPreference = modelPreferences[modelName];
+      const nextPreference = {
+        ...previousPreference,
+        ...(input.ctxSize !== undefined ? { ctxSize: input.ctxSize } : {}),
+        ...(input.residency ? { residency: input.residency } : {}),
+      };
+      setModelPreferences(current => ({
+        ...current,
+        [modelName]: nextPreference,
+      }));
+      setLoading(true);
+      dismissToast();
+      try {
+        const nextPreferences = await window.electron.llamacpp.setModelPreference({
+          modelName,
+          preference: nextPreference,
+        });
+        setModelPreferences(nextPreferences);
+        const runningModel = runningModels.find(
+          model => model.name === modelName || model.model === modelName,
+        );
+        showToast(
+          input.ctxSize !== undefined && input.ctxSize !== previousPreference?.ctxSize
+            ? runningModel
+              ? i18nService.t('localInferenceContextSavedReloadRequired')
+              : i18nService.t('localInferenceContextSaved')
+            : i18nService.t('localInferenceResidencySaved'),
+          LocalInferenceToastKind.Success,
+        );
+        return true;
+      } catch (error) {
+        setModelPreferences(current => {
+          const { [modelName]: _discarded, ...remaining } = current;
+          return previousPreference
+            ? { ...remaining, [modelName]: previousPreference }
+            : remaining;
+        });
+        showToast(
+          getLocalInferenceUserFacingErrorMessage(error),
+          LocalInferenceToastKind.Error,
+        );
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [dismissToast, modelPreferences, runningModels, showToast],
   );
 
   const handleTabChange = useCallback(
     (value: string) => {
       const nextTab = value as LocalInferenceTab;
       if (nextTab === activeTab) return;
-      closeLaunchLogPanel();
       setInspectorModel(null);
       setTabDirection(
         LOCAL_INFERENCE_TAB_ORDER.indexOf(nextTab) >= LOCAL_INFERENCE_TAB_ORDER.indexOf(activeTab)
@@ -1113,7 +1158,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       );
       setActiveTab(nextTab);
     },
-    [activeTab, closeLaunchLogPanel],
+    [activeTab],
   );
 
   return (
@@ -1246,17 +1291,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onDelete={handleDelete}
                   onConfigureContext={setContextModel}
                   onOpenInspector={model => {
-                    closeLaunchLogPanel();
+                    setInspectorInitialTab(ModelInspectorTab.Overview);
                     setInspectorModel(model);
                   }}
                   onOpenMarketplace={() => handleTabChange('marketplace')}
-                  onOpenLaunchLog={modelName => {
-                    setInspectorModel(null);
-                    launchLogs.openPanelForModel(modelName);
+                  onOpenLaunchLog={model => {
+                    setInspectorModel(model);
+                    setInspectorInitialTab(ModelInspectorTab.Logs);
                   }}
                   showRegisteredModelsTitle={false}
-                  logPanelVisible={launchLogs.state.visible && !launchLogFullscreen}
-                  logPanelModelName={launchLogFullscreen ? null : launchLogs.state.modelName}
                 />
               </LayeredTabsContent>
               <LayeredTabsContent
@@ -1296,17 +1339,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               onClose={() => setMarketplaceDownloadPanelVisible(false)}
               onCancel={modelId => void window.electron.llamacpp.cancelInstall(modelId)}
             />
-          ) : (
-            <ModelLaunchLogSidebar
-              state={launchLogs.state}
-              isFullscreen={launchLogFullscreen}
-              onFullscreenChange={setLaunchLogFullscreen}
-              onClose={launchLogs.closePanel}
-            />
-          )}
+          ) : null}
           <ModelInspectorSidebar
             open={inspectorModel !== null}
             model={inspectorModel}
+            initialTab={inspectorInitialTab}
             runningModel={
               inspectorModel
                 ? runningModels.find(
@@ -1318,14 +1355,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             preference={inspectorModel ? modelPreferences[inspectorModel.name] : undefined}
             serviceConfig={serviceConfig}
             onOpenChange={nextOpen => {
-              if (!nextOpen) setInspectorModel(null);
+              if (!nextOpen) {
+                setInspectorModel(null);
+                setInspectorInitialTab(ModelInspectorTab.Overview);
+              }
             }}
-            onSaveContext={ctxSize => {
-              if (inspectorModel) handleSaveModelContext(inspectorModel.name, ctxSize);
-            }}
-            onOpenLogs={modelName => {
-              setInspectorModel(null);
-              launchLogs.openPanelForModel(modelName);
+            onValidationError={message => showToast(message, LocalInferenceToastKind.Error)}
+            onSavePreferences={input => {
+              if (!inspectorModel) return Promise.resolve(false);
+              return handleSaveModelInspectorPreferences(inspectorModel.name, input);
             }}
           />
         </div>
