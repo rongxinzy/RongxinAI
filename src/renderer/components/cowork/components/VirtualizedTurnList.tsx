@@ -17,7 +17,6 @@ export interface VirtualizedTurnListHandle {
 }
 
 interface VirtualizedTurnListProps {
-  isStreaming: boolean;
   turns: ConversationTurn[];
   onInitialTailPositioned?: () => void;
   /** Renders one turn row, including its wrapper element. */
@@ -40,7 +39,7 @@ const TURN_OVERSCAN = 8;
 export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
->(({ isStreaming, turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
+>(({ turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
   const { scrollRef } = useStickToBottomContext();
   const hasPositionedInitialTailRef = useRef(false);
   const shouldFollowInitialTailRef = useRef(true);
@@ -118,8 +117,11 @@ export const VirtualizedTurnList = React.forwardRef<
     overscan: TURN_OVERSCAN,
     initialOffset,
     initialRect: INITIAL_VIEWPORT_RECT,
+    // 2026/09/16 lixiang  贴底时条目增高由 virtualizer 直接补偿 scrollTop，勿再额外 scrollToEnd（防抖只会滞后跳动）
     anchorTo: 'end',
-    followOnAppend: isStreaming ? 'auto' : false,
+    followOnAppend: true,
+    // 2026/09/16 lixiang  测高必须同帧补偿 scrollTop；推到下一帧会出现「最后一行先掉下去再弹回」
+    useAnimationFrameWithResizeObserver: false,
     scrollToFn,
     onChange: instance => {
       // ResizeObserver corrections happen before React can commit the new
@@ -224,16 +226,22 @@ export const VirtualizedTurnList = React.forwardRef<
     previousMessageIdsByTurnRef.current = nextMessageIdsByTurn;
   }, [internallyPrependedTurnSizes, nextMessageIdsByTurn, scrollRef, turns, virtualizer]);
 
+  // 2026/09/16 lixiang  仅首次定位到底；流式增高交给 anchorTo:end，避免每帧/防抖 scrollToEnd 二次跳动
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
-    if (!scrollElement || renderAll || !shouldFollowInitialTailRef.current) return;
+    if (
+      !scrollElement ||
+      renderAll ||
+      !shouldFollowInitialTailRef.current ||
+      hasPositionedInitialTailRef.current
+    ) {
+      return;
+    }
 
     virtualizer.scrollToEnd({ behavior: 'auto' });
-    if (!hasPositionedInitialTailRef.current) {
-      hasPositionedInitialTailRef.current = true;
-      onInitialTailPositioned?.();
-    }
-  });
+    hasPositionedInitialTailRef.current = true;
+    onInitialTailPositioned?.();
+  }, [onInitialTailPositioned, renderAll, scrollRef, turns.length, virtualizer]);
 
   useImperativeHandle(
     ref,
