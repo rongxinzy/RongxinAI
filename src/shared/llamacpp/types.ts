@@ -1,4 +1,5 @@
 import type {
+  LlamaCppGatewayAccessMode,
   LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
   LlamaCppModelLaunchLogSessionStatus,
@@ -261,12 +262,15 @@ export type LlamaCppLatestModelLaunchLogSessionInput = {
 
 export type LlamaCppReadModelLaunchLogFileInput = {
   sessionId: string;
+  offset?: number;
 };
 
 export type LlamaCppReadModelLaunchLogFileResult = {
   success: boolean;
   session?: LlamaCppModelLaunchLogSession;
   content?: string;
+  startOffset?: number;
+  nextOffset?: number;
   error?: string;
 };
 
@@ -287,6 +291,7 @@ export type LlamaCppServiceConfig = {
   host?: string;
   listenHost?: string;
   port?: string;
+  gatewayAccessMode?: LlamaCppGatewayAccessMode;
   modelsDir?: string;
   runtimeVersion?: string;
   runtimeBackend?: LlamaCppRuntimeBackend;
@@ -327,6 +332,10 @@ export type LlamaCppServiceConfig = {
   prefillAssistant?: boolean;
   noMmap?: boolean;
   mlock?: boolean;
+};
+
+export type LlamaCppGatewayLanTokenResult = {
+  token: string;
 };
 
 export type LlamaCppDeleteModelResult = {

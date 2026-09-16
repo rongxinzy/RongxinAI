@@ -722,6 +722,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     draftAllowLanAccess,
     draftKeepRunningOnAppQuit,
     draftPort,
+    draftLanToken,
     exampleModelName,
     setDraftKeepRunningOnAppQuit,
     setDraftPort,
@@ -730,6 +731,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     closeAccessSettings,
     saveAccessSettings,
     setDraftAllowLanAccess,
+    regenerateLanToken,
   } = useLocalInferenceAccessSettings({
     isRunning,
     localModels,
@@ -1445,12 +1447,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         keepRunningOnAppQuit={draftKeepRunningOnAppQuit}
         willRestartOnSave={isRunning}
         port={draftPort}
+        lanToken={draftLanToken}
         exampleModelName={exampleModelName}
         onAllowLanAccessChange={setDraftAllowLanAccess}
         onKeepRunningOnAppQuitChange={setDraftKeepRunningOnAppQuit}
         onPortChange={setDraftPort}
         onClose={closeAccessSettings}
         onSave={saveAccessSettings}
+        onRegenerateLanToken={regenerateLanToken}
       />
       <LocalInferenceMemorySettingsDialog
         isOpen={memorySettingsOpen}

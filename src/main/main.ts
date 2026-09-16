@@ -157,6 +157,7 @@ import type {
   WecomInstanceConfig,
 } from './im/types';
 import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
+import type { LlamaCppModelDaemonController } from './libs/llamacppModelDaemonController';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import { registerProviderModelDiscoveryIpcHandler } from './ipcHandlers/providerModelDiscovery';
@@ -1719,6 +1720,7 @@ let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
 
 let llamaCppManager: LlamaCppManager | null = null;
+let llamaCppModelDaemonController: LlamaCppModelDaemonController | null = null;
 let ollamaManager: OllamaManager | null = null;
 
 let piWorkbenchRuntimeForwarderBound = false;
@@ -7153,6 +7155,12 @@ if (!gotTheLock) {
       });
     }
 
+    if (llamaCppModelDaemonController) {
+      await llamaCppModelDaemonController.shutdownForQuit().catch(error => {
+        console.error('[LlamaCppDaemon] Failed to stop local inference daemon on quit:', error);
+      });
+    }
+
     if (engramManager) {
       await engramManager.stop().catch(error => {
         console.error('[MemoryRuntime] Failed to stop local memory service:', error);
@@ -7459,7 +7467,9 @@ if (!gotTheLock) {
     });
     const localInferenceManager = getLlamaCppManager();
     localInferenceManager.initializeModelsDir();
-    registerLlamaCppIpcHandlers(localInferenceManager, { getStore });
+    llamaCppModelDaemonController = registerLlamaCppIpcHandlers(localInferenceManager, {
+      getStore,
+    });
     // Warm the short-lived backend cache before the runtime settings dialog is opened.
     void localInferenceManager.listBackends();
     registerTriageIpcHandlers({ getStore });
