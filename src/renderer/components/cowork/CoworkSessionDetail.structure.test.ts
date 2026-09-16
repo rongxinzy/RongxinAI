@@ -16,15 +16,22 @@ const userBubbleSource = readFileSync(
   'utf8',
 );
 
-test('lets the conversation fill the pane behind the floating composer', () => {
+test('reserves conversation viewport above the absolutely positioned composer', () => {
   const inputArea = source.indexOf('{/* Input Area */}');
   const overlay = source.indexOf('ref={composerOverlayRef}', inputArea);
   const promptInput = source.indexOf('<CoworkPromptInput', inputArea);
   const permission = source.indexOf('<CoworkPermissionModal', promptInput);
 
   expect(source).toContain('const composerOverlayRef = useCoworkComposerInset(detailRootRef);');
-  expect(source).toContain('style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
-  expect(source).toContain('style={{ bottom: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
+  // 对话区与绝对定位输入框平级且 flex:1，用 paddingBottom 留出输入框高度，避免被遮挡
+  expect(source).toContain('style={{ paddingBottom: COWORK_COMPOSER_INSET_VALUE }}');
+  expect(source).toContain(
+    'className="pointer-events-none absolute inset-x-0 z-[1] h-16 bg-gradient-to-t from-background to-transparent"',
+  );
+  expect(source).toContain('style={{ bottom: COWORK_COMPOSER_INSET_VALUE }}');
+  expect(source).not.toContain(
+    'style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}',
+  );
   expect(inputArea).toBeGreaterThanOrEqual(0);
   expect(overlay).toBeGreaterThan(inputArea);
   // The floating composer must live in the conversation column's coordinate
