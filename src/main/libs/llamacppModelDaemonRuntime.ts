@@ -9,7 +9,6 @@ import type {
 } from '../../shared/llamacpp';
 import { LlamaCppGatewayAccessMode } from '../../shared/llamacpp';
 import { scanLocalGgufModels } from './llamacppModelCatalog';
-import { findLlamaCppExecutable } from './llamacppRuntimePaths';
 import { createLlamaCppModelGateway, type LlamaCppModelGateway } from './llamacppModelGateway';
 import {
   LlamaCppModelDaemonCommand,
@@ -42,7 +41,7 @@ export class LlamaCppModelDaemonRuntime {
     this.config = bootstrap.serviceConfig;
     this.lanToken = bootstrap.lanToken;
     this.processes = new LlamaCppModelProcessManager({
-      getExecutablePath: async () => await findLlamaCppExecutable(this.config),
+      getExecutablePath: async () => this.bootstrap.executablePath,
       getServiceConfig: () => this.config,
       startupTimeoutMs: () => Math.max(1, Number.parseInt(this.config.timeout ?? '120', 10) || 120) * 1000,
     });

@@ -23,6 +23,7 @@ export type LlamaCppModelDaemonBootstrap = {
   controlToken: string;
   lanToken?: string;
   userDataPath: string;
+  executablePath: string;
   serviceConfig: LlamaCppServiceConfig;
 };
 
