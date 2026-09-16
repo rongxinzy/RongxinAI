@@ -8,6 +8,7 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
+import { DEFAULT_LLAMACPP_SERVICE_CONFIG } from '../../shared/llamacpp/defaults';
 import { readLlamaCppModelDaemonRegistry, writeLlamaCppModelDaemonRegistry } from './llamacppModelDaemonRegistry';
 import {
   LlamaCppModelDaemonCommand,
@@ -17,10 +18,46 @@ import {
   type LlamaCppModelDaemonStatus,
 } from './llamacppModelDaemonProtocol';
 import { LlamaCppGatewayCredentialVault } from './llamacppGatewayCredentialVault';
+import { findLlamaCppExecutable } from './llamacppRuntimePaths';
 
 const CONTROL_CONNECT_TIMEOUT_MS = 1_000;
+const MODEL_STARTUP_CONTROL_REQUEST_GRACE_MS = 5_000;
 const DAEMON_START_TIMEOUT_MS = 10_000;
 const DAEMON_START_POLL_INTERVAL_MS = 150;
+const MAX_DAEMON_STARTUP_OUTPUT_LENGTH = 4_000;
+
+export function resolveLlamaCppModelDaemonEntryPath(bundleDirectory: string): string {
+  return path.join(bundleDirectory, 'llamacppModelDaemonEntry.js');
+}
+
+export function formatLlamaCppDaemonStartupFailure(input: {
+  message: string;
+  output?: string;
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
+}): string {
+  const details = [input.message.trim() || 'Local inference daemon did not become ready.'];
+  if (input.exitCode !== undefined && input.exitCode !== null) {
+    details.push(`daemon exited with code ${input.exitCode}`);
+  }
+  if (input.signal) details.push(`daemon exited with signal ${input.signal}`);
+  const output = input.output?.trim();
+  if (output) details.push(output.slice(-MAX_DAEMON_STARTUP_OUTPUT_LENGTH));
+  return details.join('\n');
+}
+
+export function resolveLlamaCppModelDaemonRequestTimeoutMs(
+  command: LlamaCppModelDaemonCommand,
+  serviceConfig: LlamaCppServiceConfig,
+): number {
+  if (command !== LlamaCppModelDaemonCommand.EnsureModel) {
+    return CONTROL_CONNECT_TIMEOUT_MS;
+  }
+  const configuredTimeoutSeconds =
+    Number.parseInt(serviceConfig.timeout ?? DEFAULT_LLAMACPP_SERVICE_CONFIG.timeout ?? '120', 10) ||
+    120;
+  return Math.max(1, configuredTimeoutSeconds) * 1000 + MODEL_STARTUP_CONTROL_REQUEST_GRACE_MS;
+}
 
 type KeyValueStore = {
   get<T = unknown>(key: string): T | undefined;
@@ -193,17 +230,20 @@ export class LlamaCppModelDaemonController {
   private async startNewDaemon(): Promise<LlamaCppModelDaemonStatus> {
     const controlPort = await findAvailableLoopbackPort();
     const serviceConfig = this.options.getServiceConfig();
+    const executablePath = await findLlamaCppExecutable(serviceConfig);
+    if (!executablePath) throw new Error('llama.cpp runtime is not installed.');
     const bootstrap: LlamaCppModelDaemonBootstrap = {
       controlPort,
       controlToken: this.credentials.ensureControlToken(),
       userDataPath: this.options.userDataPath,
+      executablePath,
       serviceConfig,
       ...(this.isLanMode(serviceConfig) ? { lanToken: this.credentials.ensureLanToken() } : {}),
     };
-    const entryPath = path.resolve(__dirname, '../llamacppModelDaemonEntry.js');
+    const entryPath = resolveLlamaCppModelDaemonEntryPath(__dirname);
     const child = spawn(process.execPath, [entryPath], {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       env: {
         ...process.env,
@@ -211,12 +251,38 @@ export class LlamaCppModelDaemonController {
         ZHIYUAN_LLAMACPP_DAEMON_BOOTSTRAP: Buffer.from(JSON.stringify(bootstrap)).toString('base64url'),
       },
     });
+    let startupError: Error | null = null;
+    let exitCode: number | null | undefined;
+    let exitSignal: NodeJS.Signals | null | undefined;
+    let startupOutput = '';
+    const captureStartupOutput = (chunk: Buffer) => {
+      startupOutput = `${startupOutput}${chunk.toString()}`.slice(-MAX_DAEMON_STARTUP_OUTPUT_LENGTH);
+    };
+    child.stdout?.on('data', captureStartupOutput);
+    child.stderr?.on('data', captureStartupOutput);
+    child.once('error', error => {
+      startupError = error;
+    });
+    child.once('exit', (code, signal) => {
+      exitCode = code;
+      exitSignal = signal;
+    });
     child.unref();
     this.controlPort = controlPort;
 
     const deadline = Date.now() + DAEMON_START_TIMEOUT_MS;
     let latestError = 'Local inference daemon did not become ready.';
     while (Date.now() < deadline) {
+      if (startupError || exitCode !== undefined) {
+        throw new Error(
+          formatLlamaCppDaemonStartupFailure({
+            message: startupError?.message ?? latestError,
+            output: startupOutput,
+            exitCode,
+            signal: exitSignal,
+          }),
+        );
+      }
       try {
         const status = await this.request({ command: LlamaCppModelDaemonCommand.Status });
         await this.persistRegistry(child.pid, status);
@@ -227,7 +293,14 @@ export class LlamaCppModelDaemonController {
       }
     }
     this.controlPort = null;
-    throw new Error(latestError);
+    throw new Error(
+      formatLlamaCppDaemonStartupFailure({
+        message: latestError,
+        output: startupOutput,
+        exitCode,
+        signal: exitSignal,
+      }),
+    );
   }
 
   private async request(input: LlamaCppModelDaemonRequest): Promise<LlamaCppModelDaemonStatus> {
@@ -239,7 +312,12 @@ export class LlamaCppModelDaemonController {
         'content-type': 'application/json',
       },
       body: JSON.stringify(input),
-      signal: AbortSignal.timeout(CONTROL_CONNECT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(
+        resolveLlamaCppModelDaemonRequestTimeoutMs(
+          input.command,
+          this.options.getServiceConfig(),
+        ),
+      ),
     });
     const payload = (await response.json()) as LlamaCppModelDaemonResponse;
     if (!response.ok || payload.success === false) {

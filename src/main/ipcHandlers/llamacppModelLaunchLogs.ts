@@ -7,7 +7,11 @@ import type {
   LlamaCppOpenModelLaunchLogWindowInput,
   LlamaCppReadModelLaunchLogFileInput,
 } from '../../shared/llamacpp';
-import { LlamaCppIpcChannel, LlamaCppModelLaunchLogSource } from '../../shared/llamacpp';
+import {
+  LlamaCppIpcChannel,
+  LlamaCppModelLaunchLogPhase,
+  LlamaCppModelLaunchLogSource,
+} from '../../shared/llamacpp';
 import { createLlamaCppModelLaunchLogFileStore } from '../libs/llamacppModelLaunchLogFile';
 import { openLlamaCppModelLaunchLogWindow } from '../libs/llamacppModelLaunchLogWindow';
 
@@ -95,7 +99,10 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
     },
 
     sendModelLaunchLog: (event: LlamaCppModelLaunchLogEvent) => {
-      if (event.source === LlamaCppModelLaunchLogSource.ProcessOutput) {
+      if (
+        event.source === LlamaCppModelLaunchLogSource.ProcessOutput ||
+        event.phase === LlamaCppModelLaunchLogPhase.Failed
+      ) {
         try {
           modelLaunchLogFiles.append(event);
         } catch (error) {

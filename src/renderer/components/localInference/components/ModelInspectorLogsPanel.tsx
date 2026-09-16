@@ -27,24 +27,25 @@ export function ModelInspectorLogsPanel({ modelName }: { modelName: string }) {
       : i18nService.t('localInferenceModelLaunchLogWindowEmpty')
   );
   return (
-    <div className="mt-5 flex min-h-0 flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <span />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={i18nService.t('localInferenceModelLaunchLogsDownload')}
-          disabled={!state.content}
-          onClick={handleDownload}
-        >
-          <Download />
-        </Button>
-      </div>
-      {state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+    <div className="mt-5 flex min-h-0 flex-1 flex-col gap-3">
+      {state.error ? <p className="shrink-0 text-sm text-destructive">{state.error}</p> : null}
       <LocalInferenceLogViewer
         text={logOutput}
-        className="h-96 min-h-64 rounded-lg border-0"
+        className="min-h-0 flex-1"
+        toolbar={
+          <div className="flex min-w-0 flex-1 items-center justify-end px-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={i18nService.t('localInferenceModelLaunchLogsDownload')}
+              disabled={!state.content}
+              onClick={handleDownload}
+            >
+              <Download data-icon="inline-start" />
+            </Button>
+          </div>
+        }
       />
     </div>
   );

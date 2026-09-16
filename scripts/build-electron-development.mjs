@@ -63,6 +63,7 @@ fs.mkdirSync(outputDirectory, { recursive: true });
 fs.rmSync(readyPath, { force: true });
 
 await build(createBuildOptions('src/main/preload.ts'));
+await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(
   createBuildOptions('src/main/main.ts', {
     output: {
