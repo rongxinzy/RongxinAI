@@ -64,7 +64,7 @@ export function ProviderModelEditorDialog({
   };
 
   return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-black/35 px-4">
+    <div className="modal-backdrop absolute inset-0 z-20 flex items-center justify-center rounded-2xl px-4">
       <div
         role="dialog"
         aria-modal="true"

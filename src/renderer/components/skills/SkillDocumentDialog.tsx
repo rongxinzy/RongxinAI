@@ -133,7 +133,7 @@ export function SkillDocumentDialog({
 
   return (
     <div
-      className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 p-4"
+      className="modal-backdrop absolute inset-0 z-20 flex items-center justify-center p-4"
       onPointerDown={event => {
         if (event.target === event.currentTarget) onClose();
       }}
