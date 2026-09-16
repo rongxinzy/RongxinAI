@@ -37,7 +37,7 @@ test('restores the legacy API config when app bootstrap has not synced it yet', 
   });
 });
 
-test('unknown tool capability tries tools first and falls back when the endpoint rejects them', async () => {
+test('default-supported tool capability falls back when the endpoint rejects tools', async () => {
   const model = {
     id: 'custom-unknown',
     name: 'Custom Unknown',
@@ -60,11 +60,11 @@ test('unknown tool capability tries tools first and falls back when the endpoint
   expect(loop).toHaveBeenCalledOnce();
   expect(regularChat).toHaveBeenCalledOnce();
   expect(progress).toHaveBeenCalledWith(
-    '当前模型的工具调用能力尚未确认，已改用普通对话，未执行联网搜索。\n\n',
+    '当前模型不支持工具调用，已改用普通对话，未执行联网搜索。\n\n',
   );
 });
 
-test('unknown tool capability keeps the tool loop when the endpoint accepts tools', async () => {
+test('default-supported tool capability keeps the tool loop when the endpoint accepts tools', async () => {
   const model = {
     id: 'custom-optimistic',
     name: 'Custom Optimistic',
@@ -91,7 +91,7 @@ test('unknown tool capability keeps the tool loop when the endpoint accepts tool
   );
 });
 
-test('unknown tool capability does not swallow unrelated tool-loop errors', async () => {
+test('default-supported tool capability does not swallow unrelated tool-loop errors', async () => {
   const model = {
     id: 'custom-unknown-500',
     name: 'Custom Unknown 500',
@@ -307,7 +307,7 @@ test('web-search fallback message follows the selected UI language', async () =>
   await apiService.chatWithWebSearch('latest news', progress);
 
   expect(progress).toHaveBeenCalledWith(
-    'Tool-calling support for this model is unknown. Switched to regular chat without web search.\n\n',
+    'This model does not support tool calling. Switched to regular chat without web search.\n\n',
   );
 });
 
