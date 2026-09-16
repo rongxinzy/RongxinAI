@@ -602,6 +602,79 @@ test('resolveRawApiConfigForModelRef forwards custom model Pi runtime metadata',
   );
 });
 
+test('resolves custom providers without an API key for anonymous compatible endpoints', () => {
+  const CustomProviderKey = {
+    OpenAI: 'custom_0',
+    Anthropic: 'custom_1',
+  } as const;
+  const AnonymousApiKeyPlaceholder = 'sk-zhiyuan-local';
+
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config'
+            ? {
+                model: {
+                  defaultModel: 'openai-model',
+                  defaultModelProvider: CustomProviderKey.OpenAI,
+                },
+                providers: {
+                  [CustomProviderKey.OpenAI]: {
+                    enabled: true,
+                    apiKey: '',
+                    baseUrl: 'http://127.0.0.1:8081/v1',
+                    apiFormat: 'openai' as const,
+                    models: [{ id: 'openai-model', name: 'OpenAI Model' }],
+                  },
+                  [CustomProviderKey.Anthropic]: {
+                    enabled: true,
+                    apiKey: '',
+                    baseUrl: 'http://127.0.0.1:8082',
+                    apiFormat: 'anthropic' as const,
+                    models: [{ id: 'anthropic-model', name: 'Anthropic Model' }],
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  const openAIResolution = resolveRawApiConfigForModelRef(
+    `${CustomProviderKey.OpenAI}/openai-model`,
+  );
+  expect(openAIResolution.config).toEqual({
+      apiKey: AnonymousApiKeyPlaceholder,
+      baseURL: 'http://127.0.0.1:8081/v1',
+      model: 'openai-model',
+      apiType: 'openai',
+    });
+  expect(openAIResolution.providerMetadata?.usesAnonymousAccess).toBe(true);
+
+  const anthropicResolution = resolveRawApiConfigForModelRef(
+    `${CustomProviderKey.Anthropic}/anthropic-model`,
+  );
+  expect(anthropicResolution.config).toEqual({
+      apiKey: AnonymousApiKeyPlaceholder,
+      baseURL: 'http://127.0.0.1:8082',
+      model: 'anthropic-model',
+      apiType: 'anthropic',
+    });
+  expect(anthropicResolution.providerMetadata?.usesAnonymousAccess).toBe(true);
+  expect(resolveAllEnabledProviderConfigs()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        providerName: CustomProviderKey.OpenAI,
+        apiKey: AnonymousApiKeyPlaceholder,
+      }),
+      expect.objectContaining({
+        providerName: CustomProviderKey.Anthropic,
+        apiKey: AnonymousApiKeyPlaceholder,
+      }),
+    ]),
+  );
+});
+
 test('managed free model is available without a user key or compatibility proxy', () => {
   vi.mocked(getCoworkOpenAICompatProxyStatus).mockReturnValue({ running: false } as ReturnType<
     typeof getCoworkOpenAICompatProxyStatus

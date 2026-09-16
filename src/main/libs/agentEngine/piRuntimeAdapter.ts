@@ -3645,7 +3645,9 @@ async function resolvePiCustomModelBaseUrl(
 
   return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
     baseURL: config.baseURL,
-    apiKey: config.apiKey,
+    ...(providerMetadata.usesAnonymousAccess
+      ? { forwardIncomingAuthorization: false }
+      : { apiKey: config.apiKey }),
   });
 }
 

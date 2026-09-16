@@ -1234,6 +1234,38 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
+    it('should retain the runtime API key for anonymous custom models', async () => {
+      mockGetModel.mockImplementationOnce(() => undefined);
+      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-zhiyuan-local',
+          baseURL: 'http://127.0.0.1:8081/v1',
+          model: 'anonymous-model',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'custom_2',
+          usesAnonymousAccess: true,
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName: 'Anonymous Model',
+        },
+      });
+
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'custom_2/anonymous-model',
+      });
+
+      expect(mockRegisterPiOpenAICompatUpstream).toHaveBeenCalledWith('custom_2', {
+        baseURL: 'http://127.0.0.1:8081/v1',
+        forwardIncomingAuthorization: false,
+      });
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith(
+        'custom_2',
+        'sk-zhiyuan-local',
+      );
+    });
+
     it('should inject and refresh access tokens for the managed model proxy', async () => {
       mockGetModel.mockImplementationOnce(() => undefined);
       mockResolveRawApiConfigForModelRef.mockReturnValueOnce({

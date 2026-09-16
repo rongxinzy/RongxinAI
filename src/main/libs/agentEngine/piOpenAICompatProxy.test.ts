@@ -184,6 +184,36 @@ describe('piOpenAICompatProxy', () => {
     }
   });
 
+  it('does not forward the runtime API key to anonymous custom upstreams', async () => {
+    let receivedAuthorization: string | undefined;
+    const upstream = http.createServer((request, response) => {
+      receivedAuthorization = request.headers.authorization;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ choices: [] }));
+    });
+    const upstreamBaseURL = await listen(upstream);
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream('custom_8', {
+        baseURL: upstreamBaseURL,
+        forwardIncomingAuthorization: false,
+      });
+      const response = await fetch(`${proxyBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer runtime-placeholder',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ model: 'anonymous-model', messages: [] }),
+      });
+
+      expect(response.ok).toBe(true);
+      expect(receivedAuthorization).toBeUndefined();
+    } finally {
+      await close(upstream);
+    }
+  });
+
   it('proxies upstream SSE and injects missing finish_reason through the local server', async () => {
     const upstream = http.createServer((request, response) => {
       expect(request.url).toBe('/v1/chat/completions');
