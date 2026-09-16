@@ -54,7 +54,6 @@ test('starts at the estimated end and anchors dynamic measurements to the end', 
     expect.objectContaining({
       anchorTo: 'end',
       followOnAppend: true,
-      useAnimationFrameWithResizeObserver: false,
       initialOffset: 0,
       initialRect: { width: 0, height: 1200 },
     }),

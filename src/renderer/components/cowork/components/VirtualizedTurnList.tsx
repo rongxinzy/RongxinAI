@@ -120,8 +120,6 @@ export const VirtualizedTurnList = React.forwardRef<
     // 2026/09/16 lixiang  贴底时条目增高由 virtualizer 直接补偿 scrollTop，勿再额外 scrollToEnd（防抖只会滞后跳动）
     anchorTo: 'end',
     followOnAppend: true,
-    // 2026/09/16 lixiang  测高必须同帧补偿 scrollTop；推到下一帧会出现「最后一行先掉下去再弹回」
-    useAnimationFrameWithResizeObserver: false,
     scrollToFn,
     onChange: instance => {
       // ResizeObserver corrections happen before React can commit the new
