@@ -5323,7 +5323,8 @@ const Settings: React.FC<SettingsProps> = ({
       className="theme-settings-modal-shell w-auto sm:max-w-none p-0"
     >
       <div
-        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 overflow-hidden modal-content theme-settings-modal-frame"
+        // 2026/09/16 lixiang  不要挂 modal-content：换风格会换 data-theme，入场动画重播看起来像弹窗先关再开
+        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 overflow-hidden theme-settings-modal-frame"
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
