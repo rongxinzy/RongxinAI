@@ -76,6 +76,7 @@ export type ApiConfigResolution = {
   providerMetadata?: {
     providerName: string;
     authType?: ProviderConfig['authType'];
+    usesAnonymousAccess?: boolean;
     codingPlanEnabled: boolean;
     supportsImage?: boolean;
     modelName?: string;
@@ -323,8 +324,19 @@ function getEffectiveProviderApiFormat(
   return normalizeProviderApiFormat(apiFormat);
 }
 
+const CUSTOM_PROVIDER_KEY_PREFIX = 'custom_';
+
+function isCustomProvider(providerName: string): boolean {
+  return providerName.startsWith(CUSTOM_PROVIDER_KEY_PREFIX);
+}
+
+function usesAnonymousProviderAccess(providerName: string, apiKey: string): boolean {
+  return isCustomProvider(providerName) && !apiKey.trim();
+}
+
 function providerRequiresApiKey(providerName: string): boolean {
   return (
+    !isCustomProvider(providerName) &&
     providerName !== ProviderName.Zhiyuan &&
     providerName !== ProviderName.Ollama &&
     providerName !== ProviderName.LlamaCpp
@@ -607,6 +619,9 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
     providerMetadata: {
       providerName: matched.providerName,
       authType: matched.providerConfig.authType,
+      ...(usesAnonymousProviderAccess(matched.providerName, apiKey)
+        ? { usesAnonymousAccess: true }
+        : {}),
       codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
       supportsImage: matched.supportsImage,
       modelName: matched.modelName,
@@ -759,6 +774,9 @@ export function resolveCurrentApiConfig(
       },
       providerMetadata: {
         providerName: matched.providerName,
+        ...(usesAnonymousProviderAccess(matched.providerName, resolvedApiKey)
+          ? { usesAnonymousAccess: true }
+          : {}),
         codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
         supportsImage: matched.supportsImage,
         modelName: matched.modelName,
@@ -819,6 +837,9 @@ export function resolveCurrentApiConfig(
     },
     providerMetadata: {
       providerName: matched.providerName,
+      ...(usesAnonymousProviderAccess(matched.providerName, resolvedApiKey)
+        ? { usesAnonymousAccess: true }
+        : {}),
       codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
       supportsImage: matched.supportsImage,
       modelName: matched.modelName,
@@ -912,6 +933,9 @@ export function resolveRawApiConfig(): ApiConfigResolution {
     providerMetadata: {
       providerName: matched.providerName,
       authType: matched.providerConfig.authType,
+      ...(usesAnonymousProviderAccess(matched.providerName, apiKey)
+        ? { usesAnonymousAccess: true }
+        : {}),
       codingPlanEnabled: !!matched.providerConfig.codingPlanEnabled,
       supportsImage: matched.supportsImage,
       modelName: matched.modelName,
