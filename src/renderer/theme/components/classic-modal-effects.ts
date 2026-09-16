@@ -1,3 +1,4 @@
+import { modalOverlayBlur, modalOverlayScrim } from './modal-overlay-style';
 import { recipe } from './recipe';
 
 export function classicModalEffects(dark: boolean) {
@@ -34,8 +35,7 @@ export function classicModalEffects(dark: boolean) {
     'legacy-modal-backdrop': recipe({
       base: {
         ...entrance,
-        'background-color':
-          'color-mix(in oklab, var(--zy-component-palette-black) 10%, transparent)',
+        ...modalOverlayScrim,
       },
       motionStart: { opacity: '0' },
       motionEnd: { opacity: '1' },
@@ -71,6 +71,7 @@ export function classicModalEffects(dark: boolean) {
       base: {
         'background-color':
           'color-mix(in oklab, var(--zy-component-palette-black) 60%, transparent)',
+        ...modalOverlayBlur,
       },
     }),
     'skill-security-modal': recipe({
