@@ -105,9 +105,8 @@ const ChatSkillShortcuts: React.FC = () => {
     );
     dispatch(clearCurrentSession());
     window.setTimeout(() => {
-      // Switching shortcut skills starts a new prompt context. Clear the
-      // previous case text while preserving the conversation transcript.
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: true } }));
+      // 2026/09/16 lixiang  切换快捷 skill 只聚焦输入框，保留已输入的 prompt，不清空
+      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
     }, 0);
   };
 
