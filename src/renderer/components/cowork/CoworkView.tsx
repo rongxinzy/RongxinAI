@@ -1475,7 +1475,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       dispatch(clearActiveSkills());
     }
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: true } }));
+      // 2026/09/16 lixiang  选择快捷操作时保留已输入的 prompt，只聚焦输入框
+      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
     }, 0);
   };
 
