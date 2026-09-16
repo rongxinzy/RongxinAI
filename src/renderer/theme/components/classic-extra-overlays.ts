@@ -1,3 +1,4 @@
+import { modalOverlayScrim } from './modal-overlay-style';
 import { recipe } from './recipe';
 import type { AppearanceStyle, ComponentAppearances } from './contract';
 type ExtraAppearances = Pick<
@@ -80,8 +81,7 @@ export function classicExtraOverlays(): ExtraAppearances {
     }),
     'sheet-overlay': recipe({
       base: {
-        'background-color':
-          'color-mix(in oklab, var(--zy-component-palette-black) 10%, transparent)',
+        ...modalOverlayScrim,
         opacity: '1',
         'transition-property': 'opacity',
         'transition-duration': '150ms',

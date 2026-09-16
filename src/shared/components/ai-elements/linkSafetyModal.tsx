@@ -55,7 +55,8 @@ export const LinkSafetyModal: React.FC<{
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+      // 2026/09/16 lixiang  外链确认遮罩改用公共 modal-backdrop（半透明 + 模糊）
+      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
       data-streamdown="link-safety-modal"
       onClick={onClose}
     >

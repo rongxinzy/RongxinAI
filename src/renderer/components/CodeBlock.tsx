@@ -826,8 +826,8 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-200 flex flex-col"
-      style={{ backgroundColor: 'var(--zy-component-overlay-strong)', backdropFilter: 'blur(4px)' }}
+      // 2026/09/16 lixiang  代码预览全屏遮罩复用公共 modal-backdrop
+      className="modal-backdrop fixed inset-0 z-200 flex flex-col"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
       }}
