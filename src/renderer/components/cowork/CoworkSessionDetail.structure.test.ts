@@ -20,7 +20,8 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   const inputArea = source.indexOf('{/* Input Area */}');
   const overlay = source.indexOf('ref={composerOverlayRef}', inputArea);
   const promptInput = source.indexOf('<CoworkPromptInput', inputArea);
-  const permission = source.indexOf('<CoworkPermissionModal', promptInput);
+  const permission = source.indexOf('<CoworkPermissionModal');
+  const askUserQuestion = source.indexOf('<AskUserQuestionCard');
 
   expect(source).toContain('const composerOverlayRef = useCoworkComposerInset(detailRootRef);');
   // 对话区与绝对定位输入框平级且 flex:1，用 paddingBottom 留出输入框高度，避免被遮挡
@@ -47,10 +48,18 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(overlay).toBeGreaterThan(detailRootOpen);
   expect(overlay).toBeLessThan(detailRootClose);
   const scrollContainer = source.indexOf('ref={scrollContainerRef}');
-  const overlayClose = source.indexOf('{!isSessionSwitching && inlinePermission', overlay);
-  expect(overlayClose).toBeGreaterThan(scrollContainer);
+  /*
+  2026/09/16 lixiang  
+  1、工具授权和提问卡片放在对话流（思考/工具执行）里，不要叠在底部输入框上
+  2、能匹配到工具卡片时，拒绝/允许画在卡片内部，不再单独出一张授权卡
+  */ 
+  expect(askUserQuestion).toBeGreaterThan(scrollContainer);
+  expect(askUserQuestion).toBeLessThan(inputArea);
+  expect(permission).toBeGreaterThan(scrollContainer);
+  expect(permission).toBeLessThan(inputArea);
+  expect(source.indexOf('<CoworkPermissionModal', promptInput)).toBe(-1);
   expect(source.slice(overlay, promptInput)).toContain(
-    'className="pointer-events-auto relative col-start-1 row-start-1 min-w-0 self-end rounded-t-3xl bg-background pb-4"',
+    'className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4"',
   );
   expect(turnBlockSource).toContain('className="mx-auto w-full max-w-5xl min-w-[320px] pl-4"');
   expect(turnBlockSource).toContain('className="flex min-w-0 flex-1 flex-col gap-3 py-3"');
@@ -59,5 +68,4 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   );
   expect(source).toMatch(/<ConversationContent\r?\n\s+className="pt-3"/);
   expect(promptInput).toBeGreaterThan(overlay);
-  expect(permission).toBeGreaterThan(promptInput);
 });

@@ -83,6 +83,7 @@ import {
   buildTurnRailIndices,
   hasRenderableAssistantContent,
 } from './helpers/messageGrouping';
+import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
 import { setPersistentToggleNamespace } from './hooks/usePersistentToggle';
@@ -955,6 +956,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // Stabilize turn object identity so completed turns do not re-render on
   // every streaming token (issue #141).
   const turns = useStableConversationTurns(rawTurns, sessionId);
+  // 2026/09/16 lixiang  末轮已有匹配工具卡片时，授权按钮画在卡片里，不再单独渲染白底授权卡
+  const lastTurnItems = turns[turns.length - 1]?.assistantItems;
+  const hasInlineToolPermissionCard = Boolean(
+    inlinePermission &&
+    lastTurnItems &&
+    findToolGroupForPermission(lastTurnItems, inlinePermission),
+  );
   const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
   // Scope persisted collapsible state to this session. Rendered sessions are
   // shown one at a time, so a render-time namespace assignment is safe.
@@ -1086,6 +1094,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 recoverableTaskId={recoverableTaskId}
                 resumeTaskId={resumeTaskId}
                 onResumeTask={onResumeTask ? handleResumeTask : undefined}
+                // 2026/09/16 lixiang  仅末轮需要工具授权，避免历史轮次误挂授权按钮
+                pendingPermission={isLastTurn ? inlinePermission : null}
+                onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
                 expandToolResults={isExportingImage}
                 hideDefaultAssistantHeader={hideDefaultAssistantHeader}
               />
@@ -1227,6 +1238,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                           permission={inlineQuestionPermission}
                           onRespond={onRespondToInlineQuestion}
                         />
+                      </div>
+                    )}
+                    {/* 2026/09/16 lixiang  对不上工具卡片时才在对话流里兜底展示独立授权卡 */}
+                    {inlinePermission &&
+                      onRespondToInlinePermission &&
+                      !hasInlineToolPermissionCard && (
+                      <div className="px-3 pt-3">
+                        <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
+                          <CoworkPermissionModal
+                            permission={inlinePermission}
+                            onRespond={onRespondToInlinePermission}
+                            inline
+                          />
+                        </div>
                       </div>
                     )}
                     {sessionId && (
@@ -1495,8 +1520,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             ref={composerOverlayRef}
             className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
           >
-            <div className="mx-auto grid w-full max-w-5xl min-w-[320px] grid-cols-[minmax(0,1fr)] pl-4">
-              <div className="pointer-events-auto relative col-start-1 row-start-1 min-w-0 self-end rounded-t-3xl bg-background pb-4">
+            <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
+              <div className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4">
                 <CoworkPromptInput
                   ref={promptInputRef}
                   topAccessory={
@@ -1551,15 +1576,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   {i18nService.t('aiGeneratedDisclaimer')}
                 </p>
               </div>
-              {!isSessionSwitching && inlinePermission && onRespondToInlinePermission && (
-                <div className="pointer-events-auto relative z-10 col-start-1 row-start-1 self-end">
-                  <CoworkPermissionModal
-                    permission={inlinePermission}
-                    onRespond={onRespondToInlinePermission}
-                    inline
-                  />
-                </div>
-              )}
             </div>
           </div>
         </div>
