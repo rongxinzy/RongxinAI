@@ -12,6 +12,11 @@ test('keeps execution groups and nested thinking collapsed by default', () => {
   expect(source).toMatch(/<PersistentReasoning[\s\S]*?defaultOpen=\{false\}/);
 });
 
+test('embeds pending tool permission actions in the matching tool card', () => {
+  expect(source).toContain('pendingPermission={isPendingTool ? pendingPermission : null}');
+  expect(source).toContain('forceOpen={Boolean(');
+});
+
 test('settles execution counts after an answer or when the turn reaches a terminal state', () => {
   expect(source).toContain('const flush = (followedByAnswer = false) => {');
   expect(source).toMatch(
