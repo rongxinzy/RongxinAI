@@ -9,6 +9,7 @@ interface PiOpenAICompatUpstream {
   baseURL: string;
   apiKey?: string;
   requiredIncomingApiKey?: string;
+  forwardIncomingAuthorization?: boolean;
 }
 
 function incomingApiKeyMatches(request: IncomingMessage, expected: string): boolean {
@@ -77,7 +78,7 @@ function createFetchHeaders(request: IncomingMessage, upstream: PiOpenAICompatUp
   const apiKey = upstream.apiKey?.trim();
   if (apiKey) {
     headers.set('authorization', `Bearer ${apiKey}`);
-  } else {
+  } else if (upstream.forwardIncomingAuthorization !== false) {
     const authorization = request.headers.authorization;
     if (typeof authorization === 'string') {
       headers.set('authorization', authorization);
@@ -564,6 +565,7 @@ export async function registerPiOpenAICompatUpstream(
     baseURL: upstream.baseURL,
     apiKey: upstream.apiKey,
     requiredIncomingApiKey: upstream.requiredIncomingApiKey,
+    forwardIncomingAuthorization: upstream.forwardIncomingAuthorization,
   });
   return `http://127.0.0.1:${port}${PI_OPENAI_COMPAT_PROXY_PREFIX}/${encodeURIComponent(
     providerId,
