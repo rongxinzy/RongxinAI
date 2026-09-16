@@ -212,6 +212,9 @@ contextBridge.exposeInMainWorld('electron', {
     getServiceConfig: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetServiceConfig),
     setServiceConfig: (config: unknown) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.SetServiceConfig, config),
+    getGatewayLanToken: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetGatewayLanToken),
+    regenerateGatewayLanToken: () =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.RegenerateGatewayLanToken),
     modelsDir: () => ipcRenderer.invoke(LlamaCppIpcChannel.ModelsDir),
     setModelsDir: (modelsDir: string) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.SetModelsDir, modelsDir),

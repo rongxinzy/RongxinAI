@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import fs from 'fs';
 
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
@@ -6,13 +6,11 @@ import type {
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
-  LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppModelPreference,
   LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
-  LlamaCppRunningModel,
   LlamaCppRuntimeInstallSnapshot,
   LlamaCppServiceConfig,
   LlamaCppSetModelPreferenceInput,
@@ -26,7 +24,7 @@ import {
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppIpcChannel,
-  LlamaCppModelLaunchLogLevel,
+  LlamaCppGatewayAccessMode,
   LlamaCppModelLaunchLogPhase,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
@@ -41,25 +39,15 @@ import {
 } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
-import {
-  LlamaCppManager,
-  LlamaCppManagerLifecycleEvent,
-  LlamaCppProcessOutputStream,
-  type LlamaCppProcessOutputEvent,
-  resolveLlamaCppDeviceSelection,
-} from '../libs/llamacppManager';
-import {
-  createLlamaCppModelLaunchLogger,
-  createLlamaCppServiceStartupLaunchLogger,
-  type LlamaCppModelLaunchLogReporter,
-} from '../libs/llamacppModelLaunchLog';
+import { LlamaCppManager, resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
+import { createLlamaCppModelLaunchLogger } from '../libs/llamacppModelLaunchLog';
 import {
   classifyLlamaCppModelLoadError,
   getLlamaCppModelLoadFailureI18nKey,
   LlamaCppModelLoadFailureReason,
 } from '../libs/llamacppModelLoadErrors';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
-import { createLlamaCppModelGateway, type LlamaCppModelGateway } from '../libs/llamacppModelGateway';
+import { LlamaCppModelDaemonController } from '../libs/llamacppModelDaemonController';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
 import {
   LlamaCppModelResidencyManager,
@@ -73,11 +61,6 @@ import {
   removeLlamaCppModelFromAppConfig,
   upsertLlamaCppProviderInAppConfig,
 } from '../libs/llamacppAgentBinding';
-import {
-  ensureLlamaCppServiceRunning,
-  getLlamaCppServiceStartupFailureI18nKey,
-  LlamaCppServiceStartupReason,
-} from '../libs/llamacppServiceStartup';
 import { applyLlamaCppServiceTransition } from '../libs/llamacppServiceTransition';
 import { LlamaCppServiceTransitionLock } from '../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
@@ -203,19 +186,6 @@ export function hasRecoveredVram(input: {
   return currentFreeMiB - beforeFreeMiB >= requiredRecoveryMiB;
 }
 
-function getLlamaCppModelLogClearNames(
-  requestedModelName: string,
-  runningModel?: { name?: string; model?: string; id?: string },
-): string[] {
-  return Array.from(
-    new Set(
-      [requestedModelName, runningModel?.name, runningModel?.model, runningModel?.id]
-        .map(value => value?.trim())
-        .filter((value): value is string => Boolean(value)),
-    ),
-  );
-}
-
 function matchesRunningModelName(
   model: { name?: string; model?: string; id?: string },
   modelName: string,
@@ -230,14 +200,6 @@ function toUserFacingLlamaCppModelLoadError(error: unknown): Error {
 
 function throwIfLlamaCppModelLoadCancelled(signal: AbortSignal): void {
   if (signal.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
-}
-
-async function unloadCancelledLlamaCppModel(manager: LlamaCppManager, modelName: string): Promise<void> {
-  try {
-    await (await manager.client()).unloadModel(modelName, 10_000);
-  } catch (error) {
-    console.warn(`[LlamaCpp] failed to unload cancelled model startup ${modelName}:`, error);
-  }
 }
 
 export async function waitForLlamaCppModelUnloadConfirmation(input: {
@@ -292,7 +254,7 @@ export function registerLlamaCppIpcHandlers(
   options: {
     getStore: () => SqliteStore;
   },
-): void {
+): LlamaCppModelDaemonController {
   const broadcast = (channel: string, payload: unknown): void => {
     BrowserWindow.getAllWindows().forEach(win => {
       if (win.isDestroyed()) return;
@@ -345,7 +307,7 @@ export function registerLlamaCppIpcHandlers(
       current,
       bindingModels,
       getLlamaCppServiceConfig(store),
-      modelGateway?.baseUrl() ?? undefined,
+      daemon.gatewayBaseUrl() ?? undefined,
     );
     if (appConfigUpdate.changed) {
       store.set('app_config', appConfigUpdate.config);
@@ -365,7 +327,7 @@ export function registerLlamaCppIpcHandlers(
     }
     const refreshGeneration = bindingRefreshGeneration;
     try {
-      const runningModels = await manager.listRunningModels();
+      const runningModels = await daemon.listRunningModels();
       if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
         return { changed: false, hasRunningModels: false };
       }
@@ -394,16 +356,24 @@ export function registerLlamaCppIpcHandlers(
     }
   };
 
-  const sendStatus = (status: LlamaCppStatusSnapshot) =>
-    broadcast(LlamaCppIpcChannel.StatusChanged, status);
   const sendProgress = (progress: LlamaCppInstallProgress) =>
     broadcast(LlamaCppIpcChannel.InstallProgress, progress);
-  const { clearModelLaunchLog, sendModelLaunchLog } = registerLlamaCppModelLaunchLogIpcHandlers({
+  const { sendModelLaunchLog } = registerLlamaCppModelLaunchLogIpcHandlers({
     broadcast,
+  });
+  const daemon = new LlamaCppModelDaemonController({
+    userDataPath: app.getPath('userData'),
+    getStore: options.getStore,
+    getServiceConfig: () => {
+      const config = getLlamaCppServiceConfig(options.getStore());
+      return {
+        ...config,
+        modelsDir: config.modelsDir?.trim() || manager.getModelsDir(),
+      };
+    },
   });
   const loadModelLock = new LlamaCppModelLoadLock();
   let activeModelLoad: { modelName: string; controller: AbortController } | null = null;
-  let modelGateway: LlamaCppModelGateway | null = null;
   let loadModelCore: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
   const residency = new LlamaCppModelResidencyManager({
     getPolicy: modelName => {
@@ -415,10 +385,10 @@ export function registerLlamaCppIpcHandlers(
       return getLlamaCppModelPreferences(options.getStore())[modelName]?.residency;
     },
     unload: async modelName => {
-      await (await manager.client()).unloadModel(modelName);
+      await daemon.stopModel(modelName);
       const confirmation = await waitForLlamaCppModelUnloadConfirmation({
         modelName,
-        listRunningModels: () => manager.listRunningModels(),
+        listRunningModels: () => daemon.listRunningModels(),
       });
       await updateRunningModelBindings(confirmation.runningModels);
     },
@@ -442,22 +412,17 @@ export function registerLlamaCppIpcHandlers(
       isCurrent: () => syncGeneration === startupBindingSyncGeneration,
     });
   };
+  const getDedicatedServiceStatus = async (): Promise<LlamaCppStatusSnapshot> => {
+    return await daemon.status();
+  };
 
   migrateLegacyLlamaCppConfig(options.getStore());
-  manager.on('status', status => {
-    sendStatus(status);
-  });
   const runtimeInstallState = createLlamaCppRuntimeInstallState();
   manager.on('install-progress', progress => {
     if (progress.modelId === LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID) {
       runtimeInstallState.update(progress);
     }
     sendProgress(progress);
-  });
-  manager.on(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, event => {
-    for (const modelName of event.modelNames) {
-      clearModelLaunchLog(modelName);
-    }
   });
 
   const activeInstalls = new Map<string, AbortController>();
@@ -480,7 +445,7 @@ export function registerLlamaCppIpcHandlers(
     return installPromise;
   };
 
-  ipcMain.handle(LlamaCppIpcChannel.Status, async () => manager.detect());
+  ipcMain.handle(LlamaCppIpcChannel.Status, async () => await getDedicatedServiceStatus());
   ipcMain.handle(LlamaCppIpcChannel.Install, async () =>
     runRuntimeInstall(signal => manager.installRuntime({ signal })),
   );
@@ -499,7 +464,10 @@ export function registerLlamaCppIpcHandlers(
     const result = await install.catch((): RuntimeInstallResult | undefined => undefined);
     return { success: true as const, cancelled: Boolean(result?.cancelled) };
   });
-  ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
+  ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => {
+    await daemon.stopService();
+    return await manager.uninstallRuntime();
+  });
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
     return await manager.listRuntimeDevices(ref ?? undefined);
@@ -528,6 +496,7 @@ export function registerLlamaCppIpcHandlers(
     return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallBackend, async (_event, input: unknown) => {
+    await daemon.stopService();
     const ref = sanitizeLlamaCppBackendRef(input);
     if (!ref) return await manager.uninstallRuntime();
     return await manager.uninstallBackend(ref);
@@ -558,7 +527,7 @@ export function registerLlamaCppIpcHandlers(
     return await manager.importRuntime(result.filePaths[0]);
   });
   ipcMain.handle(LlamaCppIpcChannel.Start, async () => {
-    const status = await manager.start();
+    const status = await getDedicatedServiceStatus();
     if (status.status === LlamaCppServiceStatus.Running) {
       const bindingRefresh = await refreshRunningModelBindings({
         preserveExistingWhenEmpty: true,
@@ -572,7 +541,12 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Stop, async () => {
     // Cancel delayed startup polling before the explicit stop clears the model bindings.
     startupBindingSyncGeneration += 1;
-    const status = await manager.stop();
+    await daemon.stopService();
+    const status: LlamaCppStatusSnapshot = {
+      status: LlamaCppServiceStatus.Stopped,
+      managedByApp: true,
+      checkedAt: new Date().toISOString(),
+    };
     if (status.status === LlamaCppServiceStatus.Stopped) {
       await updateRunningModelBindings([]);
     }
@@ -582,22 +556,10 @@ export function registerLlamaCppIpcHandlers(
     LlamaCppIpcChannel.Restart,
     async () =>
       await runServiceTransition(async () => {
-        const wasRunning = manager.getStatus().status === LlamaCppServiceStatus.Running;
-        const nextStatus = await applyLlamaCppServiceTransition({
-          wasRunning,
-          stop: () => manager.stop(),
-          start: () => manager.start(),
-          applyConfig: () => undefined,
-          clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: async () => {
-            await refreshRunningModelBindings();
-          },
-          setBindingRefreshSuppressed: suppressed => {
-            bindingRefreshSuppressed = suppressed;
-            if (suppressed) bindingRefreshGeneration += 1;
-          },
-        });
-        return nextStatus ?? manager.getStatus();
+        const config = getLlamaCppServiceConfig(options.getStore());
+        const status = await daemon.restart(config);
+        await refreshRunningModelBindings();
+        return status;
       }),
   );
   ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
@@ -608,9 +570,16 @@ export function registerLlamaCppIpcHandlers(
     async (_event, config: LlamaCppServiceConfig) => {
       const sanitized = sanitizeLlamaCppServiceConfig(config);
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
+      await daemon.applyConfigIfRunning(sanitized);
       return sanitized;
     },
   );
+  ipcMain.handle(LlamaCppIpcChannel.GetGatewayLanToken, async () => ({
+    token: daemon.getLanToken(),
+  }));
+  ipcMain.handle(LlamaCppIpcChannel.RegenerateGatewayLanToken, async () => ({
+    token: await daemon.regenerateLanToken(),
+  }));
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
   ipcMain.handle(
     LlamaCppIpcChannel.SetModelsDir,
@@ -661,7 +630,7 @@ export function registerLlamaCppIpcHandlers(
     try {
       // Keep model listing read-only. Binding persistence and Gateway sync are
       // performed by explicit model lifecycle transitions below.
-      return await manager.listRunningModels();
+      return await daemon.listRunningModels();
     } catch (error) {
       if (manager.getStatus().status !== 'running') return [];
       throw error;
@@ -671,6 +640,7 @@ export function registerLlamaCppIpcHandlers(
     await refreshRunningModelBindings();
   });
   ipcMain.handle(LlamaCppIpcChannel.DeleteModel, async (_event, name: string) => {
+    await daemon.stopModel(name);
     const result = await manager.deleteModel(name);
     if (!result.success || !result.deleted || !result.removedModelName) {
       return result;
@@ -696,8 +666,19 @@ export function registerLlamaCppIpcHandlers(
     };
   });
   ipcMain.handle(LlamaCppIpcChannel.ShowModel, async (_event, name: string) => {
-    const client = await manager.client();
-    return await client.showModel(name);
+    const modelName = name.trim();
+    const localModel = (await manager.listLocalModels()).find(
+      model => model.name === modelName || model.id === modelName || model.model === modelName,
+    );
+    if (!localModel) throw new Error('Local model was not found.');
+    const runningModel = (await daemon.listRunningModels()).find(
+      model => model.name === modelName || model.id === modelName || model.model === modelName,
+    );
+    return {
+      ...localModel,
+      ...(runningModel ?? {}),
+      status: runningModel ? 'loaded' : 'unloaded',
+    };
   });
   ipcMain.handle(LlamaCppIpcChannel.GetModelPreferences, async () => {
     return getLlamaCppModelPreferences(options.getStore());
@@ -767,36 +748,10 @@ export function registerLlamaCppIpcHandlers(
         const store = options.getStore();
         const serviceConfig = getLlamaCppServiceConfig(store);
         const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(store, input);
-        let processOutputPhase: LlamaCppModelLaunchLogPhase =
-          LlamaCppModelLaunchLogPhase.CheckingService;
-        const unsubscribeProcessOutput = subscribeToLlamaCppProcessOutput(
-          manager,
-          launchLogger.report,
-          () => processOutputPhase,
-        );
-
         try {
           launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingService);
-          processOutputPhase = LlamaCppModelLaunchLogPhase.StartingService;
-          const serviceStartupResult = await ensureLlamaCppServiceRunning(manager, {
-            reason: LlamaCppServiceStartupReason.LoadModel,
-            logger: createLlamaCppServiceStartupLaunchLogger(launchLogger),
-          });
           throwIfLlamaCppModelLoadCancelled(controller.signal);
-          if (serviceStartupResult.success === false) {
-            launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, {
-              code: serviceStartupResult.code,
-              detail: serviceStartupResult.detail,
-            });
-            throw new Error(t(getLlamaCppServiceStartupFailureI18nKey(serviceStartupResult.code)));
-          }
-          launchLogger.info(LlamaCppModelLaunchLogPhase.ServiceReady, undefined, {
-            managedByApp: serviceStartupResult.serviceStatus.managedByApp,
-            pid: serviceStartupResult.serviceStatus.pid,
-          });
-          processOutputPhase = LlamaCppModelLaunchLogPhase.LoadingModel;
-
-          const runningModels = await manager.listRunningModels();
+          const runningModels = await daemon.listRunningModels();
           throwIfLlamaCppModelLoadCancelled(controller.signal);
           const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
             modelsMax: serviceConfig.modelsMax,
@@ -823,46 +778,57 @@ export function registerLlamaCppIpcHandlers(
             modelSizeBytes: targetModel?.size,
             modelPath: targetModel?.path,
           });
-          processOutputPhase = LlamaCppModelLaunchLogPhase.CheckingRuntime;
           launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingRuntime);
-          const runtimeCapabilities = await manager
-            .getRuntimeCapabilities()
-            .catch((error): null => {
-              launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
-              return null;
-            });
-          const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((error): null => {
-            launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
-            return null;
-          });
-
-          processOutputPhase = LlamaCppModelLaunchLogPhase.LoadingModel;
           try {
-            const result = await loadLlamaCppModelThroughPipeline({
-              launchInput: { ...inputWithPreferences, model: modelName },
-              runtimeBackend:
-                serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
+            if (!targetModel?.path) {
+              throw new Error(
+                t(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.ModelNotFound)),
+              );
+            }
+            launchLogger.info(LlamaCppModelLaunchLogPhase.LoadingModel);
+            const runtimeCapabilities = await manager
+              .getRuntimeCapabilities()
+              .catch((): null => null);
+            const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((): null => null);
+            const pipelineResult = await loadLlamaCppModelThroughPipeline({
+              launchInput: { ...inputWithPreferences, model: modelName, modelPath: targetModel.path },
+              runtimeBackend: serviceConfig.runtimeBackend,
               runtimeCapabilities,
               nvidiaSnapshot,
               systemMemorySnapshot: getSystemMemorySnapshot(),
               memoryPolicy: serviceConfig.memoryPolicy,
               memoryBudgetPercent: serviceConfig.memoryBudgetPercent,
-              modelSizeBytes: targetModel?.size,
+              modelSizeBytes: targetModel.size,
               signal: controller.signal,
               onLog: launchLogger.report,
-              loadModel: async (
-                loadInput: LlamaCppModelLaunchInput,
-              ): Promise<LlamaCppModelLaunchResult> =>
-                manager.loadModel(loadInput, { signal: controller.signal }),
-              listModels: (timeoutMs: number): Promise<LlamaCppModel[]> =>
-                manager.listRouterModels(timeoutMs),
-              listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
-              detectService: (): Promise<LlamaCppStatusSnapshot> => manager.detect(),
+              loadModel: async launchInput => {
+                const daemonStatus = await daemon.ensureModel({
+                  ...launchInput,
+                  model: modelName,
+                  modelPath: targetModel.path,
+                });
+                return { success: true, runningModels: daemonStatus.runningModels };
+              },
+              listModels: async () => {
+                const runningModels = await daemon.listRunningModels();
+                const runningNames = new Set(
+                  runningModels.map(model => model.name || model.model || model.id).filter(Boolean),
+                );
+                return (await manager.listLocalModels()).map(model =>
+                  runningNames.has(model.name) ? { ...model, status: 'loaded' } : model,
+                );
+              },
+              listRunningModels: () => daemon.listRunningModels(),
+              detectService: () => daemon.status(),
               unloadModel: async unloadModelName => {
-                await (await manager.client()).unloadModel(unloadModelName);
+                await daemon.stopModel(unloadModelName);
               },
             });
-            // The pipeline returns the settled router state, avoiding a second read during convergence.
+            throwIfLlamaCppModelLoadCancelled(controller.signal);
+            const result: LlamaCppModelLaunchResult = {
+              success: true,
+              runningModels: pipelineResult.runningModels,
+            };
             await updateRunningModelBindings(result.runningModels);
             launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
               runningModelCount: result.runningModels.length,
@@ -870,7 +836,7 @@ export function registerLlamaCppIpcHandlers(
             return result;
           } catch (error) {
             if (controller.signal.aborted) {
-              await unloadCancelledLlamaCppModel(manager, modelName);
+              await daemon.stopModel(modelName);
               await refreshRunningModelBindings();
               launchLogger.info(LlamaCppModelLaunchLogPhase.Failed, 'Model startup cancelled');
               throw new Error(t('llamacppModelLoadCancelled'));
@@ -879,7 +845,6 @@ export function registerLlamaCppIpcHandlers(
             throw toUserFacingLlamaCppModelLoadError(error);
           }
         } finally {
-          unsubscribeProcessOutput();
           if (activeModelLoad?.controller === controller) {
             activeModelLoad = null;
           }
@@ -895,22 +860,15 @@ export function registerLlamaCppIpcHandlers(
       },
     );
   };
-  modelGateway = createLlamaCppModelGateway({
-    acquireModel: async modelName =>
-      await residency.acquire(modelName, async () => {
-        await loadModelCore({ model: modelName });
-      }),
-    getUpstreamBaseUrl: () => manager.getBaseUrl(),
-  });
-  void modelGateway.start().then(() => refreshRunningModelBindings()).catch(error => {
-    console.error('[LlamaCppGateway] failed to start local model gateway:', error);
+  void daemon.reconnect().then(() => refreshRunningModelBindings()).catch(error => {
+    console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
   });
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     let result: LlamaCppModelLaunchResult | undefined;
     await residency.ensureReady(input.model, async () => {
       result = await loadModelCore(input);
     });
-    return result ?? { success: true, runningModels: await manager.listRunningModels() };
+    return result ?? { success: true, runningModels: await daemon.listRunningModels() };
   });
   ipcMain.handle(LlamaCppIpcChannel.CancelModelLoad, async (_event, input: unknown) => {
     const activeLoad = activeModelLoad;
@@ -933,22 +891,18 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
-    const beforeRunningModels = await manager.listRunningModels();
+    const beforeRunningModels = await daemon.listRunningModels();
     const unloadingModel = beforeRunningModels.find(
       model => model.name === modelName || model.model === modelName || model.id === modelName,
     );
     const beforeSnapshot = unloadingModel?.size_vram ? await getNvidiaSmiSnapshot() : null;
-    const client = await manager.client();
-    await client.unloadModel(modelName);
+    await daemon.stopModel(modelName);
     const confirmation = await waitForLlamaCppModelUnloadConfirmation({
       modelName,
-      listRunningModels: () => manager.listRunningModels(),
+      listRunningModels: () => daemon.listRunningModels(),
     });
     residency.markUnloaded(modelName);
     await updateRunningModelBindings(confirmation.runningModels);
-    for (const clearedModelName of getLlamaCppModelLogClearNames(modelName, unloadingModel)) {
-      clearModelLaunchLog(clearedModelName);
-    }
     const result: LlamaCppModelUnloadResult = {
       success: true,
       confirmed: confirmation.confirmed,
@@ -1031,6 +985,7 @@ export function registerLlamaCppIpcHandlers(
     controller.abort(new Error('Install cancelled'));
     return { success: true, cancelled: true };
   });
+  return daemon;
 }
 
 export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceConfig {
@@ -1268,6 +1223,7 @@ export function sanitizeLlamaCppServiceConfig(
     LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.MainGpu];
   const host = config?.host?.trim();
   const listenHost = config?.listenHost?.trim();
+  const gatewayAccessMode = config?.gatewayAccessMode;
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
   const runtimeVersion = config?.runtimeVersion?.trim();
@@ -1364,6 +1320,12 @@ export function sanitizeLlamaCppServiceConfig(
     next.host = host;
   }
   if (listenHost) next.listenHost = listenHost;
+  if (
+    gatewayAccessMode === LlamaCppGatewayAccessMode.Local ||
+    gatewayAccessMode === LlamaCppGatewayAccessMode.Lan
+  ) {
+    next.gatewayAccessMode = gatewayAccessMode;
+  }
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
   if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion))
@@ -1518,32 +1480,6 @@ function normalizeGpuLayersStringWithDefault(
   if (!Number.isFinite(parsed)) return range.defaultValue;
   if (parsed < range.min || parsed > range.max) return range.defaultValue;
   return normalized;
-}
-
-function subscribeToLlamaCppProcessOutput(
-  manager: LlamaCppManager,
-  report: LlamaCppModelLaunchLogReporter,
-  getPhase: () => LlamaCppModelLaunchLogPhase,
-): () => void {
-  const handleProcessOutput = (event: LlamaCppProcessOutputEvent) => {
-    report({
-      level:
-        event.stream === LlamaCppProcessOutputStream.Stderr
-          ? LlamaCppModelLaunchLogLevel.Warn
-          : LlamaCppModelLaunchLogLevel.Debug,
-      phase: getPhase(),
-      message:
-        event.stream === LlamaCppProcessOutputStream.Stderr
-          ? 'llama-server stderr'
-          : 'llama-server stdout',
-      detail: event.text,
-    });
-  };
-
-  manager.on(LlamaCppManagerLifecycleEvent.ProcessOutput, handleProcessOutput);
-  return () => {
-    manager.off(LlamaCppManagerLifecycleEvent.ProcessOutput, handleProcessOutput);
-  };
 }
 
 function normalizeVisibleDevices(

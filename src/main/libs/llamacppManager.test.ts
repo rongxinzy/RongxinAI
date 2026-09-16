@@ -9,6 +9,7 @@ import type { MarketplaceModel } from '../../shared/marketplace';
 import {
   buildLlamaCppExecutableCandidates,
   buildLlamaCppServeEnv,
+  buildLlamaServerModelArgs,
   buildLlamaServerArgs,
   chooseModelScopeInstallFile,
   extractModelScopeFilePaths,
@@ -249,6 +250,33 @@ test('buildLlamaServerArgs always disables router model autoload', () => {
       '/presets/custom.ini',
     ),
   ).toEqual(expect.arrayContaining(['--models-max', '1', '--no-models-autoload']));
+});
+
+test('buildLlamaServerModelArgs starts one loopback model without router flags', () => {
+  const args = buildLlamaServerModelArgs({
+    config: { ctxSize: '4096', gpuLayers: 'all', modelsMax: '3' },
+    modelPath: '/models/qwen.gguf',
+    port: 18081,
+    options: { ctxSize: 8192 },
+  });
+
+  expect(args).toEqual(
+    expect.arrayContaining([
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '18081',
+      '--model',
+      '/models/qwen.gguf',
+      '--ctx-size',
+      '8192',
+      '--gpu-layers',
+      'all',
+    ]),
+  );
+  expect(args).not.toContain('--models-dir');
+  expect(args).not.toContain('--models-preset');
+  expect(args).not.toContain('--models-max');
 });
 
 test('shouldEnableLlamaCppModelsAutoload only allows single-model residency', () => {
