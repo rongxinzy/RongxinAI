@@ -27,13 +27,17 @@ export const PersistentReasoning: React.FC<PersistentProps<ReasoningProps>> = ({
   );
 };
 
-export const PersistentChainOfThought: React.FC<PersistentProps<ChainOfThoughtProps>> = ({
-  persistKey,
-  defaultOpen = false,
-  ...props
-}) => {
+export const PersistentChainOfThought: React.FC<
+  PersistentProps<ChainOfThoughtProps> & { forceOpen?: boolean }
+> = ({ persistKey, defaultOpen = false, forceOpen = false, ...props }) => {
+  // 2026/09/16 lixiang  等待工具授权时强制展开思考过程，避免按钮被折叠藏住
   const [open, setOpen] = usePersistentToggle(persistKey, defaultOpen);
   return (
-    <ChainOfThought {...props} defaultOpen={defaultOpen} open={open} onOpenChange={setOpen} />
+    <ChainOfThought
+      {...props}
+      defaultOpen={defaultOpen}
+      open={forceOpen || open}
+      onOpenChange={setOpen}
+    />
   );
 };
