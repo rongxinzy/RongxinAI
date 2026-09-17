@@ -359,7 +359,12 @@ const TurnBlockComponent: React.FC<{
   };
   const visibleGroups = groups.filter(group => !isEmptyAnswerGroup(group));
   const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems, isTurnComplete);
-  const finalAnswerItem = finalAnswerIndex >= 0 ? visibleAssistantItems[finalAnswerIndex] : null;
+  // Historical interruptions belong before the resumed answer, not after it.
+  const finalAnswerItem =
+    finalAnswerIndex >= 0 &&
+    !visibleAssistantItems.slice(0, finalAnswerIndex).some(isStandaloneSystemItem)
+      ? visibleAssistantItems[finalAnswerIndex]
+      : null;
   const standaloneSystemItems = visibleAssistantItems.filter(isStandaloneSystemItem);
   const executionItems =
     finalAnswerIndex >= 0

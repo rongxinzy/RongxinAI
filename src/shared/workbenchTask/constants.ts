@@ -55,6 +55,12 @@ export const WorkbenchVerificationCheckStatus = {
 export type WorkbenchVerificationCheckStatus =
   (typeof WorkbenchVerificationCheckStatus)[keyof typeof WorkbenchVerificationCheckStatus];
 
+export const WorkbenchVerificationCheckName = {
+  UserAcceptance: 'user_acceptance',
+  DeliveryReady: 'delivery_ready',
+  ArtifactVerification: 'artifact_verification',
+} as const;
+
 export const WorkbenchApprovalRiskLevel = {
   ReadOnly: 'read_only',
   Reversible: 'reversible',

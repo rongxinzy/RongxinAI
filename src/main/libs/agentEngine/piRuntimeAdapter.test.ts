@@ -32,6 +32,12 @@ import {
 import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
+import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
+
+vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
+  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
+    collectWorkbenchArtifacts(input),
+}));
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {

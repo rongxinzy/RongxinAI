@@ -166,6 +166,9 @@ import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskS
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
+import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
+import { prependWorkbenchTaskBoundary } from './piWorkbenchTaskBoundary';
+import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
 import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
@@ -296,6 +299,7 @@ interface ActivePiSession {
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
+  completionPending?: Promise<void>;
   requestStartedAt: number | null;
   firstVisibleTextAt: number | null;
   confirmationMode: 'modal' | 'text';
@@ -962,14 +966,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         customTools.push(
           buildDeclareArtifactTool({
             onDeclare: this.workbenchTaskService
-              ? artifact => {
+              ? async artifact => {
                   const runId =
                     this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
                   if (!runId) throw new Error('No active workbench run is available.');
-                  this.workbenchTaskService?.registerArtifact({
+                  await this.workbenchTaskService?.registerArtifact({
                     sessionId,
                     runId,
                     workspaceRoot,
+                    signal: abortController.signal,
                     candidate: {
                       path: artifact.filePath,
                       source: WorkbenchArtifactCandidateSource.Declaration,
@@ -1280,6 +1285,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       );
       if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
       if (projectMemoryContext) initialPrompt = `${projectMemoryContext}\n\n${initialPrompt}`;
+      initialPrompt = prependWorkbenchTaskBoundary(
+        initialPrompt,
+        this.workbenchTaskService,
+        sessionId,
+      );
 
       // The user may stop the session while the execution-mode question is
       // open. Do not revive an aborted Pi turn when that question resolves.
@@ -1293,6 +1303,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.capabilities,
         undefined,
       );
+      await active.completionPending;
     } catch (error) {
       // A stopped turn can immediately restart from the first queued follow-up.
       // Its eventual abort rejection must not delete that replacement session.
@@ -1322,6 +1333,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
     const nextUnattended = options.unattended === true;
     const active = this.activeSessions.get(sessionId);
+    if (active?.completionPending) await active.completionPending;
     if (!active || active.aborted) {
       if (active?.aborted) {
         this.activeSessions.delete(sessionId);
@@ -1628,6 +1640,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         prompt,
       );
       if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;
+      nextPrompt = prependWorkbenchTaskBoundary(nextPrompt, this.workbenchTaskService, sessionId);
       await sendPiPrompt(
         active.piSession,
         nextPrompt,
@@ -1635,6 +1648,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.capabilities,
         options._streamingBehavior,
       );
+      await active.completionPending;
     } catch (error) {
       active.isRunning = false;
       if (active.abortController.signal.aborted) {
@@ -2636,6 +2650,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           const finalThinking = thinking || active.thinkingText;
           const finalAnswer = text || active.answerText;
 
+          if (invalidatesPiFinalResponse(event.message)) {
+            active.lastCompletedAnswerMessageId = null;
+            active.lastCompletedAnswerText = '';
+          }
+
           // Finalize thinking bubble (if any) on its own id.
           if (finalThinking.trim()) {
             if (finalThinking !== active.thinkingText) {
@@ -2648,8 +2667,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           if (finalAnswer.trim()) {
             active.answerText = finalAnswer;
             this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
-            active.lastCompletedAnswerMessageId = active.assistantMessageId;
-            active.lastCompletedAnswerText = finalAnswer;
+            if (isPiFinalResponse(event.message)) {
+              active.lastCompletedAnswerMessageId = active.assistantMessageId;
+              active.lastCompletedAnswerText = finalAnswer;
+            }
             this.scheduleContextUsageSync(
               sessionId,
               active.assistantMessageId,
@@ -2674,6 +2695,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         break;
 
       case 'tool_execution_start': {
+        active.lastCompletedAnswerMessageId = null;
+        active.lastCompletedAnswerText = '';
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
         // Preserve the shared tool_use message shape.
         if (!event.toolCallId || !event.toolName) break;
@@ -2794,6 +2817,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         break;
 
       case 'agent_end': {
+        if (active.completionPending) break;
         this.finalizeActiveThinking(sessionId, active);
         active.toolStartedAtByCallId.clear();
         const clearActivity = active.toolActivityTracker.clear();
@@ -2861,17 +2885,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           void this.flushFollowUpQueue(sessionId, active);
           break;
         }
-        if (this.store) {
-          this.store.updateSession(sessionId, { status: 'idle' });
-          try {
-            this.store.refreshSessionArtifacts(sessionId);
-          } catch (error) {
-            console.error(
-              `[PiRuntimeAdapter] Failed to refresh artifacts for session ${sessionId}:`,
-              error,
-            );
-          }
-        }
+        let verification: Promise<unknown> | undefined;
         if (active.workbenchRunId && this.workbenchTaskService) {
           const domainWorkflowSnapshot = active.researchRun
             ? active.researchRun.getSnapshot()
@@ -2898,9 +2912,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               ? WorkbenchArtifactVerificationStatus.Pending
               : WorkbenchArtifactVerificationStatus.Verified,
           }));
-          this.workbenchTaskService.completeRun({
+          verification = this.workbenchTaskService.completeRun({
             sessionId,
             runId: active.workbenchRunId,
+            signal: active.abortController.signal,
             workspaceRoot: active.workspaceRoot,
             finalAnswer: active.lastCompletedAnswerText,
             finalMessageId: active.lastCompletedAnswerMessageId,
@@ -2911,12 +2926,36 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             artifactCandidates: deliveryArtifacts,
           });
         }
-        void this.runPostTurnMemoryMaintenance(
-          sessionId,
-          active.workspaceRoot,
-          this.createSessionMemoryCompletion(active),
+        void settlePiWorkbenchCompletion(
+          active,
+          verification,
+          () => this.activeSessions.get(sessionId) === active && !active.aborted,
+          () => {
+            if (this.store) {
+              this.store.updateSession(sessionId, { status: 'idle' });
+              try {
+                this.store.refreshSessionArtifacts(sessionId);
+              } catch (error) {
+                console.error(
+                  `[PiRuntimeAdapter] artifact refresh failed for session ${sessionId}:`,
+                  error,
+                );
+              }
+            }
+            void this.runPostTurnMemoryMaintenance(
+              sessionId,
+              active.workspaceRoot,
+              this.createSessionMemoryCompletion(active),
+            );
+            this.emit('complete', sessionId, null);
+            void this.flushFollowUpQueue(sessionId, active);
+          },
+          error => {
+            console.error(`[PiRuntimeAdapter] completion failed for session ${sessionId}:`, error);
+            this.workbenchTaskService?.failRun?.(sessionId, { message: String(error) });
+            this.emit('error', sessionId, classifyCoworkError(String(error)));
+          },
         );
-        this.emit('complete', sessionId, null);
         break;
       }
 
@@ -2941,6 +2980,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         break;
 
       case 'agent_settled':
+        if (active.completionPending) break;
         // Run settled (covers non-retryable errors with no auto-retry) —
         // surface the deferred error, if any. Idempotent after auto_retry_end.
         active.isRunning = false;

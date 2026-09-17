@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import type { CoworkMessage } from '../../coworkStore';
+import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   buildPiConversationPrompt,
   calculatePiConversationHistoryCharLimit,
@@ -52,6 +53,29 @@ test('keeps the latest complete entries when recovery context exceeds its budget
   expect(prompt).not.toContain('User: 1:');
   expect(prompt).toContain('User: 9:');
   expect(prompt.length).toBeLessThan(61_000);
+});
+
+test('restored history preserves the interruption boundary before the current request', () => {
+  const prompt = buildPiConversationPrompt(
+    [
+      message('answer', 'assistant', 'I still need to generate the presentation.'),
+      message('stop', 'system', '', {
+        interruption: {
+          cause: CoworkInterruptionCause.UserStop,
+          taskId: 'task',
+          sessionId: 'session',
+          interruptionId: 'interruption',
+          recoverable: false,
+        },
+      }),
+    ],
+    '哈哈',
+  );
+  expect(prompt).toContain('The preceding execution was interrupted.');
+  expect(prompt).toContain('unless the current user request explicitly asks to continue or retry');
+  expect(prompt.indexOf('Application:')).toBeGreaterThan(prompt.indexOf('Assistant:'));
+  expect(prompt.indexOf('Application:')).toBeLessThan(prompt.lastIndexOf('User:'));
+  expect(prompt.endsWith('User: 哈哈')).toBe(true);
 });
 
 test('calculates a conservative history budget for the default 32K context', () => {
