@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import { buildAccessSettingsConfig } from './useLocalInferenceAccessSettings';
+import { LlamaCppGatewayAccessMode } from '../../../../shared/llamacpp';
 
 test('preserves the model library directory when applying access settings', () => {
   expect(
@@ -17,6 +18,7 @@ test('preserves the model library directory when applying access settings', () =
   ).toEqual({
     modelsDir: 'D:\\models',
     port: '8080',
+    gatewayAccessMode: LlamaCppGatewayAccessMode.Lan,
     ctxSize: '4096',
     listenHost: '0.0.0.0',
     keepRunningOnAppQuit: false,

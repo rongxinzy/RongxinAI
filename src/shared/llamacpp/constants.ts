@@ -9,6 +9,8 @@ export const LlamaCppIpcChannel = {
   Restart: 'llamacpp:restart',
   GetServiceConfig: 'llamacpp:service-config:get',
   SetServiceConfig: 'llamacpp:service-config:set',
+  GetGatewayLanToken: 'llamacpp:gateway:lan-token:get',
+  RegenerateGatewayLanToken: 'llamacpp:gateway:lan-token:regenerate',
   ModelsDir: 'llamacpp:models-dir',
   SetModelsDir: 'llamacpp:models-dir:set',
   ListLocalModels: 'llamacpp:list-local-models',
@@ -90,6 +92,14 @@ export const LlamaCppMemoryPolicy = {
 export type LlamaCppMemoryPolicy =
   (typeof LlamaCppMemoryPolicy)[keyof typeof LlamaCppMemoryPolicy];
 
+export const LlamaCppGatewayAccessMode = {
+  Local: 'local',
+  Lan: 'lan',
+} as const;
+
+export type LlamaCppGatewayAccessMode =
+  (typeof LlamaCppGatewayAccessMode)[keyof typeof LlamaCppGatewayAccessMode];
+
 export const LlamaCppModelResidencyMode = {
   Timed: 'timed',
   Forever: 'forever',
@@ -157,6 +167,7 @@ export type LlamaCppModelLaunchLogPhase =
 
 export const LlamaCppModelLaunchLogSource = {
   LaunchFlow: 'launch-flow',
+  ProcessOutput: 'process-output',
 } as const;
 
 export type LlamaCppModelLaunchLogSource =

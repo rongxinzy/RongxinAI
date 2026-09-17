@@ -17,6 +17,8 @@ import { configService } from '../../../services/config';
 import { i18nService } from '../../../services/i18n';
 import { themeService } from '../../../services/theme';
 
+const LOG_REFRESH_INTERVAL_MS = 750;
+
 type ModelLaunchLogWindowState = {
   sessionId: string | null;
   modelName: string | null;
@@ -40,6 +42,8 @@ export function ModelLaunchLogWindow() {
     error: null,
   });
   const readVersionRef = useRef(0);
+  const activeSessionIdRef = useRef<string | null>(initialSessionId);
+  const offsetRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -57,11 +61,17 @@ export function ModelLaunchLogWindow() {
   const readSessionLog = useCallback(async (sessionId: string) => {
     const readVersion = readVersionRef.current + 1;
     readVersionRef.current = readVersion;
+    const isSameSession = activeSessionIdRef.current === sessionId;
+    const requestedOffset = isSameSession ? offsetRef.current : 0;
     setState(current => ({ ...current, loading: true, error: null }));
     try {
-      const result = await window.electron.llamacpp.readModelLaunchLogFile({ sessionId });
+      const result = await window.electron.llamacpp.readModelLaunchLogFile({
+        sessionId,
+        ...(requestedOffset > 0 ? { offset: requestedOffset } : {}),
+      });
       if (readVersion !== readVersionRef.current) return;
-      if (!result.success || !result.session) {
+      const resultSession = result.session;
+      if (!result.success || !resultSession) {
         setState(current => ({
           ...current,
           loading: false,
@@ -70,12 +80,19 @@ export function ModelLaunchLogWindow() {
         return;
       }
 
+      const startOffset = result.startOffset ?? 0;
+      const isIncrementalRead =
+        isSameSession && requestedOffset > 0 && startOffset === requestedOffset;
+      activeSessionIdRef.current = resultSession.sessionId;
+      offsetRef.current = result.nextOffset ?? 0;
       setState(current => ({
         ...current,
-        sessionId: result.session?.sessionId ?? sessionId,
-        modelName: result.session?.modelName ?? current.modelName,
-        session: result.session ?? null,
-        content: result.content ?? '',
+        sessionId: resultSession.sessionId,
+        modelName: resultSession.modelName ?? current.modelName,
+        session: resultSession,
+        content: isIncrementalRead
+          ? `${current.content}${result.content ?? ''}`
+          : (result.content ?? ''),
         loading: false,
         error: null,
       }));
@@ -100,13 +117,14 @@ export function ModelLaunchLogWindow() {
         return;
       }
 
+      activeSessionIdRef.current = session.sessionId;
+      offsetRef.current = 0;
       setState(current => ({
         ...current,
         sessionId: session.sessionId,
         modelName: session.modelName,
         session,
       }));
-      await readSessionLog(session.sessionId);
     } catch {
       setState(current => ({
         ...current,
@@ -114,7 +132,7 @@ export function ModelLaunchLogWindow() {
         error: i18nService.t('localInferenceModelLaunchLogWindowReadFailed'),
       }));
     }
-  }, [readSessionLog, state.modelName]);
+  }, [state.modelName]);
 
   useEffect(() => {
     if (state.sessionId) {
@@ -141,6 +159,9 @@ export function ModelLaunchLogWindow() {
           error: null,
         };
       });
+      readVersionRef.current += 1;
+      activeSessionIdRef.current = nextSessionId;
+      offsetRef.current = 0;
     });
     return () => unsubscribe();
   }, []);
@@ -150,6 +171,8 @@ export function ModelLaunchLogWindow() {
       setState(current => {
         if (!shouldClearLaunchLog(event, current.session, current.modelName)) return current;
         readVersionRef.current += 1;
+        activeSessionIdRef.current = null;
+        offsetRef.current = 0;
         return {
           ...current,
           sessionId: null,
@@ -167,15 +190,32 @@ export function ModelLaunchLogWindow() {
   useEffect(() => {
     const unsubscribe = window.electron.llamacpp.onModelLaunchLog(event => {
       if (!shouldFollowLaunchLogEvent(event, state.sessionId, state.modelName)) return;
+      const isCurrentSession = state.sessionId === event.sessionId;
+      if (activeSessionIdRef.current !== event.sessionId) {
+        activeSessionIdRef.current = event.sessionId;
+        offsetRef.current = 0;
+      }
       setState(current => ({
         ...current,
         sessionId: event.sessionId,
         modelName: event.modelName,
       }));
-      void readSessionLog(event.sessionId);
+      if (isCurrentSession) void readSessionLog(event.sessionId);
     });
     return () => unsubscribe();
   }, [readSessionLog, state.modelName, state.sessionId]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const sessionId = activeSessionIdRef.current;
+      if (sessionId) {
+        void readSessionLog(sessionId);
+        return;
+      }
+      void resolveLatestSession();
+    }, LOG_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [readSessionLog, resolveLatestSession]);
 
   const windowTitle = i18nService.t('localInferenceModelLaunchLogWindowTitle');
   const pageTitle = state.modelName ?? windowTitle;

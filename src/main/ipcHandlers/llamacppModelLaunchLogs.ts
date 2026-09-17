@@ -7,7 +7,11 @@ import type {
   LlamaCppOpenModelLaunchLogWindowInput,
   LlamaCppReadModelLaunchLogFileInput,
 } from '../../shared/llamacpp';
-import { LlamaCppIpcChannel } from '../../shared/llamacpp';
+import {
+  LlamaCppIpcChannel,
+  LlamaCppModelLaunchLogPhase,
+  LlamaCppModelLaunchLogSource,
+} from '../../shared/llamacpp';
 import { createLlamaCppModelLaunchLogFileStore } from '../libs/llamacppModelLaunchLogFile';
 import { openLlamaCppModelLaunchLogWindow } from '../libs/llamacppModelLaunchLogWindow';
 
@@ -38,7 +42,7 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
         };
       }
 
-      const result = modelLaunchLogFiles.readSessionLog(sessionId);
+      const result = modelLaunchLogFiles.readSessionLog(sessionId, request?.offset);
       if (!result) {
         return {
           success: false,
@@ -50,6 +54,8 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
         success: true,
         session: result.session,
         content: result.content,
+        startOffset: result.startOffset,
+        nextOffset: result.nextOffset,
       };
     },
   );
@@ -93,10 +99,15 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
     },
 
     sendModelLaunchLog: (event: LlamaCppModelLaunchLogEvent) => {
-      try {
-        modelLaunchLogFiles.append(event);
-      } catch (error) {
-        console.warn('[LlamaCpp] Failed to write model launch log file:', error);
+      if (
+        event.source === LlamaCppModelLaunchLogSource.ProcessOutput ||
+        event.phase === LlamaCppModelLaunchLogPhase.Failed
+      ) {
+        try {
+          modelLaunchLogFiles.append(event);
+        } catch (error) {
+          console.warn('[LlamaCpp] Failed to write model launch log file:', error);
+        }
       }
       input.broadcast(LlamaCppIpcChannel.ModelLaunchLog, event);
     },

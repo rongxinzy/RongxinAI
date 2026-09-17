@@ -1133,8 +1133,8 @@ export interface ProviderDef {
  *
  * This is deliberately not a provider-wide fallback for arbitrary model IDs:
  * accepting an endpoint protocol does not prove that every model routed through
- * that endpoint can emit tool calls. Unknown/custom models must stay Unknown
- * unless they carry explicit metadata or a runtime probe confirms support.
+ * that endpoint can emit tool calls. Explicit model metadata and runtime probes
+ * still override the optimistic fallback used for unverified models.
  */
 const CATALOG_PROVIDER_TOOL_CAPABILITIES: Readonly<
   Record<string, Partial<Record<ApiFormat, ModelCapabilityStatus>>>
@@ -1559,16 +1559,15 @@ class ProviderRegistryImpl {
           : undefined) ??
         // Catalog models keep their evidence requirement — an endpoint
         // accepting `tools` does not prove every model can emit tool calls.
-        // User-added models outside the catalog have no catalog evidence at
-        // all, so the endpoint declaration is the only reasonable default
-        // (this restores the pre-#314 behavior: unknown user models trusted
-        // the endpoint).
+        // The absence of a verdict, however, defaults optimistically to
+        // Supported. Explicit model metadata and runtime detection above
+        // retain precedence for known unsupported models.
         (isCatalogModel
           ? hasVerifiedCatalogToolCalling
             ? endpointToolCalling
             : undefined
           : endpointToolCalling) ??
-        ModelCapabilityStatus.Unknown,
+        ModelCapabilityStatus.Supported,
     };
   }
 

@@ -87,7 +87,7 @@ const runCommand = async (
       if (!settled) stderr = append(stderr, chunk);
     });
     child.once('error', error => finish(() => reject(error)));
-    child.once('exit', code => {
+    child.once('close', code => {
       const exitCode = code ?? -1;
       finish(() => {
         if (acceptedExitCodes.includes(exitCode)) {
