@@ -41,11 +41,15 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
   }, [load, sessionId]);
 
   const runAction = useCallback(
-    async (action: () => Promise<{ success: boolean; error?: string }>) => {
+    async (
+      action: () => Promise<{ success: boolean; error?: string }>,
+      confirmAcceptance = false,
+    ) => {
       setBusy(true);
       try {
         const result = await action();
         if (!result.success) throw new Error(result.error);
+        if (confirmAcceptance) toast.success(i18nService.t('workbenchTaskAcceptedToast'));
       } catch (error) {
         console.error('[WorkbenchTask] Acceptance action failed:', error);
         toast.error(i18nService.t('workbenchTaskActionFailed'));
@@ -99,7 +103,7 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
         <Button
           type="button"
           disabled={busy}
-          onClick={() => void runAction(() => window.electron.workbenchTask.accept(task.id))}
+          onClick={() => void runAction(() => window.electron.workbenchTask.accept(task.id), true)}
         >
           {i18nService.t('workbenchTaskAccept')}
         </Button>

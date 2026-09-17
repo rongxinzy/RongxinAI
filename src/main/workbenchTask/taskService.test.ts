@@ -30,7 +30,13 @@ import {
 import { initializeWorkbenchTaskSchema } from './schema';
 import { initializeProductionLoopSchema } from '../productionLoop/schema';
 import { WorkbenchTaskService } from './taskService';
+import { collectWorkbenchArtifacts } from './artifactCollector';
 import type { WorkbenchTaskServiceOptions } from './taskService';
+
+vi.mock('./artifactWorkerPool', () => ({
+  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
+    collectWorkbenchArtifacts(input),
+}));
 
 const createService = (options: WorkbenchTaskServiceOptions = {}) => {
   const db = new Database(':memory:');
@@ -94,7 +100,7 @@ const prepareProductionDelivery = (
   service.productionLoop.recordDeliveryRequest(runId, 'Critic approved delivery.');
 };
 
-test('completes the production loop only after deterministic verification passes', () => {
+test('completes the production loop only after deterministic verification passes', async () => {
   const { db, service } = createService();
   try {
     const { task, run } = service.beginRun({
@@ -104,7 +110,7 @@ test('completes the production loop only after deterministic verification passes
     });
     prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Chat);
 
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
@@ -120,7 +126,7 @@ test('completes the production loop only after deterministic verification passes
   }
 });
 
-test('emits a verified run source only after deterministic verification passes', () => {
+test('emits a verified run source only after deterministic verification passes', async () => {
   const onVerifiedRun = vi.fn();
   const { db, service } = createService({ onVerifiedRun });
   try {
@@ -130,7 +136,7 @@ test('emits a verified run source only after deterministic verification passes',
       contract: chatContract,
     });
     prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Chat);
-    service.completeRun({
+    await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
@@ -152,7 +158,7 @@ test('emits a verified run source only after deterministic verification passes',
   }
 });
 
-test('registers a declared artifact before production workflow completion', () => {
+test('registers a declared artifact before production workflow completion', async () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-ledger-'));
   const filePath = path.join(workspace, 'report.md');
@@ -163,7 +169,7 @@ test('registers a declared artifact before production workflow completion', () =
       goal: 'create a small report',
       contract: chatContract,
     });
-    const artifact = service.registerArtifact({
+    const artifact = await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -191,7 +197,7 @@ test('registers a declared artifact before production workflow completion', () =
   }
 });
 
-test('promotes a declared artifact when reviewed evidence is projected at completion', () => {
+test('promotes a declared artifact when reviewed evidence is projected at completion', async () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-reviewed-artifact-'));
   const filePath = path.join(workspace, 'report.md');
@@ -202,7 +208,7 @@ test('promotes a declared artifact when reviewed evidence is projected at comple
       goal: 'create a reviewed report',
       contract: chatContract,
     });
-    service.registerArtifact({
+    await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -213,7 +219,7 @@ test('promotes a declared artifact when reviewed evidence is projected at comple
       },
     });
 
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -245,7 +251,7 @@ test('promotes a declared artifact when reviewed evidence is projected at comple
   }
 });
 
-test('returns critic-approved work to revision when deterministic verification fails', () => {
+test('returns critic-approved work to revision when deterministic verification fails', async () => {
   const onVerifiedRun = vi.fn();
   const { db, service } = createService({ onVerifiedRun });
   try {
@@ -260,7 +266,7 @@ test('returns critic-approved work to revision when deterministic verification f
     });
     prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Shortcut);
 
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
@@ -283,7 +289,7 @@ test('returns critic-approved work to revision when deterministic verification f
   }
 });
 
-test('keeps acceptance-required production work ready until explicit user acceptance', () => {
+test('keeps acceptance-required production work ready until explicit user acceptance', async () => {
   const { db, service } = createService();
   try {
     const contract = {
@@ -297,7 +303,7 @@ test('keeps acceptance-required production work ready until explicit user accept
     });
     prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
 
-    const pending = service.completeRun({
+    const pending = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
@@ -322,7 +328,7 @@ test('keeps acceptance-required production work ready until explicit user accept
   }
 });
 
-test('user acceptance promotes pending workspace artifacts to verified', () => {
+test('user acceptance promotes pending workspace artifacts to verified', async () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-accept-artifact-'));
   const filePath = path.join(workspace, 'report.md');
@@ -338,7 +344,7 @@ test('user acceptance promotes pending workspace artifacts to verified', () => {
       contract,
     });
     prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
-    service.registerArtifact({
+    await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -349,7 +355,7 @@ test('user acceptance promotes pending workspace artifacts to verified', () => {
       },
     });
 
-    const pending = service.completeRun({
+    const pending = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -375,7 +381,7 @@ test('user acceptance promotes pending workspace artifacts to verified', () => {
   }
 });
 
-test('baseline pass without the production workflow requires acceptance when artifacts exist', () => {
+test('baseline pass without the production workflow requires acceptance when artifacts exist', async () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-baseline-artifact-'));
   const filePath = path.join(workspace, 'report.md');
@@ -390,7 +396,7 @@ test('baseline pass without the production workflow requires acceptance when art
       goal: 'produce a quick report',
       contract,
     });
-    service.registerArtifact({
+    await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -401,7 +407,7 @@ test('baseline pass without the production workflow requires acceptance when art
       },
     });
 
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -440,7 +446,7 @@ test('baseline pass without the production workflow requires acceptance when art
   }
 });
 
-test('baseline pass without artifacts completes without acceptance', () => {
+test('baseline pass without artifacts completes without acceptance', async () => {
   const { db, service } = createService();
   try {
     const contract = {
@@ -453,7 +459,7 @@ test('baseline pass without artifacts completes without acceptance', () => {
       contract,
     });
 
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
@@ -461,15 +467,13 @@ test('baseline pass without artifacts completes without acceptance', () => {
     });
 
     expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
-    expect(detail.runs[0].verificationResult?.outcome).toBe(
-      WorkbenchVerificationOutcome.Passed,
-    );
+    expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Passed);
   } finally {
     db.close();
   }
 });
 
-test('user acceptance dispatches the verified-run memory promotion', () => {
+test('user acceptance dispatches the verified-run memory promotion', async () => {
   const onVerifiedRun = vi.fn();
   const { db, service } = createService({ onVerifiedRun });
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-accept-promotion-'));
@@ -493,7 +497,7 @@ test('user acceptance dispatches the verified-run memory promotion', () => {
       skillIds: [],
     });
     prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
-    service.registerArtifact({
+    await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -503,7 +507,7 @@ test('user acceptance dispatches the verified-run memory promotion', () => {
         source: WorkbenchArtifactCandidateSource.Declaration,
       },
     });
-    service.completeRun({
+    await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -536,7 +540,7 @@ test('user acceptance dispatches the verified-run memory promotion', () => {
   }
 });
 
-test('lightweight inspected artifacts enter pending and are elevated by acceptance', () => {
+test('lightweight inspected artifacts enter pending and are elevated by acceptance', async () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-lightweight-artifact-'));
   const filePath = path.join(workspace, 'report.md');
@@ -554,7 +558,7 @@ test('lightweight inspected artifacts enter pending and are elevated by acceptan
     // Lightweight production runs submit inspection artifacts that the
     // reviewer never passed: they must land as pending (not be dropped),
     // then be elevated by user acceptance.
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: workspace,
@@ -586,7 +590,7 @@ test('lightweight inspected artifacts enter pending and are elevated by acceptan
   }
 });
 
-test('creates a new task for each ordinary user message', () => {
+test('creates a new task for each ordinary user message', async () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({ sessionId: 'session', goal: 'first', contract: chatContract });
@@ -683,11 +687,11 @@ test('expires pending approvals when a new message supersedes the task', async (
   }
 });
 
-test('explicit retry creates an incremented run under the same completed task', () => {
+test('explicit retry creates an incremented run under the same completed task', async () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({ sessionId: 'session', goal: 'first', contract: chatContract });
-    service.completeRun({
+    await service.completeRun({
       sessionId: 'session',
       runId: first.run.id,
       workspaceRoot: process.cwd(),
@@ -891,7 +895,7 @@ test('rejects tool calls from another session or an inactive run', async () => {
       goal: 'first',
       contract: chatContract,
     });
-    service.completeRun({
+    await service.completeRun({
       sessionId: 'session',
       runId: first.run.id,
       workspaceRoot: process.cwd(),
@@ -950,7 +954,7 @@ test('agent end does not verify a run paused by a denied approval', async () => 
     service.respondToApproval({ approvalId: approval!.id, approved: false });
     await authorization;
 
-    const detail = service.completeRun({
+    const detail = await service.completeRun({
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
@@ -964,7 +968,7 @@ test('agent end does not verify a run paused by a denied approval', async () => 
   }
 });
 
-test('reports only running workbench runs as eligible for continuation', () => {
+test('reports only running workbench runs as eligible for continuation', async () => {
   const { db, service } = createService();
   try {
     const { run } = service.beginRun({
@@ -1143,7 +1147,7 @@ test('startup recovery marks executing effects and their runs for review', async
   }
 });
 
-test('startup recovery marks a verifying run for review', () => {
+test('startup recovery marks a verifying run for review', async () => {
   const { db, service } = createService();
   try {
     const { task, run } = service.beginRun({
@@ -1173,7 +1177,7 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
       goal: 'write a report',
       contract: chatContract,
     });
-    service.registerArtifact({
+    await service.registerArtifact({
       sessionId: 'session',
       runId: first.run.id,
       workspaceRoot: workspace,
@@ -1194,7 +1198,7 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
     });
     service.recordToolResult(first.run.id, 'write-call', { path: filePath }, false);
 
-    const completed = service.completeRun({
+    const completed = await service.completeRun({
       sessionId: 'session',
       runId: first.run.id,
       workspaceRoot: workspace,
@@ -1212,7 +1216,7 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
       goal: 'answer without a file',
       contract: chatContract,
     });
-    const nextCompleted = service.completeRun({
+    const nextCompleted = await service.completeRun({
       sessionId: 'session',
       runId: second.run.id,
       workspaceRoot: workspace,

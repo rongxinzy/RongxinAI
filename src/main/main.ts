@@ -1127,8 +1127,13 @@ const getCodingRoomService = (): CodingRoomService => {
           });
           return { taskId: workbench.task.id, runId: workbench.run.id };
         },
-        completeExternalWorkbenchRun: ({ sessionId, runId, workspaceRoot, finalAnswer }) => {
-          getWorkbenchTaskService().completeRun({ sessionId, runId, workspaceRoot, finalAnswer });
+        completeExternalWorkbenchRun: async ({ sessionId, runId, workspaceRoot, finalAnswer }) => {
+          await getWorkbenchTaskService().completeRun({
+            sessionId,
+            runId,
+            workspaceRoot,
+            finalAnswer,
+          });
         },
         failExternalWorkbenchRun: ({ sessionId, error }) => {
           getWorkbenchTaskService().failRun(sessionId, { message: error });
