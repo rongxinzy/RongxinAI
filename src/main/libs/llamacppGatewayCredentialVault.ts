@@ -27,8 +27,14 @@ export class LlamaCppGatewayCredentialVault {
   }
 
   regenerateLanToken(): string {
+    const credentials = this.vault.getValue<LlamaCppGatewayCredentials>(
+      LLAMACPP_GATEWAY_CREDENTIAL_KEY,
+    );
     const lanToken = randomBytes(LLAMACPP_GATEWAY_TOKEN_BYTES).toString('base64url');
-    this.vault.setValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY, { lanToken });
+    this.vault.setValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY, {
+      ...credentials,
+      lanToken,
+    });
     return lanToken;
   }
 
