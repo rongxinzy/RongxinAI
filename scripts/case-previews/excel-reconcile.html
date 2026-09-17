@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-reconcile</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
+.file{font-weight:600;margin-left:6px}
+.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
+.grid{flex:1;min-height:0;overflow:hidden}
+.row{display:grid;border-top:1px solid #edede9}
+.row:first-child{border-top:0}
+.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
+.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
+.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
+.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
+.warn{color:#b3564a}
+.split{flex:1;display:grid;grid-template-columns:1.25fr 1fr;min-height:0}
+.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
+.pane:last-child{border-right:0}
+.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
+.bars{margin-top:16px;display:grid;gap:11px}
+.bar{display:grid;grid-template-columns:62px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
+.notes{margin-top:14px;display:grid;gap:8px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.7;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+</style></head><body>
+<div class="win" style="--accent:#8B5CF6">
+  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="file">对账差异_2026年9月.xlsx</span>
+    <span class="menu"><span>开始</span><span>数据</span><span>公式</span><span>审阅</span></span>
+  </div>
+  <div class="split">
+    <div class="grid">
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx"></div><div class="cell head">订单号</div><div class="cell head">系统金额</div><div class="cell head">渠道金额</div><div class="cell head">差异</div><div class="cell head">状态</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">2</div><div class="cell mono">SO-28417</div><div class="cell mono">1,284.00</div><div class="cell mono">1,284.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">3</div><div class="cell mono">SO-28409</div><div class="cell mono">642.00</div><div class="cell mono">642.50</div><div class="cell mono warn">-0.50</div><div class="cell hi">待核对</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">4</div><div class="cell mono">NO-11902</div><div class="cell mono">910.00</div><div class="cell mono">910.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">5</div><div class="cell mono">NO-11884</div><div class="cell mono">1,470.00</div><div class="cell mono">1,452.00</div><div class="cell mono warn">+18.00</div><div class="cell hi">待核对</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">6</div><div class="cell mono">SN-5521</div><div class="cell mono">788.00</div><div class="cell mono">788.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">7</div><div class="cell mono">SN-5488</div><div class="cell mono">2,046.00</div><div class="cell mono">0.00</div><div class="cell mono warn">+2,046.00</div><div class="cell hi">缺单</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">8</div><div class="cell mono">WN-3370</div><div class="cell mono">536.00</div><div class="cell mono">536.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx">9</div><div class="cell mono">WN-3358</div><div class="cell mono">1,120.00</div><div class="cell mono">1,120.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
+        <div class="cell idx"></div><div class="cell total">合计</div><div class="cell total mono">2,184,620</div><div class="cell total mono">2,182,111</div><div class="cell total mono">2,509</div><div class="cell total">17 待核对</div>
+      </div>
+<div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">14</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">15</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">16</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">17</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
+    </div>
+    <div class="pane">
+      <h3>差异类型分布</h3>
+      <p style="margin-top:10px;font-size:12px;color:#8b8f97;line-height:1.7">本期共核对 3,231 单,其中 17 单存在差异</p>
+      <div class="bars">
+        <div class="bar"><span>四舍五入</span><i style="width:100%"></i><span class="mono">9</span></div>
+        <div class="bar"><span>渠道缺单</span><i style="width:55%"></i><span class="mono">5</span></div>
+        <div class="bar"><span>退款未同步</span><i style="width:33%"></i><span class="mono">3</span></div>
+        <div class="bar"><span>手续费口径</span><i style="width:22%"></i><span class="mono">2</span></div>
+      </div>
+      <h3 style="margin-top:24px">处理建议</h3>
+      <div class="notes">
+        <div>9 笔为分位取整差异，金额均小于 1 元，可按容差自动勾稽</div>
+        <div>5 笔渠道缺单集中在 9 月 3 日，需向渠道方索要当日的原始流水</div>
+        <div>退款未同步的 3 笔建议按 T+1 重新拉取一次渠道对账文件</div>
+      </div>
+    </div>
+  </div>
+</div></body></html>

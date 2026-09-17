@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-product-plan</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:0;display:block}
+.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
+.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
+.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
+h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
+.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
+.rule{margin-top:26px;height:1px;background:#e6e6e2}
+.body{margin-top:30px;display:grid;gap:26px;flex:1}
+.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
+.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
+.cols2{grid-template-columns:1fr 1fr}
+.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
+.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
+ul{list-style:none;margin-top:10px;display:grid;gap:8px}
+li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
+li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
+
+.matrix{margin-top:8px;border:1px solid #e6e6e2}
+.matrix .row{display:grid;grid-template-columns:1.5fr 1fr .9fr;border-top:1px solid #e6e6e2}
+.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
+.matrix .row div{padding:10px 14px;font-size:13px;border-left:1px solid #e6e6e2;color:#4c5058}
+.matrix .row div:first-child{border-left:0}
+.phases{margin-top:12px;display:grid;gap:0}
+.phase{display:grid;grid-template-columns:64px 1fr;gap:14px;padding:10px 0;border-top:1px solid #e6e6e2;font-size:13px;color:#4c5058}
+.phase:first-child{border-top:0}
+.phase b{color:var(--accent);font-weight:600}
+</style></head>
+<body>
+<div class="slide" style="--accent:#F59E0B">
+  <div class="kicker">Product Proposal</div>
+  <h1>智能工单助手产品方案</h1>
+  <p class="lede">面向商家中台的工单自动化能力设计、版本节奏与资源投入评估</p>
+  <div class="rule"></div>
+  <div class="body" style="grid-template-columns:1.05fr 1fr">
+    <div class="blk">
+      <h2>01 需求与场景</h2>
+      <p>商家后台每天产生约 3,200 张工单，其中 68% 属于重复咨询，人工分派与回复消耗了客服团队近一半的工作时间。</p>
+      <ul>
+        <li>夜间异常单无人分派，平均滞留 4.2 小时</li>
+        <li>同一问题在不同商家间重复出现，缺少模板沉淀</li>
+        <li>处理过程不留痕，纠纷时无法回溯</li>
+      </ul>
+      <h2 style="margin-top:24px">02 方案要点</h2>
+      <div class="matrix">
+        <div class="row"><div>能力</div><div>覆盖场景</div><div>优先级</div></div>
+        <div class="row"><div>智能分类</div><div>18 类常见问题</div><div>P0</div></div>
+        <div class="row"><div>自动分派</div><div>夜间与高峰时段</div><div>P0</div></div>
+        <div class="row"><div>回复建议</div><div>重复咨询模板库</div><div>P1</div></div>
+        <div class="row"><div>过程留痕</div><div>全量操作记录</div><div>P1</div></div>
+      </div>
+    </div>
+    <div class="blk">
+      <h2>03 版本节奏</h2>
+      <div class="phases">
+        <div class="phase"><b>V1.0</b><span>分类与分派上线，灰度 3 家商家，验证准确率</span></div>
+        <div class="phase"><b>V1.1</b><span>接入模板库，回复建议进入客服工作台</span></div>
+        <div class="phase"><b>V1.2</b><span>全量开放并补齐操作留痕与审计导出</span></div>
+      </div>
+      <h2 style="margin-top:24px">04 投入与预期</h2>
+      <p>预计投入 3 人 6 周。目标是把人均日处理量从 40 单提升到 120 单，夜间工单滞留时间压到 30 分钟以内。</p>
+    </div>
+  </div>
+  <div class="brandline">云帆科技 · 商家工具组</div>
+  <div class="pageno">03 / 16</div>
+</div></body></html>

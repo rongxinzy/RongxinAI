@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --paper: #eef0e9;
+    --paper-2: #e3e7dd;
+    --card: #f8f9f5;
+    --ink: #20241d;
+    --muted: #6a7062;
+    --rule: #d2d7ca;
+    --rule-strong: #b6bda9;
+    --accent: #55682f;
+    --accent-2: #a9482a;
+    --on-accent: #f4f6ee;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --serif: Georgia, "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", SimSun, serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --max: 1080px;
+    --bar: 68px;
+    --gap: 76px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-themed]) {
+      --paper: #14170f;
+      --paper-2: #1b1f15;
+      --card: #1e2318;
+      --ink: #e9ebdf;
+      --muted: #9ba18d;
+      --rule: #2d3224;
+      --rule-strong: #3f4633;
+      --accent: #adc06f;
+      --accent-2: #d3704a;
+      --on-accent: #14170f;
+      color-scheme: dark;
+    }
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.62;
+    letter-spacing: 0.01em;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, p, figure { margin: 0; }
+
+  .wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 40px; }
+
+  .skip {
+    position: absolute; left: -9999px;
+    background: var(--ink); color: var(--paper);
+    padding: 10px 16px; z-index: 50;
+  }
+  .skip:focus { left: 12px; top: 12px; }
+
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  /* ── 顶栏 ─────────────────────────────────────────────── */
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .bar-inner {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    height: var(--bar);
+  }
+
+  .shop-name {
+    font-family: var(--serif);
+    font-size: 20px;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .bar-nav { display: flex; gap: 30px; margin-left: auto; }
+
+  .bar-nav a {
+    font-size: 13.5px;
+    color: var(--muted);
+    padding: 6px 0;
+    border-bottom: 1px solid transparent;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .bar-nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+
+  .bar-hours {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    white-space: nowrap;
+    padding-left: 30px;
+    border-left: 1px solid var(--rule);
+  }
+
+  /* ── 首屏 ─────────────────────────────────────────────── */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+    align-items: center;
+    padding-top: 56px;
+    padding-bottom: 64px;
+  }
+
+  .hero-art {
+    position: relative;
+    height: clamp(300px, 42vh, 420px);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 39px, color-mix(in srgb, var(--rule) 55%, transparent) 39px 40px),
+      repeating-linear-gradient(0deg, transparent 0 39px, color-mix(in srgb, var(--rule) 55%, transparent) 39px 40px),
+      var(--paper-2);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+
+  .hero-art::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 22%;
+    background: var(--paper);
+    border-top: 1px solid var(--rule-strong);
+  }
+
+  .art-plate {
+    position: absolute;
+    right: 14%;
+    bottom: 22%;
+    width: 36%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .art-plate::after {
+    content: "";
+    position: absolute;
+    inset: 19%;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--paper) 62%, transparent);
+  }
+
+  .art-bottle {
+    position: absolute;
+    left: 16%;
+    bottom: 22%;
+    width: 14%;
+    height: 44%;
+    background: var(--ink);
+    border-radius: 44% 44% 3px 3px / 20% 20% 3px 3px;
+  }
+  .art-bottle::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    translate: -50% 0;
+    width: 34%;
+    height: 15%;
+    background: var(--ink);
+  }
+
+  .art-bowl {
+    position: absolute;
+    left: 39%;
+    bottom: 22%;
+    width: 22%;
+    height: 12%;
+    background: var(--accent-2);
+    border-radius: 0 0 999px 999px;
+  }
+
+  .art-bowl::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 26%;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent-2) 62%, var(--paper));
+  }
+
+  .hero-card {
+    position: relative;
+    margin-left: -76px;
+    background: var(--card);
+    border: 1px solid var(--rule);
+    padding: 44px 40px 40px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--rule-strong);
+    padding: 5px 10px;
+    margin-bottom: 24px;
+  }
+
+  .hero-title {
+    font-family: var(--serif);
+    font-size: clamp(28px, 3.1vw, 38px);
+    line-height: 1.26;
+    font-weight: 400;
+    text-wrap: balance;
+  }
+
+  .hero-slogan {
+    margin-top: 18px;
+    color: var(--muted);
+    max-width: 34ch;
+    text-wrap: balance;
+  }
+
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 22px;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+    cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+  }
+  .btn:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
+  .btn-ghost:hover { background: transparent; color: var(--accent); border-color: var(--accent); }
+
+  /* ── 区块 ─────────────────────────────────────────────── */
+  .section { padding: var(--gap) 0; border-top: 1px solid var(--rule); }
+
+  .section-head { max-width: 60ch; }
+
+  .section-title {
+    font-family: var(--serif);
+    font-size: clamp(23px, 2.5vw, 29px);
+    line-height: 1.28;
+    font-weight: 400;
+    text-wrap: balance;
+  }
+
+  .section-lede { margin-top: 14px; color: var(--muted); max-width: 54ch; text-wrap: balance; }
+
+  .head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+  .head-note {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ── 招牌 ─────────────────────────────────────────────── */
+  .picks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px; margin-top: 42px; }
+
+  .pick { border-top: 2px solid var(--accent); padding-top: 22px; }
+  .pick:nth-child(2) { border-top-color: var(--accent-2); }
+  .pick:nth-child(3) { border-top-color: var(--ink); }
+
+  .swatch {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 31px, color-mix(in srgb, var(--rule) 55%, transparent) 31px 32px),
+      repeating-linear-gradient(0deg, transparent 0 31px, color-mix(in srgb, var(--rule) 55%, transparent) 31px 32px),
+      var(--paper-2);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+
+  .swatch::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 26%;
+    background: var(--paper);
+    border-top: 1px solid var(--rule-strong);
+  }
+
+  .swatch span { position: absolute; display: block; }
+  .sw-a { left: 50%; bottom: 26%; translate: -50% 0; width: 44%; aspect-ratio: 1; border-radius: 50%; background: var(--accent); }
+  .sw-b { left: 50%; bottom: 26%; translate: -50% 0; width: 42%; height: 21%; background: var(--accent-2); border-radius: 0 0 999px 999px; }
+  .sw-c { left: 50%; bottom: 26%; translate: -50% 0; width: 22%; height: 40%; background: var(--ink); border-radius: 44% 44% 3px 3px / 20% 20% 3px 3px; }
+  .sw-a::after { content: ""; position: absolute; inset: 17%; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--paper) 58%, transparent); }
+  .sw-c::after { content: ""; position: absolute; left: 50%; bottom: 100%; translate: -50% 0; width: 34%; height: 14%; background: var(--ink); }
+
+  .pick-name { font-family: var(--serif); font-size: 19px; margin-top: 20px; }
+  .pick-price { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; color: var(--accent-2); margin-top: 6px; }
+  .pick-note { margin-top: 12px; color: var(--muted); font-size: 13.5px; }
+
+  /* ── 菜单 ─────────────────────────────────────────────── */
+  .menu-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 64px; margin-top: 42px; }
+
+  .group-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink);
+    padding-bottom: 13px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .menu-item { display: flex; align-items: baseline; gap: 10px; padding: 13px 0; }
+  .menu-text { min-width: 0; }
+  .menu-name { font-size: 15px; }
+  .menu-sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .leader { flex: 1 1 auto; min-width: 16px; border-bottom: 1px dotted var(--rule-strong); translate: 0 -4px; }
+  .menu-price { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ── 到店 ─────────────────────────────────────────────── */
+  .visit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(32px, 5vw, 72px); margin-top: 42px; }
+
+  .col-label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .visit-line { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 14px; padding: 14px 0; }
+  .visit-key { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+  .visit-value { font-size: 14.5px; }
+
+  .map {
+    position: relative;
+    aspect-ratio: 5 / 4;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 47px, var(--rule) 47px 48px),
+      repeating-linear-gradient(0deg, transparent 0 47px, var(--rule) 47px 48px),
+      var(--paper-2);
+    border: 1px solid var(--rule);
+    overflow: hidden;
+  }
+
+  .map-road-h { position: absolute; left: 0; right: 0; height: 5px; background: var(--paper); border-top: 1px solid var(--rule-strong); border-bottom: 1px solid var(--rule-strong); }
+  .map-road-v { position: absolute; top: 0; bottom: 0; width: 5px; background: var(--paper); border-left: 1px solid var(--rule-strong); border-right: 1px solid var(--rule-strong); }
+  .map-road-h.one { top: 38%; }
+  .map-road-v.one { left: 58%; }
+
+  .map-pin {
+    position: absolute;
+    left: 58%; top: 38%;
+    width: 15px; height: 15px;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: var(--accent-2);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent-2) 22%, transparent);
+  }
+
+  .map-tag {
+    position: absolute;
+    left: 58%; top: 38%;
+    translate: 16px 12px;
+    background: var(--card);
+    border: 1px solid var(--rule-strong);
+    padding: 6px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+
+  /* ── 收尾 ─────────────────────────────────────────────── */
+  .closing { text-align: center; padding: var(--gap) 0 calc(var(--gap) + 8px); border-top: 1px solid var(--rule); }
+  .closing-title { font-family: var(--serif); font-size: clamp(24px, 2.7vw, 33px); font-weight: 400; line-height: 1.26; text-wrap: balance; }
+  .closing-text { margin-top: 16px; color: var(--muted); max-width: 46ch; margin-left: auto; margin-right: auto; text-wrap: balance; }
+  .closing-actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 28px; }
+
+  /* ── 页脚 ─────────────────────────────────────────────── */
+  .foot { border-top: 1px solid var(--rule); }
+  .foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px 24px;
+    padding: 26px 0 44px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .foot-brand { font-family: var(--serif); letter-spacing: 0.24em; }
+
+  /* ── 响应式 ───────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .wrap { padding: 0 24px; }
+    .hero { grid-template-columns: 1fr; padding-top: 40px; }
+    .hero-art { height: clamp(240px, 40vh, 320px); }
+    .hero-card { margin-left: 0; margin-top: -44px; margin-right: 20px; padding: 34px 28px 30px; }
+    .bar-hours { display: none; }
+    .bar-nav { gap: 22px; }
+    .picks { grid-template-columns: 1fr; gap: 34px; }
+    .menu-cols { grid-template-columns: 1fr; gap: 0; }
+    .menu-group + .menu-group { margin-top: 40px; }
+    .visit-grid { grid-template-columns: 1fr; }
+    :root { --gap: 60px; }
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 0 18px; }
+    .shop-name { font-size: 17px; letter-spacing: 0.3em; text-indent: 0.3em; }
+    .bar-nav { gap: 16px; }
+    .bar-nav a { font-size: 13px; }
+    .hero-card { margin-right: 0; padding: 28px 22px 26px; }
+    .visit-line { grid-template-columns: 56px minmax(0, 1fr); gap: 10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <a class="shop-name" id="shop-name" href="#top"></a>
+    <nav class="bar-nav" id="bar-nav" aria-label="页面导航"></nav>
+    <span class="bar-hours" id="shop-hours"></span>
+  </div>
+</header>
+
+<main id="main">
+  <section class="wrap hero" id="top">
+    <div class="hero-art" role="img" aria-label="工作台上一只瓶、一只碗和一只盘">
+      <span class="art-plate"></span>
+      <span class="art-bottle"></span>
+      <span class="art-bowl"></span>
+    </div>
+
+    <div class="hero-card">
+      <p class="badge" id="hero-badge"></p>
+      <h1 class="hero-title" id="hero-title"></h1>
+      <p class="hero-slogan" id="hero-slogan"></p>
+      <div class="hero-actions" id="hero-actions"></div>
+    </div>
+  </section>
+
+  <section class="section" id="picks">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="head-row">
+          <h2 class="section-title" id="picks-title"></h2>
+          <span class="head-note" id="picks-note"></span>
+        </div>
+        <p class="section-lede" id="picks-lede"></p>
+      </div>
+      <div class="picks" id="picks-grid"></div>
+    </div>
+  </section>
+
+  <section class="section" id="menu">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 class="section-title" id="menu-title"></h2>
+        <p class="section-lede" id="menu-lede"></p>
+      </div>
+      <div class="menu-cols" id="menu-cols"></div>
+    </div>
+  </section>
+
+  <section class="section" id="visit">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 class="section-title" id="visit-title"></h2>
+      </div>
+      <div class="visit-grid">
+        <div>
+          <p class="col-label" id="visit-info-label"></p>
+          <div id="visit-lines"></div>
+        </div>
+        <div>
+          <p class="col-label" id="visit-map-label"></p>
+          <div class="map">
+            <span class="map-road-h one"></span>
+            <span class="map-road-v one"></span>
+            <span class="map-pin"></span>
+            <span class="map-tag" id="map-tag"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="closing" id="closing">
+    <div class="wrap">
+      <h2 class="closing-title" id="closing-title"></h2>
+      <p class="closing-text" id="closing-text"></p>
+      <div class="closing-actions" id="closing-actions"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <span class="foot-brand" id="foot-brand"></span>
+    <span id="foot-note"></span>
+  </div>
+</footer>
+
+<script>
+/* ── 可编辑区 ─────────────────────────────────────────────
+   交付时只改这一个对象；下面的渲染层与 <style> 不要动。
+   theme 留空即沿用 CSS 默认配色（跟随系统深浅色）。
+   ──────────────────────────────────────────────────────── */
+const TEMPLATE = {
+  meta: {
+    lang: 'zh-CN',
+    title: '素窑 · 手作陶器与日常器物',
+    description: '一间做日用餐具的陶艺工作室，可以到店挑选，也可以按尺寸预订。',
+  },
+
+  // 留空即用默认：冷骨白底 + 橄榄绿强调 + 砖红次强调
+  theme: {},
+
+  shop: {
+    name: '素窑',
+    hoursShort: '周二至周日 10:00-19:00',
+    nav: [
+      { label: '招牌', target: '#picks' },
+      { label: '器物单', target: '#menu' },
+      { label: '到店', target: '#visit' },
+    ],
+  },
+
+  hero: {
+    badge: '陶艺工作室',
+    title: '把一只手感留在每天都要用的碗上',
+    slogan: '拉坯、修足、上釉都在店里完成，一趟烧成，不做代工。',
+    primary: { label: '看作坊出品', target: '#picks' },
+    secondary: { label: '预约到店', target: '#visit' },
+  },
+
+  picks: {
+    title: '这一季出窑的三件',
+    note: '每窑约 40 件',
+    lede: '每窑的釉色都会走一点，尺寸也差在几毫米之间。下面写的是一窑里最稳的那三件。',
+    items: [
+      {
+        name: '粗陶饭碗',
+        price: '96 元 / 只',
+        note: '内壁留着拉坯的旋纹，盛热汤不烫手。',
+      },
+      {
+        name: '灰釉浅盘',
+        price: '128 元 / 只',
+        note: '盘沿压过一道指痕，深浅每只都不一样。',
+      },
+      {
+        name: '直身花器',
+        price: '260 元 / 只',
+        note: '口沿收窄，插三五枝就够看。',
+      },
+    ],
+  },
+
+  menu: {
+    title: '器物单',
+    lede: '店里常年备着的一批，单价以元计，含釉料与烧成。缺货的可以登记等下一窑。',
+    groups: [
+      {
+        name: '日常器',
+        items: [
+          { name: '粗陶饭碗', sub: '内壁旋纹，可进洗碗机', price: '96' },
+          { name: '灰釉浅盘', sub: '直径 21cm', price: '128' },
+          { name: '高足茶盏', sub: '120ml', price: '86' },
+          { name: '直身花器', sub: '高 24cm', price: '260' },
+          { name: '双耳汤钵', sub: '带盖，1.2L', price: '320' },
+        ],
+      },
+      {
+        name: '茶与花',
+        items: [
+          { name: '侧把急须', sub: '200ml，配滤网', price: '380' },
+          { name: '茶入', sub: '装 100g 茶叶', price: '150' },
+          { name: '公道杯', sub: '薄胎，出水利落', price: '168' },
+          { name: '花器托', sub: '白橡木', price: '120' },
+          { name: '陶制花留', sub: '一对', price: '60' },
+        ],
+      },
+    ],
+  },
+
+  visit: {
+    title: '到店',
+    infoLabel: '门店信息',
+    mapLabel: '位置示意',
+    lines: [
+      { key: '地址', value: '杭州市拱墅区小河直街 12 号院内，进门左手第二间' },
+      { key: '营业', value: '周二至周日 10:00-19:00，周一闭店' },
+      { key: '电话', value: '0571 8722 4198' },
+      { key: '提示', value: '拉坯课每场四人，需提前三天约；窑边地面滑，别穿高跟鞋' },
+    ],
+  },
+
+  closing: {
+    title: '想先摸一下再决定',
+    text: '到店可以上手试握，也可以把尺寸和用途说清楚，我们按需拉坯。',
+    primary: { label: '打给店里', href: 'tel:057187224198' },
+    secondary: { label: '预约到店', href: '#visit' },
+  },
+
+  footer: {
+    brand: '素窑',
+    note: '杭州 · 二〇一六年开窑',
+  },
+};
+
+/* ── 渲染层（不要修改） ──────────────────────────────────── */
+(function render() {
+  const byId = id => document.getElementById(id);
+  const setText = (id, value) => {
+    const node = byId(id);
+    if (node && value != null) node.textContent = value;
+  };
+  const el = (tag, cls, text) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  };
+  const text = (parent, cls, value) => {
+    if (value == null || value === '') return null;
+    const node = el('p', cls, value);
+    parent.appendChild(node);
+    return node;
+  };
+
+  if (TEMPLATE.meta) {
+    if (TEMPLATE.meta.lang) document.documentElement.lang = TEMPLATE.meta.lang;
+    if (TEMPLATE.meta.title) {
+      document.title = TEMPLATE.meta.title;
+      setText('doc-title', TEMPLATE.meta.title);
+    }
+    if (TEMPLATE.meta.description) {
+      const meta = byId('doc-desc');
+      if (meta) meta.setAttribute('content', TEMPLATE.meta.description);
+    }
+  }
+
+  const THEME_VARS = {
+    paper: '--paper',
+    paper2: '--paper-2',
+    card: '--card',
+    ink: '--ink',
+    muted: '--muted',
+    rule: '--rule',
+    accent: '--accent',
+    accent2: '--accent-2',
+  };
+  const theme = TEMPLATE.theme || {};
+  let themed = false;
+  Object.keys(THEME_VARS).forEach(key => {
+    const value = theme[key];
+    if (typeof value === 'string' && value) {
+      document.documentElement.style.setProperty(THEME_VARS[key], value);
+      themed = true;
+    }
+  });
+  // 自定义配色后固定为浅色底，避免深色模式下两套变量互相覆盖
+  if (themed) document.documentElement.setAttribute('data-themed', '');
+
+  const shop = TEMPLATE.shop || {};
+  setText('shop-name', shop.name);
+  setText('shop-hours', shop.hoursShort);
+  const nav = byId('bar-nav');
+  if (nav) {
+    (shop.nav || []).forEach(item => {
+      const link = el('a', null, item.label);
+      link.href = item.target || '#top';
+      nav.appendChild(link);
+    });
+  }
+
+  const hero = TEMPLATE.hero || {};
+  setText('hero-badge', hero.badge);
+  setText('hero-title', hero.title);
+  setText('hero-slogan', hero.slogan);
+  const heroActions = byId('hero-actions');
+  if (heroActions) {
+    [hero.primary, hero.secondary].forEach((action, index) => {
+      if (!action || !action.label) return;
+      const link = el('a', index === 0 ? 'btn' : 'btn btn-ghost', action.label);
+      link.href = action.target || '#top';
+      heroActions.appendChild(link);
+    });
+  }
+
+  const picks = TEMPLATE.picks || {};
+  setText('picks-title', picks.title);
+  setText('picks-note', picks.note);
+  setText('picks-lede', picks.lede);
+  const picksGrid = byId('picks-grid');
+  if (picksGrid) {
+    const variants = ['sw-b', 'sw-a', 'sw-c'];
+    (picks.items || []).forEach((item, index) => {
+      const card = el('article', 'pick');
+      const swatch = el('div', 'swatch');
+      swatch.setAttribute('aria-hidden', 'true');
+      swatch.appendChild(el('span', variants[index % variants.length]));
+      card.appendChild(swatch);
+      card.appendChild(el('h3', 'pick-name', item.name));
+      card.appendChild(el('p', 'pick-price', item.price));
+      text(card, 'pick-note', item.note);
+      picksGrid.appendChild(card);
+    });
+  }
+
+  const menu = TEMPLATE.menu || {};
+  setText('menu-title', menu.title);
+  setText('menu-lede', menu.lede);
+  const menuCols = byId('menu-cols');
+  if (menuCols) {
+    (menu.groups || []).forEach(group => {
+      const box = el('div', 'menu-group');
+      box.appendChild(el('p', 'group-name', group.name));
+      (group.items || []).forEach(item => {
+        const row = el('div', 'menu-item');
+        const body = el('div', 'menu-text');
+        body.appendChild(el('div', 'menu-name', item.name));
+        if (item.sub) body.appendChild(el('div', 'menu-sub', item.sub));
+        row.appendChild(body);
+        const leader = el('span', 'leader');
+        leader.setAttribute('aria-hidden', 'true');
+        row.appendChild(leader);
+        row.appendChild(el('span', 'menu-price', item.price));
+        box.appendChild(row);
+      });
+      menuCols.appendChild(box);
+    });
+  }
+
+  const visit = TEMPLATE.visit || {};
+  setText('visit-title', visit.title);
+  setText('visit-info-label', visit.infoLabel);
+  setText('visit-map-label', visit.mapLabel);
+  setText('map-tag', shop.name);
+  const visitLines = byId('visit-lines');
+  if (visitLines) {
+    (visit.lines || []).forEach(line => {
+      const row = el('div', 'visit-line');
+      row.appendChild(el('div', 'visit-key', line.key));
+      row.appendChild(el('div', 'visit-value', line.value));
+      visitLines.appendChild(row);
+    });
+  }
+
+  const closing = TEMPLATE.closing || {};
+  setText('closing-title', closing.title);
+  setText('closing-text', closing.text);
+  const closingActions = byId('closing-actions');
+  if (closingActions) {
+    [closing.primary, closing.secondary].forEach((action, index) => {
+      if (!action || !action.label) return;
+      const link = el('a', index === 0 ? 'btn' : 'btn btn-ghost', action.label);
+      link.href = action.href || '#top';
+      closingActions.appendChild(link);
+    });
+  }
+
+  const footer = TEMPLATE.footer || {};
+  setText('foot-brand', footer.brand);
+  setText('foot-note', footer.note);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1587 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>经纬 · 把散落的事件流压成一张可查询的网格</title>
+<meta name="description" content="经纬把 23 类数据源接入同一张事件网格，p95 查询稳定在 68 毫秒以内。">
+<style>
+  :root {
+    color-scheme: dark;
+    --canvas: #0b0d10;
+    --surface: #12151a;
+    --surface-2: #171b21;
+    --ink: #e9edf2;
+    --ink-soft: #b6bec8;
+    --muted: #7d8794;
+    --rule: rgba(233, 237, 242, 0.12);
+    --rule-strong: rgba(233, 237, 242, 0.26);
+    --accent: #2ee6d6;
+    --accent-ink: #04211f;
+    --accent-dim: rgba(46, 230, 214, 0.16);
+    --gutter: clamp(20px, 4vw, 44px);
+    --measure: 62ch;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font: 400 15px/1.7 var(--sans);
+    letter-spacing: 0.004em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  a { color: inherit; text-decoration: none; }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 1px;
+  }
+
+  .skip {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 40;
+    background: var(--accent);
+    color: var(--accent-ink);
+    padding: 10px 16px;
+  }
+
+  .skip:focus { left: 12px; top: 12px; }
+
+  .wrap {
+    width: 100%;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 0 var(--gutter);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .rule-top { border-top: 1px solid var(--rule); }
+
+  /* ── 顶栏 ─────────────────────────────────────────────── */
+  header.nav {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--canvas) 82%, transparent);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    height: 62px;
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+
+  .brand-mark {
+    font-weight: 650;
+    font-size: 17px;
+    letter-spacing: 0.16em;
+  }
+
+  .brand-latin {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 26px;
+    margin-left: auto;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+
+  .nav-links a { position: relative; padding: 4px 0; }
+
+  .nav-links a::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 100%;
+    bottom: 0;
+    height: 1px;
+    background: var(--accent);
+    transition: right 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .nav-links a:hover { color: var(--ink); }
+
+  .nav-links a:hover::after { right: 0; }
+
+  .nav-cta { margin-left: 4px; }
+
+  /* ── 按钮 ─────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 0 20px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 2px;
+    font-size: 13.5px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background-color 220ms ease, border-color 220ms ease, color 220ms ease, transform 160ms ease;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn:active { transform: translateY(1px); }
+
+  .btn-solid {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+
+  .btn-solid:hover { background: #59f0e2; border-color: #59f0e2; color: var(--accent-ink); }
+
+  /* ── 首屏 ─────────────────────────────────────────────── */
+  .hero-band {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: min(700px, calc(100svh - 62px));
+    padding: clamp(40px, 6vh, 72px) var(--gutter) clamp(32px, 4.5vh, 56px);
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+    gap: clamp(28px, 4vw, 62px);
+    align-items: center;
+  }
+
+  .hero-copy { max-width: min(100%, 560px); }
+
+  .hero h1 {
+    margin: 16px 0 0;
+    font-size: clamp(28px, 3.3vw, 48px);
+    line-height: 1.16;
+    text-wrap: balance;
+    font-weight: 640;
+    letter-spacing: -0.02em;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 2px;
+  }
+
+  .hero-lede {
+    margin: 20px 0 0;
+    color: var(--ink-soft);
+    max-width: 42ch;
+    text-wrap: balance;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 30px;
+  }
+
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    margin-top: clamp(38px, 5vh, 60px);
+    border-top: 1px solid var(--rule);
+  }
+
+  .stat { padding: 18px 14px 0 0; }
+
+  .stat-key {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .stat-value {
+    display: block;
+    margin-top: 8px;
+    font-family: var(--sans);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(24px, 2.6vw, 34px);
+    line-height: 1;
+    letter-spacing: -0.012em;
+    font-weight: 560;
+  }
+
+  .stat-unit {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+
+  /* 仪表：首屏右半边的可视化面板 */
+  .instrument {
+    position: relative;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--surface-2), var(--surface));
+    overflow: hidden;
+  }
+
+  .instrument-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .instrument-live { display: inline-flex; align-items: center; gap: 7px; }
+
+  .instrument-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-dim);
+    animation: pulse 2400ms ease-out infinite;
+  }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(46, 230, 214, 0.34); }
+    70% { box-shadow: 0 0 0 9px rgba(46, 230, 214, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(46, 230, 214, 0); }
+  }
+
+  .instrument-readout {
+    font-family: var(--sans);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+    font-weight: 560;
+    color: var(--ink);
+  }
+
+  .instrument canvas {
+    display: block;
+    width: 100%;
+    height: clamp(240px, 34vh, 340px);
+  }
+
+  .instrument-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+
+  /* ── 分节标题 ─────────────────────────────────────────── */
+  .section { padding: clamp(64px, 9vh, 112px) 0; }
+
+  .section-head { max-width: var(--measure); }
+
+  .section-head h2 {
+    margin: 14px 0 0;
+    font-size: clamp(26px, 3.2vw, 40px);
+    line-height: 1.16;
+    text-wrap: balance;
+    font-weight: 620;
+    letter-spacing: -0.014em;
+  }
+
+  .section-head p { margin: 16px 0 0; color: var(--ink-soft); text-wrap: balance; }
+
+  /* ── 三段工作流（左粘右滚） ───────────────────────────── */
+  .flow-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(28px, 5vw, 72px);
+    align-items: start;
+    margin-top: 52px;
+  }
+
+  .flow-visual {
+    position: sticky;
+    top: 92px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--surface);
+    padding: 18px;
+  }
+
+  .morph {
+    position: relative;
+    height: clamp(230px, 30vh, 300px);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background:
+      linear-gradient(90deg, var(--rule) 1px, transparent 1px) 0 0 / 25% 100%,
+      linear-gradient(180deg, var(--rule) 1px, transparent 1px) 0 0 / 100% 25%,
+      var(--canvas);
+    overflow: hidden;
+  }
+
+  .morph-dot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+    transition: transform 900ms cubic-bezier(0.22, 0.7, 0.2, 1), background-color 500ms ease, opacity 500ms ease;
+  }
+
+  .morph.is-lattice .morph-dot { background: var(--accent); }
+
+  .morph-rows {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 9px;
+    padding: 0 22px;
+    opacity: 0;
+    transition: opacity 520ms ease;
+  }
+
+  .morph.is-rows .morph-rows { opacity: 1; }
+
+  .morph.is-rows .morph-dot { opacity: 0.18; }
+
+  .morph-row {
+    display: grid;
+    grid-template-columns: 74px 1fr 52px;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+
+  .morph-bar { height: 6px; background: var(--accent); border-radius: 1px; opacity: 0.72; }
+
+  .flow-caption {
+    margin: 14px 0 0;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .steps { display: flex; flex-direction: column; }
+
+  .step {
+    padding: 30px 0 34px;
+    border-top: 1px solid var(--rule);
+    opacity: 0.42;
+    transition: opacity 420ms ease;
+  }
+
+  .step:first-child { border-top: 0; padding-top: 0; }
+
+  .step.is-active { opacity: 1; }
+
+  .step-index {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+
+  .step h3 {
+    margin: 12px 0 0;
+    font-size: clamp(19px, 1.7vw, 24px);
+    font-weight: 600;
+    letter-spacing: -0.008em;
+  }
+
+  .step p { margin: 12px 0 0; color: var(--ink-soft); max-width: 46ch; }
+
+  .step-metric {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 5px 10px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  /* ── 指标 ─────────────────────────────────────────────── */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    margin-top: 46px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .metric {
+    padding: 26px 20px 26px 0;
+    border-right: 1px solid var(--rule);
+  }
+
+  .metric:last-child { border-right: 0; }
+
+  .metric-label { font-size: 13px; color: var(--ink-soft); }
+
+  .metric-value {
+    display: block;
+    margin-top: 14px;
+    font-family: var(--sans);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(30px, 3.4vw, 46px);
+    line-height: 1;
+    letter-spacing: -0.012em;
+    font-weight: 560;
+  }
+
+  .metric-note { display: block; margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+  .metric svg { display: block; margin-top: 18px; width: 100%; height: 34px; overflow: visible; }
+
+  /* ── 对比表 ───────────────────────────────────────────── */
+  .compare { margin-top: 42px; }
+
+  .compare-row {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(16px, 3vw, 44px);
+    padding: 20px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+  }
+
+  .compare-row:last-child { border-bottom: 0; }
+
+  .compare-head {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .compare-key { font-size: 14px; color: var(--ink); }
+
+  .compare-before { color: var(--muted); }
+
+  .compare-after { color: var(--ink); }
+
+  .compare-after b { color: var(--accent); font-weight: 500; }
+
+  /* ── 客户 ─────────────────────────────────────────────── */
+  .logos {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1px;
+    margin-top: 40px;
+    border: 1px solid var(--rule);
+  }
+
+  .logo-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 96px;
+    padding: 18px;
+    border-right: 1px solid var(--rule);
+    color: var(--ink-soft);
+    transition: color 220ms ease, background-color 220ms ease;
+  }
+
+  .logo-cell:last-child { border-right: 0; }
+
+  .logo-cell:hover { color: var(--ink); background: var(--surface); }
+
+  .logo-cell svg { flex: none; }
+
+  .logo-name { font-size: 13.5px; letter-spacing: 0.02em; }
+
+  /* ── 引言 ─────────────────────────────────────────────── */
+  .quote {
+    max-width: 32ch;
+    margin: 0;
+    font-size: clamp(24px, 3vw, 38px);
+    line-height: 1.28;
+    text-wrap: balance;
+    letter-spacing: -0.014em;
+    font-weight: 500;
+  }
+
+  .quote-by {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 26px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .quote-by::before { content: ""; width: 42px; height: 1px; background: var(--accent); }
+
+  /* ── 接入 ─────────────────────────────────────────────── */
+  .start-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(28px, 5vw, 68px);
+    align-items: start;
+    margin-top: 44px;
+  }
+
+  .start-list { list-style: none; margin: 0; padding: 0; }
+
+  .start-list li {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 14px;
+    padding: 18px 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .start-list li:first-child { border-top: 0; padding-top: 0; }
+
+  .start-index { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+
+  .start-list b { display: block; font-weight: 550; font-size: 15px; }
+
+  .start-list span.body { display: block; margin-top: 6px; color: var(--ink-soft); font-size: 13.5px; }
+
+  .code {
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .code-head {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .code pre {
+    margin: 0;
+    padding: 18px 16px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.85;
+    color: var(--ink-soft);
+  }
+
+  .code .k { color: var(--accent); }
+  .code .c { color: #5c6672; }
+
+  /* ── 收尾 ─────────────────────────────────────────────── */
+  .closing {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 28px;
+    padding: clamp(52px, 7vh, 84px) 0;
+    border-top: 1px solid var(--rule-strong);
+  }
+
+  .closing h2 {
+    margin: 0;
+    font-size: clamp(26px, 3.4vw, 44px);
+    line-height: 1.14;
+    font-weight: 620;
+    letter-spacing: -0.016em;
+    max-width: 22ch;
+  }
+
+  .closing-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  footer {
+    padding: 30px 0 46px;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .foot-inner { display: flex; flex-wrap: wrap; gap: 18px 32px; justify-content: space-between; }
+
+  .foot-links { display: flex; flex-wrap: wrap; gap: 20px; }
+
+  .foot-links a:hover { color: var(--ink); }
+
+  /* ── 滚动显现 ─────────────────────────────────────────── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 700ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .reveal.is-in { opacity: 1; transform: none; }
+
+  @media (max-width: 1080px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-copy { max-width: 46ch; }
+    .flow-grid { grid-template-columns: 1fr; }
+    .flow-visual { position: static; }
+    .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric:nth-child(2n) { border-right: 0; }
+    .metric:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+    .logos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .logo-cell:nth-child(2n) { border-right: 0; }
+    .logo-cell:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+    .start-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 720px) {
+    .nav-links { display: none; }
+    .nav-inner { gap: 12px; }
+    .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat { padding-bottom: 16px; }
+    .compare-row { grid-template-columns: 1fr; gap: 8px; }
+    .compare-head { display: none; }
+    .metric-grid, .logos { grid-template-columns: 1fr; }
+    .metric, .logo-cell { border-right: 0; }
+    .metric + .metric, .logo-cell + .logo-cell { border-top: 1px solid var(--rule); }
+    .morph-row { grid-template-columns: 58px 1fr 40px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <div class="brand">
+      <span class="brand-mark" id="brand-mark">经纬</span>
+      <span class="brand-latin" id="brand-latin">Meridian</span>
+    </div>
+    <nav class="nav-links" id="nav-links" aria-label="页面导航"></nav>
+    <div class="nav-cta" id="nav-cta"></div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="wrap hero-band">
+    <div class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow" id="hero-eyebrow"></p>
+      <h1 id="hero-title"></h1>
+      <p class="hero-lede" id="hero-lede"></p>
+      <div class="hero-actions" id="hero-actions"></div>
+    </div>
+
+    <figure class="instrument reveal" style="margin:0">
+      <div class="instrument-head">
+        <span id="panel-title"></span>
+        <span class="instrument-live">
+          <span class="instrument-dot" aria-hidden="true"></span>
+          <span class="instrument-readout" id="panel-readout">0</span>
+        </span>
+      </div>
+      <canvas id="field"></canvas>
+      <figcaption class="instrument-foot">
+        <span id="panel-left"></span>
+        <span id="panel-right"></span>
+      </figcaption>
+    </figure>
+    </div>
+    <div class="hero-stats" id="hero-stats"></div>
+  </section>
+
+  <section class="section rule-top" id="flow">
+    <div class="wrap">
+      <div class="section-head reveal">
+          <h2 id="flow-title"></h2>
+        <p id="flow-lede"></p>
+      </div>
+
+      <div class="flow-grid">
+        <div class="flow-visual reveal">
+          <div class="morph" id="morph" aria-hidden="true">
+            <div class="morph-rows" id="morph-rows"></div>
+          </div>
+          <p class="flow-caption" id="flow-caption"></p>
+        </div>
+
+        <div class="steps" id="steps"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section rule-top" id="metrics">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow" id="metrics-eyebrow"></p>
+        <h2 id="metrics-title"></h2>
+        <p id="metrics-note"></p>
+      </div>
+      <div class="metric-grid reveal" id="metric-grid"></div>
+    </div>
+  </section>
+
+  <section class="section rule-top" id="compare">
+    <div class="wrap">
+      <div class="section-head reveal">
+          <h2 id="compare-title"></h2>
+      </div>
+      <div class="compare reveal" id="compare-body"></div>
+    </div>
+  </section>
+
+  <section class="section rule-top" id="proof">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <p class="eyebrow" id="proof-eyebrow"></p>
+        <h2 id="proof-title"></h2>
+      </div>
+      <div class="logos reveal" id="logo-cells"></div>
+
+      <div style="margin-top: clamp(56px, 8vh, 96px)" class="reveal">
+        <blockquote class="quote" id="quote-text"></blockquote>
+        <p class="quote-by" id="quote-by"></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section rule-top" id="start">
+    <div class="wrap">
+      <div class="section-head reveal">
+          <h2 id="start-title"></h2>
+      </div>
+
+      <div class="start-grid">
+        <ul class="start-list reveal" id="start-steps"></ul>
+        <div class="code reveal">
+          <div class="code-head" id="code-caption"></div>
+          <pre id="code-body"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <div class="closing">
+      <h2 id="closing-title"></h2>
+      <div class="closing-actions" id="closing-actions"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div>
+      <span id="footer-brand"></span> · <span id="footer-note"></span>
+    </div>
+    <nav class="foot-links" id="footer-links" aria-label="页脚链接"></nav>
+  </div>
+</footer>
+
+<script>
+  // 可编辑区：这个模板里所有文案、数字与配色都在下面这个对象里。
+  // 改内容只改这里；结构、样式与交互（尤其是那片流场）都不要动。
+  const TEMPLATE = {
+    theme: {
+      canvas: '#0b0d10',
+      surface: '#12151a',
+      surface2: '#171b21',
+      ink: '#e9edf2',
+      inkSoft: '#b6bec8',
+      muted: '#7d8794',
+      rule: 'rgba(233,237,242,0.12)',
+      ruleStrong: 'rgba(233,237,242,0.26)',
+      accent: '#2ee6d6',
+      accentInk: '#04211f',
+    },
+
+    meta: {
+      lang: 'zh-CN',
+      title: '经纬 · 把散落的事件流压成一张可查询的网格',
+      description: '经纬把 23 类数据源接入同一张事件网格，p95 查询稳定在 68 毫秒以内。',
+    },
+
+    brand: {
+      mark: '经纬',
+      latin: 'Meridian',
+      nav: [
+        { label: '指标网格', target: '#metrics' },
+        { label: '接入方式', target: '#start' },
+        { label: '容量与计价', target: '#compare' },
+      ],
+      cta: { label: '申请试用', href: '#closing' },
+    },
+
+    hero: {
+      eyebrow: '事件指标网格',
+      title: '把散落的事件流<em>压成一张</em>可查询的网格',
+      lede: '接入 23 类数据源，统一落到指标网格，p95 查询稳定在 68 毫秒以内，不再依赖离线任务回填。',
+      primary: { label: '申请试用', href: '#closing' },
+      secondary: { label: '查看接入文档', href: '#start' },
+      stats: [
+        { key: '日均写入', value: 2.4, unit: '亿事件', decimals: 1 },
+        { key: 'p95 查询', value: 68, unit: '毫秒' },
+        { key: '已适配数据源', value: 23, unit: '类' },
+        { key: '在线区域', value: 8, unit: '个可用区' },
+      ],
+      panel: {
+        title: '实时写入流',
+        unit: '事件 / 秒',
+        left: '采样 1:2000 · 保留 10 分钟',
+        right: '窗口 60s',
+        nodes: '网格节点 512 · 在线 512',
+      },
+    },
+
+    flow: {
+      eyebrow: '工作方式',
+      title: '三种读法，同一份数据',
+      lede: '采集、落格、查询是同一条链路的三个阶段，改任意一段都不需要重跑上游。',
+      caption: '散点 → 网格 → 结果表',
+      steps: [
+        {
+          title: '接入即结构化',
+          text: '日志、埋点、CDC、业务库直接以原始 schema 进入采集层，不做预聚合，字段名与类型原样保留。',
+          metric: '23 类数据源 / 无需 ETL 建模',
+        },
+        {
+          title: '自动落格',
+          text: '按事件时间与维度基数自动切分网格单元，热点单元独立扩容，冷单元自动合并，不需要人工分区。',
+          metric: '单表 1.2 万亿行 / 分区 0 维护',
+        },
+        {
+          title: '查询即服务',
+          text: 'SQL、指标 API、告警规则共用同一份网格，聚合结果与明细完全对得上，不存在两套口径。',
+          metric: 'p95 68ms / 口径唯一',
+        },
+      ],
+    },
+
+    metrics: {
+      eyebrow: '实测数字',
+      title: '把「快」拆成能验收的四个数',
+      note: '以下为 2026 年第三季度生产集群的滚动均值，覆盖 8 个可用区、3.1 万个查询账号。',
+      items: [
+        {
+          label: '日均写入事件',
+          value: '2.4',
+          unit: '亿',
+          note: '峰值 4.1 亿 / 天',
+          spark: [22, 26, 24, 31, 29, 36, 34, 41, 38, 44],
+        },
+        {
+          label: 'p95 查询耗时',
+          value: '68',
+          unit: 'ms',
+          note: '较迁移前下降 71%',
+          spark: [236, 214, 198, 164, 150, 122, 96, 84, 72, 68],
+        },
+        {
+          label: '数据源适配',
+          value: '23',
+          unit: '类',
+          note: '含 6 类国产数据库',
+          spark: [6, 9, 11, 14, 15, 18, 19, 21, 22, 23],
+        },
+        {
+          label: '在线可用区',
+          value: '8',
+          unit: '个',
+          note: '跨区查询免回源',
+          spark: [2, 3, 3, 4, 5, 6, 6, 7, 8, 8],
+        },
+      ],
+    },
+
+    compare: {
+      eyebrow: '迁移前后',
+      title: '同一套业务问题，两种成本',
+      head: { key: '对比项', before: '迁移前', after: '接入经纬后' },
+      rows: [
+        { key: '查询口径', before: '离线宽表与实时看板各算一遍，经常对不上', after: '只有一份网格，<b>口径唯一</b>' },
+        { key: '新指标上线', before: '平均 9 个工作日，涉及三方排期', after: '<b>当天</b>自助配置' },
+        { key: '历史回算', before: '全量重跑，停机窗口 4 小时', after: '增量回填，<b>不停机</b>' },
+        { key: '存储成本', before: '冗余宽表占 62% 空间', after: '压缩后下降 <b>48%</b>' },
+      ],
+    },
+
+    proof: {
+      eyebrow: '正在使用',
+      title: '从日活两百万的消费业务，到只有十二个指标的内部平台',
+      note: '',
+      brands: [
+        { name: '云帆出行', mark: 'hex' },
+        { name: '青栈零售', mark: 'square' },
+        { name: '万相支付', mark: 'circle' },
+        { name: '临界制造', mark: 'triangle' },
+        { name: '有朋数科', mark: 'diamond' },
+      ],
+    },
+
+    quote: {
+      text: '我们把四个看板的数字收敛成一套网格之后，季度对账会第一次没吵起来。',
+      author: '陈昱',
+      role: '云帆出行 数据平台负责人'
+    },
+
+    start: {
+      eyebrow: '接入方式',
+      title: '三条命令，接进现有采集链路',
+      steps: [
+        { title: '创建网格', text: '在控制台建空间，选择数据源类型，系统给出 23 类适配器中的对应模板。' },
+        { title: '投递事件', text: '沿用现有 SDK，只改 endpoint 与空间 ID；批大小、重试策略保持不变。' },
+        { title: '查询与告警', text: '同一份网格上写 SQL、配指标 API、挂告警规则，结果可以直接回灌业务库。' },
+      ],
+      code: {
+        caption: 'meridian.config.ts',
+        lines: [
+          '<span class="c">// 沿用现有 SDK，只改 endpoint 与空间 ID</span>',
+          '<span class="k">export</span> const sink = meridian({',
+          '  endpoint: <span class="k">"https://ingest.meridian.dev"</span>,',
+          '  space: <span class="k">"yunfan-prod"</span>,',
+          '  batch: { size: 5000, windowMs: 800 },',
+          '});',
+        ],
+      },
+    },
+
+    closing: {
+      title: '先用一周的真实数据，验一次 68 毫秒。',
+      text: '提供数据源清单和三个最慢的查询，我们在两个工作日内给出迁移方案与压测报告。',
+      primary: { label: '申请试用', href: '#' },
+      secondary: { label: '预约技术评审', href: '#' },
+    },
+
+    footer: {
+      brand: '经纬 Meridian',
+      note: '实时指标网格',
+      links: [
+        { label: '接入文档', target: '#start' },
+        { label: '状态页', target: '#' },
+        { label: '服务条款', target: '#' },
+        { label: '隐私说明', target: '#' },
+      ],
+    },
+  };
+  // ── 可编辑区结束 ────────────────────────────────────────────────────────────
+
+  (function render() {
+    const byId = id => document.getElementById(id);
+
+    const setText = (id, value) => {
+      const node = byId(id);
+      if (node) node.textContent = value == null ? '' : String(value);
+    };
+
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text != null) node.textContent = text;
+      return node;
+    };
+
+    const fill = (id, nodes) => {
+      const host = byId(id);
+      if (!host) return;
+      host.textContent = '';
+      nodes.forEach(node => host.appendChild(node));
+    };
+
+    const announce = node => {
+      const href = node.getAttribute('href');
+      if (!href || href.charAt(0) !== '#' || href === '#') return;
+      node.addEventListener('click', event => {
+        const anchor = document.querySelector(href);
+        if (!anchor) return;
+        event.preventDefault();
+        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
+
+    const action = (item, solid) => {
+      const node = el('a', 'btn' + (solid ? ' btn-solid' : ''), item.label);
+      node.href = item.href || '#';
+      announce(node);
+      return node;
+    };
+
+    // 配色由 TEMPLATE.theme 注入，结构里不写死颜色
+    const themeVars = {
+      canvas: '--canvas',
+      surface: '--surface',
+      surface2: '--surface-2',
+      ink: '--ink',
+      inkSoft: '--ink-soft',
+      muted: '--muted',
+      rule: '--rule',
+      ruleStrong: '--rule-strong',
+      accent: '--accent',
+      accentInk: '--accent-ink',
+    };
+    const theme = TEMPLATE.theme || {};
+    Object.keys(themeVars).forEach(key => {
+      if (theme[key]) document.documentElement.style.setProperty(themeVars[key], theme[key]);
+    });
+
+    const meta = TEMPLATE.meta || {};
+    if (meta.lang) document.documentElement.lang = meta.lang;
+    if (meta.title) document.title = meta.title;
+    const description = document.querySelector('meta[name="description"]');
+    if (description && meta.description) description.setAttribute('content', meta.description);
+
+    const brand = TEMPLATE.brand || {};
+    setText('brand-mark', brand.mark);
+    setText('brand-latin', brand.latin);
+    fill('nav-links', (brand.nav || []).map(item => {
+      const node = el('a', null, item.label);
+      node.href = item.target || '#';
+      announce(node);
+      return node;
+    }));
+    if (brand.cta) {
+      const cta = el('a', 'btn', brand.cta.label);
+      cta.href = brand.cta.href || '#';
+      announce(cta);
+      fill('nav-cta', [cta]);
+    }
+
+    const hero = TEMPLATE.hero || {};
+    setText('hero-eyebrow', hero.eyebrow);
+    // 标题允许一个 <em> 标记，用来给关键词加底线强调
+    byId('hero-title').innerHTML = hero.title || '';
+    setText('hero-lede', hero.lede);
+    fill('hero-actions', [action(hero.primary || {}, true), action(hero.secondary || {}, false)]);
+    fill('hero-stats', (hero.stats || []).map(item => {
+      const cell = el('div', 'stat');
+      cell.appendChild(el('span', 'stat-key', item.key));
+      const value = el('span', 'stat-value');
+      value.appendChild(el('span', 'stat-number', formatNumber(item.value, item.decimals)));
+      if (item.unit) value.appendChild(el('span', 'stat-unit', item.unit));
+      cell.appendChild(value);
+      return cell;
+    }));
+
+    const panel = hero.panel || {};
+    setText('panel-title', panel.title);
+    setText('panel-left', panel.left);
+    setText('panel-right', panel.right || panel.nodes);
+
+    function formatNumber(value, decimals) {
+      const number = Number(value);
+      if (!isFinite(number)) return String(value == null ? '' : value);
+      return number.toFixed(decimals || 0);
+    }
+
+    const flow = TEMPLATE.flow || {};
+    setText('flow-title', flow.title);
+    setText('flow-lede', flow.lede);
+    setText('flow-caption', flow.caption);
+    fill('steps', (flow.steps || []).map((step, index) => {
+      const block = el('article', 'step' + (index === 0 ? ' is-active' : ''));
+      block.dataset.step = String(index);
+      block.appendChild(el('span', 'step-index', '0' + (index + 1)));
+      block.appendChild(el('h3', null, step.title));
+      block.appendChild(el('p', null, step.text));
+      if (step.metric) block.appendChild(el('span', 'step-metric', step.metric));
+      return block;
+    }));
+
+    const metrics = TEMPLATE.metrics || {};
+    setText('metrics-eyebrow', metrics.eyebrow);
+    setText('metrics-title', metrics.title);
+    setText('metrics-note', metrics.note);
+    fill('metric-grid', (metrics.items || []).map(item => {
+      const cell = el('div', 'metric');
+      cell.appendChild(el('span', 'metric-label', item.label));
+      const value = el('span', 'metric-value', item.value + (item.unit || ''));
+      cell.appendChild(value);
+      cell.appendChild(el('span', 'metric-note', item.note));
+      cell.appendChild(sparkline(item.spark));
+      return cell;
+    }));
+
+    function sparkline(points) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      const values = (points || []).map(Number).filter(value => isFinite(value));
+      svg.setAttribute('viewBox', '0 0 100 30');
+      svg.setAttribute('preserveAspectRatio', 'none');
+      svg.setAttribute('aria-hidden', 'true');
+      if (values.length < 2) return svg;
+      const max = Math.max.apply(null, values);
+      const min = Math.min.apply(null, values);
+      const span = max - min || 1;
+      const step = 100 / (values.length - 1);
+      const coords = values.map((value, index) => {
+        const x = index * step;
+        const y = 28 - ((value - min) / span) * 24;
+        return x.toFixed(2) + ',' + y.toFixed(2);
+      });
+      const line = document.createElementNS(ns, 'polyline');
+      line.setAttribute('points', coords.join(' '));
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', 'var(--accent)');
+      line.setAttribute('stroke-width', '1.4');
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
+      svg.appendChild(line);
+      const area = document.createElementNS(ns, 'polygon');
+      area.setAttribute('points', '0,30 ' + coords.join(' ') + ' 100,30');
+      area.setAttribute('fill', 'rgba(46,230,214,0.10)');
+      svg.insertBefore(area, line);
+      return svg;
+    }
+
+    const compare = TEMPLATE.compare || {};
+    setText('compare-title', compare.title);
+    const compareRows = [];
+    if (compare.head) {
+      const head = el('div', 'compare-row');
+      head.appendChild(el('span', 'compare-head', compare.head.key));
+      head.appendChild(el('span', 'compare-head', compare.head.before));
+      head.appendChild(el('span', 'compare-head', compare.head.after));
+      compareRows.push(head);
+    }
+    (compare.rows || []).forEach(row => {
+      const line = el('div', 'compare-row');
+      line.appendChild(el('span', 'compare-key', row.key));
+      line.appendChild(el('span', 'compare-before', row.before));
+      line.appendChild(el('span', 'compare-after', row.after)).innerHTML = row.after || '';
+      return line;
+    });
+    fill('compare-body', compareRows);
+
+    const proof = TEMPLATE.proof || {};
+    setText('proof-eyebrow', proof.eyebrow);
+    setText('proof-title', proof.title);
+    fill('logo-cells', (proof.brands || []).map(item => {
+      const cell = el('div', 'logo-cell');
+      cell.appendChild(monogram(item.mark));
+      cell.appendChild(el('span', 'logo-name', item.name));
+      return cell;
+    }));
+
+    // 客户标识只用单色几何字标，不引入任何外部图片
+    function monogram(mark) {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('width', '22');
+      svg.setAttribute('height', '22');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('aria-hidden', 'true');
+      const shape = document.createElementNS(ns, 'rect');
+      shape.setAttribute('fill', 'none');
+      shape.setAttribute('stroke', 'currentColor');
+      shape.setAttribute('stroke-width', '1.3');
+      if (mark === 'circle') {
+        shape.setAttribute('x', '3');
+        shape.setAttribute('y', '3');
+        shape.setAttribute('width', '18');
+        shape.setAttribute('height', '18');
+        shape.setAttribute('rx', '9');
+      } else if (mark === 'triangle') {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M12 3.6 20.6 19.4H3.4Z');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'currentColor');
+        path.setAttribute('stroke-width', '1.3');
+        svg.appendChild(path);
+        return svg;
+      } else if (mark === 'diamond') {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M12 2.8 21.2 12 12 21.2 2.8 12Z');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'currentColor');
+        path.setAttribute('stroke-width', '1.3');
+        svg.appendChild(path);
+        return svg;
+      } else if (mark === 'hex') {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', 'M12 2.6 20.2 7.3v9.4L12 21.4 3.8 16.7V7.3Z');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'currentColor');
+        path.setAttribute('stroke-width', '1.3');
+        svg.appendChild(path);
+        return svg;
+      } else {
+        shape.setAttribute('x', '3');
+        shape.setAttribute('y', '3');
+        shape.setAttribute('width', '18');
+        shape.setAttribute('height', '18');
+        shape.setAttribute('rx', '2');
+      }
+      svg.appendChild(shape);
+      return svg;
+    }
+
+    const quote = TEMPLATE.quote || {};
+    setText('quote-text', quote.text);
+    setText('quote-by', (quote.author || '') + (quote.role ? ' · ' + quote.role : ''));
+
+    const start = TEMPLATE.start || {};
+    setText('start-title', start.title);
+    fill('start-steps', (start.steps || []).map((step, index) => {
+      const item = el('li');
+      item.appendChild(el('span', 'start-index', '0' + (index + 1)));
+      const body = el('div');
+      body.appendChild(el('b', null, step.title));
+      body.appendChild(el('span', 'body', step.text));
+      item.appendChild(body);
+      return item;
+    }));
+    const code = start.code || {};
+    setText('code-caption', code.caption);
+    byId('code-body').innerHTML = (code.lines || []).join('\n');
+
+    const closing = TEMPLATE.closing || {};
+    setText('closing-title', closing.title);
+    fill('closing-actions', [action(closing.primary || {}, true), action(closing.secondary || {}, false)]);
+
+    const footer = TEMPLATE.footer || {};
+    setText('footer-brand', footer.brand);
+    setText('footer-note', footer.note);
+    fill('footer-links', (footer.links || []).map(item => {
+      const node = el('a', null, item.label);
+      node.href = item.target || '#';
+      announce(node);
+      return node;
+    }));
+
+    // ── 滚动显现 ─────────────────────────────────────────────
+    const reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-in');
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { rootMargin: '0px 0px -12% 0px', threshold: 0.12 },
+      );
+      reveals.forEach(node => observer.observe(node));
+    } else {
+      reveals.forEach(node => node.classList.add('is-in'));
+    }
+
+    // ── 指标数字：滚动进入时补间 ─────────────────────────────
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!reduceMotion && 'IntersectionObserver' in window) {
+      const counters = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            counters.unobserve(entry.target);
+            const node = entry.target;
+            const target = Number(node.dataset.value);
+            const decimals = Number(node.dataset.decimals || 0);
+            if (!isFinite(target)) return;
+            const start = performance.now();
+            const duration = 900;
+            const tick = now => {
+              const progress = Math.min(1, (now - start) / duration);
+              const eased = 1 - Math.pow(1 - progress, 3);
+              node.textContent = (target * eased).toFixed(decimals);
+              if (progress < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          });
+        },
+        { threshold: 0.6 },
+      );
+      Array.prototype.slice.call(document.querySelectorAll('.stat-number')).forEach(node => {
+        const raw = node.textContent;
+        node.dataset.value = raw;
+        node.dataset.decimals = raw.indexOf('.') >= 0 ? String(raw.split('.')[1].length) : '0';
+        counters.observe(node);
+      });
+    }
+
+    // ── 散点 → 网格 → 结果表 ─────────────────────────────────
+    const morph = byId('morph');
+    const steps = Array.prototype.slice.call(document.querySelectorAll('.step'));
+    const DOTS = 56;
+    const dots = [];
+    const layout = {};
+
+    function measure() {
+      const box = morph.getBoundingClientRect();
+      layout.width = box.width;
+      layout.height = box.height;
+    }
+
+    // 用固定种子生成散点，保证每次渲染的截图一致
+    let seed = 20260917;
+    function random() {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    }
+
+    function buildDots() {
+      measure();
+      for (let index = 0; index < DOTS; index += 1) {
+        const dot = el('span', 'morph-dot');
+        morph.appendChild(dot);
+        dots.push({
+          node: dot,
+          scatter: { x: random() * layout.width, y: random() * layout.height },
+        });
+      }
+      paint(0);
+    }
+
+    function latticePosition(index) {
+      const columns = 8;
+      const rows = Math.ceil(DOTS / columns);
+      const gapX = layout.width / (columns + 1);
+      const gapY = layout.height / (rows + 1);
+      return {
+        x: gapX * ((index % columns) + 1),
+        y: gapY * (Math.floor(index / columns) + 1),
+      };
+    }
+
+    function paint(stepIndex) {
+      measure();
+      morph.classList.toggle('is-lattice', stepIndex === 1);
+      morph.classList.toggle('is-rows', stepIndex === 2);
+      dots.forEach((dot, index) => {
+        const target = stepIndex === 0 ? dot.scatter : latticePosition(index);
+        dot.node.style.transform = 'translate3d(' + target.x.toFixed(1) + 'px,' + target.y.toFixed(1) + 'px,0)';
+      });
+    }
+
+    fill('morph-rows', (flow.steps || []).map((step, index) => {
+      const row = el('div', 'morph-row');
+      row.appendChild(el('span', null, 'step ' + (index + 1)));
+      row.appendChild(el('span', 'morph-bar'));
+      row.appendChild(el('span', null, '·'));
+      return row;
+    }));
+    const bars = Array.prototype.slice.call(document.querySelectorAll('.morph-bar'));
+    bars.forEach((bar, index) => {
+      bar.style.width = String(38 + index * 26) + '%';
+    });
+
+    function activate(stepIndex) {
+      steps.forEach((node, index) => node.classList.toggle('is-active', index === stepIndex));
+      paint(stepIndex);
+    }
+
+    if ('IntersectionObserver' in window && steps.length) {
+      const stepObserver = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) activate(Number(entry.target.dataset.step || 0));
+          });
+        },
+        { rootMargin: '-42% 0px -42% 0px', threshold: 0 },
+      );
+      steps.forEach(node => stepObserver.observe(node));
+    }
+
+    buildDots();
+    window.addEventListener('resize', () => {
+      const active = steps.findIndex(node => node.classList.contains('is-active'));
+      paint(active < 0 ? 0 : active);
+    });
+
+    // ── 首屏流场 ─────────────────────────────────────────────
+    (function field() {
+      const canvas = byId('field');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const readout = byId('panel-readout');
+      const accent = theme.accent || '#2ee6d6';
+      // 拖尾层：每帧用画布底色做一次低透明覆盖，粒子轨迹形成余晖
+      const trail = 'rgba(11, 13, 16, 0.14)';
+      let width = 0;
+      let height = 0;
+      let particles = [];
+      let running = false;
+      let frame = 0;
+      let animation = 0;
+      let lastTime = 0;
+
+      function resize() {
+        const box = canvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        width = Math.max(1, Math.round(box.width));
+        height = Math.max(1, Math.round(box.height));
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        seedParticles();
+      }
+
+      function seedParticles() {
+        const count = width < 620 ? 190 : 520;
+        particles = [];
+        for (let index = 0; index < count; index += 1) {
+          particles.push({
+            x: random() * width,
+            y: random() * height,
+            life: 40 + random() * 90,
+          });
+        }
+      }
+
+      // 廉价的方向场：两个正弦叠加，足够形成稳定的流线
+      function angleAt(x, y, time) {
+        const scale = 0.0042;
+        return (
+          Math.sin(x * scale + time * 0.00016) * 1.5 +
+          Math.cos(y * scale * 1.3 - time * 0.00011) * 1.1
+        );
+      }
+
+      function step(time, delta) {
+        const speed = Math.min(3.4, delta * 0.13);
+        ctx.lineWidth = 1;
+        for (let index = 0; index < particles.length; index += 1) {
+          const particle = particles[index];
+          const angle = angleAt(particle.x, particle.y, time);
+          const nextX = particle.x + Math.cos(angle) * speed;
+          const nextY = particle.y + Math.sin(angle) * speed;
+          const alpha = 0.16 + 0.46 * (particle.life / 130);
+          ctx.strokeStyle = 'rgba(46,230,214,' + alpha.toFixed(3) + ')';
+          ctx.beginPath();
+          ctx.moveTo(particle.x, particle.y);
+          ctx.lineTo(nextX, nextY);
+          ctx.stroke();
+          particle.x = nextX;
+          particle.y = nextY;
+          particle.life -= 1;
+          if (particle.life <= 0 || nextX < -20 || nextX > width + 20 || nextY < -20 || nextY > height + 20) {
+            particle.x = random() * width;
+            particle.y = random() * height;
+            particle.life = 40 + random() * 90;
+          }
+        }
+      }
+
+      function intensity() {
+        return Math.round(width * 2.6 + Math.sin(performance.now() / 900) * 420 + height * 3.1);
+      }
+
+      function loop(time) {
+        if (!running) return;
+        const delta = Math.min(32, time - lastTime || 16);
+        lastTime = time;
+        // 拖尾：每帧用画布底色做一层低透明度覆盖
+        ctx.fillStyle = trail;
+        ctx.fillRect(0, 0, width, height);
+        step(time, delta);
+        frame += 1;
+        if (frame % 12 === 0 && readout) readout.textContent = intensity().toLocaleString('en-US');
+        animation = requestAnimationFrame(loop);
+      }
+
+      function start() {
+        if (running) return;
+        running = true;
+        lastTime = 0;
+        animation = requestAnimationFrame(loop);
+      }
+
+      function stop() {
+        running = false;
+        if (animation) cancelAnimationFrame(animation);
+      }
+
+      function staticFrame() {
+        ctx.fillStyle = trail;
+        ctx.fillRect(0, 0, width, height);
+        for (let index = 0; index < 90; index += 1) step(0, 16);
+        if (readout) readout.textContent = intensity().toLocaleString('en-US');
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      if (reduceMotion) {
+        staticFrame();
+      } else {
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(
+            entries => {
+              entries.forEach(entry => (entry.isIntersecting ? start() : stop()));
+            },
+            { threshold: 0.06 },
+          ).observe(canvas);
+        } else {
+          start();
+        }
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) stop();
+          else if (canvas.getBoundingClientRect().top < window.innerHeight) start();
+        });
+      }
+    })();
+  })();
+</script>
+</body>
+</html>

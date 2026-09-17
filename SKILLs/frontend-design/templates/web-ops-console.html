@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --bg: #eef0f2;
+    --panel: #ffffff;
+    --line: #e0e4e8;
+    --line-strong: #c6ccd3;
+    --ink: #171a1f;
+    --muted: #5d6672;
+    --accent: #2f5fa8;
+    --ok: #1f7a4d;
+    --warn: #9a6a12;
+    --danger: #b02f26;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --bar: 54px;
+    --max: 1360px;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, p, ul { margin: 0; }
+  ul { padding: 0; list-style: none; }
+  button { font: inherit; }
+
+  .wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 22px; }
+
+  .skip { position: absolute; left: -9999px; background: var(--ink); color: var(--panel); padding: 9px 14px; z-index: 30; }
+  .skip:focus { left: 10px; top: 10px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ── 顶栏 ─────────────────────────────────────────────── */
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .bar-inner { display: flex; align-items: center; gap: 26px; height: var(--bar); }
+
+  .mark { display: flex; align-items: baseline; gap: 9px; white-space: nowrap; }
+  .mark-name { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  .mark-env {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--ok);
+    border: 1px solid currentColor;
+    padding: 2px 6px;
+    border-radius: 0;
+  }
+
+  .bar-nav { display: flex; gap: 2px; margin-left: 6px; min-width: 0; overflow: hidden; }
+  .bar-nav a {
+    display: block;
+    padding: 7px 12px;
+    font-size: 13.5px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease;
+  }
+  .bar-nav a:hover { color: var(--ink); background: var(--bg); }
+  .bar-nav a[aria-current="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+  .bar-right { display: flex; align-items: center; gap: 14px; margin-left: auto; white-space: nowrap; }
+  .stamp { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  .duty { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+  .duty::before { content: ""; width: 7px; height: 7px; background: var(--ok); }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 14px;
+    font-size: 13px;
+    color: var(--panel);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+  .btn:hover { background: var(--accent); border-color: var(--accent); }
+  .btn-quiet { color: var(--ink); background: transparent; border-color: var(--line-strong); }
+  .btn-quiet:hover { color: var(--accent); background: transparent; border-color: var(--accent); }
+
+  /* ── 版面 ─────────────────────────────────────────────── */
+  .main { padding: 22px 0 8px; }
+
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
+  .page-title { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; }
+  .page-sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--line); }
+
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .panel-title { font-size: 13.5px; font-weight: 600; }
+  .panel-note { font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-align: right; }
+
+  /* ── 异常条 ───────────────────────────────────────────── */
+  .alert {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 11px 16px;
+    border: 1px solid var(--danger);
+    border-left-width: 4px;
+    background: color-mix(in srgb, var(--danger) 6%, var(--panel));
+    margin-bottom: 18px;
+  }
+  .alert-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--panel);
+    background: var(--danger);
+    padding: 3px 8px;
+  }
+  .alert-text { font-size: 13.5px; }
+  .alert-action { margin-left: auto; font-size: 13px; color: var(--danger); border-bottom: 1px solid currentColor; }
+
+  /* ── KPI ──────────────────────────────────────────────── */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    background: var(--panel);
+    border: 1px solid var(--line);
+    margin-bottom: 18px;
+  }
+  .kpi { padding: 16px 18px 18px; border-left: 1px solid var(--line); }
+  .kpi:first-child { border-left: 0; }
+  .kpi-label { font-size: 12.5px; color: var(--muted); }
+  .kpi-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 27px; line-height: 1.15; margin-top: 8px; letter-spacing: -0.01em; }
+  .kpi-delta { font-size: 12px; color: var(--muted); margin-top: 7px; }
+  .kpi[data-alert="true"] .kpi-value { color: var(--danger); }
+  .kpi[data-alert="true"] .kpi-delta { color: var(--danger); }
+
+  /* ── 图表 ─────────────────────────────────────────────── */
+  .chart-panel { margin-bottom: 18px; }
+  .chart-body { padding: 16px 16px 10px; }
+  .chart svg { display: block; width: 100%; height: 132px; }
+  .chart-grid { stroke: var(--line); stroke-width: 1; }
+  .chart-bar { fill: color-mix(in srgb, var(--accent) 52%, var(--panel)); }
+  .chart-bar[data-peak="true"] { fill: var(--ink); }
+  .chart-axis { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 6px 2px 0; }
+
+  /* ── 双栏 ─────────────────────────────────────────────── */
+  .cols { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 18px; }
+  .side { display: grid; gap: 18px; }
+
+  /* ── 表格 ─────────────────────────────────────────────── */
+  .table { width: 100%; border-collapse: collapse; }
+  .table th {
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .table td { padding: 11px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .table tr:last-child td { border-bottom: 0; }
+  .table tbody tr:hover { background: var(--bg); }
+  .t-no { font-family: var(--mono); font-size: 12.5px; }
+  .t-dim { color: var(--muted); font-size: 13px; }
+  .t-right { text-align: right; }
+
+  .chip {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 8px;
+    border: 1px solid var(--line-strong);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip[data-tone="critical"] { color: var(--danger); border-color: currentColor; }
+  .chip[data-tone="warn"] { color: var(--warn); border-color: currentColor; }
+  .chip[data-tone="steady"] { color: var(--accent); border-color: currentColor; }
+  .chip[data-tone="ok"] { color: var(--ok); border-color: currentColor; }
+
+  /* ── 分布 ─────────────────────────────────────────────── */
+  .dist { padding: 6px 16px 16px; }
+  .dist-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) 72px; align-items: center; gap: 12px; padding: 9px 0; }
+  .dist-label { font-size: 13px; color: var(--muted); }
+  .dist-track { height: 2px; background: var(--line); }
+  .dist-fill { height: 2px; background: var(--ink); }
+  .dist-fill[data-tone="warn"] { background: var(--warn); }
+  .dist-fill[data-tone="critical"] { background: var(--danger); }
+  .dist-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; text-align: right; }
+
+  /* ── 当班 ─────────────────────────────────────────────── */
+  .shift { padding: 4px 16px 14px; }
+  .shift-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .shift-row:last-child { border-bottom: 0; }
+  .shift-name { font-size: 13.5px; }
+  .shift-role { color: var(--muted); font-size: 12.5px; margin-left: 8px; }
+  .shift-state { font-family: var(--mono); font-size: 11.5px; color: var(--ok); white-space: nowrap; }
+  .shift-state[data-tone="muted"] { color: var(--muted); }
+
+  /* ── 页脚 ─────────────────────────────────────────────── */
+  .foot { border-top: 1px solid var(--line-strong); background: var(--panel); margin-top: 6px; }
+  .foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding: 13px 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  /* ── 响应式 ───────────────────────────────────────────── */
+  @media (max-width: 1080px) {
+    .bar-nav { display: none; }
+    .cols { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 760px) {
+    :root { --bar: 50px; }
+    .wrap { padding: 0 14px; }
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpi:nth-child(odd) { border-left: 0; }
+    .kpi:nth-child(n + 3) { border-top: 1px solid var(--line); }
+    .bar-right .stamp, .bar-right .btn-quiet { display: none; }
+    .table-scroll { overflow-x: auto; }
+    .table { min-width: 620px; }
+    .main { padding-top: 16px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<header class="bar">
+  <div class="wrap bar-inner">
+    <span class="mark">
+      <span class="mark-name" id="mark-name"></span>
+      <span class="mark-env" id="mark-env"></span>
+    </span>
+    <nav class="bar-nav" id="bar-nav" aria-label="控制台导航"></nav>
+    <div class="bar-right">
+      <span class="stamp" id="stamp"></span>
+      <span class="duty" id="duty"></span>
+      <button class="btn btn-quiet" type="button" id="refresh"></button>
+    </div>
+  </div>
+</header>
+
+<main class="main wrap" id="main">
+  <div id="alert-slot"></div>
+
+  <div class="page-head">
+    <div>
+      <h1 class="page-title" id="view-title"></h1>
+      <p class="page-sub" id="view-subtitle"></p>
+    </div>
+  </div>
+
+  <section class="kpis" id="kpis" aria-label="关键指标"></section>
+
+  <section class="panel chart-panel">
+    <div class="panel-head">
+      <h2 class="panel-title" id="chart-title"></h2>
+      <span class="panel-note" id="chart-note"></span>
+    </div>
+    <div class="chart-body">
+      <div class="chart" id="chart"></div>
+      <div class="chart-axis" id="chart-axis"></div>
+    </div>
+  </section>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="queue-title">
+      <div class="panel-head">
+        <h2 class="panel-title" id="queue-title"></h2>
+        <span class="panel-note" id="queue-note"></span>
+      </div>
+      <div class="table-scroll">
+        <table class="table">
+          <thead><tr id="queue-head"></tr></thead>
+          <tbody id="queue-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title" id="dist-title"></h2>
+          <span class="panel-note" id="dist-note"></span>
+        </div>
+        <div class="dist" id="dist"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title" id="shift-title"></h2>
+          <span class="panel-note" id="shift-note"></span>
+        </div>
+        <div class="shift" id="shift"></div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <span id="foot-left"></span>
+    <span id="foot-right"></span>
+  </div>
+</footer>
+
+<script>
+/* ── 可编辑区 ─────────────────────────────────────────────
+   交付时只改这一个对象；下面的渲染层与 <style> 不要动。
+   下面的数字都是示例数据，替换成你自己的口径。
+   ──────────────────────────────────────────────────────── */
+const TEMPLATE = {
+  meta: {
+    lang: 'zh-CN',
+    title: '订单履约 · 生产控制台',
+    description: '单文件运营监控看板，异常优先的履约队列。',
+  },
+
+  // 留空即用默认：冷灰底 + 白面板 + 功能性强调色
+  theme: {},
+
+  copy: {
+    mark: '订单履约',
+    env: '生产',
+    nav: [
+      { label: '异常队列', on: true },
+      { label: '订单流转' },
+      { label: '仓库负载' },
+      { label: '运力调度' },
+      { label: '值班排班' },
+    ],
+    duty: '陈立群 早班值班中',
+    refreshLabel: '刷新',
+    stampJustNow: '更新于 刚刚',
+    stampTemplate: '更新于 {seconds} 秒前',
+    footLeft: '订单履约 · 生产 · 华东主站',
+    footRight: '值班热线 8021',
+  },
+
+  view: {
+    title: '异常队列',
+    subtitle: '今天 09:00 至今，按影响面从大到小排列',
+
+    alert: {
+      tone: 'critical',
+      chip: '超时',
+      text: '6 单已滞留超过一小时，其中 2 单卡在同一个运力池',
+      action: '只看这 6 单',
+    },
+
+    kpis: [
+      { label: '待履约订单', value: '3,148', delta: '较昨日同时段少 214 单' },
+      { label: '准时率', value: '96.4%', delta: '低于目标 1.1 个点' },
+      { label: '履约时长中位数', value: '12m 38s', delta: '过去一小时' },
+      { label: '超时未处理', value: '6', delta: '最长已滞留 1 小时 12 分', alert: true },
+    ],
+
+    chart: {
+      title: '每小时流转单量',
+      note: '峰值 14:00 · 2,481 单',
+      aria: '过去 24 小时的每小时流转单量柱状图',
+      axis: ['昨天 10:00', '18:00', '今天 02:00', '10:00'],
+      series: [
+        1180, 1360, 1520, 1480, 1340, 1210, 1090, 980, 860, 720, 640, 590,
+        620, 760, 1120, 1680, 2140, 2481, 2360, 2180, 1940, 1720, 1490, 1310,
+      ],
+    },
+
+    queue: {
+      title: '待处理',
+      note: '共 27 单，列前 6 单',
+      columns: ['单号', '客户', '异常', '已滞留', '仓库'],
+      rows: [
+        { no: 'SO-28417', who: '蒋雪', chip: '超时未发', tone: 'critical', dur: '1 小时 12 分', hub: '杭州北' },
+        { no: 'SO-28409', who: '周曼', chip: '运力未接单', tone: 'critical', dur: '46 分钟', hub: '上海外高桥' },
+        { no: 'SO-28396', who: '徐海鹏', chip: '缺货待补', tone: 'warn', dur: '22 分钟', hub: '成都双流' },
+        { no: 'SO-28374', who: '陈立群', chip: '地址待确认', tone: 'warn', dur: '18 分钟', hub: '深圳龙华' },
+        { no: 'SO-28368', who: '谭亦文', chip: '已改派运力', tone: 'steady', dur: '8 分钟', hub: '杭州北' },
+        { no: 'SO-28355', who: '高晓鹭', chip: '等待复核', tone: 'plain', dur: '2 分钟', hub: '广州南沙' },
+      ],
+    },
+
+    dist: {
+      title: '今日流转',
+      note: '22,741 单',
+      items: [
+        { label: '已完成', value: '18,662', width: 88 },
+        { label: '流转中', value: '1,204', width: 14 },
+        { label: '待履约', value: '3,148', width: 32, tone: 'warn' },
+        { label: '异常', value: '27', width: 4, tone: 'critical' },
+      ],
+    },
+
+    shift: {
+      title: '当班',
+      note: '早班 08:00 起',
+      rows: [
+        { name: '陈立群', role: '总值班', state: '在岗' },
+        { name: '周曼', role: '华东仓', state: '在岗' },
+        { name: '徐海鹏', role: '西南仓', state: '15:40 交接', tone: 'muted' },
+      ],
+    },
+  },
+};
+
+/* ── 渲染层（不要修改） ──────────────────────────────────── */
+(function render() {
+  const SVG = 'http://www.w3.org/2000/svg';
+  const byId = id => document.getElementById(id);
+  const setText = (id, value) => {
+    const node = byId(id);
+    if (node && value != null) node.textContent = value;
+  };
+  const el = (tag, cls, text) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  };
+  const svgEl = tag => document.createElementNS(SVG, tag);
+
+  if (TEMPLATE.meta) {
+    if (TEMPLATE.meta.lang) document.documentElement.lang = TEMPLATE.meta.lang;
+    if (TEMPLATE.meta.title) {
+      document.title = TEMPLATE.meta.title;
+      setText('doc-title', TEMPLATE.meta.title);
+    }
+    if (TEMPLATE.meta.description) {
+      const meta = byId('doc-desc');
+      if (meta) meta.setAttribute('content', TEMPLATE.meta.description);
+    }
+  }
+
+  const THEME_VARS = {
+    bg: '--bg', panel: '--panel', line: '--line', lineStrong: '--line-strong',
+    ink: '--ink', muted: '--muted', accent: '--accent',
+    ok: '--ok', warn: '--warn', danger: '--danger',
+  };
+  const theme = TEMPLATE.theme || {};
+  Object.keys(THEME_VARS).forEach(key => {
+    const value = theme[key];
+    if (typeof value === 'string' && value) document.documentElement.style.setProperty(THEME_VARS[key], value);
+  });
+
+  const copy = TEMPLATE.copy || {};
+  setText('mark-name', copy.mark);
+  setText('mark-env', copy.env);
+  setText('duty', copy.duty);
+  setText('refresh', copy.refreshLabel);
+  setText('foot-left', copy.footLeft);
+  setText('foot-right', copy.footRight);
+  const nav = byId('bar-nav');
+  if (nav) {
+    (copy.nav || []).forEach(item => {
+      const link = el('a', null, item.label);
+      link.href = item.target || '#main';
+      if (item.on) link.setAttribute('aria-current', 'true');
+      nav.appendChild(link);
+    });
+  }
+
+  const view = TEMPLATE.view || {};
+  setText('view-title', view.title);
+  setText('view-subtitle', view.subtitle);
+
+  const alert = view.alert;
+  const alertSlot = byId('alert-slot');
+  if (alertSlot && alert && alert.text) {
+    const box = el('div', 'alert');
+    box.setAttribute('role', 'status');
+    if (alert.chip) box.appendChild(el('span', 'alert-chip', alert.chip));
+    box.appendChild(el('span', 'alert-text', alert.text));
+    if (alert.action) {
+      const link = el('a', 'alert-action', alert.action);
+      link.href = alert.href || '#main';
+      box.appendChild(link);
+    }
+    alertSlot.appendChild(box);
+  }
+
+  const kpis = byId('kpis');
+  if (kpis) {
+    (view.kpis || []).forEach(item => {
+      const cell = el('div', 'kpi');
+      if (item.alert) cell.setAttribute('data-alert', 'true');
+      cell.appendChild(el('div', 'kpi-label', item.label));
+      cell.appendChild(el('div', 'kpi-value', item.value));
+      cell.appendChild(el('div', 'kpi-delta', item.delta));
+      kpis.appendChild(cell);
+    });
+  }
+
+  const chart = view.chart || {};
+  setText('chart-title', chart.title);
+  setText('chart-note', chart.note);
+  const chartBox = byId('chart');
+  const series = Array.isArray(chart.series) ? chart.series.map(Number).filter(isFinite) : [];
+  if (chartBox && series.length) {
+    const W = 720;
+    const H = 132;
+    const gap = 3;
+    const barWidth = (W - (series.length - 1) * gap) / series.length;
+    const peak = series.reduce((best, value, index) => (value > series[best] ? index : best), 0);
+    const max = series[peak] || 1;
+    const svg = svgEl('svg');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', chart.aria || chart.title || '吞吐量柱状图');
+    [0, 0.5, 1].forEach(ratio => {
+      const line = svgEl('line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('x2', String(W));
+      const y = ratio === 1 ? H - 0.5 : ratio * H;
+      line.setAttribute('y1', String(y));
+      line.setAttribute('y2', String(y));
+      line.setAttribute('class', 'chart-grid');
+      svg.appendChild(line);
+    });
+    series.forEach((value, index) => {
+      const height = Math.max(2, (value / max) * (H - 8));
+      const bar = svgEl('rect');
+      bar.setAttribute('x', (index * (barWidth + gap)).toFixed(2));
+      bar.setAttribute('y', (H - height).toFixed(2));
+      bar.setAttribute('width', barWidth.toFixed(2));
+      bar.setAttribute('height', height.toFixed(2));
+      bar.setAttribute('class', 'chart-bar');
+      if (index === peak) bar.setAttribute('data-peak', 'true');
+      svg.appendChild(bar);
+    });
+    chartBox.appendChild(svg);
+  }
+  const axis = byId('chart-axis');
+  if (axis) (chart.axis || []).forEach(label => axis.appendChild(el('span', null, label)));
+
+  const queue = view.queue || {};
+  setText('queue-title', queue.title);
+  setText('queue-note', queue.note);
+  const head = byId('queue-head');
+  if (head) (queue.columns || []).forEach((label, index, all) => {
+    const th = el('th', index === all.length - 1 ? 't-right' : null, label);
+    th.scope = 'col';
+    head.appendChild(th);
+  });
+  const body = byId('queue-body');
+  if (body) {
+    (queue.rows || []).forEach(row => {
+      const tr = el('tr');
+      tr.appendChild(el('td', 't-no', row.no));
+      tr.appendChild(el('td', 't-dim', row.who));
+      const chipCell = el('td');
+      const chip = el('span', 'chip', row.chip);
+      if (row.tone && row.tone !== 'plain') chip.setAttribute('data-tone', row.tone);
+      chipCell.appendChild(chip);
+      tr.appendChild(chipCell);
+      tr.appendChild(el('td', 't-no t-dim', row.dur));
+      tr.appendChild(el('td', 't-dim t-right', row.hub));
+      body.appendChild(tr);
+    });
+  }
+
+  const dist = view.dist || {};
+  setText('dist-title', dist.title);
+  setText('dist-note', dist.note);
+  const distBox = byId('dist');
+  if (distBox) {
+    (dist.items || []).forEach(item => {
+      const row = el('div', 'dist-row');
+      row.appendChild(el('div', 'dist-label', item.label));
+      const track = el('div', 'dist-track');
+      const fill = el('div', 'dist-fill');
+      if (item.tone) fill.setAttribute('data-tone', item.tone);
+      fill.style.width = Math.max(0, Math.min(100, Number(item.width) || 0)) + '%';
+      track.appendChild(fill);
+      row.appendChild(track);
+      row.appendChild(el('div', 'dist-value', item.value));
+      distBox.appendChild(row);
+    });
+  }
+
+  const shift = view.shift || {};
+  setText('shift-title', shift.title);
+  setText('shift-note', shift.note);
+  const shiftBox = byId('shift');
+  if (shiftBox) {
+    (shift.rows || []).forEach(row => {
+      const line = el('div', 'shift-row');
+      const left = el('div');
+      left.appendChild(el('span', 'shift-name', row.name));
+      if (row.role) left.appendChild(el('span', 'shift-role', row.role));
+      line.appendChild(left);
+      const state = el('span', 'shift-state', row.state || row.note || '');
+      if (row.tone === 'muted') state.setAttribute('data-tone', 'muted');
+      line.appendChild(state);
+      shiftBox.appendChild(line);
+    });
+  }
+
+  // 数据新鲜度：刷新后从零开始计秒
+  let seconds = 0;
+  const stamp = byId('stamp');
+  function paintStamp() {
+    if (!stamp) return;
+    stamp.textContent = seconds === 0
+      ? (copy.stampJustNow || '')
+      : String(copy.stampTemplate || '{seconds}').replace('{seconds}', String(seconds));
+  }
+  paintStamp();
+  const timer = setInterval(() => {
+    seconds += 1;
+    paintStamp();
+  }, 1000);
+  window.addEventListener('beforeunload', () => clearInterval(timer));
+  const refresh = byId('refresh');
+  if (refresh) {
+    refresh.addEventListener('click', () => {
+      seconds = 0;
+      paintStamp();
+    });
+  }
+})();
+</script>
+</body>
+</html>
