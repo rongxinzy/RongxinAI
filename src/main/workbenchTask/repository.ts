@@ -480,17 +480,18 @@ export class WorkbenchTaskRepository {
    * Promote pending final deliverables only. Intermediate evidence, verified
    * artifacts and failed artifacts are left untouched.
    */
-  markArtifactsVerified(runId: string): number {
-    const run = this.getRun(runId);
-    const detail = run ? this.getDetail(run.taskId) : null;
-    if (!detail) return 0;
+  markArtifactsVerified(
+    runId: string,
+    contract: WorkbenchTaskContract,
+    artifacts: WorkbenchArtifact[],
+  ): number {
     return this.transaction(() => {
       const update = this.db.prepare(
         'UPDATE workbench_artifacts SET verification_status = ?, updated_at = ? WHERE id = ? AND verification_status = ?',
       );
       let changes = 0;
-      for (const artifact of detail.artifacts) {
-        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact, detail.task.contract))
+      for (const artifact of artifacts) {
+        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact, contract))
           continue;
         changes += update.run(
           WorkbenchArtifactVerificationStatus.Verified,

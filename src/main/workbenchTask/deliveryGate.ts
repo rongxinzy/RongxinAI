@@ -3,6 +3,7 @@ import {
   isWorkbenchDeliverable,
   matchesOutputRequirement,
   WorkbenchOutputMode,
+  WorkbenchContractKind,
   WorkbenchArtifactVerificationStatus,
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationCheckName,
@@ -23,7 +24,7 @@ export function applyWorkbenchDeliveryGate(
   const deliverables = artifacts.filter(artifact => isWorkbenchDeliverable(artifact, contract));
   const requirements = contract.outputRequirements;
   const missing =
-    requirements?.length === 0 ||
+    (contract.kind !== WorkbenchContractKind.Chat && !requirements?.length) ||
     requirements?.some(
       requirement =>
         requirement.mode !== WorkbenchOutputMode.Text &&
@@ -43,7 +44,7 @@ export function applyWorkbenchDeliveryGate(
           status: WorkbenchVerificationCheckStatus.Failed,
           detail: failed
             ? t('workbenchDeliveryHashFailed')
-            : requirements?.length === 0
+              : !requirements?.length
               ? t('workbenchOutputContractMissing')
               : t('workbenchDeliveryMissing'),
         },

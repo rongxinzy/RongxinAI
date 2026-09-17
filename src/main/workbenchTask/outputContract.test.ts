@@ -210,6 +210,32 @@ test('an allowed explicit inline table requires acceptance rather than automatic
   }
 });
 
+test('old Work acceptance records cannot bypass delivery by omitting the output contract', async () => {
+  const { db, service, task, run } = fixture();
+  try {
+    setWorkbenchOutputRequirements(service.repository, 'session', run.id, [
+      { mode: WorkbenchOutputMode.Inline, formats: ['csv'] },
+    ]);
+    await service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: '```artifact:csv\na,b\n1,2\n```',
+      workflowSnapshot: { productionActive: false },
+    });
+    service.repository.updateTaskContract(task.id, {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    });
+    expect(() => service.acceptTask(task.id)).toThrow('no final deliverable');
+    expect(service.getDetail(task.id)?.artifacts[0].verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Pending,
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test('rejects invalid and unbounded output contracts', () => {
   expect(() => normalizeOutputRequirements([])).toThrow();
   expect(() =>

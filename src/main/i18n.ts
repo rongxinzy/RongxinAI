@@ -16,6 +16,7 @@ export type LanguageType = 'zh' | 'en';
 
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    workbenchTaskOutputToolLabel: '输出要求',
     workbenchDeliveryHashFailed: '最终交付物内容校验失败。',
     workbenchOutputContractMissing: '尚未确认任务输出要求，结果暂不能验收。',
     workbenchDeliveryMissing: '缺少符合任务输出要求的最终交付物；临时文件和普通回复片段不能替代交付。',
@@ -389,6 +390,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
   en: {
+    workbenchTaskOutputToolLabel: 'Output Requirements',
     workbenchDeliveryHashFailed: 'Final deliverable content verification failed.',
     workbenchOutputContractMissing: 'The task output requirements have not been committed; the result cannot be accepted yet.',
     workbenchDeliveryMissing:

@@ -23,6 +23,7 @@ export type WorkbenchJsonObject = Record<string, unknown>;
 export interface WorkbenchTaskContract {
   kind: WorkbenchContractKind;
   requiresUserAcceptance: boolean;
+  /** Required for Work delivery. Chat alone may omit this for a plain text response. */
   outputRequirements?: WorkbenchOutputRequirement[];
   metadata?: WorkbenchJsonObject;
 }
