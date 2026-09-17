@@ -212,8 +212,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceAccessRestartOnSaveTitle: '保存时会自动重启服务',
     localInferenceAccessRestartRequiredTitle: '保存修改后会关闭当前服务',
     localInferenceAccessRequestExample: '请求示例',
-    localInferenceAccessRequestExampleHint:
-      '统一走一个服务端口，通过请求体里的 model 字段区分模型。',
     localInferenceAccessSettingsSaved: '访问设置已保存。',
     localInferenceAccessSettingsSavedRestarted: '访问设置已保存，本地推理已自动重启并生效。',
     localInferenceAccessSettingsSavedRestartRequired: '访问设置已保存；重启本地推理服务后生效。',
@@ -3597,8 +3595,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceAccessRestartOnSaveTitle: 'The service will restart on save',
     localInferenceAccessRestartRequiredTitle: 'Changes require a service restart to take effect',
     localInferenceAccessRequestExample: 'Request example',
-    localInferenceAccessRequestExampleHint:
-      'Use one shared service endpoint and distinguish models with the model field in the request body.',
     localInferenceAccessSettingsSaved: 'Access settings saved.',
     localInferenceAccessSettingsSavedRestarted:
       'Access settings saved. local inference was restarted and the change is now active.',
