@@ -165,11 +165,12 @@ export const UserBubble: React.FC<{
         {hasTextContent && (
           <Message from="user" className="ml-auto items-end">
             <MessageContent className="theme-message-cowork-user">
+              {/* 2026/09/17 lixiang  skill与正文同一文本流，避免左右分栏 */}
               <div className="whitespace-pre-wrap wrap-break-word">
                 {messageSkills.map(skill => (
                   <MessageSkillSummary key={skill.id} skill={skill} />
                 ))}
-                <span className='cowork-message mx-0.5'>{textContent}</span>
+                <span className="cowork-message mx-0.5">{textContent}</span>
               </div>
             </MessageContent>
           </Message>
@@ -200,6 +201,7 @@ const MessageSkillSummary: React.FC<{ skill: Skill }> = ({ skill }) => {
   const ShortcutIcon = shortcut?.icon;
 
   return (
+    // 2026/09/17 lixiang  气泡内 skill 以行内 token 样式展示，跟输入框 skill 胶囊一致
     <span className="theme-surface-skill-token mx-0.5 inline-flex h-6 max-w-40 select-none items-center gap-1 align-baseline px-2 text-sm leading-none">
       {skill.iconUrl ? (
         <img

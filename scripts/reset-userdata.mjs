@@ -1,10 +1,12 @@
 /**
- * Wipe XiaoruanAgent userData so the next launch behaves like a fresh install.
- * Does not touch node_modules, dist, or release builds.
+ * Author: lixiang
+ * Date: 2026/09/17
+ * Description: 清除 XiaoruanAgent 用户数据，下次启动等同全新安装（不动 node_modules/dist/release）
  *
  * Usage:
  *   node scripts/reset-userdata.mjs
  *   npm run reset:userdata
+ *   npm run electron:dev:fresh
  */
 import fs from 'node:fs';
 import os from 'node:os';

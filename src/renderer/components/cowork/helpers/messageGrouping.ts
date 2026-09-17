@@ -25,12 +25,30 @@ export type ConversationTurn = {
 
 // ── buildDisplayItems ──
 
+// 2026/09/17 lixiang  多次暂停只保留最新一条中断消息，避免列表堆多条「继续执行」
+export const omitSupersededSessionInterruptions = (
+  messages: CoworkMessage[],
+): CoworkMessage[] => {
+  let latestInterruptionIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.metadata?.interruption) {
+      latestInterruptionIndex = i;
+      break;
+    }
+  }
+  if (latestInterruptionIndex < 0) return messages;
+  return messages.filter((message, index) => {
+    if (!message.metadata?.interruption) return true;
+    return index === latestInterruptionIndex;
+  });
+};
+
 export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
   const items: DisplayItem[] = [];
   const groupsByToolUseId = new Map<string, ToolGroupItem>();
   let pendingAdjacentGroup: ToolGroupItem | null = null;
 
-  for (const message of messages) {
+  for (const message of omitSupersededSessionInterruptions(messages)) {
     if (message.type === 'tool_use') {
       const group: ToolGroupItem = { type: 'tool_group', toolUse: message };
       items.push(group);
