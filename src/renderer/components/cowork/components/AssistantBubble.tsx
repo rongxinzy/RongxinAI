@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
-import { CopyButton } from './CopyButton';
 import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
@@ -17,31 +16,25 @@ export const AssistantBubble: React.FC<{
   message: CoworkMessage;
   resolveLocalFilePath?: (href: string, text: string) => string | null;
   mapDisplayText?: (value: string) => string;
-  showCopyButton?: boolean;
   turnMetadata?: CoworkMessageMetadata | null;
-}> = ({ message, mapDisplayText, showCopyButton = false, turnMetadata }) => {
-  const [isHovered, setIsHovered] = useState(false);
+}> = ({ message, mapDisplayText, turnMetadata }) => {
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
   const isStreaming = Boolean(message.metadata?.isStreaming);
   const modelLabel = getMessageModelLabel(turnMetadata);
 
   return (
-    <div
-      className="py-1 focus:outline-none"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
+    <div className="py-1 focus:outline-none">
       <Message from="assistant">
         <MessageContent>
           <StreamingMarkdownResponse content={rawContent} isStreaming={isStreaming} />
         </MessageContent>
       </Message>
-      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{formatMessageDateTime(message.timestamp)}</span>
-        {modelLabel && <span>{modelLabel}</span>}
-        {showCopyButton && <CopyButton content={message.content} visible={isHovered} />}
-      </div>
+      {modelLabel && (
+        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+          <span>{modelLabel}</span>
+        </div>
+      )}
       {expandedImage && (
         <ImagePreviewModal image={expandedImage} onClose={() => setExpandedImage(null)} />
       )}
