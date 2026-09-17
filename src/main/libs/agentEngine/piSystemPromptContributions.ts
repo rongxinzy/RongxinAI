@@ -16,6 +16,7 @@ import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
+import { PiTaskOutputSystemPrompt } from './piTaskOutputTool';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 
 export interface PiSystemPromptContext {
@@ -27,6 +28,8 @@ export interface PiSystemPromptContext {
   platform?: NodeJS.Platform;
   /** Whether the current run has no foreground user interaction. */
   unattended?: boolean;
+  /** The output-contract tool is registered for this Work session. */
+  taskOutputEnabled?: boolean;
   /** Concrete MCP capabilities discovered before this session was created. */
   mcpToolManifest?: McpToolManifestEntry[];
   /** Configured MCP servers, including connection and discovery failures. */
@@ -88,6 +91,11 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     prompt: context => createPiLargeFileWriteSystemPrompt(context.maxOutputTokens),
   },
   { id: 'declare-artifact', prompt: DeclareArtifactSystemPrompt },
+  {
+    id: 'task-output',
+    enabled: context => context.taskOutputEnabled === true,
+    prompt: PiTaskOutputSystemPrompt,
+  },
 ];
 
 export function collectPiSystemPromptContributions(context: PiSystemPromptContext): string[] {

@@ -7,6 +7,7 @@ import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
+  WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchRunEventType,
@@ -364,7 +365,7 @@ export class WorkbenchTaskService extends EventEmitter {
       finalResult = applyWorkbenchDeliveryGate(
         finalResult,
         artifacts,
-        artifactCandidates.length > 0 || artifacts.length > 0,
+        task.contract,
       );
       if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
@@ -429,7 +430,7 @@ export class WorkbenchTaskService extends EventEmitter {
     }
     const runArtifacts = detail.artifacts.filter(artifact => artifact.runId === run.id);
     if (
-      applyWorkbenchDeliveryGate(run.verificationResult, runArtifacts, runArtifacts.length > 0)
+      applyWorkbenchDeliveryGate(run.verificationResult, runArtifacts, detail.task.contract)
         .outcome === WorkbenchVerificationOutcome.Failed
     ) {
       throw new Error('This task cannot be accepted because no final deliverable is ready.');
@@ -456,7 +457,7 @@ export class WorkbenchTaskService extends EventEmitter {
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
       // Acceptance attests final deliverables, never intermediate execution evidence.
-      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id);
+      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id, detail.task.contract, runArtifacts);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
@@ -561,6 +562,13 @@ export class WorkbenchTaskService extends EventEmitter {
       return { allow: false, reason: 'The tool call does not belong to the active run.' };
     }
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
+    if (
+      task.contract.kind !== WorkbenchContractKind.Chat &&
+      !task.contract.outputRequirements?.length &&
+      riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
+    ) {
+      return { allow: false, reason: 'Commit the requested outputs with set_task_output before executing this task.' };
+    }
     if (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly) {
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ToolRead, {
         toolCallId: input.toolCallId,

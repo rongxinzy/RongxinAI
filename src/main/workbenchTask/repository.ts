@@ -14,6 +14,7 @@ import {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationCheckName,
   WorkbenchTerminalTaskStatuses,
+  isWorkbenchDeliverable,
   type WorkbenchApproval,
   type WorkbenchApprovalDecisionSource,
   type WorkbenchApprovalRiskLevel,
@@ -32,7 +33,6 @@ import {
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { assertRunTransition, assertTaskTransition } from './stateMachine';
-import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
 
 const terminalTaskStatuses = new Set<string>(WorkbenchTerminalTaskStatuses);
 
@@ -190,6 +190,12 @@ export class WorkbenchTaskRepository {
       | TaskRow
       | undefined;
     return row ? this.mapTask(row) : null;
+  }
+
+  updateTaskContract(taskId: string, contract: WorkbenchTaskContract): void {
+    this.db
+      .prepare('UPDATE workbench_tasks SET contract_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(contract), Date.now(), taskId);
   }
 
   getLatestTaskForSession(sessionId: string): WorkbenchTask | null {
@@ -474,31 +480,28 @@ export class WorkbenchTaskRepository {
    * Promote pending final deliverables only. Intermediate evidence, verified
    * artifacts and failed artifacts are left untouched.
    */
-  markArtifactsVerified(runId: string): number {
-    const result = this.db
-      .prepare(
-        `UPDATE workbench_artifacts
-         SET verification_status = ?, updated_at = ?
-         WHERE run_id = ? AND verification_status = ?
-           AND (kind = ? OR
-             (COALESCE(json_extract(metadata_json, '$.role'), '') != ? AND
-               (json_extract(metadata_json, '$.source') IN (?, ?) OR
-                 (json_extract(metadata_json, '$.source') = ? AND
-                  json_extract(metadata_json, '$.role') = ?))))`,
-      )
-      .run(
-        WorkbenchArtifactVerificationStatus.Verified,
-        Date.now(),
-        runId,
-        WorkbenchArtifactVerificationStatus.Pending,
-        WorkbenchArtifactKind.MessageBlock,
-        CoworkArtifactRole.Intermediate,
-        WorkbenchArtifactCandidateSource.DomainWorkflow,
-        WorkbenchArtifactCandidateSource.ProductionInspection,
-        WorkbenchArtifactCandidateSource.Declaration,
-        CoworkArtifactRole.Deliverable,
+  markArtifactsVerified(
+    runId: string,
+    contract: WorkbenchTaskContract,
+    artifacts: WorkbenchArtifact[],
+  ): number {
+    return this.transaction(() => {
+      const update = this.db.prepare(
+        'UPDATE workbench_artifacts SET verification_status = ?, updated_at = ? WHERE id = ? AND verification_status = ?',
       );
-    return result.changes;
+      let changes = 0;
+      for (const artifact of artifacts) {
+        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact, contract))
+          continue;
+        changes += update.run(
+          WorkbenchArtifactVerificationStatus.Verified,
+          Date.now(),
+          artifact.id,
+          WorkbenchArtifactVerificationStatus.Pending,
+        ).changes;
+      }
+      return changes;
+    });
   }
 
   countPendingArtifacts(runId: string): number {

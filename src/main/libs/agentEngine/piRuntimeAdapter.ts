@@ -164,6 +164,8 @@ import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
+import { buildPiTaskOutputTool } from './piTaskOutputTool';
+import { setWorkbenchOutputRequirements } from '../../workbenchTask/outputContract';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
@@ -886,6 +888,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           : undefined;
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
+        taskOutputEnabled: Boolean(this.workbenchTaskService) && options.sessionMode !== 'chat',
         getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
         settingsManager,
         getApprovalMode: () =>
@@ -904,6 +907,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // Each call creates a distinct tool instance for this Pi session, so its
       // sequential execution mode cannot block another session.
       const customTools: Record<string, unknown>[] = [];
+      if (this.workbenchTaskService && options.sessionMode !== 'chat') {
+        customTools.push(
+          buildPiTaskOutputTool(requirements => {
+            const runId = this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
+            if (!runId || !this.workbenchTaskService)
+              throw new Error('No active workbench run is available.');
+            setWorkbenchOutputRequirements(
+              this.workbenchTaskService.repository,
+              sessionId,
+              runId,
+              requirements,
+            );
+          }),
+        );
+      }
 
       if (options.planTool === true || options.planMode === true) {
         // The plan tool never touches the workspace: it publishes the structured
@@ -2256,6 +2274,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     resourceState: PiResourceState,
     approvalContext?: {
       sessionId: string;
+      taskOutputEnabled?: boolean;
       getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
       getApprovalMode: () => WorkbenchApprovalMode;
@@ -2305,6 +2324,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           maxOutputTokens: resourceState.maxOutputTokens,
           platform: process.platform,
           unattended: resourceState.unattended,
+          taskOutputEnabled: approvalContext?.taskOutputEnabled,
           mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
           mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
         }),
@@ -3527,6 +3547,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             : WorkbenchContractKind.GenericWork;
     return {
       kind,
+      ...(sessionMode !== 'chat' ? { outputRequirements: [] } : {}),
       // Generic Work keeps production controls available. Verification uses
       // the controller snapshot to distinguish a dormant direct answer from
       // an activated production run; only the latter owns the acceptance gate.
