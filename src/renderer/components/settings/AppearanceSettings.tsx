@@ -1,15 +1,14 @@
 import { Button } from '@shared/components/ui/button';
-import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import { Spinner } from '@shared/components/ui/spinner';
 import { Check } from 'lucide-react';
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { i18nService } from '../../services/i18n';
-import { backgroundStyle, normalizeBackground } from '../../theme/background/background';
 import { resolveThemePlugin, themePlugins } from '../../theme/themes/plugins';
-import { TOKEN_CONTRACT, TOKEN_NAMES } from '../../theme/tokens/contract';
 
 type Appearance = 'light' | 'dark' | 'system';
 const APPEARANCES = ['light', 'dark', 'system'] as const;
 const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
+
 function subscribeSystemAppearance(onChange: () => void) {
   const query = window.matchMedia(SYSTEM_DARK_QUERY);
   query.addEventListener('change', onChange);
@@ -18,36 +17,24 @@ function subscribeSystemAppearance(onChange: () => void) {
 const getSystemDark = () => window.matchMedia(SYSTEM_DARK_QUERY).matches;
 const getServerDark = () => false;
 
-function ThemePreview({ styleId, appearance }: { styleId: string; appearance: 'light' | 'dark' }) {
+// 2026/09/17 lixiang  外观只展示主色正方形色块 + 风格名
+function ThemePrimarySwatch({
+  styleId,
+  appearance,
+}: {
+  styleId: string;
+  appearance: 'light' | 'dark';
+}) {
   const theme = resolveThemePlugin(styleId).appearances[appearance];
-  const variables = {
-    ...Object.fromEntries(TOKEN_NAMES.map(key => [TOKEN_CONTRACT[key], theme.tokens[key]])),
-    ...backgroundStyle(normalizeBackground(theme.background)),
-  } as CSSProperties;
+  const primary = theme.tokens.primary;
   return (
     <span
-      style={variables}
       data-theme-preview={theme.meta.id}
       aria-hidden="true"
-      className="theme-appearance-preview-frame flex aspect-[3/2] w-full overflow-hidden"
-    >
-      <span className="theme-appearance-preview-sidebar flex w-1/4 flex-col gap-2">
-        <span className="theme-appearance-preview-line w-3/4" />
-        <span className="theme-appearance-preview-selection w-full" />
-        <span className="theme-appearance-preview-muted w-full" />
-        <span className="theme-appearance-preview-muted w-3/4" />
-        <span className="theme-appearance-preview-muted mt-auto w-1/2" />
-      </span>
-      <span data-main-canvas className="theme-appearance-preview-main relative flex min-w-0 flex-1 flex-col gap-2">
-        <span className="theme-appearance-preview-line w-2/3" />
-        <span className="theme-appearance-preview-message mt-2 w-2/3 self-end" />
-        <span className="theme-appearance-preview-muted w-full" />
-        <span className="theme-appearance-preview-muted w-4/5" />
-        <span className="theme-appearance-preview-composer mt-auto flex items-end justify-end">
-          <span className="theme-appearance-preview-send" />
-        </span>
-      </span>
-    </span>
+      className="size-5 shrink-0 rounded-md border border-border"
+      style={{ backgroundColor: primary }}
+      title="primary"
+    />
   );
 }
 
@@ -96,7 +83,8 @@ export function AppearanceSettings({
     <div className="space-y-6">
       <section className="space-y-3" aria-label={i18nService.t('themeStyle')}>
         <h4 className="text-sm font-medium">{i18nService.t('themeStyle')}</h4>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3">
+        {/* 2026/09/17 lixiang  仅主色块+名称同一行，不填按钮背景色；一行最多 5 个 */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
           {themePlugins.map(plugin => {
             const isPending = pendingStyleId === plugin.id;
             // 设置中也保持高亮，结束后勾选已在选中态上
@@ -104,30 +92,26 @@ export function AppearanceSettings({
             return (
               <Button
                 key={plugin.id}
-                variant="appearance"
-                size="appearance"
-                className="relative overflow-hidden"
+                variant="outline"
+                size="sm"
+                className={`h-auto min-h-0 w-full justify-start gap-1.5 px-2 py-2 ${isActive ? 'border-primary ring-1 ring-primary' : ''}`}
                 aria-pressed={isActive}
                 aria-busy={isPending || undefined}
                 disabled={pendingStyleId !== null && !isPending}
                 onClick={() => handleStyleChange(plugin.id)}
               >
-                <ThemePreview styleId={plugin.id} appearance={previewAppearance} />
-                <span className="flex w-full items-center justify-between gap-2">
-                  <span>{plugin.name[language]}</span>
+                <ThemePrimarySwatch styleId={plugin.id} appearance={previewAppearance} />
+                <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
+                  {plugin.name[language]}
+                </span>
+                {/* 2026/09/17 lixiang  设置中显示加载转圈，完成后显示勾选 */}
+                {isPending ? (
+                  <Spinner className="size-3.5 shrink-0" aria-label={i18nService.t('themeStyleApplying')} />
+                ) : (
                   <Check
                     aria-hidden="true"
-                    className={`theme-appearance-preview-check ${styleId === plugin.id && !isPending ? '' : 'invisible'}`}
+                    className={`theme-appearance-preview-check size-3.5 shrink-0 ${styleId === plugin.id ? '' : 'invisible'}`}
                   />
-                </span>
-                {/* 2026/09/16 lixiang  设置中：灰色文案 + blur(2px) 毛玻璃 */}
-                {isPending && (
-                  <span
-                    className="absolute inset-0 z-[1] flex items-center justify-center bg-background/20 text-sm font-medium text-foreground/70 backdrop-blur-[2px]"
-                    role="status"
-                  >
-                    {i18nService.t('themeStyleApplying')}
-                  </span>
                 )}
               </Button>
             );
@@ -136,13 +120,30 @@ export function AppearanceSettings({
       </section>
       <section className="space-y-3" aria-label={i18nService.t('appearanceMode')}>
         <h4 className="text-sm font-medium">{i18nService.t('appearanceMode')}</h4>
-        <FluidTabs<Appearance>
-          className="theme-appearance-mode-tabs"
+        {/* 2026/09/17 lixiang  明暗模式改为三个独立按钮，选中项用主题色 */}
+        <div
+          className="flex flex-wrap gap-2"
+          role="radiogroup"
           aria-label={i18nService.t('appearanceMode')}
-          value={appearance}
-          onValueChange={onAppearanceChange}
-          items={APPEARANCES.map(value => ({ value, label: i18nService.t(value) }))}
-        />
+        >
+          {APPEARANCES.map(value => {
+            const selected = appearance === value;
+            return (
+              <Button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                variant={selected ? 'default' : 'outline'}
+                size="sm"
+                className="min-w-20"
+                onClick={() => onAppearanceChange(value)}
+              >
+                {i18nService.t(value)}
+              </Button>
+            );
+          })}
+        </div>
       </section>
     </div>
   );
