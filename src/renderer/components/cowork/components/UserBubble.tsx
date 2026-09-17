@@ -1,5 +1,5 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -24,9 +24,6 @@ const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string |
   if (!model) return null;
   return model.includes('/') ? model.split('/').pop() || model : model;
 };
-
-const hasFocusWithin = (element: HTMLElement): boolean =>
-  document.activeElement instanceof Node && element.contains(document.activeElement);
 
 const IMAGE_ATTACHMENT_EXTENSION = /\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?|ico|avif)$/i;
 const LEGACY_INPUT_FILE_LABELS = ['输入文件', 'Input Files'] as const;
@@ -82,18 +79,8 @@ export const UserBubble: React.FC<{
 }> = React.memo(({ message, skills, onReEdit }) => {
   'use memo';
 
-  const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const modelLabel = getMessageModelLabel(message.metadata);
-  const handleBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget;
-    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
-    setIsHovered(false);
-  }, []);
-  const handleMouseLeave = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (hasFocusWithin(event.currentTarget)) return;
-    setIsHovered(false);
-  }, []);
   const displayContent = useMemo(
     () => parseUserMessageForDisplay(message.content || ''),
     [message.content],
@@ -146,22 +133,8 @@ export const UserBubble: React.FC<{
   const hasTextContent = Boolean(textContent.trim()) || messageSkills.length > 0;
 
   return (
-    <div
-      className="w-full py-2 focus:outline-none"
-      tabIndex={0}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={handleMouseLeave}
-      onBlur={handleBlur}
-    >
+    <div className="w-full py-2 focus:outline-none" tabIndex={0}>
       <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end pl-4">
-        {inlineAttachments.length > 0 && (
-          <CoworkInlineAttachments
-            attachments={inlineAttachments}
-            className="mb-2 ml-auto max-w-full justify-end"
-            onOpenImage={setExpandedImage}
-          />
-        )}
-
         {hasTextContent && (
           <Message from="user" className="ml-auto items-end">
             <MessageContent className="theme-message-cowork-user">
@@ -176,14 +149,20 @@ export const UserBubble: React.FC<{
           </Message>
         )}
 
-        <div
-          className={`flex items-center gap-2 mt-1 text-xs text-muted-foreground select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          aria-hidden={!isHovered}
-        >
+        {inlineAttachments.length > 0 && (
+          <CoworkInlineAttachments
+            attachments={inlineAttachments}
+            className="mt-2 ml-auto max-w-full justify-end"
+            onOpenImage={setExpandedImage}
+          />
+        )}
+
+        {/* 2026/09/17 lixiang  操作区放在正文与附件之后并常显，参考豆包 */}
+        <div className="mt-1 flex items-center justify-end gap-2 text-xs text-muted-foreground select-none">
           <span>{formatMessageDateTime(message.timestamp)}</span>
           {modelLabel && <span className="opacity-70">{modelLabel}</span>}
-          <CopyButton content={message.content} visible={isHovered} />
-          {onReEdit && <ReEditButton visible={isHovered} onClick={() => onReEdit(message)} />}
+          <CopyButton content={message.content} visible />
+          {onReEdit && <ReEditButton visible onClick={() => onReEdit(message)} />}
         </div>
       </div>
       {expandedImage &&
