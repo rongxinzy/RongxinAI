@@ -14,6 +14,7 @@ import {
   setArtifactLayoutMode,
   setPanelView,
   setPanelWidth,
+  togglePanel,
 } from './artifactSlice';
 import artifactReducer from './artifactSlice';
 
@@ -265,5 +266,109 @@ describe('artifact reducer', () => {
     expect(selectSessionSelectedArtifact({ artifact: state } as never, 'session-1')?.title).toBe(
       'first.pptx',
     );
+  });
+
+  test('opens the artifact panel when a deliverable is added to the active session', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'deliverable-1',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
+      }),
+    );
+
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('deliverable-1');
+    expect(state.panelView).toBe(ArtifactPanelView.Preview);
+  });
+
+  test('previews the sole deliverable when the panel is toggled open', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'only-file',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
+      }),
+    );
+    state = artifactReducer(state, closePanel());
+    state = artifactReducer(state, setPanelView(ArtifactPanelView.Files));
+    state = artifactReducer(state, togglePanel());
+
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('only-file');
+    expect(state.panelView).toBe(ArtifactPanelView.Preview);
+  });
+
+  test('keeps the first deliverable selected when more files are generated', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'deliverable-1',
+          filePath: 'D:/workspace/a.pptx',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+          createdAt: 1,
+        }),
+      }),
+    );
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'deliverable-2',
+          filePath: 'D:/workspace/b.pptx',
+          fileName: 'b.pptx',
+          title: 'b.pptx',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+          createdAt: 2,
+        }),
+      }),
+    );
+
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('deliverable-1');
+  });
+
+  test('does not open the panel for intermediate artifacts or unchanged re-detects', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({ id: 'intermediate-1', role: ArtifactRole.Intermediate }),
+      }),
+    );
+    expect(state.isPanelOpen).toBe(false);
+
+    state = artifactReducer(state, closePanel());
+    const deliverable = makeArtifact({
+      id: 'deliverable-2',
+      role: ArtifactRole.Deliverable,
+      declared: true,
+    });
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: deliverable }));
+    expect(state.isPanelOpen).toBe(true);
+
+    state = artifactReducer(state, closePanel());
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: { ...deliverable } }),
+    );
+    expect(state.isPanelOpen).toBe(false);
   });
 });
