@@ -14,6 +14,7 @@ import {
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
+  WorkbenchOutputMode,
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
   WorkbenchRunStatus,
@@ -257,6 +258,7 @@ test('returns critic-approved work to revision when deterministic verification f
   try {
     const contract = {
       kind: WorkbenchContractKind.Shortcut,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
     const { task, run } = service.beginRun({
@@ -294,6 +296,7 @@ test('keeps acceptance-required production work ready until explicit user accept
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -336,6 +339,7 @@ test('user acceptance promotes pending workspace artifacts to verified', async (
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -389,6 +393,7 @@ test('baseline pass without the production workflow requires acceptance when art
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
     const { task, run } = service.beginRun({
@@ -451,6 +456,7 @@ test('baseline pass without artifacts completes without acceptance', async () =>
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
     const { run } = service.beginRun({
@@ -482,6 +488,7 @@ test('user acceptance dispatches the verified-run memory promotion', async () =>
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -548,6 +555,7 @@ test('lightweight inspected artifacts enter pending and are elevated by acceptan
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
+      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -622,6 +630,7 @@ test('supersedes a paused task instead of reusing its contract', async () => {
       goal: 'create a presentation',
       contract: {
         kind: WorkbenchContractKind.Shortcut,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: false,
       },
     });
@@ -642,6 +651,7 @@ test('supersedes a paused task instead of reusing its contract', async () => {
       goal: 'hello',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -719,6 +729,7 @@ test('successful side effects are not authorized twice', async () => {
       goal: 'write',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -748,6 +759,7 @@ test('skip_workflow executes without creating a user approval', async () => {
       goal: 'Explain the current state',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -779,6 +791,7 @@ test('pending, denied, and failed side effects cannot be authorized again', asyn
       goal: 'write',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -1126,6 +1139,7 @@ test('startup recovery marks executing effects and their runs for review', async
       goal: 'write',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });

@@ -2,6 +2,11 @@ import { ArtifactRole, type Artifact, type ArtifactType } from '../types/artifac
 import type { CoworkMessage } from '../types/cowork';
 import { discoverWorkbenchMessageArtifactBlocks } from '../../shared/workbenchTask';
 import {
+  ArtifactTypeByLanguage,
+  getInlineArtifactRole,
+  getInlineArtifactLanguage,
+} from '../../shared/cowork/artifactClassification';
+import {
   ArtifactTypeByExtension,
   getArtifactTypeByExtension,
   isBinaryArtifactFile,
@@ -26,25 +31,7 @@ export function normalizeFilePathForDedup(p: string): string {
   return p.replace(/\\/g, '/').toLowerCase();
 }
 
-const LANGUAGE_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
-  html: 'html',
-  svg: 'svg',
-  mermaid: 'mermaid',
-  jsx: 'code',
-  tsx: 'code',
-  markdown: 'markdown',
-  md: 'markdown',
-  csv: 'document',
-  tsv: 'document',
-  text: 'text',
-  txt: 'text',
-  plaintext: 'text',
-  model: 'model',
-  stl: 'model',
-  obj: 'model',
-  step: 'model',
-  iges: 'model',
-};
+const LANGUAGE_TO_ARTIFACT_TYPE = ArtifactTypeByLanguage;
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.bmp', '.ico', '.jpg', '.jpeg', '.gif', '.webp']);
 export function getArtifactTypeFromLanguage(lang: string): ArtifactType | null {
@@ -71,7 +58,6 @@ export function parseCodeBlockArtifacts(
   if (!messageContent) return [];
 
   const artifacts: Artifact[] = [];
-  let index = 0;
 
   for (const block of discoverWorkbenchMessageArtifactBlocks(messageContent)) {
     const isExplicitArtifact = block.explicit;
@@ -89,19 +75,17 @@ export function parseCodeBlockArtifacts(
     const title = explicitTitle || generateTitle(type, language, content);
 
     artifacts.push({
-      id: `artifact-${messageId}-${index}`,
+      id: `artifact-${messageId}-${block.index}`,
       messageId,
       sessionId,
       type,
       title,
       content,
-      language: type === 'code' || language === 'csv' || language === 'tsv' ? language : undefined,
+      language: getInlineArtifactLanguage(type, language),
       source: 'codeblock',
-      role: ArtifactRole.Deliverable,
+      role: getInlineArtifactRole(isExplicitArtifact),
       createdAt: Date.now(),
     });
-
-    index++;
   }
 
   return artifacts;
@@ -385,8 +369,8 @@ export function detectArtifactsFromMessages(
   }
 
   // The final answer often names an output path without a preceding explicit
-  // declaration. Accept supported absolute paths there, but not paths from
-  // streamed reasoning or arbitrary tool output.
+  // declaration. These are preview candidates only: the delivery gate still
+  // requires an explicit file declaration or controller verification.
   for (const artifact of parseFinalAnswerPathArtifacts(messages, sessionId)) {
     addPathArtifact(artifact, true);
   }

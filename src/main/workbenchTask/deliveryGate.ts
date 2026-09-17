@@ -1,35 +1,39 @@
-import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
 import { t } from '../i18n';
 import {
-  WorkbenchArtifactCandidateSource,
-  WorkbenchArtifactKind,
+  isWorkbenchDeliverable,
+  matchesOutputRequirement,
+  WorkbenchOutputMode,
+  WorkbenchContractKind,
   WorkbenchArtifactVerificationStatus,
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationCheckName,
   WorkbenchVerificationOutcome,
   type WorkbenchArtifact,
   type WorkbenchVerificationResult,
+  type WorkbenchTaskContract,
 } from '../../shared/workbenchTask';
 
-export const isWorkbenchDeliverable = (artifact: WorkbenchArtifact): boolean =>
-  artifact.kind === WorkbenchArtifactKind.MessageBlock ||
-  (artifact.metadata.role !== CoworkArtifactRole.Intermediate &&
-    (artifact.metadata.source === WorkbenchArtifactCandidateSource.DomainWorkflow ||
-      artifact.metadata.source === WorkbenchArtifactCandidateSource.ProductionInspection ||
-      (artifact.metadata.source === WorkbenchArtifactCandidateSource.Declaration &&
-        artifact.metadata.role === CoworkArtifactRole.Deliverable)));
+export { isWorkbenchDeliverable } from '../../shared/workbenchTask';
 
 export function applyWorkbenchDeliveryGate(
   result: WorkbenchVerificationResult,
   artifacts: WorkbenchArtifact[],
-  fileWorkAttempted: boolean,
+  contract: WorkbenchTaskContract,
 ): WorkbenchVerificationResult {
   if (result.outcome === WorkbenchVerificationOutcome.Failed) return result;
-  const deliverables = artifacts.filter(isWorkbenchDeliverable);
+  const deliverables = artifacts.filter(artifact => isWorkbenchDeliverable(artifact, contract));
+  const requirements = contract.outputRequirements;
+  const missing =
+    (contract.kind !== WorkbenchContractKind.Chat && !requirements?.length) ||
+    requirements?.some(
+      requirement =>
+        requirement.mode !== WorkbenchOutputMode.Text &&
+        !deliverables.some(artifact => matchesOutputRequirement(artifact, requirement)),
+    );
   const failed = deliverables.some(
     artifact => artifact.verificationStatus === WorkbenchArtifactVerificationStatus.Failed,
   );
-  if (failed || (fileWorkAttempted && deliverables.length === 0)) {
+  if (failed || missing) {
     return {
       ...result,
       outcome: WorkbenchVerificationOutcome.Failed,
@@ -38,7 +42,11 @@ export function applyWorkbenchDeliveryGate(
         {
           name: WorkbenchVerificationCheckName.DeliveryReady,
           status: WorkbenchVerificationCheckStatus.Failed,
-          detail: failed ? t('workbenchDeliveryHashFailed') : t('workbenchDeliveryMissing'),
+          detail: failed
+            ? t('workbenchDeliveryHashFailed')
+              : !requirements?.length
+              ? t('workbenchOutputContractMissing')
+              : t('workbenchDeliveryMissing'),
         },
       ],
       summary: t('workbenchDeliveryNotReady'),
