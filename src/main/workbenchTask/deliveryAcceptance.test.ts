@@ -9,6 +9,7 @@ import {
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
+  WorkbenchOutputMode,
   WorkbenchTaskStatus,
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
@@ -51,7 +52,11 @@ test.each([undefined, { productionActive: false }, { skipped: true }])(
     const { task, run } = service.beginRun({
       sessionId: 'session',
       goal: 'Create a presentation',
-      contract: { kind: WorkbenchContractKind.GenericWork, requiresUserAcceptance: false },
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+        outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }],
+      },
     });
     fs.writeFileSync(path.join(workspace, 'build-slides.py'), 'print("intermediate")');
     await service.authorizeToolCall({
@@ -83,7 +88,11 @@ test('declaring only intermediate files does not open the acceptance gate', asyn
   const { run } = service.beginRun({
     sessionId: 'session',
     goal: 'Create a report',
-    contract: { kind: WorkbenchContractKind.GenericWork, requiresUserAcceptance: true },
+    contract: {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+      outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
+    },
   });
   await service.registerArtifact({
     sessionId: 'session',

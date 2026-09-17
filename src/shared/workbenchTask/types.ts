@@ -8,6 +8,7 @@ import type {
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
+  WorkbenchOutputMode,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
@@ -22,7 +23,14 @@ export type WorkbenchJsonObject = Record<string, unknown>;
 export interface WorkbenchTaskContract {
   kind: WorkbenchContractKind;
   requiresUserAcceptance: boolean;
+  outputRequirements?: WorkbenchOutputRequirement[];
   metadata?: WorkbenchJsonObject;
+}
+
+export interface WorkbenchOutputRequirement {
+  mode: WorkbenchOutputMode;
+  /** Allowed extensions or inline languages. Entries are alternatives, not substitutes for other requirements. */
+  formats: string[];
 }
 
 export interface WorkbenchVerificationCheck {
