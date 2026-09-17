@@ -4,6 +4,7 @@ import {
   formatModelInspectorContext,
   getModelInspectorContextLimit,
   getModelInspectorContextValue,
+  getModelInspectorMemoryProjection,
   MODEL_INSPECTOR_CONTEXT_MAX,
   parseModelInspectorContextK,
 } from './modelInspectorViewModel';
@@ -32,6 +33,25 @@ describe('modelInspectorViewModel', () => {
         runningModel: { name: 'model', runtime_context_length: 32768 },
       }),
     ).toBe(16384);
+  });
+
+  test('uses an unsaved context draft for memory estimates before runtime telemetry', () => {
+    expect(
+      getModelInspectorMemoryProjection({
+        contextDraftSize: 65536,
+        preference: { ctxSize: 16384 },
+        runningModel: { name: 'model', runtime_context_length: 32768 },
+      }),
+    ).toEqual({ contextSize: 65536, useEstimatedVram: true });
+  });
+
+  test('keeps runtime telemetry for memory estimates when no context draft exists', () => {
+    expect(
+      getModelInspectorMemoryProjection({
+        preference: { ctxSize: 16384 },
+        runningModel: { name: 'model', runtime_context_length: 32768 },
+      }),
+    ).toEqual({ contextSize: 32768, useEstimatedVram: false });
   });
 
   test('accepts only whole-K values inside the supported range', () => {

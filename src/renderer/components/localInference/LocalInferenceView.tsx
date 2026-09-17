@@ -48,7 +48,6 @@ import { PageTabs } from '@shared/components/ui/page-tabs';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
-import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelInspectorSidebar, ModelInspectorTab } from './components/ModelInspectorSidebar';
 import { MarketplaceDownloadSidebar } from './components/MarketplaceDownloadSidebar';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
@@ -195,7 +194,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [modelPreferences, setModelPreferences] = useState<LlamaCppModelPreferences>({});
   const [librarySettingsOpen, setLibrarySettingsOpen] = useState(false);
   const [draftModelsDir, setDraftModelsDir] = useState('');
-  const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
   const [inspectorModel, setInspectorModel] = useState<OllamaModel | null>(null);
   const [inspectorInitialTab, setInspectorInitialTab] = useState<ModelInspectorTab>(
     ModelInspectorTab.Overview,
@@ -1066,31 +1064,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     void window.electron.shell.openPath(modelsDir.trim());
   }, [modelsDir]);
 
-  const handleSaveModelContext = useCallback(
-    (modelName: string, ctxSize?: number) => {
-      void runAction(async () => {
-        const { ctxSize: _previousCtxSize, ...preferenceWithoutContext } =
-          modelPreferences[modelName] ?? {};
-        const nextPreferences = await window.electron.llamacpp.setModelPreference({
-          modelName,
-          preference: { ...preferenceWithoutContext, ...(ctxSize ? { ctxSize } : {}) },
-        });
-        setModelPreferences(nextPreferences);
-        const runningModel = runningModels.find(
-          model => model.name === modelName || model.model === modelName,
-        );
-        showToast(
-          runningModel
-            ? i18nService.t('localInferenceContextSavedReloadRequired')
-            : i18nService.t('localInferenceContextSaved'),
-          LocalInferenceToastKind.Success,
-        );
-        setContextModel(null);
-      });
-    },
-    [modelPreferences, runAction, runningModels, showToast],
-  );
-
   const handleSaveModelInspectorPreferences = useCallback(
     async (
       modelName: string,
@@ -1291,7 +1264,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onCancelModelLoad={handleCancelModelLoad}
                   onUnload={handleUnload}
                   onDelete={handleDelete}
-                  onConfigureContext={setContextModel}
                   onOpenInspector={model => {
                     setInspectorInitialTab(ModelInspectorTab.Overview);
                     setInspectorModel(model);
@@ -1466,24 +1438,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onMemoryBudgetPercentChange={setDraftMemoryBudgetPercent}
         onClose={closeMemorySettings}
         onSave={saveMemorySettings}
-      />
-      <ModelContextSettingsModal
-        isOpen={Boolean(contextModel)}
-        model={contextModel}
-        savedContextSize={contextModel ? modelPreferences[contextModel.name]?.ctxSize : undefined}
-        runningContextSize={
-          contextModel
-            ? runningModels.find(
-                model => model.name === contextModel.name || model.model === contextModel.name,
-              )?.runtime_context_length
-            : undefined
-        }
-        onClose={() => setContextModel(null)}
-        onSave={ctxSize => {
-          if (!contextModel) return;
-          handleSaveModelContext(contextModel.name, ctxSize);
-        }}
-        onValidationError={message => showToast(message, LocalInferenceToastKind.Error)}
       />
     </div>
   );

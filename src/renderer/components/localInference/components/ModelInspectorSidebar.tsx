@@ -47,11 +47,13 @@ import {
   type ModelContextEditorState,
 } from './ModelContextSettingsModal';
 import { ModelInspectorLogsPanel } from './ModelInspectorLogsPanel';
-import { formatModelInspectorContext } from './modelInspectorViewModel';
+import {
+  formatModelInspectorContext,
+  getModelInspectorMemoryProjection,
+} from './modelInspectorViewModel';
 
 export const ModelInspectorTab = {
   Overview: 'overview',
-  Parameters: 'parameters',
   Logs: 'logs',
 } as const;
 export type ModelInspectorTab = (typeof ModelInspectorTab)[keyof typeof ModelInspectorTab];
@@ -265,6 +267,7 @@ export function ModelInspectorSidebar({
     activeSnapshot.runningModel,
     preferenceWithDraft,
     activeSnapshot.serviceConfig,
+    contextDraft?.contextSize,
   );
   const runtimeConfigRows = [
     ...overviewRows.slice(0, 2),
@@ -426,7 +429,6 @@ export function ModelInspectorSidebar({
             onValueChange={setActiveTab}
             items={[
               { value: ModelInspectorTab.Overview, label: i18nService.t('localInferenceInspectorOverview') },
-              { value: ModelInspectorTab.Parameters, label: i18nService.t('localInferenceInspectorParameters') },
               { value: ModelInspectorTab.Logs, label: i18nService.t('localInferenceInspectorLogs') },
             ]}
           />
@@ -438,10 +440,6 @@ export function ModelInspectorSidebar({
                 isOpen={open}
                 model={inspectedModel}
                 savedContextSize={preferenceWithDraft?.ctxSize}
-                runningContextSize={
-                  activeSnapshot.runningModel?.runtime_context_length ??
-                  activeSnapshot.runningModel?.context_length
-                }
                 hideContextEditor
                 onClose={() => {
                   setContextDraft(null);
@@ -576,12 +574,19 @@ function getFixedParameterRows(
   runningModel: LlamaCppRunningModel | undefined,
   preference: LlamaCppModelPreference | undefined,
   serviceConfig: LlamaCppServiceConfig,
+  contextDraftSize?: number,
 ): InspectorRow[] {
+  const memoryProjection = getModelInspectorMemoryProjection({
+    contextDraftSize,
+    preference,
+    runningModel,
+    serviceContextSize: serviceConfig.ctxSize,
+  });
   const estimatedMemory = estimateLlamaCppModelMemory({
     modelSizeBytes: model.size,
-    contextSize: getEffectiveContextSize(runningModel, preference, serviceConfig),
+    contextSize: memoryProjection.contextSize,
   });
-  const actualVramBytes = runningModel?.size_vram;
+  const actualVramBytes = memoryProjection.useEstimatedVram ? undefined : runningModel?.size_vram;
   return [
     {
       id: InspectorRowId.KeepAlive,
@@ -736,19 +741,6 @@ function formatResidencyValue(preference: LlamaCppModelPreference | undefined): 
   return i18nService
     .t('localInferenceResidencyThirtyMinutes')
     .replace('30', String(preference?.residency?.idleMinutes ?? 30));
-}
-
-function getEffectiveContextSize(
-  runningModel: LlamaCppRunningModel | undefined,
-  preference: LlamaCppModelPreference | undefined,
-  serviceConfig: LlamaCppServiceConfig,
-): number | undefined {
-  return (
-    runningModel?.runtime_context_length ??
-    runningModel?.context_length ??
-    preference?.ctxSize ??
-    (serviceConfig.ctxSize ? Number(serviceConfig.ctxSize) : undefined)
-  );
 }
 
 function formatMemoryValue(valueBytes: number): string {
