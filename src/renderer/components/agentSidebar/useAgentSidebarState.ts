@@ -5,57 +5,34 @@ import type { AgentSidebarTaskNode } from './types';
 
 const normalizeAgentId = (agentId?: string) => agentId?.trim() || 'main';
 
+/**
+ * A session shows the running indicator while a task is executing: either the
+ * persisted status says so, or the live stream registry still holds an open run.
+ */
+export const isSessionExecuting = (
+  session: CoworkSessionSummary,
+  streamingSessionIds?: ReadonlySet<string>,
+): boolean =>
+  session.status === CoworkSessionStatusValue.Running ||
+  (streamingSessionIds?.has(session.id) ?? false);
+
 export const deriveAgentSidebarIndicator = (
   session: CoworkSessionSummary,
   unreadSessionIds: Set<string>,
-  streamingSessionIds: Set<string> = new Set(),
+  streamingSessionIds?: ReadonlySet<string>,
 ) => {
-  if (
-    session.status === CoworkSessionStatusValue.Running ||
-    streamingSessionIds.has(session.id)
-  ) {
-    return AgentSidebarIndicator.Running;
-  }
+  if (isSessionExecuting(session, streamingSessionIds)) return AgentSidebarIndicator.Running;
   if (session.status === CoworkSessionStatusValue.Completed && unreadSessionIds.has(session.id)) {
     return AgentSidebarIndicator.CompletedUnread;
   }
   return AgentSidebarIndicator.None;
 };
 
-export const sortAgentSidebarTasks = (
-  tasks: CoworkSessionSummary[],
-  streamingSessionIds?: string[],
-): CoworkSessionSummary[] => {
-  const streamingSet =
-    streamingSessionIds && streamingSessionIds.length > 0
-      ? new Set(streamingSessionIds)
-      : null;
-  return [...tasks].sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    if (a.pinned && b.pinned) {
-      const aPinOrder = a.pinOrder ?? a.updatedAt ?? a.createdAt;
-      const bPinOrder = b.pinOrder ?? b.updatedAt ?? b.createdAt;
-      if (aPinOrder !== bPinOrder) return aPinOrder - bPinOrder;
-    }
-    // When two sessions are both actively streaming, sort by creation time
-    // (stable) instead of updatedAt (which keeps changing). Without this,
-    // concurrent streaming sessions continuously swap positions as each
-    // turn completes, making the sidebar unusable.
-    if (streamingSet && streamingSet.has(a.id) && streamingSet.has(b.id)) {
-      return b.createdAt - a.createdAt;
-    }
-    const aUpdatedAt = a.updatedAt || a.createdAt;
-    const bUpdatedAt = b.updatedAt || b.createdAt;
-    if (bUpdatedAt !== aUpdatedAt) return bUpdatedAt - aUpdatedAt;
-    return b.createdAt - a.createdAt;
-  });
-};
-
 export const toAgentSidebarTaskNode = (
   session: CoworkSessionSummary,
   currentSessionId: string | null,
   unreadSessionIds: Set<string>,
-  streamingSessionIds?: Set<string>,
+  streamingSessionIds?: ReadonlySet<string>,
 ): AgentSidebarTaskNode => {
   return {
     id: session.id,

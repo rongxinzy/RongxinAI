@@ -14,14 +14,15 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import { WorkMode, type WorkMode as WorkModeType } from '../../store/workMode/constants';
 import type { CoworkSessionSummary } from '../../types/cowork';
-import { CoworkSessionStatusValue } from '../../types/cowork';
 import { isScratchWorkspacePath } from '../../utils/path';
-import { AgentSidebarIndicator, AgentSidebarPageSize } from './constants';
+import { AgentSidebarPageSize } from './constants';
+import { sortAgentSidebarTasks } from './sessionSort';
 import type {
   AgentSidebarTaskNode,
   WorkspaceSidebarNode,
   WorkspaceSidebarPreferenceState,
 } from './types';
+import { deriveAgentSidebarIndicator } from './useAgentSidebarState';
 import {
   isSessionOwnedByWorkspace,
   mergeSessionSummaries,
@@ -50,7 +51,7 @@ const toTaskNode = (
   session: CoworkSessionSummary,
   currentSessionId: string | null,
   unread: Set<string>,
-  streamingSessionIds: Set<string>,
+  streamingSessionIds: ReadonlySet<string>,
 ): AgentSidebarTaskNode => ({
   id: session.id,
   agentId: session.agentId?.trim() || 'main',
@@ -61,25 +62,9 @@ const toTaskNode = (
   pinOrder: session.pinOrder ?? null,
   updatedAt: session.updatedAt,
   createdAt: session.createdAt,
-  indicator:
-    session.status === CoworkSessionStatusValue.Running || streamingSessionIds.has(session.id)
-      ? AgentSidebarIndicator.Running
-      : session.status === CoworkSessionStatusValue.Completed && unread.has(session.id)
-        ? AgentSidebarIndicator.CompletedUnread
-        : AgentSidebarIndicator.None,
+  indicator: deriveAgentSidebarIndicator(session, unread, streamingSessionIds),
   isSelected: session.id === currentSessionId,
 });
-
-const sortTasks = (tasks: CoworkSessionSummary[]) =>
-  [...tasks].sort((a, b) => {
-    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    if (a.pinned && b.pinned) {
-      const aOrder = a.pinOrder ?? a.updatedAt ?? a.createdAt;
-      const bOrder = b.pinOrder ?? b.updatedAt ?? b.createdAt;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-    }
-    return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
-  });
 
 export const useWorkspaceSidebarState = (
   workMode: WorkModeType = WorkMode.Work,
@@ -311,7 +296,7 @@ export const useWorkspaceSidebarState = (
         .filter(workspace => !workspace.isHidden)
         .map(workspace => {
           const groupKey = workspaceGroupKey(workspace.id, scheduled);
-          const filtered = sortTasks(
+          const filtered = sortAgentSidebarTasks(
             (previews[workspace.id] ?? []).filter(
               session =>
                 isSessionOwnedByWorkspace(session, workspace.id) &&
@@ -389,7 +374,7 @@ export const useWorkspaceSidebarState = (
     const query = searchQuery.trim().toLowerCase();
     const buildSearchNodes = (nodes: WorkspaceSidebarNode[], scheduled: boolean) =>
       nodes.flatMap(node => {
-        const tasks = sortTasks(
+        const tasks = sortAgentSidebarTasks(
           (searchSource[node.id] ?? []).filter(
             session =>
               isScheduledSession(session) === scheduled &&
