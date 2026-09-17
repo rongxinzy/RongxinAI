@@ -36,6 +36,14 @@ export const WorkbenchContractKind = {
   Shortcut: 'shortcut',
   GenericWork: 'generic_work',
 } as const;
+
+export const WorkbenchOutputMode = {
+  Text: 'text',
+  File: 'file',
+  Inline: 'inline',
+} as const;
+export type WorkbenchOutputMode = (typeof WorkbenchOutputMode)[keyof typeof WorkbenchOutputMode];
+export const WorkbenchOutputToolName = 'set_task_output';
 export type WorkbenchContractKind =
   (typeof WorkbenchContractKind)[keyof typeof WorkbenchContractKind];
 

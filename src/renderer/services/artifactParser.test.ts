@@ -247,7 +247,7 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.type).toBe('code');
-    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Intermediate);
     expect(artifacts[0].needsFileLoad).toBe(false);
   });
 
@@ -292,7 +292,7 @@ describe('detectArtifactsFromMessages', () => {
       'sess1',
     );
 
-    // Bare paths in prose are no longer detected — artifacts must be explicitly declared.
+    // A path in prose is a preview candidate, not verified delivery evidence.
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0]).toMatchObject({
       needsFileLoad: true,

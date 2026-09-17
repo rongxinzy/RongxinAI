@@ -126,13 +126,13 @@ describe('collectSessionArtifactCandidates', () => {
     ]);
   });
 
-  test('marks assistant code blocks as intermediate, not deliverable', () => {
+  test('marks ordinary assistant code blocks as intermediate, not deliverable', () => {
     const [candidate] = collectSessionArtifactCandidates([
       message(
         'assistant-1',
         1,
         'assistant',
-        '```artifact:html title="Preview"\n<h1>Hello</h1>\n```',
+        '```html title="Preview"\n<h1>Hello</h1>\n```',
       ),
     ]);
 

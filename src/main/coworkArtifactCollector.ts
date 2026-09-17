@@ -2,27 +2,16 @@ import { discoverWorkbenchMessageArtifactBlocks } from '../shared/workbenchTask'
 import type { CoworkArtifactType, CoworkPersistedArtifact } from '../shared/cowork/artifacts';
 import { CoworkArtifactRole, CoworkArtifactSource } from '../shared/cowork/artifacts';
 import { getArtifactTypeByExtension } from '../shared/cowork/artifactPreview';
+import {
+  ArtifactTypeByLanguage,
+  getInlineArtifactRole,
+  getInlineArtifactLanguage,
+} from '../shared/cowork/artifactClassification';
 
 const DECLARE_ARTIFACT_TOOL = 'declare_artifact';
 const WRITE_TOOL_NAMES = new Set(['write', 'writefile']);
 
-const LANGUAGE_TYPES: Record<string, CoworkArtifactType> = {
-  html: 'html',
-  svg: 'svg',
-  mermaid: 'mermaid',
-  jsx: 'code',
-  tsx: 'code',
-  // The declare_artifact tool advertises these kinds directly. Keep them
-  // mapped so an explicit declaration wins over extension inference.
-  code: 'code',
-  document: 'document',
-  image: 'image',
-  markdown: 'markdown',
-  md: 'markdown',
-  text: 'text',
-  txt: 'text',
-  plaintext: 'text',
-};
+const LANGUAGE_TYPES = ArtifactTypeByLanguage;
 
 export interface CoworkArtifactMessage {
   id: string;
@@ -172,12 +161,11 @@ function collectCodeBlocks(messages: CoworkArtifactMessage[]): CoworkArtifactCan
           type: artifactType,
           title: block.title || `${block.language || artifactType} code`,
           content: block.content,
-          language: artifactType === 'code' ? block.language : undefined,
+          language: getInlineArtifactLanguage(artifactType, block.language),
           source: CoworkArtifactSource.CodeBlock,
-          // Code blocks are inline evidence, not final outputs. Deliverable
-          // identity must come from an explicit declare_artifact call so the
-          // end-of-turn deliverables strip stays meaningful.
-          role: CoworkArtifactRole.Intermediate,
+          // Explicit inline outputs are candidates; the task contract still
+          // decides whether they qualify for delivery and acceptance.
+          role: getInlineArtifactRole(block.explicit),
           declared: false,
           createdAt: message.timestamp,
         },

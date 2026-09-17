@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { ArtifactWorkerLimit } from './artifactWorkerConstants';
 import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
+import { getInlineArtifactRole } from '../../shared/cowork/artifactClassification';
 
 import {
   WorkbenchArtifactCandidateSource,
@@ -45,6 +46,8 @@ const mimeForPath = (filePath: string): string => {
   const mapping: Record<string, string> = {
     '.md': 'text/markdown',
     '.txt': 'text/plain',
+    '.csv': 'text/csv',
+    '.tsv': 'text/tab-separated-values',
     '.json': 'application/json',
     '.html': 'text/html',
     '.svg': 'image/svg+xml',
@@ -98,12 +101,24 @@ export function collectWorkbenchArtifacts(input: {
       taskId: input.taskId,
       runId: input.runId,
       kind: WorkbenchArtifactKind.MessageBlock,
-      mimeType: block.language === 'html' ? 'text/html' : 'text/plain',
+      mimeType:
+        block.language === 'html'
+          ? 'text/html'
+          : block.language === 'csv'
+            ? 'text/csv'
+            : block.language === 'tsv'
+              ? 'text/tab-separated-values'
+              : 'text/plain',
       reference: `message:${input.finalMessageId || 'final'}:block:${block.index}`,
       contentHash: hashText(content),
       provenance: WorkbenchArtifactProvenance.Message,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: { language: block.language, blockIndex: block.index },
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: {
+        language: block.language,
+        blockIndex: block.index,
+        explicit: block.explicit,
+        role: getInlineArtifactRole(block.explicit),
+      },
     });
   }
 

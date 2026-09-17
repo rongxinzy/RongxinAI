@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
 import type { Artifact, ArtifactType } from '@/types/artifact';
+import { CoworkArtifactSource } from '../../../shared/cowork/artifacts';
 
 const t = (key: string) => i18nService.t(key);
 
@@ -143,8 +144,8 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
                         {getShortPath(artifact.filePath)}
                       </div>
                     )}
-                    {!compact && !artifact.filePath && artifact.source === 'codeblock' && (
-                      <div className="text-xs text-muted-foreground">code block</div>
+                    {!compact && !artifact.filePath && artifact.source === CoworkArtifactSource.CodeBlock && (
+                      <div className="text-xs text-muted-foreground">{t('artifactResponseFragment')}</div>
                     )}
                   </div>
                   {!compact && (

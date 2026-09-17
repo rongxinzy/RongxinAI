@@ -17,7 +17,8 @@ export type LanguageType = 'zh' | 'en';
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
     workbenchDeliveryHashFailed: '最终交付物内容校验失败。',
-    workbenchDeliveryMissing: '尚未声明最终交付物；临时文件和执行脚本不能作为最终交付。',
+    workbenchOutputContractMissing: '尚未确认任务输出要求，结果暂不能验收。',
+    workbenchDeliveryMissing: '缺少符合任务输出要求的最终交付物；临时文件和普通回复片段不能替代交付。',
     workbenchDeliveryNotReady: '结果尚未达到交付条件，不能人工验收。',
     workbenchDeliverablesRequireAcceptance: '有 {count} 个最终交付物需要人工验收。',
     workbenchArtifactCollectionFailed: '交付物采集失败，结果暂不能验收。',
@@ -389,8 +390,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
   },
   en: {
     workbenchDeliveryHashFailed: 'Final deliverable content verification failed.',
+    workbenchOutputContractMissing: 'The task output requirements have not been committed; the result cannot be accepted yet.',
     workbenchDeliveryMissing:
-      'No final deliverable was declared. Temporary files and execution scripts are not final outputs.',
+      'No final deliverable satisfies the task output requirements. Temporary files and ordinary response fragments cannot replace delivery.',
     workbenchDeliveryNotReady: 'The result is not ready for delivery and cannot be accepted.',
     workbenchDeliverablesRequireAcceptance: '{count} final deliverable(s) require user acceptance.',
     workbenchArtifactCollectionFailed:
