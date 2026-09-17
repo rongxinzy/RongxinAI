@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { ArtifactWorkerLimit } from './artifactWorkerConstants';
+import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
 
 import {
   WorkbenchArtifactCandidateSource,
@@ -15,6 +17,28 @@ import {
 type ArtifactInput = Omit<WorkbenchArtifact, 'id' | 'createdAt' | 'updatedAt'>;
 
 const hashText = (value: string): string => createHash('sha256').update(value).digest('hex');
+
+const hashFile = (filePath: string): string => {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const size = fs.fstatSync(fd).size;
+    if (size > ArtifactWorkerLimit.FileBytes) throw new Error('Artifact file size limit exceeded.');
+    const hash = createHash('sha256');
+    const buffer = Buffer.alloc(64 * 1024);
+    let total = 0;
+    let count: number;
+    while ((count = fs.readSync(fd, buffer, 0, buffer.length, null)) > 0) {
+      total += count;
+      if (total > ArtifactWorkerLimit.FileBytes)
+        throw new Error('Artifact file size limit exceeded.');
+      hash.update(buffer.subarray(0, count));
+    }
+    if (total !== size) throw new Error('Artifact file changed during collection.');
+    return hash.digest('hex');
+  } finally {
+    fs.closeSync(fd);
+  }
+};
 
 const mimeForPath = (filePath: string): string => {
   const extension = path.extname(filePath).toLowerCase();
@@ -116,8 +140,16 @@ export function collectWorkbenchArtifacts(input: {
   for (const candidate of snapshotFiles) {
     const reference = candidate.path;
     const resolved = resolveWorkspaceFile(input.workspaceRoot, reference);
-    if (!resolved) continue;
-    const contentHash = createHash('sha256').update(fs.readFileSync(resolved)).digest('hex');
+    if (!resolved) {
+      if (
+        candidate.source === WorkbenchArtifactCandidateSource.Declaration &&
+        candidate.role === CoworkArtifactRole.Deliverable
+      ) {
+        throw new Error('The declared deliverable is missing or outside the workspace.');
+      }
+      continue;
+    }
+    const contentHash = hashFile(resolved);
     const declaredHash = candidate.sha256 ?? null;
     const provenance =
       candidate.source === WorkbenchArtifactCandidateSource.DomainWorkflow ||

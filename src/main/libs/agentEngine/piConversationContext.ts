@@ -58,6 +58,9 @@ const formatHistoryMessage = (message: CoworkMessage): string | null => {
     const content = truncateEntry(message.content || String(message.metadata?.toolResult || ''));
     return content ? `Tool result: ${content}` : null;
   }
+  if (message.type === 'system' && message.metadata?.interruption) {
+    return 'Application: The preceding execution was interrupted. Do not resume it unless the current user request explicitly asks to continue or retry.';
+  }
   return null;
 };
 

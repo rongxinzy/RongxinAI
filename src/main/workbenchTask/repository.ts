@@ -5,17 +5,19 @@ import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalEffectStatus,
   WorkbenchArtifactCandidateSource,
+  WorkbenchArtifactKind,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
+  WorkbenchVerificationCheckStatus,
+  WorkbenchVerificationCheckName,
   WorkbenchTerminalTaskStatuses,
   type WorkbenchApproval,
   type WorkbenchApprovalDecisionSource,
   type WorkbenchApprovalRiskLevel,
   type WorkbenchArtifact,
-  type WorkbenchArtifactKind,
   type WorkbenchArtifactProvenance,
   type WorkbenchJsonObject,
   type WorkbenchRun,
@@ -30,6 +32,7 @@ import {
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { assertRunTransition, assertTaskTransition } from './stateMachine';
+import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
 
 const terminalTaskStatuses = new Set<string>(WorkbenchTerminalTaskStatuses);
 
@@ -123,6 +126,27 @@ type ApprovalRow = {
 
 export class WorkbenchTaskRepository {
   constructor(private readonly db: Database.Database) {}
+
+  getTaskBoundaryForSession(
+    sessionId: string,
+  ): Pick<WorkbenchTask, 'id' | 'goal' | 'status'> | null {
+    const row = this.db
+      .prepare(`
+      SELECT t.id, t.goal, t.status FROM workbench_tasks t
+      WHERE t.session_id = ? AND t.status = ? AND EXISTS (
+        SELECT 1 FROM workbench_runs r, json_each(r.verification_result_json, '$.checks') c
+        WHERE r.task_id = t.id AND json_extract(c.value, '$.name') = ?
+          AND json_extract(c.value, '$.status') = ?
+      ) ORDER BY t.updated_at DESC, t.rowid DESC LIMIT 1
+    `)
+      .get(
+        sessionId,
+        WorkbenchTaskStatus.Completed,
+        WorkbenchVerificationCheckName.UserAcceptance,
+        WorkbenchVerificationCheckStatus.Passed,
+      ) as Pick<WorkbenchTask, 'id' | 'goal' | 'status'> | undefined;
+    return row ?? null;
+  }
 
   transaction<T>(operation: () => T): T {
     return this.db.transaction(operation)();
@@ -447,23 +471,32 @@ export class WorkbenchTaskRepository {
   }
 
   /**
-   * Promote every pending artifact of a run to verified. Invoked when the
-   * run's own verification gate succeeds — deterministic verification pass
-   * or explicit user acceptance — because pending workspace artifacts have
-   * no other verifier. Verified and failed artifacts are left untouched.
+   * Promote pending final deliverables only. Intermediate evidence, verified
+   * artifacts and failed artifacts are left untouched.
    */
   markArtifactsVerified(runId: string): number {
     const result = this.db
       .prepare(
         `UPDATE workbench_artifacts
          SET verification_status = ?, updated_at = ?
-         WHERE run_id = ? AND verification_status = ?`,
+         WHERE run_id = ? AND verification_status = ?
+           AND (kind = ? OR
+             (COALESCE(json_extract(metadata_json, '$.role'), '') != ? AND
+               (json_extract(metadata_json, '$.source') IN (?, ?) OR
+                 (json_extract(metadata_json, '$.source') = ? AND
+                  json_extract(metadata_json, '$.role') = ?))))`,
       )
       .run(
         WorkbenchArtifactVerificationStatus.Verified,
         Date.now(),
         runId,
         WorkbenchArtifactVerificationStatus.Pending,
+        WorkbenchArtifactKind.MessageBlock,
+        CoworkArtifactRole.Intermediate,
+        WorkbenchArtifactCandidateSource.DomainWorkflow,
+        WorkbenchArtifactCandidateSource.ProductionInspection,
+        WorkbenchArtifactCandidateSource.Declaration,
+        CoworkArtifactRole.Deliverable,
       );
     return result.changes;
   }
