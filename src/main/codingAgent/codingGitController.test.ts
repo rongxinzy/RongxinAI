@@ -18,7 +18,7 @@ const git = async (cwd: string, args: string[]): Promise<string> =>
     child.stdout.on('data', chunk => (stdout += chunk));
     child.stderr.on('data', chunk => (stderr += chunk));
     child.once('error', reject);
-    child.once('exit', code =>
+    child.once('close', code =>
       code === 0
         ? resolve(stdout.trim())
         : reject(new Error(stderr.trim() || `git failed with exit code ${code}.`)),
