@@ -6,6 +6,7 @@ import type {
   LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeDevice,
   LlamaCppRuntimeListDevicesResult,
+  LlamaCppModelLaunchInput,
   LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend, LlamaCppServiceConfigFieldKey } from '../../shared/llamacpp';
@@ -93,6 +94,93 @@ export function buildLlamaServerArgs(
   if (config.noMmap) args.push('--no-mmap');
   if (config.mlock) args.push('--mlock');
   return args;
+}
+
+/**
+ * Builds an isolated llama-server command line for one GGUF model. Unlike the
+ * router command line, this process never discovers or loads another model.
+ */
+export function buildLlamaServerModelArgs(input: {
+  config: LlamaCppServiceConfig;
+  modelPath: string;
+  port: number;
+  options?: LlamaCppModelLaunchInput['options'];
+}): string[] {
+  const config = applyModelLaunchOptions(input.config, input.options);
+  const args = [
+    '--host',
+    '127.0.0.1',
+    '--port',
+    String(input.port),
+    '--model',
+    input.modelPath,
+    '--no-ui',
+    '--no-slots',
+  ];
+  appendSharedLlamaServerArgs(args, config);
+  return args;
+}
+
+function appendSharedLlamaServerArgs(args: string[], config: LlamaCppServiceConfig): void {
+  appendArg(args, '--timeout', config.timeout);
+  appendArg(args, '--threads-http', config.threadsHttp);
+  if (typeof config.cachePrompt === 'boolean') {
+    args.push(config.cachePrompt ? '--cache-prompt' : '--no-cache-prompt');
+  }
+  appendArg(args, '--parallel', config.parallel);
+  if (config.kvUnified === true) args.push('--kv-unified');
+  if (config.kvUnified === false) args.push('--no-kv-unified');
+  appendArg(args, '--batch-size', config.batchSize);
+  appendArg(args, '--ubatch-size', config.ubatchSize);
+  appendArg(args, '--ctx-size', config.ctxSize);
+  appendArg(args, '--gpu-layers', config.gpuLayers);
+  appendArg(args, '--threads', config.threads);
+  appendArg(args, '--threads-batch', config.threadsBatch);
+  appendArg(args, '--device', config.device);
+  appendArg(args, '--main-gpu', config.mainGpu);
+  appendArg(args, '--split-mode', config.splitMode);
+  appendArg(args, '--tensor-split', config.tensorSplit);
+  appendArg(args, '--flash-attn', config.flashAttn);
+  if (config.jinja === 'on') args.push('--jinja');
+  if (config.jinja === 'off') args.push('--no-jinja');
+  appendArg(args, '--reasoning', config.reasoning);
+  if (config.reasoningFormat && config.reasoningFormat !== 'auto') {
+    appendArg(args, '--reasoning-format', config.reasoningFormat);
+  }
+  appendArg(args, '--reasoning-budget', config.reasoningBudget);
+  appendArg(args, '--reasoning-budget-message', config.reasoningBudgetMessage);
+  appendArg(args, '--chat-template', config.chatTemplate);
+  appendArg(args, '--chat-template-file', config.chatTemplateFile);
+  if (typeof config.skipChatParsing === 'boolean') {
+    args.push(config.skipChatParsing ? '--skip-chat-parsing' : '--no-skip-chat-parsing');
+  }
+  if (typeof config.prefillAssistant === 'boolean') {
+    args.push(config.prefillAssistant ? '--prefill-assistant' : '--no-prefill-assistant');
+  }
+  if (config.noMmap) args.push('--no-mmap');
+  if (config.mlock) args.push('--mlock');
+}
+
+function applyModelLaunchOptions(
+  config: LlamaCppServiceConfig,
+  options: LlamaCppModelLaunchInput['options'],
+): LlamaCppServiceConfig {
+  if (!options) return config;
+  return {
+    ...config,
+    ...(options.ctxSize !== undefined ? { ctxSize: String(options.ctxSize) } : {}),
+    ...(options.batchSize !== undefined ? { batchSize: String(options.batchSize) } : {}),
+    ...(options.ubatchSize !== undefined ? { ubatchSize: String(options.ubatchSize) } : {}),
+    ...(options.gpuLayers !== undefined ? { gpuLayers: String(options.gpuLayers) } : {}),
+    ...(options.threads !== undefined ? { threads: String(options.threads) } : {}),
+    ...(options.device ? { device: options.device } : {}),
+    ...(options.mainGpu !== undefined ? { mainGpu: String(options.mainGpu) } : {}),
+    ...(options.splitMode ? { splitMode: options.splitMode } : {}),
+    ...(options.tensorSplit ? { tensorSplit: options.tensorSplit } : {}),
+    ...(options.flashAttn ? { flashAttn: options.flashAttn } : {}),
+    ...(options.reasoningFormat ? { reasoningFormat: options.reasoningFormat } : {}),
+    ...(options.chatTemplate ? { chatTemplate: options.chatTemplate } : {}),
+  };
 }
 
 export function filterLlamaCppServiceConfigByRuntimeCapabilities(

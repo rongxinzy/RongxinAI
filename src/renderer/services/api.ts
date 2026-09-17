@@ -672,11 +672,10 @@ class ApiService {
       onProgress?.(`${i18nService.t('toolCapabilityUnsupportedFallback')}\n\n`);
       return this.chat(message, onProgress, history, options, requestId);
     }
-    // Unknown is not a verdict: attempt the native tool loop optimistically and
-    // fall back to plain chat only when the endpoint rejects tool use.
-    const isToolCallingUnverified = capabilities.toolCalling !== ModelCapabilityStatus.Supported;
+    // Default support is optimistic. An endpoint rejection is authoritative and
+    // must still fall back to plain chat for any model that attempted tools.
     const fallbackToPlainChat = (error: unknown) => {
-      if (!isToolCallingUnverified || !isToolCallUnsupportedError(error)) {
+      if (!isToolCallUnsupportedError(error)) {
         throw error;
       }
       // Remember the rejection so later requests skip the doomed attempt.
@@ -684,7 +683,7 @@ class ApiService {
         `${provider}\u0000${selectedModel.id}\u0000${config.baseUrl.trim()}`,
         { toolCalling: ModelCapabilityStatus.Unsupported },
       );
-      onProgress?.(`${i18nService.t('toolCapabilityUnknownFallback')}\n\n`);
+      onProgress?.(`${i18nService.t('toolCapabilityUnsupportedFallback')}\n\n`);
       return this.chat(message, onProgress, history, options, requestId);
     };
     const prompt =

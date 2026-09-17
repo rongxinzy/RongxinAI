@@ -411,7 +411,14 @@ export function ModelInspectorSidebar({
             <X />
           </Button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div
+          className={cn(
+            'min-h-0 flex-1 px-3 py-3',
+            activeTab === ModelInspectorTab.Logs
+              ? 'flex flex-col overflow-hidden'
+              : 'overflow-y-auto',
+          )}
+        >
           <FluidTabs
             aria-label={i18nService.t('localInferenceInspectorTitle')}
             size={FluidTabsSize.Small}

@@ -6,6 +6,7 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../../../shared/llamacpp';
+import { LlamaCppGatewayAccessMode } from '../../../../shared/llamacpp';
 import { notifyLlamaCppRunningModelsChanged } from '../../../services/availableModels';
 import { i18nService } from '../../../services/i18n';
 import {
@@ -35,6 +36,9 @@ export function buildAccessSettingsConfig(
     ...config,
     port: port?.trim() || undefined,
     listenHost: allowLanAccess ? LLAMACPP_LAN_HOST : LLAMACPP_LOCALHOST_HOST,
+    gatewayAccessMode: allowLanAccess
+      ? LlamaCppGatewayAccessMode.Lan
+      : LlamaCppGatewayAccessMode.Local,
     keepRunningOnAppQuit,
   };
 }
@@ -55,6 +59,7 @@ type UseLocalInferenceAccessSettingsResult = {
   draftAllowLanAccess: boolean;
   draftKeepRunningOnAppQuit: boolean;
   draftPort: string;
+  draftLanToken: string;
   setDraftKeepRunningOnAppQuit: (value: boolean) => void;
   setDraftPort: (value: string) => void;
   currentHost: string;
@@ -65,6 +70,7 @@ type UseLocalInferenceAccessSettingsResult = {
   closeAccessSettings: () => void;
   saveAccessSettings: () => void;
   setDraftAllowLanAccess: (value: boolean) => void;
+  regenerateLanToken: () => void;
 };
 
 export function useLocalInferenceAccessSettings(
@@ -84,6 +90,7 @@ export function useLocalInferenceAccessSettings(
   const [draftAllowLanAccess, setDraftAllowLanAccess] = useState(false);
   const [draftKeepRunningOnAppQuit, setDraftKeepRunningOnAppQuit] = useState(true);
   const [draftPort, setDraftPort] = useState(LLAMACPP_DEFAULT_PORT);
+  const [draftLanToken, setDraftLanToken] = useState('');
 
   const currentHost =
     serviceConfig.listenHost?.trim() || serviceConfig.host?.trim() || LLAMACPP_LOCALHOST_HOST;
@@ -110,12 +117,21 @@ export function useLocalInferenceAccessSettings(
         setDraftAllowLanAccess(nextHost === LLAMACPP_LAN_HOST);
         setDraftKeepRunningOnAppQuit(nextConfig.keepRunningOnAppQuit !== false);
         setDraftPort(nextConfig.port?.trim() || LLAMACPP_DEFAULT_PORT);
+        if (nextHost === LLAMACPP_LAN_HOST) {
+          void window.electron.llamacpp
+            .getGatewayLanToken()
+            .then(token => setDraftLanToken(token.token))
+            .catch(() => setDraftLanToken(''));
+        } else {
+          setDraftLanToken('');
+        }
         setAccessSettingsOpen(true);
       })
       .catch(() => {
         setDraftAllowLanAccess(allowLanAccess);
         setDraftKeepRunningOnAppQuit(true);
         setDraftPort(currentPort);
+        setDraftLanToken('');
         setAccessSettingsOpen(true);
       });
   }, [allowLanAccess, currentPort, refreshServiceConfig]);
@@ -123,6 +139,28 @@ export function useLocalInferenceAccessSettings(
   const closeAccessSettings = useCallback(() => {
     setAccessSettingsOpen(false);
   }, []);
+
+  const updateDraftAllowLanAccess = useCallback(
+    (value: boolean) => {
+      setDraftAllowLanAccess(value);
+      if (!value) {
+        setDraftLanToken('');
+        return;
+      }
+      void window.electron.llamacpp
+        .getGatewayLanToken()
+        .then(result => setDraftLanToken(result.token))
+        .catch(() => setDraftLanToken(''));
+    },
+    [],
+  );
+
+  const regenerateLanToken = useCallback(() => {
+    void runAction(async () => {
+      const result = await window.electron.llamacpp.regenerateGatewayLanToken();
+      setDraftLanToken(result.token);
+    });
+  }, [runAction]);
 
   const saveAccessSettings = useCallback(() => {
     void runAction(async () => {
@@ -183,6 +221,7 @@ export function useLocalInferenceAccessSettings(
     draftAllowLanAccess,
     draftKeepRunningOnAppQuit,
     draftPort,
+    draftLanToken,
     setDraftKeepRunningOnAppQuit,
     setDraftPort,
     currentHost,
@@ -192,6 +231,7 @@ export function useLocalInferenceAccessSettings(
     openAccessSettings,
     closeAccessSettings,
     saveAccessSettings,
-    setDraftAllowLanAccess,
+    setDraftAllowLanAccess: updateDraftAllowLanAccess,
+    regenerateLanToken,
   };
 }

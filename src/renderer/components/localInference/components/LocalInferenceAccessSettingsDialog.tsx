@@ -9,7 +9,7 @@ import {
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
 import { Switch } from '@shared/components/ui/switch';
-import { Globe, Lock, RefreshCw } from 'lucide-react';
+import { Copy, Globe, Lock, RefreshCw } from 'lucide-react';
 
 import { i18nService } from '../../../services/i18n';
 import { localInferenceCompactButtonClass } from '../constants';
@@ -22,12 +22,14 @@ type LocalInferenceAccessSettingsDialogProps = {
   keepRunningOnAppQuit: boolean;
   willRestartOnSave: boolean;
   port: string;
+  lanToken: string;
   exampleModelName?: string;
   onAllowLanAccessChange: (value: boolean) => void;
   onKeepRunningOnAppQuitChange: (value: boolean) => void;
   onPortChange: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
+  onRegenerateLanToken: () => void;
 };
 
 const LOCALHOST_HOST = '127.0.0.1';
@@ -41,12 +43,14 @@ export function LocalInferenceAccessSettingsDialog({
   keepRunningOnAppQuit,
   willRestartOnSave,
   port,
+  lanToken,
   exampleModelName,
   onAllowLanAccessChange,
   onKeepRunningOnAppQuitChange,
   onPortChange,
   onClose,
   onSave,
+  onRegenerateLanToken,
 }: LocalInferenceAccessSettingsDialogProps) {
   const resolvedPort = port.trim() || DEFAULT_PORT;
   const portValid = isValidLlamaCppPort(port);
@@ -55,6 +59,9 @@ export function LocalInferenceAccessSettingsDialog({
     ? `http://<LAN-IP>:${resolvedPort}/v1`
     : `http://${listenHost}:${resolvedPort}/v1`;
   const modelName = exampleModelName?.trim() || '<model-name>';
+  const copyLanToken = () => {
+    void navigator.clipboard.writeText(lanToken).catch(() => undefined);
+  };
 
   return (
     <Dialog
@@ -136,6 +143,46 @@ export function LocalInferenceAccessSettingsDialog({
               <span className="break-all text-sm leading-5 text-foreground">{endpointBase}</span>
             </div>
           </div>
+
+          {allowLanAccess ? (
+            <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border p-3">
+              <div className="min-w-0 flex-1">
+                <Label htmlFor="llamacpp-lan-token" className="theme-control-label-strong">
+                  {i18nService.t('localInferenceAccessLanToken')}
+                </Label>
+                <Input
+                  id="llamacpp-lan-token"
+                  value={lanToken}
+                  readOnly
+                  className="mt-2"
+                />
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={i18nService.t('localInferenceAccessCopyLanToken')}
+                  title={i18nService.t('localInferenceAccessCopyLanToken')}
+                  disabled={!lanToken || saving}
+                  onClick={copyLanToken}
+                >
+                  <Copy />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={i18nService.t('localInferenceAccessRegenerateLanToken')}
+                  title={i18nService.t('localInferenceAccessRegenerateLanToken')}
+                  disabled={saving}
+                  onClick={onRegenerateLanToken}
+                >
+                  <RefreshCw />
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-3">

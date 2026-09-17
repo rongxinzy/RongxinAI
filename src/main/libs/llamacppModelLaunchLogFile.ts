@@ -8,6 +8,7 @@ import type {
 import {
   LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
+  LlamaCppModelLaunchLogSource,
   LlamaCppModelLaunchLogSessionStatus,
 } from '../../shared/llamacpp';
 
@@ -20,11 +21,8 @@ const LlamaCppProcessLogMessage = {
   Stderr: 'llama-server stderr',
 } as const;
 const MODEL_LAUNCH_LOG_DISK_SESSION_ID_PREFIX = 'file:';
-const MODEL_LAUNCH_LOG_ERROR_MARKER = ' - ERROR - ';
-const MODEL_LAUNCH_LOG_LINE_BREAK_PATTERN = /\r?\n/;
 const MODEL_LAUNCH_LOG_FILE_NAME_PATTERN =
   /^(.+)_(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.txt$/;
-const MODEL_LAUNCH_LOG_MODEL_NAME_DETAIL_PATTERN = /"modelName"\s*:\s*"((?:\\.|[^"\\])*)"/;
 
 export type LlamaCppModelLaunchLogFileStore = ReturnType<
   typeof createLlamaCppModelLaunchLogFileStore
@@ -109,22 +107,38 @@ export function createLlamaCppModelLaunchLogFileStore(input: { userDataPath: str
       );
     },
 
-    readSessionLog(sessionId: string): {
+    readSessionLog(sessionId: string, offset = 0): {
       session: LlamaCppModelLaunchLogSession;
       content: string;
+      startOffset: number;
+      nextOffset: number;
     } | null {
       const session = sessionsById.get(sessionId) ?? getDiskSession(sessionId);
       if (!session || clearedModelNames.has(getLogModelKey(session.modelName))) return null;
       if (!fs.existsSync(session.filePath)) {
-        return { session, content: '' };
+        return { session, content: '', startOffset: 0, nextOffset: 0 };
       }
       try {
+        const size = fs.statSync(session.filePath).size;
+        const safeOffset = Number.isSafeInteger(offset) && offset > 0 && offset <= size ? offset : 0;
+        const length = size - safeOffset;
+        const buffer = Buffer.alloc(length);
+        if (length > 0) {
+          const fd = fs.openSync(session.filePath, 'r');
+          try {
+            fs.readSync(fd, buffer, 0, length, safeOffset);
+          } finally {
+            fs.closeSync(fd);
+          }
+        }
         return {
           session,
-          content: fs.readFileSync(session.filePath, 'utf8'),
+          content: buffer.toString('utf8'),
+          startOffset: safeOffset,
+          nextOffset: size,
         };
       } catch {
-        return { session, content: '' };
+        return { session, content: '', startOffset: 0, nextOffset: 0 };
       }
     },
 
@@ -185,20 +199,14 @@ function createDiskSessionFromFile(
   if (!fs.existsSync(filePath)) return null;
 
   let stats: fs.Stats;
-  let content: string;
   try {
     stats = fs.statSync(filePath);
-    content = fs.readFileSync(filePath, 'utf8');
   } catch {
     return null;
   }
   const parsed = parseLogFileName(fileName);
   const startedAt = parsed?.startedAt ?? stats.birthtime.toISOString();
-  const updatedAt = stats.mtime.toISOString();
-  const modelName =
-    extractModelNameFromLogContent(content) ??
-    parsed?.modelName ??
-    path.basename(fileName, MODEL_LAUNCH_LOG_EXTENSION);
+  const modelName = parsed?.modelName ?? path.basename(fileName, MODEL_LAUNCH_LOG_EXTENSION);
 
   return {
     sessionId: `${MODEL_LAUNCH_LOG_DISK_SESSION_ID_PREFIX}${fileName}`,
@@ -206,9 +214,9 @@ function createDiskSessionFromFile(
     fileName,
     filePath,
     startedAt,
-    updatedAt,
-    status: getLogFileSessionStatus(content),
-    sequence: getLogFileSequence(content),
+    updatedAt: stats.mtime.toISOString(),
+    status: LlamaCppModelLaunchLogSessionStatus.Starting,
+    sequence: 0,
   };
 }
 
@@ -241,34 +249,6 @@ function parseLogFileName(fileName: string): {
   };
 }
 
-function extractModelNameFromLogContent(content: string): string | null {
-  const match = MODEL_LAUNCH_LOG_MODEL_NAME_DETAIL_PATTERN.exec(content);
-  if (!match) return null;
-  try {
-    const value = JSON.parse(`"${match[1]}"`);
-    return typeof value === 'string' && value.trim() ? value : null;
-  } catch {
-    return match[1].trim() || null;
-  }
-}
-
-function getLogFileSessionStatus(content: string): LlamaCppModelLaunchLogSession['status'] {
-  if (
-    content.includes(MODEL_LAUNCH_LOG_ERROR_MARKER) ||
-    content.includes(getDefaultLogMessage(LlamaCppModelLaunchLogPhase.Failed))
-  ) {
-    return LlamaCppModelLaunchLogSessionStatus.Failed;
-  }
-  if (content.includes(getDefaultLogMessage(LlamaCppModelLaunchLogPhase.Succeeded))) {
-    return LlamaCppModelLaunchLogSessionStatus.Succeeded;
-  }
-  return LlamaCppModelLaunchLogSessionStatus.Starting;
-}
-
-function getLogFileSequence(content: string): number {
-  return content.split(MODEL_LAUNCH_LOG_LINE_BREAK_PATTERN).filter(line => line.trim()).length;
-}
-
 function isSameLogModelName(left: string, right: string): boolean {
   return left === right || getLogModelKey(left) === getLogModelKey(right);
 }
@@ -278,6 +258,9 @@ function getLogModelKey(modelName: string): string {
 }
 
 export function formatModelLaunchLogEvent(event: LlamaCppModelLaunchLogEvent): string {
+  if (event.source === LlamaCppModelLaunchLogSource.ProcessOutput) {
+    return event.detail ?? '';
+  }
   const date = normalizeIsoDate(event.createdAt);
   const processOutputText = getProcessOutputText(event);
   const moduleName = processOutputText

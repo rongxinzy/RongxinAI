@@ -1,12 +1,28 @@
 import http from 'node:http';
 
-const GATEWAY_HOST = '127.0.0.1';
+import {
+  LlamaCppGatewayAccessMode,
+  type LlamaCppGatewayAccessMode as LlamaCppGatewayAccessModeType,
+} from '../../shared/llamacpp';
+
+const LOCAL_GATEWAY_HOST = '127.0.0.1';
+const LAN_GATEWAY_HOST = '0.0.0.0';
 const GATEWAY_PATH_PREFIX = '/v1/';
 const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
-type LlamaCppModelGatewayOptions = {
-  acquireModel: (modelName: string) => Promise<() => void>;
-  getUpstreamBaseUrl: () => string;
+export type LlamaCppGatewayModelLease = {
+  baseUrl: string;
+  release: () => void;
+};
+
+export type LlamaCppModelGatewayOptions = {
+  acquireModel: (modelName: string) => Promise<LlamaCppGatewayModelLease>;
+  listModels: () => Array<{ id: string; owned_by?: string }>;
+  getConfig: () => {
+    port: number;
+    accessMode: LlamaCppGatewayAccessModeType;
+    lanToken?: string;
+  };
 };
 
 export type LlamaCppModelGateway = {
@@ -17,12 +33,15 @@ export type LlamaCppModelGateway = {
 
 export function createLlamaCppModelGateway(options: LlamaCppModelGatewayOptions): LlamaCppModelGateway {
   let server: http.Server | null = null;
-  let port: number | null = null;
+  let boundPort: number | null = null;
 
   return {
-    baseUrl: () => (port ? `http://${GATEWAY_HOST}:${port}/v1` : null),
+    baseUrl: () => (boundPort ? `http://${LOCAL_GATEWAY_HOST}:${boundPort}/v1` : null),
     start: async () => {
       if (server) return;
+      const config = options.getConfig();
+      const host =
+        config.accessMode === LlamaCppGatewayAccessMode.Lan ? LAN_GATEWAY_HOST : LOCAL_GATEWAY_HOST;
       await new Promise<void>((resolve, reject) => {
         const nextServer = http.createServer((request, response) => {
           void handleGatewayRequest(request, response, options).catch(error => {
@@ -31,7 +50,7 @@ export function createLlamaCppModelGateway(options: LlamaCppModelGatewayOptions)
           });
         });
         nextServer.once('error', reject);
-        nextServer.listen(0, GATEWAY_HOST, () => {
+        nextServer.listen(config.port, host, () => {
           const address = nextServer.address();
           if (!address || typeof address === 'string') {
             nextServer.close();
@@ -39,8 +58,8 @@ export function createLlamaCppModelGateway(options: LlamaCppModelGatewayOptions)
             return;
           }
           server = nextServer;
-          port = address.port;
-          console.log(`[LlamaCppGateway] local model gateway started on port ${port}`);
+          boundPort = address.port;
+          console.log(`[LlamaCppGateway] local model gateway started on ${host}:${boundPort}`);
           resolve();
         });
       });
@@ -49,7 +68,7 @@ export function createLlamaCppModelGateway(options: LlamaCppModelGatewayOptions)
       if (!server) return;
       const current = server;
       server = null;
-      port = null;
+      boundPort = null;
       await new Promise<void>((resolve, reject) => {
         current.close(error => (error ? reject(error) : resolve()));
       });
@@ -62,12 +81,20 @@ async function handleGatewayRequest(
   response: http.ServerResponse,
   options: LlamaCppModelGatewayOptions,
 ): Promise<void> {
-  if (!isLoopbackHost(request.headers.host) || !request.url?.startsWith(GATEWAY_PATH_PREFIX)) {
+  if (!request.url?.startsWith(GATEWAY_PATH_PREFIX)) {
     writeJsonError(response, 404, 'Route not found.');
     return;
   }
+  if (!isAuthorized(request, options.getConfig())) {
+    writeJsonError(response, 401, 'A valid gateway bearer token is required.');
+    return;
+  }
+  if (request.method === 'GET' && request.url === '/v1/models') {
+    writeJson(response, 200, { object: 'list', data: options.listModels().map(toOpenAiModel) });
+    return;
+  }
   if (request.method !== 'POST' || !request.url.startsWith('/v1/chat/completions')) {
-    await forwardWithoutLease(request, response, options.getUpstreamBaseUrl());
+    writeJsonError(response, 404, 'Only model-aware OpenAI chat completion routes are available.');
     return;
   }
 
@@ -78,21 +105,30 @@ async function handleGatewayRequest(
     return;
   }
 
-  const release = await options.acquireModel(modelName);
+  const lease = await options.acquireModel(modelName);
   try {
-    await forwardRequest(request, response, options.getUpstreamBaseUrl(), body);
+    await forwardRequest(request, response, lease.baseUrl, body);
   } finally {
-    release();
+    lease.release();
   }
 }
 
-async function forwardWithoutLease(
+function isAuthorized(
   request: http.IncomingMessage,
-  response: http.ServerResponse,
-  upstreamBaseUrl: string,
-): Promise<void> {
-  const body = await readRequestBody(request);
-  await forwardRequest(request, response, upstreamBaseUrl, body);
+  config: ReturnType<LlamaCppModelGatewayOptions['getConfig']>,
+): boolean {
+  if (config.accessMode !== LlamaCppGatewayAccessMode.Lan || isLoopbackRequest(request)) return true;
+  const token = config.lanToken?.trim();
+  return Boolean(token && request.headers.authorization === `Bearer ${token}`);
+}
+
+function isLoopbackRequest(request: http.IncomingMessage): boolean {
+  const address = request.socket.remoteAddress;
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
+
+function toOpenAiModel(model: { id: string; owned_by?: string }): Record<string, string> {
+  return { id: model.id, object: 'model', owned_by: model.owned_by ?? 'zhiyuan-agent' };
 }
 
 async function forwardRequest(
@@ -165,15 +201,13 @@ function getModelName(body: Buffer): string {
   }
 }
 
-function isLoopbackHost(host: string | undefined): boolean {
-  if (!host) return true;
-  const hostname = host.split(':')[0];
-  return hostname === GATEWAY_HOST || hostname === 'localhost';
-}
-
-function writeJsonError(response: http.ServerResponse, status: number, message: string): void {
+function writeJson(response: http.ServerResponse, status: number, body: unknown): void {
   if (response.writableEnded) return;
   response.statusCode = status;
   response.setHeader('content-type', 'application/json; charset=utf-8');
-  response.end(JSON.stringify({ error: { message } }));
+  response.end(JSON.stringify(body));
+}
+
+function writeJsonError(response: http.ServerResponse, status: number, message: string): void {
+  writeJson(response, status, { error: { message } });
 }

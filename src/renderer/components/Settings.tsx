@@ -227,7 +227,7 @@ const resolveModelSupportsImageForProvider = (
   ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage);
 
 const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
-  toolCalling: ModelCapabilityStatus.Unknown,
+  toolCalling: ModelCapabilityStatus.Supported,
   imageInput: ModelCapabilityStatus.Unknown,
   videoInput: ModelCapabilityStatus.Unknown,
   audioInput: ModelCapabilityStatus.Unknown,

@@ -1644,6 +1644,7 @@ export {
 } from './llamacppRuntimePaths';
 export {
   buildLlamaCppServeEnv,
+  buildLlamaServerModelArgs,
   buildLlamaServerArgs,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
   listLlamaCppRuntimeDevices,

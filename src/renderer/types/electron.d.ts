@@ -19,6 +19,7 @@ import type {
 import type {
   LlamaCppCancelModelLoadResult,
   LlamaCppCancelInstallResult,
+  LlamaCppGatewayLanTokenResult,
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
@@ -539,6 +540,8 @@ interface IElectronAPI {
     restart: () => Promise<LlamaCppStatusSnapshot>;
     getServiceConfig: () => Promise<LlamaCppServiceConfig>;
     setServiceConfig: (config: LlamaCppServiceConfig) => Promise<LlamaCppServiceConfig>;
+    getGatewayLanToken: () => Promise<LlamaCppGatewayLanTokenResult>;
+    regenerateGatewayLanToken: () => Promise<LlamaCppGatewayLanTokenResult>;
     modelsDir: () => Promise<string>;
     setModelsDir: (modelsDir: string) => Promise<string>;
     listLocalModels: () => Promise<LlamaCppModel[]>;

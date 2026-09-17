@@ -167,7 +167,7 @@ describe('ProviderRegistry', () => {
         'unknown',
         ApiFormat.OpenAI,
       ).toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.OpenAI,
@@ -269,15 +269,15 @@ describe('ProviderRegistry', () => {
         { supportsImage: true },
       ).imageInput,
     ).toBe(ModelCapabilityStatus.Unsupported);
-    // Providers without an endpoint tool declaration keep failing closed
-    // (llamacpp/Ollama/custom rely on runtime probing instead).
+    // Providers without an endpoint tool declaration default to support;
+    // runtime endpoint rejections are cached as Unsupported.
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.LlamaCpp,
         'unlisted-local-model',
         ApiFormat.OpenAI,
       ).toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
     for (const provider of [ProviderName.Zhipu, ProviderName.Volcengine]) {
       const capability = ProviderRegistry.resolveModelCapabilities(
         provider,
@@ -299,7 +299,7 @@ describe('ProviderRegistry', () => {
         'ernie-4.5-8k',
         ApiFormat.OpenAI,
       ).toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.StepFun,
@@ -313,7 +313,7 @@ describe('ProviderRegistry', () => {
         'deepseek-reasoner',
         ApiFormat.OpenAI,
       ).toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.OpenRouter,

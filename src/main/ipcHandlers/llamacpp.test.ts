@@ -9,6 +9,7 @@ import {
 } from '../../shared/llamacpp';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import type { LlamaCppManager } from '../libs/llamacppManager';
+import { LlamaCppModelDaemonController } from '../libs/llamacppModelDaemonController';
 import {
   enforceLlamaCppParallelTwo,
   getLlamaCppLoadedModelLimitViolation,
@@ -438,17 +439,15 @@ test('getLlamaCppLoadedModelLimitViolation allows reloading an already running m
   ).toBeNull();
 });
 
-test('does not refresh model capabilities for manager status events', async () => {
-  let statusListener: ((status: unknown) => void) | undefined;
-  const listRunningModels = vi.fn(async () => []);
-  const client = vi.fn(async () => ({ showModel: vi.fn() }));
+test('does not subscribe to obsolete manager status events', async () => {
+  const reconnect = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'reconnect')
+    .mockResolvedValue(null);
+  const daemonListRunningModels = vi
+    .spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels')
+    .mockResolvedValue([]);
   const manager = {
-    on: vi.fn((event: string, listener: (value: unknown) => void) => {
-      if (event === 'status') statusListener = listener;
-      return manager;
-    }),
-    listRunningModels,
-    client,
+    on: vi.fn(() => manager),
   } as unknown as LlamaCppManager;
   const store = {
     get: vi.fn(() => undefined),
@@ -459,12 +458,12 @@ test('does not refresh model capabilities for manager status events', async () =
     getStore: () => store as never,
   });
 
-  expect(statusListener).toBeDefined();
-  statusListener?.({ status: 'running' });
   await Promise.resolve();
 
-  expect(listRunningModels).not.toHaveBeenCalled();
-  expect(client).not.toHaveBeenCalled();
+  expect(manager.on).toHaveBeenCalledWith('install-progress', expect.any(Function));
+  expect(manager.on).not.toHaveBeenCalledWith('status', expect.any(Function));
+  expect(reconnect).toHaveBeenCalledOnce();
+  expect(daemonListRunningModels).toHaveBeenCalledOnce();
 });
 
 test('retries startup binding synchronization until an automatically loaded model is available', async () => {
@@ -520,6 +519,15 @@ test('synchronizes running models and notifies renderers after service startup',
     get: vi.fn(() => undefined),
     set: vi.fn(),
   };
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'status').mockResolvedValue({
+    status: 'running',
+    managedByApp: true,
+    checkedAt: new Date(0).toISOString(),
+  });
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockResolvedValue([
+    { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
+  ]);
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
@@ -555,6 +563,10 @@ test('synchronizes current running models when model bindings are refreshed', as
     get: vi.fn(() => undefined),
     set: vi.fn(),
   };
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockResolvedValue([
+    { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
+  ]);
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
@@ -590,6 +602,15 @@ test('preserves model bindings when the running-model query temporarily fails', 
     get: vi.fn(() => ({ providers: { llamacpp: { models: [{ id: 'qwen-local' }] } } })),
     set: vi.fn(),
   };
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'status').mockResolvedValue({
+    status: 'running',
+    managedByApp: true,
+    checkedAt: new Date(0).toISOString(),
+  });
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockRejectedValue(
+    new Error('temporary connection failure'),
+  );
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,

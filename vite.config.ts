@@ -122,6 +122,25 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                // The local inference daemon is launched as an independent Node process.
+                entry: 'src/main/llamacppModelDaemonEntry.ts',
+                vite: {
+                  build: {
+                    watch: null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: {
+                      external:
+                        command === 'serve'
+                          ? isElectronDevelopmentExternal
+                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                    },
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {

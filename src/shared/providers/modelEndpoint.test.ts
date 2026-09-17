@@ -58,7 +58,7 @@ test('includes verified registry capability facts used by Work', () => {
   expect(coder.capabilities.reasoning).toBe(ModelCapabilityStatus.Supported);
 });
 
-test('unknown models remain configurable and conservative', () => {
+test('unverified models default to tool calling support', () => {
   const endpoint = resolveModelEndpoint('custom_0', 'my-model', {
     providerConfig: {
       apiKey: 'key',
@@ -70,7 +70,6 @@ test('unknown models remain configurable and conservative', () => {
           name: 'My Model',
           contextWindow: 8192,
           maxTokens: 1024,
-          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
         },
       ],
     },
@@ -80,6 +79,19 @@ test('unknown models remain configurable and conservative', () => {
   expect(endpoint.maxTokens).toBe(1024);
   expect(endpoint.capabilities.toolCalling).toBe(ModelCapabilityStatus.Supported);
   expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Unknown);
+});
+
+test('runtime-detected unsupported tool calling overrides the default', () => {
+  const endpoint = resolveModelEndpoint('custom_0', 'my-model', {
+    apiFormat: 'openai',
+    runtime: {
+      kind: 'llamacpp',
+      status: 'loaded',
+      detectedCapabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+    },
+  });
+
+  expect(endpoint.capabilities.toolCalling).toBe(ModelCapabilityStatus.Unsupported);
 });
 
 test('explicit metadata wins over runtime and registry values', () => {
