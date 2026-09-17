@@ -15,10 +15,6 @@ const taskAuditSource = readFileSync(
   'utf8',
 );
 
-vi.mock('../icons/ArtifactPanelAnimatedToggleIcon', () => ({
-  ArtifactPanelAnimatedToggleIcon: () => <span data-testid="artifact-toggle-icon" />,
-}));
-
 vi.mock('../icons/SidebarAnimatedMessageCirclePlusIcon', () => ({
   SidebarAnimatedMessageCirclePlusIcon: () => <span data-testid="new-chat-icon" />,
 }));
@@ -57,8 +53,6 @@ test('renders the title above tabs and preserves conversation state across tab s
       title="布局调整会话"
       sessionId="session-1"
       isSessionSwitching={false}
-      isArtifactPanelOpen={false}
-      onToggleArtifactPanel={vi.fn()}
     >
       <StatefulConversation />
     </CoworkSessionLayout>,
