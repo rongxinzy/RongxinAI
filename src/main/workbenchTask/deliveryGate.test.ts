@@ -128,6 +128,9 @@ test('text tasks may use temporary files without a mandatory file delivery', () 
 });
 
 test('uncommitted output requirements and failed file verification cannot be accepted', () => {
+  expect(applyWorkbenchDeliveryGate(passed, [file('table.csv')], contract()).outcome).toBe(
+    WorkbenchVerificationOutcome.Failed,
+  );
   expect(applyWorkbenchDeliveryGate(passed, [file('table.csv')], contract([])).outcome).toBe(
     WorkbenchVerificationOutcome.Failed,
   );

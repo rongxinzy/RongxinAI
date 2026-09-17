@@ -3,6 +3,7 @@ import {
   WorkbenchOutputToolName,
   type WorkbenchOutputRequirement,
 } from '../../../shared/workbenchTask';
+import { t } from '../../i18n';
 
 export const PiTaskOutputSystemPrompt = [
   '## Task output contract',
@@ -18,7 +19,7 @@ export function buildPiTaskOutputTool(
 ): Record<string, unknown> {
   return {
     name: WorkbenchOutputToolName,
-    label: 'Task Output',
+    label: t('workbenchTaskOutputToolLabel'),
     executionMode: 'sequential',
     description:
       'Commit the requested task output requirements before execution, independently of production workflow activation. Requirements cannot be downgraded after committing.',

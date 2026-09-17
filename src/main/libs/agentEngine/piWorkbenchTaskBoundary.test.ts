@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
-import { WorkbenchContractKind } from '../../../shared/workbenchTask';
+import { WorkbenchContractKind, WorkbenchOutputMode } from '../../../shared/workbenchTask';
 import { initializeProductionLoopSchema } from '../../productionLoop/schema';
 import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -21,8 +21,12 @@ test('user acceptance is persisted and injected into reused and restored convers
   try {
     const { task, run } = service.beginRun({
       sessionId: 'session',
-      goal: 'Create quarterly presentation',
-      contract: { kind: WorkbenchContractKind.GenericWork, requiresUserAcceptance: true },
+      goal: 'Create a quarterly written summary',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: true,
+        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
+      },
     });
     await service.completeRun({
       sessionId: 'session',

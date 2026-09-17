@@ -7,6 +7,7 @@ import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
+  WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchRunEventType,
@@ -456,7 +457,7 @@ export class WorkbenchTaskService extends EventEmitter {
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
       // Acceptance attests final deliverables, never intermediate execution evidence.
-      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id);
+      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id, detail.task.contract, runArtifacts);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
@@ -562,7 +563,8 @@ export class WorkbenchTaskService extends EventEmitter {
     }
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
     if (
-      task.contract.outputRequirements?.length === 0 &&
+      task.contract.kind !== WorkbenchContractKind.Chat &&
+      !task.contract.outputRequirements?.length &&
       riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
     ) {
       return { allow: false, reason: 'Commit the requested outputs with set_task_output before executing this task.' };
