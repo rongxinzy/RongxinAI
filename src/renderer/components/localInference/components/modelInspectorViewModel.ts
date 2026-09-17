@@ -44,6 +44,24 @@ export function getModelInspectorContextValue(input: {
   return Math.max(MODEL_INSPECTOR_CONTEXT_MIN, Math.min(candidate, contextLimit));
 }
 
+export function getModelInspectorMemoryProjection(input: {
+  contextDraftSize?: number;
+  preference?: LlamaCppModelPreference;
+  runningModel?: LlamaCppRunningModel;
+  serviceContextSize?: string;
+}): { contextSize?: number; useEstimatedVram: boolean } {
+  const { contextDraftSize, preference, runningModel, serviceContextSize } = input;
+  return {
+    contextSize:
+      contextDraftSize ??
+      runningModel?.runtime_context_length ??
+      runningModel?.context_length ??
+      preference?.ctxSize ??
+      (serviceContextSize ? Number(serviceContextSize) : undefined),
+    useEstimatedVram: contextDraftSize !== undefined,
+  };
+}
+
 export function parseModelInspectorContextK(value: string, contextLimit: number): number | undefined {
   const parsedK = Number(value.trim());
   if (!Number.isFinite(parsedK) || !Number.isInteger(parsedK)) return undefined;
