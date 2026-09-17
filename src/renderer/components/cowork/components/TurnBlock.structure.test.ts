@@ -28,12 +28,15 @@ test('settles execution counts after an answer or when the turn reaches a termin
   );
 });
 
-test('keeps recoverable interruptions outside reasoning and exposes a message action', () => {
+test('keeps recoverable interruptions outside reasoning and exposes a resume button', () => {
+  // 2026/09/17 lixiang  继续执行改为同行主题色 Button，不再用 MessageAction 图标
   expect(source).toContain('Boolean(item.message.metadata?.interruption)');
   expect(source).toContain('interruption.taskId === recoverableTaskId');
-  expect(source).toContain('<MessageAction');
+  expect(source).toContain('<Button');
+  expect(source).toContain('variant="default"');
   expect(source).toContain("i18nService.t('coworkResumeTaskAction')");
   expect(source).toContain('onClick={() => onResumeTask(interruption)}');
+  expect(source).not.toContain('<MessageAction');
 });
 
 test('keeps terminal errors visible outside execution summaries', () => {

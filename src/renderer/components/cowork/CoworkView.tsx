@@ -1605,6 +1605,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           inlinePermission={inlinePermission}
           onRespondToInlinePermission={onRespondToInlinePermission}
           resumeTaskId={taskResume.interruption?.taskId}
+          resumeDisabled={taskResume.isResuming} // 2026/09/17 lixiang  恢复中禁用继续执行，避免重复点击
           onResumeTask={taskResume.select}
           onCancelTaskResume={taskResume.cancel}
         />

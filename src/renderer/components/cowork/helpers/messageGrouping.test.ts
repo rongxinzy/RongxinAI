@@ -7,6 +7,7 @@ import {
   buildDisplayItems,
   buildTurnRailIndices,
   getVisibleAssistantItems,
+  omitSupersededSessionInterruptions,
   stabilizeConversationTurns,
 } from './messageGrouping';
 
@@ -130,6 +131,44 @@ test('keeps empty interruption messages visible while hiding other empty system 
   expect(getVisibleAssistantItems(turn.assistantItems)).toEqual([
     { type: 'system', message: interruptionMessage },
   ]);
+});
+
+test('keeps only the latest session interruption message', () => {
+  const older: CoworkMessage = {
+    ...message('interruption-1', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 'session-1',
+        interruptionId: 'interruption-1',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: 'task-1',
+        recoverable: true,
+      },
+    },
+  };
+  const newer: CoworkMessage = {
+    ...message('interruption-2', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 'session-1',
+        interruptionId: 'interruption-2',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: 'task-1',
+        recoverable: true,
+      },
+    },
+  };
+  const filtered = omitSupersededSessionInterruptions([
+    message('user-1', 'user', 'run task'),
+    older,
+    message('assistant-1', 'assistant', 'partial'),
+    newer,
+  ]);
+
+  expect(filtered.map(item => item.id)).toEqual(['user-1', 'assistant-1', 'interruption-2']);
+
+  const turn = buildTurns([message('user-1', 'user', 'run task'), older, newer])[0];
+  expect(getVisibleAssistantItems(turn.assistantItems)).toEqual([{ type: 'system', message: newer }]);
 });
 
 // ── Scale fixtures (issue #141: 20/200/1000-turn sessions) ──
