@@ -31,6 +31,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile --ignore-scripts
       - uses: ./.github/actions/verify-windows-runtime-signatures
         with:
           signer-thumbprint: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}

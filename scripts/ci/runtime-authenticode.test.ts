@@ -138,3 +138,15 @@ test('postpack smoke verifies the extracted sidecar and copied memory executable
     "Join-Path $ProjectRoot 'release\\win-unpacked\\resources\\memory\\engram.exe'",
   );
 });
+
+test('standalone signature CI installs download dependencies without native lifecycle scripts', () => {
+  const workflow = readFileSync(
+    path.join(root, '.github/workflows/runtime-signature-gate.yml'),
+    'utf8',
+  );
+  const install = workflow.indexOf('bun install --frozen-lockfile --ignore-scripts');
+  expect(install).toBeGreaterThan(-1);
+  expect(install).toBeLessThan(
+    workflow.indexOf('uses: ./.github/actions/verify-windows-runtime-signatures'),
+  );
+});
