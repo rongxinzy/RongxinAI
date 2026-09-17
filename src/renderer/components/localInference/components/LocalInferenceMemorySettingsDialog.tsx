@@ -144,8 +144,8 @@ export function LocalInferenceMemorySettingsDialog({
         <DialogFooter>
           <Button
             type="button"
-            variant="outline"
-            className={localInferenceCompactButtonClass}
+            variant="ghost"
+            className="theme-confirm-cancel min-w-16"
             onClick={onClose}
             disabled={saving}
           >

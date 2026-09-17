@@ -28,6 +28,13 @@ test('preserves the daemon control token when rotating the LAN token', () => {
   const lanToken = vault.regenerateLanToken();
 
   expect(lanToken).not.toBe(previousLanToken);
+  expect(lanToken.startsWith('sk-')).toBe(true);
   expect(vault.getLanToken()).toBe(lanToken);
   expect(vault.ensureControlToken()).toBe(controlToken);
+});
+
+test('creates prefixed LAN tokens when no credentials exist', () => {
+  const vault = new LlamaCppGatewayCredentialVault(createStore());
+
+  expect(vault.ensureLanToken().startsWith('sk-')).toBe(true);
 });

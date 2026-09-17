@@ -59,6 +59,7 @@ export function LocalInferenceAccessSettingsDialog({
     ? `http://<LAN-IP>:${resolvedPort}/v1`
     : `http://${listenHost}:${resolvedPort}/v1`;
   const modelName = exampleModelName?.trim() || '<model-name>';
+  const requestAuthorization = allowLanAccess && lanToken ? `Authorization: Bearer ${lanToken}\n` : '';
   const copyLanToken = () => {
     void navigator.clipboard.writeText(lanToken).catch(() => undefined);
   };
@@ -140,7 +141,6 @@ export function LocalInferenceAccessSettingsDialog({
                   ? i18nService.t('localInferenceAccessAllowLanEnabledHint')
                   : i18nService.t('localInferenceAccessAllowLanDisabledHint')}
               </p>
-              <span className="break-all text-sm leading-5 text-foreground">{endpointBase}</span>
             </div>
           </div>
 
@@ -157,7 +157,7 @@ export function LocalInferenceAccessSettingsDialog({
                   className="mt-2"
                 />
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 self-end items-center gap-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -189,17 +189,11 @@ export function LocalInferenceAccessSettingsDialog({
               <div className="shrink-0 text-xs font-medium text-foreground">
                 {i18nService.t('localInferenceAccessRequestExample')}
               </div>
-              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-                {endpointBase}
-              </span>
             </div>
-            <pre className="overflow-x-auto whitespace-pre rounded-lg border border-border-subtle bg-background px-3 py-2 font-mono text-xs leading-5 text-foreground">
+            <pre className="max-w-full overflow-x-hidden whitespace-pre-wrap break-all rounded-lg border border-border-subtle bg-background px-3 py-2 font-mono text-xs leading-5 text-foreground">
               {`POST ${endpointBase}/chat/completions
-model: "${modelName}"`}
+${requestAuthorization}model: "${modelName}"`}
             </pre>
-            <p className="text-xs leading-4 text-muted-foreground">
-              {i18nService.t('localInferenceAccessRequestExampleHint')}
-            </p>
           </div>
         </div>
 
@@ -217,8 +211,8 @@ model: "${modelName}"`}
           <div className="flex shrink-0 items-center gap-2">
             <Button
               type="button"
-              variant="outline"
-              className={localInferenceCompactButtonClass}
+              variant="ghost"
+              className="theme-confirm-cancel min-w-16"
               onClick={onClose}
               disabled={saving}
             >
