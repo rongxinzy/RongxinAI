@@ -216,6 +216,12 @@ export interface CoworkSessionSummary {
   source: CoworkSessionSource;
   createdAt: number;
   updatedAt: number;
+  /**
+   * When the current run started. Frozen for the whole run so streaming
+   * activity cannot move the session in the sidebar; cleared when the run ends,
+   * which lets `updatedAt` (the run's end) place it.
+   */
+  runStartedAt?: number | null;
 }
 
 // Start session options

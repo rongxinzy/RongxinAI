@@ -45,7 +45,8 @@ import { ShellIconButton } from './shell/ShellIconButton';
 import { SidebarAnimatedPanelLeftCloseIcon } from './icons/SidebarAnimatedPanelLeftCloseIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
-import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
+import { sortAgentSidebarTasks } from './agentSidebar/sessionSort';
+import { toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import LoginButton from './LoginButton';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import { SidebarNavigationControls, type SidebarActiveView } from './SidebarNavigationControls';
@@ -141,8 +142,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
   const chatTaskNodes = React.useMemo(() => {
     if (workMode !== WorkMode.Chat) return [];
-    const sorted = sortAgentSidebarTasks(sessions, streamingSessionIds);
     const streamingSessionIdSet = new Set(streamingSessionIds);
+    const sorted = sortAgentSidebarTasks(sessions);
     return sorted.map(s =>
       toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet, streamingSessionIdSet),
     );

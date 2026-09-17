@@ -168,7 +168,14 @@ const upsertSessionSummary = (
     sessions.unshift(summary);
     return;
   }
-  sessions[index] = { ...sessions[index], ...summary };
+  sessions[index] = {
+    ...sessions[index],
+    ...summary,
+    runStartedAt:
+      summary.status === CoworkSessionStatusValue.Running
+        ? (sessions[index].runStartedAt ?? null)
+        : null,
+  };
 };
 
 const updateSessionSummary = (
@@ -178,6 +185,44 @@ const updateSessionSummary = (
 ): void => {
   const session = sessions.find(item => item.id === sessionId);
   if (session) update(session);
+};
+
+/**
+ * Applies a status change and keeps `runStartedAt` in step with the run
+ * lifecycle: stamped when a run starts, frozen while it lasts, cleared once it
+ * ends. Sidebar ordering reads it so an executing conversation holds its slot
+ * instead of drifting with every streamed message.
+ */
+const applySessionStatus = (
+  session: CoworkSessionSummary,
+  status: CoworkSessionStatus,
+  at: number,
+): void => {
+  session.status = status;
+  session.updatedAt = at;
+  session.runStartedAt =
+    status === CoworkSessionStatusValue.Running ? (session.runStartedAt ?? at) : null;
+};
+
+/**
+ * A session list refreshed from SQLite carries no run timing, so keep the run
+ * start we already know for sessions that are still running.
+ */
+const carryRunStartedAt = (
+  previous: CoworkSessionSummary[],
+  incoming: CoworkSessionSummary[],
+): CoworkSessionSummary[] => {
+  const runStarts = new Map(
+    previous
+      .filter(session => session.runStartedAt != null)
+      .map(session => [session.id, session.runStartedAt as number]),
+  );
+  if (runStarts.size === 0) return incoming;
+  return incoming.map(session =>
+    session.status === CoworkSessionStatusValue.Running
+      ? { ...session, runStartedAt: runStarts.get(session.id) ?? null }
+      : session,
+  );
 };
 
 type MessageContentUpdate = {
@@ -246,7 +291,7 @@ const coworkSlice = createSlice({
     },
 
     setSessions(state, action: PayloadAction<CoworkSessionSummary[]>) {
-      state.sessions = action.payload;
+      state.sessions = carryRunStartedAt(state.sessions, action.payload);
       retainUnreadSessionIds(state);
     },
 
@@ -266,7 +311,7 @@ const coworkSlice = createSlice({
     },
 
     setChatSessions(state, action: PayloadAction<CoworkSessionSummary[]>) {
-      state.chatSessions = action.payload;
+      state.chatSessions = carryRunStartedAt(state.chatSessions, action.payload);
       state.chatSessionsLoaded = true;
       retainUnreadSessionIds(state);
     },
@@ -387,14 +432,12 @@ const coworkSlice = createSlice({
       setSessionStreaming(state, sessionId, status === CoworkSessionStatusValue.Running);
 
       const updatedAt = Date.now();
-      updateSessionSummary(state.sessions, sessionId, session => {
-        session.status = status;
-        session.updatedAt = updatedAt;
-      });
-      updateSessionSummary(state.chatSessions, sessionId, session => {
-        session.status = status;
-        session.updatedAt = updatedAt;
-      });
+      updateSessionSummary(state.sessions, sessionId, session =>
+        applySessionStatus(session, status, updatedAt),
+      );
+      updateSessionSummary(state.chatSessions, sessionId, session =>
+        applySessionStatus(session, status, updatedAt),
+      );
 
       // Update current session if applicable
       if (state.currentSession?.id === sessionId) {
@@ -457,12 +500,15 @@ const coworkSlice = createSlice({
         }
       }
 
-      updateSessionSummary(state.sessions, sessionId, session => {
+      const applyMessageTime = (session: CoworkSessionSummary) => {
         session.updatedAt = message.timestamp;
-      });
-      updateSessionSummary(state.chatSessions, sessionId, session => {
-        session.updatedAt = message.timestamp;
-      });
+        const running =
+          session.status === CoworkSessionStatusValue.Running ||
+          state.streamingSessionIds.includes(sessionId);
+        if (running && !session.runStartedAt) session.runStartedAt = message.timestamp;
+      };
+      updateSessionSummary(state.sessions, sessionId, applyMessageTime);
+      updateSessionSummary(state.chatSessions, sessionId, applyMessageTime);
 
       markSessionUnread(state, sessionId);
     },

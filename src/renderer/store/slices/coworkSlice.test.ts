@@ -9,7 +9,7 @@ import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
 } from '../../../shared/cowork/toolActivity';
-import { CoworkSessionStatusValue } from '../../types/cowork';
+import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import coworkReducer, {
   addMessage,
   addSession,
@@ -555,4 +555,105 @@ test('applies a batched stream frame without touching summaries or unread state'
   // Token-frequency deltas must not invalidate the sidebar summary list (issue #141).
   expect(updated.sessions[0]?.updatedAt).toBe(5);
   expect(updated.unreadSessionIds).toBe(unreadBefore);
+});
+
+const makeSummary = (
+  id: string,
+  overrides: Partial<CoworkSessionSummary> = {},
+): CoworkSessionSummary => ({
+  id,
+  title: id,
+  status: CoworkSessionStatusValue.Idle,
+  pinned: false,
+  agentId: 'main',
+  source: CoworkSessionSource.Manual,
+  createdAt: 1,
+  updatedAt: 1,
+  ...overrides,
+});
+
+test('updateSessionStatus freezes the run start for the whole run', () => {
+  const started = coworkReducer(
+    coworkReducer(undefined, setSessions([makeSummary('session-1')])),
+    updateSessionStatus({ sessionId: 'session-1', status: CoworkSessionStatusValue.Running }),
+  );
+  const runStartedAt = started.sessions[0]?.runStartedAt;
+  expect(typeof runStartedAt).toBe('number');
+
+  // Streamed messages keep rewriting updatedAt; the ordering key must not move.
+  const streaming = coworkReducer(
+    started,
+    addMessage({
+      sessionId: 'session-1',
+      message: { id: 'answer', type: 'assistant', content: 'chunk', timestamp: 4000 },
+    }),
+  );
+
+  expect(streaming.sessions[0]?.runStartedAt).toBe(runStartedAt);
+  expect(streaming.sessions[0]?.updatedAt).toBe(4000);
+});
+
+test('updateSessionStatus clears the run start once the run ends', () => {
+  const summary = makeSummary('session-1');
+  const started = coworkReducer(
+    coworkReducer(coworkReducer(undefined, setSessions([summary])), setChatSessions([summary])),
+    updateSessionStatus({ sessionId: 'session-1', status: CoworkSessionStatusValue.Running }),
+  );
+
+  const paused = coworkReducer(
+    started,
+    updateSessionStatus({ sessionId: 'session-1', status: CoworkSessionStatusValue.Idle }),
+  );
+
+  expect(paused.sessions[0]?.runStartedAt).toBeNull();
+  expect(paused.chatSessions[0]?.runStartedAt).toBeNull();
+  expect(paused.sessions[0]?.updatedAt).toBeGreaterThanOrEqual(1);
+});
+
+test('a refreshed session list keeps the run start of a session that is still running', () => {
+  const running = coworkReducer(
+    coworkReducer(
+      undefined,
+      setSessions([makeSummary('session-1', { status: CoworkSessionStatusValue.Running })]),
+    ),
+    updateSessionStatus({ sessionId: 'session-1', status: CoworkSessionStatusValue.Running }),
+  );
+  const runStartedAt = running.sessions[0]?.runStartedAt;
+
+  // Realtime list refreshes carry no run timing: the stored start survives.
+  const refreshed = coworkReducer(
+    running,
+    setSessions([
+      makeSummary('session-1', { status: CoworkSessionStatusValue.Running, updatedAt: 900 }),
+    ]),
+  );
+  expect(refreshed.sessions[0]?.runStartedAt).toBe(runStartedAt);
+
+  // Once the run is over the refreshed row falls back to its last activity.
+  const settled = coworkReducer(
+    refreshed,
+    setSessions([
+      makeSummary('session-1', { status: CoworkSessionStatusValue.Idle, updatedAt: 1000 }),
+    ]),
+  );
+  expect(settled.sessions[0]?.runStartedAt ?? null).toBeNull();
+});
+
+test('addMessage stamps a run start for a session that arrives already running', () => {
+  // Channel and IM turns flip no status in the renderer, so the first message
+  // of such a turn is what dates the run.
+  const state = coworkReducer(
+    undefined,
+    setSessions([makeSummary('session-1', { status: CoworkSessionStatusValue.Running })]),
+  );
+
+  const withMessage = coworkReducer(
+    state,
+    addMessage({
+      sessionId: 'session-1',
+      message: { id: 'inbound', type: 'user', content: 'hello', timestamp: 700 },
+    }),
+  );
+
+  expect(withMessage.sessions[0]?.runStartedAt).toBe(700);
 });
