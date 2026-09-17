@@ -24,6 +24,7 @@ const isModelLaunchLogWindow =
 
 const root = ReactDOM.createRoot(rootElement);
 let activityUnsubscribe: (() => void) | null = null;
+let devNetworkUnsubscribe: (() => void) | null = null;
 
 async function renderRoot(): Promise<void> {
   if (isModelLaunchLogWindow) {
@@ -37,6 +38,13 @@ async function renderRoot(): Promise<void> {
       </React.StrictMode>,
     );
     return;
+  }
+
+  // 2026/09/17 lixiang  开发态：主进程 HTTP → xr-net beacon → DevTools Network
+  if (import.meta.env.DEV) {
+    const { startDevNetworkBeacon } = await import('./services/devNetworkBeacon');
+    devNetworkUnsubscribe?.();
+    devNetworkUnsubscribe = startDevNetworkBeacon();
   }
 
   const [{ default: App }, { store }] = await Promise.all([import('./App'), import('./store')]);
@@ -63,6 +71,8 @@ if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     activityUnsubscribe?.();
     activityUnsubscribe = null;
+    devNetworkUnsubscribe?.();
+    devNetworkUnsubscribe = null;
   });
 }
 
