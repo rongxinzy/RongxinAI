@@ -4,6 +4,7 @@ import { McpCredentialVault, type McpCredentialKeyValueStore } from './mcpCreden
 
 const LLAMACPP_GATEWAY_CREDENTIAL_KEY = 'llamacpp.gateway.credentials';
 const LLAMACPP_GATEWAY_TOKEN_BYTES = 32;
+const LLAMACPP_GATEWAY_LAN_TOKEN_PREFIX = 'sk-';
 
 type LlamaCppGatewayCredentials = {
   lanToken: string;
@@ -30,7 +31,7 @@ export class LlamaCppGatewayCredentialVault {
     const credentials = this.vault.getValue<LlamaCppGatewayCredentials>(
       LLAMACPP_GATEWAY_CREDENTIAL_KEY,
     );
-    const lanToken = randomBytes(LLAMACPP_GATEWAY_TOKEN_BYTES).toString('base64url');
+    const lanToken = createLanToken();
     this.vault.setValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY, {
       ...credentials,
       lanToken,
@@ -45,9 +46,13 @@ export class LlamaCppGatewayCredentialVault {
     if (credentials?.controlToken) return credentials.controlToken;
     const controlToken = randomBytes(LLAMACPP_GATEWAY_TOKEN_BYTES).toString('base64url');
     this.vault.setValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY, {
-      ...(credentials ?? { lanToken: randomBytes(LLAMACPP_GATEWAY_TOKEN_BYTES).toString('base64url') }),
+      ...(credentials ?? { lanToken: createLanToken() }),
       controlToken,
     });
     return controlToken;
   }
+}
+
+function createLanToken(): string {
+  return `${LLAMACPP_GATEWAY_LAN_TOKEN_PREFIX}${randomBytes(LLAMACPP_GATEWAY_TOKEN_BYTES).toString('base64url')}`;
 }
