@@ -12,7 +12,8 @@ export function createContentSecurityPolicy(options: ContentSecurityPolicyOption
       : "script-src 'self' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: http: localfile:",
-    'connect-src *',
+    // 2026/09/17 lixiang  开发态允许 xr-net beacon（主进程请求镜像到 Network）
+    options.isDev ? 'connect-src * xr-net:' : 'connect-src *',
     "font-src 'self' data:",
     "media-src 'self'",
     "worker-src 'self' blob:",

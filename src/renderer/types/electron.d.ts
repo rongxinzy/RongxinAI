@@ -1617,6 +1617,12 @@ interface IElectronAPI {
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
   };
+  // 2026/09/17 lixiang  开发态主进程 HTTP 镜像到 DevTools Network
+  devNetwork: {
+    onEntry: (
+      callback: (entry: import('../../shared/devNetworkLog').DevNetworkLogEntry) => void,
+    ) => () => void;
+  };
   qwen: Record<string, never>;
   feishu: {
     install: {
