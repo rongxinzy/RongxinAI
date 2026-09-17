@@ -1,42 +1,45 @@
 const { spawn } = require('child_process');
 const { createServer } = require('vite');
 const electron = require('electron');
-const path = require('path');
 
 async function startApp() {
-  // 启动 Vite 开发服务器
-  const server = await createServer();
+  process.env.VITE_SKIP_ELECTRON = '1';
+  const server = await createServer({
+    server: {
+      port: 5175,
+      strictPort: true,
+    },
+  });
   await server.listen();
 
-  console.log('Vite server started');
-
-  // 编译 Electron 主进程代码
-  require('child_process').execSync('tsc --project electron-tsconfig.json', {
-    stdio: 'inherit',
-  });
-
-  console.log('Electron main process code compiled');
-
-  // 启动 Electron
   const proc = spawn(electron, ['.'], {
     stdio: 'inherit',
     env: {
       ...process.env,
       NODE_ENV: 'development',
+      ELECTRON_START_URL: 'http://localhost:5175',
     },
   });
 
-  proc.on('close', () => {
-    server.close();
-    process.exit();
+  let shuttingDown = false;
+  const shutdown = async exitCode => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (proc.exitCode === null && proc.signalCode === null) proc.kill();
+    await server.close();
+    process.exit(exitCode);
+  };
+
+  proc.once('close', exitCode => {
+    void shutdown(exitCode ?? 1);
+  });
+  proc.once('error', error => {
+    console.error('Electron development process failed:', error);
+    void shutdown(1);
   });
 
-  // 处理进程终止
-  process.on('SIGTERM', () => {
-    proc.kill();
-    server.close();
-    process.exit();
-  });
+  process.once('SIGINT', () => void shutdown(0));
+  process.once('SIGTERM', () => void shutdown(0));
 }
 
 startApp().catch(err => {
