@@ -1,7 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
@@ -62,7 +62,6 @@ interface PptxSlideNavigatorProps {
 
 const PptxSlideNavigator: React.FC<PptxSlideNavigatorProps> = ({ slides, title }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [showThumbnails, setShowThumbnails] = useState(true);
   const [mainScale, setMainScale] = useState(0);
   const thumbnailScrollRef = useRef<HTMLDivElement>(null);
   const mainViewportRef = useRef<HTMLDivElement>(null);
@@ -136,101 +135,88 @@ const PptxSlideNavigator: React.FC<PptxSlideNavigatorProps> = ({ slides, title }
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      <div className="flex h-10 shrink-0 items-center border-b border-border px-2">
+      {/* 2026/09/17 lixiang  页码栏不再放缩略图展开/收起，避免干扰翻页 */}
+      <div className="flex h-10 shrink-0 items-center justify-center gap-1 border-b border-border px-2">
         <Button
-          aria-label={t(showThumbnails ? 'artifactHideThumbnails' : 'artifactShowThumbnails')}
-          onClick={() => setShowThumbnails(value => !value)}
+          aria-label={t('artifactPreviousSlide')}
+          disabled={selectedIndex === 0}
+          onClick={() => selectSlide(selectedIndex - 1)}
           size="icon-sm"
-          title={t(showThumbnails ? 'artifactHideThumbnails' : 'artifactShowThumbnails')}
+          title={t('artifactPreviousSlide')}
           variant="ghost"
         >
-          {showThumbnails ? <PanelLeftClose /> : <PanelLeftOpen />}
+          <ChevronLeft />
         </Button>
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-1">
-          <Button
-            aria-label={t('artifactPreviousSlide')}
-            disabled={selectedIndex === 0}
-            onClick={() => selectSlide(selectedIndex - 1)}
-            size="icon-sm"
-            title={t('artifactPreviousSlide')}
-            variant="ghost"
-          >
-            <ChevronLeft />
-          </Button>
-          <span className="min-w-20 text-center text-xs tabular-nums text-muted-foreground">
-            {positionLabel}
-          </span>
-          <Button
-            aria-label={t('artifactNextSlide')}
-            disabled={selectedIndex === slides.length - 1}
-            onClick={() => selectSlide(selectedIndex + 1)}
-            size="icon-sm"
-            title={t('artifactNextSlide')}
-            variant="ghost"
-          >
-            <ChevronRight />
-          </Button>
-        </div>
-        <div className="size-7" aria-hidden="true" />
+        <span className="min-w-20 text-center text-xs tabular-nums text-muted-foreground">
+          {positionLabel}
+        </span>
+        <Button
+          aria-label={t('artifactNextSlide')}
+          disabled={selectedIndex === slides.length - 1}
+          onClick={() => selectSlide(selectedIndex + 1)}
+          size="icon-sm"
+          title={t('artifactNextSlide')}
+          variant="ghost"
+        >
+          <ChevronRight />
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {showThumbnails && (
-          <aside
-            aria-label={t('artifactPptxThumbnails')}
-            className="flex w-40 shrink-0 flex-col border-r border-border bg-muted/30"
+        <aside
+          aria-label={t('artifactPptxThumbnails')}
+          className="flex w-40 shrink-0 flex-col border-r border-border bg-muted/30"
+        >
+          <div
+            ref={thumbnailScrollRef}
+            className="min-h-0 flex-1 overflow-auto py-1"
+            tabIndex={0}
+            onKeyDown={handleKeyDown}
           >
-            <div
-              ref={thumbnailScrollRef}
-              className="min-h-0 flex-1 overflow-auto py-1"
-              tabIndex={0}
-              onKeyDown={handleKeyDown}
-            >
-              <div className="relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
-                {rowVirtualizer.getVirtualItems().map(virtualSlide => {
-                  const slide = slides[virtualSlide.index];
-                  const scale = THUMBNAIL_WIDTH / slide.width;
-                  const slideLabel = t('artifactSlideLabel').replace(
-                    '{n}',
-                    String(virtualSlide.index + 1),
-                  );
-                  const selected = virtualSlide.index === selectedIndex;
+            <div className="relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
+              {rowVirtualizer.getVirtualItems().map(virtualSlide => {
+                const slide = slides[virtualSlide.index];
+                const scale = THUMBNAIL_WIDTH / slide.width;
+                const slideLabel = t('artifactSlideLabel').replace(
+                  '{n}',
+                  String(virtualSlide.index + 1),
+                );
+                const selected = virtualSlide.index === selectedIndex;
 
-                  return (
-                    <div
-                      key={virtualSlide.key}
-                      className="absolute left-0 top-0 w-full px-2 py-1"
-                      style={{ transform: `translateY(${virtualSlide.start}px)` }}
+                return (
+                  <div
+                    key={virtualSlide.key}
+                    className="absolute left-0 top-0 w-full px-2 py-1"
+                    style={{ transform: `translateY(${virtualSlide.start}px)` }}
+                  >
+                    <button
+                      aria-current={selected ? 'page' : undefined}
+                      aria-label={slideLabel}
+                      className={cn(
+                        'theme-native-slide flex w-full flex-col items-center gap-1 p-1 text-left',
+                        selected ? 'theme-native-slide-selected' : 'theme-native-slide-idle',
+                      )}
+                      type="button"
+                      onClick={() => selectSlide(virtualSlide.index)}
                     >
-                      <button
-                        aria-current={selected ? 'page' : undefined}
-                        aria-label={slideLabel}
+                      <div
                         className={cn(
-                          'theme-native-slide flex w-full flex-col items-center gap-1 p-1 text-left',
-                          selected ? 'theme-native-slide-selected' : 'theme-native-slide-idle',
+                          'overflow-hidden rounded-sm border bg-background shadow-sm',
+                          selected ? 'border-primary' : 'border-border',
                         )}
-                        type="button"
-                        onClick={() => selectSlide(virtualSlide.index)}
                       >
-                        <div
-                          className={cn(
-                            'overflow-hidden rounded-sm border bg-background shadow-sm',
-                            selected ? 'border-primary' : 'border-border',
-                          )}
-                        >
-                          <ScaledSlide lazy scale={scale} slide={slide} title={slideLabel} />
-                        </div>
-                        <span className="text-xs tabular-nums text-muted-foreground">
-                          {virtualSlide.index + 1}
-                        </span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+                        <ScaledSlide lazy scale={scale} slide={slide} title={slideLabel} />
+                      </div>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {virtualSlide.index + 1}
+                      </span>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-          </aside>
-        )}
+          </div>
+        </aside>
 
         <div
           ref={mainViewportRef}

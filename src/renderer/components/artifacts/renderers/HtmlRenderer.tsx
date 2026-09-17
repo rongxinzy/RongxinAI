@@ -28,6 +28,23 @@ function hasRelativeResources(html: string): boolean {
   return false;
 }
 
+// 2026/09/17 lixiang  阻断应用深色 color-scheme 渗入 srcDoc，避免简历等浅底页白字不可见
+export function ensurePreviewColorScheme(html: string): string {
+  if (/name\s*=\s*["']color-scheme["']/i.test(html) || /color-scheme\s*:/i.test(html)) {
+    return html;
+  }
+  const inject =
+    '<meta name="color-scheme" content="light">' +
+    '<style data-xiaoruan-preview-color-scheme>:root{color-scheme:light;}</style>';
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/(<head[^>]*>)/i, `$1${inject}`);
+  }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/(<html[^>]*>)/i, `$1<head>${inject}</head>`);
+  }
+  return `<!DOCTYPE html><html><head>${inject}</head><body>${html}</body></html>`;
+}
+
 const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   const [processedHtml, setProcessedHtml] = useState<string | null>(null);
 
@@ -65,9 +82,13 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
         if (artifact.filePath && !hasRelativeResources(html)) {
           html = await inlineLocalResources(html, artifact.filePath);
         }
-        if (!cancelled) setProcessedHtml(html);
+        if (!cancelled) setProcessedHtml(ensurePreviewColorScheme(html));
       } catch {
-        if (!cancelled) setProcessedHtml(artifact.content || null);
+        if (!cancelled) {
+          setProcessedHtml(
+            artifact.content ? ensurePreviewColorScheme(artifact.content) : null,
+          );
+        }
       }
     };
 
@@ -90,11 +111,14 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   if (artifact.filePath && artifact.content && hasRelativeResources(artifact.content)) {
     const dirPath = artifact.filePath.slice(0, artifact.filePath.lastIndexOf('/') + 1);
     const baseTag = `<base href="file://${dirPath}">`;
-    const htmlWithBase = artifact.content.replace(/(<head[^>]*>)/i, `$1${baseTag}`);
+    const htmlWithBase = ensurePreviewColorScheme(
+      artifact.content.replace(/(<head[^>]*>)/i, `$1${baseTag}`),
+    );
     return (
       <iframe
         srcDoc={htmlWithBase}
         className="w-full h-full border-0"
+        style={{ colorScheme: 'light' }}
         sandbox="allow-scripts allow-same-origin"
         title={artifact.title}
       />
@@ -113,8 +137,9 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   // Self-contained HTML (no relative resources): use srcDoc
   return (
     <iframe
-      srcDoc={processedHtml || artifact.content}
+      srcDoc={processedHtml || ensurePreviewColorScheme(artifact.content)}
       className="w-full h-full border-0"
+      style={{ colorScheme: 'light' }}
       sandbox="allow-scripts"
       title={artifact.title}
     />

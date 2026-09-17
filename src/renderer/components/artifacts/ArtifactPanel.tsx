@@ -21,6 +21,7 @@ import {
   setActiveTab,
   setArtifactLayoutMode,
   setPanelView,
+  togglePanel,
 } from '@/store/slices/artifactSlice';
 import type { ArtifactActiveTab } from '@/store/slices/artifactSlice';
 import {
@@ -32,6 +33,7 @@ import {
 } from '@/types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
+import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
 import ArtifactRenderer from './ArtifactRenderer';
 import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
@@ -427,6 +429,39 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 {selectedArtifact.fileName || selectedArtifact.title}
               </span>
               <span className="flex-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => void handleToggleWorkspace()}
+                className="theme-action-icon-muted"
+                title={t(
+                  layoutMode === ArtifactLayoutMode.Workspace
+                    ? 'artifactExitFullWindow'
+                    : 'artifactEnterFullWindow',
+                )}
+                aria-label={t(
+                  layoutMode === ArtifactLayoutMode.Workspace
+                    ? 'artifactExitFullWindow'
+                    : 'artifactEnterFullWindow',
+                )}
+              >
+                {layoutMode === ArtifactLayoutMode.Workspace ? (
+                  <Shrink className="h-3.5 w-3.5" />
+                ) : (
+                  <Expand className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              {/* 2026/09/17 lixiang  页头侧栏展开/收起挪到刷新按钮左侧 */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => dispatch(togglePanel())}
+                className="theme-action-icon-muted"
+                title={t('artifactPanelToggle')}
+                aria-label={t('artifactPanelToggle')}
+              >
+                <ArtifactPanelAnimatedToggleIcon open />
+              </Button>
               {selectedArtifact.filePath && selectedArtifact.type !== 'unsupported' && (
                 <Button
                   variant="ghost"
@@ -482,28 +517,6 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <FolderIcon />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => void handleToggleWorkspace()}
-                className="theme-action-icon-muted"
-                title={t(
-                  layoutMode === ArtifactLayoutMode.Workspace
-                    ? 'artifactExitFullWindow'
-                    : 'artifactEnterFullWindow',
-                )}
-                aria-label={t(
-                  layoutMode === ArtifactLayoutMode.Workspace
-                    ? 'artifactExitFullWindow'
-                    : 'artifactEnterFullWindow',
-                )}
-              >
-                {layoutMode === ArtifactLayoutMode.Workspace ? (
-                  <Shrink className="h-3.5 w-3.5" />
-                ) : (
-                  <Expand className="h-3.5 w-3.5" />
-                )}
-              </Button>
               {document.fullscreenEnabled && (
                 <Button
                   variant="ghost"
@@ -602,6 +615,17 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 {t('artifactFiles')}
               </span>
               <span className="flex-1" />
+              {/* 2026/09/17 lixiang  文件列表态同样提供侧栏收起，位置与预览栏刷新左侧一致 */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => dispatch(togglePanel())}
+                className="theme-action-icon-muted"
+                title={t('artifactPanelToggle')}
+                aria-label={t('artifactPanelToggle')}
+              >
+                <ArtifactPanelAnimatedToggleIcon open />
+              </Button>
               {intermediateToggle}
               <Button
                 variant="ghost"
