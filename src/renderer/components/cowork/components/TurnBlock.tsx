@@ -43,6 +43,7 @@ import { findToolGroupForPermission } from '../helpers/toolPermissionMatch';
 import { getThinkingPresentation } from '../helpers/thinkingPresentation';
 import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
+import { CopyButton } from './CopyButton';
 import { ExpertAvatar } from '../../expert/expertAvatars';
 import { ExecutionSummary } from './ExecutionSummary';
 import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
@@ -317,16 +318,16 @@ const TurnBlockComponent: React.FC<{
 
     // ── Assistant answer ──
     if (item.type === 'assistant') {
-      const isLastAssistant = showCopyButtons && isFinalAnswer;
       return (
         <AssistantBubble
           key={item.message.id}
           message={item.message}
           resolveLocalFilePath={resolveLocalFilePath}
           mapDisplayText={mapDisplayText}
-          showCopyButton={isLastAssistant}
           turnMetadata={
-            isLastAssistant ? (item.message.metadata as CoworkMessageMetadata) : undefined
+            showCopyButtons && isFinalAnswer
+              ? (item.message.metadata as CoworkMessageMetadata)
+              : undefined
           }
         />
       );
@@ -473,6 +474,28 @@ const TurnBlockComponent: React.FC<{
       </PersistentChainOfThought>
     );
   };
+  const hasDeliverableArtifacts = Boolean(
+    artifacts?.some(artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared),
+  );
+  // 2026/09/17 lixiang  轮次结束后在文件卡片下方常显复制（参考豆包）
+  const copyContent = (() => {
+    if (!showCopyButtons) return null;
+    if (finalAnswerItem?.type === 'assistant' && hasText(finalAnswerItem.message.content)) {
+      return finalAnswerItem.message.content;
+    }
+    for (let i = visibleAssistantItems.length - 1; i >= 0; i -= 1) {
+      const item = visibleAssistantItems[i];
+      if (
+        item?.type === 'assistant' &&
+        !item.message.metadata?.isThinking &&
+        hasText(item.message.content)
+      ) {
+        return item.message.content;
+      }
+    }
+    return null;
+  })();
+
   return (
     <div className="py-2">
       <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
@@ -522,17 +545,25 @@ const TurnBlockComponent: React.FC<{
               </ChainOfThought>
             )}
             {showTypingIndicator && <WorkingIndicator />}
-            {artifacts?.some(
-              artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
-            ) && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {artifacts
-                  .filter(
-                    artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
-                  )
-                  .map(artifact => (
-                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
-                  ))}
+            {/* 2026/09/17 lixiang  文件卡片与复制按钮上下间距收紧 */}
+            {(hasDeliverableArtifacts || copyContent) && (
+              <div className="-mt-1 flex flex-col gap-1">
+                {hasDeliverableArtifacts && artifacts && (
+                  <div className="flex flex-wrap gap-2">
+                    {artifacts
+                      .filter(
+                        artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
+                      )
+                      .map(artifact => (
+                        <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                      ))}
+                  </div>
+                )}
+                {copyContent && (
+                  <div className="flex items-center gap-1">
+                    <CopyButton content={copyContent} visible />
+                  </div>
+                )}
               </div>
             )}
           </div>
