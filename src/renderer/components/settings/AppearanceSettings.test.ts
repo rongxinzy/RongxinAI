@@ -24,7 +24,10 @@ function systemAppearance() {
   return {
     query,
     change(dark: boolean) {
-      act(() => { query.matches = dark; events.dispatchEvent(new Event('change')); });
+      act(() => {
+        query.matches = dark;
+        events.dispatchEvent(new Event('change'));
+      });
     },
   };
 }
@@ -41,19 +44,23 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   const callbacks = props();
   const view = render(createElement(AppearanceSettings, callbacks));
   expect(view.container.querySelectorAll('[data-theme-preview]')).toHaveLength(themePlugins.length);
-  expect(screen.getByRole('button', { name: 'Codex' })).toHaveAttribute('aria-pressed', 'true');
-  const daming = screen.getByRole('button', { name: 'Daming Fenghua' });
+  expect(screen.getByRole('button', { name: /Codex/i })).toHaveAttribute('aria-pressed', 'true');
+  const daming = screen.getByRole('button', { name: /Daming Fenghua/i });
   daming.focus();
   await userEvent.setup().keyboard('{Enter}');
   await vi.waitFor(() => expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming'));
   expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
-  expect(screen.getByRole('tablist', { name: 'appearanceMode' }).querySelector('[data-theme-preview]')).toBeNull();
-  await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
+  expect(
+    screen.getByRole('radiogroup', { name: 'appearanceMode' }).querySelector('[data-theme-preview]'),
+  ).toBeNull();
+  await userEvent.setup().click(screen.getByRole('radio', { name: 'dark' }));
   expect(callbacks.onAppearanceChange).toHaveBeenCalledWith('dark');
-  view.rerender(createElement(AppearanceSettings, { ...callbacks, appearance: 'dark', styleId: 'daming' }));
+  view.rerender(
+    createElement(AppearanceSettings, { ...callbacks, appearance: 'dark', styleId: 'daming' }),
+  );
   expect(view.container.querySelector('[data-theme-preview="classic-dark"]')).not.toBeNull();
   expect(view.container.querySelector('[data-theme-preview="daming-dark"]')).not.toBeNull();
-  expect(screen.getByRole('button', { name: 'Daming Fenghua' })).toBe(daming);
+  expect(screen.getByRole('button', { name: /Daming Fenghua/i })).toBe(daming);
   expect(daming).toHaveAttribute('aria-pressed', 'true');
 });
 
@@ -62,7 +69,7 @@ test('shows an applying spinner on the selected style before the change runs', (
   systemAppearance();
   const callbacks = props();
   const view = render(createElement(AppearanceSettings, callbacks));
-  const daming = screen.getByRole('button', { name: 'Daming Fenghua' });
+  const daming = screen.getByRole('button', { name: /Daming Fenghua/i });
 
   act(() => {
     fireEvent.click(daming);
@@ -71,7 +78,7 @@ test('shows an applying spinner on the selected style before the change runs', (
   expect(callbacks.onStyleChange).not.toHaveBeenCalled();
   expect(daming).toHaveAttribute('aria-busy', 'true');
   expect(daming).toHaveAttribute('aria-pressed', 'true');
-  expect(screen.getByText('themeStyleApplying')).toBeTruthy();
+  expect(daming.querySelector('[data-slot="spinner"]')).toBeTruthy();
 
   act(() => {
     vi.runAllTimers();
@@ -91,7 +98,10 @@ test('system mode updates all previews live while explicit mode stays fixed and 
   const system = systemAppearance();
   const callbacks = props();
   const view = render(createElement(AppearanceSettings, { ...callbacks, appearance: 'system' }));
-  const previews = () => Array.from(view.container.querySelectorAll('[data-theme-preview]'), e => e.getAttribute('data-theme-preview'));
+  const previews = () =>
+    Array.from(view.container.querySelectorAll('[data-theme-preview]'), e =>
+      e.getAttribute('data-theme-preview'),
+    );
   expect(previews()).toEqual(themePlugins.map(p => p.appearances.light.meta.id));
   system.change(true);
   expect(previews()).toEqual(themePlugins.map(p => p.appearances.dark.meta.id));
