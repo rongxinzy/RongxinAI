@@ -366,3 +366,9 @@ export const NetworkIpc = {
   StatusChange: 'network:status-change',
 } as const;
 export type NetworkIpc = (typeof NetworkIpc)[keyof typeof NetworkIpc];
+
+// 2026/09/17 lixiang  开发态主进程 HTTP → 渲染进程 Network beacon
+export const DevNetworkIpc = {
+  Entry: 'dev-network:entry',
+} as const;
+export type DevNetworkIpc = (typeof DevNetworkIpc)[keyof typeof DevNetworkIpc];

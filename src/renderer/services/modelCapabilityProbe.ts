@@ -3,6 +3,7 @@ import {
   ModelCapabilityStatus,
   ProviderName,
 } from '../../shared/providers';
+import { apiFetch } from './visibleApiTransport';
 
 type CapabilityProbeConfig = {
   apiKey: string;
@@ -114,7 +115,7 @@ export async function probeRuntimeModelCapabilities(
 ): Promise<Partial<ModelCapabilities>> {
   try {
     if (provider === ProviderName.OpenRouter) {
-      const response = await window.electron.api.fetch({
+      const response = await apiFetch({
         url: buildOpenRouterModelsUrl(config.baseUrl),
         method: 'GET',
         headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
