@@ -8,16 +8,28 @@
       "skillMapping": "pptx",
       "prompts": [
         {
-          "id": "pptx-work-report"
+          "id": "pptx-work-report",
+          "preview": "./case-previews/pptx-work-report.webp"
         },
         {
-          "id": "pptx-content-research"
+          "id": "pptx-content-research",
+          "preview": "./case-previews/pptx-content-research.webp"
         },
         {
-          "id": "pptx-education"
+          "id": "pptx-education",
+          "preview": "./case-previews/pptx-education.webp"
         },
         {
-          "id": "pptx-ai-intro"
+          "id": "pptx-ai-intro",
+          "preview": "./case-previews/pptx-ai-intro.webp"
+        },
+        {
+          "id": "pptx-product-plan",
+          "preview": "./case-previews/pptx-product-plan.webp"
+        },
+        {
+          "id": "pptx-training",
+          "preview": "./case-previews/pptx-training.webp"
         }
       ]
     },
@@ -28,16 +40,28 @@
       "skillMapping": "xlsx",
       "prompts": [
         {
-          "id": "excel-summary"
+          "id": "excel-summary",
+          "preview": "./case-previews/excel-summary.webp"
         },
         {
-          "id": "image-to-excel"
+          "id": "image-to-excel",
+          "preview": "./case-previews/image-to-excel.webp"
         },
         {
-          "id": "word-report"
+          "id": "word-report",
+          "preview": "./case-previews/word-report.webp"
         },
         {
-          "id": "multi-excel-merge"
+          "id": "multi-excel-merge",
+          "preview": "./case-previews/multi-excel-merge.webp"
+        },
+        {
+          "id": "excel-reconcile",
+          "preview": "./case-previews/excel-reconcile.webp"
+        },
+        {
+          "id": "excel-budget",
+          "preview": "./case-previews/excel-budget.webp"
         }
       ]
     },
@@ -48,16 +72,28 @@
       "skillMapping": "frontend-design",
       "prompts": [
         {
-          "id": "edu-english-words"
+          "id": "edu-english-words",
+          "preview": "./case-previews/edu-english-words.webp"
         },
         {
-          "id": "edu-math-explain"
+          "id": "edu-math-explain",
+          "preview": "./case-previews/edu-math-explain.webp"
         },
         {
-          "id": "edu-essay-writing"
+          "id": "edu-essay-writing",
+          "preview": "./case-previews/edu-essay-writing.webp"
         },
         {
-          "id": "edu-knowledge-explain"
+          "id": "edu-knowledge-explain",
+          "preview": "./case-previews/edu-knowledge-explain.webp"
+        },
+        {
+          "id": "edu-study-plan",
+          "preview": "./case-previews/edu-study-plan.webp"
+        },
+        {
+          "id": "edu-mistake-review",
+          "preview": "./case-previews/edu-mistake-review.webp"
         }
       ]
     },
@@ -68,16 +104,40 @@
       "skillMapping": "frontend-design",
       "prompts": [
         {
-          "id": "web-resume"
+          "id": "web-resume",
+          "preview": "./case-previews/web-resume.webp"
         },
         {
-          "id": "web-store"
+          "id": "web-store",
+          "preview": "./case-previews/web-store.webp"
         },
         {
-          "id": "web-event"
+          "id": "web-event",
+          "preview": "./case-previews/web-event.webp"
         },
         {
-          "id": "web-survey"
+          "id": "web-product-launch",
+          "preview": "./case-previews/web-product-launch.webp"
+        },
+        {
+          "id": "web-ops-console",
+          "preview": "./case-previews/web-ops-console.webp"
+        },
+        {
+          "id": "web-survey",
+          "preview": "./case-previews/web-survey.webp"
+        },
+        {
+          "id": "web-game-snake",
+          "preview": "./case-previews/web-game-snake.webp"
+        },
+        {
+          "id": "web-game-2048",
+          "preview": "./case-previews/web-game-2048.webp"
+        },
+        {
+          "id": "web-game-typing",
+          "preview": "./case-previews/web-game-typing.webp"
         }
       ]
     },
@@ -88,10 +148,30 @@
       "skillMapping": "deep-research",
       "skillIds": ["deep-research", "web-search"],
       "prompts": [
-        { "id": "research-industry" },
-        { "id": "research-competitors" },
-        { "id": "research-policy" },
-        { "id": "research-literature" }
+        {
+          "id": "research-industry",
+          "preview": "./case-previews/research-industry.webp"
+        },
+        {
+          "id": "research-competitors",
+          "preview": "./case-previews/research-competitors.webp"
+        },
+        {
+          "id": "research-policy",
+          "preview": "./case-previews/research-policy.webp"
+        },
+        {
+          "id": "research-literature",
+          "preview": "./case-previews/research-literature.webp"
+        },
+        {
+          "id": "research-user",
+          "preview": "./case-previews/research-user.webp"
+        },
+        {
+          "id": "research-market-entry",
+          "preview": "./case-previews/research-market-entry.webp"
+        }
       ]
     },
     {
@@ -101,10 +181,30 @@
       "skillMapping": "deli-autoresearch",
       "skillIds": ["deli-autoresearch", "deep-research", "web-search"],
       "prompts": [
-        { "id": "academic-outline" },
-        { "id": "academic-review" },
-        { "id": "academic-method" },
-        { "id": "academic-polish" }
+        {
+          "id": "academic-outline",
+          "preview": "./case-previews/academic-outline.webp"
+        },
+        {
+          "id": "academic-review",
+          "preview": "./case-previews/academic-review.webp"
+        },
+        {
+          "id": "academic-method",
+          "preview": "./case-previews/academic-method.webp"
+        },
+        {
+          "id": "academic-polish",
+          "preview": "./case-previews/academic-polish.webp"
+        },
+        {
+          "id": "academic-data-analysis",
+          "preview": "./case-previews/academic-data-analysis.webp"
+        },
+        {
+          "id": "academic-grant",
+          "preview": "./case-previews/academic-grant.webp"
+        }
       ]
     },
     {
@@ -113,10 +213,30 @@
       "color": "#B45309",
       "skillMapping": "docx",
       "prompts": [
-        { "id": "docs-meeting" },
-        { "id": "docs-report" },
-        { "id": "docs-summary" },
-        { "id": "docs-polish" }
+        {
+          "id": "docs-meeting",
+          "preview": "./case-previews/docs-meeting.webp"
+        },
+        {
+          "id": "docs-report",
+          "preview": "./case-previews/docs-report.webp"
+        },
+        {
+          "id": "docs-summary",
+          "preview": "./case-previews/docs-summary.webp"
+        },
+        {
+          "id": "docs-polish",
+          "preview": "./case-previews/docs-polish.webp"
+        },
+        {
+          "id": "docs-prd",
+          "preview": "./case-previews/docs-prd.webp"
+        },
+        {
+          "id": "docs-notice",
+          "preview": "./case-previews/docs-notice.webp"
+        }
       ]
     }
   ]

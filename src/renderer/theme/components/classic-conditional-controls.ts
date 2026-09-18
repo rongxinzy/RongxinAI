@@ -578,28 +578,35 @@ export function classicConditionalControls(dark: boolean) {
       base: { 'background-color': 'color-mix(in oklab, var(--muted) 30%, transparent)' },
     }),
     'page-models-panel-card-variant-4': recipe({ base: { opacity: '0.5' } }),
-    'page-prompt-panel-button-variant-1': recipe({
+    // Case tiles carry a thumbnail and a caption, nothing else: the frame would fight the
+    // artwork inside it. The tile is transparent at rest and paints a rounded surface on
+    // hover or selection, so the preview stays the only solid block in the cell.
+    'page-case-gallery-card': recipe({
       base: {
-        'background-color': 'var(--zy-primary-muted)',
-        'border-color': 'color-mix(in srgb,var(--zy-primary) 50%,transparent)',
-      },
-    }),
-    'page-prompt-panel-button-variant-2': recipe({
-      base: { 'background-color': 'var(--zy-surface)', 'border-color': 'var(--zy-border)' },
-      hover: { 'border-color': 'var(--zy-border)', 'background-color': 'var(--zy-surface-raised)' },
-    }),
-    'page-prompt-panel-button-variant-3': recipe({
-      base: {
-        gap: '0.375rem',
-        'padding-inline': '0.875rem',
-        'padding-block': '0.75rem',
+        padding: '0.75rem',
+        gap: '0.5rem',
+        'border-style': 'none',
+        'background-color': 'transparent',
         'border-radius': 'var(--zy-style-radius-lg)',
-        'border-width': '1px',
-        'border-style': 'solid',
-        'transition-property': 'color, background-color, border-color, box-shadow',
+        'transition-property': 'background-color',
         'transition-duration': '200ms',
-        height: 'auto',
+        'transition-timing-function': 'ease-out',
       },
+      hover: { 'background-color': 'var(--zy-surface-raised)' },
+      selected: { 'background-color': 'var(--zy-primary-muted)' },
+      pressed: { translate: '0 1px' },
+      focus: {
+        'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
+      },
+    }),
+    'page-case-gallery-media': recipe({
+      base: {
+        'background-color': 'var(--muted)',
+        'border-radius': 'var(--zy-style-radius-md)',
+      },
+    }),
+    'page-case-gallery-body': recipe({
+      base: { gap: '0.25rem' },
     }),
     'page-date-input-button-variant-1': recipe({
       base: {

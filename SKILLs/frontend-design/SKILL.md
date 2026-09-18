@@ -21,6 +21,34 @@ The user provides frontend requirements: a component, page, application, or inte
 4. When screenshots or an approved site are supplied, use [reference mode](references/reference-mode.md) before selecting a direction. Extract a design system; never copy protected logos, artwork, or a page screenshot.
 5. Build the hero and one representative dense section first. Render desktop and mobile, review with [the visual rubric](references/visual-review.md), revise the contract, then complete the site.
 
+## Case templates（案例模板）
+
+`templates/` holds complete, self-contained reference implementations that ship with this skill.
+
+Each template is a single offline-safe HTML file with one strict split:
+
+- **Structure, CSS and interaction are frozen.** The `<style>` block and the body skeleton are the design. Do not rewrite them.
+- **All copy, numbers and color roles live in one `TEMPLATE` object** at the top of the `<script>` block, inside the region marked `可编辑区`. A render layer underneath fills the DOM from it.
+- **Each template ships an `info.md`** next to it holding the field table, per-field length limits, design prohibitions and asset rules. Read that file before editing.
+
+Workflow when the user picks a case: read the template file, read its `info.md`, copy the HTML file as the deliverable, then change **only** the `TEMPLATE` object. Keep the section order, grid, type scale and interaction model. Hue and type may be tuned within the same design language; do not swap in a different direction, and never ship the sample copy.
+
+| Template | Direction | Fits | Contract |
+| --- | --- | --- | --- |
+| `templates/web-product-launch.html` | Swiss grid: strictly aligned columns, hairline rules, oversized numerals, high-contrast neutrals with one signal color, square shapes | product launch pages, technical explainers | `templates/web-product-launch.info.md` |
+| `templates/web-ops-console.html` | Low-noise console: light ground with white panels, semantic status colors, exception-first data hierarchy, tabular numerals | operations dashboards, admin panels, monitoring | `templates/web-ops-console.info.md` |
+| `templates/web-resume.html` | Editorial resume: paper ground, oversized serif name, letterspaced role line, ruled entry grid, hairline skill bars | personal resumes, portfolios, freelance profiles | `templates/web-resume.info.md` |
+| `templates/web-store.html` | Craft catalog: cool bone ground, olive and brick accent pair, CSS-drawn vessel still life with an overlapping info card, ruled group headings, dotted price leaders | ceramics, cafés, bakeries, florists, local retail | `templates/web-store.info.md` |
+| `templates/web-event.html` | Night invitation: plum-black ground with one rose accent, centered narrow measure, four-unit countdown, ruled schedule, underlined fields | birthdays, weddings, house warmings, RSVP pages | `templates/web-event.info.md` |
+| `templates/web-survey.html` | Focused form document: sticky hairline progress bar, numbered questions, drawn choice marks, square fields | questionnaires, intake forms, sign-ups | `templates/web-survey.info.md` |
+| `templates/web-game-snake.html` | Phosphor arcade: near-black olive ground, one mint accent, canvas board with a gradient snake and eyes, three speed steps, run history | single-file mini-games, arcade interaction | `templates/web-game-snake.info.md` |
+| `templates/web-game-2048.html` | Slate board with a single-hue cobalt tile ladder, fluid cell size, live score and best, one-step undo, ladder legend | number-merging and grid puzzle games | `templates/web-game-2048.info.md` |
+| `templates/web-game-typing.html` | Typing drill: cool paper ground, one deep teal accent, monospace passage with per-character states, metric strip, result card | typing drills, speed tests, text games | `templates/web-game-typing.info.md` |
+
+Templates constrain visual and structural direction only. Content, data, and brand names must come from the request. Every template is offline-safe: no external requests and no webfonts. Two game templates read and write one best-score key in `localStorage`; every such call is wrapped in `try/catch`, because the in-app artifact preview runs the file in a sandboxed iframe where storage access throws. Keep both properties in any variant you build.
+
+For cases without a template, choose a direction from [design archetypes](references/design-archetypes.md) as before.
+
 ## Design Thinking
 
 Before coding, understand the context and commit to a BOLD aesthetic direction:

@@ -90,6 +90,7 @@ export class QuickActionService {
             label: promptI18n?.label || prompt.id,
             description: promptI18n?.description,
             prompt: promptI18n?.prompt || '',
+            preview: prompt.preview,
           };
         }),
       };

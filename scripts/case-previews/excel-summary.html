@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-summary</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
+.file{font-weight:600;margin-left:6px}
+.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
+.grid{flex:1;min-height:0;overflow:hidden}
+.row{display:grid;border-top:1px solid #edede9}
+.row:first-child{border-top:0}
+.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
+.row:last-child .cell{border-bottom:0}
+.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
+.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
+.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
+.split{flex:1;display:grid;grid-template-columns:1.15fr 1fr;min-height:0}
+.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
+.pane:last-child{border-right:0}
+.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
+.bars{margin-top:16px;display:grid;gap:11px}
+.bar{display:grid;grid-template-columns:56px 1fr 44px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
+.shot{margin-top:14px;border:1px dashed #cfcfc9;background:#fafaf8;height:190px;padding:14px;display:flex;align-items:center;justify-content:center}
+.shot table{border-collapse:collapse;font-size:11px;color:#6f737b;background:#fff}
+.shot td,.shot th{border:1px solid #e4e4e0;padding:5px 9px}
+.arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:#b6bac0}
+.files{display:grid;gap:10px;margin-top:14px}
+.fcard{display:flex;align-items:center;gap:10px;border:1px solid #e4e4e0;background:#fafaf8;padding:10px 12px;font-size:12.5px}
+.fcard b{margin-left:auto;color:#6f737b;font-weight:500}
+.fcard .tag{background:#eceae4;color:#6f737b;font-size:11px;padding:2px 7px}
+.doc{background:#fff;border:1px solid #e4e4e0;height:100%;padding:22px 26px;overflow:hidden}
+.doc h2{font-size:19px}
+.doc .meta{margin-top:8px;font-size:11.5px;color:#9a9ea6}
+.doc p{margin-top:12px;font-size:12.5px;color:#4c5058;line-height:1.85}
+.doc .chart{margin-top:14px;height:96px;border:1px solid #edede9;background:linear-gradient(180deg,#fff,#fafaf8);display:flex;align-items:flex-end;gap:8px;padding:12px}
+.doc .chart i{flex:1;background:var(--accent);opacity:.8}
+.doc ul{margin-top:12px;list-style:none;display:grid;gap:6px}
+.doc li{font-size:12.5px;color:#4c5058;padding-left:14px;position:relative}
+.doc li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+</style></head><body>
+<div class="win" style="--accent:#8B5CF6">
+  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="file">销售明细_2026Q3.xlsx</span>
+    <span class="menu"><span>开始</span><span>插入</span><span>数据</span><span>公式</span></span>
+  </div>
+  <div class="split">
+    <div class="grid">
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx"></div><div class="cell head">区域</div><div class="cell head">订单数</div><div class="cell head">金额（元）</div><div class="cell head">环比</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx">2</div><div class="cell">华东</div><div class="cell mono">8,642</div><div class="cell mono">3,148,920</div><div class="cell mono">+12.4%</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx">3</div><div class="cell">华南</div><div class="cell mono">6,118</div><div class="cell mono">2,204,310</div><div class="cell mono">+6.8%</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx">4</div><div class="cell">华北</div><div class="cell mono">5,204</div><div class="cell mono">1,876,540</div><div class="cell mono">-2.1%</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx">5</div><div class="cell">西南</div><div class="cell mono">3,271</div><div class="cell mono">1,042,880</div><div class="cell mono">+18.9%</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx">6</div><div class="cell">西北</div><div class="cell mono">1,906</div><div class="cell mono">612,470</div><div class="cell mono">+4.2%</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
+        <div class="cell idx">7</div><div class="cell total">合计</div><div class="cell total mono">25,141</div><div class="cell total mono">8,885,120</div><div class="cell total mono">+8.6%</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">8</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">9</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">10</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
+    </div>
+    <div class="pane">
+      <h3>按区域汇总</h3>
+      <div class="bars">
+        <div class="bar"><span>华东</span><i style="width:100%"></i><span class="mono">314.9</span></div>
+        <div class="bar"><span>华南</span><i style="width:70%"></i><span class="mono">220.4</span></div>
+        <div class="bar"><span>华北</span><i style="width:60%"></i><span class="mono">187.7</span></div>
+        <div class="bar"><span>西南</span><i style="width:33%"></i><span class="mono">104.3</span></div>
+        <div class="bar"><span>西北</span><i style="width:19%"></i><span class="mono">61.2</span></div>
+      </div>
+      <h3 style="margin-top:24px">一句话结论</h3>
+      <p style="margin-top:10px;font-size:12.5px;color:#4c5058;line-height:1.8">华东与西南环比增速高于整体，华北出现负增长，需要单独复盘渠道结构。</p>
+    </div>
+  </div>
+</div></body></html>

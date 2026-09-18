@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-review</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:32px;background:#eceae4}
+.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
+.ptitle{font-size:23px;text-align:center;line-height:1.4}
+.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
+.abstract{margin-top:18px;border:1px solid #eeede7;background:#faf9f6;padding:14px 18px}
+.abstract h4{font-size:11px;letter-spacing:.2em;color:#8b8f97}
+.abstract p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+.keywords{margin-top:10px;font-size:11.5px;color:#8b8f97}
+.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:12px}
+.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
+.sec b{font-weight:600}
+.lv2{padding-left:22px}
+.lv3{padding-left:44px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.flow i{color:#b8b5ab;font-style:normal}
+.redline{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.redline .col h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.redline .col p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px}
+.reasons{margin-top:12px;display:grid;gap:7px}
+.reasons div{font-size:12px;color:#4c5058;padding-left:14px;position:relative}
+.reasons div::before{content:"·";position:absolute;left:2px;color:#b8b5ab}
+.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+</style></head><body>
+<div class="page" style="--accent:#7C3AED">
+  <div class="ptitle serif">端侧推理研究脉络整理（2019 — 2026）</div>
+  <div class="authors">纳入 68 篇文献 · 按方法与结论两个维度归类</div>
+  <div class="sections">
+    <table>
+      <tr><th>文献</th><th>方法</th><th>核心结论</th><th>可借鉴点</th></tr>
+      <tr><td class="mono">Liu 2023</td><td>量化 + 蒸馏</td><td>4bit 量化损失可控</td><td>精度与体积的取舍曲线</td></tr>
+      <tr><td class="mono">Chen 2024</td><td>任务级评测</td><td>通用榜单与业务表现弱相关</td><td>评测集需按任务构建</td></tr>
+      <tr><td class="mono">Wang 2025</td><td>流程实验</td><td>加入审批环节后落地率提升</td><td>把回溯做进流程</td></tr>
+      <tr><td class="mono">Zhao 2025</td><td>案例研究</td><td>数据不出域是决策硬约束</td><td>合规说明前置</td></tr>
+      <tr><td class="mono">Sun 2026</td><td>纵向跟踪</td><td>混合部署长期成本更低</td><td>分阶段迁移路径</td></tr>
+      <tr><td class="mono">Li 2026</td><td>工具链评测</td><td>接入成本决定试点能否转正式</td><td>把接入步骤做成一键化</td></tr>
+      <tr><td class="mono">Guo 2026</td><td>访谈研究</td><td>审计记录是采购方最常索要的材料</td><td>默认开启操作留痕</td></tr>
+    </table>
+    <div class="redline" style="grid-template-columns:1fr">
+      <div class="col"><h4>研究缺口</h4>
+        <p>已有研究多在实验室条件下比较模型能力，缺少对"团队协作流程改动"的长期观察，也少有把审批、回溯与评测放在同一框架内的研究。</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>检索式：端侧推理 AND 协作流程</span><span>更新于 2026-09</span></div>
+</div></body></html>

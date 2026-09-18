@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-grant</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:32px;background:#eceae4}
+.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
+.ptitle{font-size:23px;text-align:center;line-height:1.4}
+.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.flow i{color:#b8b5ab;font-style:normal}
+.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
+.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:13px;align-content:start}
+h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+ul{list-style:none;margin-top:8px;display:grid;gap:6px}
+li{position:relative;padding-left:14px;font-size:12px;color:#4c5058;line-height:1.85}
+li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.lv2{padding-left:26px}
+.timeline{display:grid;gap:0;margin-top:8px}
+.tl{display:grid;grid-template-columns:78px 1fr;gap:12px;padding:8px 0;border-top:1px solid #eeede7;font-size:12px;color:#4c5058}
+.tl:first-child{border-top:0}
+.tl b{color:var(--accent);font-weight:600}
+</style></head><body>
+<div class="page" style="--accent:#7C3AED">
+  <div class="ptitle serif">研究计划书要点（开题报告）</div>
+  <div class="authors">拟申报：青年科学基金 · 研究周期 2027 年 1 月至 2029 年 12 月</div>
+  <div class="sections">
+    <div>
+      <h4>立项依据</h4>
+      <p>本地优先部署已从实验场景进入生产环节，但现有研究对"流程改动如何影响落地成效"缺少长期观察。本课题以中型团队为对象，围绕任务边界与审批回溯两个变量，构建可测量的流程框架并做纵向验证。</p>
+    </div>
+    <div>
+      <h4>研究内容</h4>
+      <ul>
+        <li>内容一：任务边界与角色划分的建模方法</li>
+        <li class="lv2">关键问题：如何把模糊的协作约定转化为可执行的任务边界</li>
+        <li>内容二：审批与回溯机制的设计与代价评估</li>
+        <li class="lv2">关键问题：回溯粒度与运行成本之间的平衡点在哪里</li>
+        <li>内容三：流程改动的纵向成效评估</li>
+        <li class="lv2">关键问题：如何在真实组织中排除短期学习效应</li>
+      </ul>
+    </div>
+    <div>
+      <h4>技术路线</h4>
+      <div class="flow"><span>文献与案例梳理</span><i>→</i><span>框架设计</span><i>→</i><span>原型实现</span><i>→</i><span>现场实验</span><i>→</i><span>结果分析与修正</span></div>
+    </div>
+    <div>
+      <h4>进度安排与预期成果</h4>
+      <div class="timeline">
+        <div class="tl"><b>2027 年</b><span>完成文献综述与框架设计，形成工作论文 1 篇</span></div>
+        <div class="tl"><b>2028 年</b><span>完成原型实现与两轮现场实验，投稿期刊论文 1 篇</span></div>
+        <div class="tl"><b>2029 年</b><span>完成纵向跟踪与结果修正，形成结题报告与工具包</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>预期成果：论文 2 篇 · 原型系统 1 套</span><span>申请经费：32 万元</span></div>
+</div></body></html>

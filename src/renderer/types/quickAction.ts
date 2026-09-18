@@ -9,6 +9,8 @@
 export interface Prompt {
   /** 唯一标识 */
   id: string;
+  /** 案例缩略图路径（相对应用根）；缺失时案例卡片不渲染预览区 */
+  preview?: string;
 }
 
 /**
@@ -23,6 +25,8 @@ export interface LocalizedPrompt {
   description?: string;
   /** 完整提示词内容 */
   prompt: string;
+  /** 案例缩略图路径 */
+  preview?: string;
 }
 
 /**

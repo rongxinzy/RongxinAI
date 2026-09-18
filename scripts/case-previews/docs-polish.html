@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-polish</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
+.title{font-size:23px;letter-spacing:-.01em}
+.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
+h3{margin-top:16px;font-size:13.5px}
+p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+ul{list-style:none;margin-top:10px;display:grid;gap:7px}
+li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
+.pane{min-width:0;overflow:hidden}
+.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.dense{margin-top:10px;font-size:11px;line-height:1.95;color:#6f737b;text-align:justify}
+.card{border:1px solid #edede9;background:#fafaf8;padding:16px 18px;margin-top:10px}
+.card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.card p{margin-top:8px;font-size:12.8px;line-height:1.85;color:#3d4046}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.07)}
+</style></head><body>
+<div class="doc" style="--accent:#B45309">
+  <div class="title">文档润色：修改对照</div>
+  <div class="meta"><span>原文 1,240 字</span><span>修改 23 处</span><span>结论未变</span></div>
+  <div class="split" style="margin-top:16px">
+    <div class="pane">
+      <h4>修改前</h4>
+      <p class="dense">本季度我们的工作整体上做得还不错，各项指标基本上都完成了。首先我们在商家侧做了一些优化，<del>把原来比较慢的地方改快了一点</del>，人均处理量提升了不少。另外我们也<del>搞了一个</del>指标口径表，把各个业务线的口径统一了起来，这样大家看数的时候就不会打架了。当然也<del>有一些问题</del>，比如华北区域的增长不太好，我们后面会去看看原因。</p>
+    </div>
+    <div class="pane">
+      <h4>修改后</h4>
+      <p class="dense">本季度各项核心指标均达成目标。其中，<ins>商家侧任务分派链路完成重构，人均日处理量由 40 单提升至 128 单</ins>；同时<ins>建立</ins>经营指标口径表，覆盖 6 条业务线，使看板、告警与导出共用同一口径。仍存在待解问题：<ins>华北区域营收环比下降 2.1%，原因尚未完成归因，下季度将专项复盘</ins>。</p>
+      <div class="card"><div class="k">润色原则</div><p>删除程度副词与模糊表述，把"改快了一点"换成本可以核对的数字；"去看看原因"改为有交付物的"专项复盘"。</p></div>
+      <div class="card"><div class="k">未改动的部分</div><p>"各项核心指标均达成目标"保留原判断，仅把口语化的"还不错"收敛为可核对的表述。</p></div>
+    </div>
+  </div>
+</div></body></html>

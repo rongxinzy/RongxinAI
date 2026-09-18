@@ -116,6 +116,7 @@
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
     "generate:app-icons": "python3 scripts/generate-app-icons.py",
     "generate:nsis-assets": "node scripts/generate-nsis-brand-assets.cjs",
+    "generate:case-previews": "node scripts/generate-case-previews.mjs",
     "setup:mingit": "node scripts/setup-mingit.js",
     "setup:python-runtime": "node scripts/setup-python-runtime.js",
     "setup:uv-runtime": "node scripts/setup-uv-runtime.js",

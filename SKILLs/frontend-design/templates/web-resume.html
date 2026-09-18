@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --paper: #f1f1ec;
+    --ink: #1e201d;
+    --muted: #6e7168;
+    --rule: #d7d8d0;
+    --rule-strong: #1e201d;
+    --accent: #2f3e5c;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --serif: Georgia, "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", SimSun, serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --max: 1080px;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.68;
+    letter-spacing: 0.01em;
+  }
+
+  a { color: inherit; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; transition: color 160ms ease, text-decoration-color 160ms ease; }
+  a:hover { color: var(--accent); text-decoration-color: var(--accent); }
+  h1, h2, h3, p, ul, figure { margin: 0; }
+  ul { padding: 0; list-style: none; }
+
+  .wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 40px; }
+
+  .skip { position: absolute; left: -9999px; background: var(--ink); color: var(--paper); padding: 10px 16px; z-index: 20; }
+  .skip:focus { left: 12px; top: 12px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ── 抬头 ─────────────────────────────────────────────── */
+  .masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: clamp(28px, 5vw, 72px);
+    align-items: end;
+    padding-top: clamp(44px, 6vh, 78px);
+  }
+
+  .name {
+    font-family: var(--serif);
+    font-size: clamp(40px, 5.2vw, 60px);
+    line-height: 1.04;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    margin-left: -0.06em;
+  }
+
+  .role-line {
+    margin-top: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .intro {
+    margin-top: 20px;
+    max-width: 46ch;
+    color: var(--muted);
+    text-wrap: pretty;
+  }
+
+  .contact { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+  .contact-row {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr);
+    gap: 12px;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .contact-key { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; color: var(--muted); }
+  .contact-value { font-size: 14px; text-align: right; word-break: break-all; }
+
+  .masthead-rule { margin-top: 34px; border-top: 2px solid var(--rule-strong); }
+
+  /* ── 区块 ─────────────────────────────────────────────── */
+  .section { padding-top: 54px; }
+
+  .section-head { display: flex; align-items: center; gap: 18px; }
+  .section-head h2 {
+    font-family: var(--serif);
+    font-size: 21px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .section-head::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--rule); }
+
+  /* ── 简介 ─────────────────────────────────────────────── */
+  .summary { margin-top: 24px; max-width: 62ch; }
+
+  /* ── 工作经历 ─────────────────────────────────────────── */
+  .jobs { margin-top: 26px; }
+
+  .job {
+    display: grid;
+    grid-template-columns: 118px minmax(0, 1fr);
+    gap: clamp(18px, 3vw, 40px);
+    padding: 26px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .job:first-child { padding-top: 8px; }
+  .job:last-child { border-bottom: 0; padding-bottom: 0; }
+
+  .period { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: var(--muted); white-space: nowrap; }
+
+  .job-company { font-size: 17px; font-weight: 600; }
+  .job-role { font-size: 13.5px; color: var(--accent); margin-top: 3px; }
+
+  .points { margin-top: 14px; }
+  .points li {
+    position: relative;
+    padding-left: 18px;
+    color: var(--ink);
+    max-width: 62ch;
+  }
+  .points li + li { margin-top: 7px; }
+  .points li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0.72em;
+    width: 9px; height: 1px;
+    background: var(--rule-strong);
+  }
+
+  /* ── 项目 ─────────────────────────────────────────────── */
+  .projects {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    margin-top: 26px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .project { padding: 22px 24px 26px 0; }
+  .project + .project { padding-left: 24px; border-left: 1px solid var(--rule); }
+
+  .project-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .project-name { font-family: var(--serif); font-size: 17px; }
+  .project-year { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .project-note { margin-top: 12px; color: var(--muted); font-size: 13.5px; }
+
+  /* ── 技能 ─────────────────────────────────────────────── */
+  .skills { margin-top: 22px; }
+
+  .skill {
+    display: grid;
+    grid-template-columns: 168px minmax(0, 1fr) 92px;
+    gap: clamp(14px, 2.4vw, 30px);
+    align-items: center;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .skill:last-child { border-bottom: 0; }
+  .skill-label { font-size: 14.5px; }
+
+  .skill-track { position: relative; height: 1px; background: var(--rule); }
+  .skill-fill { position: absolute; left: 0; top: -0.5px; height: 2px; background: var(--accent); }
+
+  .skill-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+
+  /* ── 教育 ─────────────────────────────────────────────── */
+  .education { margin-top: 20px; }
+
+  .edu {
+    display: grid;
+    grid-template-columns: 118px minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: clamp(16px, 3vw, 40px);
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .edu:last-child { border-bottom: 0; }
+  .edu-title { font-size: 14.5px; }
+  .edu-place { font-size: 13.5px; color: var(--muted); }
+
+  /* ── 页脚 ─────────────────────────────────────────────── */
+  .foot { margin-top: 64px; border-top: 2px solid var(--rule-strong); }
+  .foot-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding: 20px 0 56px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .foot-note { font-family: var(--mono); letter-spacing: 0.04em; }
+
+  /* ── 响应式 ───────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .wrap { padding: 0 24px; }
+    .masthead { grid-template-columns: 1fr; align-items: start; }
+    .contact-value { text-align: left; }
+    .job { grid-template-columns: 1fr; gap: 8px; }
+    .job:first-child { padding-top: 20px; }
+    .projects { grid-template-columns: 1fr; }
+    .project { padding: 20px 0; }
+    .project + .project { padding-left: 0; border-left: 0; border-top: 1px solid var(--rule); }
+    .skill { grid-template-columns: minmax(0, 1fr) 92px; gap: 12px; }
+    .skill-track { grid-column: 1 / -1; }
+    .edu { grid-template-columns: 1fr; gap: 4px; }
+    .period, .edu-period { white-space: normal; }
+    .foot { margin-top: 48px; }
+    .foot-inner { padding-bottom: 40px; }
+  }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 0 18px; }
+    .name { letter-spacing: 0.04em; margin-left: -0.04em; }
+    .contact-row { grid-template-columns: 56px minmax(0, 1fr); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+
+  /* ── 打印 ─────────────────────────────────────────────── */
+  @media print {
+    :root { --paper: #ffffff; --rule: #cccccc; --muted: #555555; }
+    body { font-size: 11.5pt; line-height: 1.5; }
+    .skip { display: none; }
+    .wrap { max-width: none; padding: 0 14mm; }
+    .masthead { padding-top: 0; }
+    .section { padding-top: 22px; }
+    .job, .project, .edu, .skill { break-inside: avoid; page-break-inside: avoid; }
+    .foot-inner { padding-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<main id="main" class="wrap">
+  <header class="masthead">
+    <div>
+      <h1 class="name" id="person-name"></h1>
+      <p class="role-line" id="person-role"></p>
+      <p class="intro" id="person-intro"></p>
+    </div>
+    <div class="contact" id="person-contact"></div>
+  </header>
+  <div class="masthead-rule" aria-hidden="true"></div>
+
+  <section class="section">
+    <div class="section-head"><h2 id="summary-title"></h2></div>
+    <p class="summary" id="summary-text"></p>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2 id="jobs-title"></h2></div>
+    <div class="jobs" id="jobs"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2 id="projects-title"></h2></div>
+    <div class="projects" id="projects"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2 id="skills-title"></h2></div>
+    <div class="skills" id="skills"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2 id="education-title"></h2></div>
+    <div class="education" id="education"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-inner">
+    <span class="foot-note" id="foot-note"></span>
+    <span id="foot-contact"></span>
+  </div>
+</footer>
+
+<script>
+/* ── 可编辑区 ─────────────────────────────────────────────
+   交付时只改这一个对象；下面的渲染层与 <style> 不要动。
+   ──────────────────────────────────────────────────────── */
+const TEMPLATE = {
+  meta: {
+    lang: 'zh-CN',
+    title: '许岩的简历 · 产品经理',
+    description: '产品经理求职简历，六年后台工具与交易线经验。',
+  },
+
+  // 留空即用默认：中性纸底 + 墨蓝强调
+  theme: {},
+
+  person: {
+    name: '许岩',
+    role: '产品经理 / 六年经验',
+    intro: '做过交易、增长与后台工具三条线，习惯先把口径定下来再谈方案。',
+    contact: [
+      { key: '邮箱', value: 'xuyan@example.com' },
+      { key: '手机', value: '138 0174 2265' },
+      { key: '城市', value: '上海' },
+      { key: '作品集', value: 'xuyan.example.com' },
+    ],
+  },
+
+  summary: {
+    title: '个人简介',
+    text: '六年产品经验，主要在电商与本地生活。交给团队的东西尽量是可复用的：指标口径表、操作手册、灰度清单。近两年负责商家侧工具，把反复出现的运营动作收成配置项，人均日处理量从 40 单提到 128 单。',
+  },
+
+  jobs: {
+    title: '工作经历',
+    items: [
+      {
+        period: '2023 - 至今',
+        company: '云帆科技',
+        role: '高级产品经理 / 商家工具',
+        points: [
+          '重构商家后台的任务分配链路，人均日处理量从 40 单提升到 128 单',
+          '牵头建立经营指标口径表，覆盖 6 条业务线，看板与告警共用同一份定义',
+          '主导 3 次灰度发布流程改造，线上事故回退时间从 40 分钟压到 6 分钟',
+        ],
+      },
+      {
+        period: '2021 - 2023',
+        company: '拾光电商',
+        role: '产品经理 / 交易线',
+        points: [
+          '负责下单与优惠计算模块，两年零资损事故',
+          '把促销规则从硬编码改成配置化，运营上线一次活动的耗时从 2 天降到 20 分钟',
+          '搭起客服工单的分类体系，重复工单占比下降 34%',
+        ],
+      },
+      {
+        period: '2019 - 2021',
+        company: '青柠工作室',
+        role: '产品助理',
+        points: [
+          '完成用户访谈 120 余场，产出需求文档与原型 60 余份',
+          '维护竞品观察库，每周输出一份可执行的改进建议清单',
+        ],
+      },
+    ],
+  },
+
+  projects: {
+    title: '项目案例',
+    items: [
+      { name: '指标网格', year: '2024', note: '把散落的经营口径收拢成一张可查询的网格，看板、告警、导出共用一份定义。' },
+      { name: '商家任务台', year: '2023', note: '异常优先的任务分派界面，先圈定范围再交给人判断，夜间重复工单减半。' },
+      { name: '促销配置器', year: '2022', note: '把促销规则从代码搬进配置，运营自助上线，少等一个发布窗口。' },
+    ],
+  },
+
+  skills: {
+    title: '专业技能',
+    items: [
+      { label: '产品设计与原型', percent: 92, level: '熟练' },
+      { label: '项目管理', percent: 88, level: '熟练' },
+      { label: '数据分析 / SQL', percent: 84, level: '熟练' },
+      { label: '用户研究', percent: 76, level: '掌握' },
+      { label: '前端基础 HTML / CSS', percent: 58, level: '了解' },
+    ],
+  },
+
+  education: {
+    title: '教育背景与证书',
+    items: [
+      { period: '2015 - 2019', title: '信息管理与信息系统 学士', place: '华东师范大学' },
+      { period: '2020', title: 'PMP 项目管理认证', place: 'PMI' },
+      { period: '2022', title: '数据分析师（中级）', place: '工信人才交流中心' },
+    ],
+  },
+
+  footer: {
+    note: '更新于 2025 年，可直接打印或另存为 PDF',
+    contact: 'xuyan@example.com',
+  },
+};
+
+/* ── 渲染层（不要修改） ──────────────────────────────────── */
+(function render() {
+  const byId = id => document.getElementById(id);
+  const setText = (id, value) => {
+    const node = byId(id);
+    if (node && value != null) node.textContent = value;
+  };
+  const el = (tag, cls, text) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  };
+
+  if (TEMPLATE.meta) {
+    if (TEMPLATE.meta.lang) document.documentElement.lang = TEMPLATE.meta.lang;
+    if (TEMPLATE.meta.title) {
+      document.title = TEMPLATE.meta.title;
+      setText('doc-title', TEMPLATE.meta.title);
+    }
+    if (TEMPLATE.meta.description) {
+      const meta = byId('doc-desc');
+      if (meta) meta.setAttribute('content', TEMPLATE.meta.description);
+    }
+  }
+
+  const THEME_VARS = {
+    paper: '--paper',
+    ink: '--ink',
+    muted: '--muted',
+    rule: '--rule',
+    ruleStrong: '--rule-strong',
+    accent: '--accent',
+  };
+  const theme = TEMPLATE.theme || {};
+  Object.keys(THEME_VARS).forEach(key => {
+    const value = theme[key];
+    if (typeof value === 'string' && value) document.documentElement.style.setProperty(THEME_VARS[key], value);
+  });
+
+  const person = TEMPLATE.person || {};
+  setText('person-name', person.name);
+  setText('person-role', person.role);
+  setText('person-intro', person.intro);
+  const contact = byId('person-contact');
+  if (contact) {
+    (person.contact || []).forEach(item => {
+      const row = el('div', 'contact-row');
+      row.appendChild(el('span', 'contact-key', item.key));
+      const value = el('span', 'contact-value');
+      if (item.href) {
+        const link = el('a', null, item.value);
+        link.href = item.href;
+        value.appendChild(link);
+      } else {
+        value.textContent = item.value;
+      }
+      row.appendChild(value);
+      contact.appendChild(row);
+    });
+  }
+
+  const summary = TEMPLATE.summary || {};
+  setText('summary-title', summary.title);
+  setText('summary-text', summary.text);
+
+  const jobs = TEMPLATE.jobs || {};
+  setText('jobs-title', jobs.title);
+  const jobBox = byId('jobs');
+  if (jobBox) {
+    (jobs.items || []).forEach(job => {
+      const row = el('article', 'job');
+      row.appendChild(el('div', 'period', job.period));
+      const body = el('div', 'job-body');
+      body.appendChild(el('div', 'job-company', job.company));
+      if (job.role) body.appendChild(el('div', 'job-role', job.role));
+      if (job.points && job.points.length) {
+        const list = el('ul', 'points');
+        job.points.forEach(point => list.appendChild(el('li', null, point)));
+        body.appendChild(list);
+      }
+      row.appendChild(body);
+      jobBox.appendChild(row);
+    });
+  }
+
+  const projects = TEMPLATE.projects || {};
+  setText('projects-title', projects.title);
+  const projectBox = byId('projects');
+  if (projectBox) {
+    (projects.items || []).forEach(item => {
+      const card = el('article', 'project');
+      const head = el('div', 'project-head');
+      head.appendChild(el('h3', 'project-name', item.name));
+      head.appendChild(el('span', 'project-year', item.year));
+      card.appendChild(head);
+      card.appendChild(el('p', 'project-note', item.note));
+      projectBox.appendChild(card);
+    });
+  }
+
+  const skills = TEMPLATE.skills || {};
+  setText('skills-title', skills.title);
+  const skillBox = byId('skills');
+  if (skillBox) {
+    (skills.items || []).forEach(item => {
+      const row = el('div', 'skill');
+      row.appendChild(el('div', 'skill-label', item.label));
+      const track = el('div', 'skill-track');
+      const fill = el('div', 'skill-fill');
+      const percent = Math.max(0, Math.min(100, Number(item.percent) || 0));
+      fill.style.width = percent + '%';
+      track.appendChild(fill);
+      row.appendChild(track);
+      row.appendChild(el('div', 'skill-meta', (item.level ? item.level + ' · ' : '') + percent));
+      skillBox.appendChild(row);
+    });
+  }
+
+  const education = TEMPLATE.education || {};
+  setText('education-title', education.title);
+  const eduBox = byId('education');
+  if (eduBox) {
+    (education.items || []).forEach(item => {
+      const row = el('div', 'edu');
+      row.appendChild(el('div', 'period', item.period));
+      row.appendChild(el('div', 'edu-title', item.title));
+      row.appendChild(el('div', 'edu-place', item.place));
+      eduBox.appendChild(row);
+    });
+  }
+
+  const footer = TEMPLATE.footer || {};
+  setText('foot-note', footer.note);
+  setText('foot-contact', footer.contact);
+})();
+</script>
+</body>
+</html>

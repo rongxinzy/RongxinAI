@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-study-plan</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
+.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
+.ask p{font-size:14px;color:#3d4046;line-height:1.6}
+.ans{flex:1;min-height:0;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
+.hr{height:1px;background:#edede9}
+.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
+.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.notes{display:grid;gap:8px}
+.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+td.mono{font-variant-numeric:tabular-nums}
+.stage{color:var(--accent);font-weight:600}
+</style></head><body>
+<div class="panel" style="--accent:#10B981">
+  <div class="ask"><div class="avatar"></div><p>我三个月后要考英语四级，帮我排一份能坚持下来的学习计划。</p></div>
+  <div class="ans">
+    <div class="box"><div class="k">整体思路</div><p>把 12 周拆成打基础、练题型、模考冲刺三段，每周固定 5 次、每次 40 分钟，任务量按周递增而不是一次排满。</p></div>
+    <div class="flow"><span>第 1 至 4 周：打基础</span><i>→</i><span>第 5 至 9 周：练题型</span><i>→</i><span>第 10 至 12 周：模考冲刺</span></div>
+    <table>
+      <tr><th>阶段</th><th>周次</th><th>每周重点</th><th>可检查的产出</th></tr>
+      <tr><td class="stage">打基础</td><td class="mono">1 至 4</td><td>高频词汇 + 听力精听</td><td>背完 800 词，精听 12 篇短对话</td></tr>
+      <tr><td class="stage">练题型</td><td class="mono">5 至 9</td><td>阅读定位 + 翻译句型</td><td>每类题型各练 20 题，错题本累计 60 条</td></tr>
+      <tr><td class="stage">模考冲刺</td><td class="mono">10 至 12</td><td>整套限时 + 作文模板</td><td>完成 6 套整卷，作文定稿 2 篇</td></tr>
+    </table>
+    <div class="hr"></div>
+    <h3>每天 40 分钟怎么分配</h3>
+    <div class="notes">
+      <div>15 分钟背词：新词 20 个，复习昨天的 20 个，只记读音和核心释义</div>
+      <div>15 分钟主攻项：按当周重点，听力或阅读二选一，不要平均用力</div>
+      <div>10 分钟收尾：把当天错的题写进错题本，只写错因和正确思路</div>
+    </div>
+    <div class="box"><div class="k">坚持不下来的三个提醒</div><p>任务按周给，不按天补；允许每周缺一次，缺的那次不要堆到第二天；模考那三周可以停掉背词，把时间让给整套练习。</p></div>
+  </div>
+</div></body></html>

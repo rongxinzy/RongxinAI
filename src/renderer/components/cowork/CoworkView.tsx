@@ -1608,92 +1608,117 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto min-h-0 relative">
-        <div className="relative mx-auto flex min-h-full w-full max-w-5xl min-w-[320px] flex-col items-center justify-center gap-10 px-4 py-8">
-          {/* Welcome Section - staggered entrance animation */}
-          <div className="flex min-h-28 flex-col items-center justify-center gap-5 text-center">
-            <img
-              src="zhiyuan-logo-light.svg"
-              alt="logo"
-              className="logo-light h-16 w-auto mx-auto animate-fade-in-up"
-            />
-            <img
-              src="zhiyuan-logo-dark.svg"
-              alt="logo"
-              className="logo-dark h-16 w-auto mx-auto animate-fade-in-up"
-            />
-            <p
-              className={cn(
-                'min-h-5 max-w-md px-2 text-sm text-muted-foreground animate-fade-in-up',
-                workMode === WorkMode.Chat && 'invisible',
-              )}
-              style={{ animationDelay: '120ms', animationFillMode: 'both' }}
-            >
-              {i18nService.t('coworkHomeSubtitle')}
-            </p>
-          </div>
+        {/* Spacer. The case gallery is far taller than the viewport, so the brand block
+            and the input cannot be centred as one column: centring the column would let
+            the gallery drag the input up under the page header as soon as a category is
+            open. This spacer holds the input on the visible area's vertical middle
+            instead, and the gallery flows straight after the input the way the
+            reference homepage does. 15.5rem = brand block (7rem) + hero gap (2.5rem) +
+            the input block's sticky top padding (0.5rem) + half the prompt input
+            (5.5rem). */}
+        <div aria-hidden className="min-h-[max(0px,calc(50%-15.5rem))]" />
 
-          {/* Prompt Input Area - Large version with folder selector */}
-          <div
-            className="mx-auto flex w-full max-w-3xl flex-col gap-3 animate-fade-in-up"
-            style={{ animationDelay: '200ms', animationFillMode: 'both' }}
-          >
-            <div className="rounded-2xl">
-              <CoworkPromptInput
-                ref={promptInputRef}
-                onSubmit={handleStartSession}
-                onStop={handleStopSession}
-                isStreaming={isStreaming}
-                disabled={false}
-                placeholder={
-                  workMode === WorkMode.Chat
-                    ? i18nService.t(resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder')
-                    : i18nService.t('coworkPlaceholder')
-                }
-                size="large"
-                workingDirectory={currentWorkspacePath}
-                workingDirectoryName={currentWorkspaceDisplayName}
-                onWorkingDirectoryChange={async (dir: string) => {
-                  clearUnmanagedWorkingDirectory();
-                  const workspace = await workspaceService.ensureWorkspace(dir);
-                  if (workspace) await workspaceService.selectWorkspace(workspace.id);
-                }}
-                onUseNoFolder={async dir => {
-                  const selected = await selectUnmanagedWorkingDirectory(dir);
-                  if (!selected) {
-                    window.dispatchEvent(
-                      new CustomEvent('app:showToast', {
-                        detail: i18nService.t('projectCreateFailed'),
-                      }),
-                    );
-                  }
-                }}
-                showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
-                showNoFolderAction={!currentWorkspaceId}
-                showModelSelector
-                isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
-                showLocalThinkingToggle={workMode === WorkMode.Chat && !isAgentBackedChat}
-                localThinkingEnabled={localThinkingEnabled}
-                onLocalThinkingEnabledChange={setLocalThinkingEnabled}
-                onManageSkills={() => onShowSkills?.()}
-                onManageConnectors={() => onShowConnectors?.()}
-                showPermissionModeSelector={workMode !== WorkMode.Chat}
-                permissionMode={config.permissionMode}
-                onPermissionModeChange={(mode: CoworkPermissionMode) => {
-                  void coworkService.updateConfig({ permissionMode: mode });
-                }}
+        <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-center gap-10 px-4">
+          {/* Welcome Section and the prompt input share one sticky layer: once the
+              cases start scrolling, the brand mark and the input both stay on screen
+              instead of sliding away with the list. The layer is opaque and full
+              width so the cases pass behind it rather than through it. It sits in the
+              same column as the list, which is the box the sticky range is measured
+              against, so it holds all the way to the last case. */}
+          <div className="sticky top-0 z-10 flex w-full flex-col items-center gap-10 bg-background pt-2 pb-2">
+            {/* Welcome Section - staggered entrance animation */}
+            <div className="flex min-h-28 flex-col items-center justify-center gap-5 text-center">
+              <img
+                src="zhiyuan-logo-light.svg"
+                alt="logo"
+                className="logo-light h-16 w-auto mx-auto animate-fade-in-up"
               />
+              <img
+                src="zhiyuan-logo-dark.svg"
+                alt="logo"
+                className="logo-dark h-16 w-auto mx-auto animate-fade-in-up"
+              />
+              <p
+                className={cn(
+                  'min-h-5 max-w-md px-2 text-sm text-muted-foreground animate-fade-in-up',
+                  workMode === WorkMode.Chat && 'invisible',
+                )}
+                style={{ animationDelay: '120ms', animationFillMode: 'both' }}
+              >
+                {i18nService.t('coworkHomeSubtitle')}
+              </p>
+            </div>
+
+            {/* Prompt Input Area - Large version with folder selector */}
+            <div
+              className="mx-auto flex w-full max-w-3xl flex-col gap-3 animate-fade-in-up"
+              style={{ animationDelay: '200ms', animationFillMode: 'both' }}
+            >
+              <div className="rounded-2xl">
+                <CoworkPromptInput
+                  ref={promptInputRef}
+                  onSubmit={handleStartSession}
+                  onStop={handleStopSession}
+                  isStreaming={isStreaming}
+                  disabled={false}
+                  placeholder={
+                    workMode === WorkMode.Chat
+                      ? i18nService.t(
+                          resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder',
+                        )
+                      : i18nService.t('coworkPlaceholder')
+                  }
+                  size="large"
+                  workingDirectory={currentWorkspacePath}
+                  workingDirectoryName={currentWorkspaceDisplayName}
+                  onWorkingDirectoryChange={async (dir: string) => {
+                    clearUnmanagedWorkingDirectory();
+                    const workspace = await workspaceService.ensureWorkspace(dir);
+                    if (workspace) await workspaceService.selectWorkspace(workspace.id);
+                  }}
+                  onUseNoFolder={async dir => {
+                    const selected = await selectUnmanagedWorkingDirectory(dir);
+                    if (!selected) {
+                      window.dispatchEvent(
+                        new CustomEvent('app:showToast', {
+                          detail: i18nService.t('projectCreateFailed'),
+                        }),
+                      );
+                    }
+                  }}
+                  showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
+                  showNoFolderAction={!currentWorkspaceId}
+                  showModelSelector
+                  isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
+                  showLocalThinkingToggle={workMode === WorkMode.Chat && !isAgentBackedChat}
+                  localThinkingEnabled={localThinkingEnabled}
+                  onLocalThinkingEnabledChange={setLocalThinkingEnabled}
+                  onManageSkills={() => onShowSkills?.()}
+                  onManageConnectors={() => onShowConnectors?.()}
+                  showPermissionModeSelector={workMode !== WorkMode.Chat}
+                  permissionMode={config.permissionMode}
+                  onPermissionModeChange={(mode: CoworkPermissionMode) => {
+                    void coworkService.updateConfig({ permissionMode: mode });
+                  }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions. The category bar is the entry point only: once a category is
+              open the cases own the column, so the bar steps aside instead of sitting on
+              top of the gallery. The gallery shares the column with the input on purpose:
+              that is the box the input's sticky positioning is measured against, so the
+              cases can scroll all the way to the end while the input stays in place. */}
           <div
-            className="mx-auto flex w-full max-w-5xl flex-col gap-4 animate-fade-in-up"
+            className="flex w-full flex-col gap-4 pb-8 animate-fade-in-up"
             style={{ animationDelay: '300ms', animationFillMode: 'both' }}
           >
-            {selectedAction ? (
-              <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
-            ) : (
+            {!selectedAction && (
               <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
+            )}
+            {selectedAction && (
+              <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
             )}
           </div>
         </div>

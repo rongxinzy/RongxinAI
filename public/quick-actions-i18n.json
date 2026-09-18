@@ -22,6 +22,16 @@
           "label": "人工智能入门",
           "description": "零基础了解 AI 的科普演示",
           "prompt": "制作一份面向零基础观众的人工智能入门科普 PPT,内容包括:\n\n1. 什么是人工智能——用生活中的例子解释;\n2. AI 的发展简史(从图灵测试到大语言模型);\n3. 常见的 AI 应用场景(语音助手、推荐系统、自动驾驶等);\n4. 机器学习的基本原理(用直观类比说明);\n5. 大模型与 ChatGPT 是怎么工作的;\n6. AI 能做什么、不能做什么;\n7. 普通人如何开始使用 AI 工具提升效率;\n\n风格要求:通俗易懂,多用图示和类比,避免专业术语堆砌,让完全不懂技术的人也能看明白。"
+        },
+        "pptx-product-plan": {
+          "label": "产品方案",
+          "description": "产品方案评审与版本规划汇报",
+          "prompt": "制作一份产品方案评审 PPT,包含以下内容:\n\n1. 需求背景、目标用户与要解决的问题;\n2. 当前问题的具体表现与影响范围;\n3. 产品方案要点与核心流程;\n4. 版本节奏与排期规划;\n5. 资源投入与人力评估;\n6. 预期收益与衡量指标;\n7. 主要风险与应对预案;\n\n风格要求:结构清晰,重点讲清方案取舍的理由,适合向管理层做立项评审。"
+        },
+        "pptx-training": {
+          "label": "培训课件",
+          "description": "新员工入职与岗位培训课件",
+          "prompt": "制作一套面向新同事的入职培训课件,包含:\n\n1. 培训目标与三天上手路径;\n2. 开发环境搭建的完整步骤;\n3. 常用工具与团队协作规范;\n4. 业务背景与核心链路的介绍;\n5. 第一次独立提交的演练流程;\n6. 上手常见问题与避坑提示;\n\n风格要求:步骤化讲解,多用流程图和检查清单,让新人可以照着一步步做完。"
         }
       }
     },
@@ -47,6 +57,16 @@
           "label": "多表合并整理",
           "description": "合并多个 Excel 文件并统一格式",
           "prompt": "我有多个 Excel 文件需要合并整理,请帮我:\n\n1. 将多个文件的数据合并到一张表中;\n2. 统一列名和数据格式;\n3. 去除重复数据;\n4. 生成一份合并后的 Excel 文件,并添加数据来源标记。"
+        },
+        "excel-reconcile": {
+          "label": "对账差异核对",
+          "description": "比对两份数据并定位差异原因",
+          "prompt": "我有两份需要对账的数据文件,请帮我完成对账核对:\n\n1. 按订单号或唯一键比对两边的数据;\n2. 标出金额不一致、单边缺失的记录;\n3. 按差异类型归并,统计各类型的笔数与金额;\n4. 对每类差异给出可能原因的判断;\n5. 输出一份对账结果 Excel,并附上差异明细页。"
+        },
+        "excel-budget": {
+          "label": "预算表编制",
+          "description": "编制部门预算并跟踪使用率",
+          "prompt": "请帮我编制一份部门季度预算表:\n\n1. 按科目列出预算金额(人员成本、云与算力、市场推广、办公差旅等);\n2. 记录已占用金额并计算使用率;\n3. 标出使用率明显偏高或偏低的科目;\n4. 对剩余额度给出分配建议;\n5. 输出 Excel 文件,并把使用率做成图表。"
         }
       }
     },
@@ -72,6 +92,16 @@
           "label": "知识点科普",
           "description": "用通俗语言解释复杂知识",
           "prompt": "请用通俗易懂的语言给我科普「光合作用」这个知识点:\n\n1. 用一句话概括光合作用是什么;\n2. 用生活中的类比来解释它的原理;\n3. 画出光合作用的简要过程(文字版流程图);\n4. 说明光合作用对地球和人类的重要意义; \n5. 提出 3 个思考题,帮助我加深理解。"
+        },
+        "edu-study-plan": {
+          "label": "学习计划制定",
+          "description": "把备考目标拆成可执行计划",
+          "prompt": "我需要在三个月内备考英语四级,请帮我制定一份能坚持下来的学习计划:\n\n1. 把备考周期拆成几个阶段,说明每个阶段的目标;\n2. 给出每周的学习安排和每次的时长;\n3. 列出每个阶段要完成的可检查产出;\n4. 说明每天的时间怎么分配;\n5. 给出中途落下进度时的补救办法。"
+        },
+        "edu-mistake-review": {
+          "label": "错题复盘",
+          "description": "定位错因并给出改进动作",
+          "prompt": "这道题我又做错了,请帮我复盘:\n\n题目:解一元二次方程 2x² + 3x - 5 = 0\n\n要求:\n1. 先指出我可能在哪一步想错了;\n2. 对比错误思路和正确思路的差别;\n3. 归纳这道题暴露的知识漏洞;\n4. 给出这类题的固定解题步骤;\n5. 再出一道同类题让我巩固。"
         }
       }
     },
@@ -80,23 +110,48 @@
       "prompts": {
         "web-resume": {
           "label": "个人简历",
-          "description": "在线简历与作品集页面",
-          "prompt": "帮我制作一个精美的在线个人简历页面。\n\n基本信息:\n- 姓名:张小明;\n- 职位:产品经理(5年经验);\n- 联系方式:邮箱、手机、微信二维码占位区。\n\n页面内容:\n- 个人简介:一段简短的自我介绍,突出核心优势;\n- 工作经历:3段工作经历,含公司名、职位、时间、主要成果;\n- 专业技能:以进度条形式展示产品设计、数据分析、项目管理等技能;\n- 项目案例:展示3个代表项目的卡片,含项目名称和简短描述;\n- 教育背景与证书。\n\n设计目标:\n面向面试官或合作伙伴，传达可信、清晰且有个人辨识度的专业感。请从内容和受众推导视觉方向、配色、字体和版式；不要默认套用侧栏或固定颜色。"
+          "description": "衬线排版的在线简历与作品集",
+          "prompt": "用「衬线简历」模板做一个可以直接打开的个人简历与作品集网页。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-resume.html 与 templates/web-resume.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n内容替换:\n- person 里的姓名、职位、简介与联系方式换成真实信息,姓名保持 2-4 个字,联系方式写满 4 项;\n- summary 写一段具体自述,讲清做过什么、留下过什么可复用的产物,不要写「热爱」「赋能」这类空话;\n- jobs 保留 3 段经历,每段 2-3 条,用结果数字说话,不要写成职责描述;\n- projects 保持 3 条(三栏网格),skills 保持 5 条(percent 按同一量纲取相对值),education 保持 4 条;\n- meta 里的语言、标题与描述同步改掉。\n\n设计目标:\n保留模板的视觉语言:纸底、超大字衬线姓名、职位小字距大写、左时间栏的条目网格、细技能条、双栏教育背景。可以在同一语言内调整色相与字体,不要换成卡片流,也不要加入头像照片、圆角卡片或渐变。"
         },
         "web-store": {
           "label": "店铺主页",
-          "description": "小型商铺或工作室展示页",
-          "prompt": "帮我做一个烘焙工作室的展示网页,工作室名叫「麦田烘焙」。\n\n页面内容:\n- 首屏大图:工作室名称、一句口号「用心烘焙,温暖每一天」、\"查看菜单\"按钮;\n- 招牌产品:展示6款人气产品卡片(含图片占位、名称、价格、简短描述);\n- 关于我们:工作室的故事,创始人理念,配一张店内环境图占位;\n- 顾客好评:3条用户评价,带头像和星级评分;\n- 联系与地址:营业时间、地址、电话,嵌入地图占位区域;\n\n设计目标:\n传达食物、手作与社区感，但请根据品牌故事选择有辨识度的材质、色温、字体和构图；不要默认使用奶油棕、圆角卡片或手写字体。"
+          "description": "器物目录风格的门店展示与菜单页",
+          "prompt": "用「器物目录」模板做一个可以直接打开的店铺主页。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-store.html 与 templates/web-store.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n内容替换:\n- shop 里的店名、营业时间与导航换成你的门店,导航固定 3 项,锚点分别指向 #picks / #menu / #visit;\n- hero 的徽标、主标题、口号与两个按钮换成你自己的主张,全页只留这一处小标签;\n- picks 保持 3 款招牌,每款写清名称、单价与一句工艺或口感描述;图形按碗 / 盘 / 瓶的顺序固定,文案要与图形对得上;\n- menu 保持 2 组、每组 5 条,price 只写数字,单位写在 menu.lede 里,名称与价格之间的点线由模板生成;\n- visit 写满 4 条门店信息(地址、营业、电话、提示),closing 换成本店的预订方式;\n- 首屏大图与地图是纯 CSS 图形,不要换成图片。\n\n设计目标:\n保留模板的视觉语言:冷骨白纸底、左大图右压角的骨白信息卡、卡片顶部彩色粗线、点线器物单、双栏门店信息。可以在同一语言内调整色相与字体,不要改成圆角卡片流,也不要引入图片或图标库。价格与时间一律等宽字体,破折号只用普通连字符。"
         },
         "web-event": {
           "label": "活动邀请函",
-          "description": "聚会、婚礼或活动的在线邀请页",
-          "prompt": "帮我制作一个生日派对的在线邀请函网页。\n\n活动信息:\n- 主题:「Leo的30岁生日派对」;\n- 时间:2025年8月15日 周六 晚上7:00;\n- 地点:星光花园餐厅 三楼露台;\n\n页面内容:\n- 开场动画:标题渐入,彩色纸屑飘落效果;\n- 邀请语:一段温馨的邀请文字;\n- 活动安排:时间轴展示派对流程(签到、晚宴、游戏、蛋糕、自由交流);\n- 着装建议:休闲正装,配色参考图占位;\n- 交通指引:地址信息和停车提示;\n- RSVP确认:\"我会参加\"和\"很遗憾不能到\"两个按钮;\n\n设计目标:\n营造成年生日庆典的记忆点与仪式感，并优先适配手机。请独立选择色温、字体、动效和空间节奏；不要默认使用星空、深蓝金色或固定庆典模板。"
+          "description": "夜色请柬,含倒计时、流程与回执",
+          "prompt": "用「夜色请柬」模板做一个可以直接打开的在线邀请函。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-event.html 与 templates/web-event.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n内容替换:\n- event 里的活动名、副题与邀请语换成真实信息,eyebrow 全页只留这一处小字;\n- when 保留 3 格时间地点,program 保留 4 条流程,时刻用等宽字写;\n- countdown 的 target 写成带时区的 ISO 时间(例如 2026-10-18T18:30:00+08:00),done 换成开场之后的提示文案;\n- rsvp 保留 2-3 个字段,把 required 放在需要校验的那一项上,error 写清补什么;\n- footer 换成本次活动主办方的联系方式。\n\n设计目标:\n保留模板的视觉语言:深梅黑底、单一玫瑰色、居中窄栏、四格倒计时、左键右值的流程表、无框下划线输入、通体直角。可以在同一语言内调整色相,但这是一张夜色请柬,不要改成白底。不要加撒花、飘落、粒子或照片。"
+        },
+        "web-product-launch": {
+          "label": "产品发布页",
+          "description": "瑞士网格风格的技术产品发布页",
+          "prompt": "用「经纬」模板做一个技术产品的发布页。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-product-launch.html 与 templates/web-product-launch.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n内容替换:\n- 产品名、一句话定位、首屏副文与按钮文案,换成你要发布的产品;\n- 首屏下方四项数字换成真实或合理编造的业务数据,数字要具体,不要凑整;\n- 对比区、定义区与引语区保留结构,内容按产品实际情况改写;\n- 页脚的联系方式换成真实信息。\n\n设计要求:\n保留模板的瑞士网格语言:严格对齐的栏格、可见的细分隔线、超大号数字、高对比中性色配单一信号色、直角形状。可以在同一语言内调整色相与字体,不要换成另一套设计方向,也不要加入圆角卡片、渐变光效或滚动动画。"
+        },
+        "web-ops-console": {
+          "label": "运营看板",
+          "description": "异常优先的运营监控看板",
+          "prompt": "用「履约台」模板做一个业务运营看板。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-ops-console.html 与 templates/web-ops-console.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n内容替换:\n- view 的页面标题与口径说明换成你的业务;\n- kpis 固定 4 格,数字要具体(例如 96.4%、12m 38s),不要凑整,把需要警示的一格写上 alert: true;\n- queue.rows 按影响面从大到小排列,tone 用 critical / warn / steady / plain 区分严重、警告、正常三档;\n- dist.items 固定 4 条,width 是相对条宽,不要按数值线性换算,避免小值看不见;\n- shift.rows 换成当班人员,copy.foot 同步换成值班信息。\n\n设计要求:\n保留模板的低噪声界面语言:浅灰底配白色面板、细分隔线、语义状态色、等宽数字对齐。异常项必须在第一屏可见且明显,进度类信息用无底槽的细条或纯数字表达,不要加入仪表盘装饰、大面积色块或滚动动画。"
         },
         "web-survey": {
           "label": "调查问卷",
-          "description": "在线表单与问卷收集页",
-          "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填);\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意);\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块);\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障);\n- 单选题:使用频率(每天/每周/每月/偶尔);\n- 文本题:您的建议或意见(大文本框);\n- 提交按钮,提交后显示感谢页面。\n\n设计目标:\n让填写过程轻松、可信且适合手机操作，清晰呈现进度和反馈状态。请根据这一任务选择克制而有辨识度的设计系统；不要默认使用白底蓝绿色问卷模板。"
+          "description": "吸顶进度条的专注型表单",
+          "prompt": "用「专注表单」模板做一个可以直接打开的在线问卷。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-survey.html 与 templates/web-survey.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n内容替换:\n- survey 的标题、导语与 estimate 换成你的问卷,estimate 里的题数要与实际题数一致;\n- questions 保留 4 题左右,type 取 radio / checkbox / range / textarea,把 required 放在必答题上;\n- 选项保持 3-5 项,label 不超过 16 个字,需要额外解释时用 note;\n- submit 与 done 的文案换成你的口吻,done.emptyAnswer 用于结果页的未作答项;\n- bar.progressTemplate 必须保留 {done} 与 {total} 占位符。\n\n设计目标:\n保留模板的视觉语言:吸顶细进度条、640px 窄版心、两位数题号、自绘的选择框、无圆角文本域。可以在同一语言内调整色相与字体,不要改成卡片式问卷,也不要接后端或第三方表单服务。"
+        },
+        "web-game-snake": {
+          "label": "小游戏：贪吃蛇",
+          "description": "单文件贪吃蛇,三档速度与本机战绩",
+          "prompt": "用「磷光」模板做一个可以直接在浏览器里玩的贪吃蛇。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-game-snake.html 与 templates/web-game-snake.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n玩法与规则:\n- 方向键或 WASD 转向,触屏用右侧方向键,不吃斜向输入;\n- 吃到食物蛇变长并加分,撞墙或咬到自己结束本局,可以立刻重开;\n- 支持暂停,暂停遮罩半透明,棋盘仍然可见;\n- 最近几局存在本机 localStorage,换 storageKey 即清空。\n\n内容替换:\n- copy 里的标题、副标题、按钮文字与遮罩文案换成你自己的;\n- rules 暴露 cols、rows、cell、startLength 与三档 speeds,cell 改大棋盘会变宽;\n- copy.keysHint 里用 [[空格]] 这种双中括号包住按键名,渲染层会换成键帽;\n- theme.food 是食物色,必须与蛇身区分开。\n\n设计目标:\n保留模板的视觉语言:近黑橄榄底、单一薄荷绿、等宽字、方形分格棋盘、蛇头带眼、菱形食物。可以在同一语言内调整色相与字体,不要改成黑底霓虹像素风,也不要加圆角糖果色卡片。"
+        },
+        "web-game-2048": {
+          "label": "小游戏：2048 合并",
+          "description": "单文件 2048,含分值梯度与一步撤销",
+          "prompt": "用「板岩梯度」模板做一个可以直接在浏览器里玩的 2048 数字合并游戏。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-game-2048.html 与 templates/web-game-2048.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n玩法与规则:\n- 棋盘固定 4x4,方向键、WASD 与棋盘滑动都能移动,同值方块相撞翻倍;\n- 每次移动后空格里会出现一个 2 或 4,无路可走时本局结束;\n- 保留一步撤销,撤销后按钮变灰;\n- 最高分存在本机 localStorage,换 storageKey 即清空。\n\n内容替换:\n- copy 里的标题、副标题、两个按钮、遮罩文案与 rules 说明换成你自己的;\n- rules 暴露 storageKey、startTiles 与 winValue;\n- tiles 是分值到配色的梯度表,默认从 2 覆盖到 2048,再用 beyond 兜底,不要跳号;\n- 每一档的 bg 与 fg 对比度要过 WCAG AA,改色后逐档检查。\n\n设计目标:\n保留模板的视觉语言:深板岩底、单一钴蓝强调、顶部两个读数、棋盘下方一条分值梯度、只有方块带圆角。可以在同一语言内调整色相,但梯度必须还是同一条色相推明度,不要变回米色棋盘或糖果色方块。"
+        },
+        "web-game-typing": {
+          "label": "小游戏：打字练习",
+          "description": "逐字符反馈的限时英文打字练习",
+          "prompt": "用「冷纸打字」模板做一个可以直接打开的英文打字练习。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-game-typing.html 与 templates/web-game-typing.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n玩法与规则:\n- 页面显示一段英文,逐字符比对:打对的变深、打错的标红、当前字符只有一条下划线;\n- 顶部实时显示速度、准确率与剩余时间,时间到或打完一段后给出本轮成绩;\n- 保留三档时长与「换一段」,一轮结束后按回车可以直接重开;\n- 成绩只留在本页,刷新即清空。\n\n内容替换:\n- copy 里的标题、说明、读数名称与成绩卡文案换成你自己的;\n- passages 换成 3 段英文,每段 110-170 个字符,只用英文与常用标点,中文会被输入法上屏破坏逐字符比对;\n- notes 保留 2-3 条计分说明;\n- theme 留空即跟随系统深浅色;要固定配色就把九个值一次写全,只写一部分会锁定浅色底。\n\n设计目标:\n保留模板的视觉语言:冷纸底、单一深青强调、等宽正文区、三项读数是直角方条、面板底部一条 2px 进度线。可以在同一语言内调整色相,不要改成黑底绿字终端风,也不要加打字机音效。"
         }
       }
     },
@@ -106,7 +161,9 @@
         "research-industry": { "label": "行业趋势", "description": "梳理行业现状与发展方向", "prompt": "请对我指定的行业进行深度调研，梳理市场规模、主要参与者、关键趋势、机会与风险，并给出有来源依据的结论。" },
         "research-competitors": { "label": "竞品分析", "description": "比较竞品能力与市场定位", "prompt": "请完成一份竞品分析，比较主要产品的定位、目标用户、核心功能、价格、优势短板和差异化机会，并用表格总结。" },
         "research-policy": { "label": "政策分析", "description": "解读政策影响与执行要点", "prompt": "请分析我提供的政策或法规，提炼核心要求、适用范围、时间节点、对业务的影响和落地建议，标注不确定信息。" },
-        "research-literature": { "label": "文献综述", "description": "整理研究脉络与关键观点", "prompt": "请围绕指定主题撰写文献综述框架，归纳主要研究观点、方法、共识、争议与研究空白，并提出后续研究问题。" }
+        "research-literature": { "label": "文献综述", "description": "整理研究脉络与关键观点", "prompt": "请围绕指定主题撰写文献综述框架，归纳主要研究观点、方法、共识、争议与研究空白，并提出后续研究问题。" },
+        "research-user": { "label": "用户调研", "description": "访谈与需求洞察调研报告", "prompt": "请帮我完成一次目标用户调研，并输出一份调研报告。调研对象是一线使用者，围绕他们在真实工作中遇到的问题展开。\n\n报告需要包含：访谈样本构成与调研方法说明、用户当前的工作流程与卡点、需求优先级排序及判断依据、典型用户原话摘录、可直接落地的产品建议。所有结论都要标注来源，不能只给观点。" },
+        "research-market-entry": { "label": "市场进入评估", "description": "新市场进入的可行性分析", "prompt": "请对我指定的市场做一次进入可行性评估，从需求规模、获客成本、合规门槛、交付能力四个维度展开。\n\n报告需要给出：各维度的判断依据与数据来源、分市场的综合评价与优先级排序、建议的进入节奏与阶段目标、主要风险与应对方案。最后要明确指出哪些市场建议进入、哪些建议观望、哪些建议暂缓。" }
       }
     },
     "academic-research": {
@@ -115,7 +172,9 @@
         "academic-outline": { "label": "论文大纲", "description": "搭建清晰的论文结构", "prompt": "请根据我的研究主题设计一份学术论文大纲，包含研究问题、理论框架、方法、结果与讨论，并说明各部分写作重点。" },
         "academic-review": { "label": "文献整理", "description": "提炼文献并建立研究脉络", "prompt": "请整理我提供的文献，按主题、方法和结论分类，提炼关键观点并指出相互支持、矛盾和可引用之处。" },
         "academic-method": { "label": "研究方法", "description": "选择合适的方法与实验方案", "prompt": "请根据研究目标和可用数据，比较可选研究方法，给出推荐方案、变量设计、样本要求、实施步骤和潜在局限。" },
-        "academic-polish": { "label": "学术润色", "description": "提升表达的准确性与连贯性", "prompt": "请将我提供的论文段落润色为规范、清晰、严谨的学术中文，保留原意，并列出关键修改理由。" }
+        "academic-polish": { "label": "学术润色", "description": "提升表达的准确性与连贯性", "prompt": "请将我提供的论文段落润色为规范、清晰、严谨的学术中文，保留原意，并列出关键修改理由。" },
+        "academic-data-analysis": { "label": "数据与统计", "description": "问卷数据的统计方法与结果", "prompt": "请帮我完成论文中数据处理与统计分析的写作，研究对象是问卷调研数据。\n\n需要包含：变量与测量方式的对应表、缺失值处理说明、信效度检验指标的呈现方式、每个研究问题对应的统计方法与输出、结果部分的规范写法。要说明为什么选用该统计方法，不能只罗列公式。" },
+        "academic-grant": { "label": "开题报告", "description": "研究计划书与开题报告要点", "prompt": "请帮我整理一份研究计划书的写作框架，用于开题报告与基金申请。\n\n需要包含：立项依据与研究问题的提出方式、研究内容的分层拆解与关键问题、技术路线与研究方法、进度安排与阶段性成果、预期成果与创新点、经费与可行性说明。每一部分都要说明评委最关注什么。" }
       }
     },
     "docs": {
@@ -124,7 +183,9 @@
         "docs-meeting": { "label": "会议纪要", "description": "整理讨论内容与行动项", "prompt": "请把我提供的会议记录整理成正式会议纪要，包含议题、关键结论、待办事项、负责人和截止时间。" },
         "docs-report": { "label": "工作报告", "description": "生成结构清晰的正式报告", "prompt": "请根据我提供的材料撰写一份正式工作报告，包含背景、进展、数据、问题、建议和下一步计划。" },
         "docs-summary": { "label": "文档摘要", "description": "快速提炼长文档重点", "prompt": "请阅读我提供的文档，输出简明摘要、关键事实、重要结论、风险点和需要进一步确认的问题。" },
-        "docs-polish": { "label": "文档润色", "description": "改善语句与整体表达", "prompt": "请润色我提供的文档，改善语法、措辞、结构和正式程度，保留原有事实与意图，并给出修改后的完整版本。" }
+        "docs-polish": { "label": "文档润色", "description": "改善语句与整体表达", "prompt": "请润色我提供的文档，改善语法、措辞、结构和正式程度，保留原有事实与意图，并给出修改后的完整版本。" },
+        "docs-prd": { "label": "需求文档", "description": "产品需求说明与验收标准", "prompt": "请帮我写一份产品需求文档(PRD),要求:\n\n1. 说明需求背景、目标用户与要解决的问题;\n2. 列出功能需求清单,标注优先级和验收标准;\n3. 描述核心场景的完整流程;\n4. 明确本版本不做的范围;\n5. 列出依赖条件与主要风险;\n6. 语言简洁,可直接发给研发评审。" },
+        "docs-notice": { "label": "通知公告", "description": "内部通知与公告文书起草", "prompt": "请帮我起草一份公司内部通知,内容是调整月度报表的报送时间与方式,要求:\n\n1. 标题规范,文号、发文单位和日期齐全;\n2. 开头说明调整的原因和依据;\n3. 分条写清调整的具体内容;\n4. 写明执行要求与责任归属;\n5. 注明生效时间;\n6. 结尾给出反馈渠道和落款。" }
       }
     }
   },
@@ -151,6 +212,16 @@
           "label": "Introduction to AI",
           "description": "Popular science presentation for understanding AI basics",
           "prompt": "Create a popular science PPT introducing artificial intelligence for beginners, including:\n\n1. What is artificial intelligence - explain with everyday examples\n2. Brief history of AI development (from Turing Test to large language models)\n3. Common AI application scenarios (voice assistants, recommendation systems, autonomous driving, etc.)\n4. Basic principles of machine learning (explained with intuitive analogies)\n5. How large models and ChatGPT work\n6. What AI can and cannot do\n7. How ordinary people can start using AI tools to improve efficiency\n\nStyle requirements: Easy to understand, use diagrams and analogies, avoid technical jargon, make it understandable even for those with no technical background."
+        },
+        "pptx-product-plan": {
+          "label": "Product Plan",
+          "description": "Product proposal and release plan review",
+          "prompt": "Create a product proposal deck covering:\n\n1. Background, target users and the problem to solve;\n2. How the problem shows up today and who it affects;\n3. The proposed solution and its core flow;\n4. Release phases and schedule;\n5. Resourcing and staffing estimate;\n6. Expected benefits and how they will be measured;\n7. Key risks and mitigations;\n\nStyle: structured and decision-oriented, focused on the reasoning behind each tradeoff. Suitable for a review with management."
+        },
+        "pptx-training": {
+          "label": "Training Deck",
+          "description": "Onboarding and role training courseware",
+          "prompt": "Create an onboarding training deck for new team members covering:\n\n1. Training goals and a three-day ramp-up path;\n2. Step-by-step environment setup;\n3. Common tools and collaboration conventions;\n4. Business background and the core workflow;\n5. A walkthrough of the first independent change;\n6. Common pitfalls and how to avoid them;\n\nStyle: step-by-step, with flow diagrams and checklists so a newcomer can follow along."
         }
       }
     },
@@ -176,6 +247,16 @@
           "label": "Merge Multiple Tables",
           "description": "Merge multiple Excel files and standardize format",
           "prompt": "I have multiple Excel files that need to be merged and organized. Please help me:\n\n1. Merge data from multiple files into one table\n2. Standardize column names and data formats\n3. Remove duplicate data\n4. Generate a merged Excel file with data source markers."
+        },
+        "excel-reconcile": {
+          "label": "Reconciliation",
+          "description": "Compare two datasets and locate differences",
+          "prompt": "I have two datasets that need to be reconciled. Please:\n\n1. Match records on the order number or another unique key;\n2. Flag mismatched amounts and records missing on one side;\n3. Group the differences by type and count each group;\n4. Suggest likely causes for each difference type;\n5. Output an Excel result with a separate detail sheet."
+        },
+        "excel-budget": {
+          "label": "Budget Sheet",
+          "description": "Build a department budget usage tracker",
+          "prompt": "Please build a quarterly department budget sheet:\n\n1. List budget amounts by category (staff, cloud and compute, marketing, travel and office, and so on);\n2. Record the amount already committed and calculate usage;\n3. Flag categories that are overused or underused;\n4. Suggest how to allocate the remaining budget;\n5. Output an Excel file with the usage rates charted."
         }
       }
     },
@@ -201,6 +282,16 @@
           "label": "Knowledge Explanation",
           "description": "Explain complex knowledge in simple language",
           "prompt": "Please explain the concept of \"photosynthesis\" in easy-to-understand language:\n\n1. Summarize what photosynthesis is in one sentence\n2. Explain the principle with everyday life analogies\n3. Draw a simple process of photosynthesis (text-based flowchart)\n4. Explain the importance of photosynthesis for Earth and humanity\n5. Propose 3 thinking questions to help me deepen my understanding."
+        },
+        "edu-study-plan": {
+          "label": "Study Plan",
+          "description": "Turn a goal into an executable study plan",
+          "prompt": "I need to prepare for an exam in three months. Please build a study plan I can actually keep up with:\n\n1. Split the period into stages and state the goal of each;\n2. Give the weekly schedule and the length of each session;\n3. List the checkable output for every stage;\n4. Explain how to use the time each day;\n5. Offer a fallback for the weeks I fall behind."
+        },
+        "edu-mistake-review": {
+          "label": "Mistake Review",
+          "description": "Find the root cause of a wrong answer",
+          "prompt": "I got this problem wrong again. Please help me review it:\n\nProblem: solve the quadratic equation 2x² + 3x - 5 = 0\n\n1. Point out where my reasoning likely went wrong;\n2. Contrast the wrong approach with the correct one;\n3. Name the knowledge gap this exposes;\n4. Give the fixed steps for this type of problem;\n5. Add a similar problem so I can practice."
         }
       }
     },
@@ -209,23 +300,48 @@
       "prompts": {
         "web-resume": {
           "label": "Personal Resume",
-          "description": "Online resume and portfolio page",
-          "prompt": "Help me create a beautiful online personal resume page.\n\nBasic information:\n- Name: John Smith\n- Position: Product Manager (5 years experience)\n- Contact: Email, phone, WeChat QR code placeholder\n\nPage content:\n- Personal introduction: A brief self-introduction highlighting core strengths\n- Work experience: 3 work experiences, including company name, position, time, main achievements\n- Professional skills: Display product design, data analysis, project management and other skills in progress bar format\n- Project cases: Display 3 representative project cards with project name and brief description\n- Educational background and certificates\n\nDesign goal:\nCommunicate credibility, clarity, and a personal point of view to interviewers or partners. Derive the visual direction, palette, typography, and composition from the content and audience; do not default to a sidebar or fixed colors."
+          "description": "Online resume and portfolio in an editorial serif setting",
+          "prompt": "Use the editorial resume template to build a personal resume and portfolio page that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-resume.html and templates/web-resume.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nContent to replace:\n- The name, role, intro, and contact entries in person become your real details; keep the name to two to four characters and fill all four contact entries;\n- summary is one concrete paragraph about what you shipped and what reusable artefact you left behind, not a list of adjectives;\n- Keep three roles in jobs with two to three result lines each, and lead with numbers instead of responsibilities;\n- Keep three items in projects (a three-column grid), about five in skills (percent is relative on one scale), and four in education;\n- Update the language, title, and description in meta.\n\nDesign goal:\nKeep the visual language of the template: a paper ground, an oversized serif name, a letterspaced role line, the ruled entry grid with a left date column, hairline skill bars, and the two-column education block. Adjust hue and type within that language, but do not turn it into a card flow, and do not add a portrait photo, rounded cards, or gradients."
         },
         "web-store": {
           "label": "Store Homepage",
-          "description": "Small shop or studio showcase page",
-          "prompt": "Help me create a showcase webpage for a bakery studio called \"Wheat Field Bakery\".\n\nPage content:\n- Hero image: Studio name, a slogan \"Baking with heart, warming every day\", \"View Menu\" button\n- Signature products: Display 6 popular product cards (including image placeholder, name, price, brief description)\n- About us: Studio story, founder philosophy, with a store environment image placeholder\n- Customer reviews: 3 user reviews with avatars and star ratings\n- Contact and address: Business hours, address, phone, embedded map placeholder area\n\nDesign goal:\nCommunicate food, craft, and community. Select distinctive material, temperature, typography, and composition from the brand story; do not default to cream-brown, rounded cards, or handwritten type."
+          "description": "Craft catalog shop and menu page",
+          "prompt": "Use the craft catalog template to build a shop homepage that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-store.html and templates/web-store.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nContent to replace:\n- The shop name, opening hours, and navigation in shop become your own store; keep the navigation to three items pointing at #picks, #menu, and #visit;\n- The badge, headline, slogan, and two buttons in hero become your own promise, and keep that the only small label on the page;\n- Keep three signature items in picks, each with a name, a unit price, and one line about craft or taste; the artwork runs bowl, plate, bottle in that order, so the copy has to match the shape;\n- Keep two groups of five lines in menu; price holds digits only, the unit goes in menu.lede, and the dotted leader is drawn by the template;\n- Write all four lines in visit (address, hours, phone, note) and turn closing into your booking route;\n- The hero artwork and the map are pure CSS, so keep them as they are rather than swapping in images.\n\nDesign goal:\nKeep the visual language of the template: a cool bone ground, the large CSS vessel still life with a bone-white card overlapping its corner, color-coded top rules on the pick cards, the dotted menu leaders, and the two-column visit block. Adjust hue and type within that language, but do not turn it into a rounded card flow, and do not add images or an icon library. Prices and times stay monospace, and the only dash character allowed is the plain hyphen."
         },
         "web-event": {
           "label": "Event Invitation",
-          "description": "Online invitation page for parties, weddings or events",
-          "prompt": "Help me create an online invitation webpage for a birthday party.\n\nEvent information:\n- Theme: \"Leo's 30th Birthday Party\"\n- Time: Saturday, August 15, 2025, 7:00 PM\n- Location: Starlight Garden Restaurant, 3rd Floor Terrace\n\nPage content:\n- Opening animation: Title fade-in, colorful confetti falling effect\n- Invitation message: A warm invitation text\n- Event schedule: Timeline showing party flow (check-in, dinner, games, cake, free socializing)\n- Dress code: Business casual, color reference image placeholder\n- Transportation guide: Address information and parking tips\n- RSVP confirmation: \"I will attend\" and \"Regrettably cannot attend\" two buttons\n\nDesign goal:\nCreate a memorable, ceremonial adult birthday experience with mobile-first RSVP. Independently select temperature, typography, motion, and spatial rhythm; do not default to stars, navy-and-gold, or a fixed celebration template."
+          "description": "Night invitation with a countdown, schedule and RSVP",
+          "prompt": "Use the night invitation template to build an invitation page that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-event.html and templates/web-event.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nContent to replace:\n- The event name, occasion line, and invite paragraph become the real details, and the eyebrow stays the only small tracked label on the page;\n- Keep three when cells and four program rows, and write each time step in monospace;\n- Write countdown.target as an ISO timestamp with a timezone (for example 2026-10-18T18:30:00+08:00) and make done the copy shown once the moment has passed;\n- Keep two or three fields in rsvp, move required onto the field you want validated, and make error say what is missing;\n- Replace footer with the host's real contact line.\n\nDesign goal:\nKeep the visual language of the template: the plum-black ground, one rose accent, the centered narrow measure, the four-unit countdown, the ruled schedule, the underlined fields, and all-square shapes. Adjust hue within that language, but this is a night invitation, so do not move it to a light ground. Do not add confetti, falling shapes, particles, or photography."
+        },
+        "web-product-launch": {
+          "label": "Product Launch Page",
+          "description": "Technical product launch page in a Swiss grid style",
+          "prompt": "Use the 经纬 (Jingwei) template to build a technical product launch page.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-product-launch.html and templates/web-product-launch.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nContent to replace:\n- Product name, one-line positioning, hero subcopy, and button labels become the product you are launching;\n- The four figures under the hero become real or plausible business numbers, specific rather than round;\n- Keep the structure of the comparison, definition, and quote sections, rewriting their content for the actual product;\n- The footer contact line becomes real information.\n\nDesign requirements:\nKeep the Swiss grid language of the template: strictly aligned columns, visible hairline rules, oversized numerals, high-contrast neutrals with a single signal color, and square shapes. Adjust hue and type within that language, but do not switch to a different design direction, and do not add rounded cards, gradient glows, or scroll animation."
+        },
+        "web-ops-console": {
+          "label": "Operations Console",
+          "description": "Exception-first operations monitoring console",
+          "prompt": "Use the 履约台 (Fulfilment Desk) template to build a business operations console.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-ops-console.html and templates/web-ops-console.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nContent to replace:\n- The page title and scope line in view become your own business vocabulary;\n- Keep four cards in kpis with specific numbers (96.4%, 12m 38s) rather than round figures, and mark the one that needs alarm with alert: true;\n- Sort queue.rows by largest impact first and use critical, warn, steady, or plain for tone;\n- Keep four items in dist, where width is a relative bar width rather than a linear conversion, so small counts stay visible;\n- Replace shift.rows with the real on-shift people and keep copy.foot in sync.\n\nDesign requirements:\nKeep the low-noise interface language of the template: a light grey ground with white panels, hairline dividers, semantic status colors, and tabular numerals. Exceptions must be visible and obvious in the first screen, progress-like information uses thin bars without background tracks or plain numbers, and do not add dashboard ornament, large color blocks, or scroll animation."
         },
         "web-survey": {
           "label": "Survey Questionnaire",
-          "description": "Online form and questionnaire collection page",
-          "prompt": "Help me create a customer satisfaction survey questionnaire webpage.\n\nQuestionnaire title: \"Your Feedback is Important to Us\"\n\nQuestionnaire content:\n- Basic information: Name (optional), Contact (optional)\n- Single choice: Overall satisfaction (Very satisfied/Satisfied/Neutral/Dissatisfied/Very dissatisfied)\n- Single choice: Would you recommend to friends (1-10 rating slider)\n- Multiple choice: What aspects do you value most (Product quality/Service attitude/Response speed/Value for money/After-sales support)\n- Single choice: Usage frequency (Daily/Weekly/Monthly/Occasionally)\n- Text question: Your suggestions or opinions (large text box)\n- Submit button, show thank you page after submission\n\nDesign goal:\nMake completion easy, trustworthy, and mobile-friendly with clear progress and feedback states. Choose a restrained but distinctive system for this task; do not default to a white-and-teal survey template."
+          "description": "Focused form document with a sticky progress bar",
+          "prompt": "Use the focused form template to build an online questionnaire that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-survey.html and templates/web-survey.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nContent to replace:\n- The title, intro, and estimate in survey become your questionnaire, and the question count in estimate must match the real number;\n- Keep about four entries in questions, using radio, checkbox, range, or textarea, and put required on the ones that must be answered;\n- Keep three to five options per question, label within sixteen characters, and use note when an option needs a short explanation;\n- Rewrite submit and done in your own voice and use done.emptyAnswer for skipped questions;\n- bar.progressTemplate must keep the {done} and {total} placeholders.\n\nDesign goal:\nKeep the visual language of the template: the sticky hairline progress bar, the 640px measure, two-digit question numbers, drawn choice marks, and square textareas. Adjust hue and type within that language, but do not turn it into a card-style survey, and do not wire it to a backend or a third-party form service."
+        },
+        "web-game-snake": {
+          "label": "Mini-game: Snake",
+          "description": "Single-file snake with three speeds and run history",
+          "prompt": "Use the Phosphor template to build a snake mini-game that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-game-snake.html and templates/web-game-snake.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nGameplay and rules:\n- Arrow keys and WASD steer, on-screen direction buttons cover touch, and diagonal input is not accepted;\n- Eating food grows the snake and raises the score, and hitting a wall or the snake itself ends the run so the player can restart straight away;\n- Pause is supported and the scrim stays translucent so the board is still visible;\n- Recent runs are kept in local storage, and changing storageKey clears them.\n\nContent to replace:\n- Rewrite the title, subtitle, button labels, and overlay copy in copy;\n- rules exposes cols, rows, cell, startLength, and three speed steps, and a larger cell widens the board;\n- In copy.keysHint, wrap key names in double brackets such as [[Space]] and the render layer turns them into keycaps;\n- theme.food is the food color and has to stay distinguishable from the snake.\n\nDesign goal:\nKeep the visual language of the template: the near-black olive ground, one mint accent, monospace type, the square-cell board, the snake head with eyes, and the diamond food. Adjust hue and type within that language, but do not switch to a black-and-neon pixel look, and do not add rounded candy-colored cards."
+        },
+        "web-game-2048": {
+          "label": "Mini-game: 2048",
+          "description": "Single-file 2048 with a tile ladder and one-step undo",
+          "prompt": "Use the slate ladder template to build a 2048 number-merging game that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-game-2048.html and templates/web-game-2048.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nGameplay and rules:\n- The board is fixed at 4x4, arrow keys, WASD, and swiping on the board all move the tiles, and equal tiles merge into a doubled value;\n- After each move a new 2 or 4 appears in an empty cell, and the run ends when no move is possible;\n- Keep the single-step undo, and the button greys out once it is used;\n- The best score is kept in local storage, and changing storageKey clears it.\n\nContent to replace:\n- Rewrite the title, subtitle, both buttons, the end-screen copy, and the rules lines in copy;\n- rules exposes storageKey, startTiles, and winValue;\n- tiles is the value-to-color ladder, covering 2 through 2048 with a beyond fallback, and the keys must not skip values;\n- Every step's bg and fg pair has to pass WCAG AA, so check each one after changing colors.\n\nDesign goal:\nKeep the visual language of the template: the slate ground, one cobalt accent, the two score readouts at the top, the ladder strip under the board, and rounding only on the tiles. Adjust hue within that language, but the ladder has to stay one hue pushing through lightness, and the board must not fall back to beige with candy-colored tiles."
+        },
+        "web-game-typing": {
+          "label": "Mini-game: Typing Drill",
+          "description": "Timed English typing drill with per-character feedback",
+          "prompt": "Use the cool paper typing template to build an English typing drill that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-game-typing.html and templates/web-game-typing.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nGameplay and rules:\n- The page shows an English passage and compares character by character: correct characters darken, mistakes turn red, and the current character carries a single underline;\n- Speed, accuracy, and remaining time update live at the top, and the result card appears when the timer runs out or the passage is finished;\n- Keep the three time steps and the next-passage button, and let Enter restart a round immediately;\n- Results stay on the page only, and a refresh clears them.\n\nContent to replace:\n- Rewrite the title, the line under it, the metric labels, and the result-card copy in copy;\n- Replace passages with three English passages of 110-170 characters each, using only English and common punctuation, because an IME breaks the character-by-character comparison;\n- Keep two or three scoring notes in notes;\n- An empty theme follows the system color scheme, and pinning one means writing all nine values, since a partial set locks the page to light.\n\nDesign goal:\nKeep the visual language of the template: the cool paper ground, one deep teal accent, the monospace passage area, the square metric strip, and the 2px progress line under the panel. Adjust hue within that language, but do not switch to a green-on-black terminal look, and do not add typewriter sound."
         }
       }
     },
@@ -235,7 +351,9 @@
         "research-industry": { "label": "Industry Trends", "description": "Map the market and its direction", "prompt": "Conduct deep research on the industry I specify, covering market size, key players, trends, opportunities, risks, and source-backed conclusions." },
         "research-competitors": { "label": "Competitor Analysis", "description": "Compare positioning and capabilities", "prompt": "Prepare a competitor analysis comparing positioning, users, features, pricing, strengths, weaknesses, and differentiation opportunities in a table." },
         "research-policy": { "label": "Policy Analysis", "description": "Explain impact and requirements", "prompt": "Analyze the policy or regulation I provide, extracting requirements, scope, dates, business impact, and implementation advice while flagging uncertainty." },
-        "research-literature": { "label": "Literature Review", "description": "Organize the research landscape", "prompt": "Create a literature review framework for the topic, summarizing methods, consensus, disagreements, gaps, and follow-up research questions." }
+        "research-literature": { "label": "Literature Review", "description": "Organize the research landscape", "prompt": "Create a literature review framework for the topic, summarizing methods, consensus, disagreements, gaps, and follow-up research questions." },
+        "research-user": { "label": "User Research", "description": "Interview based need insight report", "prompt": "Please run a round of target user research and produce a report. The subjects are frontline users, and the focus is the problems they hit in real work.\n\nThe report should cover the sample composition and method, the current workflow and where it breaks down, a ranked list of needs with the reasoning behind it, representative quotes, and concrete product recommendations. Every conclusion needs a stated source, not just an opinion." },
+        "research-market-entry": { "label": "Market Entry", "description": "Feasibility study for a new market", "prompt": "Please assess the feasibility of entering the market I specify, across four dimensions: demand size, acquisition cost, compliance burden, and delivery capability.\n\nThe report should include the evidence and sources behind each dimension, an overall ranking of the candidate markets, a staged entry plan with goals for each stage, and the main risks with mitigations. Close by stating clearly which markets to enter, which to watch, and which to defer." }
       }
     },
     "academic-research": {
@@ -244,7 +362,9 @@
         "academic-outline": { "label": "Paper Outline", "description": "Build a clear paper structure", "prompt": "Design an academic paper outline for my topic with research questions, framework, methods, results, and discussion, including writing guidance for each section." },
         "academic-review": { "label": "Literature Notes", "description": "Extract and connect key studies", "prompt": "Organize the literature I provide by topic, method, and conclusion; extract key claims and identify support, contradictions, and useful citations." },
         "academic-method": { "label": "Research Method", "description": "Choose a suitable study design", "prompt": "Compare research methods for my objective and data, then recommend a design with variables, sample needs, steps, and limitations." },
-        "academic-polish": { "label": "Academic Editing", "description": "Improve rigor and clarity", "prompt": "Edit the paper passage I provide into precise, coherent academic English while preserving meaning, and list the key revisions." }
+        "academic-polish": { "label": "Academic Editing", "description": "Improve rigor and clarity", "prompt": "Edit the paper passage I provide into precise, coherent academic English while preserving meaning, and list the key revisions." },
+        "academic-data-analysis": { "label": "Data and Statistics", "description": "Statistical methods and results for survey data", "prompt": "Please help me write the data processing and statistical analysis section of my thesis. The subject is survey data.\n\nInclude a table mapping variables to measurement methods, how missing values were handled, how reliability and validity are reported, the statistical method matched to each research question with its output, and the conventional way to write up results. Explain why each method was chosen rather than listing formulas." },
+        "academic-grant": { "label": "Research Proposal", "description": "Proposal outline for thesis or grant application", "prompt": "Please put together a writing framework for a research proposal, for a thesis opening report or a grant application.\n\nInclude how to frame the rationale and the research question, a layered breakdown of the research content with its key questions, the technical route and methods, the schedule with staged deliverables, expected outcomes and contributions, and the budget and feasibility notes. For each part, note what reviewers look for." }
       }
     },
     "docs": {
@@ -253,7 +373,9 @@
         "docs-meeting": { "label": "Meeting Minutes", "description": "Turn discussion into action items", "prompt": "Turn my meeting notes into formal minutes with agenda, decisions, action items, owners, and due dates." },
         "docs-report": { "label": "Work Report", "description": "Create a structured formal report", "prompt": "Write a formal work report from my materials covering background, progress, data, issues, recommendations, and next steps." },
         "docs-summary": { "label": "Document Summary", "description": "Extract the essentials quickly", "prompt": "Read the document I provide and return a concise summary, key facts, conclusions, risks, and questions requiring confirmation." },
-        "docs-polish": { "label": "Document Editing", "description": "Improve language and structure", "prompt": "Edit my document for grammar, wording, structure, and appropriate formality while preserving facts and intent, then provide the complete revised version." }
+        "docs-polish": { "label": "Document Editing", "description": "Improve language and structure", "prompt": "Edit my document for grammar, wording, structure, and appropriate formality while preserving facts and intent, then provide the complete revised version." },
+        "docs-prd": { "label": "PRD", "description": "Product requirements with acceptance criteria", "prompt": "Please write a product requirements document (PRD) that:\n\n1. Explains the background, target users and the problem to solve;\n2. Lists the functional requirements with priority and acceptance criteria;\n3. Describes the end-to-end flow of the core scenarios;\n4. States clearly what is out of scope for this release;\n5. Lists dependencies and the main risks;\n6. Stays concise and is ready to hand to engineering for review." },
+        "docs-notice": { "label": "Notice", "description": "Internal notice and announcement drafting", "prompt": "Please draft an internal company notice about adjusting the submission time and method for monthly reports. It should:\n\n1. Use a proper title with document number, issuing department and date;\n2. Open with the reason and basis for the change;\n3. List the specific changes item by item;\n4. State the requirements and who owns each;\n5. Note when it takes effect;\n6. Close with a feedback channel and the signature block." }
       }
     }
   }

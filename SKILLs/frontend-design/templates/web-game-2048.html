@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --bg: #0f1216;
+    --surface: #171b21;
+    --board: #151920;
+    --cell: #1b2029;
+    --line: #252b35;
+    --line-strong: #333b47;
+    --ink: #e9edf3;
+    --muted: #8e98a6;
+    --faint: #657080;
+    --accent: #5b86f0;
+    --on-accent: #0b0f16;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, Menlo, monospace;
+    --unit: clamp(58px, 17.5vw, 96px);
+    --gap: calc(var(--unit) * 0.125);
+    --pad: clamp(9px, 1.6vw, 12px);
+    --settle: 120ms;
+    color-scheme: dark;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 20px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, p { margin: 0; }
+  button { font: inherit; color: inherit; }
+
+  .shell { width: 100%; max-width: 700px; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ── 抬头 ─────────────────────────────────────────────── */
+  .head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  h1 { font-size: 21px; font-weight: 600; letter-spacing: 0.14em; }
+
+  .sub { margin-top: 9px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+
+  .stats { display: flex; gap: 30px; text-align: right; }
+
+  .stat { position: relative; }
+
+  .stat-key { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+
+  .stat-val {
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 21px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-val.is-best { color: var(--accent); }
+
+  .gain {
+    position: absolute;
+    top: -6px;
+    right: 0;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1;
+    color: var(--accent);
+    opacity: 0;
+  }
+
+  .gain.on { animation: gainLift 760ms ease-out; }
+
+  @keyframes gainLift {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-16px); }
+  }
+
+  /* ── 操作条 ───────────────────────────────────────────── */
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .bar-hint { font-size: 13px; line-height: 1.7; color: var(--muted); }
+
+  .bar-actions { display: flex; gap: 10px; }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    padding: 11px 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .btn:hover { background: transparent; color: var(--accent); }
+
+  .btn.is-ghost { background: transparent; color: var(--accent); border-color: var(--line-strong); }
+
+  .btn.is-ghost:hover { border-color: var(--accent); }
+
+  .btn:disabled { opacity: 0.42; cursor: not-allowed; }
+
+  .btn:disabled:hover { background: transparent; color: var(--accent); border-color: var(--line-strong); }
+
+  /* ── 棋盘 ─────────────────────────────────────────────── */
+  .stage { display: flex; justify-content: center; margin-top: 22px; }
+
+  .board {
+    position: relative;
+    padding: var(--pad);
+    background: var(--board);
+    border: 1px solid var(--line);
+    touch-action: none;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, var(--unit));
+    grid-template-rows: repeat(4, var(--unit));
+    gap: var(--gap);
+  }
+
+  .cell { background: var(--cell); }
+
+  .tiles { position: absolute; inset: var(--pad); }
+
+  .tile {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--unit);
+    height: var(--unit);
+    display: grid;
+    place-content: center;
+    font-family: var(--mono);
+    font-size: calc(var(--unit) * 0.36);
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    will-change: transform;
+    transition: transform var(--settle) ease-out;
+  }
+
+  .board.is-measuring .tile { transition: none; }
+
+  .tile.d3 { font-size: calc(var(--unit) * 0.3); }
+
+  .tile.d4 { font-size: calc(var(--unit) * 0.24); }
+
+  .tile.is-new { animation: tileIn 160ms ease-out; }
+
+  .tile.was-merged { animation: tilePop 160ms ease-out; }
+
+  @keyframes tileIn {
+    from { scale: 0.5; opacity: 0; }
+    to { scale: 1; opacity: 1; }
+  }
+
+  @keyframes tilePop {
+    0% { scale: 1; }
+    55% { scale: 1.14; }
+    100% { scale: 1; }
+  }
+
+  .over {
+    position: absolute;
+    inset: 0;
+    display: none;
+    place-content: center;
+    padding: 24px;
+    text-align: center;
+    background: rgba(11, 15, 22, 0.82);
+  }
+
+  .over.on { display: grid; }
+
+  .over h2 { font-size: 19px; font-weight: 600; letter-spacing: 0.05em; }
+
+  .over-score {
+    margin-top: 14px;
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+  }
+
+  .over p { max-width: 30ch; margin: 12px auto 0; font-size: 13.5px; line-height: 1.75; color: var(--muted); }
+
+  /* ── 分值梯度 ─────────────────────────────────────────── */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 26px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  .legend-label { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+
+  .legend-list { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .chip {
+    width: calc(var(--unit) * 0.44);
+    height: calc(var(--unit) * 0.44);
+    display: grid;
+    place-content: center;
+    font-family: var(--mono);
+    font-size: calc(var(--unit) * 0.145);
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rules { margin-top: 22px; font-size: 13px; line-height: 1.95; color: var(--muted); }
+
+  .win-note {
+    display: none;
+    margin-top: 18px;
+    padding: 12px 16px;
+    border-left: 2px solid var(--accent);
+    background: var(--surface);
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+
+  .win-note.on { display: block; }
+
+  /* 矮窗口：整局收进一屏，避免出现滚动条与半截棋盘 */
+  @media (max-height: 780px) {
+    body { align-items: flex-start; padding: 20px; }
+    :root { --unit: clamp(54px, 12vh, 78px); }
+    .head { padding-bottom: 12px; }
+    .bar { margin-top: 16px; }
+    .stage { margin-top: 16px; }
+    .legend { margin-top: 16px; padding-top: 12px; }
+    .rules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 20px; margin-top: 14px; line-height: 1.75; }
+  }
+
+  @media (max-width: 560px) {
+    body { align-items: flex-start; padding: 28px 16px 36px; }
+    .head { flex-wrap: wrap; }
+    .stats { gap: 22px; }
+    .bar { flex-direction: column; align-items: stretch; }
+    .bar-actions { justify-content: stretch; }
+    .btn { flex: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="head">
+    <div>
+      <h1 id="game-title"></h1>
+      <p class="sub" id="game-sub"></p>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-key" id="score-key"></div>
+        <div class="stat-val" id="score-val">0</div>
+        <span class="gain" id="gain"></span>
+      </div>
+      <div class="stat">
+        <div class="stat-key" id="best-key"></div>
+        <div class="stat-val is-best" id="best-val">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <p class="bar-hint" id="bar-hint"></p>
+    <div class="bar-actions">
+      <button class="btn is-ghost" type="button" id="undo"></button>
+      <button class="btn" type="button" id="restart"></button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="board" id="board" role="group">
+      <div class="grid" id="grid"></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="over" id="over">
+        <div>
+          <h2 id="over-title"></h2>
+          <div class="over-score" id="over-score"></div>
+          <p id="over-text"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="win-note" id="win-note"></p>
+
+  <div class="legend">
+    <span class="legend-label" id="legend-label"></span>
+    <div class="legend-list" id="legend-list"></div>
+  </div>
+
+  <div class="rules" id="rules"></div>
+</div>
+
+<script>
+  // 可编辑区：文案、配色、分值梯度与规则都在这个对象里。改内容只改这里。
+  const TEMPLATE = {
+    meta: {
+      lang: 'zh-CN',
+      title: '2048 合并',
+      description: '单文件 2048 数字合并游戏，支持键盘与滑动操作。',
+    },
+
+    theme: {
+      bg: '#0f1216',
+      surface: '#171b21',
+      board: '#151920',
+      cell: '#1b2029',
+      line: '#252b35',
+      lineStrong: '#333b47',
+      ink: '#e9edf3',
+      muted: '#8e98a6',
+      faint: '#657080',
+      accent: '#5b86f0',
+      onAccent: '#0b0f16',
+    },
+
+    copy: {
+      title: '2048 合并',
+      subtitle: '同值方块相撞就翻倍，凑出 2048',
+      scoreLabel: '本局分数',
+      bestLabel: '本机最高',
+      undoLabel: '撤销一步',
+      restartLabel: '新游戏',
+      hint: '方向键或 WASD 移动，手机可以直接滑动棋盘。',
+      legendLabel: '分值梯度',
+      overTitle: '没有可以移动的方向了',
+      overText: '这一局拿到 {score} 分。重开一局？',
+      winNote: '已经凑出 2048。继续玩可以往上叠，或者开一局新的。',
+      rules: [
+        '每一格在一次移动里只会合并一次，先滑到的一对先合。',
+        '撤销只回退一步，开新局会清空记录。',
+        '最高分记在这台机器的浏览器里，换浏览器或清缓存就没了。',
+      ],
+    },
+
+    rules: {
+      storageKey: 'merge-2048-best',
+      startTiles: 2,
+      winValue: 2048,
+    },
+
+    tiles: {
+      '2': { bg: '#232a35', fg: '#93a0b0' },
+      '4': { bg: '#2a3341', fg: '#a8b4c4' },
+      '8': { bg: '#33405a', fg: '#cbd6e6' },
+      '16': { bg: '#3b4d75', fg: '#e8eef8' },
+      '32': { bg: '#3f5da4', fg: '#ffffff' },
+      '64': { bg: '#4a72cc', fg: '#ffffff' },
+      '128': { bg: '#5b86f0', fg: '#0b0f16' },
+      '256': { bg: '#7ba0f5', fg: '#0b0f16' },
+      '512': { bg: '#9db9f9', fg: '#0b0f16' },
+      '1024': { bg: '#c0d1fc', fg: '#0b0f16' },
+      '2048': { bg: '#e6edff', fg: '#0b0f16' },
+      beyond: { bg: '#f2f5ff', fg: '#0b0f16' },
+    },
+  };
+  // ── 可编辑区结束 ──
+
+  (function () {
+    const meta = TEMPLATE.meta || {};
+    const theme = TEMPLATE.theme || {};
+    const copy = TEMPLATE.copy || {};
+    const RULES = TEMPLATE.rules || {};
+    const LADDER = TEMPLATE.tiles || {};
+
+    const SIZE = 4;
+    const SETTLE = 120;
+    const STORAGE_KEY = RULES.storageKey || 'merge-2048-best';
+    const WIN_VALUE = RULES.winValue || 2048;
+    const START_TILES = RULES.startTiles || 2;
+
+    const VEC = {
+      up: { x: 0, y: -1 },
+      down: { x: 0, y: 1 },
+      left: { x: -1, y: 0 },
+      right: { x: 1, y: 0 },
+    };
+
+    const byId = id => document.getElementById(id);
+
+    const setText = (id, value) => {
+      const node = byId(id);
+      if (node) node.textContent = value == null ? '' : String(value);
+    };
+
+    /* 主题 */
+    const themeVars = {
+      bg: '--bg',
+      surface: '--surface',
+      board: '--board',
+      cell: '--cell',
+      line: '--line',
+      lineStrong: '--line-strong',
+      ink: '--ink',
+      muted: '--muted',
+      faint: '--faint',
+      accent: '--accent',
+      onAccent: '--on-accent',
+    };
+
+    Object.keys(themeVars).forEach(key => {
+      if (theme[key]) document.documentElement.style.setProperty(themeVars[key], theme[key]);
+    });
+
+    if (meta.lang) document.documentElement.lang = meta.lang;
+    if (meta.title) document.title = meta.title;
+    const desc = byId('doc-desc');
+    if (desc && meta.description) desc.setAttribute('content', meta.description);
+
+    /* 文案 */
+    setText('game-title', copy.title);
+    setText('game-sub', copy.subtitle);
+    setText('score-key', copy.scoreLabel);
+    setText('best-key', copy.bestLabel);
+    setText('bar-hint', copy.hint);
+    setText('undo', copy.undoLabel);
+    setText('restart', copy.restartLabel);
+    setText('legend-label', copy.legendLabel);
+    setText('over-title', copy.overTitle);
+
+    const board = byId('board');
+    const gridHost = byId('grid');
+    const tilesHost = byId('tiles');
+    const over = byId('over');
+    const overScore = byId('over-score');
+    const overText = byId('over-text');
+    const winNote = byId('win-note');
+    const gainEl = byId('gain');
+    const undoBtn = byId('undo');
+    const restartBtn = byId('restart');
+    const scoreVal = byId('score-val');
+    const bestVal = byId('best-val');
+
+    /* 静态格子 */
+    for (let i = 0; i < SIZE * SIZE; i += 1) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      gridHost.appendChild(cell);
+    }
+
+    /* 分值梯度条 */
+    const ladderList = byId('legend-list');
+    Object.keys(LADDER)
+      .filter(key => key !== 'beyond' && Number(key) >= 2)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .forEach(value => {
+        const entry = LADDER[String(value)];
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.style.background = entry.bg;
+        chip.style.color = entry.fg;
+        chip.textContent = String(value);
+        ladderList.appendChild(chip);
+      });
+
+    /* 规则 */
+    const rulesHost = byId('rules');
+    (copy.rules || []).forEach(line => {
+      const row = document.createElement('div');
+      row.textContent = String(line);
+      rulesHost.appendChild(row);
+    });
+
+    /* 状态 */
+    const tiles = [];
+    let score = 0;
+    let best = 0;
+    let over2 = false;
+    let winShown = false;
+    let previous = null;
+    let settle = null;
+
+    const metrics = () => {
+      const cell = gridHost.firstElementChild;
+      const measured = cell ? cell.getBoundingClientRect().width : 0;
+      const gap = parseFloat(getComputedStyle(gridHost).rowGap);
+      const unit = measured > 0 ? measured : 96;
+      return { step: unit + (isFinite(gap) ? gap : unit * 0.125) };
+    };
+
+    const place = tile => {
+      const step = metrics().step;
+      tile.el.style.transform =
+        'translate(' + (tile.x * step).toFixed(2) + 'px,' + (tile.y * step).toFixed(2) + 'px)';
+    };
+
+    const tileClass = (value, extra) => {
+      const digits = String(value).length;
+      const size = digits >= 4 ? ' d4' : digits === 3 ? ' d3' : '';
+      return 'tile' + size + (extra ? ' ' + extra : '');
+    };
+
+    const paint = tile => {
+      const entry = LADDER[String(tile.value)] || LADDER.beyond || { bg: '#ffffff', fg: '#000000' };
+      tile.el.className = tileClass(tile.value, '');
+      tile.el.style.background = entry.bg;
+      tile.el.style.color = entry.fg;
+      tile.el.textContent = String(tile.value);
+    };
+
+    const inBounds = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE;
+
+    const tileAt = (x, y) => {
+      for (let i = 0; i < tiles.length; i += 1) {
+        const tile = tiles[i];
+        if (!tile.dead && tile.x === x && tile.y === y) return tile;
+      }
+      return null;
+    };
+
+    const addTile = (x, y, value, isNew) => {
+      const el = document.createElement('div');
+      const tile = { x: x, y: y, value: value, merged: false, dead: false, el: el };
+      paint(tile);
+      if (isNew) el.classList.add('is-new');
+      place(tile);
+      tilesHost.appendChild(el);
+      tiles.push(tile);
+      return tile;
+    };
+
+    const empties = () => {
+      const out = [];
+      for (let y = 0; y < SIZE; y += 1) {
+        for (let x = 0; x < SIZE; x += 1) {
+          if (!tileAt(x, y)) out.push({ x: x, y: y });
+        }
+      }
+      return out;
+    };
+
+    const spawnTile = () => {
+      const free = empties();
+      if (!free.length) return null;
+      const spot = free[Math.floor(Math.random() * free.length)];
+      return addTile(spot.x, spot.y, Math.random() < 0.9 ? 2 : 4, true);
+    };
+
+    const renderStats = () => {
+      scoreVal.textContent = String(score);
+      const shown = Math.max(best, score);
+      bestVal.textContent = String(shown);
+      if (shown > best) {
+        best = shown;
+        try {
+          localStorage.setItem(STORAGE_KEY, String(best));
+        } catch (err) {
+          /* 无痕模式下写不进去，忽略 */
+        }
+      }
+    };
+
+    const updateUndo = () => {
+      undoBtn.disabled = !previous;
+    };
+
+    const updateWinNote = () => {
+      const reached = winShown || tiles.some(tile => !tile.dead && tile.value >= WIN_VALUE);
+      if (reached && !winShown) winShown = true;
+      winNote.classList.toggle('on', winShown);
+      if (winShown) winNote.textContent = copy.winNote == null ? '' : String(copy.winNote);
+    };
+
+    const showGain = amount => {
+      gainEl.textContent = '+' + amount;
+      gainEl.classList.remove('on');
+      void gainEl.offsetWidth;
+      gainEl.classList.add('on');
+    };
+
+    const showOver = () => {
+      over2 = true;
+      overScore.textContent = String(score);
+      overText.textContent = String(copy.overText || '').replace('{score}', String(score));
+      over.classList.add('on');
+    };
+
+    const hideOver = () => {
+      over2 = false;
+      over.classList.remove('on');
+    };
+
+    const isStuck = () => {
+      if (empties().length) return false;
+      for (let y = 0; y < SIZE; y += 1) {
+        for (let x = 0; x < SIZE; x += 1) {
+          const tile = tileAt(x, y);
+          const right = x + 1 < SIZE ? tileAt(x + 1, y) : null;
+          const down = y + 1 < SIZE ? tileAt(x, y + 1) : null;
+          if (right && right.value === tile.value) return false;
+          if (down && down.value === tile.value) return false;
+        }
+      }
+      return true;
+    };
+
+    const flushSettle = () => {
+      if (!settle) return;
+      const handle = settle;
+      settle = null;
+      if (handle.timer) clearTimeout(handle.timer);
+      handle.run();
+    };
+
+    const afterSettle = run => {
+      flushSettle();
+      const handle = { run: run, timer: null };
+      handle.timer = setTimeout(() => {
+        if (settle === handle) {
+          settle = null;
+          handle.timer = null;
+          run();
+        }
+      }, SETTLE);
+      settle = handle;
+    };
+
+    const findFarthest = (tile, v) => {
+      let prev = { x: tile.x, y: tile.y };
+      let cur = { x: prev.x + v.x, y: prev.y + v.y };
+      while (inBounds(cur.x, cur.y) && !tileAt(cur.x, cur.y)) {
+        prev = cur;
+        cur = { x: prev.x + v.x, y: prev.y + v.y };
+      }
+      return { farthest: prev, next: inBounds(cur.x, cur.y) ? cur : null };
+    };
+
+    const traversals = v => {
+      const xs = [0, 1, 2, 3];
+      const ys = [0, 1, 2, 3];
+      if (v.x > 0) xs.reverse();
+      if (v.y > 0) ys.reverse();
+      return { xs: xs, ys: ys };
+    };
+
+    const capture = () => ({
+      score: score,
+      tiles: tiles.filter(tile => !tile.dead).map(tile => ({ x: tile.x, y: tile.y, value: tile.value })),
+    });
+
+    const move = dir => {
+      if (over2) return;
+      flushSettle();
+      const v = VEC[dir];
+      if (!v) return;
+
+      const before = capture();
+      const order = traversals(v);
+      const removals = [];
+      const promotions = [];
+      let gain = 0;
+      let moved = false;
+
+      tiles.forEach(tile => {
+        tile.merged = false;
+      });
+
+      order.xs.forEach(x => {
+        order.ys.forEach(y => {
+          const tile = tileAt(x, y);
+          if (!tile) return;
+          const res = findFarthest(tile, v);
+          const target = res.next ? tileAt(res.next.x, res.next.y) : null;
+
+          if (target && target.value === tile.value && !target.merged) {
+            tile.x = target.x;
+            tile.y = target.y;
+            tile.dead = true;
+            target.merged = true;
+            target.value *= 2;
+            gain += target.value;
+            removals.push(tile);
+            promotions.push(target);
+            moved = true;
+          } else if (res.farthest.x !== tile.x || res.farthest.y !== tile.y) {
+            tile.x = res.farthest.x;
+            tile.y = res.farthest.y;
+            moved = true;
+          }
+        });
+      });
+
+      if (!moved) return;
+
+      previous = before;
+      tiles.forEach(place);
+      score += gain;
+      if (gain > 0) showGain(gain);
+      renderStats();
+
+      afterSettle(() => {
+        removals.forEach(tile => {
+          if (tile.el.parentNode) tile.el.parentNode.removeChild(tile.el);
+        });
+        for (let i = tiles.length - 1; i >= 0; i -= 1) {
+          if (tiles[i].dead) tiles.splice(i, 1);
+        }
+        promotions.forEach(tile => {
+          paint(tile);
+          tile.el.classList.add('was-merged');
+          setTimeout(() => tile.el.classList.remove('was-merged'), 200);
+        });
+        spawnTile();
+        renderStats();
+        updateUndo();
+        updateWinNote();
+        if (isStuck()) showOver();
+      });
+    };
+
+    const restart = () => {
+      flushSettle();
+      tiles.forEach(tile => {
+        if (tile.el.parentNode) tile.el.parentNode.removeChild(tile.el);
+      });
+      tiles.length = 0;
+      score = 0;
+      previous = null;
+      winShown = false;
+      hideOver();
+      updateWinNote();
+      for (let i = 0; i < START_TILES; i += 1) spawnTile();
+      renderStats();
+      updateUndo();
+    };
+
+    const undo = () => {
+      if (!previous) return;
+      flushSettle();
+      const state = previous;
+      previous = null;
+      tiles.forEach(tile => {
+        if (tile.el.parentNode) tile.el.parentNode.removeChild(tile.el);
+      });
+      tiles.length = 0;
+      score = state.score;
+      state.tiles.forEach(item => addTile(item.x, item.y, item.value, false));
+      hideOver();
+      winShown = state.tiles.some(item => item.value >= WIN_VALUE);
+      updateWinNote();
+      renderStats();
+      updateUndo();
+    };
+
+    /* 键盘 */
+    const keyMap = {
+      ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+      w: 'up', s: 'down', a: 'left', d: 'right',
+      W: 'up', S: 'down', A: 'left', D: 'right',
+    };
+
+    window.addEventListener('keydown', ev => {
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      const dir = keyMap[ev.key];
+      if (!dir) return;
+      ev.preventDefault();
+      move(dir);
+    });
+
+    /* 滑动 */
+    let touchStart = null;
+
+    board.addEventListener('pointerdown', ev => {
+      touchStart = { x: ev.clientX, y: ev.clientY };
+    });
+
+    window.addEventListener('pointerup', ev => {
+      if (!touchStart) return;
+      const dx = ev.clientX - touchStart.x;
+      const dy = ev.clientY - touchStart.y;
+      touchStart = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+      if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+      else move(dy > 0 ? 'down' : 'up');
+    });
+
+    restartBtn.addEventListener('click', restart);
+    undoBtn.addEventListener('click', undo);
+
+    /* 尺寸变化时重新落位，不播放位移过渡 */
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+      board.classList.add('is-measuring');
+      tiles.forEach(place);
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        resizeTimer = null;
+        board.classList.remove('is-measuring');
+      }, 80);
+    });
+
+    /* 开局 */
+    try {
+      const stored = Number(localStorage.getItem(STORAGE_KEY));
+      if (isFinite(stored) && stored > 0) best = stored;
+    } catch (err) {
+      best = 0;
+    }
+    restart();
+    requestAnimationFrame(() => tiles.forEach(place));
+  })();
+</script>
+</body>
+</html>

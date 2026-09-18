@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-data-analysis</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:32px;background:#eceae4}
+.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
+.ptitle{font-size:23px;text-align:center;line-height:1.4}
+.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.flow i{color:#b8b5ab;font-style:normal}
+.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
+.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:11px;align-content:start}
+h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+ul{list-style:none;margin-top:8px;display:grid;gap:7px}
+li{position:relative;padding-left:14px;font-size:12px;color:#4c5058;line-height:1.85}
+li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.metric{border:1px solid #eeede7;background:#faf9f6;padding:8px 11px}
+.metric b{display:block;font-size:20px;letter-spacing:-.02em;color:var(--accent)}
+.metric span{display:block;margin-top:5px;font-size:11px;color:#8b8f97}
+</style></head><body>
+<div class="page" style="--accent:#7C3AED">
+  <div class="ptitle serif">问卷数据的统计方法与结果呈现</div>
+  <div class="authors">有效样本 412 份 · 回收率 91.6% · 数据处理与统计部分</div>
+  <div class="sections">
+    <div>
+      <h4>变量与测量</h4>
+      <table>
+        <tr><th>变量</th><th>测量方式</th><th>题项</th><th>缺失值处理</th></tr>
+        <tr><td>任务边界清晰度</td><td>李克特五点量表</td><td class="mono">4</td><td>均值填补（缺失 6 例）</td></tr>
+        <tr><td>审批与回溯需求</td><td>李克特五点量表</td><td class="mono">5</td><td>整卷剔除（缺失 3 例）</td></tr>
+        <tr><td>使用频率</td><td>单选分级</td><td class="mono">1</td><td>无缺失</td></tr>
+        <tr><td>落地成效自评</td><td>李克特七点量表</td><td class="mono">3</td><td>均值填补（缺失 2 例）</td></tr>
+      </table>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>0.87</b><span>Cronbach α</span></div>
+      <div class="metric"><b>0.81</b><span>KMO 值</span></div>
+      <div class="metric"><b>4</b><span>提取因子数</span></div>
+      <div class="metric"><b>68.4%</b><span>累计方差解释率</span></div>
+    </div>
+    <div>
+      <h4>研究问题与对应方法</h4>
+      <table>
+        <tr><th>研究问题</th><th>适用方法</th><th>输出</th></tr>
+        <tr><td>不同规模团队的流程需求是否存在差异</td><td>单因素方差分析</td><td>组间差异表 + 事后检验</td></tr>
+        <tr><td>任务边界清晰度能否预测落地成效</td><td>多元回归</td><td>回归系数表 + 调整后 R²</td></tr>
+        <tr><td>需求结构包含哪些维度</td><td>探索性因子分析</td><td>因子载荷矩阵</td></tr>
+      </table>
+    </div>
+    <div>
+      <h4>结果呈现的写法</h4>
+      <ul>
+        <li>先报描述统计，再报推断统计，表格与正文不重复叙述同一组数字</li>
+        <li>回归结果需同时给出系数、标准误与显著性水平，避免只写"显著影响"</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>分析工具：Python statsmodels + pandas</span><span>更新于 2026-09</span></div>
+</div></body></html>

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const {
@@ -188,6 +188,91 @@ describe('Engram runtime downloader', () => {
         'utf8',
       ),
     ).toBe('old runtime');
+  });
+
+  test('leaves an already matching current copy untouched', async () => {
+    writeCachedRuntime({
+      target: targetId,
+      version: config.version,
+      repo: config.repo,
+      assetName: config.runtimeAssets[targetId],
+      checksum,
+    });
+    const currentDirectory = path.join(rootDir, 'vendor', 'engram-runtime', 'current');
+    fs.cpSync(targetDirectory(), currentDirectory, { recursive: true });
+    const markerPath = path.join(currentDirectory, 'marker.txt');
+    fs.writeFileSync(markerPath, 'kept');
+
+    await ensureMemoryRuntime(rootDir, targetId, options());
+
+    expect(fs.readFileSync(markerPath, 'utf8')).toBe('kept');
+  });
+
+  test('clears runtime directories left behind by an interrupted run', async () => {
+    writeCachedRuntime();
+    const runtimeRoot = path.join(rootDir, 'vendor', 'engram-runtime');
+    const staleBackup = path.join(runtimeRoot, '.current.backup-interrupted');
+    const staleStaging = path.join(runtimeRoot, '.current.staging-interrupted');
+    fs.mkdirSync(staleBackup, { recursive: true });
+    fs.mkdirSync(staleStaging, { recursive: true });
+
+    await ensureMemoryRuntime(rootDir, targetId, options());
+
+    expect(fs.existsSync(staleBackup)).toBe(false);
+    expect(fs.existsSync(staleStaging)).toBe(false);
+    expect(fs.existsSync(targetDirectory())).toBe(true);
+  });
+
+  test('keeps the live runtime when the swap is blocked by a running app', () => {
+    writeCachedRuntime();
+    const stagedDirectory = path.join(rootDir, 'vendor', 'engram-runtime', '.staged-blocked');
+    fs.mkdirSync(stagedDirectory, { recursive: true });
+    fs.writeFileSync(path.join(stagedDirectory, executableName), 'new runtime');
+    const fileSystem = {
+      existsSync: fs.existsSync,
+      rmSync: fs.rmSync,
+      renameSync() {
+        const error = new Error('EPERM: operation not permitted, rename engram.exe');
+        (error as NodeJS.ErrnoException).code = 'EPERM';
+        throw error;
+      },
+    };
+
+    expect(() =>
+      replaceDirectoryAtomically(stagedDirectory, targetDirectory(), fileSystem),
+    ).toThrow(/close the app and retry/);
+    expect(fs.readFileSync(path.join(targetDirectory(), executableName), 'utf8')).toBe(
+      'old runtime',
+    );
+  });
+
+  test('keeps a locked runtime directory instead of failing the swap', () => {
+    writeCachedRuntime();
+    const stagedDirectory = path.join(rootDir, 'vendor', 'engram-runtime', '.staged-locked');
+    fs.mkdirSync(stagedDirectory, { recursive: true });
+    fs.writeFileSync(path.join(stagedDirectory, executableName), 'new runtime');
+    const fileSystem = {
+      existsSync: fs.existsSync,
+      renameSync: fs.renameSync,
+      rmSync() {
+        const error = new Error('EPERM: operation not permitted, unlink engram.exe');
+        (error as NodeJS.ErrnoException).code = 'EPERM';
+        throw error;
+      },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      expect(() =>
+        replaceDirectoryAtomically(stagedDirectory, targetDirectory(), fileSystem),
+      ).not.toThrow();
+    } finally {
+      warn.mockRestore();
+    }
+
+    expect(fs.readFileSync(path.join(targetDirectory(), executableName), 'utf8')).toBe(
+      'new runtime',
+    );
   });
 
   test('rejects placeholder checksums before downloading', async () => {
