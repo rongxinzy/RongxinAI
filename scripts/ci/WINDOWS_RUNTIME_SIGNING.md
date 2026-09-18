@@ -21,8 +21,8 @@ installer signing remain unchanged.
 
 ## Rollout dependencies
 
-1. Merge the central RongxinAI signing workflow and both runtime workflows.
-   Certum credentials remain exclusively in RongxinAI's `release` environment.
+1. Merge the central ZhiYuan Agent signing workflow and both runtime workflows.
+   Certum credentials remain exclusively in ZhiYuan Agent's `release` environment.
    Configure cross-repository artifact read tokens, not additional Certum keys.
 2. Build new runtime tags, dispatch central signing, then dispatch verified
    publication in each original runtime repository. Do not mutate old assets.

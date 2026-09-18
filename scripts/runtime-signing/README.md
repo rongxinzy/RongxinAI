@@ -1,22 +1,22 @@
 # Central Windows runtime signing
 
-Certum SimplySign credentials remain exclusively in the RongxinAI protected
+Certum SimplySign credentials remain exclusively in the ZhiYuan Agent protected
 `release` environment. The runtime repositories build unsigned binaries,
 request no cloud credentials, and publish final signed releases in their own
 repositories. Desktop builds only verify the signatures.
 
 ## Configuration
 
-RongxinAI reuses its existing `CERTUM_USER_ID`, `CERTUM_OTP_URI` (full TOTP URI),
+ZhiYuan Agent reuses its existing `CERTUM_USER_ID`, `CERTUM_OTP_URI` (full TOTP URI),
 and `CERTUM_CERT_THUMBPRINT` environment secrets and its existing Certum action.
 Do not copy them to runtime repositories.
 
 Configure the repository secret `RUNTIME_ARTIFACT_READ_TOKEN` in each
 participating repository (the central prepare job has no release environment):
 
-- RongxinAI needs Actions/read and Contents/read for `rongxinzy/pi-connect`
+- ZhiYuan Agent needs Actions/read and Contents/read for `rongxinzy/pi-connect`
   and `z189yis/engram-cjk`.
-- Each runtime needs Actions/read and Contents/read for RongxinAI, plus
+- Each runtime needs Actions/read and Contents/read for ZhiYuan Agent, plus
   Contents/read for its own source provenance.
 - No cross-repository write permission is required. The runtime's own
   `GITHUB_TOKEN` publishes its release.
@@ -30,16 +30,16 @@ by that workflow. Do not grant signing-key access with this token.
 Set the public `RUNTIME_SIGNER_THUMBPRINT` variable in both runtimes and both
 desktop repositories to the certificate's 40-character SHA-1 thumbprint.
 Protect each runtime's `release` environment with main-only deployment rules
-and required reviewers as appropriate. RongxinAI retains its existing
+and required reviewers as appropriate. ZhiYuan Agent retains its existing
 protected signing environment.
 
 ## Protected publication sequence
 
 1. Merge the build/publication changes to each runtime main and the central
-   workflow to RongxinAI main. Push a new immutable runtime tag whose commit
+   workflow to ZhiYuan Agent main. Push a new immutable runtime tag whose commit
    belongs to main. The tagged workflow tests and builds Actions artifacts;
    it does not create a release.
-2. From RongxinAI main, dispatch `runtime-central-signing.yml` with
+2. From ZhiYuan Agent main, dispatch `runtime-central-signing.yml` with
    `sidecar_run_id`, `engram_run_id`, or both. Supply successful tagged build
    run IDs. Approve the signing environment when requested.
 3. From each runtime main, dispatch its release workflow with the successful
@@ -50,7 +50,7 @@ protected signing environment.
 
 This is a three-stage manual protected sequence, not automatic cross-repo
 dispatch. Signed files travel through Actions artifacts; final release assets
-remain in pi-connect and engram-cjk, not RongxinAI releases.
+remain in pi-connect and engram-cjk, not ZhiYuan Agent releases.
 
 Source and signed artifacts expire after 14 days. If expired, rebuild the
 same unchanged unpublished tag, sign the new successful run, and publish
