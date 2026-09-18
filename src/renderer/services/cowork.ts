@@ -389,6 +389,7 @@ class CoworkService {
 
   async startSession(
     options: CoworkStartOptions,
+    temporarySessionId?: string,
   ): Promise<{ session: CoworkSession | null; error?: string }> {
     const cowork = window.electron?.cowork;
     if (!cowork) {
@@ -403,7 +404,7 @@ class CoworkService {
         : undefined,
     });
     if (result.success && result.session) {
-      store.dispatch(addSession(result.session));
+      store.dispatch(addSession(result.session, temporarySessionId));
       workspaceService.promoteWorkspace(result.session.workspaceId);
       await workspaceService.refreshWorkspaces();
       return { session: result.session };
