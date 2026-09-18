@@ -159,7 +159,6 @@ test('cancels pending scroll debounce timers before disposing the viewport', asy
   const viewport = installViewport();
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: makeTurns(100),
       renderAll: false,
       renderTurn: (turn: ConversationTurn) =>
