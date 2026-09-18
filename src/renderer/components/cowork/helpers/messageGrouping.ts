@@ -46,7 +46,29 @@ export const omitSupersededSessionInterruptions = (
 export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
   const items: DisplayItem[] = [];
   const groupsByToolUseId = new Map<string, ToolGroupItem>();
+  const openGroups: ToolGroupItem[] = [];
   let pendingAdjacentGroup: ToolGroupItem | null = null;
+
+  const settleOpenTools = () => {
+    for (const group of openGroups) {
+      if (group.toolResult) continue;
+      const toolUseId = group.toolUse.metadata?.toolUseId;
+      group.toolResult = {
+        id: `interrupted:${group.toolUse.id}`,
+        type: 'tool_result',
+        content: '任务已暂停，该命令已中断。',
+        timestamp: group.toolUse.timestamp,
+        metadata: {
+          toolUseId: typeof toolUseId === 'string' && toolUseId ? toolUseId : group.toolUse.id,
+          isError: true,
+          error: 'interrupted',
+          isStreaming: false,
+          isFinal: true,
+        },
+      };
+    }
+    openGroups.length = 0;
+  };
 
   for (const message of omitSupersededSessionInterruptions(messages)) {
     if (message.type === 'tool_use') {
@@ -56,6 +78,7 @@ export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
       if (typeof toolUseId === 'string' && toolUseId.trim())
         groupsByToolUseId.set(toolUseId, group);
       pendingAdjacentGroup = group;
+      openGroups.push(group);
       continue;
     }
 
@@ -67,10 +90,14 @@ export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
         if (group) {
           group.toolResult = message;
           matched = true;
+          const openIndex = openGroups.indexOf(group);
+          if (openIndex >= 0) openGroups.splice(openIndex, 1);
         }
       } else if (pendingAdjacentGroup && !pendingAdjacentGroup.toolResult) {
         pendingAdjacentGroup.toolResult = message;
         matched = true;
+        const openIndex = openGroups.indexOf(pendingAdjacentGroup);
+        if (openIndex >= 0) openGroups.splice(openIndex, 1);
       }
       pendingAdjacentGroup = null;
       if (!matched) items.push({ type: 'message', message });
@@ -78,6 +105,9 @@ export const buildDisplayItems = (messages: CoworkMessage[]): DisplayItem[] => {
     }
 
     pendingAdjacentGroup = null;
+    // A pause closes every command that started before it. Commands after the
+    // interruption stay live so resume only shows the new one as running.
+    if (message.metadata?.interruption) settleOpenTools();
     items.push({ type: 'message', message });
   }
 
