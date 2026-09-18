@@ -27,7 +27,7 @@ const source = readFileSync(
 test('mounts the inline skill editor inside the prompt body', () => {
   expect(source).toContain('<InlineSkillPromptEditor');
 
-  const bodyOpen = source.indexOf('<PromptInputBody>');
+  const bodyOpen = source.indexOf('<PromptInputBody');
   const editor = source.indexOf('<InlineSkillPromptEditor');
   const bodyClose = source.indexOf('</PromptInputBody>');
   expect(bodyOpen).toBeGreaterThanOrEqual(0);
