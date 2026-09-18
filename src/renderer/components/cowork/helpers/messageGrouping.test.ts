@@ -271,3 +271,35 @@ test('pagination assigns unique keys when an earlier page also starts mid-turn',
   expect(turnIds).toEqual(['orphan:assistant-a', 'orphan:assistant-b', 'user-c']);
   expect(new Set(turnIds).size).toBe(turnIds.length);
 });
+
+test('marks commands before a pause as interrupted and leaves the resumed command running', () => {
+  const paused: CoworkMessage = {
+    ...message('pause-1', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 's1',
+        interruptionId: 'i1',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: 'task-1',
+        recoverable: true,
+      },
+    },
+  };
+  const items = buildDisplayItems([
+    message('user-1', 'user', 'list files'),
+    {
+      ...message('tool-old', 'tool_use', 'ls'),
+      metadata: { toolName: 'bash', toolUseId: 'call-old' },
+    },
+    paused,
+    {
+      ...message('tool-new', 'tool_use', 'whisper'),
+      metadata: { toolName: 'bash', toolUseId: 'call-new' },
+    },
+  ]);
+  const groups = items.filter(item => item.type === 'tool_group');
+
+  expect(groups).toHaveLength(2);
+  expect(groups[0]?.toolResult?.metadata?.error).toBe('interrupted');
+  expect(groups[1]?.toolResult).toBeUndefined();
+});
