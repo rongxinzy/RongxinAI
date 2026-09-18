@@ -7,7 +7,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
-import { Ellipsis, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { Ellipsis, FolderOpen, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -81,6 +81,10 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const canRename =
     typeof onRenameWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
   const canManage = canRemove || canRename;
+
+  const handleOpenWorkspaceFolder = () => {
+    void window.electron.shell.openPath(workspace.path);
+  };
 
   useEffect(() => {
     let frame = 0;
@@ -168,6 +172,10 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 }
               />
               <DropdownMenuContent align="end" className="min-w-[124px]">
+                <DropdownMenuItem onClick={handleOpenWorkspaceFolder}>
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  {i18nService.t('openFolder')}
+                </DropdownMenuItem>
                 {canRename && (
                   <DropdownMenuItem onClick={() => onRenameWorkspace(workspace)}>
                     <Pencil className="h-3.5 w-3.5" />

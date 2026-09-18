@@ -21,6 +21,8 @@ interface FolderSelectorPopoverProps {
   children: React.ReactNode;
   /** Called when a folder is selected */
   onSelectFolder: (path: string) => void;
+  /** Called when a new project is registered for the selected directory. */
+  onCreateProject: (path: string, name: string) => Promise<boolean>;
   /** Called when an unlisted working directory is selected. */
   onUseNoFolder?: (path: string) => void | Promise<void>;
   /** Dropdown side relative to trigger (default: "top") */
@@ -41,6 +43,7 @@ const isWindowsDriveRoot = (dirPath: string): boolean => {
 const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   children,
   onSelectFolder,
+  onCreateProject,
   onUseNoFolder,
   side = 'top',
   align = 'start',
@@ -77,10 +80,8 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   }, []);
 
   const handleProjectCreated = useCallback(
-    (path: string) => {
-      onSelectFolder(path);
-    },
-    [onSelectFolder],
+    (path: string, name: string) => onCreateProject(path, name),
+    [onCreateProject],
   );
 
   const handleUseExistingFolder = useCallback(async () => {

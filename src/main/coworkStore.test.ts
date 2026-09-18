@@ -73,7 +73,7 @@ function setupDb(): void {
     CREATE TABLE IF NOT EXISTS workspaces (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      path TEXT NOT NULL UNIQUE,
+      path TEXT NOT NULL,
       is_hidden INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -291,6 +291,57 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(
     store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
   ).toEqual(expect.arrayContaining([first.id, second.id]));
+});
+
+test('creates independent workspaces for the same directory', () => {
+  const sharedPath = '/tmp/shared-workspace';
+  const first = store.createWorkspace(sharedPath, '1');
+  const second = store.createWorkspace(sharedPath, '2');
+  const third = store.createWorkspace(sharedPath, '3');
+
+  expect([first.id, second.id, third.id]).toEqual([
+    expect.any(String),
+    expect.any(String),
+    expect.any(String),
+  ]);
+  expect(new Set([first.id, second.id, third.id]).size).toBe(3);
+  expect([first, second, third].map(workspace => workspace.name)).toEqual(['1', '2', '3']);
+  expect([first, second, third].map(workspace => workspace.path)).toEqual([
+    sharedPath,
+    sharedPath,
+    sharedPath,
+  ]);
+
+  const firstSession = store.createSession(
+    'first session',
+    sharedPath,
+    '',
+    'local',
+    [],
+    'main',
+    '',
+    CoworkSessionMode.Work,
+    undefined,
+    first.id,
+  );
+  const secondSession = store.createSession(
+    'second session',
+    sharedPath,
+    '',
+    'local',
+    [],
+    'main',
+    '',
+    CoworkSessionMode.Work,
+    undefined,
+    second.id,
+  );
+
+  expect(firstSession.workspaceId).toBe(first.id);
+  expect(secondSession.workspaceId).toBe(second.id);
+  expect(store.countSessions(undefined, first.id)).toBe(1);
+  expect(store.countSessions(undefined, second.id)).toBe(1);
+  expect(store.countSessions(undefined, third.id)).toBe(0);
 });
 
 test('listSessions paginates independently by session source', () => {
