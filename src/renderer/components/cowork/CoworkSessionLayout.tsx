@@ -1,9 +1,11 @@
+import { Button } from '@shared/components/ui/button';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { cn } from '@shared/lib/utils';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
 import PageHeader from '../PageHeader';
 import {
   CoworkSessionView,
@@ -18,8 +20,10 @@ interface CoworkSessionLayoutProps {
   sessionId?: string;
   isSessionSwitching: boolean;
   isSidebarCollapsed?: boolean;
+  isArtifactPanelOpen: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
+  onToggleArtifactPanel: () => void;
   updateBadge?: React.ReactNode;
   children: React.ReactNode;
 }
@@ -38,14 +42,17 @@ export function CoworkSessionLayout({
   sessionId,
   isSessionSwitching,
   isSidebarCollapsed,
+  isArtifactPanelOpen,
   onToggleSidebar,
   onNewChat,
+  onToggleArtifactPanel,
   updateBadge,
   children,
 }: CoworkSessionLayoutProps) {
   const [activeView, setActiveView] = useState<CoworkSessionViewType>(
     CoworkSessionView.Conversation,
   );
+  const isConversationView = activeView === CoworkSessionView.Conversation;
 
   return (
     <Tabs
@@ -55,7 +62,7 @@ export function CoworkSessionLayout({
       }}
       className="h-full min-h-0 flex-1 gap-0 overflow-hidden bg-background"
     >
-      {/* 2026/09/17 lixiang  页头不再显示产物侧栏展开/收起，改由产物栏内刷新左侧按钮控制 */}
+      {/* 2026/09/18 lixiang  产物侧栏展开/收起还原到页头（窗口控件左侧） */}
       <PageHeader
         title={isSessionSwitching ? undefined : title}
         leftContent={isSessionSwitching ? <CoworkSessionTitleLoadingSkeleton /> : undefined}
@@ -63,6 +70,20 @@ export function CoworkSessionLayout({
         onToggleSidebar={onToggleSidebar}
         onNewChat={onNewChat}
         updateBadge={updateBadge}
+        actions={
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleArtifactPanel}
+            aria-label={i18nService.t('artifactPanelToggle')}
+            aria-hidden={!isConversationView}
+            tabIndex={isConversationView ? 0 : -1}
+            disabled={isSessionSwitching || !isConversationView}
+            className={cn(!isConversationView && 'invisible')}
+          >
+            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isArtifactPanelOpen} />
+          </Button>
+        }
         tabs={
           <PageTabs
             bare
