@@ -19,7 +19,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/component
 import { Spinner } from '@shared/components/ui/spinner';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { cn } from '@shared/lib/utils';
-import { ArrowRight, Box, Clock3, Ellipsis, PanelRightOpen, ScrollText, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRight, Box, Clock3, Ellipsis, PanelRightOpen, ScrollText, Trash2 } from 'lucide-react';
 import {
   type ComponentType,
   type DragEvent,
@@ -119,7 +119,6 @@ type ModelsPanelProps = {
   onCancelModelLoad: (modelName: string) => void;
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
-  onConfigureContext: (model: LlamaCppModel) => void;
   onOpenInspector?: (model: LlamaCppModel) => void;
   onOpenMarketplace?: () => void;
   onOpenLaunchLog?: (model: LlamaCppModel) => void;
@@ -142,7 +141,6 @@ type ModelCardProps = {
   unloading: boolean;
   onLoadModel: (model: LlamaCppModel) => void;
   onCancelModelLoad: (modelName: string) => void;
-  onConfigureContext: (model: LlamaCppModel) => void;
   onOpenInspector: (model: LlamaCppModel) => void;
   onUnload: (modelName: string) => void;
   onDelete: (model: LlamaCppModel) => void;
@@ -175,7 +173,6 @@ export function ModelsPanel({
   onCancelModelLoad,
   onUnload,
   onDelete,
-  onConfigureContext,
   onOpenInspector,
   onOpenMarketplace,
   onOpenLaunchLog,
@@ -361,7 +358,6 @@ export function ModelsPanel({
                   unloading={unloadingModelName === model.name}
                   onLoadModel={onLoadModel}
                   onCancelModelLoad={onCancelModelLoad}
-                  onConfigureContext={onConfigureContext}
                   onOpenInspector={onOpenInspector ?? noopOpenInspector}
                   onUnload={onUnload}
                   onDelete={setPendingDeleteModel}
@@ -447,7 +443,6 @@ const ModelCard = memo(function ModelCard({
   unloading,
   onLoadModel,
   onCancelModelLoad,
-  onConfigureContext,
   onOpenInspector,
   onUnload,
   onDelete,
@@ -605,10 +600,6 @@ const ModelCard = memo(function ModelCard({
                   <DropdownMenuItem onClick={() => onOpenInspector(model)}>
                     <PanelRightOpen className="size-4" />
                     {i18nService.t('localInferenceOpenInspector')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onConfigureContext(model)}>
-                    <Settings2 className="size-4" />
-                    {i18nService.t('localInferenceConfigureContext')}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
