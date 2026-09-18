@@ -437,10 +437,12 @@ const TurnBlockComponent: React.FC<{
       return renderItem(firstItem, 0, isFinalAnswer);
     }
 
-    // A turn that has ended (completed, stopped, or failed) never shows a
-    // live "working" shimmer: trailing execution groups settle into their
-    // completed summary even when no answer follows them.
-    const showCompletedSummary = group.followedByAnswer || isTurnComplete;
+    // A turn that has ended, or a group whose tools already have results, never
+    // keeps a live "正在执行命令" header. Resume only highlights the new command.
+    const toolsSettled =
+      group.items.some(item => item.type === 'tool_group') &&
+      group.items.every(item => item.type !== 'tool_group' || Boolean(item.group.toolResult));
+    const showCompletedSummary = group.followedByAnswer || isTurnComplete || toolsSettled;
     const currentStatus = showCompletedSummary ? null : getCurrentExecutionStatus(group.items);
     const isActiveTool = currentStatus?.kind === ExecutionStatusKind.Tool;
     return (

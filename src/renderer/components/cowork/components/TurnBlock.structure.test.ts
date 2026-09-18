@@ -24,7 +24,7 @@ test('settles execution counts after an answer or when the turn reaches a termin
   );
   expect(source).toContain('flush(isAnswer);');
   expect(source).toContain(
-    'const showCompletedSummary = group.followedByAnswer || isTurnComplete;',
+    'const showCompletedSummary = group.followedByAnswer || isTurnComplete || toolsSettled;',
   );
 });
 
