@@ -9,6 +9,12 @@ import { VirtualizedTurnList } from './VirtualizedTurnList';
 
 const VIEWPORT_HEIGHT = 600;
 const scrollRef = { current: null as HTMLElement | null };
+const viewportTimeouts = new Set<number>();
+
+const clearViewportTimeouts = (): void => {
+  for (const timeout of viewportTimeouts) window.clearTimeout(timeout);
+  viewportTimeouts.clear();
+};
 
 vi.mock('use-stick-to-bottom', () => ({
   useStickToBottomContext: () => ({ scrollRef }),
@@ -116,6 +122,14 @@ const installViewport = (): HTMLElement => {
 };
 
 beforeEach(() => {
+  // The virtualizer's scroll debounce survives unmount. Keep its timers
+  // inside this fixture's lifetime instead of letting them outlive jsdom.
+  const setViewportTimeout = window.setTimeout.bind(window);
+  vi.spyOn(window, 'setTimeout').mockImplementation((handler, timeout, ...args) => {
+    const handle = setViewportTimeout(handler, timeout, ...args);
+    viewportTimeouts.add(handle);
+    return handle;
+  });
   TestResizeObserver.instances.clear();
   vi.stubGlobal('ResizeObserver', TestResizeObserver);
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
@@ -133,9 +147,45 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  clearViewportTimeouts();
   scrollRef.current?.remove();
   scrollRef.current = null;
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+test('cancels pending scroll debounce timers before disposing the viewport', async () => {
+  const viewport = installViewport();
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns: makeTurns(100),
+      renderAll: false,
+      renderTurn: (turn: ConversationTurn) =>
+        React.createElement('div', {
+          'data-turn-height': '200',
+          'data-turn-id': turn.id,
+        }),
+    }),
+    { container: viewport },
+  );
+  await flushResizeObservers();
+  clearViewportTimeouts();
+
+  await act(async () => {
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  const pendingTimeouts = [...viewportTimeouts];
+  expect(pendingTimeouts.length).toBeGreaterThan(0);
+  const clearTimeout = vi.spyOn(window, 'clearTimeout');
+
+  view.unmount();
+  clearViewportTimeouts();
+
+  for (const timeout of pendingTimeouts) {
+    expect(clearTimeout).toHaveBeenCalledWith(timeout);
+  }
+  expect(viewportTimeouts.size).toBe(0);
 });
 
 test('renders a short session at the top of a non-overflowing viewport', async () => {
