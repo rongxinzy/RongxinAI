@@ -70,6 +70,10 @@ import {
   ProviderModelPiApi,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
+import {
+  persistCoworkImageAttachments,
+  readCoworkImageBase64,
+} from '../../coworkImageAttachments';
 import type { CoworkMessage } from '../../coworkStore';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
 import type { CoworkStore } from '../../coworkStore';
@@ -446,8 +450,13 @@ function preparePiPrompt(
   if (!attachments?.length) return { content: text, hasImages: false };
   if (capabilities.imageInput === ModelCapabilityStatus.Supported) {
     const images = attachments
-      .filter(item => item.base64Data && item.mimeType.startsWith('image/'))
-      .map(item => ({ type: 'image' as const, data: item.base64Data, mimeType: item.mimeType }));
+      .filter(item => item.mimeType.startsWith('image/') && (item.base64Data || item.path))
+      .map(item => ({
+        type: 'image' as const,
+        data: readCoworkImageBase64(item),
+        mimeType: item.mimeType,
+      }))
+      .filter(item => item.data.length > 0);
     if (images.length > 0) {
       return {
         content: [{ type: 'text', text }, ...images],
@@ -561,6 +570,12 @@ let hasAppliedApplicationRuntimeEnv = false;
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
+  /**
+   * Sessions that have been stopped still need to look active to IM routing,
+   * but must not keep the Pi session, transcript buffers, or tool maps.
+   */
+  private readonly retainedSessionIds = new Set<string>();
+  private imageAttachmentRoot: string | null = null;
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
   /** Opaque application actions that run after queued Work prompts settle. */
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
@@ -605,6 +620,26 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   setCoworkStore(store: CoworkStore): void {
     this.store = store;
+  }
+
+  setImageAttachmentRoot(root: string): void {
+    this.imageAttachmentRoot = root;
+  }
+
+  private persistImageAttachments(
+    sessionId: string,
+    attachments: PiStartOptions['imageAttachments'],
+  ): PiStartOptions['imageAttachments'] {
+    if (!attachments?.length || !this.imageAttachmentRoot) return attachments;
+    // Already on disk — skip a second write when IPC (or enqueue) persisted first.
+    if (attachments.every(item => Boolean(item.path) && !item.base64Data)) {
+      return attachments;
+    }
+    return persistCoworkImageAttachments(this.imageAttachmentRoot, sessionId, attachments);
+  }
+
+  private noteThrottleMessage(sessionId: string, messageId: string): void {
+    this.throttleSessionByMessageId.set(messageId, sessionId);
   }
   /**
    * Bundled SKILLs root (resources/SKILLs in production). Injected so the
@@ -676,6 +711,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     { content: string; metadata: Record<string, unknown> }
   >();
   private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly throttleSessionByMessageId = new Map<string, string>();
 
   // ── PiRuntime.on/off ──
 
@@ -723,13 +759,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // truth for messages; emit alone delivers to the in-memory Redux state
     // but never writes to SQLite, causing the prompt to vanish on session switch.
     if (!options.skipInitialUserMessage) {
+      const storedImages = this.persistImageAttachments(sessionId, options.imageAttachments);
       const userMsg: CoworkMessage = {
         id: randomUUID(),
         type: 'user',
         content: prompt,
         timestamp: Date.now(),
         metadata:
-          options.skillIds?.length || expertIds.length
+          options.skillIds?.length ||
+          expertIds.length ||
+          storedImages?.length ||
+          options.fileAttachments?.length
             ? {
                 ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
                 ...(expertIds.length
@@ -742,6 +782,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                           presetId: expert.packageId,
                         })),
                     }
+                  : {}),
+                ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
+                ...(options.fileAttachments?.length
+                  ? { fileAttachments: options.fileAttachments }
                   : {}),
               }
             : undefined,
@@ -1275,6 +1319,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
       this.activeSessions.set(sessionId, active);
       this.initializingSessions.delete(sessionId);
+      // A live Pi session replaces the lightweight IM retention marker.
+      this.retainedSessionIds.delete(sessionId);
 
       // Send the prompt (may include conversation history for restart restores)
       let initialPrompt = researchRun
@@ -1579,6 +1625,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
     // Emit user message (persisted to SQLite, same as startSession).
     if (!options._skipUserMessage) {
+      const storedImages = this.persistImageAttachments(sessionId, options.imageAttachments);
       const userMsg: CoworkMessage = {
         id: randomUUID(),
         type: 'user',
@@ -1587,15 +1634,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         metadata:
           options.skillIds?.length ||
           options._queueDelivery ||
-          options.imageAttachments?.length ||
+          storedImages?.length ||
           options.fileAttachments?.length ||
           active.turnExperts.length
             ? {
                 ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
                 ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
-                ...(options.imageAttachments?.length
-                  ? { imageAttachments: options.imageAttachments }
-                  : {}),
+                ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
                 ...(options.fileAttachments?.length
                   ? { fileAttachments: options.fileAttachments }
                   : {}),
@@ -1790,7 +1835,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!active) {
       this.workbenchTaskService?.pauseRun?.(sessionId, reason);
       this.clearApprovalsBySession(sessionId);
-      if (cause) this.recordSessionInterruption(sessionId, cause);
+      if (cause && !this.retainedSessionIds.has(sessionId)) {
+        this.recordSessionInterruption(sessionId, cause);
+      }
       return;
     }
     const wasRunning = active.isRunning;
@@ -1810,9 +1857,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const clearActivity = active.toolActivityTracker.clear();
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
 
-    // Only abort the current turn — keep the session entry in activeSessions
-    // so isSessionActive still reports true for IM routing, but do not reuse
-    // the underlying Pi session for subsequent turns.
+    // Drop the Pi session after the turn is aborted. IM routing still treats the
+    // session as active via retainedSessionIds, and the next turn rebuilds from SQLite.
     active.piSession.abortBash();
     active.abortController.abort();
     active.unsubscribe();
@@ -1822,16 +1868,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.emit('sessionStopped', sessionId);
     if (cause) this.recordSessionInterruption(sessionId, cause);
 
-    // A user stop ends the current turn without cancelling messages already
-    // queued in Work. Start the next follow-up from a fresh Pi session; the
-    // internal stop used during that recreation is not running and will not
-    // recursively drain the queue.
-    if (
+    const shouldDrainFollowUp =
       wasRunning &&
       drainQueuedFollowUp &&
       active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
-      this.pendingMessageQueue.hasPendingFollowUp(sessionId)
-    ) {
+      this.pendingMessageQueue.hasPendingFollowUp(sessionId);
+    this.releaseStoppedSession(sessionId);
+
+    if (shouldDrainFollowUp) {
       const next = this.pendingMessageQueue.findNextPending(
         sessionId,
         CoworkQueueDelivery.FollowUp,
@@ -1928,7 +1972,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   isSessionActive(sessionId: string): boolean {
-    return this.activeSessions.has(sessionId);
+    return this.activeSessions.has(sessionId) || this.retainedSessionIds.has(sessionId);
   }
 
   isSessionRunning(sessionId: string): boolean {
@@ -2005,11 +2049,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
     const normalizedText = text.trim();
     if (!normalizedText) return { success: false, error: 'Message text is required.' };
+    // IPC enqueue already persists; IM/internal callers still pass base64 here.
+    const storedImages = this.persistImageAttachments(sessionId, imageAttachments);
     const item = this.pendingMessageQueue.enqueue(
       sessionId,
       normalizedText,
       CoworkQueueDelivery.FollowUp,
-      imageAttachments,
+      storedImages,
       fileAttachments,
       skillIds,
       skillPrompt,
@@ -2090,7 +2136,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!this.isWorkSession(sessionId, active)) {
       return { success: false, error: 'Pending message queue is only available in Work sessions.' };
     }
-    if (!active) return { success: false, error: 'The Work session is not active.' };
+    if (!this.isSessionActive(sessionId)) {
+      return { success: false, error: 'The Work session is not active.' };
+    }
     if (this.isSessionRunning(sessionId)) {
       return { success: false, error: 'The Work session is still running.' };
     }
@@ -2224,8 +2272,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.stopActiveSession(sessionId, 'The session was deleted.', false);
     this.clearApprovalsBySession(sessionId);
     this.activeSessions.delete(sessionId);
+    this.retainedSessionIds.delete(sessionId);
+    this.clearThrottleStateBySession(sessionId, true);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
+  }
+
+  private releaseStoppedSession(sessionId: string): void {
+    this.activeSessions.delete(sessionId);
+    this.retainedSessionIds.add(sessionId);
+    this.clearThrottleStateBySession(sessionId, true);
   }
 
   // ── Chat mode: direct LLM without agent loop ──
@@ -2798,13 +2854,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             Boolean(event.isError),
           );
         }
+        // Keep the result only on `content` — duplicating into metadata.toolResult
+        // doubles the largest strings in SQLite, IPC, and the renderer heap.
         const toolResultMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_result',
           content: resultText,
           timestamp: Date.now(),
           metadata: {
-            toolResult: resultText,
             toolUseId: event.toolCallId,
             isError: Boolean(event.isError),
             isStreaming: false,
@@ -2894,6 +2951,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           break;
         }
         this.markFinalAnswer(sessionId, active);
+        this.clearThrottleStateBySession(sessionId, false);
         active.isRunning = false;
         // Pi versions differ in whether they emit agent_settled after agent_end.
         // Drain queued Work follow-ups here so completion never leaves them stuck.
@@ -3264,6 +3322,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     content: string,
     metadata?: Record<string, unknown>,
   ): void {
+    this.noteThrottleMessage(sessionId, messageId);
     const now = Date.now();
     const lastEmit = this.lastMessageUpdateEmitTime.get(messageId) ?? 0;
     const elapsed = now - lastEmit;
@@ -3316,6 +3375,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     content: string,
     metadata: Record<string, unknown>,
   ): void {
+    this.noteThrottleMessage(sessionId, messageId);
     if (!this.store) return;
     const now = Date.now();
     const lastWrite = this.lastStoreUpdateTime.get(messageId) ?? 0;
@@ -3355,19 +3415,30 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.pendingStoreUpdate.delete(messageId);
   }
 
-  private clearThrottleStateBySession(_sessionId: string): void {
-    // Clean up any pending timers for this session's messages.
-    // We iterate all timers since we don't track session→messageId mapping.
-    for (const [messageId, timer] of this.pendingMessageUpdateTimer) {
-      clearTimeout(timer);
-      this.pendingMessageUpdateTimer.delete(messageId);
+  private clearThrottleStateBySession(sessionId: string, flush: boolean): void {
+    for (const [messageId, owner] of this.throttleSessionByMessageId) {
+      if (owner !== sessionId) continue;
+      if (flush && this.store) {
+        const pending = this.pendingStoreUpdate.get(messageId);
+        if (pending) this.store.updateMessage(sessionId, messageId, pending);
+      }
+      if (flush) {
+        const pendingEmit = this.pendingMessageUpdate.get(messageId);
+        if (pendingEmit) {
+          this.emit(
+            'messageUpdate',
+            sessionId,
+            messageId,
+            pendingEmit.content,
+            pendingEmit.metadata,
+          );
+        }
+      }
+      this.clearPendingMessageUpdate(messageId);
+      this.clearPendingStoreUpdate(messageId);
       this.lastMessageUpdateEmitTime.delete(messageId);
-    }
-    for (const [messageId, timer] of this.pendingStoreUpdateTimer) {
-      clearTimeout(timer);
-      this.pendingStoreUpdateTimer.delete(messageId);
-      this.pendingStoreUpdate.delete(messageId);
       this.lastStoreUpdateTime.delete(messageId);
+      this.throttleSessionByMessageId.delete(messageId);
     }
   }
 

@@ -16,7 +16,9 @@ import type { ProductionLoopMode } from '../../shared/productionLoop';
 export interface CoworkImageAttachment {
   name: string;
   mimeType: string;
-  base64Data: string;
+  /** Omitted after the image is stored on disk. */
+  base64Data?: string;
+  path?: string;
 }
 
 export interface CoworkFileAttachment {

@@ -557,12 +557,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           });
           const userParts: DirectChatPart[] = [
             { type: 'text' as const, text: prompt },
-            ...(imageAttachments ?? []).map(image => ({
-              type: 'file' as const,
-              mediaType: image.mimeType,
-              url: `data:${image.mimeType};base64,${image.base64Data}`,
-              filename: image.name,
-            })),
+            ...(imageAttachments ?? [])
+              .filter(image => image.base64Data)
+              .map(image => ({
+                type: 'file' as const,
+                mediaType: image.mimeType,
+                url: `data:${image.mimeType};base64,${image.base64Data}`,
+                filename: image.name,
+              })),
           ];
           const stream = await transport.sendMessages({
             trigger: 'submit-message',
@@ -1116,12 +1118,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               role: 'user' as const,
               parts: [
                 { type: 'text' as const, text: prompt },
-                ...(imageAttachments ?? []).map(image => ({
-                  type: 'file' as const,
-                  mediaType: image.mimeType,
-                  url: `data:${image.mimeType};base64,${image.base64Data}`,
-                  filename: image.name,
-                })),
+                ...(imageAttachments ?? [])
+                  .filter(image => image.base64Data)
+                  .map(image => ({
+                    type: 'file' as const,
+                    mediaType: image.mimeType,
+                    url: `data:${image.mimeType};base64,${image.base64Data}`,
+                    filename: image.name,
+                  })),
               ],
             }),
           abortSignal: abortController.signal,

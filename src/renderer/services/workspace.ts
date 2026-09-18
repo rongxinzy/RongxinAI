@@ -2,6 +2,7 @@ import type { Workspace } from '../../shared/workspace';
 import { WorkspaceDefault } from '../../shared/workspace';
 import { store } from '../store';
 import { isScratchWorkspacePath } from '../utils/path';
+import { clearSessionArtifacts } from '../store/slices/artifactSlice';
 import {
   clearCurrentSession,
   clearCurrentSessionForWorkspaceChange,
@@ -318,6 +319,9 @@ class WorkspaceService {
     const deletedSessionIds = result.deletedSessionIds ?? [];
     if (deletedSessionIds.length > 0) {
       store.dispatch(deleteSessionsAction(deletedSessionIds));
+      for (const sessionId of deletedSessionIds) {
+        store.dispatch(clearSessionArtifacts(sessionId));
+      }
     }
 
     const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];

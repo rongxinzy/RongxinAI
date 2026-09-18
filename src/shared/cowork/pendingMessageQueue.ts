@@ -29,7 +29,8 @@ export const CoworkQueueAttachmentLimit = {
 export interface CoworkQueuedImageAttachment {
   name: string;
   mimeType: string;
-  base64Data: string;
+  base64Data?: string;
+  path?: string;
 }
 
 export interface CoworkQueuedFileAttachment {
