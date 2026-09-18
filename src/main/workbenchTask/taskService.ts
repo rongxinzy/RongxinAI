@@ -7,6 +7,7 @@ import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
+  WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchRunEventType,
@@ -14,6 +15,7 @@ import {
   WorkbenchRunTrigger,
   WorkbenchTaskStatus,
   WorkbenchVerificationCheckStatus,
+  WorkbenchVerificationCheckName,
   WorkbenchVerificationOutcome,
   type WorkbenchApproval,
   type WorkbenchArtifact,
@@ -32,9 +34,12 @@ import {
 import { HarnessActivationType } from '../../shared/harness';
 import { ProductionLoopRecoveryReason } from '../../shared/productionLoop';
 import { HarnessMeasurementService } from '../harness/measurementService';
+import { t } from '../i18n';
 import { ProductionLoopRepository } from '../productionLoop/repository';
 import { ProductionLoopService } from '../productionLoop/service';
-import { collectWorkbenchArtifacts } from './artifactCollector';
+import { collectWorkbenchArtifactsAsync } from './artifactWorkerPool';
+import { applyWorkbenchDeliveryGate } from './deliveryGate';
+import { getCurrentDeclaredArtifacts } from './artifactCompletion';
 import { WorkbenchTaskRepository } from './repository';
 import { classifyWorkbenchToolRisk, createToolIdempotencyKey } from './riskClassifier';
 import { verifyWorkbenchRun, type WorkbenchVerificationContext } from './verification';
@@ -109,12 +114,13 @@ export class WorkbenchTaskService extends EventEmitter {
     return this.repository.listTasksForSession(sessionId);
   }
 
-  registerArtifact(input: {
+  async registerArtifact(input: {
     sessionId: string;
     runId: string;
     workspaceRoot: string;
     candidate: WorkbenchArtifactCandidate;
-  }): WorkbenchArtifact {
+    signal?: AbortSignal;
+  }): Promise<WorkbenchArtifact> {
     const run = this.requireRun(input.runId);
     const task = this.requireTask(run.taskId);
     if (task.sessionId !== input.sessionId || task.activeRunId !== run.id) {
@@ -123,15 +129,21 @@ export class WorkbenchTaskService extends EventEmitter {
     if (run.status !== WorkbenchRunStatus.Running) {
       throw new Error('Artifacts can only be registered while the task run is active.');
     }
-    const [artifact] = collectWorkbenchArtifacts({
-      taskId: task.id,
-      runId: run.id,
-      workspaceRoot: input.workspaceRoot,
-      finalAnswer: '',
-      artifactCandidates: [input.candidate],
-    });
+    const [artifact] = await collectWorkbenchArtifactsAsync(
+      {
+        taskId: task.id,
+        runId: run.id,
+        workspaceRoot: input.workspaceRoot,
+        finalAnswer: '',
+        artifactCandidates: [input.candidate],
+      },
+      input.signal,
+    );
     if (!artifact) {
       throw new Error('The artifact path must resolve to a file inside the workspace.');
+    }
+    if (!this.isRunRunning(run.id) || this.requireTask(task.id).activeRunId !== run.id) {
+      throw new Error('The artifact run ended during collection.');
     }
     const registered = this.repository.transaction(() => {
       const stored = this.repository.addArtifact(artifact);
@@ -256,7 +268,7 @@ export class WorkbenchTaskService extends EventEmitter {
     return run;
   }
 
-  completeRun(input: {
+  async completeRun(input: {
     sessionId: string;
     runId: string;
     workspaceRoot: string;
@@ -266,9 +278,12 @@ export class WorkbenchTaskService extends EventEmitter {
     workflowSnapshot?: Record<string, unknown> | null;
     artifactCandidates?: WorkbenchArtifactCandidate[];
     streamClosedCleanly?: boolean;
-  }): WorkbenchTaskDetail {
+    signal?: AbortSignal;
+  }): Promise<WorkbenchTaskDetail> {
     const run = this.requireRun(input.runId);
     const task = this.requireTask(run.taskId);
+    if (task.sessionId !== input.sessionId)
+      throw new Error('The run does not belong to this session.');
     if (run.status !== WorkbenchRunStatus.Running) {
       const current = this.repository.getDetail(task.id);
       if (!current) throw new Error('Workbench task detail disappeared before verification.');
@@ -307,45 +322,51 @@ export class WorkbenchTaskService extends EventEmitter {
             ]
           : [];
       });
-    const artifactCandidates = [...toolArtifactCandidates, ...(input.artifactCandidates ?? [])];
+    const artifactCandidates = [
+      ...getCurrentDeclaredArtifacts(this.repository.getDetail(task.id)!.artifacts, run.id),
+      ...toolArtifactCandidates,
+      ...(input.artifactCandidates ?? []),
+    ];
+    let collected: Awaited<ReturnType<typeof collectWorkbenchArtifactsAsync>> = [];
     let finalResult = result;
+    try {
+      collected = await collectWorkbenchArtifactsAsync(
+        {
+          taskId: task.id,
+          runId: run.id,
+          workspaceRoot: input.workspaceRoot,
+          finalAnswer: input.finalAnswer,
+          finalMessageId: input.finalMessageId,
+          workflowSnapshot: input.workflowSnapshot,
+          artifactCandidates,
+        },
+        input.signal,
+      );
+    } catch (error) {
+      console.warn(`[WorkbenchTask] artifact collection failed for run ${run.id}:`, error);
+      finalResult = {
+        ...result,
+        outcome: WorkbenchVerificationOutcome.Failed,
+        summary: t('workbenchArtifactCollectionFailed'),
+      };
+    }
+    if (!this.isRunRunning(run.id) || this.requireTask(task.id).activeRunId !== run.id) {
+      return this.getDetail(task.id)!;
+    }
     this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Verifying);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationStarted);
-      for (const artifact of collectWorkbenchArtifacts({
-        taskId: task.id,
-        runId: run.id,
-        workspaceRoot: input.workspaceRoot,
-        finalAnswer: input.finalAnswer,
-        finalMessageId: input.finalMessageId,
-        workflowSnapshot: input.workflowSnapshot,
-        artifactCandidates,
-      })) {
+      for (const artifact of collected) {
         this.repository.addArtifact(artifact);
       }
-      // A passed baseline only attests a non-empty final response and a
-      // cleanly closed stream; it says nothing about artifact content. Pending
-      // artifacts therefore have no verifier on the baseline-only path and
-      // must go through explicit user acceptance instead. Pending artifacts
-      // are promoted to verified exclusively by acceptTask.
-      if (result.outcome === WorkbenchVerificationOutcome.Passed) {
-        const pendingCount = this.repository.countPendingArtifacts(run.id);
-        if (pendingCount > 0) {
-          finalResult = {
-            outcome: WorkbenchVerificationOutcome.AcceptanceRequired,
-            checks: [
-              {
-                name: 'artifact_verification',
-                status: WorkbenchVerificationCheckStatus.Skipped,
-                detail: `${pendingCount} artifact(s) require explicit user acceptance.`,
-              },
-              ...result.checks,
-            ],
-            evidence: result.evidence,
-            summary: `The work result produced ${pendingCount} artifact(s) that require explicit user acceptance.`,
-          };
-        }
-      }
+      const artifacts = this.repository
+        .getDetail(task.id)!
+        .artifacts.filter(artifact => artifact.runId === run.id);
+      finalResult = applyWorkbenchDeliveryGate(
+        finalResult,
+        artifacts,
+        task.contract,
+      );
       if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
           verificationResult: finalResult,
@@ -383,7 +404,7 @@ export class WorkbenchTaskService extends EventEmitter {
             run: verifiedRun,
             artifacts: detail.artifacts.filter(artifact => artifact.runId === run.id),
             approvals: detail.approvals.filter(approval => approval.runId === run.id),
-            verificationResult: result,
+            verificationResult: finalResult,
             workspaceRoot: input.workspaceRoot,
             finalAnswer: input.finalAnswer,
           });
@@ -407,13 +428,20 @@ export class WorkbenchTaskService extends EventEmitter {
     ) {
       throw new Error('This task cannot be accepted because deterministic verification failed.');
     }
+    const runArtifacts = detail.artifacts.filter(artifact => artifact.runId === run.id);
+    if (
+      applyWorkbenchDeliveryGate(run.verificationResult, runArtifacts, detail.task.contract)
+        .outcome === WorkbenchVerificationOutcome.Failed
+    ) {
+      throw new Error('This task cannot be accepted because no final deliverable is ready.');
+    }
     const acceptedResult: WorkbenchVerificationResult = {
       ...run.verificationResult,
       outcome: WorkbenchVerificationOutcome.Passed,
       checks: [
         ...run.verificationResult.checks,
         {
-          name: 'user_acceptance',
+          name: WorkbenchVerificationCheckName.UserAcceptance,
           status: WorkbenchVerificationCheckStatus.Passed,
         },
       ],
@@ -428,9 +456,8 @@ export class WorkbenchTaskService extends EventEmitter {
         verificationResult: acceptedResult,
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
-      // User acceptance is the final verifier: promote every pending artifact
-      // (workspace declarations and tool effects) alongside the accepted run.
-      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id);
+      // Acceptance attests final deliverables, never intermediate execution evidence.
+      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id, detail.task.contract, runArtifacts);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
@@ -535,6 +562,13 @@ export class WorkbenchTaskService extends EventEmitter {
       return { allow: false, reason: 'The tool call does not belong to the active run.' };
     }
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
+    if (
+      task.contract.kind !== WorkbenchContractKind.Chat &&
+      !task.contract.outputRequirements?.length &&
+      riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
+    ) {
+      return { allow: false, reason: 'Commit the requested outputs with set_task_output before executing this task.' };
+    }
     if (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly) {
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ToolRead, {
         toolCallId: input.toolCallId,

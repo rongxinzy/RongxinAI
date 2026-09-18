@@ -36,6 +36,14 @@ export const WorkbenchContractKind = {
   Shortcut: 'shortcut',
   GenericWork: 'generic_work',
 } as const;
+
+export const WorkbenchOutputMode = {
+  Text: 'text',
+  File: 'file',
+  Inline: 'inline',
+} as const;
+export type WorkbenchOutputMode = (typeof WorkbenchOutputMode)[keyof typeof WorkbenchOutputMode];
+export const WorkbenchOutputToolName = 'set_task_output';
 export type WorkbenchContractKind =
   (typeof WorkbenchContractKind)[keyof typeof WorkbenchContractKind];
 
@@ -54,6 +62,12 @@ export const WorkbenchVerificationCheckStatus = {
 } as const;
 export type WorkbenchVerificationCheckStatus =
   (typeof WorkbenchVerificationCheckStatus)[keyof typeof WorkbenchVerificationCheckStatus];
+
+export const WorkbenchVerificationCheckName = {
+  UserAcceptance: 'user_acceptance',
+  DeliveryReady: 'delivery_ready',
+  ArtifactVerification: 'artifact_verification',
+} as const;
 
 export const WorkbenchApprovalRiskLevel = {
   ReadOnly: 'read_only',
