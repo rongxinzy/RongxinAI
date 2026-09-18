@@ -21,9 +21,11 @@ installer signing remain unchanged.
 
 ## Rollout dependencies
 
-1. Merge the signing workflows in `rongxinzy/pi-connect` and
-   `z189yis/engram-cjk`; configure their protected Certum credentials.
-2. Publish new immutable signed runtime releases. Do not mutate old assets.
+1. Merge the central RongxinAI signing workflow and both runtime workflows.
+   Certum credentials remain exclusively in RongxinAI's `release` environment.
+   Configure cross-repository artifact read tokens, not additional Certum keys.
+2. Build new runtime tags, dispatch central signing, then dispatch verified
+   publication in each original runtime repository. Do not mutate old assets.
 3. Update `package.json` runtime versions and Windows checksums from those
    releases. Set the public signer variable in both desktop repositories.
 4. Run Windows source verification and cold-install/upgrade gates before
@@ -32,6 +34,9 @@ installer signing remain unchanged.
 Existing unsigned pinned releases will be rejected intentionally. Do not
 merge the consumer gate change until the pins and public signer are ready.
 Policy unit tests mock signature results and do not certify a real release.
+
+See the [central operational guide](https://github.com/rongxinzy/RongxinAI/blob/main/scripts/runtime-signing/README.md)
+for protected manual stages, token permissions and artifact expiry handling.
 
 Manual verification:
 
