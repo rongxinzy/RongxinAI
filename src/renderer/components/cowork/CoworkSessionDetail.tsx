@@ -41,6 +41,7 @@ import {
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
+  togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
@@ -1129,8 +1130,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       sessionId={sessionId}
       isSessionSwitching={isSessionSwitching}
       isSidebarCollapsed={isSidebarCollapsed}
+      isArtifactPanelOpen={isPanelOpen}
       onToggleSidebar={onToggleSidebar}
       onNewChat={onNewChat}
+      onToggleArtifactPanel={() => dispatch(togglePanel())}
       updateBadge={updateBadge}
     >
       {/* Export Options Modal */}
