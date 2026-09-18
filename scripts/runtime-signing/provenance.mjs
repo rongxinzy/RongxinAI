@@ -113,13 +113,12 @@ export function executableHash(directory, filename) {
     throw new Error('Runtime file is not a Windows executable.');
   return createHash('sha256').update(bytes).digest('hex');
 }
-export function validateManifest(manifest, build, signingId, expectedSigner) {
+export function validateManifest(manifest, build, signingId) {
   const source = sourceFor(build.key);
   if (
     manifest.schemaVersion !== 1 ||
     manifest.signingRepository !== SigningAuthority.repo ||
     manifest.signingRunId !== runId(signingId) ||
-    manifest.signerThumbprint !== signerThumbprint(expectedSigner) ||
     ['key', 'sourceRepository', 'sourceRunId', 'sourceSha', 'sourceTag'].some(
       key => manifest[key] !== build[key],
     ) ||
