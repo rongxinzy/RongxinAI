@@ -1676,6 +1676,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     const workspace = await workspaceService.ensureWorkspace(dir);
                     if (workspace) await workspaceService.selectWorkspace(workspace.id);
                   }}
+                  onCreateProject={async (dir, name) => {
+                    clearUnmanagedWorkingDirectory();
+                    const workspace = await workspaceService.createWorkspace(dir, name);
+                    if (!workspace) return false;
+                    await workspaceService.selectWorkspace(workspace.id);
+                    return true;
+                  }}
                   onUseNoFolder={async dir => {
                     const selected = await selectUnmanagedWorkingDirectory(dir);
                     if (!selected) {

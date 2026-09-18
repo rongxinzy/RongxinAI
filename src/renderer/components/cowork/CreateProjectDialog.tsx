@@ -3,6 +3,7 @@ import {
   Dialog,
   DialogContent,
   DialogFooter,
+  DialogFooterSurface,
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
@@ -17,20 +18,17 @@ import { localInferenceCompactButtonClass } from '../localInference/constants';
 interface CreateProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Called with the newly created project directory path */
-  onCreated: (path: string) => void;
+  /** Called with the selected project directory and its independent display name. */
+  onCreated: (path: string, name: string) => Promise<boolean>;
 }
-
-const ILLEGAL_NAME_CHARS = /[\\/:*?"<>|]/;
 
 const showToast = (message: string) => {
   window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
 };
 
 /**
- * 「创建项目」dialog: creates a new empty project directory under a base path
- * (default: <Documents>/ZhiYuanAgent/Workspaces) and hands the new path back
- * to the folder-selection flow.
+ * 「创建项目」dialog: registers the selected project directory with an
+ * independent display name for the folder-selection flow.
  */
 const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   open,
@@ -40,6 +38,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const [name, setName] = useState('');
   const [baseDir, setBaseDir] = useState('');
   const [nameError, setNameError] = useState('');
+  const [pathError, setPathError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset the form and load the default base path each time the dialog opens
@@ -47,6 +46,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     if (!open) return;
     setName('');
     setNameError('');
+    setPathError('');
     setIsSaving(false);
     let cancelled = false;
     void window.electron.project.getDefaultBaseDir().then(result => {
@@ -60,7 +60,10 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
   const handleBrowse = useCallback(async () => {
     try {
       const result = await window.electron.dialog.selectDirectory();
-      if (result.success && result.path) setBaseDir(result.path);
+      if (result.success && result.path) {
+        setBaseDir(result.path);
+        setPathError('');
+      }
     } catch (error) {
       console.error('[CreateProjectDialog] Failed to select directory:', error);
     }
@@ -68,33 +71,27 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
   const handleSave = useCallback(async () => {
     const trimmedName = name.trim();
+    const selectedPath = baseDir.trim();
     if (!trimmedName) {
       setNameError(i18nService.t('projectNameRequired'));
       return;
     }
-    if (ILLEGAL_NAME_CHARS.test(trimmedName) || trimmedName === '.' || trimmedName === '..') {
-      setNameError(i18nService.t('projectNameInvalid'));
+    if (!selectedPath) {
+      setPathError(i18nService.t('projectPathRequired'));
       return;
     }
     setNameError('');
+    setPathError('');
     setIsSaving(true);
     try {
-      const result = await window.electron.project.createDirectory({
-        name: trimmedName,
-        baseDir: baseDir || undefined,
-      });
-      if (result.success && result.path) {
-        onOpenChange(false);
-        onCreated(result.path);
-      } else if (result.code === 'already-exists') {
-        showToast(i18nService.t('projectAlreadyExists'));
-      } else if (result.code === 'invalid-name') {
-        setNameError(i18nService.t('projectNameInvalid'));
-      } else {
+      const created = await onCreated(selectedPath, trimmedName);
+      if (!created) {
         showToast(i18nService.t('projectCreateFailed'));
+        return;
       }
+      onOpenChange(false);
     } catch (error) {
-      console.error('[CreateProjectDialog] Failed to create project directory:', error);
+      console.error('[CreateProjectDialog] Failed to create project:', error);
       showToast(i18nService.t('projectCreateFailed'));
     } finally {
       setIsSaving(false);
@@ -109,10 +106,6 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
         </DialogHeader>
         <div className="flex flex-col gap-3 py-1">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="create-project-name">
-              {i18nService.t('projectNameLabel')}
-              <span className="text-destructive"> *</span>
-            </Label>
             <Input
               id="create-project-name"
               value={name}
@@ -150,13 +143,14 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 {i18nService.t('browse')}
               </Button>
             </div>
+            {pathError && <p className="text-xs text-destructive">{pathError}</p>}
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter surface={DialogFooterSurface.Seamless}>
           <Button
             type="button"
-            variant="outline"
-            className={localInferenceCompactButtonClass}
+            variant="ghost"
+            className="theme-confirm-cancel min-w-16"
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >

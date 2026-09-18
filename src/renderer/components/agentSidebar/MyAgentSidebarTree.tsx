@@ -1,8 +1,12 @@
 import { Button } from '@shared/components/ui/button';
-import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogFooterSurface,
+} from '@shared/components/ui/dialog';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { Input } from '@shared/components/ui/input';
-import { Label } from '@shared/components/ui/label';
 import { useReducedMotion } from 'motion/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -166,9 +170,11 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     setIsCreateProjectOpen(true);
   };
 
-  const handleProjectCreated = async (projectPath: string) => {
-    const workspace = await workspaceService.ensureWorkspace(projectPath);
-    if (workspace) await workspaceService.selectWorkspace(workspace.id);
+  const handleProjectCreated = async (projectPath: string, projectName: string) => {
+    const workspace = await workspaceService.createWorkspace(projectPath, projectName);
+    if (!workspace) return false;
+    await workspaceService.selectWorkspace(workspace.id);
+    return true;
   };
 
   const handleDeleteTask = async (task: AgentSidebarTaskNode) => {
@@ -200,7 +206,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
       <CreateProjectDialog
         open={isCreateProjectOpen}
         onOpenChange={setIsCreateProjectOpen}
-        onCreated={path => void handleProjectCreated(path)}
+        onCreated={handleProjectCreated}
       />
       <DestructiveConfirmDialog
         open={workspacePendingRemoval !== null}
@@ -220,7 +226,6 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         <DialogContent className="max-w-sm">
           <h2 className="text-base font-semibold">{i18nService.t('renameProject')}</h2>
           <div className="space-y-2">
-            <Label htmlFor="workspace-rename">{i18nService.t('projectNameLabel')}</Label>
             <Input
               id="workspace-rename"
               value={workspaceRenameValue}
@@ -231,8 +236,12 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               autoFocus
             />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setWorkspacePendingRename(null)}>
+          <DialogFooter surface={DialogFooterSurface.Seamless}>
+            <Button
+              variant="ghost"
+              className="theme-confirm-cancel min-w-16"
+              onClick={() => setWorkspacePendingRename(null)}
+            >
               {i18nService.t('cancel')}
             </Button>
             <Button onClick={() => void handleConfirmRenameWorkspace()}>

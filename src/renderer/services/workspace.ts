@@ -24,6 +24,10 @@ type SelectWorkspaceOptions = {
 
 type LegacyCompatibleCoworkApi = {
   listWorkspaces?: () => Promise<{ success: boolean; workspaces?: Workspace[] }>;
+  createWorkspace?: (options: {
+    path: string;
+    name: string;
+  }) => Promise<{ success: boolean; workspace?: Workspace }>;
   ensureWorkspace?: (options: {
     path: string;
     name?: string;
@@ -200,6 +204,31 @@ class WorkspaceService {
     );
     store.dispatch(setWorkspaces(next));
     return ensuredWorkspace;
+  }
+
+  async createWorkspace(path: string, name: string): Promise<Workspace | null> {
+    const cowork = getCompatibleCoworkApi();
+    if (typeof cowork?.createWorkspace !== 'function') return null;
+
+    try {
+      const result = await cowork.createWorkspace({ path, name });
+      if (!result.success || !result.workspace) return null;
+
+      const current = store.getState().workspace.workspaces;
+      const existingWorkspace = current.find(item => item.id === result.workspace!.id);
+      const createdWorkspace = {
+        ...result.workspace,
+        pinned: existingWorkspace?.pinned ?? false,
+      };
+      const next = [...current.filter(item => item.id !== createdWorkspace.id), createdWorkspace].sort(
+        (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+      );
+      store.dispatch(setWorkspaces(next));
+      return createdWorkspace;
+    } catch (error) {
+      console.warn('[WorkspaceService] Failed to create workspace through IPC:', error);
+      return null;
+    }
   }
 
   async selectWorkspace(

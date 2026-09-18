@@ -3942,6 +3942,39 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(
+    WorkspaceIpc.Create,
+    async (_event, rawOptions: { path?: string; name?: string }) => {
+      try {
+        const workspacePath = rawOptions?.path?.trim();
+        const workspaceName = rawOptions?.name?.trim();
+        if (!workspacePath) return { success: false, error: 'Workspace path is required' };
+        if (!workspaceName) return { success: false, error: 'Workspace name is required' };
+
+        const defaultWorkspacePath = getDefaultProjectBaseDir();
+        const resolvedWorkspacePath = path.resolve(workspacePath);
+        const resolvedDefaultPath = path.resolve(defaultWorkspacePath);
+        const isDefaultWorkspacePath =
+          process.platform === 'win32'
+            ? resolvedWorkspacePath.toLowerCase() === resolvedDefaultPath.toLowerCase()
+            : resolvedWorkspacePath === resolvedDefaultPath;
+        if (isDefaultWorkspacePath) {
+          await fs.promises.mkdir(resolvedWorkspacePath, { recursive: true });
+        }
+        const stat = await fs.promises.stat(resolvedWorkspacePath);
+        if (!stat.isDirectory()) return { success: false, error: 'Workspace path is not a directory' };
+
+        const workspace = getCoworkStore().createWorkspace(resolvedWorkspacePath, workspaceName);
+        return { success: true, workspace };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to create workspace',
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
     WorkspaceIpc.Ensure,
     async (_event, rawOptions: { path?: string; name?: string; isHidden?: boolean }) => {
       try {
@@ -3965,14 +3998,7 @@ if (!gotTheLock) {
   ipcMain.handle(WorkspaceIpc.Rename, async (_event, id: string, name: string) => {
     try {
       const normalizedName = name.trim();
-      if (
-        !normalizedName ||
-        /[\\/:*?"<>|]/.test(normalizedName) ||
-        normalizedName === '.' ||
-        normalizedName === '..'
-      ) {
-        return { success: false, error: 'Invalid project name' };
-      }
+      if (!normalizedName) return { success: false, error: 'Workspace name is required' };
 
       const coworkStore = getCoworkStore();
       const workspace = coworkStore.getWorkspace(id);
@@ -3980,28 +4006,9 @@ if (!gotTheLock) {
       if (isDefaultConversationWorkspacePath(workspace.path)) {
         return { success: false, error: 'The default conversation workspace cannot be renamed' };
       }
-      if (!fs.existsSync(workspace.path) || !fs.statSync(workspace.path).isDirectory()) {
-        return { success: false, error: 'Project directory no longer exists' };
-      }
-
-      const targetPath = path.join(path.dirname(workspace.path), normalizedName);
-      const pathsMatch =
-        process.platform === 'win32'
-          ? path.resolve(targetPath).toLowerCase() === path.resolve(workspace.path).toLowerCase()
-          : path.resolve(targetPath) === path.resolve(workspace.path);
-      if (!pathsMatch && fs.existsSync(targetPath)) {
-        return { success: false, error: 'A directory with this name already exists' };
-      }
-
-      fs.renameSync(workspace.path, targetPath);
-      try {
-        const renamedWorkspace = coworkStore.relocateWorkspace(id, targetPath, normalizedName);
-        if (!renamedWorkspace) throw new Error('Workspace not found');
-        return { success: true, workspace: renamedWorkspace };
-      } catch (error) {
-        fs.renameSync(targetPath, workspace.path);
-        throw error;
-      }
+      const renamedWorkspace = coworkStore.renameWorkspace(id, normalizedName);
+      if (!renamedWorkspace) return { success: false, error: 'Workspace not found' };
+      return { success: true, workspace: renamedWorkspace };
     } catch (error) {
       return {
         success: false,
