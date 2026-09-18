@@ -98,7 +98,7 @@
     "start:electron": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron --remote-debugging-port=9222 .",
     "start:electron:inspect": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron --inspect=9229 --remote-debugging-port=9222 .",
     "reset:userdata": "node scripts/reset-userdata.mjs",
-    "electron:dev": "cross-env ZHIYUAN_PRESERVE_HOST_RUNTIME=1 bun run channel:runtime:download && bun run engram:runtime:host && rimraf dist-electron && bun run build:electron:dev && concurrently --kill-others --kill-signal SIGKILL \"cross-env VITE_SKIP_ELECTRON=1 vite --port 5175\" \"wait-on -l -t 120000 -i 1000 -s 1 http-get://localhost:5175/src/renderer/main.tsx http-get://localhost:5175/src/renderer/index.css && wait-on -l -t 120000 -i 1000 dist-electron/.electron-ready && bun run start:electron\"",
+    "electron:dev": "cross-env ZHIYUAN_PRESERVE_HOST_RUNTIME=1 bun run channel:runtime:download && bun run engram:runtime:host && rimraf dist-electron && bun run build:electron:dev && node scripts/electron-dev.mjs",
     "electron:dev:fresh": "npm run reset:userdata && npm run electron:dev",
     "apply:patches": "patch-package --error-on-fail",
     "postinstall": "bun run apply:patches && electron-builder install-app-deps",
