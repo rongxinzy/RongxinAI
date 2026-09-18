@@ -9,10 +9,10 @@ import {
 } from '@shared/providers';
 import { RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 
 import { i18nService } from '../../services/i18n';
 import { isCurrentProviderModelDiscoveryRequest } from '../../services/providerModelDiscovery';
+import { showAppInfoToast } from '../../services/toastNotification';
 
 interface ProviderModelDiscoveryButtonProps {
   providerId: string;
@@ -27,7 +27,7 @@ interface ProviderModelDiscoveryButtonProps {
   onModelsDiscovered: (
     providerId: string,
     models: readonly DiscoveredProviderModel[],
-  ) => Promise<boolean> | boolean;
+  ) => Promise<void> | void;
 }
 
 const errorTranslationKeys = {
@@ -87,11 +87,11 @@ export function ProviderModelDiscoveryButton({
 
   const handleFetchModels = useCallback(async () => {
     if (!endpoint.baseUrl.trim()) {
-      toast.error(i18nService.t('fetchModelsNeedEndpoint'));
+      showAppInfoToast(i18nService.t('fetchModelsNeedEndpoint'));
       return;
     }
     if (requiresApiKey && !apiKey) {
-      toast.error(i18nService.t('fetchModelsNeedApiKey'));
+      showAppInfoToast(i18nService.t('fetchModelsNeedApiKey'));
       return;
     }
 
@@ -116,12 +116,15 @@ export function ProviderModelDiscoveryButton({
         return;
       }
       if (!result.success) {
-        toast.error(i18nService.t(errorTranslationKeys[result.code]));
+        // 拉取模型列表是只读探测：失败后列表保持原样，什么都没改动，正文已经写明原因和
+        // 下一步，所以用中性信息提示而不是红色错误（DESIGN.md「全局提示与错误文案」）。
+        showAppInfoToast(i18nService.t(errorTranslationKeys[result.code]));
         return;
       }
-      const didTestModels = await onModelsDiscovered(providerId, result.models);
-      if (result.models.length === 0 && !didTestModels) {
-        toast.message(i18nService.t('fetchModelsEmpty'));
+      await onModelsDiscovered(providerId, result.models);
+      // 探测成功但一个模型都没返回时必须给出明确反馈：用户主动点的就是这一步。
+      if (result.models.length === 0) {
+        showAppInfoToast(i18nService.t('fetchModelsEmpty'));
       }
     } catch {
       if (
@@ -132,7 +135,7 @@ export function ProviderModelDiscoveryButton({
           currentSignature.current,
         )
       ) {
-        toast.error(i18nService.t('fetchModelsFailed'));
+        showAppInfoToast(i18nService.t('fetchModelsFailed'));
       }
     } finally {
       const remainingLoadingDuration = Math.max(
