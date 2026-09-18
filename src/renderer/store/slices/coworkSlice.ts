@@ -407,21 +407,39 @@ const coworkSlice = createSlice({
       }
     },
 
-    addSession(state, action: PayloadAction<CoworkSession>) {
-      const summary = toSessionSummary(action.payload);
-      if (summary.mode === CoworkSessionMode.Chat) {
-        upsertSessionSummary(state.chatSessions, summary);
-      } else {
-        upsertSessionSummary(state.sessions, summary);
-      }
-      state.currentSession = {
-        ...action.payload,
-        messagesOffset: action.payload.messagesOffset ?? 0,
-        totalMessages: action.payload.totalMessages ?? action.payload.messages.length,
-      };
-      state.currentSessionId = action.payload.id;
-      cacheStreamingSession(state, state.currentSession);
-      markSessionRead(state, action.payload.id);
+    addSession: {
+      prepare: (session: CoworkSession, temporarySessionId?: string) => ({
+        payload: session,
+        meta: { temporarySessionId },
+      }),
+      reducer(
+        state,
+        action: PayloadAction<CoworkSession, string, { temporarySessionId?: string }>,
+      ) {
+        // Publish replacement as one state transition, before any asynchronous refresh.
+        const temporarySessionId = action.meta.temporarySessionId;
+        if (temporarySessionId && temporarySessionId !== action.payload.id) {
+          removeSessionFromState(state, temporarySessionId);
+          state.chatSessions = state.chatSessions.filter(
+            session => session.id !== temporarySessionId,
+          );
+          setSessionStreaming(state, temporarySessionId, false);
+        }
+        const summary = toSessionSummary(action.payload);
+        if (summary.mode === CoworkSessionMode.Chat) {
+          upsertSessionSummary(state.chatSessions, summary);
+        } else {
+          upsertSessionSummary(state.sessions, summary);
+        }
+        state.currentSession = {
+          ...action.payload,
+          messagesOffset: action.payload.messagesOffset ?? 0,
+          totalMessages: action.payload.totalMessages ?? action.payload.messages.length,
+        };
+        state.currentSessionId = action.payload.id;
+        cacheStreamingSession(state, state.currentSession);
+        markSessionRead(state, action.payload.id);
+      },
     },
 
     updateSessionStatus(

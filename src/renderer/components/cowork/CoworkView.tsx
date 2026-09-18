@@ -47,7 +47,6 @@ import {
   addMessage,
   addSession,
   clearCurrentSession,
-  deleteSession,
   updateMessageContent,
   updateMessageContents,
   updateSessionStatus,
@@ -867,25 +866,28 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           ? `${combinedSystemPrompt.slice(0, 120)}...`
           : '(undefined)',
       });
-      const { session: startedSession, error: startError } = await coworkService.startSession({
-        prompt,
-        title: fallbackTitle,
-        cwd: currentWorkspacePath || undefined,
-        systemPrompt: combinedSystemPrompt,
-        // Agent-backed chat stays tagged as a chat session so it remains in
-        // the Chat sidebar list; work sessions keep the default work mode.
-        mode: isChatAgentExecution ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
-        activeSkillIds: sessionSkillIds,
-        workspaceId: currentWorkspaceId || undefined,
-        agentId: currentAgentId,
-        expertIds,
-        goalMode,
-        productionLoopMode,
-        modelOverride: sessionModelOverride,
-        permissionMode: sessionPermissionMode,
-        imageAttachments,
-        fileAttachments,
-      });
+      const { session: startedSession, error: startError } = await coworkService.startSession(
+        {
+          prompt,
+          title: fallbackTitle,
+          cwd: currentWorkspacePath || undefined,
+          systemPrompt: combinedSystemPrompt,
+          // Agent-backed chat stays tagged as a chat session so it remains in
+          // the Chat sidebar list; work sessions keep the default work mode.
+          mode: isChatAgentExecution ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
+          activeSkillIds: sessionSkillIds,
+          workspaceId: currentWorkspaceId || undefined,
+          agentId: currentAgentId,
+          expertIds,
+          goalMode,
+          productionLoopMode,
+          modelOverride: sessionModelOverride,
+          permissionMode: sessionPermissionMode,
+          imageAttachments,
+          fileAttachments,
+        },
+        tempSessionId,
+      );
 
       if (!startedSession && startError) {
         // Show the error as a system message in the temp session
@@ -916,9 +918,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           });
         }
         clearUnmanagedWorkingDirectory();
-        // coworkService.startSession already selected the real session.
-        // Remove only the temporary list entry after that replacement.
-        dispatch(deleteSession(tempSessionId));
       }
 
       // Stop immediately if user cancelled while startup request was in flight.
