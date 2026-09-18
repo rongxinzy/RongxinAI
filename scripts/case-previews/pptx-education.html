@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-education</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:0;display:block}
+.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
+.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
+.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
+h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
+.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
+.rule{margin-top:26px;height:1px;background:#e6e6e2}
+.body{margin-top:30px;display:grid;gap:26px;flex:1}
+.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
+.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
+.cols3{grid-template-columns:repeat(3,1fr)}
+.cols2{grid-template-columns:repeat(2,1fr)}
+.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
+.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
+.blk .num{margin-top:6px;font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
+.blk .num small{font-size:15px;font-weight:500;color:#6f737b;margin-left:8px;letter-spacing:0}
+ul{list-style:none;margin-top:10px;display:grid;gap:8px}
+li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
+li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
+.matrix{margin-top:8px;border:1px solid #e6e6e2}
+.matrix .row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-top:1px solid #e6e6e2}
+.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
+.matrix .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2}
+.matrix .row div:first-child{border-left:0}
+.bars{margin-top:14px;display:grid;gap:9px}
+.bar{display:grid;grid-template-columns:74px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.diagram{margin-top:6px;height:230px;position:relative;border:1px solid #e6e6e2;background:radial-gradient(120% 120% at 50% 50%,#fdfaf3 0%,#fff 70%)}
+.sun{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--accent)}
+.orbit{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.planet{position:absolute;width:16px;height:16px;border-radius:50%;background:#4c5058}
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+.mini{border:1px solid #e6e6e2;padding:16px 18px;background:#fafaf8}
+.mini b{display:block;font-size:34px;color:var(--accent);letter-spacing:-.02em}
+.mini span{display:block;margin-top:8px;font-size:14px;font-weight:600}
+.mini p{margin-top:8px;font-size:13px;color:#6f737b;line-height:1.7}
+</style></head>
+<body>
+<div class="slide" style="--accent:#F59E0B">
+  <div class="kicker">Science Class</div>
+  <h1>太阳系与行星探索</h1>
+  <p class="lede">中学课堂科普课件 · 从太阳系全景到行星特征对比</p>
+  <div class="rule"></div>
+  <div class="body cols2">
+    <div class="diagram">
+      <div class="sun"></div>
+      <div class="orbit" style="width:170px;height:170px;margin:-85px 0 0 -85px"></div>
+      <div class="orbit" style="width:260px;height:260px;margin:-130px 0 0 -130px"></div>
+      <div class="orbit" style="width:350px;height:350px;margin:-175px 0 0 -175px"></div>
+      <div class="planet" style="left:calc(50% + 85px - 8px);top:50%"></div>
+      <div class="planet" style="left:50%;top:calc(50% - 130px - 8px);background:#8b8f97"></div>
+      <div class="planet" style="left:calc(50% - 175px - 8px);top:calc(50% + 40px);background:#c2703f"></div>
+    </div>
+    <div>
+      <div class="blk"><h2>本页要点</h2>
+        <ul>
+          <li>八大行星按距日顺序排列，类地行星与气态巨行星差异明显</li>
+          <li>地球位于宜居带，液态水与大气层是生命存在的关键条件</li>
+          <li>探索里程碑：从伽利略观测到深空探测器着陆</li>
+        </ul>
+      </div>
+      <div class="cards3" style="grid-template-columns:1fr 1fr;margin-top:22px">
+        <div class="mini"><b>8</b><span>行星数量</span></div>
+        <div class="mini"><b>1.5 亿</b><span>日地距离（公里）</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="brandline">自然科学 · 第三章</div>
+  <div class="pageno">03 / 16</div>
+</div></body></html>

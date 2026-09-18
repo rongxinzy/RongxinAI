@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-budget</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
+.file{font-weight:600;margin-left:6px}
+.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
+.grid{flex:1;min-height:0;overflow:hidden}
+.row{display:grid;border-top:1px solid #edede9}
+.row:first-child{border-top:0}
+.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
+.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
+.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
+.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
+.warn{color:#b3564a}
+.split{flex:1;display:grid;grid-template-columns:1.25fr 1fr;min-height:0}
+.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
+.pane:last-child{border-right:0}
+.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
+.bars{margin-top:16px;display:grid;gap:11px}
+.bar{display:grid;grid-template-columns:62px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
+.notes{margin-top:14px;display:grid;gap:8px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.7;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+</style></head><body>
+<div class="win" style="--accent:#8B5CF6">
+  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="file">2026Q4_部门预算表.xlsx</span>
+    <span class="menu"><span>开始</span><span>数据</span><span>公式</span><span>视图</span></span>
+  </div>
+  <div class="split">
+    <div class="grid">
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx"></div><div class="cell head">科目</div><div class="cell head">预算（万元）</div><div class="cell head">已占用</div><div class="cell head">使用率</div><div class="cell head">状态</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx">2</div><div class="cell">人员成本</div><div class="cell mono">420.0</div><div class="cell mono">318.6</div><div class="cell mono">75.9%</div><div class="cell">正常</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx">3</div><div class="cell">云与算力</div><div class="cell mono">180.0</div><div class="cell mono">171.2</div><div class="cell mono warn">95.1%</div><div class="cell hi">关注</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx">4</div><div class="cell">市场推广</div><div class="cell mono">260.0</div><div class="cell mono">132.4</div><div class="cell mono">50.9%</div><div class="cell">正常</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx">5</div><div class="cell">办公与差旅</div><div class="cell mono">64.0</div><div class="cell mono">58.8</div><div class="cell mono warn">91.9%</div><div class="cell hi">关注</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx">6</div><div class="cell">培训与招聘</div><div class="cell mono">48.0</div><div class="cell mono">19.2</div><div class="cell mono">40.0%</div><div class="cell">正常</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx">7</div><div class="cell">设备采购</div><div class="cell mono">120.0</div><div class="cell mono">46.0</div><div class="cell mono">38.3%</div><div class="cell">正常</div>
+      </div>
+      <div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px">
+        <div class="cell idx"></div><div class="cell total">合计</div><div class="cell total mono">1,092.0</div><div class="cell total mono">746.2</div><div class="cell total mono">68.3%</div><div class="cell total">2 项关注</div>
+      </div>
+<div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">9</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">10</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">14</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">15</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">16</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 96px 96px 92px 76px 84px"><div class="cell idx">17</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
+    </div>
+    <div class="pane">
+      <h3>科目使用率</h3>
+      <div class="bars">
+        <div class="bar"><span>云与算力</span><i style="width:95%"></i><span class="mono">95.1%</span></div>
+        <div class="bar"><span>办公差旅</span><i style="width:92%"></i><span class="mono">91.9%</span></div>
+        <div class="bar"><span>人员成本</span><i style="width:76%"></i><span class="mono">75.9%</span></div>
+        <div class="bar"><span>市场推广</span><i style="width:51%"></i><span class="mono">50.9%</span></div>
+        <div class="bar"><span>培训招聘</span><i style="width:40%"></i><span class="mono">40.0%</span></div>
+        <div class="bar"><span>设备采购</span><i style="width:38%"></i><span class="mono">38.3%</span></div>
+      </div>
+      <h3 style="margin-top:22px">关键提示</h3>
+      <div class="notes">
+        <div>云与算力已用 95.1%，按当前增速将在 11 月中旬超支，需提前评估追加或压缩</div>
+        <div>办公与差旅的差旅部分占了 46 万，其中两次集中出差占六成</div>
+        <div>市场推广与设备采购剩余充足，可承接季度末的临时投放</div>
+      </div>
+    </div>
+  </div>
+</div></body></html>

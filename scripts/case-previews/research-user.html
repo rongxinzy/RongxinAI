@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-user</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:30px}
+.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
+.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
+.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:16px}
+h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
+.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
+td.mono{font-variant-numeric:tabular-nums}
+ul{list-style:none;margin-top:10px;display:grid;gap:8px}
+li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
+li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.cols2{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;min-height:0;align-items:start}
+.bars{display:grid;gap:10px;margin-top:12px}
+.bar{display:grid;grid-template-columns:64px 1fr 40px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
+.tag{display:inline-block;border:1px solid #e4e4e0;padding:2px 8px;font-size:11px;color:#6f737b;margin-right:6px}
+</style></head><body>
+<div class="sheet" style="--accent:#0F766E">
+  <div class="sheet-top">
+    <div class="kicker">User Research</div>
+    <h1>目标用户访谈与需求洞察</h1>
+    <div class="meta"><span>样本：24 位一线使用者</span><span>覆盖：制造 / 零售 / 金融 / 医疗 / 教育</span><span>周期：3 周</span></div>
+  </div>
+  <div class="body">
+    <div><h3>摘要</h3><p class="abstract">访谈中最稳定的诉求不是功能多少，而是"我知道它在替我做什么"。24 位受访者里有 19 位主动提到希望看到每一步的执行依据；愿意付费的前三位因素依次是数据不出本机、过程可回看、接入不改造现有流程。</p></div>
+    <div class="cols2">
+      <div><h3>需求优先级</h3>
+        <table>
+          <tr><th>需求</th><th>提及人数</th><th>当前满足度</th><th>判断</th></tr>
+          <tr><td>执行过程可回看</td><td class="mono">19 / 24</td><td>低</td><td>优先做</td></tr>
+          <tr><td>数据不出本机</td><td class="mono">17 / 24</td><td>中</td><td>优先做</td></tr>
+          <tr><td>不改现有流程接入</td><td class="mono">14 / 24</td><td>低</td><td>优先做</td></tr>
+          <tr><td>多人协作与分工</td><td class="mono">9 / 24</td><td>中</td><td>次优先</td></tr>
+          <tr><td>自定义界面外观</td><td class="mono">4 / 24</td><td>高</td><td>暂缓</td></tr>
+        </table>
+      </div>
+      <div><h3>痛点提及频次</h3>
+        <div class="bars">
+          <div class="bar"><span>结果不可解释</span><i style="width:100%"></i><span class="mono">19</span></div>
+          <div class="bar"><span>数据出境顾虑</span><i style="width:89%"></i><span class="mono">17</span></div>
+          <div class="bar"><span>接入要改流程</span><i style="width:74%"></i><span class="mono">14</span></div>
+          <div class="bar"><span>失败要重来</span><i style="width:58%"></i><span class="mono">11</span></div>
+          <div class="bar"><span>多人对不齐</span><i style="width:47%"></i><span class="mono">9</span></div>
+        </div>
+        <h3 style="margin-top:20px">引用摘录</h3>
+        <ul>
+          <li><span class="tag">制造业</span>出了问题我要能查到是哪一步，不然不敢让它在生产环节跑。</li>
+          <li><span class="tag">金融</span>能不能证明数据没出我们的机房，这决定了能不能立项。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot"><span>研究方法：半结构化访谈 + 需求编码</span><span>第 2 / 10 页</span></div>
+</div></body></html>

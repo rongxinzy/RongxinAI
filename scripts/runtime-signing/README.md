@@ -1,9 +1,10 @@
 # Central Windows runtime signing
 
-Certum SimplySign credentials remain exclusively in the ZhiYuan Agent protected
+Certum SimplySign credentials remain exclusively in the ZhiYuan Agent
 `release` environment. The runtime repositories build unsigned binaries,
 request no cloud credentials, and publish final signed releases in their own
-repositories. Desktop builds only verify the signatures.
+repositories. Runtime publication and desktop builds do not verify signatures;
+source provenance and SHA-256 integrity checks remain mandatory.
 
 ## Configuration
 
@@ -27,11 +28,13 @@ two owners, so one multi-owner fine-grained PAT is not sufficient. Provision
 an appropriate credential and ensure it can read every repository required
 by that workflow. Do not grant signing-key access with this token.
 
-Set the public `RUNTIME_SIGNER_THUMBPRINT` variable in both runtimes and both
-desktop repositories to the certificate's 40-character SHA-1 thumbprint.
+No public `RUNTIME_SIGNER_THUMBPRINT` variable is required. The central signing
+job still uses its existing private `CERTUM_CERT_THUMBPRINT` secret to select
+the signing certificate. Signing command failure stops the job; no post-sign
+Authenticode verification is performed.
 Protect each runtime's `release` environment with main-only deployment rules
 and required reviewers as appropriate. ZhiYuan Agent retains its existing
-protected signing environment.
+signing environment; confirm its protection rules in repository settings.
 
 ## Protected publication sequence
 
@@ -45,8 +48,8 @@ protected signing environment.
 3. From each runtime main, dispatch its release workflow with the successful
    central `signing_run_id`. Approve its publication environment. The workflow
    verifies repository/workflow/event, main ancestry, unchanged tag identity,
-   manifest metadata/hashes, expected publisher and actual Authenticode trust,
-   code-signing usage and timestamp before publication.
+   manifest source metadata and file hashes before publication. It does not
+   check certificate publisher, Authenticode trust, EKU, or timestamp.
 
 This is a three-stage manual protected sequence, not automatic cross-repo
 dispatch. Signed files travel through Actions artifacts; final release assets
@@ -66,10 +69,10 @@ publishing all six archives, checksums and SBOMs. A mismatch fails closed.
 
 ## Desktop rollout
 
-Publish the new signed releases first, then update desktop runtime pins and
-SHA-256 values together. Existing unsigned pins must not be silently accepted.
-Keep consumer PRs draft until signed versions and the public signer are ready.
+Publish the new centrally signed releases first, then update desktop runtime
+pins and SHA-256 values together. No desktop signature gate or public signer
+configuration is required. Hashes check byte integrity, not publisher identity.
 Application/installer signing is unchanged; runtime EXEs are not re-signed by
-the desktop builder. Mock policy tests are not proof of real cloud signing:
+the desktop builder. Policy tests are not proof of real cloud signing:
 the first protected release and desktop cold-install/upgrade gates provide
 that validation.

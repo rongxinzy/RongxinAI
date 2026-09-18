@@ -491,6 +491,9 @@ export const COMPONENT_SELECTORS = {
   'page-task-list-card-1': '.theme-page-task-list-card-1',
   'page-task-template-gallery-card-1': '.theme-page-task-template-gallery-card-1',
   'page-task-template-gallery-card-2': '.theme-page-task-template-gallery-card-2',
+  'page-case-gallery-card': '.theme-page-case-gallery-card',
+  'page-case-gallery-media': '.theme-page-case-gallery-media',
+  'page-case-gallery-body': '.theme-page-case-gallery-body',
   'page-pi-runtime-model-config-select-trigger-1':
     '.theme-page-pi-runtime-model-config-select-trigger-1',
   'page-pi-runtime-model-config-select-trigger-2':
@@ -628,9 +631,6 @@ export const COMPONENT_SELECTORS = {
   'page-models-panel-card-variant-2': '.theme-page-models-panel-card-variant-2',
   'page-models-panel-card-variant-3': '.theme-page-models-panel-card-variant-3',
   'page-models-panel-card-variant-4': '.theme-page-models-panel-card-variant-4',
-  'page-prompt-panel-button-variant-1': '.theme-page-prompt-panel-button-variant-1',
-  'page-prompt-panel-button-variant-2': '.theme-page-prompt-panel-button-variant-2',
-  'page-prompt-panel-button-variant-3': '.theme-page-prompt-panel-button-variant-3',
   'page-date-input-button-variant-1': '.theme-page-date-input-button-variant-1',
   'page-date-input-button-variant-2': '.theme-page-date-input-button-variant-2',
   'page-date-input-button-variant-3': '.theme-page-date-input-button-variant-3',

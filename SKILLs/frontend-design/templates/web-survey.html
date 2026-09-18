@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --ground: #f6f6f7;
+    --panel: #ffffff;
+    --ink: #1a1c1f;
+    --muted: #6b7078;
+    --rule: #e3e5e8;
+    --rule-strong: #c9ccd1;
+    --accent: #c4442a;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --measure: 660px;
+    --progress: 0%;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.66;
+  }
+
+  a { color: var(--accent); text-underline-offset: 3px; }
+  h1, h2, h3, p, fieldset, legend { margin: 0; }
+  ul { margin: 0; padding: 0; list-style: none; }
+  button, input, textarea { font: inherit; color: inherit; }
+
+  .skip { position: absolute; left: -9999px; background: var(--ink); color: var(--panel); padding: 9px 14px; z-index: 30; }
+  .skip:focus { left: 10px; top: 10px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── 吸顶进度 ─────────────────────────────────────────── */
+  .meter {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--panel);
+    border-bottom: 1px solid var(--rule);
+  }
+  .meter-track { height: 2px; background: var(--rule); }
+  .meter-fill { height: 2px; width: var(--progress); background: var(--accent); transition: width 240ms cubic-bezier(0.3, 0.8, 0.2, 1); }
+  .meter-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 11px 24px;
+  }
+  .meter-label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; color: var(--muted); }
+  .meter-mark { font-size: 13.5px; font-weight: 600; letter-spacing: 0.02em; }
+
+  /* ── 抬头 ─────────────────────────────────────────────── */
+  .shell { max-width: var(--measure); margin: 0 auto; padding: 46px 24px 0; }
+
+  .doc-title { font-size: clamp(27px, 3.4vw, 34px); line-height: 1.2; font-weight: 620; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-intro { margin-top: 16px; color: var(--muted); text-wrap: pretty; }
+  .doc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  /* ── 问题 ─────────────────────────────────────────────── */
+  .questions { margin-top: 34px; }
+
+  .q { padding: 26px 0; border-top: 1px solid var(--rule); }
+  .q:first-child { border-top: 0; padding-top: 6px; }
+
+  .q-head { display: flex; gap: 14px; align-items: baseline; }
+  .q-no { font-family: var(--mono); font-size: 12px; color: var(--accent); min-width: 26px; }
+  .q-label { font-size: 16px; font-weight: 560; line-height: 1.5; text-wrap: pretty; }
+  .q-req { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--accent); margin-left: 8px; white-space: nowrap; }
+  .q-help { margin: 6px 0 0 40px; font-size: 13px; color: var(--muted); }
+  .q-body { margin: 14px 0 0 40px; }
+  .q-error { margin: 10px 0 0 40px; font-size: 13px; color: var(--accent); display: none; }
+  .q[data-invalid="true"] .q-error { display: block; }
+  .q[data-invalid="true"] .q-label { color: var(--accent); }
+
+  /* ── 选项 ─────────────────────────────────────────────── */
+  .opts { display: grid; gap: 2px; }
+  .opt {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 14px;
+    border: 1px solid var(--rule);
+    background: var(--panel);
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+  .opt:hover { border-color: var(--rule-strong); }
+  .opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .opt-mark {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 3px;
+    border: 1px solid var(--rule-strong);
+    background: var(--panel);
+    position: relative;
+  }
+  .opt-mark[data-shape="round"] { border-radius: 50%; }
+  .opt-mark::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 120ms ease;
+  }
+  .opt-mark[data-shape="round"]::after { border-radius: 50%; }
+  .opt-body { display: block; min-width: 0; }
+  .opt-text { display: block; font-size: 14.5px; }
+  .opt-note { display: block; font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+
+  .opt:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 5%, var(--panel)); }
+  .opt:has(input:checked) .opt-mark::after { opacity: 1; }
+  .opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── 输入 ─────────────────────────────────────────────── */
+  .field { display: block; }
+  .field input, .field textarea {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid var(--rule-strong);
+    background: var(--panel);
+    border-radius: 0;
+    transition: border-color 140ms ease;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); outline: none; box-shadow: inset 0 0 0 1px var(--accent); }
+  .field textarea { min-height: 104px; resize: vertical; }
+  .field-hint { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+
+  /* ── 量表 ─────────────────────────────────────────────── */
+  .scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .scale label { position: relative; background: var(--panel); text-align: center; padding: 13px 6px 11px; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; }
+  .scale label:hover { background: var(--ground); }
+  .scale input { position: absolute; opacity: 0; pointer-events: none; }
+  .scale-num { font-family: var(--mono); font-size: 15px; }
+  .scale-cap { display: block; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .scale label:has(input:checked) { background: var(--ink); color: var(--panel); }
+  .scale label:has(input:checked) .scale-cap { color: color-mix(in srgb, var(--panel) 72%, transparent); }
+  .scale label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* ── 提交 ─────────────────────────────────────────────── */
+  .submit-row { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 20px; padding: 30px 0 0; border-top: 1px solid var(--rule); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 26px;
+    background: var(--ink);
+    color: var(--panel);
+    border: 1px solid var(--ink);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 140ms ease, border-color 140ms ease;
+  }
+  .btn:hover { background: var(--accent); border-color: var(--accent); }
+  .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .submit-note { font-size: 12.5px; color: var(--muted); max-width: 40ch; }
+
+  .done {
+    display: none;
+    margin: 34px 0 0;
+    padding: 26px 28px;
+    border: 1px solid var(--ink);
+    background: var(--panel);
+  }
+  .done[data-on="true"] { display: block; }
+  .done-title { font-size: 19px; font-weight: 600; }
+  .done-text { margin-top: 10px; color: var(--muted); }
+  body[data-done="true"] .submit-row { display: none; }
+
+  .foot { margin-top: 56px; border-top: 1px solid var(--rule); background: var(--panel); }
+  .foot-inner {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 18px 24px 42px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 22px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 620px) {
+    .shell { padding: 32px 16px 0; }
+    .meter-inner { padding: 10px 16px; }
+    .q-body, .q-help, .q-error { margin-left: 0; }
+    .q-head { flex-wrap: wrap; gap: 6px 10px; }
+    .scale { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .scale-cap { display: none; }
+    .foot-inner { padding: 16px 16px 34px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#questions">跳到问题</a>
+
+<div class="meter">
+  <div class="meter-track"><div class="meter-fill" id="meter-fill"></div></div>
+  <div class="meter-inner">
+    <span class="meter-mark" id="meter-mark"></span>
+    <span class="meter-label" id="meter-label"></span>
+  </div>
+</div>
+
+<main class="shell">
+  <h1 class="doc-title" id="doc-heading"></h1>
+  <p class="doc-intro" id="doc-intro"></p>
+  <div class="doc-meta" id="doc-meta"></div>
+
+  <form class="questions" id="questions" novalidate></form>
+
+  <div class="submit-row">
+    <button class="btn" type="submit" id="submit" form="questions"></button>
+    <p class="submit-note" id="submit-note"></p>
+  </div>
+
+  <div class="done" id="done" role="status">
+    <p class="done-title" id="done-title"></p>
+    <p class="done-text" id="done-text"></p>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="foot-inner">
+    <span id="foot-left"></span>
+    <span id="foot-right"></span>
+  </div>
+</footer>
+
+<script>
+/* ── 可编辑区 ─────────────────────────────────────────────
+   交付时只改这一个对象；下面的渲染层与 <style> 不要动。
+   题型：single（单选）/ multi（多选）/ scale（量表）/ text（单行）/ long（多行）
+   ──────────────────────────────────────────────────────── */
+const TEMPLATE = {
+  meta: {
+    lang: 'zh-CN',
+    title: '项目需求收集表 · 木更工作室',
+    description: '单文件需求收集表，带吸顶进度条与校验，可离线填写。',
+  },
+
+  // 留空即用默认：近白底 + 朱红强调
+  theme: {},
+
+  form: {
+    mark: '木更工作室',
+    title: '新项目需求收集',
+    intro: '填完大概三分钟。这份表用来判断能不能接、大概怎么报价，不构成正式委托。',
+    meta: ['七道题', '约 3 分钟', '答完自动保存进度'],
+
+    progressTemplate: '已答 {done} / {total}',
+    requiredMark: '必填',
+    requiredHint: '这道题需要填写后再提交',
+    requiredNote: '带「必填」的问题需要填完才能提交',
+
+    questions: [
+      {
+        no: '01',
+        label: '怎么称呼你，怎么联系',
+        help: '写常用称呼就行，联系方式留一个能收到消息的。',
+        type: 'text',
+        required: true,
+        fields: [
+          { name: 'name', placeholder: '称呼', width: '1fr' },
+          { name: 'contact', placeholder: '微信或邮箱', width: '1.4fr' },
+        ],
+      },
+      {
+        no: '02',
+        label: '这个项目属于哪一类',
+        type: 'single',
+        required: true,
+        options: [
+          { value: 'brand', text: '品牌官网', note: '介绍、案例、联系方式' },
+          { value: 'shop', text: '电商店铺', note: '商品列表与下单' },
+          { value: 'tool', text: '内部工具', note: '给同事用的后台或看板' },
+          { value: 'other', text: '还没想好', note: '先把需求聊清楚再说' },
+        ],
+      },
+      {
+        no: '03',
+        label: '希望什么时候上线',
+        type: 'scale',
+        required: true,
+        scale: ['两周内', '一个月', '三个月', '半年', '不着急'],
+      },
+      {
+        no: '04',
+        label: '需要包含哪些部分',
+        help: '可多选，后面还会一起过一遍。',
+        type: 'multi',
+        options: [
+          { value: 'home', text: '首页与介绍' },
+          { value: 'list', text: '产品列表与详情' },
+          { value: 'order', text: '在线下单与支付' },
+          { value: 'booking', text: '预约或报名' },
+          { value: 'i18n', text: '中英双语' },
+        ],
+      },
+      {
+        no: '05',
+        label: '预算大概在哪个区间',
+        type: 'single',
+        options: [
+          { value: 'a', text: '三万以下' },
+          { value: 'b', text: '三到八万' },
+          { value: 'c', text: '八到二十万' },
+          { value: 'd', text: '还没定，先看方案' },
+        ],
+      },
+      {
+        no: '06',
+        label: '有没有能参考的站点',
+        help: '贴链接，或者写清楚你喜欢它哪一点。',
+        type: 'long',
+        placeholder: '例如：喜欢 example.com 的商品排列方式，但不喜欢它的配色',
+      },
+      {
+        no: '07',
+        label: '还有什么要提前说的',
+        type: 'long',
+        placeholder: '排期限制、已有的素材、必须对接的系统，都写在这里',
+      },
+    ],
+
+    submitLabel: '提交需求',
+    submitNote: '提交后一个工作日内回你一封邮件，附三个问题和一个初步方案。',
+    doneTitle: '收到了',
+    doneText: '需求已经记下。一个工作日内会有回复，如果赶时间可以直接打 021 6428 7713。',
+    footLeft: '木更工作室 · 上海',
+    footRight: 'hello@mugeng.example.com',
+  },
+};
+
+/* ── 渲染层（不要修改） ──────────────────────────────────── */
+(function render() {
+  const form = TEMPLATE.form || {};
+  const byId = id => document.getElementById(id);
+  const setText = (id, value) => {
+    const node = byId(id);
+    if (node && value != null) node.textContent = value;
+  };
+  const el = (tag, cls, text) => {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  };
+
+  if (TEMPLATE.meta) {
+    if (TEMPLATE.meta.lang) document.documentElement.lang = TEMPLATE.meta.lang;
+    if (TEMPLATE.meta.title) {
+      document.title = TEMPLATE.meta.title;
+      setText('doc-title', TEMPLATE.meta.title);
+    }
+    if (TEMPLATE.meta.description) {
+      const meta = byId('doc-desc');
+      if (meta) meta.setAttribute('content', TEMPLATE.meta.description);
+    }
+  }
+
+  const THEME_VARS = {
+    ground: '--ground', panel: '--panel', ink: '--ink', muted: '--muted',
+    rule: '--rule', ruleStrong: '--rule-strong', accent: '--accent',
+  };
+  const theme = TEMPLATE.theme || {};
+  Object.keys(THEME_VARS).forEach(key => {
+    const value = theme[key];
+    if (typeof value === 'string' && value) document.documentElement.style.setProperty(THEME_VARS[key], value);
+  });
+
+  setText('meter-mark', form.mark);
+  setText('doc-heading', form.title);
+  setText('doc-intro', form.intro);
+  setText('submit', form.submitLabel);
+  setText('submit-note', form.submitNote);
+  setText('done-title', form.doneTitle);
+  setText('done-text', form.doneText);
+  setText('foot-left', form.footLeft);
+  setText('foot-right', form.footRight);
+  const metaRow = byId('doc-meta');
+  if (metaRow) (form.meta || []).forEach(item => metaRow.appendChild(el('span', null, item)));
+
+  const questions = form.questions || [];
+  const inputsOf = question =>
+    Array.prototype.slice.call(document.querySelectorAll('[data-q="' + question.no + '"] input, [data-q="' + question.no + '"] textarea'));
+
+  function buildOption(question, option, shape) {
+    const label = el('label', 'opt');
+    const input = el('input');
+    input.type = shape === 'round' ? 'radio' : 'checkbox';
+    input.name = 'q' + question.no;
+    input.value = option.value;
+    input.setAttribute('data-q', question.no);
+    const mark = el('span', 'opt-mark');
+    mark.setAttribute('data-shape', shape);
+    mark.setAttribute('aria-hidden', 'true');
+    label.appendChild(input);
+    label.appendChild(mark);
+    const body = el('span', 'opt-body');
+    body.appendChild(el('span', 'opt-text', option.text));
+    if (option.note) body.appendChild(el('span', 'opt-note', option.note));
+    label.appendChild(body);
+    return label;
+  }
+
+  function buildQuestion(question) {
+    const box = el('section', 'q');
+    box.setAttribute('data-q', question.no);
+
+    const head = el('div', 'q-head');
+    head.appendChild(el('span', 'q-no', question.no));
+    const labelText = el('span', 'q-label', question.label);
+    head.appendChild(labelText);
+    if (question.required) head.appendChild(el('span', 'q-req', form.requiredMark || ''));
+    box.appendChild(head);
+    if (question.help) box.appendChild(el('p', 'q-help', question.help));
+
+    const body = el('div', 'q-body');
+
+    if (question.type === 'single' || question.type === 'multi') {
+      const shape = question.type === 'single' ? 'round' : 'square';
+      const wrap = el('div', 'opts');
+      (question.options || []).forEach(option => wrap.appendChild(buildOption(question, option, shape)));
+      body.appendChild(wrap);
+    } else if (question.type === 'scale') {
+      const wrap = el('div', 'scale');
+      (question.scale || []).forEach((cap, index) => {
+        const item = el('label');
+        const input = el('input');
+        input.type = 'radio';
+        input.name = 'q' + question.no;
+        input.value = String(index + 1);
+        input.setAttribute('data-q', question.no);
+        input.setAttribute('aria-label', cap);
+        item.appendChild(input);
+        item.appendChild(el('span', 'scale-num', String(index + 1)));
+        item.appendChild(el('span', 'scale-cap', cap));
+        wrap.appendChild(item);
+      });
+      body.appendChild(wrap);
+    } else if (question.type === 'text') {
+      const wrap = el('div');
+      wrap.style.display = 'grid';
+      wrap.style.gap = '10px';
+      wrap.style.gridTemplateColumns = (question.fields || []).map(field => field.width || '1fr').join(' ');
+      (question.fields || []).forEach(field => {
+        const holder = el('label', 'field');
+        const input = el('input');
+        input.type = 'text';
+        input.name = field.name;
+        input.placeholder = field.placeholder || '';
+        input.setAttribute('data-q', question.no);
+        holder.appendChild(input);
+        wrap.appendChild(holder);
+      });
+      body.appendChild(wrap);
+    } else if (question.type === 'long') {
+      const holder = el('label', 'field');
+      const area = el('textarea');
+      area.name = 'q' + question.no;
+      area.placeholder = question.placeholder || '';
+      area.setAttribute('data-q', question.no);
+      holder.appendChild(area);
+      body.appendChild(holder);
+    }
+
+    box.appendChild(body);
+    box.appendChild(el('p', 'q-error', form.requiredHint || ''));
+    return box;
+  }
+
+  const formEl = byId('questions');
+  if (formEl) questions.forEach(question => formEl.appendChild(buildQuestion(question)));
+
+  function isAnswered(question) {
+    const inputs = inputsOf(question);
+    if (question.type === 'text') {
+      return inputs.some(input => input.value.trim() !== '');
+    }
+    if (question.type === 'long') {
+      return inputs.some(input => input.value.trim() !== '');
+    }
+    return inputs.some(input => input.checked);
+  }
+
+  function paintProgress() {
+    const total = questions.length || 1;
+    const done = questions.filter(isAnswered).length;
+    document.documentElement.style.setProperty('--progress', (done / total) * 100 + '%');
+    setText('meter-label', String(form.progressTemplate || '{done} / {total}')
+      .replace('{done}', String(done))
+      .replace('{total}', String(questions.length)));
+  }
+
+  if (formEl) {
+    formEl.addEventListener('input', paintProgress);
+    formEl.addEventListener('change', paintProgress);
+    formEl.addEventListener('submit', event => {
+      event.preventDefault();
+      let firstInvalid = null;
+      questions.forEach(question => {
+        const box = formEl.querySelector('.q[data-q="' + question.no + '"]');
+        if (!box) return;
+        const invalid = Boolean(question.required) && !isAnswered(question);
+        box.setAttribute('data-invalid', invalid ? 'true' : 'false');
+        if (invalid && !firstInvalid) firstInvalid = box;
+      });
+      if (firstInvalid) {
+        firstInvalid.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const focusable = firstInvalid.querySelector('input, textarea');
+        if (focusable) focusable.focus({ preventScroll: true });
+        return;
+      }
+      document.body.setAttribute('data-done', 'true');
+      const done = byId('done');
+      if (done) done.setAttribute('data-on', 'true');
+      setText('meter-label', form.doneLabel || '已提交');
+    });
+  }
+
+  const submit = byId('submit');
+  if (submit && form.requiredNote) submit.title = form.requiredNote;
+  paintProgress();
+})();
+</script>
+</body>
+</html>

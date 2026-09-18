@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-method</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:32px;background:#eceae4}
+.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
+.ptitle{font-size:23px;text-align:center;line-height:1.4}
+.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
+.abstract{margin-top:18px;border:1px solid #eeede7;background:#faf9f6;padding:14px 18px}
+.abstract h4{font-size:11px;letter-spacing:.2em;color:#8b8f97}
+.abstract p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+.keywords{margin-top:10px;font-size:11.5px;color:#8b8f97}
+.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:12px}
+.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
+.sec b{font-weight:600}
+.lv2{padding-left:22px}
+.lv3{padding-left:44px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.flow i{color:#b8b5ab;font-style:normal}
+.redline{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.redline .col h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.redline .col p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px}
+.reasons{margin-top:12px;display:grid;gap:7px}
+.reasons div{font-size:12px;color:#4c5058;padding-left:14px;position:relative}
+.reasons div::before{content:"·";position:absolute;left:2px;color:#b8b5ab}
+.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+</style></head><body>
+<div class="page" style="--accent:#7C3AED">
+  <div class="ptitle serif">研究方法与实验方案</div>
+  <div class="authors">准实验设计 · 两组对照 · 周期 12 周</div>
+  <div class="sections">
+    <div class="flow"><span>研究对象</span><i>→</i><span>分组</span><i>→</i><span>流程干预</span><i>→</i><span>指标采集</span><i>→</i><span>结果分析</span></div>
+    <table>
+      <tr><th>变量</th><th>类型</th><th>测量方式</th><th>预期方向</th></tr>
+      <tr><td>任务完成时长</td><td>连续</td><td>系统日志中位数</td><td>下降</td></tr>
+      <tr><td>返工率</td><td>连续</td><td>被驳回任务占比</td><td>下降</td></tr>
+      <tr><td>流程依从度</td><td>类别</td><td>审批节点覆盖率</td><td>上升</td></tr>
+      <tr><td>主观负荷</td><td>量表</td><td>每周自评（1-7）</td><td>持平或下降</td></tr>
+      <tr><td>异常处理占比</td><td>连续</td><td>人工介入次数 / 任务数</td><td>下降</td></tr>
+      <tr><td>采用意愿</td><td>量表</td><td>期末问卷（1-7）</td><td>上升</td></tr>
+    </table>
+    <div class="redline">
+      <div class="col"><h4>样本设计</h4><p>选取 2 个规模相近的 20 人团队，A 组启用流程干预，B 组保持原有方式，周期 12 周，每两周采集一次。</p></div>
+      <div class="col"><h4>分析方法</h4><p>组间比较用双重差分，控制团队既往任务量差异；对主观量表做信度检验后取组内均值。</p></div>
+    </div>
+    <div class="reasons"><div>局限：样本量偏小，结论只适用于流程高度相似的团队。</div></div>
+  </div>
+  <div class="foot"><span>伦理审查：已通过</span><span>预注册编号 MR-2026-118</span></div>
+</div></body></html>
