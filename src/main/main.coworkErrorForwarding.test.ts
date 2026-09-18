@@ -11,3 +11,16 @@ test('sends structured errors from asynchronous Cowork fallbacks', () => {
   expect(fallbackCalls).toHaveLength(2);
   expect(source).not.toMatch(/CoworkStreamIpc\.Error,[\s\S]{0,160}error: errorMessage/);
 });
+
+test('persists terminal errors before forwarding the error event', () => {
+  const forwarder = source.slice(source.indexOf('const forwardPiWorkbenchRuntimeToRenderer'));
+  const errorListener = forwarder.slice(
+    forwarder.indexOf("runtime.on('error'"),
+    forwarder.indexOf('const bindPiWorkbenchRuntimeForwarder'),
+  );
+  expect(errorListener).toContain('persistCoworkTerminalError(');
+  expect(errorListener).toContain("runtime.emit('message', sessionId, message)");
+  expect(errorListener.indexOf('persistCoworkTerminalError(')).toBeLessThan(
+    errorListener.indexOf('CoworkStreamIpc.Error'),
+  );
+});
