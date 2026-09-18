@@ -84,9 +84,9 @@ export function classicModalEffects(dark: boolean) {
     'composer-near': recipe({
       base: {
         ...aura,
-        // 2026/09/18 lixiang  线框单独降透明度，避免过实过艳
+        // 2026/09/18 lixiang  阴影用主题色原饱和度，不与灰色混色冲淡
         'box-shadow':
-          '0 0 0 1px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 12%, oklch(0.55 0 0)) 16%, transparent), 0 0 10px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.55 0 0)) 10%, transparent), 0 4px 14px -6px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.55 0 0)) 10%, transparent)',
+          '0 0 0 1px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 0 10px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 4px 14px -6px color-mix(in oklch, var(--zy-primary) 90%, transparent)',
       },
       composerFocus: focused,
     }),
@@ -94,8 +94,8 @@ export function classicModalEffects(dark: boolean) {
       base: {
         ...aura,
         'box-shadow': dark
-          ? '0 0 26px 2px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.62 0 0)) 8%, transparent), 0 0 60px 10px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 8%, oklch(0.62 0 0)) 4%, transparent)'
-          : '0 0 22px 1px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.55 0 0)) 6%, transparent), 0 0 52px 8px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 8%, oklch(0.55 0 0)) 3%, transparent)',
+          ? '0 0 22px 2px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 0 48px 8px color-mix(in oklch, var(--zy-primary) 90%, transparent)'
+          : '0 0 18px 2px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 0 44px 8px color-mix(in oklch, var(--zy-primary) 90%, transparent)',
       },
       composerFocus: {
         ...focused,
