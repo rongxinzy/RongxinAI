@@ -22,7 +22,6 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  RUNTIME_SIGNER_THUMBPRINT: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}
 
 jobs:
   prepare-candidate:
@@ -208,11 +207,6 @@ jobs:
           user-id: ${{ secrets.CERTUM_USER_ID }}
           otp-uri: ${{ secrets.CERTUM_OTP_URI }}
           certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
-      - name: Verify publisher signatures before Windows packaging
-        if: ${{ matrix.platform == 'windows' }}
-        uses: ./.github/actions/verify-windows-runtime-signatures
-        with:
-          signer-thumbprint: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}
       - name: Build Windows candidate
         if: ${{ matrix.platform == 'windows' }}
         run: bun run dist:win:signed

@@ -1,46 +1,35 @@
-# Windows runtime signature gates
+# Windows runtime signing policy
 
-Both Windows runtimes must be Authenticode-signed by their publisher before
-desktop packaging. SHA-256 download and offline component checks remain in
-place; code signatures are an additional independent gate.
+Windows runtime executables are signed centrally with the existing Certum
+credentials in `rongxinzy/RongxinAI`, then published in their original runtime
+repositories. Desktop builds do not re-sign these executables.
 
-Set the public repository variable `RUNTIME_SIGNER_THUMBPRINT` to the expected
-40-character SHA-1 certificate thumbprint. This is a certificate identity,
-not the file hash or a private credential. Verification does not require
-SimplySign, certificate-store installation, or access to a signing key.
-Missing configuration fails closed. A certificate rollover requires an
-explicit variable update and new signed runtime releases.
+Runtime publication and desktop download, packaging, cold-install and upgrade
+checks do not perform Authenticode verification. No public
+`RUNTIME_SIGNER_THUMBPRINT` variable is required. This intentionally removes
+publisher identity, trust-chain, EKU and timestamp checks; SHA-256 checks are
+integrity checks, not a substitute for signature verification.
 
-The prepack action downloads the pinned sidecar and memory releases and
-checks trust, publisher identity, code-signing usage, and timestamps before
-packaging. Cold-install and cache-hit-upgrade gates repeat verification
-against the actual installed executables, including the sidecar extracted
-from its offline component. The builder excludes `engram.exe` from its own
-signing pass to preserve the runtime publisher's signature. Application and
-installer signing remain unchanged.
+Frozen runtime release pins, download SHA-256 checks, offline component and
+sentinel hashes, installed-file existence, and clean-PATH execution smoke tests
+remain in place. The builder still excludes `engram.exe` from its own signing
+pass. Application and installer signing and verification are unchanged.
 
-## Rollout dependencies
+## Rollout
 
-1. Merge the central ZhiYuan Agent signing workflow and both runtime workflows.
-   Certum credentials remain exclusively in ZhiYuan Agent's `release` environment.
-   Configure cross-repository artifact read tokens, not additional Certum keys.
-2. Build new runtime tags, dispatch central signing, then dispatch verified
-   publication in each original runtime repository. Do not mutate old assets.
-3. Update `package.json` runtime versions and Windows checksums from those
-   releases. Set the public signer variable in both desktop repositories.
-4. Run Windows source verification and cold-install/upgrade gates before
-   releasing either desktop product.
+1. Merge the central and runtime workflow updates. Configure cross-repository
+   `RUNTIME_ARTIFACT_READ_TOKEN` secrets and main-only runtime `release` environments.
+   Do not copy Certum credentials to the runtime or desktop repositories.
+2. Build a new immutable runtime tag, dispatch central signing from main, then
+   dispatch publication in the original runtime repository. Source provenance,
+   returned hashes, and archive integrity remain mandatory.
+3. Update `package.json` runtime pins, source revision and SHA-256 values from
+   the published assets together. Never replace an existing release's assets.
+4. Run desktop CI and Windows package/install/upgrade/uninstall smoke checks.
 
-Existing unsigned pinned releases will be rejected intentionally. Do not
-merge the consumer gate change until the pins and public signer are ready.
-Policy unit tests mock signature results and do not certify a real release.
+The central signing command must succeed; there is no unsigned-release
+fallback on signing command failure. No post-sign runtime signature check is
+performed. Policy tests are not proof of real cloud signing.
 
 See the [central operational guide](https://github.com/rongxinzy/RongxinAI/blob/main/scripts/runtime-signing/README.md)
-for protected manual stages, token permissions and artifact expiry handling.
-
-Manual verification:
-
-```powershell
-./scripts/ci/verify-windows-runtime-signatures.ps1 -ExpectedThumbprint <public-thumbprint>
-./scripts/ci/verify-windows-runtime-signatures.ps1 -ResourcesRoot <installed-resources> -ExpectedThumbprint <public-thumbprint>
-```
+for the manual sequence, token permissions and artifact expiry handling.

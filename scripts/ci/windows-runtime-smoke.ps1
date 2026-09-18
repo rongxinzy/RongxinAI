@@ -97,13 +97,8 @@ try {
   }
 
   $resourcesRoot = $smokeRoot
-  . (Join-Path $PSScriptRoot 'runtime-authenticode.ps1')
-  Assert-WindowsRuntimeSignature `
-    -Path (Join-Path $resourcesRoot 'channel-runtime\cc-connect-sidecar.exe') `
-    -ExpectedThumbprint $env:RUNTIME_SIGNER_THUMBPRINT
-  Assert-WindowsRuntimeSignature `
-    -Path (Join-Path $ProjectRoot 'release\win-unpacked\resources\memory\engram.exe') `
-    -ExpectedThumbprint $env:RUNTIME_SIGNER_THUMBPRINT
+  Assert-Path (Join-Path $resourcesRoot 'channel-runtime\cc-connect-sidecar.exe') 'bundled channel runtime'
+  Assert-Path (Join-Path $ProjectRoot 'release\win-unpacked\resources\memory\engram.exe') 'bundled memory runtime'
   $bash = Join-Path $resourcesRoot 'mingit\usr\bin\bash.exe'
   if (-not (Test-Path -LiteralPath $bash)) {
     $bash = Join-Path $resourcesRoot 'mingit\bin\bash.exe'

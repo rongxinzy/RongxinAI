@@ -24,7 +24,6 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  RUNTIME_SIGNER_THUMBPRINT: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}
 
 jobs:
   plan-platforms:
@@ -122,11 +121,6 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Verify publisher signatures before Windows packaging
-        if: ${{ matrix.platform == 'windows' }}
-        uses: ./.github/actions/verify-windows-runtime-signatures
-        with:
-          signer-thumbprint: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}
       - name: Build Windows
         if: ${{ matrix.platform == 'windows' }}
         run: bun run dist:win

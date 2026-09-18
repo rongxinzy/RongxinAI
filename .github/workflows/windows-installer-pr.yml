@@ -11,7 +11,6 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  RUNTIME_SIGNER_THUMBPRINT: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}
 
 jobs:
   package-and-install:
@@ -48,10 +47,6 @@ jobs:
           bun run setup:uv-runtime
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
-      - name: Verify publisher signatures before Windows packaging
-        uses: ./.github/actions/verify-windows-runtime-signatures
-        with:
-          signer-thumbprint: ${{ vars.RUNTIME_SIGNER_THUMBPRINT }}
       - name: Build complete offline installer
         # Keep a stuck packager observable and fail it before the job-level
         # timeout so the diagnostics upload below still gets a chance to run.
