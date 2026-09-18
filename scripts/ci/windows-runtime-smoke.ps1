@@ -97,6 +97,8 @@ try {
   }
 
   $resourcesRoot = $smokeRoot
+  Assert-Path (Join-Path $resourcesRoot 'channel-runtime\cc-connect-sidecar.exe') 'bundled channel runtime'
+  Assert-Path (Join-Path $ProjectRoot 'release\win-unpacked\resources\memory\engram.exe') 'bundled memory runtime'
   $bash = Join-Path $resourcesRoot 'mingit\usr\bin\bash.exe'
   if (-not (Test-Path -LiteralPath $bash)) {
     $bash = Join-Path $resourcesRoot 'mingit\bin\bash.exe'
