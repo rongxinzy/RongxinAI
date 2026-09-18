@@ -1,8 +1,22 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { expect, test } from 'vitest';
 
 const root = path.resolve(__dirname, '../..');
+
+test('architecture gate accepts the currently pinned signed runtime release', () => {
+  const filename = readdirSync(__dirname).find(name => name.endsWith('decoupling.mjs'));
+  expect(filename).toBeDefined();
+  const result = spawnSync(process.execPath, [path.join(__dirname, filename!)], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+    windowsHide: true,
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.status, result.stderr).toBe(0);
+});
 
 function read(filename: string): string {
   return readFileSync(path.join(root, filename), 'utf8');
