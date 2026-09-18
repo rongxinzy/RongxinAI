@@ -42,6 +42,7 @@ export const VirtualizedTurnList = React.forwardRef<
 >(({ turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
   const { scrollRef } = useStickToBottomContext();
   const hasPositionedInitialTailRef = useRef(false);
+  const followedTailEdgesRef = useRef<{ first?: string; last?: string } | null>(null);
   const shouldFollowInitialTailRef = useRef(true);
   const virtualSizerRef = useRef<HTMLDivElement>(null);
   const measuredTurnSizesRef = useRef(new Map<string, number>());
@@ -75,22 +76,20 @@ export const VirtualizedTurnList = React.forwardRef<
   const scrollToFn = useCallback<typeof elementScroll>((offset, options, instance) => {
     const scrollElement = instance.scrollElement as HTMLElement | null;
     const targetWindow = scrollElement?.ownerDocument.defaultView;
-    const wasAtTail = scrollElement
-      ? Math.abs(
-          scrollElement.scrollTop -
-            Math.max(scrollElement.scrollHeight - scrollElement.clientHeight, 0),
-        ) < 1
-      : false;
+    const maxScroll = scrollElement
+      ? Math.max(scrollElement.scrollHeight - scrollElement.clientHeight, 0)
+      : 0;
+    const wasAtTail = scrollElement ? Math.abs(scrollElement.scrollTop - maxScroll) < 1 : false;
+    const requestedOffset = offset + (options.adjustments ?? 0);
 
     elementScroll(offset, options, instance);
     if (!scrollElement || !targetWindow) return;
 
-    // Internal anchor adjustments during upward scrolling must never schedule
-    // a later scroll write. Retry only a clamped tail update or an explicit
-    // programmatic scroll such as the initial jump to the end.
-    if (!wasAtTail && options.behavior === undefined) return;
-
-    const requestedOffset = offset + (options.adjustments ?? 0);
+    // Upward anchor adjustments stay short of the end and must not schedule a
+    // later scroll write. A clamped tail write still needs a retry: the sizer
+    // grows in the same turn, after this scrollTop assignment.
+    const seeksTail = wasAtTail || requestedOffset >= maxScroll - 1;
+    if (!seeksTail && options.behavior === undefined) return;
     const clampedOffset = scrollElement.scrollTop;
     if (requestedOffset - clampedOffset < 1) return;
 
@@ -224,22 +223,28 @@ export const VirtualizedTurnList = React.forwardRef<
     previousMessageIdsByTurnRef.current = nextMessageIdsByTurn;
   }, [internallyPrependedTurnSizes, nextMessageIdsByTurn, scrollRef, turns, virtualizer]);
 
-  // 2026/09/16 lixiang  仅首次定位到底；流式增高交给 anchorTo:end，避免每帧/防抖 scrollToEnd 二次跳动
+  // 仅首次定位到底；同一次数的流式增高交给 anchorTo:end。
+  // 首屏还在跟随底部时，历史消息前插会换掉首条 id 但末条不变，followOnAppend 不会补滚。
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
-    if (
-      !scrollElement ||
-      renderAll ||
-      !shouldFollowInitialTailRef.current ||
-      hasPositionedInitialTailRef.current
-    ) {
+    if (!scrollElement || renderAll || !shouldFollowInitialTailRef.current) {
+      return;
+    }
+
+    const firstId = turns[0]?.id;
+    const lastId = turns[turns.length - 1]?.id;
+    const previousEdges = followedTailEdgesRef.current;
+    const historyPrepended =
+      previousEdges !== null && firstId !== previousEdges.first && lastId === previousEdges.last;
+    if (hasPositionedInitialTailRef.current && !historyPrepended) {
       return;
     }
 
     virtualizer.scrollToEnd({ behavior: 'auto' });
     hasPositionedInitialTailRef.current = true;
-    onInitialTailPositioned?.();
-  }, [onInitialTailPositioned, renderAll, scrollRef, turns.length, virtualizer]);
+    followedTailEdgesRef.current = { first: firstId, last: lastId };
+    if (!historyPrepended) onInitialTailPositioned?.();
+  }, [onInitialTailPositioned, renderAll, scrollRef, turns, virtualizer]);
 
   useImperativeHandle(
     ref,
