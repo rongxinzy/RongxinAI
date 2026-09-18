@@ -17,11 +17,12 @@ export function classicModalEffects(dark: boolean) {
     'animation-duration': '200ms',
     'animation-timing-function': 'ease-out',
   };
+  // 2026/09/18 lixiang  只去掉 scale，避免获焦/失焦边框内收；光晕尺寸保持原样
   const aura = {
     'border-radius': 'inherit',
     opacity: '0',
-    scale: '0.985',
-    'transition-property': 'opacity, scale',
+    scale: '1',
+    'transition-property': 'opacity',
     'transition-duration': '520ms',
     'transition-timing-function': 'cubic-bezier(0.4, 0, 0.2, 1)',
   };
@@ -83,8 +84,9 @@ export function classicModalEffects(dark: boolean) {
     'composer-near': recipe({
       base: {
         ...aura,
+        // 2026/09/18 lixiang  线框单独降透明度，避免过实过艳
         'box-shadow':
-          '0 0 0 1px color-mix(in srgb, var(--zy-primary) 38%, transparent), 0 0 10px color-mix(in srgb, var(--zy-primary) 15%, transparent), 0 4px 14px -6px color-mix(in srgb, var(--zy-primary) 16%, transparent)',
+          '0 0 0 1px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 12%, oklch(0.55 0 0)) 16%, transparent), 0 0 10px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.55 0 0)) 10%, transparent), 0 4px 14px -6px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.55 0 0)) 10%, transparent)',
       },
       composerFocus: focused,
     }),
@@ -92,8 +94,8 @@ export function classicModalEffects(dark: boolean) {
       base: {
         ...aura,
         'box-shadow': dark
-          ? '0 0 26px 2px color-mix(in srgb, var(--zy-primary) 14%, transparent), 0 0 60px 10px color-mix(in srgb, var(--zy-primary) 8%, transparent)'
-          : '0 0 22px 1px color-mix(in srgb, var(--zy-primary) 10%, transparent), 0 0 52px 8px color-mix(in srgb, var(--zy-primary) 5%, transparent)',
+          ? '0 0 26px 2px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.62 0 0)) 8%, transparent), 0 0 60px 10px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 8%, oklch(0.62 0 0)) 4%, transparent)'
+          : '0 0 22px 1px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 10%, oklch(0.55 0 0)) 6%, transparent), 0 0 52px 8px color-mix(in oklch, color-mix(in oklch, var(--zy-primary) 8%, oklch(0.55 0 0)) 3%, transparent)',
       },
       composerFocus: {
         ...focused,
@@ -104,8 +106,9 @@ export function classicModalEffects(dark: boolean) {
         'animation-iteration-count': 'infinite',
         'animation-direction': 'alternate',
       },
-      motionStart: { opacity: '0.6', scale: '0.995' },
-      motionEnd: { opacity: '1', scale: '1.005' },
+      // 2026/09/18 lixiang  呼吸动画不再改 scale，避免失焦时边框内收
+      motionStart: { opacity: '0.6' },
+      motionEnd: { opacity: '1' },
     }),
   };
 }
