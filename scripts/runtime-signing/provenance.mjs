@@ -32,15 +32,24 @@ export function runId(value) {
   return String(value);
 }
 export function signerThumbprint(value) {
-  const normalized = String(value ?? '').replace(/\s/g, '').toUpperCase();
-  if (!/^[0-9A-F]{40}$/.test(normalized)) throw new Error('Expected public runtime signer is not configured.');
+  const normalized = String(value ?? '')
+    .replace(/\s/g, '')
+    .toUpperCase();
+  if (!/^[0-9A-F]{40}$/.test(normalized))
+    throw new Error('Expected public runtime signer is not configured.');
   return normalized;
 }
 export function validateRun(run, repo, workflow, expectedId, event) {
-  if (String(run.id) !== runId(expectedId) || run.repository?.full_name !== repo ||
-      run.head_repository?.full_name !== repo || run.path !== workflow ||
-      run.event !== event || run.status !== 'completed' || run.conclusion !== 'success' ||
-      !/^[0-9a-f]{40}$/.test(run.head_sha ?? '')) {
+  if (
+    String(run.id) !== runId(expectedId) ||
+    run.repository?.full_name !== repo ||
+    run.head_repository?.full_name !== repo ||
+    run.path !== workflow ||
+    run.event !== event ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    !/^[0-9a-f]{40}$/.test(run.head_sha ?? '')
+  ) {
     throw new Error('Actions run provenance is not a successful trusted workflow execution.');
   }
 }
@@ -50,10 +59,14 @@ export function assertAncestor(comparison) {
   }
 }
 export async function githubApi(repo, suffix, token = process.env.RUNTIME_ARTIFACT_READ_TOKEN) {
-  if (!token) throw new Error('RUNTIME_ARTIFACT_READ_TOKEN is required for cross-repository artifacts.');
+  if (!token)
+    throw new Error('RUNTIME_ARTIFACT_READ_TOKEN is required for cross-repository artifacts.');
   const response = await fetch(`https://api.github.com/repos/${repo}/${suffix}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28' },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error(`GitHub provenance query failed (${response.status}).`);
@@ -64,15 +77,22 @@ export async function readBuildRun(key, value, api = githubApi) {
   const id = runId(value);
   const run = await api(source.repo, `actions/runs/${id}`);
   validateRun(run, source.repo, source.workflow, id, 'push');
-  if (!source.tag.test(run.head_branch ?? '')) throw new Error('Build must originate from a release tag.');
+  if (!source.tag.test(run.head_branch ?? ''))
+    throw new Error('Build must originate from a release tag.');
   assertAncestor(await api(source.repo, `compare/${run.head_sha}...main`));
   let ref = (await api(source.repo, `git/ref/tags/${encodeURIComponent(run.head_branch)}`)).object;
   for (let depth = 0; ref?.type === 'tag' && depth < 4; depth++) {
     ref = (await api(source.repo, `git/tags/${ref.sha}`)).object;
   }
-  if (ref?.type !== 'commit' || ref.sha !== run.head_sha) throw new Error('Release tag no longer matches the build commit.');
-  return { key, sourceRepository: source.repo, sourceRunId: id,
-    sourceSha: run.head_sha, sourceTag: run.head_branch };
+  if (ref?.type !== 'commit' || ref.sha !== run.head_sha)
+    throw new Error('Release tag no longer matches the build commit.');
+  return {
+    key,
+    sourceRepository: source.repo,
+    sourceRunId: id,
+    sourceSha: run.head_sha,
+    sourceTag: run.head_branch,
+  };
 }
 export async function readSigningRun(value, api = githubApi) {
   const id = runId(value);
@@ -89,22 +109,34 @@ export function executableHash(directory, filename) {
     throw new Error('Runtime executable must be a bounded regular file.');
   }
   const bytes = readFileSync(file);
-  if (bytes[0] !== 0x4d || bytes[1] !== 0x5a) throw new Error('Runtime file is not a Windows executable.');
+  if (bytes[0] !== 0x4d || bytes[1] !== 0x5a)
+    throw new Error('Runtime file is not a Windows executable.');
   return createHash('sha256').update(bytes).digest('hex');
 }
 export function validateManifest(manifest, build, signingId, expectedSigner) {
   const source = sourceFor(build.key);
-  if (manifest.schemaVersion !== 1 || manifest.signingRepository !== SigningAuthority.repo ||
-      manifest.signingRunId !== runId(signingId) ||
-      manifest.signerThumbprint !== signerThumbprint(expectedSigner) ||
-      ['key', 'sourceRepository', 'sourceRunId', 'sourceSha', 'sourceTag'].some(key => manifest[key] !== build[key]) ||
-      !Array.isArray(manifest.files) || manifest.files.length !== source.files.length) {
+  if (
+    manifest.schemaVersion !== 1 ||
+    manifest.signingRepository !== SigningAuthority.repo ||
+    manifest.signingRunId !== runId(signingId) ||
+    manifest.signerThumbprint !== signerThumbprint(expectedSigner) ||
+    ['key', 'sourceRepository', 'sourceRunId', 'sourceSha', 'sourceTag'].some(
+      key => manifest[key] !== build[key],
+    ) ||
+    !Array.isArray(manifest.files) ||
+    manifest.files.length !== source.files.length
+  ) {
     throw new Error('Signed manifest does not match the requested source and signing run.');
   }
   const names = manifest.files.map(file => file.name).sort();
-  if (JSON.stringify(names) !== JSON.stringify([...source.files].sort()) ||
-      manifest.files.some(file => !/^[0-9a-f]{64}$/.test(file.unsignedSha256 ?? '') ||
-        !/^[0-9a-f]{64}$/.test(file.signedSha256 ?? ''))) {
+  if (
+    JSON.stringify(names) !== JSON.stringify([...source.files].sort()) ||
+    manifest.files.some(
+      file =>
+        !/^[0-9a-f]{64}$/.test(file.unsignedSha256 ?? '') ||
+        !/^[0-9a-f]{64}$/.test(file.signedSha256 ?? ''),
+    )
+  ) {
     throw new Error('Signed manifest executable set or hashes are invalid.');
   }
 }
