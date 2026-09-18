@@ -36,8 +36,15 @@ import ArtifactRenderer from './ArtifactRenderer';
 import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
-import CodeRenderer from './renderers/CodeRenderer';
 import { invalidateArtifactFile, loadArtifactFile } from '@/services/artifactFileLoader';
+
+// Same code-split as ArtifactRenderer — avoid static import pulling Prism into the main chunk.
+const CodeRenderer = React.lazy(() => import('./renderers/CodeRenderer'));
+const codeRendererFallback = (
+  <div className="h-full min-h-0 p-4" aria-busy="true">
+    <Skeleton className="theme-scene-preview-loading h-full w-full" />
+  </div>
+);
 
 const t = (key: string) => i18nService.t(key);
 
@@ -577,7 +584,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   sessionArtifacts={artifacts}
                 />
               ) : (
-                <CodeRenderer artifact={selectedArtifact} />
+                <React.Suspense fallback={codeRendererFallback}>
+                  <CodeRenderer artifact={selectedArtifact} />
+                </React.Suspense>
               )}
             </div>
           </div>

@@ -2137,8 +2137,14 @@ describe('PiRuntimeAdapter', () => {
       adapter.on('sessionInterrupted', event => interruptions.push(event));
       adapter.stopSession('test');
       adapter.stopSession('test');
-      // Session entry stays active so isSessionActive still reports true for IM,
-      // but the underlying Pi session is marked aborted.
+      // Drop the heavy Pi session after stop, but keep a lightweight retention
+      // marker so isSessionActive still reports true for IM routing.
+      const internals = adapter as unknown as {
+        activeSessions: Map<string, unknown>;
+        retainedSessionIds: Set<string>;
+      };
+      expect(internals.activeSessions.has('test')).toBe(false);
+      expect(internals.retainedSessionIds.has('test')).toBe(true);
       expect(adapter.isSessionActive('test')).toBe(true);
       expect(mockSession.abort).toHaveBeenCalled();
       expect(addMessage).toHaveBeenCalledOnce();
@@ -2203,7 +2209,14 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('s1', 'A');
       await adapter.startSession('s2', 'B');
       adapter.stopAllSessions();
-      // Sessions stay active so continueSession can find them
+      // Lightweight retention keeps IM routing alive without holding Pi sessions.
+      const internals = adapter as unknown as {
+        activeSessions: Map<string, unknown>;
+        retainedSessionIds: Set<string>;
+      };
+      expect(internals.activeSessions.size).toBe(0);
+      expect(internals.retainedSessionIds.has('s1')).toBe(true);
+      expect(internals.retainedSessionIds.has('s2')).toBe(true);
       expect(adapter.isSessionActive('s1')).toBe(true);
       expect(adapter.isSessionActive('s2')).toBe(true);
     });

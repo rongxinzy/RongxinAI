@@ -12,9 +12,10 @@ import {
 } from '@shared/components/ai-elements/attachments';
 import { cn } from '@shared/lib/utils';
 import type { KeyboardEvent } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { toLocalfileUrl } from '../../utils/localfileUrl';
 import {
   CoworkAttachmentMediaType,
   CoworkAttachmentMediaTypeByExtension,
@@ -87,55 +88,37 @@ const getSpecificMediaType = (mediaType?: string | null): string | null => {
   return baseMediaType === CoworkAttachmentMediaType.Binary ? null : trimmedMediaType;
 };
 
+const resolvePreviewUrl = (attachment: CoworkInlineAttachment): string => {
+  if (attachment.dataUrl) return attachment.dataUrl;
+  if (!attachment.isImage) return '';
+  return toLocalfileUrl(attachment.path);
+};
+
 const CoworkInlineAttachmentItem = ({
   attachment,
   onRemove,
   onOpenImage,
 }: CoworkInlineAttachmentItemProps) => {
-  const [resolvedDataUrl, setResolvedDataUrl] = useState<string | null>(attachment.dataUrl ?? null);
-
-  useEffect(() => {
-    setResolvedDataUrl(attachment.dataUrl ?? null);
-    if (attachment.dataUrl || !attachment.isImage) {
-      return;
-    }
-
-    let cancelled = false;
-    void window.electron.dialog
-      .readFileAsDataUrl(attachment.path)
-      .then(result => {
-        if (!cancelled && result.success && result.dataUrl) {
-          setResolvedDataUrl(result.dataUrl);
-        }
-      })
-      .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachment.dataUrl, attachment.isImage, attachment.path]);
+  const previewUrl = useMemo(() => resolvePreviewUrl(attachment), [attachment]);
 
   const attachmentExtension = getAttachmentExtension(attachment);
-  const data = useMemo<AttachmentData>(
-    () => {
-      const mediaType =
-        getSpecificMediaType(attachment.mediaType) ??
-        getSpecificMediaType(getDataUrlMediaType(resolvedDataUrl)) ??
-        (attachmentExtension && CoworkAttachmentMediaTypeByExtension[attachmentExtension]) ??
-        (attachment.isImage
-          ? CoworkAttachmentMediaType.GenericImage
-          : CoworkAttachmentMediaType.Binary);
+  const data = useMemo<AttachmentData>(() => {
+    const mediaType =
+      getSpecificMediaType(attachment.mediaType) ??
+      getSpecificMediaType(getDataUrlMediaType(attachment.dataUrl)) ??
+      (attachmentExtension && CoworkAttachmentMediaTypeByExtension[attachmentExtension]) ??
+      (attachment.isImage
+        ? CoworkAttachmentMediaType.GenericImage
+        : CoworkAttachmentMediaType.Binary);
 
-      return {
-        type: 'file',
-        id: attachment.path,
-        filename: attachment.name,
-        mediaType,
-        url: resolvedDataUrl ?? '',
-      };
-    },
-    [attachment, attachmentExtension, resolvedDataUrl],
-  );
+    return {
+      type: 'file',
+      id: attachment.path,
+      filename: attachment.name,
+      mediaType,
+      url: previewUrl,
+    };
+  }, [attachment, attachmentExtension, previewUrl]);
   const mediaTypeLabel =
     data.mediaType === CoworkAttachmentMediaType.Binary
       ? attachmentExtension?.toUpperCase()
@@ -143,10 +126,10 @@ const CoworkInlineAttachmentItem = ({
   const filenameParts = getAttachmentFilenameParts(attachment.name);
   const mediaCategory = getMediaCategory(data);
   const label = getAttachmentLabel(data);
-  const canOpenImage = Boolean(attachment.isImage && resolvedDataUrl && onOpenImage);
+  const canOpenImage = Boolean(attachment.isImage && previewUrl && onOpenImage);
   const openImage = () => {
-    if (!canOpenImage || !resolvedDataUrl) return;
-    onOpenImage?.({ src: resolvedDataUrl, alt: attachment.name, name: attachment.name });
+    if (!canOpenImage || !previewUrl) return;
+    onOpenImage?.({ src: previewUrl, alt: attachment.name, name: attachment.name });
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;

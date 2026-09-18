@@ -333,10 +333,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       },
       setImageAttachments: (images: CoworkImageAttachment[]) => {
         const newAttachments: CoworkAttachment[] = images.map((img, idx) => ({
-          path: `inline:${img.name}:reedit-${Date.now()}-${idx}`,
+          path: img.path || `inline:${img.name}:reedit-${Date.now()}-${idx}`,
           name: img.name,
           isImage: true,
-          dataUrl: `data:${img.mimeType};base64,${img.base64Data}`,
+          ...(!img.path && img.base64Data
+            ? { dataUrl: `data:${img.mimeType};base64,${img.base64Data}` }
+            : {}),
         }));
         dispatch(setDraftAttachments({ draftKey, attachments: newAttachments }));
       },
@@ -600,6 +602,31 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 dataUrlPrefix: attachment.dataUrl.slice(0, 60),
               },
             );
+          }
+        } else if (
+          attachment.isImage &&
+          attachment.path &&
+          !attachment.path.startsWith('inline:')
+        ) {
+          const readResult = await window.electron?.dialog?.readFileAsDataUrl(attachment.path);
+          const extracted =
+            readResult?.success && readResult.dataUrl
+              ? extractBase64FromDataUrl(readResult.dataUrl)
+              : null;
+          if (extracted) {
+            imageAtts.push({
+              name: attachment.name,
+              mimeType: extracted.mimeType,
+              base64Data: extracted.base64Data,
+            });
+          } else {
+            const dotIndex = attachment.name.lastIndexOf('.');
+            fileAtts.push({
+              name: attachment.name,
+              path: attachment.path,
+              extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
+              isImage: true,
+            });
           }
         } else if (attachment.isImage) {
           console.warn('[CoworkPromptInput] handleSubmit: image attachment missing dataUrl', {
@@ -906,35 +933,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
           if (fileIsImage) {
             if (modelSupportsImage) {
-              // For images on vision-capable models, read as data URL
+              // Path-based images preview via localfile:// — keep Redux free of base64 dataUrls.
               if (nativePath) {
-                try {
-                  const result = await window.electron.dialog.readFileAsDataUrl(nativePath);
-                  if (result.success && result.dataUrl) {
-                    console.log('[CoworkPromptInput] handleIncomingFiles: native image read OK', {
-                      nativePath,
-                      dataUrlLength: result.dataUrl.length,
-                    });
-                    addAttachment(nativePath, { isImage: true, dataUrl: result.dataUrl });
-                    continue;
-                  }
-                  console.warn(
-                    '[CoworkPromptInput] handleIncomingFiles: readFileAsDataUrl returned falsy',
-                    { nativePath, success: result.success },
-                  );
-                } catch (error) {
-                  console.error('Failed to read image as data URL:', error);
-                }
-                // Fallback: add as regular file attachment
-                console.warn(
-                  '[CoworkPromptInput] handleIncomingFiles: native image fallback to path-only (no dataUrl)',
-                  { nativePath },
-                );
                 addAttachment(nativePath, { isImage: true });
               } else {
-                // No native path (clipboard/drag from browser):
-                // 1. Read as dataUrl for preview + base64 vision
-                // 2. Save to disk so the agent can access the file in later turns
+                // Clipboard/browser drag: stage to disk when possible; only keep dataUrl
+                // for true in-memory fallbacks with no path.
                 let dataUrl: string | null = null;
                 try {
                   dataUrl = await fileToDataUrl(file);
@@ -956,10 +960,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 );
 
                 if (stagedPath) {
-                  addAttachment(stagedPath, {
-                    isImage: true,
-                    dataUrl: dataUrl ?? undefined,
-                  });
+                  addAttachment(stagedPath, { isImage: true });
                 } else if (dataUrl) {
                   console.warn('Clipboard image saved only in memory (disk save failed)');
                   addImageAttachmentFromDataUrl(file.name, dataUrl);
@@ -1022,25 +1023,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         let hasImageWithoutVision = false;
         for (const filePath of result.paths) {
           if (isImagePath(filePath)) {
-            if (modelSupportsImage) {
-              try {
-                const readResult = await window.electron.dialog.readFileAsDataUrl(filePath);
-                if (readResult.success && readResult.dataUrl) {
-                  console.log('[CoworkPromptInput] handleAddFile: image read OK', {
-                    filePath,
-                    dataUrlLength: readResult.dataUrl.length,
-                  });
-                  addAttachment(filePath, { isImage: true, dataUrl: readResult.dataUrl });
-                  continue;
-                }
-                console.warn(
-                  '[CoworkPromptInput] handleAddFile: readFileAsDataUrl returned falsy',
-                  { filePath },
-                );
-              } catch (error) {
-                console.error('Failed to read image as data URL:', error);
-              }
-            } else {
+            if (!modelSupportsImage) {
               console.warn(
                 '[CoworkPromptInput] handleAddFile: image skipped vision path because modelSupportsImage=false',
                 {
@@ -1050,8 +1033,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               );
               hasImageWithoutVision = true;
             }
+            addAttachment(filePath, { isImage: true });
+            continue;
           }
-          addAttachment(filePath, isImagePath(filePath) ? { isImage: true } : undefined);
+          addAttachment(filePath);
         }
         if (hasImageWithoutVision) {
           setImageVisionHint(true);
