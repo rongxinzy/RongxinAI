@@ -7,6 +7,21 @@ export const COWORK_MESSAGE_PAGE_SIZE = 30;
 /** Background page size used to keep scroll-up history ahead of the viewport. */
 export const COWORK_MESSAGE_HISTORY_PAGE_SIZE = 50;
 
+export const CoworkMessageType = {
+  User: 'user',
+  Assistant: 'assistant',
+  ToolUse: 'tool_use',
+  ToolResult: 'tool_result',
+  System: 'system',
+} as const;
+
+export const CoworkSessionStatus = {
+  Idle: 'idle',
+  Running: 'running',
+  Completed: 'completed',
+  Error: 'error',
+} as const;
+
 export const CoworkSessionMode = {
   Work: 'work',
   Chat: 'chat',

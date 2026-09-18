@@ -24,6 +24,7 @@ import { pathToFileURL } from 'url';
 
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import { classifyCoworkError } from '../common/coworkError';
+import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
@@ -1977,9 +1978,18 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
 
   runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
     try {
-      getCoworkStore().updateSession(sessionId, { status: 'error' });
-    } catch {
-      /* ignore */
+      persistCoworkTerminalError(
+        getStore().getDatabase(),
+        getCoworkStore(),
+        sessionId,
+        error,
+        message => runtime.emit('message', sessionId, message),
+      );
+    } catch (persistenceError) {
+      console.error(
+        `[PiWorkbenchForwarder] failed to persist an error for session ${sessionId}:`,
+        persistenceError,
+      );
     }
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
