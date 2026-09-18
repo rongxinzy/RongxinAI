@@ -1,0 +1,92 @@
+name: Sign desktop runtimes centrally
+on:
+  workflow_dispatch:
+    inputs:
+      sidecar_run_id:
+        description: Successful tagged pi-connect build run ID (optional)
+        type: string
+        required: false
+      engram_run_id:
+        description: Successful tagged engram-cjk build run ID (optional)
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: runtime-certum-signing
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.source.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - id: source
+        name: Validate repository, workflow, tag and main ancestry
+        env:
+          SIDECAR_RUN_ID: ${{ inputs.sidecar_run_id }}
+          ENGRAM_RUN_ID: ${{ inputs.engram_run_id }}
+          RUNTIME_ARTIFACT_READ_TOKEN: ${{ secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+        run: node scripts/runtime-signing/prepare.mjs
+  sign:
+    needs: prepare
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 30
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      RUNTIME_KEY: ${{ matrix.key }}
+      SOURCE_RUN_ID: ${{ matrix.sourceRunId }}
+      SOURCE_SHA: ${{ matrix.sourceSha }}
+      SOURCE_TAG: ${{ matrix.sourceTag }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: actions/download-artifact@v8
+        with:
+          repository: ${{ matrix.sourceRepository }}
+          run-id: ${{ matrix.sourceRunId }}
+          name: ${{ matrix.artifact }}
+          path: runtime-input
+          github-token: ${{ secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+      - name: Validate executable inputs before cloud authentication
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+        run: node scripts/runtime-signing/manifest.mjs before runtime-input
+      - name: Connect existing Certum SimplySign
+        id: certum
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      - name: Sign only allowlisted Windows executable files
+        shell: pwsh
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
+        run: |
+          $manifest = Get-Content runtime-input/signed-runtime-manifest.json -Raw | ConvertFrom-Json
+          foreach ($file in $manifest.files) {
+            & ./scripts/runtime-signing/sign-runtime.ps1 -Path (Join-Path 'runtime-input' $file.name)
+          }
+      - name: Record signed byte hashes
+        run: node scripts/runtime-signing/manifest.mjs after runtime-input
+      - uses: actions/upload-artifact@v6
+        with:
+          name: signed-${{ matrix.key }}
+          path: |
+            runtime-input/*.exe
+            runtime-input/signed-runtime-manifest.json
+          if-no-files-found: error
+          retention-days: 14
