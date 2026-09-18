@@ -670,6 +670,33 @@ export class CoworkStore {
     return this.getWorkspace(id)!;
   }
 
+  createWorkspace(workspacePath: string, name: string): Workspace {
+    const normalizedPath = normalizeWorkspacePath(workspacePath);
+    const normalizedName = name.trim();
+    if (!normalizedPath) throw new Error('Workspace path is required');
+    if (!normalizedName) throw new Error('Workspace name is required');
+
+    const id = `workspace-${uuidv4()}`;
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO workspaces (id, name, path, is_hidden, created_at, updated_at)
+         VALUES (?, ?, ?, 0, ?, ?)`,
+      )
+      .run(id, normalizedName, normalizedPath, now, now);
+    return this.getWorkspace(id)!;
+  }
+
+  renameWorkspace(id: string, name: string): Workspace | null {
+    const normalizedName = name.trim();
+    if (!normalizedName) throw new Error('Workspace name is required');
+
+    const result = this.db
+      .prepare('UPDATE workspaces SET name = ?, updated_at = ? WHERE id = ?')
+      .run(normalizedName, Date.now(), id);
+    return result.changes > 0 ? this.getWorkspace(id) : null;
+  }
+
   touchWorkspace(id: string): void {
     this.db
       .prepare(
