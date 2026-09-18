@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { toast } from 'sonner';
 
 import type { CoworkSessionInterruption } from '../../../../shared/cowork/interruption';
 import type { WorkbenchTaskResumeInput } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
 import { normalizeError } from '../../../services/errorNormalization';
+import { showAppErrorToast } from '../../../services/toastNotification';
 import { updateSessionStatus } from '../../../store/slices/coworkSlice';
 import { CoworkSessionStatusValue } from '../../../types/cowork';
 
@@ -39,7 +39,7 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
           taskId: interruption.taskId,
         });
         if (!result.success) {
-          toast.error(normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')));
+          showAppErrorToast(normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')));
           return false;
         }
         if (sessionId) {
@@ -53,7 +53,7 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
         setInterruption(null);
         return true;
       } catch {
-        toast.error(i18nService.t('coworkResumeTaskFailed'));
+        showAppErrorToast(i18nService.t('coworkResumeTaskFailed'));
         return false;
       } finally {
         setIsResuming(false);
