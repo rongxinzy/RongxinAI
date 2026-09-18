@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-prd</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
+.title{font-size:23px;letter-spacing:-.01em}
+.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
+h3{margin-top:16px;font-size:13.5px}
+p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+ul{list-style:none;margin-top:10px;display:grid;gap:7px}
+li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
+td.mono{font-variant-numeric:tabular-nums}
+.p0{color:var(--accent);font-weight:600}
+.cols2{flex:1;min-height:0;display:grid;grid-template-columns:1.1fr 1fr;gap:26px;margin-top:14px}
+.pane{min-width:0;overflow:hidden}
+.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.flow{margin-top:10px;display:grid;gap:0}
+.fl{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
+.fl:first-child{border-top:0}
+.fl b{color:var(--accent);font-weight:600}
+.card{border:1px solid #edede9;background:#fafaf8;padding:14px 16px;margin-top:10px}
+.card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.card p{margin-top:8px;font-size:12.5px;line-height:1.85;color:#3d4046}
+</style></head><body>
+<div class="doc" style="--accent:#B45309">
+  <div class="title">智能工单助手需求文档</div>
+  <div class="meta"><span>版本：v0.9</span><span>负责人：陈立群</span><span>日期：2026-09-16</span><span>状态：待评审</span></div>
+  <h3>一、背景与目标</h3>
+  <p>商家后台日均产生约 3,200 张工单，其中近七成为重复咨询，分派与回复占用了客服团队一半以上工时。本期目标是把夜间工单的滞留时间压到 30 分钟以内。</p>
+  <h3>二、需求清单</h3>
+  <table>
+    <tr><th>编号</th><th>需求</th><th>优先级</th><th>验收标准</th></tr>
+    <tr><td class="mono">REQ-01</td><td>工单自动分类</td><td class="p0">P0</td><td>18 类常见问题分类准确率不低于 92%</td></tr>
+    <tr><td class="mono">REQ-02</td><td>夜间自动分派</td><td class="p0">P0</td><td>22:00 至 08:00 工单平均分派时延低于 5 分钟</td></tr>
+    <tr><td class="mono">REQ-03</td><td>回复模板建议</td><td>P1</td><td>模板命中率不低于 60%，可一键采用</td></tr>
+    <tr><td class="mono">REQ-04</td><td>处理过程留痕</td><td>P1</td><td>每次分派与回复可追溯到操作人与时间</td></tr>
+  </table>
+  <div class="cols2">
+    <div class="pane">
+      <h4>三、关键流程</h4>
+      <div class="flow">
+        <div class="fl"><b>01</b><span>工单进入队列，先做分类与影响面判断</span></div>
+        <div class="fl"><b>02</b><span>命中夜间规则时直接分派，不再等人工挑单</span></div>
+        <div class="fl"><b>03</b><span>客服工作台给出模板建议，人工确认后发送</span></div>
+        <div class="fl"><b>04</b><span>全流程写入操作记录，供纠纷时回溯</span></div>
+      </div>
+    </div>
+    <div class="pane">
+      <h4>四、本版本不做</h4>
+      <div class="card"><div class="k">明确排除</div><p>不做面向商家的自助入口，不做跨语言回复，不做与外部 CRM 的双向同步。以上三项在下一版本重新评估。</p></div>
+      <p style="margin-top:12px;font-size:11.5px;color:#8b8f97;line-height:1.8">分类准确率依赖历史工单的标注质量。若 92% 的验收线在灰度期无法达到，先放开 P1 需求，把分类能力迭代到 V1.1。</p>
+    </div>
+  </div>
+</div></body></html>

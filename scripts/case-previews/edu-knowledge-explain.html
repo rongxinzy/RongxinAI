@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-knowledge-explain</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
+.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
+.ask p{font-size:14px;color:#3d4046;line-height:1.6}
+.ans{flex:1;min-height:0;padding:24px 26px;display:flex;flex-direction:column;gap:18px}
+.ans h2{font-size:16px;letter-spacing:-.01em}
+.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
+.hr{height:1px;background:#edede9}
+.word{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.word b{font-size:34px;letter-spacing:-.02em}
+.word span{font-size:14px;color:#6f737b}
+.pos{font-size:12px;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px}
+.def{font-size:15px;color:#3d4046}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
+.quote{font-size:14.5px;color:#3d4046;line-height:1.9;border-left:3px solid var(--accent);padding-left:16px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
+.steps{display:grid;gap:12px}
+.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
+.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
+.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
+.formula{font-size:16px;color:#16171a;margin-top:4px}
+.answer{margin-top:6px;background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:12px 16px;font-size:14px}
+.cmp{display:grid;gap:12px}
+.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
+.cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
+.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.notes{display:grid;gap:8px}
+.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+</style></head><body>
+<div class="panel" style="--accent:#10B981">
+  <div class="ask"><div class="avatar"></div><p>用通俗的话讲讲光合作用是什么。</p></div>
+  <div class="ans">
+    <div class="box"><div class="k">一句话概括</div><p>植物用阳光做燃料，把水和二氧化碳加工成自己的食物，顺便把氧气放出来。</p></div>
+    <div class="box"><div class="k">生活类比</div><p>叶子是一座开在阳光下的厨房：水是从根部送进来的原料，二氧化碳从气孔飘进来，阳光是灶火，做出来的菜就是葡萄糖。</p></div>
+    <div class="flow"><span>光能</span><i>→</i><span>叶绿体</span><i>→</i><span>水 + 二氧化碳</span><i>→</i><span>葡萄糖</span><i>+</i><span>氧气</span></div>
+    <div class="hr"></div>
+    <h3>思考题</h3>
+    <div class="notes">
+      <div>如果没有阳光，植物当天还能不能继续生长？为什么？</div>
+      <div>为什么说地球上的氧气几乎都来自光合作用？</div>
+      <div>大棚里补光灯的作用，和阳光是不是同一件事？</div>
+    </div>
+    <div class="box"><div class="k">记住一句话</div><p>光合作用是地球上最大的能量转换工厂：太阳的账，最终记在每一条食物链上。</p>
+    </div>
+  </div>
+</div></body></html>

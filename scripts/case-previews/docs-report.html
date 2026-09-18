@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-report</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
+.title{font-size:23px;letter-spacing:-.01em}
+.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
+h3{margin-top:16px;font-size:13.5px}
+p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+ul{list-style:none;margin-top:10px;display:grid;gap:7px}
+li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
+.pane{min-width:0;overflow:hidden}
+.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.dense{margin-top:10px;font-size:11px;line-height:1.95;color:#6f737b;text-align:justify}
+.card{border:1px solid #edede9;background:#fafaf8;padding:16px 18px;margin-top:10px}
+.card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.card p{margin-top:8px;font-size:12.8px;line-height:1.85;color:#3d4046}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.07)}
+</style></head><body>
+<div class="doc" style="--accent:#B45309">
+  <div class="title">2026 年第三季度运营工作报告</div>
+  <div class="meta"><span>报送：运营管理部</span><span>编制：数据分析组</span><span>日期：2026-09-30</span></div>
+  <h3>一、总体情况</h3>
+  <p>本季度累计处理订单 25,141 单，整体准时率 96.4%，较上季度提升 1.8 个百分点。异常单从季初的日均 46 单降至 27 单。</p>
+  <h3>二、主要工作</h3>
+  <ul>
+    <li>完成经营指标口径表建设，覆盖 6 条业务线，看板、告警与导出共用同一份定义</li>
+    <li>重构任务分派链路，人均日处理量提升至 128 单</li>
+    <li>建立异常单影响面排序机制，优先处理影响面最大的前 6 单</li>
+  </ul>
+  <h3>三、存在问题与下阶段安排</h3>
+  <p>华北区域环比出现负增长，渠道结构变化尚未完成归因；下季度将优先补齐归因分析，并推进夜间自动分派上线。</p>
+  <h3>四、下阶段重点</h3>
+  <ul>
+    <li>完成华北区域渠道归因，输出可执行的调整方案</li>
+    <li>夜间异常单自动分派上线，将人工挑单比例压到 10% 以内</li>
+    <li>统一导出模块与看板口径，消除两处已知差异</li>
+  </ul>
+  <p style="margin-top:16px;font-size:12px;color:#9a9ea6">编制人：数据分析组 · 审核：运营管理部</p>
+</div></body></html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-competitors</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:30px}
+.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
+.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
+.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:18px}
+h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
+.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0}
+.bars{display:grid;gap:10px;margin-top:12px}
+.bar{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
+td.mono{font-variant-numeric:tabular-nums}
+ul{list-style:none;margin-top:10px;display:grid;gap:8px}
+li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
+li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.timeline{display:grid;gap:0;margin-top:12px}
+.tl{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
+.tl:first-child{border-top:0}
+.tl b{color:var(--accent);font-weight:600}
+.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+</style></head><body>
+<div class="sheet" style="--accent:#0F766E">
+  <div class="sheet-top">
+    <div class="kicker">Competitive Analysis</div>
+    <h1>竞品能力与市场定位对比</h1>
+    <div class="meta"><span>覆盖 6 家主要厂商</span><span>评估维度：部署 / 数据 / 生态 / 价格</span></div>
+  </div>
+  <div class="body">
+    <table>
+      <tr><th>厂商</th><th>部署方式</th><th>数据可控性</th><th>价格带</th><th>典型客户</th><th>定位判断</th></tr>
+      <tr><td>竞品 A</td><td>纯云端</td><td>黑盒</td><td>¥299/人/月</td><td>互联网中小团队</td><td>体验优先</td></tr>
+      <tr><td>竞品 B</td><td>私有化为主</td><td>可导出</td><td>按项目</td><td>金融、政企</td><td>合规优先</td></tr>
+      <tr><td>竞品 C</td><td>云端 + 本地插件</td><td>部分可控</td><td>¥199 起</td><td>开发者</td><td>生态优先</td></tr>
+      <tr><td>竞品 D</td><td>本地优先</td><td>完全可控</td><td>按坐席</td><td>制造业</td><td>数据优先</td></tr>
+      <tr><td>竞品 E</td><td>纯云端</td><td>黑盒</td><td>免费 + 增值</td><td>个人用户</td><td>流量优先</td></tr>
+    </table>
+    <div class="cols2" style="grid-template-columns:1fr 1fr">
+      <div><h3>结构性缺口</h3>
+        <ul>
+          <li>没有厂商把"离线可用 + 数据留在本机"做成默认而不是选项</li>
+          <li>跨工具的数据流转仍需人工搬运，缺少统一出口</li>
+        </ul>
+      </div>
+      <div><h3>我方可切入的位置</h3>
+        <ul>
+          <li>以本地优先为默认形态，用数据可控性换采购决策权重</li>
+          <li>在中型团队价位段提供可量化的合规说明</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot"><span>评分口径：功能覆盖 × 使用成本</span><span>第 3 / 12 页</span></div>
+</div></body></html>

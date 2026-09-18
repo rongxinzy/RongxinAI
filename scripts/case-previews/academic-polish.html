@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-polish</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:32px;background:#eceae4}
+.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
+.ptitle{font-size:23px;text-align:center;line-height:1.4}
+.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
+.abstract{margin-top:18px;border:1px solid #eeede7;background:#faf9f6;padding:14px 18px}
+.abstract h4{font-size:11px;letter-spacing:.2em;color:#8b8f97}
+.abstract p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+.keywords{margin-top:10px;font-size:11.5px;color:#8b8f97}
+.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:12px}
+.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
+.sec b{font-weight:600}
+.lv2{padding-left:22px}
+.lv3{padding-left:44px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.flow i{color:#b8b5ab;font-style:normal}
+.redline{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.redline .col h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.redline .col p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px}
+.reasons{margin-top:12px;display:grid;gap:7px}
+.reasons div{font-size:12px;color:#4c5058;padding-left:14px;position:relative}
+.reasons div::before{content:"·";position:absolute;left:2px;color:#b8b5ab}
+.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+</style></head><body>
+<div class="page" style="--accent:#7C3AED">
+  <div class="ptitle serif">学术表达润色：修改对照</div>
+  <div class="authors">保留原意 · 只动表达 · 标注修改理由</div>
+  <div class="sections">
+    <div class="redline">
+      <div class="col"><h4>修改前</h4>
+        <p>本文<del>做了很多</del>关于本地部署的研究，<del>发现</del>如果数据不出本机的话，团队用起来会比较放心，<del>而且</del>效率也<del>会好一些</del>。</p>
+      </div>
+      <div class="col"><h4>修改后</h4>
+        <p>本文<ins>聚焦</ins>本地部署场景，<ins>结果表明</ins>：当数据不出本机时，团队的使用意愿<ins>显著提高</ins>，任务完成效率<ins>亦有所提升</ins>。</p>
+      </div>
+    </div>
+    <div class="reasons">
+      <div>"做了很多"信息量低，改为明确研究对象"聚焦本地部署场景"。</div>
+      <div>口语化的"比较放心"改为可观测的"使用意愿显著提高"。</div>
+      <div>"效率也会好一些"缺少量级，改为"亦有所提升"以保持克制表述。</div>
+      <div>合并短句，减少连接词，保持学术语体的连贯性。</div>
+    </div>
+  </div>
+  <div class="foot"><span>共修改 14 处表达</span><span>原意未变</span></div>
+</div></body></html>
