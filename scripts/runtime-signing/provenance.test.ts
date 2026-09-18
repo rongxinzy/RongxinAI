@@ -134,8 +134,9 @@ test('central signing must be a successful dispatch from the signing authority m
   ).rejects.toThrow();
 });
 
-test('rejects replayed, cross-runtime, wrong-signer or extra-file manifests', () => {
-  expect(() => validateManifest(manifest, build, '456', signer)).not.toThrow();
+test('validates source and hashes without requiring a public signer configuration', () => {
+  expect(() => validateManifest(manifest, build, '456')).not.toThrow();
+  expect(() => validateManifest({ ...manifest, signerThumbprint: undefined }, build, '456')).not.toThrow();
   for (const override of [
     { schemaVersion: 2 },
     { key: 'sidecar' },
@@ -145,13 +146,12 @@ test('rejects replayed, cross-runtime, wrong-signer or extra-file manifests', ()
     { sourceTag: 'v1.20.0-zhiyuan.5' },
     { signingRepository: 'attacker/repo' },
     { signingRunId: '457' },
-    { signerThumbprint: 'E'.repeat(40) },
     { files: [...manifest.files, manifest.files[0]] },
     { files: [manifest.files[0], manifest.files[0]] },
     { files: manifest.files.map(file => ({ ...file, signedSha256: 'bad' })) },
     { files: manifest.files.map(file => ({ ...file, unsignedSha256: 'bad' })) },
   ])
-    expect(() => validateManifest({ ...manifest, ...override }, build, '456', signer)).toThrow();
+    expect(() => validateManifest({ ...manifest, ...override }, build, '456')).toThrow();
 });
 
 test('hashes bounded regular Windows executables and rejects absent, tiny or non-PE files', () => {
@@ -178,6 +178,10 @@ test('workflow validates inputs before authenticating and signs only the manifes
   expect(workflow).toContain('environment: release');
   expect(workflow).toContain('foreach ($file in $manifest.files)');
   expect(workflow).not.toContain('contents: write');
+  const signing = readFileSync(new URL('./sign-runtime.ps1', import.meta.url), 'utf8');
+  expect(signing).toContain('& $signTool sign /v /fd sha256');
+  expect(signing).toContain('SignTool failed with exit code');
+  expect(signing).not.toMatch(/\$signTool verify|Get-AuthenticodeSignature|Assert-WindowsRuntimeSignature/);
 });
 
 test('manifest CLI rejects extra executables before signing and records both byte hashes', () => {
@@ -200,7 +204,7 @@ test('manifest CLI rejects extra executables before signing and records both byt
   for (const name of source.files) writeFileSync(path.join(directory, name), 'MZsigned');
   execFileSync(process.execPath, [script, 'after', directory], { env });
   const signed = JSON.parse(readFileSync(filename, 'utf8'));
-  expect(() => validateManifest(signed, build, '456', signer)).not.toThrow();
+  expect(() => validateManifest(signed, build, '456')).not.toThrow();
   expect(signed.files[0].unsignedSha256).toBe(unsigned.files[0].unsignedSha256);
   expect(signed.files[0].signedSha256).not.toBe(signed.files[0].unsignedSha256);
   writeFileSync(path.join(directory, 'unexpected.exe'), 'MZuntrusted');
