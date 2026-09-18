@@ -3,7 +3,6 @@ import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { ClipboardCheck } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 import {
   WorkbenchTaskStatus,
@@ -11,6 +10,7 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
+import { showAppErrorToast, showAppSuccessToast } from '../../services/toastNotification';
 import { getProjectedRun } from './workbenchTaskAudit/utils';
 
 interface WorkbenchTaskAcceptanceCardProps {
@@ -49,10 +49,10 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
       try {
         const result = await action();
         if (!result.success) throw new Error(result.error);
-        if (confirmAcceptance) toast.success(i18nService.t('workbenchTaskAcceptedToast'));
+        if (confirmAcceptance) showAppSuccessToast(i18nService.t('workbenchTaskAcceptedToast'));
       } catch (error) {
         console.error('[WorkbenchTask] Acceptance action failed:', error);
-        toast.error(i18nService.t('workbenchTaskActionFailed'));
+        showAppErrorToast(i18nService.t('workbenchTaskActionFailed'));
       } finally {
         setBusy(false);
       }

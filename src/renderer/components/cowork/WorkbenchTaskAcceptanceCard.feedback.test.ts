@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { toast } from 'sonner';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
   WorkbenchContractKind,
@@ -12,9 +11,13 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
+import { showAppErrorToast, showAppSuccessToast } from '../../services/toastNotification';
 import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../../services/toastNotification', () => ({
+  showAppErrorToast: vi.fn(),
+  showAppSuccessToast: vi.fn(),
+}));
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -81,11 +84,11 @@ test.each([true, false])(
     await waitFor(() => expect(accept).toHaveBeenCalledWith('task'));
     if (success)
       await waitFor(() =>
-        expect(toast.success).toHaveBeenCalledWith(i18nService.t('workbenchTaskAcceptedToast')),
+        expect(showAppSuccessToast).toHaveBeenCalledWith(i18nService.t('workbenchTaskAcceptedToast')),
       );
     else {
-      await waitFor(() => expect(toast.error).toHaveBeenCalled());
-      expect(toast.success).not.toHaveBeenCalled();
+      await waitFor(() => expect(showAppErrorToast).toHaveBeenCalled());
+      expect(showAppSuccessToast).not.toHaveBeenCalled();
     }
     expect(stopSession).not.toHaveBeenCalled();
   },

@@ -21,12 +21,10 @@ import {
   Eye,
   EyeOff,
   Key,
-  Pencil,
   PlusCircle,
   RefreshCw,
   ServerCog,
   ShieldCheck,
-  Trash2,
   X,
   XCircle,
 } from 'lucide-react';
@@ -54,7 +52,12 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
-import { MODEL_CAPABILITY_FIELDS } from './settings/ModelCapabilitiesFields';
+import {
+  buildProviderModelConnectionTestNotification,
+  buildProviderModelConnectionTestProgressNotification,
+  MODEL_CONNECTION_TEST_PROGRESS_INTERVAL_MS,
+  shouldReportProviderModelConnectionTestProgress,
+} from './settings/modelConnectionTestNotification';
 import { ProviderModelDiscoveryButton } from './settings/ProviderModelDiscoveryButton';
 import {
   ModelConnectionStatus,
@@ -132,9 +135,12 @@ import {
   type ProviderModelEditorDraft,
 } from './settings/ProviderModelEditorDialog';
 import {
-  resolveDiscoveredModelContext,
-  resolveOllamaRunningModelContext,
-} from './settings/ollamaRuntimeMetadata';
+  ProviderModelRow,
+  type ProviderModelEntry,
+  type ProviderModelRowActions,
+} from './settings/ProviderModelRow';
+import { resolveOllamaModelEditorContext } from './settings/providerModelEditorContext';
+import { formatTokenK, TOKENS_PER_K } from './settings/tokenFormat';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
@@ -235,16 +241,7 @@ const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
   reasoning: ModelCapabilityStatus.Unknown,
 };
 
-const TOKENS_PER_K = 1024;
 const LOCAL_MODEL_REFRESH_MIN_LOADING_DURATION_MS = 1_000;
-
-const formatTokenK = (tokens?: number): string => {
-  if (!tokens || !Number.isFinite(tokens) || tokens <= 0) return '';
-  return String(Number((tokens / TOKENS_PER_K).toFixed(2)));
-};
-
-const formatDetectedTokenLimit = (tokens: number): string =>
-  tokens >= TOKENS_PER_K ? `${formatTokenK(tokens)}K` : String(tokens);
 
 const parseTokenK = (value: string): number | undefined => {
   const parsed = Number.parseFloat(value.trim());
@@ -765,6 +762,18 @@ const Settings: React.FC<SettingsProps> = ({
   const [isInitialProviderPending, setIsInitialProviderPending] = useState(
     Boolean(initialProvider),
   );
+  // 模型行是 memo 组件：整棵设置面板每次状态更新都会重渲染，所以行回调的引用必须稳定，
+  // 否则每次更新都会重渲染整张模型列表（几百个模型时明显卡顿）。
+  // 用 ref 指向最新的处理函数，避免为了稳定引用把 providers 之类的状态塞进 useCallback 依赖。
+  const modelRowActionsRef = useRef<ProviderModelRowActions | null>(null);
+  const modelRowActions = useMemo<ProviderModelRowActions>(
+    () => ({
+      testModel: model => modelRowActionsRef.current?.testModel(model),
+      editModel: model => modelRowActionsRef.current?.editModel(model),
+      deleteModel: model => modelRowActionsRef.current?.deleteModel(model),
+    }),
+    [],
+  );
   const [showApiKey, setShowApiKey] = useState(false);
 
   // MiniMax OAuth state
@@ -799,6 +808,7 @@ const Settings: React.FC<SettingsProps> = ({
   const modelConnectionTestRequestIdRef = useRef<Partial<Record<ProviderType, number>>>({});
   const {
     getModelConnectionStatus,
+    mergeProviderModelConnectionStatuses,
     resetProviderModelConnectionStatuses,
     setModelConnectionStatus,
     setProviderModelConnectionStatuses,
@@ -2584,10 +2594,70 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  const handleRowModelTest = (model: ProviderModelEntry) => {
+    setSelectedModelId(model.id);
+    void handleTestConnection(model.id);
+  };
+
+  const handleRowModelEdit = (model: ProviderModelEntry) => {
+    const openEditor = (runtimeContextWindow?: number) =>
+      handleEditModel(
+        model.id,
+        model.name,
+        model.supportsImage,
+        model.capabilities,
+        model.piRuntime,
+        runtimeContextWindow ?? model.contextWindow,
+        model.maxTokens,
+      );
+
+    if (activeProvider === ProviderName.LlamaCpp) {
+      // 本地模型的编辑框优先用运行时偏好，偏好缺失时退回模型自身配置。
+      void window.electron.llamacpp.getModelPreferences().then(preferences => {
+        const preference = preferences[model.id];
+        handleEditModel(
+          model.id,
+          model.name,
+          model.supportsImage,
+          { ...model.capabilities, ...preference?.capabilities },
+          undefined,
+          preference?.ctxSize ?? model.contextWindow,
+          preference?.maxTokens ?? model.maxTokens,
+        );
+      });
+      return;
+    }
+
+    if (activeProvider !== ProviderName.Ollama) {
+      openEditor();
+      return;
+    }
+
+    const providerConfig = providers[activeProvider];
+    const apiFormat = getEffectiveApiFormat(activeProvider, providerConfig.apiFormat);
+    void resolveOllamaModelEditorContext({
+      baseUrl: resolveBaseUrl(activeProvider, providerConfig.baseUrl, apiFormat),
+      apiFormat,
+      apiKey: providerConfig.apiKey,
+      modelId: model.id,
+    }).then(contextWindow => openEditor(contextWindow));
+  };
+
+  const handleRowModelDelete = (model: ProviderModelEntry) => {
+    handleDeleteModel(model.id);
+  };
+
+  // 每帧读取最新实现：行组件拿到的引用因此可以永久稳定。
+  modelRowActionsRef.current = {
+    testModel: handleRowModelTest,
+    editModel: handleRowModelEdit,
+    deleteModel: handleRowModelDelete,
+  };
+
   const handleModelsDiscovered = async (
     providerId: string,
     discoveredModels: readonly DiscoveredProviderModel[],
-  ) => {
+  ): Promise<void> => {
     const provider = providerId as ProviderType;
     const providerConfig = providers[provider];
     const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels);
@@ -2599,7 +2669,8 @@ const Settings: React.FC<SettingsProps> = ({
       id: model.id,
       name: model.name,
     }));
-    if (modelsToTest.length === 0) return false;
+    // 一个模型都没发现时列表保持原样，也不必把已有模型再测一遍；空结果由调用方提示。
+    if (discoveredModels.length === 0 || modelsToTest.length === 0) return;
     const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
     modelConnectionTestRequestIdRef.current[provider] = requestId;
 
@@ -2616,7 +2687,33 @@ const Settings: React.FC<SettingsProps> = ({
     }));
 
     // Run connection tests in the background so the discovery button stops
-    // loading once the model list is merged; per-model status dots show progress.
+    // loading once the model list is merged. Each finished test writes its own
+    // status dot, so the list shows progress while the batch is still running.
+    // 模型多的提供商（如 Qwen 上百个模型）整批要跑很久，列表里的状态点容易被忽略，
+    // 所以整批期间挂一条中性进度提示，结束时由结果汇总提示替换掉它。
+    let testedCount = 0;
+    const reportProgress = () => {
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: buildProviderModelConnectionTestProgressNotification({
+            tested: testedCount,
+            total: modelsToTest.length,
+          }),
+        }),
+      );
+    };
+    let progressTimer: number | null = null;
+    if (shouldReportProviderModelConnectionTestProgress(modelsToTest.length)) {
+      progressTimer = window.setInterval(() => {
+        if (modelConnectionTestRequestIdRef.current[provider] !== requestId) {
+          if (progressTimer !== null) window.clearInterval(progressTimer);
+          return;
+        }
+        reportProgress();
+      }, MODEL_CONNECTION_TEST_PROGRESS_INTERVAL_MS);
+      reportProgress();
+    }
+
     void (async () => {
       const testingApiFormat = getEffectiveApiFormat(provider, nextProviderConfig.apiFormat);
       const testingBaseUrl = resolveBaseUrl(provider, nextProviderConfig.baseUrl, testingApiFormat);
@@ -2626,12 +2723,35 @@ const Settings: React.FC<SettingsProps> = ({
         apiFormat: testingApiFormat,
         provider: nextProviderConfig,
       });
+      // 结果回来的节奏不可控（快速失败时会成批返回），按帧合并成一次状态更新，
+      // 避免整张列表跟着每个模型重渲染一遍。
+      const pendingConnectionStatuses: Record<string, ModelConnectionStatus> = {};
+      let flushScheduled = false;
+      const flushModelConnectionStatuses = () => {
+        flushScheduled = false;
+        if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return;
+        mergeProviderModelConnectionStatuses(provider, { ...pendingConnectionStatuses });
+      };
+      const queueModelConnectionStatus = (modelId: string, status: ModelConnectionStatus) => {
+        pendingConnectionStatuses[modelId] = status;
+        if (flushScheduled) return;
+        flushScheduled = true;
+        window.requestAnimationFrame(flushModelConnectionStatuses);
+      };
+
       const results = await testProviderModelsConcurrently({
         providerId: provider,
         provider: nextProviderConfig,
         baseUrl: testingBaseUrl,
         apiFormat: testingApiFormat,
         models: modelsToTest,
+        onResult: ({ model, result }) => {
+          testedCount += 1;
+          queueModelConnectionStatus(
+            model.id,
+            result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
+          );
+        },
       });
       if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return;
 
@@ -2662,7 +2782,6 @@ const Settings: React.FC<SettingsProps> = ({
       setProviderModelConnectionStatuses(provider, statuses);
 
       const successCount = results.filter(({ result }) => result.success).length;
-      const failureCount = results.length - successCount;
       if (successCount > 0) {
         try {
           await persistTestedProviderConfiguration(provider, testedProviderConfig);
@@ -2679,24 +2798,29 @@ const Settings: React.FC<SettingsProps> = ({
         await persistProviderModelConnectionResults(provider, outcomes, connectionSignature);
       }
 
-      const summary = i18nService
-        .t(failureCount === 0 ? 'modelConnectionTestSuccessSummary' : 'modelConnectionTestSummary')
-        .replace('{total}', String(results.length))
-        .replace('{success}', String(successCount))
-        .replace('{failure}', String(failureCount));
+      // 结果汇总在这里同步派发，且必须早于 finally 清掉 interval：App 的 Toast 宿主每收到
+      // 一次 app:showToast 就覆盖文案并重置自动关闭计时器，所以最后留在屏幕上的是这条结果，
+      // 进度提示会被原地替换而不是挂在顶部（调度上 finally 是 microtask，interval 是 macrotask，
+      // 不可能插在两者之间多刷一条进度）。这条顺序由 modelConnectionTestToast.test.ts 锁住。
       window.dispatchEvent(
         new CustomEvent('app:showToast', {
-          detail: {
-            message: summary,
-            isError: failureCount > 0,
-            isSuccess: failureCount === 0,
-            autoClose: true,
-            durationMs: failureCount > 0 ? 5_000 : undefined,
-          },
+          detail: buildProviderModelConnectionTestNotification({
+            total: results.length,
+            successCount,
+          }),
         }),
       );
-    })();
-    return true;
+    })()
+      .catch(error => {
+        console.error('[Settings] provider model connection batch failed:', error);
+        showConnectionTestNotification(
+          { success: false, message: i18nService.t('modelConnectionTestBatchFailed') },
+          provider,
+        );
+      })
+      .finally(() => {
+        if (progressTimer !== null) window.clearInterval(progressTimer);
+      });
   };
 
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
@@ -4707,199 +4831,15 @@ const Settings: React.FC<SettingsProps> = ({
 
                     <div className="max-h-60 divide-y divide-border overflow-y-auto">
                       {(providers[activeProvider].models ?? []).map(model => (
-                        <div
+                        <ProviderModelRow
                           key={model.id}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`${i18nService.t('testConnection')} ${model.name}`}
-                          className="theme-surface-settings-row flex min-h-12 cursor-pointer items-center px-3 py-2"
-                          onClick={event => {
-                            if (event.target instanceof Element && event.target.closest('button')) {
-                              return;
-                            }
-                            setSelectedModelId(model.id);
-                            void handleTestConnection(model.id);
-                          }}
-                          onKeyDown={event => {
-                            if (event.target !== event.currentTarget) return;
-                            if (event.key !== 'Enter' && event.key !== ' ') return;
-                            event.preventDefault();
-                            setSelectedModelId(model.id);
-                            void handleTestConnection(model.id);
-                          }}
-                        >
-                          <div className="flex w-full min-w-0 items-center justify-between gap-2">
-                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                              <div
-                                className={cn(
-                                  'h-1.5 w-1.5 shrink-0 rounded-full',
-                                  getModelConnectionStatus(activeProvider, model.id) ===
-                                  ModelConnectionStatus.Failure
-                                    ? 'bg-destructive'
-                                    : activeProvider === ProviderName.LlamaCpp ||
-                                        getModelConnectionStatus(activeProvider, model.id) ===
-                                          ModelConnectionStatus.Success
-                                      ? 'bg-success'
-                                      : 'bg-muted-foreground',
-                                )}
-                              />
-                              <div className="min-w-0">
-                                <div
-                                  className={cn('truncate font-medium text-foreground', 'text-sm')}
-                                >
-                                  {model.name}
-                                </div>
-                                {activeProvider !== ProviderName.LlamaCpp ? (
-                                  <div className={cn('truncate text-muted-foreground', 'text-xs')}>
-                                    {model.id}
-                                  </div>
-                                ) : null}
-                                {isCustomProvider(activeProvider) &&
-                                  (model.maxTokens ||
-                                    Object.values(model.capabilities ?? {}).some(
-                                      status => status === ModelCapabilityStatus.Supported,
-                                    )) && (
-                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                      {model.maxTokens && (
-                                        <span>
-                                          {i18nService.t('modelMaxOutputTokensShort')}:{' '}
-                                          {formatDetectedTokenLimit(model.maxTokens)}
-                                        </span>
-                                      )}
-                                      {MODEL_CAPABILITY_FIELDS.filter(
-                                        field =>
-                                          field.key !== 'imageInput' &&
-                                          model.capabilities?.[field.key] ===
-                                            ModelCapabilityStatus.Supported,
-                                      ).map(field => (
-                                        <span key={field.key}>{i18nService.t(field.labelKey)}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                              </div>
-                            </div>
-                            <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
-                              {model.supportsImage && (
-                                <span
-                                  className={cn(
-                                    'rounded-md bg-primary-muted px-1.5 py-0.5 text-primary',
-                                    'text-xs',
-                                  )}
-                                >
-                                  {i18nService.t('imageInput')}
-                                </span>
-                              )}
-                              {activeProvider !== ProviderName.LlamaCpp && (
-                                <>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    onClick={() => {
-                                      const openEditor = (runtimeContextWindow?: number) =>
-                                        handleEditModel(
-                                          model.id,
-                                          model.name,
-                                          model.supportsImage,
-                                          model.capabilities,
-                                          model.piRuntime,
-                                          runtimeContextWindow ?? model.contextWindow,
-                                          model.maxTokens,
-                                        );
-                                      if (activeProvider !== ProviderName.Ollama) {
-                                        openEditor();
-                                        return;
-                                      }
-                                      const providerConfig = providers[activeProvider];
-                                      const apiFormat = getEffectiveApiFormat(
-                                        activeProvider,
-                                        providerConfig.apiFormat,
-                                      );
-                                      const openWithLocalRuntimeFallback = () => {
-                                        void window.electron.ollama
-                                          .listRunningModels()
-                                          .then(runningModels =>
-                                            openEditor(
-                                              resolveOllamaRunningModelContext(
-                                                model.id,
-                                                runningModels,
-                                              ),
-                                            ),
-                                          )
-                                          .catch(() => openEditor());
-                                      };
-                                      void window.electron.api
-                                        .fetchModels({
-                                          baseUrl: resolveBaseUrl(
-                                            activeProvider,
-                                            providerConfig.baseUrl,
-                                            apiFormat,
-                                          ),
-                                          apiKey: providerConfig.apiKey,
-                                          apiFormat,
-                                        })
-                                        .then(result => {
-                                          const contextWindow = result.success
-                                            ? resolveDiscoveredModelContext(model.id, result.models)
-                                            : undefined;
-                                          if (contextWindow !== undefined) {
-                                            openEditor(contextWindow);
-                                            return;
-                                          }
-                                          openWithLocalRuntimeFallback();
-                                        })
-                                        .catch(openWithLocalRuntimeFallback);
-                                    }}
-                                    aria-label={`${i18nService.t('editModel')} ${model.name}`}
-                                    title={i18nService.t('editModel')}
-                                    className="theme-page-settings-button-8"
-                                  >
-                                    <Pencil />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    onClick={() => handleDeleteModel(model.id)}
-                                    aria-label={`${i18nService.t('delete')} ${model.name}`}
-                                    title={i18nService.t('delete')}
-                                    className="theme-page-settings-button-9"
-                                  >
-                                    <Trash2 />
-                                  </Button>
-                                </>
-                              )}
-                              {activeProvider === ProviderName.LlamaCpp && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => {
-                                    void window.electron.llamacpp
-                                      .getModelPreferences()
-                                      .then(preferences => {
-                                        const preference = preferences[model.id];
-                                        handleEditModel(
-                                          model.id,
-                                          model.name,
-                                          model.supportsImage,
-                                          { ...model.capabilities, ...preference?.capabilities },
-                                          undefined,
-                                          preference?.ctxSize ?? model.contextWindow,
-                                          preference?.maxTokens ?? model.maxTokens,
-                                        );
-                                      });
-                                  }}
-                                  aria-label={`${i18nService.t('editModel')} ${model.name}`}
-                                  title={i18nService.t('editModel')}
-                                  className="theme-page-settings-button-10 [&_svg]:size-3.5"
-                                >
-                                  <Pencil />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                          providerId={activeProvider}
+                          model={model}
+                          connectionStatus={getModelConnectionStatus(activeProvider, model.id)}
+                          onTestModel={modelRowActions.testModel}
+                          onEditModel={modelRowActions.editModel}
+                          onDeleteModel={modelRowActions.deleteModel}
+                        />
                       ))}
 
                       {(!providers[activeProvider].models ||

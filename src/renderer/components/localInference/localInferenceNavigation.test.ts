@@ -10,6 +10,7 @@ const appSource = readSource('../../App.tsx');
 const settingsSource = readSource('../Settings.tsx');
 const localInferenceSource = readSource('./LocalInferenceView.tsx');
 const modelsPanelSource = readSource('./panels/ModelsPanel.tsx');
+const providerModelRowSource = readSource('../settings/ProviderModelRow.tsx');
 
 test('keeps model-load cancellation reachable through the loading overlay', () => {
   expect(modelsPanelSource).toContain('pointer-events-none absolute inset-0');
@@ -36,7 +37,10 @@ test('keeps the requested provider selected while settings configuration loads',
   expect(settingsSource).toContain('if (isInitialProviderPending) return;');
   expect(settingsSource).toContain('initialProvider === activeProvider ||');
   expect(settingsSource).toContain('ModelConnectionStatus.Failure');
-  expect(settingsSource).toContain('activeProvider === ProviderName.LlamaCpp ||');
+  // 双向断言：Settings 继续消费提取出来的行组件，LlamaCpp 特判留在组件内部。
+  expect(settingsSource).toContain('<ProviderModelRow');
+  expect(settingsSource).toContain('providerId={activeProvider}');
+  expect(providerModelRowSource).toContain('providerId === ProviderName.LlamaCpp');
 });
 
 test('refreshes the kept-alive local inference view on navigation requests', () => {

@@ -37,6 +37,8 @@ export interface ProviderModelConnectionTestResponse {
 }
 
 const CONNECTIVITY_TEST_TOKEN_BUDGET = 64;
+// 每个模型都要跑一次真实的 chat completion，推理模型即使只生成 64 tokens 也可能很慢，
+// 所以这里保留 30 秒上限：宁可多等慢模型，也不要把能用的模型误判成不通。
 const CONNECTION_TEST_TIMEOUT_MS = 30_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -234,34 +236,47 @@ export async function testProviderModelConnection(
   }
 }
 
+export interface ProviderModelConnectionTestEntry {
+  model: ProviderModelConnectionTarget;
+  result: ProviderModelConnectionTestResult;
+}
+
 export const PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY = 4;
 
 export async function testProviderModelsConcurrently(
   input: Omit<ProviderModelConnectionTestInput, 'model'> & {
     models: readonly ProviderModelConnectionTarget[];
+    /** 每个模型测完立即回调，调用方据此展示进度，而不是等整批结束。 */
+    onResult?: (entry: ProviderModelConnectionTestEntry) => void;
   },
-): Promise<Array<{ model: ProviderModelConnectionTarget; result: ProviderModelConnectionTestResult }>> {
-  const results: Array<{
-    model: ProviderModelConnectionTarget;
-    result: ProviderModelConnectionTestResult;
-  }> = new Array(input.models.length);
+): Promise<ProviderModelConnectionTestEntry[]> {
+  const { models, onResult, ...testInput } = input;
+  const results: ProviderModelConnectionTestEntry[] = new Array(models.length);
   let nextModelIndex = 0;
 
   const runWorker = async (): Promise<void> => {
-    while (nextModelIndex < input.models.length) {
+    while (nextModelIndex < models.length) {
       const modelIndex = nextModelIndex;
       nextModelIndex += 1;
-      const model = input.models[modelIndex];
+      const model = models[modelIndex];
       if (!model) break;
 
-      const result = await testProviderModelConnection({ ...input, model });
-      results[modelIndex] = { model, result };
+      const result = await testProviderModelConnection({ ...testInput, model });
+      const entry: ProviderModelConnectionTestEntry = { model, result };
+      results[modelIndex] = entry;
+      // 回调是调用方的展示逻辑（写状态点、计数），它抛异常不该让整批测试停摆：
+      // 记日志后继续测下一个模型，剩下的模型仍然能拿到结果。
+      try {
+        onResult?.(entry);
+      } catch (error) {
+        console.error('[ProviderModelConnection] onResult callback threw:', error);
+      }
     }
   };
 
   await Promise.all(
     Array.from(
-      { length: Math.min(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY, input.models.length) },
+      { length: Math.min(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY, models.length) },
       () => runWorker(),
     ),
   );

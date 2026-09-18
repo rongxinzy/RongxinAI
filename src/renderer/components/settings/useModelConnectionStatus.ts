@@ -37,6 +37,17 @@ export function useModelConnectionStatus() {
     [],
   );
 
+  /** 合并式写入：批量回填测试进度时，不覆盖该提供商里尚未写入的状态。 */
+  const mergeProviderModelConnectionStatuses = useCallback(
+    (providerId: string, nextStatuses: Record<string, ModelConnectionStatus>) => {
+      setStatuses(current => ({
+        ...current,
+        [providerId]: { ...current[providerId], ...nextStatuses },
+      }));
+    },
+    [],
+  );
+
   const resetProviderModelConnectionStatuses = useCallback((providerId: string) => {
     setStatuses(current => {
       if (!current[providerId]) return current;
@@ -47,6 +58,7 @@ export function useModelConnectionStatus() {
 
   return {
     getModelConnectionStatus,
+    mergeProviderModelConnectionStatuses,
     resetProviderModelConnectionStatuses,
     setModelConnectionStatus,
     setProviderModelConnectionStatuses,

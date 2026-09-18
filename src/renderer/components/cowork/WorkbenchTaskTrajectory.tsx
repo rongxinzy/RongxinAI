@@ -17,7 +17,6 @@ import {
 import { Activity, Check, Play, RefreshCw, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { toast } from 'sonner';
 
 import {
   WorkbenchTaskStatus,
@@ -28,6 +27,7 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
+import { showAppErrorToast } from '../../services/toastNotification';
 import type { AppDispatch } from '../../store';
 import { setActiveArtifactProjection } from '../../store/slices/artifactSlice';
 import { WorkbenchTaskAuditView } from './workbenchTaskAudit/WorkbenchTaskAuditView';
@@ -121,7 +121,7 @@ export function WorkbenchTaskTrajectory({
       applyDetail(result.detail ?? null);
     } catch (error) {
       console.error('[WorkbenchTask] Failed to load task audit detail:', error);
-      toast.error(i18nService.t('workbenchTaskLoadFailed'));
+      showAppErrorToast(i18nService.t('workbenchTaskLoadFailed'));
     }
   }, [applyDetail, sessionId]);
 
@@ -134,7 +134,7 @@ export function WorkbenchTaskTrajectory({
       setTaskHistory(result.tasks ?? []);
     } catch (error) {
       console.error('[WorkbenchTask] Failed to load task audit history:', error);
-      toast.error(i18nService.t('workbenchTaskHistoryLoadFailed'));
+      showAppErrorToast(i18nService.t('workbenchTaskHistoryLoadFailed'));
     } finally {
       setAuditLoading(false);
     }
@@ -148,7 +148,7 @@ export function WorkbenchTaskTrajectory({
       setAuditDetail(result.detail);
     } catch (error) {
       console.error('[WorkbenchTask] Failed to load historical task detail:', error);
-      toast.error(i18nService.t('workbenchTaskLoadFailed'));
+      showAppErrorToast(i18nService.t('workbenchTaskLoadFailed'));
     } finally {
       setAuditLoading(false);
     }
@@ -209,7 +209,7 @@ export function WorkbenchTaskTrajectory({
         }
       } catch (error) {
         console.error('[WorkbenchTask] Task action failed:', error);
-        toast.error(i18nService.t('workbenchTaskActionFailed'));
+        showAppErrorToast(i18nService.t('workbenchTaskActionFailed'));
       } finally {
         setBusy(false);
       }

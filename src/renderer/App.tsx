@@ -38,12 +38,14 @@ import { ZhiyuanModelPoolEvent } from '../shared/modelPool/constants';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
-import {
-  normalizeError,
-  TOAST_DEFAULT_DURATION_MS,
-  TOAST_MAX_DURATION_MS,
-} from './services/errorNormalization';
+import { TOAST_DEFAULT_DURATION_MS, TOAST_MAX_DURATION_MS } from './services/errorNormalization';
 import { matchesShortcut } from './services/shortcuts';
+import {
+  resolveToastMessage,
+  resolveToastNotification,
+  type ToastNotificationDetail,
+  type ToastNotificationOptions,
+} from './services/toastNotification';
 import { themeService } from './services/theme';
 import { workspaceService } from './services/workspace';
 import { RootState, store } from './store';
@@ -62,14 +64,6 @@ import type { CoworkPermissionResult } from './types/cowork';
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
 const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
 const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
-
-interface AppToastOptions {
-  autoClose?: boolean;
-  durationMs?: number;
-  isError?: boolean;
-  isSuccess?: boolean;
-  onClose?: () => void;
-}
 
 // Feature areas outside the default cowork view are code-split so they stay
 // out of the initial preload graph (see issue #141).
@@ -633,7 +627,7 @@ const App: React.FC = () => {
   }, []);
 
   const showToast = useCallback(
-    (message: string, options: AppToastOptions = {}) => {
+    (message: string, options: ToastNotificationOptions = {}) => {
       const {
         autoClose = true,
         durationMs = TOAST_DEFAULT_DURATION_MS,
@@ -641,7 +635,7 @@ const App: React.FC = () => {
         isSuccess = false,
         onClose = null,
       } = options;
-      setToastMessage(isError ? normalizeError(message) : message);
+      setToastMessage(resolveToastMessage(message, options));
       setIsToastError(isError);
       setIsToastSuccess(isSuccess);
       toastOnCloseRef.current = onClose;
@@ -659,11 +653,6 @@ const App: React.FC = () => {
     },
     [dismissToast],
   );
-
-  const isLikelyErrorToast = (message: string): boolean =>
-    /(failed|failure|error|unable|cannot|could not|invalid|denied|timeout|timed out|not found|失败|错误|无法|不允许|超时|拒绝|不存在)/i.test(
-      message,
-    );
 
   useEffect(() => {
     let mounted = true;
@@ -798,23 +787,11 @@ const App: React.FC = () => {
   // Listen for toast events from child components
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<({ message: string } & AppToastOptions) | string>).detail;
-      if (!detail) return;
-      if (typeof detail === 'string') {
-        showToast(
-          isLikelyErrorToast(detail) ? normalizeError(detail) : detail,
-          isLikelyErrorToast(detail) ? { isError: true } : undefined,
-        );
-      } else {
-        showToast(
-          detail.isError || isLikelyErrorToast(detail.message)
-            ? normalizeError(detail.message)
-            : detail.message,
-          detail.isError || isLikelyErrorToast(detail.message)
-            ? { ...detail, isError: true }
-            : detail,
-        );
-      }
+      const resolved = resolveToastNotification(
+        (e as CustomEvent<ToastNotificationDetail>).detail,
+      );
+      if (!resolved) return;
+      showToast(resolved.message, resolved.options);
     };
     window.addEventListener('app:showToast', handler);
     return () => window.removeEventListener('app:showToast', handler);

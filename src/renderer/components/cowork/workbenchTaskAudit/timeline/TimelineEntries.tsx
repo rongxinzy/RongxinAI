@@ -35,7 +35,6 @@ import {
 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { memo, useState } from 'react';
-import { toast } from 'sonner';
 
 import {
   WorkbenchApprovalDecision,
@@ -48,7 +47,9 @@ import {
   type WorkbenchRun,
   type WorkbenchRunEvent,
 } from '../../../../../shared/workbenchTask';
+import { cleanErrorReason } from '../../../../services/errorNormalization';
 import { i18nService } from '../../../../services/i18n';
+import { showAppErrorToast, showAppSuccessToast } from '../../../../services/toastNotification';
 import { AuditJsonDisclosure } from '../AuditJsonDisclosure';
 import {
   decisionLabel,
@@ -533,10 +534,11 @@ const TimelineArtifactItem = memo(function TimelineArtifactItem({
   const Icon = artifactIcons[artifact.kind] ?? FileText;
 
   const showActionError = (error?: string) =>
-    toast.error(
+    // 这里的 error 直接来自 IPC，必须先清洗掉 URL / 路径，再交给不改写文案的错误提示。
+    showAppErrorToast(
       i18nService
         .t('workbenchTaskArtifactActionFailed')
-        .replace('{error}', error || i18nService.t('unknownError')),
+        .replace('{error}', cleanErrorReason(error ?? '') || i18nService.t('unknownError')),
     );
 
   const openArtifact = async (target: string) => {
@@ -560,7 +562,7 @@ const TimelineArtifactItem = memo(function TimelineArtifactItem({
   const copyHash = async (hash: string) => {
     try {
       await navigator.clipboard.writeText(hash);
-      toast.success(i18nService.t('workbenchTaskHashCopied'));
+      showAppSuccessToast(i18nService.t('workbenchTaskHashCopied'));
     } catch (error) {
       showActionError(error instanceof Error ? error.message : String(error));
     }

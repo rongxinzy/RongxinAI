@@ -13,7 +13,6 @@ import { cn } from '@shared/lib/utils';
 import { ChevronRight, Download } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
-import { toast } from 'sonner';
 import { normalizeError } from '../../../services/errorNormalization';
 
 import {
@@ -23,6 +22,7 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
+import { showAppErrorToast, showAppSuccessToast } from '../../../services/toastNotification';
 import { AuditJsonDisclosure } from './AuditJsonDisclosure';
 import { WorkbenchTimeline } from './timeline/WorkbenchTimeline';
 import { contractLabel, formatTimestamp, statusBadgeVariant, statusLabel } from './utils';
@@ -54,16 +54,16 @@ export function WorkbenchTaskAuditView({
     try {
       const result = await window.electron.workbenchTask.exportAudit(task.id);
       if (!result.success) {
-        toast.error(
+        showAppErrorToast(
           i18nService
             .t('workbenchTaskExportFailed')
             .replace('{error}', normalizeError(result.error || i18nService.t('unknownError'))),
         );
       } else if (!result.canceled) {
-        toast.success(i18nService.t('workbenchTaskExported'));
+        showAppSuccessToast(i18nService.t('workbenchTaskExported'));
       }
     } catch (error) {
-      toast.error(
+      showAppErrorToast(
         i18nService
           .t('workbenchTaskExportFailed')
           .replace('{error}', normalizeError(error)),

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import { toast } from 'sonner';
 
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
@@ -46,6 +45,7 @@ import {
 } from '../../../../shared/memory';
 import { i18nService } from '../../../services/i18n';
 import { memoryService } from '../../../services/memory';
+import { showAppErrorToast, showAppSuccessToast } from '../../../services/toastNotification';
 import type { RootState } from '../../../store';
 import { getWorkspaceDisplayName } from '../../../utils/path';
 import { ManagedMemoryView } from './constants';
@@ -148,7 +148,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
       }
       setRecords(nextRecords);
     } catch (error) {
-      toast.error(i18nService.t('managedMemoryLoadFailed'));
+      showAppErrorToast(i18nService.t('managedMemoryLoadFailed'));
       console.error('[ManagedMemory] Failed to load memory projection:', error);
     } finally {
       setLoading(false);
@@ -168,10 +168,10 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     setBusyId(id);
     try {
       await action();
-      toast.success(i18nService.t(successKey));
+      showAppSuccessToast(i18nService.t(successKey));
       await load();
     } catch (error) {
-      toast.error(i18nService.t('managedMemoryActionFailed'));
+      showAppErrorToast(i18nService.t('managedMemoryActionFailed'));
       console.error('[ManagedMemory] Memory action failed:', error);
     } finally {
       setBusyId(null);
@@ -184,7 +184,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
       await memoryService.retryPending();
       await load();
     } catch (error) {
-      toast.error(i18nService.t('managedMemoryRetryFailed'));
+      showAppErrorToast(i18nService.t('managedMemoryRetryFailed'));
       console.error('[ManagedMemory] Failed to retry pending propagation:', error);
     } finally {
       setBusyId(null);
@@ -240,7 +240,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
           kind: editor.draft.kind,
           sensitivity: editor.draft.sensitivity,
         });
-        toast.success(i18nService.t('managedMemoryUpdated'));
+        showAppSuccessToast(i18nService.t('managedMemoryUpdated'));
       } else {
         await memoryService.createManual({
           workingDirectory: selectedWorkspacePath,
@@ -250,12 +250,12 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
           kind: editor.draft.kind,
           sensitivity: editor.draft.sensitivity,
         });
-        toast.success(i18nService.t('managedMemoryCreated'));
+        showAppSuccessToast(i18nService.t('managedMemoryCreated'));
       }
       setEditor(null);
       await load();
     } catch (error) {
-      toast.error(i18nService.t('managedMemorySaveFailed'));
+      showAppErrorToast(i18nService.t('managedMemorySaveFailed'));
       console.error('[ManagedMemory] Failed to save manual memory:', error);
     } finally {
       setBusyId(null);
