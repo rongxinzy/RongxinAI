@@ -13,6 +13,7 @@ Do not copy them to runtime repositories.
 
 Configure the repository secret `RUNTIME_ARTIFACT_READ_TOKEN` in each
 participating repository (the central prepare job has no release environment):
+
 - RongxinAI needs Actions/read and Contents/read for `rongxinzy/pi-connect`
   and `z189yis/engram-cjk`.
 - Each runtime needs Actions/read and Contents/read for RongxinAI, plus
