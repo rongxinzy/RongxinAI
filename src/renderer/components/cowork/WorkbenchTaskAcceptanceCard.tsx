@@ -10,7 +10,7 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
-import { showAppErrorToast } from '../../services/toastNotification';
+import { showAppErrorToast, showAppSuccessToast } from '../../services/toastNotification';
 import { getProjectedRun } from './workbenchTaskAudit/utils';
 
 interface WorkbenchTaskAcceptanceCardProps {
@@ -49,7 +49,7 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
       try {
         const result = await action();
         if (!result.success) throw new Error(result.error);
-        if (confirmAcceptance) toast.success(i18nService.t('workbenchTaskAcceptedToast'));
+        if (confirmAcceptance) showAppSuccessToast(i18nService.t('workbenchTaskAcceptedToast'));
       } catch (error) {
         console.error('[WorkbenchTask] Acceptance action failed:', error);
         showAppErrorToast(i18nService.t('workbenchTaskActionFailed'));
