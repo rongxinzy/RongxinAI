@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { configureStore } from '@reduxjs/toolkit';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { beforeEach, expect, test, vi } from 'vitest';
 
@@ -36,8 +36,10 @@ const renderView = (runs: readonly ActivityRun[], onShowScheduledTasks?: () => v
   );
 };
 
-/** The trigger filter is the first tab list of the page, the status filter the second. */
-const statusTabs = (): HTMLElement => screen.getAllByRole('tablist')[1];
+/** Source filter uses PageTabs; status filter is the pill buttons below it. */
+const clickStatusPill = (label: string): void => {
+  fireEvent.click(screen.getByRole('button', { name: label }));
+};
 
 beforeEach(() => {
   i18nService.setLanguage('zh', { persist: false });
@@ -66,12 +68,18 @@ test('offers a scheduled-task entry point when there is no run at all', () => {
   expect(onShowScheduledTasks).toHaveBeenCalledTimes(1);
 });
 
-test('clears both filters from the empty state instead of dead-ending the page', () => {
+test('clears the source filter from the empty state instead of dead-ending the page', () => {
   renderView([
-    run({ id: 'ok', status: ActivityStatus.Completed, replyPreview: '回复内容', updatedAt: 2 }),
+    run({
+      id: 'ok',
+      source: ActivitySource.Channel,
+      status: ActivityStatus.Running,
+      replyPreview: '回复内容',
+      updatedAt: 2,
+    }),
   ]);
 
-  fireEvent.click(within(statusTabs()).getByText(t('activityStatusFailed')));
+  fireEvent.click(screen.getByRole('tab', { name: t('activityTriggerCron') }));
   expect(screen.getByText(t('activityFilterEmpty'))).toBeInTheDocument();
   expect(screen.getByText(t('activityFilterClear'))).toBeInTheDocument();
 
@@ -79,17 +87,17 @@ test('clears both filters from the empty state instead of dead-ending the page',
   expect(screen.getByText('回复内容')).toBeInTheDocument();
 });
 
-test('returns to every run through the explicit all segment', () => {
+test('returns to every run through the explicit all status pill', () => {
   renderView([
     run({ id: 'failed', status: ActivityStatus.Failed, errorMessage: '接口超时', updatedAt: 2 }),
     run({ id: 'ok', status: ActivityStatus.Completed, replyPreview: '回复内容', updatedAt: 1 }),
   ]);
 
-  fireEvent.click(within(statusTabs()).getByText(t('activityStatusFailed')));
+  clickStatusPill(t('activityStatusFailed'));
   expect(screen.getByText('接口超时')).toBeInTheDocument();
   expect(screen.queryByText('回复内容')).toBeNull();
 
-  fireEvent.click(within(statusTabs()).getByText(t('activityFilterAll')));
+  clickStatusPill(t('activityFilterAll'));
   expect(screen.getByText('回复内容')).toBeInTheDocument();
 });
 
@@ -103,6 +111,7 @@ test('localizes an interrupted run instead of showing the persisted marker', () 
     }),
   ]);
 
+  clickStatusPill(t('activityFilterAll'));
   expect(screen.getByText(t('activityErrorInterrupted'))).toBeInTheDocument();
   expect(screen.queryByText(ActivityErrorCode.Interrupted)).toBeNull();
 });
@@ -119,6 +128,7 @@ test('shows the trigger text until the run has a reply', () => {
     }),
   ]);
 
+  clickStatusPill(t('activityFilterAll'));
   expect(screen.getByText('帮我看下今天的日志')).toBeInTheDocument();
   expect(screen.getByText('已经处理好了')).toBeInTheDocument();
   expect(screen.queryByText('帮我处理一下')).toBeNull();
