@@ -124,8 +124,9 @@ const installViewport = (): HTMLElement => {
 beforeEach(() => {
   // The virtualizer's scroll debounce survives unmount. Keep its timers
   // inside this fixture's lifetime instead of letting them outlive jsdom.
-  const setViewportTimeout = window.setTimeout.bind(window);
-  vi.spyOn(window, 'setTimeout').mockImplementation((handler, timeout, ...args) => {
+  const viewportWindow: Window = window;
+  const setViewportTimeout = viewportWindow.setTimeout.bind(viewportWindow);
+  vi.spyOn(viewportWindow, 'setTimeout').mockImplementation((handler, timeout, ...args) => {
     const handle = setViewportTimeout(handler, timeout, ...args);
     viewportTimeouts.add(handle);
     return handle;
