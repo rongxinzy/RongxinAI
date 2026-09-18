@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-meeting</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
+.title{font-size:23px;letter-spacing:-.01em}
+.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
+h3{margin-top:16px;font-size:13.5px}
+p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+ul{list-style:none;margin-top:10px;display:grid;gap:7px}
+li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
+.pane{min-width:0;overflow:hidden}
+.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
+.dense{margin-top:10px;font-size:11px;line-height:1.95;color:#6f737b;text-align:justify}
+.card{border:1px solid #edede9;background:#fafaf8;padding:16px 18px;margin-top:10px}
+.card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.card p{margin-top:8px;font-size:12.8px;line-height:1.85;color:#3d4046}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.07)}
+</style></head><body>
+<div class="doc" style="--accent:#B45309">
+  <div class="title">商家工具组周会纪要</div>
+  <div class="meta"><span>时间：9 月 16 日 10:00 — 11:20</span><span>地点：三楼小会议室</span><span>参会：陈立群、周曼、徐海鹏、谭亦文</span></div>
+  <h3>一、讨论内容</h3>
+  <p>任务分派链路的改版上线两周，人均日处理量从 40 单提升到 128 单，但夜间时段的异常单仍依赖人工挑单。徐海鹏提出把超时判定前移到分派阶段，减少事后补救。</p>
+  <p>指标口径表已覆盖 6 条业务线，周曼反馈导出模块仍有两处口径与看板不一致，需要在下个版本统一。</p>
+  <h3>二、行动项</h3>
+  <table>
+    <tr><th>事项</th><th>负责人</th><th>截止</th><th>状态</th></tr>
+    <tr><td>超时判定前移到分派阶段</td><td>徐海鹏</td><td class="mono">9-23</td><td>进行中</td></tr>
+    <tr><td>导出模块口径对齐</td><td>周曼</td><td class="mono">9-20</td><td>待开始</td></tr>
+    <tr><td>夜间值班排班规则定稿</td><td>陈立群</td><td class="mono">9-25</td><td>待开始</td></tr>
+  </table>
+  <h3>三、下次会议</h3>
+  <p>定于 9 月 23 日 10:00 复看行动项进度，重点确认超时判定前移的灰度范围；如口径对齐未完成，顺延到下一次评审。</p>
+</div></body></html>

@@ -215,6 +215,36 @@ function runtimeMatchesConfig(buildInfo, config, targetId, assetName, checksum) 
   );
 }
 
+/**
+ * Removing a runtime directory fails while a running app still holds its
+ * executable. Cleanup must therefore never turn a successful swap into a
+ * failed dev start; the leftover directory is retried on the next run.
+ */
+function removeDirectoryBestEffort(directory, fileSystem = fs) {
+  try {
+    fileSystem.rmSync(directory, { recursive: true, force: true });
+  } catch (error) {
+    console.warn(
+      `[MemoryRuntime] Keeping ${directory}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+const LOCKED_RUNTIME_ERROR_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
+
+/**
+ * Windows reports a locked runtime directory as a bare EPERM, which reads as an
+ * unexplained permission failure in the dev start. Say what to do about it.
+ */
+function describeRuntimeSwapFailure(targetDirectory, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const hint = LOCKED_RUNTIME_ERROR_CODES.has(error?.code)
+    ? ' A running app still holds this memory runtime; close the app and retry.'
+    : '';
+
+  return new Error(`Unable to replace ${targetDirectory}: ${message}.${hint}`, { cause: error });
+}
+
 function replaceDirectoryAtomically(stagedDirectory, targetDirectory, fileSystem = fs) {
   const parentDirectory = path.dirname(targetDirectory);
   const backupDirectory = path.join(
@@ -227,16 +257,29 @@ function replaceDirectoryAtomically(stagedDirectory, targetDirectory, fileSystem
     if (hadTarget) fileSystem.renameSync(targetDirectory, backupDirectory);
     fileSystem.renameSync(stagedDirectory, targetDirectory);
   } catch (error) {
-    if (fileSystem.existsSync(targetDirectory)) {
-      fileSystem.rmSync(targetDirectory, { recursive: true, force: true });
-    }
-    if (hadTarget && fileSystem.existsSync(backupDirectory)) {
+    // Only roll back once the previous directory is known to sit in the
+    // backup: when the first rename was the one that failed, the target is
+    // still the live runtime and must not be deleted.
+    const previousIsInBackup = hadTarget && fileSystem.existsSync(backupDirectory);
+    if (previousIsInBackup) {
+      if (fileSystem.existsSync(targetDirectory)) {
+        fileSystem.rmSync(targetDirectory, { recursive: true, force: true });
+      }
       fileSystem.renameSync(backupDirectory, targetDirectory);
     }
-    throw error;
+    throw describeRuntimeSwapFailure(targetDirectory, error);
   }
 
-  if (hadTarget) fileSystem.rmSync(backupDirectory, { recursive: true, force: true });
+  if (hadTarget) removeDirectoryBestEffort(backupDirectory, fileSystem);
+}
+
+const STALE_RUNTIME_DIRECTORY_PATTERN = /^\.(?:[^.]+\.)?(?:backup|staging)-/;
+
+function removeStaleRuntimeDirectories(runtimeRoot) {
+  for (const entry of fs.readdirSync(runtimeRoot)) {
+    if (!STALE_RUNTIME_DIRECTORY_PATTERN.test(entry)) continue;
+    removeDirectoryBestEffort(path.join(runtimeRoot, entry));
+  }
 }
 
 async function prepareRuntimeDirectory(options) {
@@ -323,7 +366,24 @@ async function ensureMemoryRuntime(rootDir, targetId, options = {}) {
     }
   }
 
+  removeStaleRuntimeDirectories(runtimeRoot);
+
   const currentDirectory = path.join(runtimeRoot, 'current');
+  const currentExecutable = path.join(currentDirectory, executableName);
+  if (
+    currentMatchesTarget(
+      currentDirectory,
+      currentExecutable,
+      targetExecutable,
+      config,
+      targetId,
+      assetName,
+      checksum,
+    )
+  ) {
+    return targetDirectory;
+  }
+
   const stagedCurrentDirectory = fs.mkdtempSync(path.join(runtimeRoot, '.current.staging-'));
   try {
     fs.cpSync(targetDirectory, stagedCurrentDirectory, { recursive: true });
@@ -334,6 +394,29 @@ async function ensureMemoryRuntime(rootDir, targetId, options = {}) {
   }
 
   return targetDirectory;
+}
+
+/**
+ * The launch path reads vendor/engram-runtime/current, so the copy is refreshed
+ * whenever the pinned runtime changes. Rebuilding an identical copy would fail
+ * with EPERM while a running app holds the executable, so an already matching
+ * copy is left untouched.
+ */
+function currentMatchesTarget(
+  currentDirectory,
+  currentExecutable,
+  targetExecutable,
+  config,
+  targetId,
+  assetName,
+  checksum,
+) {
+  if (!fs.existsSync(currentExecutable)) return false;
+
+  const buildInfo = readBuildInfo(path.join(currentDirectory, 'runtime-build-info.json'));
+  if (!runtimeMatchesConfig(buildInfo, config, targetId, assetName, checksum)) return false;
+
+  return fs.statSync(currentExecutable).size === fs.statSync(targetExecutable).size;
 }
 
 async function main() {

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-work-report</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:0;display:block}
+.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
+.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
+.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
+h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
+.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
+.rule{margin-top:26px;height:1px;background:#e6e6e2}
+.body{margin-top:30px;display:grid;gap:26px;flex:1}
+.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
+.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
+.cols3{grid-template-columns:repeat(3,1fr)}
+.cols2{grid-template-columns:repeat(2,1fr)}
+.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
+.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
+.blk .num{margin-top:6px;font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
+.blk .num small{font-size:15px;font-weight:500;color:#6f737b;margin-left:8px;letter-spacing:0}
+ul{list-style:none;margin-top:10px;display:grid;gap:8px}
+li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
+li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
+.matrix{margin-top:8px;border:1px solid #e6e6e2}
+.matrix .row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-top:1px solid #e6e6e2}
+.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
+.matrix .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2}
+.matrix .row div:first-child{border-left:0}
+.bars{margin-top:14px;display:grid;gap:9px}
+.bar{display:grid;grid-template-columns:74px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.diagram{margin-top:6px;height:230px;position:relative;border:1px solid #e6e6e2;background:radial-gradient(120% 120% at 50% 50%,#fdfaf3 0%,#fff 70%)}
+.sun{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--accent)}
+.orbit{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.planet{position:absolute;width:16px;height:16px;border-radius:50%;background:#4c5058}
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+.mini{border:1px solid #e6e6e2;padding:16px 18px;background:#fafaf8}
+.mini b{display:block;font-size:34px;color:var(--accent);letter-spacing:-.02em}
+.mini span{display:block;margin-top:8px;font-size:14px;font-weight:600}
+.mini p{margin-top:8px;font-size:13px;color:#6f737b;line-height:1.7}
+</style></head>
+<body>
+<div class="slide" style="--accent:#F59E0B">
+  <div class="kicker">Quarterly Review</div>
+  <h1>2026 Q3 工作汇报</h1>
+  <p class="lede">本季度核心成果、关键指标完成度与下阶段重点工作安排</p>
+  <div class="rule"></div>
+  <div class="body" style="grid-template-columns:repeat(3,1fr)">
+    <div class="blk">
+      <h2>01 核心成果</h2>
+      <p>完成 4 个版本迭代，重构商家后台任务分配链路，人均日处理量从 40 单提升到 128 单</p>
+    </div>
+    <div class="blk">
+      <h2>02 关键指标</h2>
+      <div class="num">128%<small>目标完成率</small></div>
+      <div class="num" style="font-size:34px;margin-top:14px">96.4%<small>准时交付率</small></div>
+    </div>
+    <div class="blk">
+      <h2>03 下阶段计划</h2>
+      <ul>
+        <li>经营指标口径表覆盖 6 条业务线</li>
+        <li>异常工单夜间自动分派上线</li>
+        <li>团队值班排班规则统一</li>
+      </ul>
+    </div>
+  </div>
+  <div class="brandline">云帆科技 · 商家工具组</div>
+  <div class="pageno">07 / 18</div>
+</div></body></html>

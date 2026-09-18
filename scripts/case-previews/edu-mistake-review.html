@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-mistake-review</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+body{padding:30px}
+.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
+.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
+.ask p{font-size:14px;color:#3d4046;line-height:1.6}
+.ans{flex:1;min-height:0;padding:22px 26px;display:flex;flex-direction:column;gap:13px}
+.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
+.hr{height:1px;background:#edede9}
+.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
+.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.notes{display:grid;gap:8px}
+.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.cmp{display:grid;gap:12px}
+.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
+.cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
+.steps{display:grid;gap:12px}
+.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
+.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
+.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
+</style></head><body>
+<div class="panel" style="--accent:#10B981">
+  <div class="ask"><div class="avatar"></div><p>这道一元二次方程的题我又错了，帮我看看问题到底出在哪。</p></div>
+  <div class="ans">
+    <div class="cmp">
+      <div class="before"><span class="tag">当时的做法</span>直接把 2x² + 3x - 5 = 0 里的系数当成 1、3、-5 代进求根公式，算出 x = 1 和 x = -2.5。</div>
+      <div class="after"><span class="tag">正确做法</span>二次项系数 a = 2，必须一起代入求根公式。判别式 Δ = 9 + 40 = 49，根为 x = 1 和 x = -2.5，两个根恰好与错误结果相同，所以错因被结果掩盖了。</div>
+    </div>
+    <div class="hr"></div>
+    <h3>错因归类</h3>
+    <div class="chips"><span class="chip">公式代入漏系数</span><span class="chip">跳步未写判别式</span><span class="chip">靠结果对错判断</span></div>
+    <div class="hr"></div>
+    <h3>这类题的四步复盘</h3>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div class="t">先写标准形式，把 a、b、c 单独列一行，不直接代入</div></div>
+      <div class="step"><div class="n">2</div><div class="t">先算判别式 Δ，写出 Δ 的符号再决定用哪种求根方式</div></div>
+      <div class="step"><div class="n">3</div><div class="t">代入后回代验算：把根代回原方程，两边必须相等</div></div>
+      <div class="step"><div class="n">4</div><div class="t">结果正确不等于过程正确，把过程一步步写出来才算掌握</div></div>
+    </div>
+    <div class="box"><div class="k">同类练习</div><p>换一组系数再算一次：3x² - 7x + 2 = 0。做完对照上一步，重点确认 a、b、c 是否一次取对。</p></div>
+  </div>
+</div></body></html>

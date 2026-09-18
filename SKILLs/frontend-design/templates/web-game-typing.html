@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --paper: #f3f5f4;
+    --panel: #ffffff;
+    --ink: #12171a;
+    --muted: #5f6a69;
+    --faint: #717c7b;
+    --rule: #dfe4e2;
+    --rule-strong: #c3cbc9;
+    --accent: #0f6f66;
+    --accent-soft: #e3efed;
+    --on-accent: #f2f8f7;
+    --bad: #b83a2c;
+    --bad-soft: #fbeae7;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --max: 760px;
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-themed]) {
+      --paper: #0f1315;
+      --panel: #151a1c;
+      --ink: #e8edec;
+      --muted: #9aa4a2;
+      --faint: #838d8b;
+      --rule: #242c2e;
+      --rule-strong: #38423f;
+      --accent: #4fbfae;
+      --accent-soft: #16241f;
+      --on-accent: #0a1513;
+      --bad: #e8837a;
+      --bad-soft: #2b1d1a;
+      color-scheme: dark;
+    }
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, p, dl, dd, dt { margin: 0; }
+  button { font: inherit; color: inherit; }
+
+  .shell { width: 100%; max-width: var(--max); margin: 0 auto; padding: 44px 32px 56px; }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* ── 抬头 ─────────────────────────────────────────────── */
+  .top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--rule-strong);
+  }
+
+  h1 { font-size: 21px; font-weight: 600; letter-spacing: 0.12em; }
+
+  .sub { margin-top: 9px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+
+  .seg { display: grid; grid-auto-flow: column; border: 1px solid var(--rule-strong); }
+
+  .seg button {
+    appearance: none;
+    border: 0;
+    border-left: 1px solid var(--rule-strong);
+    background: transparent;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1;
+    color: var(--muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .seg button:first-child { border-left: 0; }
+
+  .seg button:hover { color: var(--ink); }
+
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+  /* ── 三项读数 ─────────────────────────────────────────── */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: 26px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .stat { position: relative; padding: 16px 0 15px; }
+
+  .stat + .stat { padding-left: 22px; }
+
+  .stat + .stat::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 16px;
+    bottom: 15px;
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .stat-key { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+
+  .stat-val {
+    margin-top: 7px;
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stat-unit { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 3px; }
+
+  /* ── 正文 ─────────────────────────────────────────────── */
+  .panel {
+    margin-top: 26px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+  }
+
+  .measure { position: relative; cursor: text; }
+
+  .passage {
+    margin: 0;
+    padding: 30px 30px 34px;
+    font-family: var(--mono);
+    font-size: 19.5px;
+    line-height: 2;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+
+  .ch { color: var(--muted); }
+
+  .ch.ok { color: var(--ink); }
+
+  .ch.bad { color: var(--bad); background: var(--bad-soft); }
+
+  .ch.cur { box-shadow: inset 0 -2px 0 var(--accent); color: var(--muted); }
+
+  .catcher {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    opacity: 0;
+    font-size: 16px;
+    cursor: text;
+  }
+
+  .measure[data-focus]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent);
+  }
+
+  .meter { height: 2px; background: var(--rule); }
+
+  .meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width 120ms linear; }
+
+  .panel-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 14px 30px 16px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .panel-foot span:last-child { font-family: var(--mono); color: var(--faint); }
+
+  /* ── 操作 ─────────────────────────────────────────────── */
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    padding: 12px 24px;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .btn:hover { background: transparent; color: var(--accent); }
+
+  .btn.is-ghost { background: transparent; color: var(--accent); border-color: var(--rule-strong); }
+
+  .btn.is-ghost:hover { border-color: var(--accent); }
+
+  /* ── 成绩 ─────────────────────────────────────────────── */
+  .result {
+    margin-top: 22px;
+    padding: 24px 30px 26px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+  }
+
+  .result h2 { font-size: 16px; font-weight: 600; letter-spacing: 0.02em; }
+
+  .result-empty { margin-top: 10px; font-size: 13.5px; line-height: 1.7; color: var(--muted); }
+
+  .result-grid { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 18px; }
+
+  .result-cell { position: relative; }
+
+  .result-cell + .result-cell { border-left: 1px solid var(--rule); padding-left: 20px; }
+
+  .result-key { font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+
+  .result-val {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result-note { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 13px; line-height: 1.85; color: var(--muted); }
+
+  /* ── 说明 ─────────────────────────────────────────────── */
+  .notes { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--rule); }
+
+  .notes div { font-size: 12.5px; line-height: 1.95; color: var(--muted); }
+
+  /* 矮窗口：正文与成绩卡收进一屏，不要出现滚动条 */
+  @media (max-height: 780px) {
+    .shell { padding: 24px 32px 20px; }
+    .top { padding-bottom: 12px; }
+    .stats { margin-top: 14px; }
+    .stat { padding: 12px 0 11px; }
+    .stat + .stat::before { top: 12px; bottom: 11px; }
+    .panel { margin-top: 14px; }
+    .passage { padding: 20px 30px 22px; font-size: 17px; line-height: 1.75; }
+    .panel-foot { padding: 11px 30px 12px; }
+    .actions { margin-top: 12px; }
+    .btn { padding: 11px 24px; }
+    .result { margin-top: 12px; padding: 18px 30px 20px; }
+    .result-empty { margin-top: 8px; }
+    .notes { margin-top: 12px; padding-top: 12px; }
+    .notes div { line-height: 1.6; }
+  }
+
+  @media (max-width: 640px) {
+    .shell { padding: 28px 18px 40px; }
+    .top { flex-direction: column; align-items: stretch; }
+    .seg { justify-content: stretch; }
+    .seg button { flex: 1; }
+    .passage { padding: 22px 18px 26px; font-size: 17px; }
+    .panel-foot { padding: 12px 18px 14px; }
+    .result { padding: 20px 18px 22px; }
+    .result-grid { grid-template-columns: repeat(2, 1fr); row-gap: 18px; }
+    .result-cell:nth-child(3) { border-left: 0; padding-left: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <div>
+      <h1 id="page-title"></h1>
+      <p class="sub" id="page-sub"></p>
+    </div>
+    <div class="seg" id="durations" role="group"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-key" id="speed-key"></div>
+      <div class="stat-val"><span id="speed-val">--</span><span class="stat-unit" id="speed-unit"></span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-key" id="accuracy-key"></div>
+      <div class="stat-val"><span id="accuracy-val">--</span><span class="stat-unit" id="accuracy-unit"></span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-key" id="time-key"></div>
+      <div class="stat-val"><span id="time-val">--</span><span class="stat-unit" id="time-unit"></span></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="measure" id="measure">
+      <p class="passage" id="passage" aria-hidden="true"></p>
+      <input class="catcher" id="catcher" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="meter"><span id="meter-fill"></span></div>
+    <div class="panel-foot">
+      <span id="hint"></span>
+      <span id="counter"></span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn" type="button" id="restart"></button>
+    <button class="btn is-ghost" type="button" id="next"></button>
+  </div>
+
+  <section class="result">
+    <h2 id="result-title"></h2>
+    <p class="result-empty" id="result-empty"></p>
+    <dl class="result-grid" id="result-grid" hidden></dl>
+    <p class="result-note" id="result-note" hidden></p>
+  </section>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+  // 可编辑区：文案、配色、时长与练习段落都在这个对象里。改内容只改这里。
+  const TEMPLATE = {
+    meta: {
+      lang: 'zh-CN',
+      title: '打字练习',
+      description: '单文件打字练习，实时统计速度与准确率。',
+    },
+
+    // 留空即用默认：冷纸底 + 深青强调。填任意一项会锁定浅色底。
+    theme: {},
+
+    copy: {
+      title: '打字练习',
+      sub: '照着上面这段打。速度、准确率与用时都在实时统计。',
+      speedLabel: '速度',
+      speedUnit: 'WPM',
+      accuracyLabel: '准确率',
+      accuracyUnit: '%',
+      timeLabel: '剩余时间',
+      timeUnit: '秒',
+      hint: '点正文，然后直接开始输入。退格可以改错字。',
+      counterLabel: '已输入',
+      counterUnit: '字符',
+      restartLabel: '重新开始',
+      nextLabel: '换一段',
+      resultTitle: '这一轮成绩',
+      resultEmpty: '还没有成绩。打完一段，或者时间到了，这里会给出这一轮的速度与准确率。',
+      resultKeys: { speed: '速度', accuracy: '准确率', correct: '正确字符', wrong: '错误字符' },
+      resultNote: '速度按每分钟正确字符数除以 5 计算，只统计打对的字符。按回车可以立刻再来一轮。',
+      notes: [
+        '速度只算打对的字符，打错的不计入，退格也不计入。',
+        '一轮结束后按回车直接重开，换一段会从下一段开始。',
+        '成绩只留在这一页，刷新就清空。',
+      ],
+    },
+
+    rules: {
+      durations: [
+        { label: '30 秒', seconds: 30 },
+        { label: '60 秒', seconds: 60 },
+        { label: '120 秒', seconds: 120 },
+      ],
+      defaultDuration: 1,
+      charsPerWord: 5,
+    },
+
+    passages: [
+      'The shortest path between two people is a shared meal. Bread comes out of the oven at seven, and by nine the counter is quiet again.',
+      'A good kitchen keeps its knives sharp and its recipes short. Write down what you changed, or you will not find it again next winter.',
+      'Rain on the window, coffee going cold, and a stack of letters that still need answers. Some mornings ask for nothing more than that.',
+    ],
+  };
+  // ── 可编辑区结束 ──
+
+  (function () {
+    const meta = TEMPLATE.meta || {};
+    const theme = TEMPLATE.theme || {};
+    const copy = TEMPLATE.copy || {};
+    const RULES = TEMPLATE.rules || {};
+    const PASSAGES = (TEMPLATE.passages || []).filter(text => typeof text === 'string' && text.length);
+
+    const DURATIONS = RULES.durations || [{ label: '30 秒', seconds: 30 }];
+    const CHARS_PER_WORD = RULES.charsPerWord || 5;
+
+    const byId = id => document.getElementById(id);
+
+    const setText = (id, value) => {
+      const node = byId(id);
+      if (node) node.textContent = value == null ? '' : String(value);
+    };
+
+    /* 主题 */
+    const themeVars = {
+      paper: '--paper',
+      panel: '--panel',
+      ink: '--ink',
+      muted: '--muted',
+      faint: '--faint',
+      rule: '--rule',
+      ruleStrong: '--rule-strong',
+      accent: '--accent',
+      onAccent: '--on-accent',
+    };
+
+    let themed = false;
+    Object.keys(themeVars).forEach(key => {
+      if (theme[key]) {
+        document.documentElement.style.setProperty(themeVars[key], theme[key]);
+        themed = true;
+      }
+    });
+
+    if (themed) document.documentElement.dataset.themed = '1';
+
+    if (meta.lang) document.documentElement.lang = meta.lang;
+    if (meta.title) document.title = meta.title;
+    const desc = byId('doc-desc');
+    if (desc && meta.description) desc.setAttribute('content', meta.description);
+
+    /* 文案 */
+    setText('page-title', copy.title);
+    setText('page-sub', copy.sub);
+    setText('speed-key', copy.speedLabel);
+    setText('speed-unit', copy.speedUnit);
+    setText('accuracy-key', copy.accuracyLabel);
+    setText('accuracy-unit', copy.accuracyUnit);
+    setText('time-key', copy.timeLabel);
+    setText('time-unit', copy.timeUnit);
+    setText('hint', copy.hint);
+    setText('restart', copy.restartLabel);
+    setText('next', copy.nextLabel);
+    setText('result-title', copy.resultTitle);
+    setText('result-empty', copy.resultEmpty);
+    setText('result-note', copy.resultNote);
+
+    const notesHost = byId('notes');
+    (copy.notes || []).forEach(line => {
+      const row = document.createElement('div');
+      row.textContent = String(line);
+      notesHost.appendChild(row);
+    });
+
+    const passageEl = byId('passage');
+    const catcher = byId('catcher');
+    const measure = byId('measure');
+    const meterFill = byId('meter-fill');
+    const speedVal = byId('speed-val');
+    const accuracyVal = byId('accuracy-val');
+    const timeVal = byId('time-val');
+    const counter = byId('counter');
+    const resultGrid = byId('result-grid');
+    const resultEmpty = byId('result-empty');
+    const resultNote = byId('result-note');
+    const durationsHost = byId('durations');
+
+    if (copy.hint) catcher.setAttribute('aria-label', copy.hint);
+
+    /* 状态 */
+    let durationIndex = Math.min(Math.max(RULES.defaultDuration || 0, 0), DURATIONS.length - 1);
+    let passageIndex = 0;
+    let target = '';
+    let typed = '';
+    let running = false;
+    let finished = false;
+    let startedAt = 0;
+    let elapsed = 0;
+    let timer = null;
+    let summary = null;
+
+    const durationSeconds = () => DURATIONS[durationIndex].seconds;
+
+    const countCorrect = () => {
+      let ok = 0;
+      for (let i = 0; i < typed.length; i += 1) if (typed[i] === target[i]) ok += 1;
+      return ok;
+    };
+
+    const renderChars = () => {
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < target.length; i += 1) {
+        const span = document.createElement('span');
+        let cls = 'ch';
+        if (i < typed.length) cls += typed[i] === target[i] ? ' ok' : ' bad';
+        else if (i === typed.length) cls += ' cur';
+        span.className = cls;
+        span.textContent = target[i];
+        frag.appendChild(span);
+      }
+      passageEl.textContent = '';
+      passageEl.appendChild(frag);
+    };
+
+    const renderMeter = () => {
+      const ratio = target.length ? typed.length / target.length : 0;
+      meterFill.style.width = (ratio * 100).toFixed(1) + '%';
+      let text = (copy.counterLabel || '') + ' ' + typed.length + ' / ' + target.length;
+      if (copy.counterUnit) text += ' ' + copy.counterUnit;
+      setText('counter', text);
+    };
+
+    const renderStats = () => {
+      const correct = countCorrect();
+      const minutes = elapsed / 60;
+      const speed = minutes > 0.02 && correct > 0 ? Math.round(correct / CHARS_PER_WORD / minutes) : 0;
+      const accuracy = typed.length ? Math.round((correct / typed.length) * 100) : null;
+      const left = Math.max(0, Math.ceil(durationSeconds() - elapsed));
+
+      speedVal.textContent = running || finished ? String(speed) : '--';
+      accuracyVal.textContent = accuracy == null ? '--' : String(accuracy);
+      timeVal.textContent = running || finished ? String(left) : String(durationSeconds());
+    };
+
+    const renderResult = () => {
+      resultGrid.textContent = '';
+      if (!summary) {
+        resultGrid.hidden = true;
+        resultNote.hidden = true;
+        resultEmpty.hidden = false;
+        return;
+      }
+      resultEmpty.hidden = true;
+      resultGrid.hidden = false;
+      resultNote.hidden = false;
+      const keys = copy.resultKeys || {};
+      const rows = [
+        [keys.speed, summary.speed + ' WPM'],
+        [keys.accuracy, summary.accuracy + '%'],
+        [keys.correct, String(summary.correct)],
+        [keys.wrong, String(summary.wrong)],
+      ];
+      rows.forEach(row => {
+        const cell = document.createElement('div');
+        cell.className = 'result-cell';
+        const key = document.createElement('dt');
+        key.className = 'result-key';
+        key.textContent = row[0] == null ? '' : String(row[0]);
+        const val = document.createElement('dd');
+        val.className = 'result-val';
+        val.textContent = row[1];
+        cell.appendChild(key);
+        cell.appendChild(val);
+        resultGrid.appendChild(cell);
+      });
+    };
+
+    const stopTimer = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      running = false;
+      stopTimer();
+      if (!elapsed) elapsed = (Date.now() - startedAt) / 1000;
+      const correct = countCorrect();
+      const minutes = elapsed / 60;
+      summary = {
+        speed: minutes > 0.02 && correct > 0 ? Math.round(correct / CHARS_PER_WORD / minutes) : 0,
+        accuracy: typed.length ? Math.round((correct / typed.length) * 100) : 0,
+        correct: correct,
+        wrong: typed.length - correct,
+      };
+      catcher.readOnly = true;
+      catcher.blur();
+      renderStats();
+      renderResult();
+    };
+
+    const tick = () => {
+      elapsed = (Date.now() - startedAt) / 1000;
+      if (elapsed >= durationSeconds()) {
+        elapsed = durationSeconds();
+        renderStats();
+        finish();
+        return;
+      }
+      renderStats();
+    };
+
+    const startTimer = () => {
+      running = true;
+      startedAt = Date.now();
+      elapsed = 0;
+      stopTimer();
+      timer = setInterval(tick, 200);
+    };
+
+    const reset = (advance, focus) => {
+      stopTimer();
+      if (advance && PASSAGES.length) passageIndex = (passageIndex + 1) % PASSAGES.length;
+      target = PASSAGES.length ? PASSAGES[passageIndex] : '';
+      typed = '';
+      running = false;
+      finished = false;
+      elapsed = 0;
+      startedAt = 0;
+      summary = null;
+      catcher.value = '';
+      catcher.readOnly = false;
+      renderChars();
+      renderStats();
+      renderMeter();
+      renderResult();
+      if (focus) catcher.focus();
+    };
+
+    catcher.addEventListener('input', () => {
+      if (finished) return;
+      let value = catcher.value;
+      if (value.length > target.length) {
+        value = value.slice(0, target.length);
+        catcher.value = value;
+      }
+      typed = value;
+      if (!running && typed.length) startTimer();
+      renderChars();
+      renderStats();
+      renderMeter();
+      if (typed.length >= target.length) finish();
+    });
+
+    catcher.addEventListener('focus', () => {
+      measure.dataset.focus = '1';
+    });
+
+    catcher.addEventListener('blur', () => {
+      delete measure.dataset.focus;
+    });
+
+    window.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' && finished) {
+        ev.preventDefault();
+        reset(false, true);
+      }
+    });
+
+    window.addEventListener('beforeunload', stopTimer);
+
+    /* 时长档位 */
+    DURATIONS.forEach((item, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = item.label;
+      btn.setAttribute('aria-pressed', i === durationIndex ? 'true' : 'false');
+      btn.addEventListener('click', () => {
+        durationIndex = i;
+        Array.prototype.forEach.call(durationsHost.children, (node, j) => {
+          node.setAttribute('aria-pressed', j === i ? 'true' : 'false');
+        });
+        reset(false, true);
+      });
+      durationsHost.appendChild(btn);
+    });
+
+    byId('restart').addEventListener('click', () => reset(false, true));
+    byId('next').addEventListener('click', () => reset(true, true));
+
+    reset(false, false);
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-market-entry</title><style>*{box-sizing:border-box;margin:0}
+html,body{width:1100px;height:688px;overflow:hidden}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+
+body{padding:30px}
+.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
+.sheet-top{padding:24px 34px 20px;border-bottom:1px solid #edede9}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{margin-top:11px;font-size:29px;letter-spacing:-.02em}
+.meta{margin-top:9px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
+.body{flex:1;min-height:0;padding:18px 34px;display:grid;gap:12px;align-content:start}
+h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
+.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:12px 16px;font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+th,td{border:1px solid #edede9;padding:6px 12px;text-align:left;color:#3d4046}
+th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
+ul{list-style:none;margin-top:9px;display:grid;gap:7px}
+li{position:relative;padding-left:16px;font-size:12.5px;color:#4c5058;line-height:1.7}
+li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;background:var(--accent)}
+.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.verdict{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.vcell{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
+.vcell .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.vcell b{display:block;margin-top:5px;font-size:16px;letter-spacing:-.01em}
+.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0;align-items:start}
+.timeline{display:grid;gap:0;margin-top:9px}
+.tl{display:grid;grid-template-columns:60px 1fr;gap:14px;padding:7px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
+.tl:first-child{border-top:0}
+.tl b{color:var(--accent);font-weight:600}
+</style></head><body>
+<div class="sheet" style="--accent:#0F766E">
+  <div class="sheet-top">
+    <div class="kicker">Market Entry</div>
+    <h1>东南亚市场进入可行性评估</h1>
+    <div class="meta"><span>评估维度：需求规模 / 获客成本 / 合规门槛 / 交付能力</span><span>数据截至 2026 年 9 月</span></div>
+  </div>
+  <div class="body">
+    <div><h3>摘要</h3><p class="abstract">按现有交付能力测算，新加坡与马来西亚在 12 个月内可实现正向毛利，前提是先解决本地化部署与数据合规两项前置条件。越南与印尼的获客成本比当前均值高 40% 以上，建议放到第二阶段观望。</p></div>
+    <div class="verdict">
+      <div class="vcell"><div class="k">建议进入</div><b>新加坡 · 马来西亚</b></div>
+      <div class="vcell"><div class="k">建议观望</div><b>越南 · 印尼</b></div>
+      <div class="vcell"><div class="k">建议暂缓</div><b>泰国 · 菲律宾</b></div>
+    </div>
+    <div>
+      <table>
+        <tr><th>市场</th><th>需求规模</th><th>获客成本</th><th>合规门槛</th><th>综合判断</th></tr>
+        <tr><td>新加坡</td><td>中</td><td>低</td><td>中</td><td>优先进入，6 个月验证</td></tr>
+        <tr><td>马来西亚</td><td>中</td><td>低</td><td>低</td><td>优先进入，与新加坡并跑</td></tr>
+        <tr><td>越南</td><td>高</td><td>高</td><td>中</td><td>观察 6 个月后再评估</td></tr>
+        <tr><td>印尼</td><td>高</td><td>高</td><td>高</td><td>需先建本地交付团队</td></tr>
+      </table>
+    </div>
+    <div class="cols2">
+      <div><h3>分阶段动作</h3>
+        <div class="timeline">
+          <div class="tl"><b>0 - 3 月</b><span>完成两地数据合规评估，确定本地部署方案</span></div>
+          <div class="tl"><b>3 - 6 月</b><span>落地 3 家种子客户，验证交付周期与成本</span></div>
+        </div>
+      </div>
+      <div><h3>主要风险</h3>
+        <ul>
+          <li>本地数据留存要求可能推高部署成本，预算需留出余量</li>
+          <li>种子客户集中在单一行业，结论可能被行业特性放大</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot"><span>泰国与菲律宾本阶段不投入，下一轮重新评估</span><span>第 1 / 8 页</span></div>
+</div></body></html>

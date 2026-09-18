@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title id="doc-title"></title>
+<meta id="doc-desc" name="description" content="">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --night: #160f11;
+    --panel: #1d1418;
+    --ink: #f2e8e6;
+    --muted: #a6888c;
+    --faint: #7a5f64;
+    --rule: #2f2226;
+    --rule-strong: #47333a;
+    --rose: #e0a1a8;
+    --rose-deep: #c4787f;
+    --on-rose: #1a1012;
+    --danger: #f0776b;
+    --serif: Georgia, "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", SimSun, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+    --measure: 640px;
+    color-scheme: dark;
+  }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: radial-gradient(130% 52% at 50% 0%, #1e1317 0%, var(--night) 58%);
+    background-color: var(--night);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, p, dl, dd, dt { margin: 0; }
+  button { font: inherit; color: inherit; }
+
+  .sheet {
+    width: 100%;
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 0 34px 64px;
+  }
+
+  :focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+
+  /* ── 抬头 ─────────────────────────────────────────────── */
+  .hero { padding: 78px 0 0; text-align: center; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    text-transform: uppercase;
+    color: var(--rose);
+    margin: 0 0 28px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(32px, 5.2vw, 49px);
+    line-height: 1.16;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+  }
+
+  .occasion {
+    margin-top: 20px;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+  }
+
+  .invite {
+    max-width: 38ch;
+    text-wrap: balance;
+    margin: 30px auto 0;
+    font-size: 15.5px;
+    line-height: 1.9;
+  }
+
+  /* ── 倒计时 ───────────────────────────────────────────── */
+  .countdown {
+    margin-top: 52px;
+    padding: 24px 0 22px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    text-align: center;
+  }
+
+  .countdown .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.24em;
+    text-indent: 0.24em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin-bottom: 20px;
+  }
+
+  .clock { display: grid; grid-template-columns: repeat(4, 1fr); }
+
+  .unit { position: relative; }
+
+  .unit + .unit::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .unit-value {
+    display: block;
+    font-family: var(--mono);
+    font-size: 29px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: var(--rose);
+  }
+
+  .unit-label {
+    display: block;
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1;
+    color: var(--faint);
+  }
+
+  .clock-done {
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--rose);
+  }
+
+  /* ── 区块 ─────────────────────────────────────────────── */
+  .block { margin-top: 66px; }
+
+  .block-title {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 19px;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+  }
+
+  .block-note {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+  }
+
+  /* ── 时间地点 ─────────────────────────────────────────── */
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 24px; }
+
+  .fact { position: relative; padding: 2px 18px 2px 0; }
+
+  .fact + .fact { padding-left: 20px; }
+
+  .fact + .fact::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    bottom: 2px;
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .fact-key { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--muted); }
+
+  .fact-val {
+    margin-top: 8px;
+    font-family: var(--serif);
+    font-size: 16.5px;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  /* ── 流程 ─────────────────────────────────────────────── */
+  .program { margin-top: 24px; }
+
+  .program-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 20px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .program-row:last-child { border-bottom: 0; }
+
+  .program-time {
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+    color: var(--rose);
+    padding-top: 1px;
+  }
+
+  .program-text { font-size: 15px; line-height: 1.6; }
+
+  .program-sub { display: block; margin-top: 6px; font-size: 13px; line-height: 1.7; color: var(--muted); }
+
+  /* ── 回执 ─────────────────────────────────────────────── */
+  .rsvp {
+    padding: 32px 30px 30px;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+  }
+
+  .fields { display: grid; gap: 28px; margin-top: 26px; }
+
+  .field-label { display: block; margin-bottom: 10px; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--muted); }
+
+  .field input,
+  .field textarea {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rule-strong);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 4px 0 10px;
+    transition: border-color 160ms ease;
+  }
+
+  .field textarea { resize: vertical; min-height: 78px; }
+
+  .field input::placeholder,
+  .field textarea::placeholder { color: var(--faint); }
+
+  .field input:focus,
+  .field textarea:focus { outline: 0; border-bottom-color: var(--rose); }
+
+  .field[data-invalid] .field-label { color: var(--danger); }
+
+  .field[data-invalid] input,
+  .field[data-invalid] textarea { border-bottom-color: var(--danger); }
+
+  .field-error { display: none; margin-top: 9px; font-size: 12.5px; line-height: 1.6; color: var(--danger); }
+
+  .field[data-invalid] .field-error { display: block; }
+
+  .choices { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule-strong); }
+
+  .choice { position: relative; border-left: 1px solid var(--rule-strong); }
+
+  .choice:first-child { border-left: 0; }
+
+  .choice input { position: absolute; width: 0; height: 0; opacity: 0; }
+
+  .choice span {
+    display: block;
+    padding: 13px 4px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+
+  .choice:hover span { color: var(--ink); }
+
+  .choice input:checked + span { background: var(--rose); color: var(--on-rose); }
+
+  .choice input:focus-visible + span { outline: 2px solid var(--rose); outline-offset: -3px; }
+
+  .submit-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 32px;
+  }
+
+  .btn {
+    appearance: none;
+    border: 0;
+    padding: 15px 32px;
+    background: var(--rose);
+    color: var(--on-rose);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background-color 160ms ease, color 160ms ease;
+  }
+
+  .btn:hover { background: var(--ink); color: var(--night); }
+
+  .btn:active { transform: translateY(1px); }
+
+  .deadline { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--faint); }
+
+  .done-text { margin-top: 14px; font-size: 15px; line-height: 1.85; }
+
+  /* ── 页脚 ─────────────────────────────────────────────── */
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 62px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--faint);
+  }
+
+  [hidden] { display: none !important; }
+
+  @media (max-width: 640px) {
+    .sheet { padding: 0 20px 48px; }
+    .hero { padding-top: 50px; }
+    .unit-value { font-size: 24px; }
+    .facts { grid-template-columns: 1fr; }
+    .fact { padding: 14px 0; }
+    .fact:first-child { padding-top: 0; }
+    .fact + .fact { padding-left: 0; border-top: 1px solid var(--rule); }
+    .fact + .fact::before { display: none; }
+    .program-row { grid-template-columns: 74px 1fr; gap: 14px; }
+    .rsvp { padding: 26px 20px 24px; }
+    .submit-row { gap: 14px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="hero">
+    <p class="eyebrow" id="event-eyebrow"></p>
+    <h1 id="event-name"></h1>
+    <p class="occasion" id="event-occasion"></p>
+    <p class="invite" id="event-invite"></p>
+  </header>
+
+  <div class="countdown">
+    <p class="label" id="countdown-label"></p>
+    <div class="clock" id="countdown-clock"></div>
+  </div>
+
+  <section class="block">
+    <h2 class="block-title" id="when-title"></h2>
+    <p class="block-note" id="when-note"></p>
+    <dl class="facts" id="when-facts"></dl>
+  </section>
+
+  <section class="block">
+    <h2 class="block-title" id="program-title"></h2>
+    <p class="block-note" id="program-note"></p>
+    <div class="program" id="program-list"></div>
+  </section>
+
+  <section class="block rsvp">
+    <div id="rsvp-form-wrap">
+      <h2 class="block-title" id="rsvp-title"></h2>
+      <p class="block-note" id="rsvp-note"></p>
+      <form id="rsvp-form" novalidate>
+        <div class="fields" id="rsvp-fields"></div>
+        <div class="submit-row">
+          <button class="btn" type="submit" id="rsvp-submit"></button>
+          <p class="deadline" id="rsvp-deadline"></p>
+        </div>
+      </form>
+    </div>
+    <div id="rsvp-done" hidden>
+      <h2 class="block-title" id="done-title"></h2>
+      <p class="done-text" id="done-text"></p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span id="foot-note"></span>
+    <span id="foot-contact"></span>
+  </footer>
+</div>
+
+<script>
+  // 可编辑区：所有文案、配色与流程都在这个对象里。改内容只改这里。
+  const TEMPLATE = {
+    meta: {
+      lang: 'zh-CN',
+      title: '生日派对邀请函',
+      description: '三十岁生日派对在线邀请函，含倒计时与回执。',
+    },
+
+    theme: {
+      night: '#160f11',
+      panel: '#1d1418',
+      ink: '#f2e8e6',
+      muted: '#a6888c',
+      faint: '#7a5f64',
+      rule: '#2f2226',
+      ruleStrong: '#47333a',
+      rose: '#e0a1a8',
+      onRose: '#1a1012',
+    },
+
+    event: {
+      eyebrow: 'Invitation',
+      name: 'Leo 的三十岁生日派对',
+      occasion: '三十 · 一起吃饭吧',
+      invite: '三十岁想见见这些年的老朋友。饭吃慢一点，话聊久一点，像以前一样。',
+    },
+
+    countdown: {
+      label: '距离开席',
+      target: '2026-10-18T18:30:00+08:00',
+      done: '今晚开席，路上小心。',
+      units: { days: '天', hours: '时', minutes: '分', seconds: '秒' },
+    },
+
+    when: {
+      title: '时间地点',
+      note: '地铁 4 号线梧桐里站 B 口，步行 6 分钟。楼下有停车位，先到先停。',
+      items: [
+        { key: '日期', value: '10 月 18 日 周六' },
+        { key: '时间', value: '18:30 入席' },
+        { key: '地点', value: '拾光里 3 号 二楼' },
+      ],
+    },
+
+    program: {
+      title: '当天流程',
+      note: '迟到没关系，直接上楼，菜会给你留着。',
+      items: [
+        { time: '18:30', text: '入席、上茶', sub: '先到的人可以先开一瓶' },
+        { time: '19:00', text: '开饭', sub: '八凉四热，一锅老鸭汤' },
+        { time: '20:30', text: '切蛋糕', sub: '蛋糕是柠檬芝士，不腻' },
+        { time: '21:00', text: '散场或续摊', sub: '想继续的，楼下有家小酒馆' },
+      ],
+    },
+
+    rsvp: {
+      title: '回执',
+      note: '写清楚名字和人数，方便我们定桌。',
+      submitLabel: '发送回执',
+      deadline: '10 月 10 日前回复',
+      fields: [
+        { key: 'name', label: '你的名字', type: 'text', placeholder: '怎么称呼你', required: true, error: '写个名字吧，不然不知道给谁留位。' },
+        { key: 'guests', label: '同行人数', type: 'choice', options: ['1 人', '2 人', '3 人', '4 人及以上'] },
+        { key: 'message', label: '想说的话', type: 'textarea', placeholder: '想说的话，或者忌口' },
+      ],
+      doneTitle: '回执已收到',
+      doneText: '谢谢你，桌位已经给你留好了。当天见。',
+    },
+
+    footer: {
+      note: '着装随意，舒服就行。',
+      contact: '有事联系 Leo · 138-0000-0000',
+    },
+  };
+  // ── 可编辑区结束 ──
+
+  (function start() {
+    const byId = id => document.getElementById(id);
+
+    const setText = (id, value) => {
+      const node = byId(id);
+      if (node) node.textContent = value == null ? '' : String(value);
+    };
+
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text != null) node.textContent = String(text);
+      return node;
+    };
+
+    const theme = TEMPLATE.theme || {};
+    const themeVars = {
+      night: '--night',
+      panel: '--panel',
+      ink: '--ink',
+      muted: '--muted',
+      faint: '--faint',
+      rule: '--rule',
+      ruleStrong: '--rule-strong',
+      rose: '--rose',
+      onRose: '--on-rose',
+    };
+
+    Object.keys(themeVars).forEach(key => {
+      if (theme[key]) document.documentElement.style.setProperty(themeVars[key], theme[key]);
+    });
+
+    const meta = TEMPLATE.meta || {};
+    if (meta.lang) document.documentElement.lang = meta.lang;
+    if (meta.title) document.title = meta.title;
+    const desc = byId('doc-desc');
+    if (desc && meta.description) desc.setAttribute('content', meta.description);
+
+    /* 抬头 */
+    const event = TEMPLATE.event || {};
+    setText('event-eyebrow', event.eyebrow);
+    setText('event-name', event.name);
+    setText('event-occasion', event.occasion);
+    setText('event-invite', event.invite);
+
+    /* 倒计时 */
+    const cd = TEMPLATE.countdown || {};
+    const units = cd.units || {};
+    const clock = byId('countdown-clock');
+    setText('countdown-label', cd.label);
+
+    const pad = n => (n < 10 ? '0' + n : String(n));
+
+    const renderClock = () => {
+      if (!clock) return;
+      const target = new Date(cd.target).getTime();
+      if (!target || Number.isNaN(target)) {
+        clock.textContent = '';
+        const note = el('p', 'clock-done', cd.done || '');
+        clock.appendChild(note);
+        return true;
+      }
+      const left = target - Date.now();
+      if (left <= 0) {
+        clock.textContent = '';
+        clock.appendChild(el('p', 'clock-done', cd.done || '已开始'));
+        return true;
+      }
+      const total = Math.floor(left / 1000);
+      const parts = [
+        [Math.floor(total / 86400), units.days],
+        [Math.floor((total % 86400) / 3600), units.hours],
+        [Math.floor((total % 3600) / 60), units.minutes],
+        [total % 60, units.seconds],
+      ];
+      if (clock.children.length !== parts.length) {
+        clock.textContent = '';
+        parts.forEach(pair => {
+          const unit = el('div', 'unit');
+          unit.appendChild(el('span', 'unit-value', ''));
+          unit.appendChild(el('span', 'unit-label', pair[1] || ''));
+          clock.appendChild(unit);
+        });
+      }
+      const values = clock.querySelectorAll('.unit-value');
+      parts.forEach((pair, i) => {
+        if (values[i]) values[i].textContent = pad(pair[0]);
+      });
+      return false;
+    };
+
+    let timer = null;
+    if (!renderClock()) {
+      timer = setInterval(() => {
+        if (renderClock() && timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      }, 1000);
+      window.addEventListener('beforeunload', () => { if (timer) clearInterval(timer); });
+    }
+
+    /* 时间地点 */
+    const when = TEMPLATE.when || {};
+    setText('when-title', when.title);
+    setText('when-note', when.note);
+    const facts = byId('when-facts');
+    if (facts) {
+      facts.textContent = '';
+      (when.items || []).forEach(item => {
+        const wrap = el('div', 'fact');
+        wrap.appendChild(el('dt', 'fact-key', item.key));
+        wrap.appendChild(el('dd', 'fact-val', item.value));
+        facts.appendChild(wrap);
+      });
+    }
+
+    /* 流程 */
+    const program = TEMPLATE.program || {};
+    setText('program-title', program.title);
+    setText('program-note', program.note);
+    const programList = byId('program-list');
+    if (programList) {
+      programList.textContent = '';
+      (program.items || []).forEach(item => {
+        const row = el('div', 'program-row');
+        row.appendChild(el('div', 'program-time', item.time));
+        const text = el('div', 'program-text', item.text);
+        if (item.sub) text.appendChild(el('span', 'program-sub', item.sub));
+        row.appendChild(text);
+        programList.appendChild(row);
+      });
+    }
+
+    /* 回执 */
+    const rsvp = TEMPLATE.rsvp || {};
+    setText('rsvp-title', rsvp.title);
+    setText('rsvp-note', rsvp.note);
+    setText('rsvp-submit', rsvp.submitLabel);
+    setText('rsvp-deadline', rsvp.deadline);
+    setText('done-title', rsvp.doneTitle);
+    setText('done-text', rsvp.doneText);
+
+    const fieldHost = byId('rsvp-fields');
+    const form = byId('rsvp-form');
+    const formWrap = byId('rsvp-form-wrap');
+    const done = byId('rsvp-done');
+
+    if (fieldHost) {
+      fieldHost.textContent = '';
+      (rsvp.fields || []).forEach(field => {
+        const wrap = el('div', 'field');
+        wrap.dataset.key = field.key || '';
+
+        const label = el('label', 'field-label', field.label);
+        label.setAttribute('for', 'field-' + field.key);
+        wrap.appendChild(label);
+
+        if (field.type === 'choice') {
+          const group = el('div', 'choices');
+          group.setAttribute('role', 'radiogroup');
+          group.setAttribute('aria-label', field.label || '');
+          (field.options || []).forEach((option, i) => {
+            const item = el('label', 'choice');
+            const input = document.createElement('input');
+            input.type = 'radio';
+            input.name = field.key;
+            input.value = option;
+            if (i === 0) input.checked = true;
+            item.appendChild(input);
+            item.appendChild(el('span', null, option));
+            group.appendChild(item);
+          });
+          wrap.appendChild(group);
+        } else if (field.type === 'textarea') {
+          const area = document.createElement('textarea');
+          area.id = 'field-' + field.key;
+          area.name = field.key;
+          if (field.placeholder) area.placeholder = field.placeholder;
+          wrap.appendChild(area);
+        } else {
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.id = 'field-' + field.key;
+          input.name = field.key;
+          if (field.placeholder) input.placeholder = field.placeholder;
+          wrap.appendChild(input);
+        }
+
+        wrap.appendChild(el('p', 'field-error', field.error || '这一项需要填写。'));
+        fieldHost.appendChild(wrap);
+      });
+    }
+
+    if (form) {
+      const fields = rsvp.fields || [];
+
+      fields.forEach(field => {
+        const wrap = fieldHost.querySelector('[data-key="' + field.key + '"]');
+        if (!wrap || field.type === 'choice') return;
+        const input = wrap.querySelector('input, textarea');
+        if (input) input.addEventListener('input', () => { wrap.removeAttribute('data-invalid'); });
+      });
+
+      form.addEventListener('submit', ev => {
+        ev.preventDefault();
+        let firstBad = null;
+
+        fields.forEach(field => {
+          if (!field.required) return;
+          const wrap = fieldHost.querySelector('[data-key="' + field.key + '"]');
+          if (!wrap) return;
+          const input = wrap.querySelector('input, textarea');
+          const empty = !input || !input.value.trim();
+          if (empty) {
+            wrap.setAttribute('data-invalid', '');
+            if (!firstBad) firstBad = input;
+          } else {
+            wrap.removeAttribute('data-invalid');
+          }
+        });
+
+        if (firstBad) {
+          firstBad.focus();
+          firstBad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+
+        if (formWrap) formWrap.hidden = true;
+        if (done) done.hidden = false;
+        if (done) done.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+
+    /* 页脚 */
+    const footer = TEMPLATE.footer || {};
+    setText('foot-note', footer.note);
+    setText('foot-contact', footer.contact);
+  })();
+</script>
+</body>
+</html>
