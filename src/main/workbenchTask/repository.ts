@@ -5,17 +5,20 @@ import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalEffectStatus,
   WorkbenchArtifactCandidateSource,
+  WorkbenchArtifactKind,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
+  WorkbenchVerificationCheckStatus,
+  WorkbenchVerificationCheckName,
   WorkbenchTerminalTaskStatuses,
+  isWorkbenchDeliverable,
   type WorkbenchApproval,
   type WorkbenchApprovalDecisionSource,
   type WorkbenchApprovalRiskLevel,
   type WorkbenchArtifact,
-  type WorkbenchArtifactKind,
   type WorkbenchArtifactProvenance,
   type WorkbenchJsonObject,
   type WorkbenchRun,
@@ -124,6 +127,27 @@ type ApprovalRow = {
 export class WorkbenchTaskRepository {
   constructor(private readonly db: Database.Database) {}
 
+  getTaskBoundaryForSession(
+    sessionId: string,
+  ): Pick<WorkbenchTask, 'id' | 'goal' | 'status'> | null {
+    const row = this.db
+      .prepare(`
+      SELECT t.id, t.goal, t.status FROM workbench_tasks t
+      WHERE t.session_id = ? AND t.status = ? AND EXISTS (
+        SELECT 1 FROM workbench_runs r, json_each(r.verification_result_json, '$.checks') c
+        WHERE r.task_id = t.id AND json_extract(c.value, '$.name') = ?
+          AND json_extract(c.value, '$.status') = ?
+      ) ORDER BY t.updated_at DESC, t.rowid DESC LIMIT 1
+    `)
+      .get(
+        sessionId,
+        WorkbenchTaskStatus.Completed,
+        WorkbenchVerificationCheckName.UserAcceptance,
+        WorkbenchVerificationCheckStatus.Passed,
+      ) as Pick<WorkbenchTask, 'id' | 'goal' | 'status'> | undefined;
+    return row ?? null;
+  }
+
   transaction<T>(operation: () => T): T {
     return this.db.transaction(operation)();
   }
@@ -166,6 +190,12 @@ export class WorkbenchTaskRepository {
       | TaskRow
       | undefined;
     return row ? this.mapTask(row) : null;
+  }
+
+  updateTaskContract(taskId: string, contract: WorkbenchTaskContract): void {
+    this.db
+      .prepare('UPDATE workbench_tasks SET contract_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(contract), Date.now(), taskId);
   }
 
   getLatestTaskForSession(sessionId: string): WorkbenchTask | null {
@@ -447,25 +477,31 @@ export class WorkbenchTaskRepository {
   }
 
   /**
-   * Promote every pending artifact of a run to verified. Invoked when the
-   * run's own verification gate succeeds — deterministic verification pass
-   * or explicit user acceptance — because pending workspace artifacts have
-   * no other verifier. Verified and failed artifacts are left untouched.
+   * Promote pending final deliverables only. Intermediate evidence, verified
+   * artifacts and failed artifacts are left untouched.
    */
-  markArtifactsVerified(runId: string): number {
-    const result = this.db
-      .prepare(
-        `UPDATE workbench_artifacts
-         SET verification_status = ?, updated_at = ?
-         WHERE run_id = ? AND verification_status = ?`,
-      )
-      .run(
-        WorkbenchArtifactVerificationStatus.Verified,
-        Date.now(),
-        runId,
-        WorkbenchArtifactVerificationStatus.Pending,
+  markArtifactsVerified(
+    runId: string,
+    contract: WorkbenchTaskContract,
+    artifacts: WorkbenchArtifact[],
+  ): number {
+    return this.transaction(() => {
+      const update = this.db.prepare(
+        'UPDATE workbench_artifacts SET verification_status = ?, updated_at = ? WHERE id = ? AND verification_status = ?',
       );
-    return result.changes;
+      let changes = 0;
+      for (const artifact of artifacts) {
+        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact, contract))
+          continue;
+        changes += update.run(
+          WorkbenchArtifactVerificationStatus.Verified,
+          Date.now(),
+          artifact.id,
+          WorkbenchArtifactVerificationStatus.Pending,
+        ).changes;
+      }
+      return changes;
+    });
   }
 
   countPendingArtifacts(runId: string): number {

@@ -141,6 +141,19 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                // Pure artifact parsing and hashing run outside the main process.
+                entry: 'src/main/workbenchTask/artifactWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {

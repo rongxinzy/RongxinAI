@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { expect, test } from 'vitest';
+import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
 
 import {
   WorkbenchArtifactCandidateSource,
@@ -216,7 +217,7 @@ test('persists and restores the run final answer', () => {
   }
 });
 
-test('marks only pending artifacts of a run as verified', () => {
+test('marks only pending final deliverables of a run as verified', () => {
   const { db, repository } = createRepository();
   try {
     const task = repository.createTask('session', 'goal', contract);
@@ -230,7 +231,10 @@ test('marks only pending artifacts of a run as verified', () => {
       contentHash: 'pending-hash',
       provenance: WorkbenchArtifactProvenance.Workspace,
       verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-      metadata: { role: 'deliverable' },
+      metadata: {
+        source: WorkbenchArtifactCandidateSource.Declaration,
+        role: CoworkArtifactRole.Deliverable,
+      },
     });
     const failed = repository.addArtifact({
       taskId: task.id,
@@ -241,7 +245,10 @@ test('marks only pending artifacts of a run as verified', () => {
       contentHash: 'failed-hash',
       provenance: WorkbenchArtifactProvenance.Workspace,
       verificationStatus: WorkbenchArtifactVerificationStatus.Failed,
-      metadata: {},
+      metadata: {
+        source: WorkbenchArtifactCandidateSource.Declaration,
+        role: CoworkArtifactRole.Deliverable,
+      },
     });
     const verified = repository.addArtifact({
       taskId: task.id,
@@ -267,7 +274,7 @@ test('marks only pending artifacts of a run as verified', () => {
       metadata: {},
     });
 
-    const changes = repository.markArtifactsVerified(run.id);
+    const changes = repository.markArtifactsVerified(run.id, task.contract, repository.getDetail(task.id)!.artifacts);
 
     expect(changes).toBe(1);
     const artifacts = repository.getDetail(task.id)?.artifacts ?? [];

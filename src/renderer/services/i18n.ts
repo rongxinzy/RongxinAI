@@ -1377,6 +1377,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     artifactViewing: '预览中',
     artifactPreview: '预览',
     artifactCode: '代码',
+    artifactResponseFragment: '回复片段',
     artifactViewMode: 'Artifact 视图模式',
     artifactPanelToggle: '预览面板',
     artifactDownload: '下载',
@@ -2026,6 +2027,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workbenchTaskApprovalRequest: '该工具操作需要你的确认',
     workbenchTaskLoadFailed: '加载任务审计记录失败',
     workbenchTaskActionFailed: '任务操作失败',
+    workbenchTaskAcceptedToast: '已验收本次任务',
     workbenchTaskAcceptanceCardTitle: '任务需要人工验收',
     workbenchTaskAcceptanceCardDescription:
       '没有可用的确定性验证结果，请确认最终成果是否符合预期后再决定。',
@@ -4858,6 +4860,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     artifactViewing: 'Viewing',
     artifactPreview: 'Preview',
     artifactCode: 'Code',
+    artifactResponseFragment: 'Response fragment',
     artifactViewMode: 'Artifact view mode',
     artifactPanelToggle: 'Artifacts',
     artifactDownload: 'Download',
@@ -5562,6 +5565,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workbenchTaskApprovalRequest: 'This tool action requires your confirmation',
     workbenchTaskLoadFailed: 'Failed to load the task audit trail',
     workbenchTaskActionFailed: 'Task action failed',
+    workbenchTaskAcceptedToast: 'Task accepted',
     workbenchTaskAcceptanceCardTitle: 'Task requires manual acceptance',
     workbenchTaskAcceptanceCardDescription:
       'No deterministic verification is available for this result. Please confirm it matches your expectation before deciding.',

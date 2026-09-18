@@ -1,10 +1,11 @@
 import { createHash } from 'crypto';
 
-import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
+import { WorkbenchApprovalRiskLevel, WorkbenchOutputToolName } from '../../shared/workbenchTask';
 import { ProductionLoopToolName } from '../../shared/productionLoop';
 
 const readOnlyTools = new Set(['read', 'grep', 'find', 'ls', 'skill_runtime_capabilities']);
 const internalControlTools = new Set([
+  WorkbenchOutputToolName,
   'askuserquestion',
   'agent_loop',
   'workflow_state',

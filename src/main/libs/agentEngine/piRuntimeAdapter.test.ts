@@ -25,6 +25,7 @@ import { ProductionLoopAction } from '../../../shared/productionLoop';
 import {
   WorkbenchApprovalMode,
   WorkbenchContractKind,
+  WorkbenchOutputMode,
   WorkbenchRunTrigger,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
@@ -32,6 +33,13 @@ import {
 import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
+import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
+import { setWorkbenchOutputRequirements } from '../../workbenchTask/outputContract';
+
+vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
+  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
+    collectWorkbenchArtifacts(input),
+}));
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -928,6 +936,7 @@ describe('PiRuntimeAdapter', () => {
         expect(greetingPrompt).not.toContain('## Production workflow decision');
         const greetingRunId = service.getCurrent('adaptive-gate')?.runs[0]?.id;
         expect(greetingRunId).toBeDefined();
+        setWorkbenchOutputRequirements(service.repository, 'adaptive-gate', greetingRunId!, [{ mode: WorkbenchOutputMode.Text, formats: [] }]);
         expect(service.productionLoop.repository.get(greetingRunId!)).toBeNull();
         const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: unknown) => void;
         listener({
@@ -2023,6 +2032,7 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot,
         });
         const first = service.getCurrent('denied-shortcut')!;
+        setWorkbenchOutputRequirements(service.repository, 'denied-shortcut', first.task.activeRunId!, [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }]);
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-shortcut',
           runId: first.task.activeRunId!,
@@ -2306,6 +2316,7 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot: createTemporaryWorkspace(),
         });
         const detail = service.getCurrent('denied-workbench');
+        setWorkbenchOutputRequirements(service.repository, 'denied-workbench', detail!.task.activeRunId!, [{ mode: WorkbenchOutputMode.File, formats: ['md'] }]);
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-workbench',
           runId: detail!.task.activeRunId!,
