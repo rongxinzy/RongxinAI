@@ -757,6 +757,11 @@ interface IElectronAPI {
       workspaces?: import('../../shared/workspace').Workspace[];
       error?: string;
     }>;
+    createWorkspace: (options: { path: string; name: string }) => Promise<{
+      success: boolean;
+      workspace?: import('../../shared/workspace').Workspace;
+      error?: string;
+    }>;
     ensureWorkspace: (options: { path: string; name?: string; isHidden?: boolean }) => Promise<{
       success: boolean;
       workspace?: import('../../shared/workspace').Workspace;

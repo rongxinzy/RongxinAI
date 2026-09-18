@@ -192,6 +192,7 @@ interface CoworkPromptInputProps {
   workingDirectory?: string;
   workingDirectoryName?: string;
   onWorkingDirectoryChange?: (dir: string) => void;
+  onCreateProject?: (dir: string, name: string) => Promise<boolean>;
   onUseNoFolder?: (dir: string) => void | Promise<void>;
   showFolderSelector?: boolean;
   showNoFolderAction?: boolean;
@@ -227,6 +228,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       workingDirectory = '',
       workingDirectoryName,
       onWorkingDirectoryChange,
+      onCreateProject,
       onUseNoFolder,
       showFolderSelector = false,
       showNoFolderAction = true,
@@ -767,6 +769,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       if (onWorkingDirectoryChange) {
         onWorkingDirectoryChange(path);
       }
+    };
+
+    const handleProjectCreate = async (path: string, name: string): Promise<boolean> => {
+      if (!onCreateProject) return false;
+      return onCreateProject(path, name);
     };
 
     const addAttachment = useCallback(
@@ -1353,6 +1360,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <div className="relative mt-1.5 flex justify-start">
             <FolderSelectorPopover
               onSelectFolder={handleFolderSelect}
+              onCreateProject={handleProjectCreate}
               onUseNoFolder={onUseNoFolder}
               side="bottom"
               align="start"

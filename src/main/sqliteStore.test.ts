@@ -324,3 +324,51 @@ test('creates the artifact index after adding sequence to legacy messages', asyn
 
   store.close();
 });
+
+test('migrates unique workspace paths while preserving existing workspaces', async () => {
+  const userDataPath = createTempUserDataPath();
+  createLegacyDatabase(userDataPath);
+  const legacyDb = new Database(path.join(userDataPath, DB_FILENAME));
+  const now = Date.now();
+  legacyDb.exec(`
+    CREATE TABLE workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  legacyDb
+    .prepare(
+      `INSERT INTO workspaces (id, name, path, is_hidden, created_at, updated_at)
+       VALUES (?, ?, ?, 0, ?, ?)`,
+    )
+    .run('workspace-legacy', 'Existing workspace', '/repo/shared', now, now);
+  legacyDb.close();
+
+  const store = await SqliteStore.create(userDataPath);
+  const db = store.getDatabase();
+  const migratedWorkspace = db
+    .prepare('SELECT id, name, path FROM workspaces WHERE id = ?')
+    .get('workspace-legacy') as { id: string; name: string; path: string };
+
+  expect(migratedWorkspace).toEqual({
+    id: 'workspace-legacy',
+    name: 'Existing workspace',
+    path: '/repo/shared',
+  });
+  expect(store.getDidRunMigration()).toBe(true);
+
+  db.prepare(
+    `INSERT INTO workspaces (id, name, path, is_hidden, created_at, updated_at)
+     VALUES (?, ?, ?, 0, ?, ?)`,
+  ).run('workspace-new', 'New workspace', '/repo/shared', now, now);
+  const workspaceCount = db
+    .prepare('SELECT COUNT(*) AS count FROM workspaces WHERE path = ?')
+    .get('/repo/shared') as { count: number };
+
+  expect(workspaceCount.count).toBe(2);
+  store.close();
+});

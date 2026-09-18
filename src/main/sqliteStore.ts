@@ -135,12 +135,14 @@ export class SqliteStore {
       CREATE TABLE IF NOT EXISTS workspaces (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        path TEXT NOT NULL UNIQUE,
+        path TEXT NOT NULL,
         is_hidden INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
     `);
+    this.migrateWorkspacePathUniqueness();
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS cowork_messages (
         id TEXT PRIMARY KEY,
@@ -638,6 +640,37 @@ export class SqliteStore {
     const oldValue = this.get(key);
     this.db.prepare('DELETE FROM kv WHERE key = ?').run(key);
     this.emitter.emit('change', { key, newValue: undefined, oldValue } as ChangePayload);
+  }
+
+  private migrateWorkspacePathUniqueness(): void {
+    const indexes = this.db.pragma('index_list(workspaces)') as Array<{
+      name: string;
+      unique: number;
+    }>;
+    const hasUniquePathIndex = indexes.some(index => {
+      if (index.unique !== 1) return false;
+      const columns = this.db.pragma(`index_info(${index.name})`) as Array<{ name: string }>;
+      return columns.length === 1 && columns[0].name === 'path';
+    });
+    if (!hasUniquePathIndex) return;
+
+    this.db.transaction(() => {
+      this.db.exec(`
+        CREATE TABLE workspaces_rebuilt (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          path TEXT NOT NULL,
+          is_hidden INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        INSERT INTO workspaces_rebuilt (id, name, path, is_hidden, created_at, updated_at)
+        SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces;
+        DROP TABLE workspaces;
+        ALTER TABLE workspaces_rebuilt RENAME TO workspaces;
+      `);
+    })();
+    this.didRunMigration = true;
   }
 
   getDatabase(): Database.Database {
