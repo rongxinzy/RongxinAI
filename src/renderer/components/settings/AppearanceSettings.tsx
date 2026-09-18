@@ -4,7 +4,6 @@ import { Check } from 'lucide-react';
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { i18nService } from '../../services/i18n';
 import { backgroundStyle, normalizeBackground } from '../../theme/background/background';
-import { modalOverlayBlur } from '../../theme/components/modal-overlay-style';
 import { resolveThemePlugin, themePlugins } from '../../theme/themes/plugins';
 import { TOKEN_CONTRACT, TOKEN_NAMES } from '../../theme/tokens/contract';
 
@@ -121,11 +120,10 @@ export function AppearanceSettings({
                     className={`theme-appearance-preview-check ${styleId === plugin.id && !isPending ? '' : 'invisible'}`}
                   />
                 </span>
-                {/* 2026/09/16 lixiang  设置中：灰色文案 + 与全局弹窗同级 blur(2px) 毛玻璃 */}
+                {/* 2026/09/16 lixiang  设置中：灰色文案 + blur(2px) 毛玻璃 */}
                 {isPending && (
                   <span
-                    className="absolute inset-0 z-[1] flex items-center justify-center bg-background/20 text-sm font-medium text-foreground/70"
-                    style={{ backdropFilter: modalOverlayBlur['backdrop-filter'] }}
+                    className="absolute inset-0 z-[1] flex items-center justify-center bg-background/20 text-sm font-medium text-foreground/70 backdrop-blur-[2px]"
                     role="status"
                   >
                     {i18nService.t('themeStyleApplying')}
