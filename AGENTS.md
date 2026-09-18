@@ -5,7 +5,7 @@ This file provides guidance to coding agents when working with code in this repo
 ## Build and Development Commands
 
 ```bash
-# Development - starts Vite dev server (port 5175) + Electron app with hot reload
+# Development - starts Vite + Electron with hot reload (port starts at 5175, auto-increments if busy)
 npm run electron:dev
 
 # Build production bundle (TypeScript + Vite)

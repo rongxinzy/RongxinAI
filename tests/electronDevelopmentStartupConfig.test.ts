@@ -17,7 +17,8 @@ test('development startup waits for Vite readiness before launching Electron', (
     path.join(root, 'scripts', 'build-electron-development.mjs'),
     'utf8',
   );
-  const developmentLauncher = readFileSync(path.join(root, 'scripts', 'dev.js'), 'utf8');
+  const electronDevScript = readFileSync(path.join(root, 'scripts', 'electron-dev.mjs'), 'utf8');
+  const findDevPortScript = readFileSync(path.join(root, 'scripts', 'find-dev-port.mjs'), 'utf8');
   const preloadEntryIndex = viteConfig.indexOf("entry: 'src/main/preload.ts'");
   const mainEntryIndex = viteConfig.indexOf("entry: 'src/main/main.ts'");
   const viteListenIndex = developmentLauncher.indexOf('await server.listen()');
@@ -48,14 +49,25 @@ test('development startup waits for Vite readiness before launching Electron', (
   assert.match(rendererStyles, /@source "\.\.\/shared"/);
   assert.ok(preloadEntryIndex >= 0 && preloadEntryIndex < mainEntryIndex);
   assert.match(viteConfig, /entry: 'src\/main\/preload\.ts'[\s\S]*watch: null/);
+  assert.match(developmentScript, /node scripts\/electron-dev\.mjs/);
+  assert.doesNotMatch(developmentScript, /-d 20000/);
   assert.doesNotMatch(developmentScript, /compile:electron/);
   assert.match(developmentScript, /build:electron:dev/);
-  assert.match(developmentScript, /node scripts\/dev\.js/);
-  assert.match(developmentLauncher, /port: 5175/);
-  assert.match(developmentLauncher, /strictPort: true/);
-  assert.match(developmentLauncher, /VITE_SKIP_ELECTRON = '1'/);
-  assert.match(developmentLauncher, /ELECTRON_START_URL: 'http:\/\/localhost:5175'/);
-  assert.ok(viteListenIndex >= 0 && viteListenIndex < electronSpawnIndex);
+  assert.match(electronDevScript, /resolveDevPort/);
+  assert.match(electronDevScript, /from 'concurrently'|from \"concurrently\"/);
+  assert.match(electronDevScript, /killOthers/);
+  assert.match(electronDevScript, /SIGKILL/);
+  assert.match(electronDevScript, /VITE_SKIP_ELECTRON/);
+  assert.match(electronDevScript, /ELECTRON_START_URL/);
+  assert.match(
+    electronDevScript,
+    /wait-on -l -t 120000 -i 1000 -s 1 http-get:\/\/localhost:\$\{port\}\/src\/renderer\/main\.tsx/,
+  );
+  assert.match(electronDevScript, /dist-electron\/\.electron-ready/);
+  assert.match(electronDevScript, /electron --remote-debugging-port=9222 \./);
+  assert.match(findDevPortScript, /DEFAULT_DEV_PORT = 5175/);
+  assert.match(findDevPortScript, /findAvailablePort/);
+  assert.match(viteConfig, /strictPort: true/);
   assert.match(electronBuildScript, /src\/main\/preload\.ts/);
   assert.match(electronBuildScript, /src\/main\/main\.ts/);
   assert.match(electronBuildScript, /fs\.writeFileSync\(readyPath/);
