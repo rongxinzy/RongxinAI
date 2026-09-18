@@ -27,29 +27,29 @@
     }
   },
   "engram": {
-    "version": "v1.20.0-zhiyuan.3",
+    "version": "v1.20.0-zhiyuan.4",
     "repo": "z189yis/engram-cjk",
     "runtimeAssets": {
-      "mac-x64": "engram_v1.20.0-zhiyuan.3_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_v1.20.0-zhiyuan.3_darwin_arm64.tar.gz",
-      "win-x64": "engram_v1.20.0-zhiyuan.3_windows_amd64.zip",
-      "win-arm64": "engram_v1.20.0-zhiyuan.3_windows_arm64.zip",
-      "linux-x64": "engram_v1.20.0-zhiyuan.3_linux_amd64.tar.gz",
-      "linux-arm64": "engram_v1.20.0-zhiyuan.3_linux_arm64.tar.gz"
+      "mac-x64": "engram_v1.20.0-zhiyuan.4_darwin_amd64.tar.gz",
+      "mac-arm64": "engram_v1.20.0-zhiyuan.4_darwin_arm64.tar.gz",
+      "win-x64": "engram_v1.20.0-zhiyuan.4_windows_amd64.zip",
+      "win-arm64": "engram_v1.20.0-zhiyuan.4_windows_arm64.zip",
+      "linux-x64": "engram_v1.20.0-zhiyuan.4_linux_amd64.tar.gz",
+      "linux-arm64": "engram_v1.20.0-zhiyuan.4_linux_arm64.tar.gz"
     },
     "runtimeChecksums": {
-      "mac-x64": "ff850a2b67222085a14cd58f101c4bd1b129e0e6de1c1cf8cfcbe3c7dd11e93d",
-      "mac-arm64": "2fbba49e28f90f0b5b8efd2f076bc425fb902052fb84e3dc9737abd7a406987e",
-      "win-x64": "a699cbec01c2ddb4674ff2499820cc38b1d7e1b7de1de0024ec137557f5b36bc",
-      "win-arm64": "ee66b3fd4cd5326a94ed4a167d4111e3c90d839b96db4e91ceb3ab169d919525",
-      "linux-x64": "894090d3fbfaa373b2a3b4aa77a5fde11cc7345f29058b0351fef743ec9f3eb5",
-      "linux-arm64": "e84230533527e97547d34dfe7b9117a2e36810e1e364c437256c0d86017a7116"
+      "mac-x64": "5b85ce91f4ec7f16ce24ef413001988283e5d8e8ff11747cb140bf83e30ec679",
+      "mac-arm64": "7181a883def28f74363bad441b2fba777634225fb56e99e9b56f7b47f37f29e5",
+      "win-x64": "d64879f73d290caf176046802f7d434f45d7e6c6f81adf7f11365bebffa220f2",
+      "win-arm64": "1692029c3123a32bdf7bdec781213b11fd368645518f2291abfab059ace4963f",
+      "linux-x64": "94d567fda8e105c05aaac8fef44bd27d626a5a8c28f3af0edafdaaec41d53d62",
+      "linux-arm64": "cb7f7af2e5bbf49333273f3e8db8435c2b2acb9ba5642f2ad3513d3063a4fbd6"
     }
   },
   "channelRuntime": {
-    "version": "zhiyuan-sidecar-v3",
+    "version": "zhiyuan-sidecar-v4",
     "repo": "rongxinzy/pi-connect",
-    "sourceRevision": "316953da6eae87fd9b2bf8887b06fb09b0d60f67",
+    "sourceRevision": "ecf720f875e31b3df3464d820e6c485775719abe",
     "runtimeAssets": {
       "mac-x64": "cc-connect-sidecar-darwin-amd64",
       "mac-arm64": "cc-connect-sidecar-darwin-arm64",
@@ -57,10 +57,10 @@
       "linux-x64": "cc-connect-sidecar-linux-amd64"
     },
     "runtimeChecksums": {
-      "mac-x64": "dee840785b0b59903e3e97839e05f753106daa67e6f42f94916b5352b53699e1",
-      "mac-arm64": "e10db14ac5e978233fc9e941f4ec8c64ebb07bfdf64b5fb707535cc831447e5e",
-      "win-x64": "0bd53571449a66ccd66b237f88c0cc1ef6a39bac69ffdbc301fba1bad7aa6a56",
-      "linux-x64": "8281853fcd73b9382ca1bc020f13c356aff51de77a5e11a2fe874cf54ae95a79"
+      "mac-x64": "74e900120a56520d62924030b3d175762668c5de6c617b19815a69fb5eadc15b",
+      "mac-arm64": "449125ebd1c85eaa543b7c2e06a90efbd2f1945b94d9d52978b4db70432c792f",
+      "win-x64": "6c3091c8cd59a4c2a7d79c4541ffabf9b183cae41abd1f5de9b355cabd8a794e",
+      "linux-x64": "f6384482424f169ec48344aaa039cce195b3e69c0ef80172e8a3f2ff137317b4"
     }
   },
   "main": "dist-electron/main.js",

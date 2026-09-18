@@ -119,6 +119,8 @@ $componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python'
 try {
   Invoke-Installer $installer 'cold installation' 2700 $timingLog
   Assert-Path $installRoot 'installation root'
+  Assert-Path (Join-Path $installRoot 'resources\channel-runtime\cc-connect-sidecar.exe') 'installed channel runtime'
+  Assert-Path (Join-Path $installRoot 'resources\memory\engram.exe') 'installed memory runtime'
   $applicationExecutables = @(Get-ChildItem -LiteralPath $installRoot -Filter '*.exe' -File |
     Where-Object { $_.Name -notlike 'Uninstall*' })
   if ($applicationExecutables.Count -ne 1) {
@@ -149,6 +151,8 @@ try {
   }
 
   Invoke-Installer $installer 'cache-hit upgrade' 600 $timingLog
+  Assert-Path (Join-Path $installRoot 'resources\channel-runtime\cc-connect-sidecar.exe') 'upgraded channel runtime'
+  Assert-Path (Join-Path $installRoot 'resources\memory\engram.exe') 'upgraded memory runtime'
   Assert-Path $timingLog 'upgrade timing log'
   $upgradeLog = Get-Content -LiteralPath $timingLog -Raw -Encoding UTF8
   if (($upgradeLog | Select-String -AllMatches 'phase=component-cache-hit ').Matches.Count -ne 7) {
