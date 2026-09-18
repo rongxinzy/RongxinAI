@@ -456,6 +456,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   cowork: {
     listWorkspaces: () => ipcRenderer.invoke(WorkspaceIpc.List),
+    createWorkspace: (options: { path: string; name: string }) =>
+      ipcRenderer.invoke(WorkspaceIpc.Create, options),
     ensureWorkspace: (options: { path: string; name?: string }) =>
       ipcRenderer.invoke(WorkspaceIpc.Ensure, options),
     renameWorkspace: (id: string, name: string) =>

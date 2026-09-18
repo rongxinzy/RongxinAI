@@ -1,5 +1,6 @@
 export const WorkspaceIpc = {
   List: 'cowork:workspace:list',
+  Create: 'cowork:workspace:create',
   Ensure: 'cowork:workspace:ensure',
   Rename: 'cowork:workspace:rename',
   Delete: 'cowork:workspace:delete',
