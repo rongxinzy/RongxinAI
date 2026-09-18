@@ -44,7 +44,6 @@ beforeEach(() => {
 test('starts at the estimated end and anchors dynamic measurements to the end', () => {
   render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: [],
       renderAll: false,
       renderTurn: () => null,
@@ -54,7 +53,7 @@ test('starts at the estimated end and anchors dynamic measurements to the end', 
   expect(mocks.useVirtualizer).toHaveBeenCalledWith(
     expect.objectContaining({
       anchorTo: 'end',
-      followOnAppend: false,
+      followOnAppend: true,
       initialOffset: 0,
       initialRect: { width: 0, height: 1200 },
     }),
@@ -67,7 +66,6 @@ test('positions a newly mounted virtualizer at the end before paint', () => {
   const view = render(
     React.createElement(VirtualizedTurnList, {
       key: 'session-1',
-      isStreaming: false,
       turns: [],
       renderAll: false,
       renderTurn: () => null,
@@ -77,7 +75,6 @@ test('positions a newly mounted virtualizer at the end before paint', () => {
   view.rerender(
     React.createElement(VirtualizedTurnList, {
       key: 'session-2',
-      isStreaming: false,
       turns: [],
       renderAll: false,
       renderTurn: () => null,
@@ -92,7 +89,6 @@ test('positions the initial tail once before enabling history pagination', () =>
 
   render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: [],
       onInitialTailPositioned,
       renderAll: false,
@@ -115,7 +111,6 @@ test('does not retry internal anchor adjustments while the user scrolls upward',
 
   render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: [],
       renderAll: false,
       renderTurn: () => null,
@@ -147,7 +142,6 @@ test('lets a short session clamp its estimated end to the top of a non-overflowi
 
   render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn: () => null,
@@ -157,6 +151,35 @@ test('lets a short session clamp its estimated end to the top of a non-overflowi
   expect(mocks.useVirtualizer).toHaveBeenCalledWith(
     expect.objectContaining({ initialOffset: 300 }),
   );
+});
+
+test('does not call scrollToEnd again after the initial tail position', () => {
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      turns: [],
+      renderAll: false,
+      renderTurn: () => null,
+    }),
+  );
+
+  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
+
+  view.rerender(
+    React.createElement(VirtualizedTurnList, {
+      turns: [],
+      renderAll: false,
+      renderTurn: () => null,
+    }),
+  );
+  view.rerender(
+    React.createElement(VirtualizedTurnList, {
+      turns: [],
+      renderAll: false,
+      renderTurn: () => null,
+    }),
+  );
+
+  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
 });
 
 test('positions only the virtual tail window instead of rendering the full session', () => {
@@ -178,7 +201,6 @@ test('positions only the virtual tail window instead of rendering the full sessi
 
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: true,
       turns,
       renderAll: false,
       renderTurn,
@@ -192,7 +214,7 @@ test('positions only the virtual tail window instead of rendering the full sessi
 
   expect(mocks.useVirtualizer).toHaveBeenCalledWith(
     expect.objectContaining({
-      followOnAppend: 'auto',
+      followOnAppend: true,
       initialOffset: 30_000,
     }),
   );
@@ -216,7 +238,6 @@ test('synchronizes measured layout before the following React commit', () => {
 
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn: () => React.createElement('div', null, 'turn'),
@@ -224,7 +245,6 @@ test('synchronizes measured layout before the following React commit', () => {
   );
   view.rerender(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn: () => React.createElement('div', null, 'turn'),

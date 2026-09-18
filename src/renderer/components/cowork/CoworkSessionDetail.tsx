@@ -1099,7 +1099,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <VirtualizedTurnList
         key={sessionId}
         ref={virtualizedTurnListRef}
-        isStreaming={isStreaming}
         turns={turns}
         onInitialTailPositioned={markInitialHistoryTailPositioned}
         renderTurn={renderTurn}
@@ -1200,14 +1199,19 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           }`}
           aria-hidden={!isSessionSwitching && isArtifactWorkspace}
         >
-          <div className="relative flex-1 min-h-0">
+          {/* 2026/09/16 lixiang  流式时也用 instant，避免 smooth 跟随时动画叠加造成抖动 */}
+          {/* 2026/09/16 lixiang  输入框绝对定位且与对话区平级，对话区 flex:1 会被挡住；用 paddingBottom 把可视区收在输入框上方 */}
+          <div
+            className="relative flex-1 min-h-0"
+            style={{ paddingBottom: COWORK_COMPOSER_INSET_VALUE }}
+          >
             {isSessionSwitching ? (
               <CoworkConversationLoadingSkeleton />
             ) : (
               <Conversation
                 className="h-full"
                 initial="instant"
-                resize={isStreaming ? 'smooth' : 'instant'}
+                resize="instant"
               >
                 <ConversationContent
                   className="pt-3"
@@ -1230,17 +1234,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                         <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
                       </div>
                     )}
-                    <div
-                      aria-hidden="true"
-                      style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}
-                    />
                   </div>
                 </ConversationContent>
-                <ConversationScrollButton
-                  style={{ bottom: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}
-                />
+                <ConversationScrollButton />
               </Conversation>
             )}
+
+            {/* 2026/09/16 lixiang  贴边时底部渐隐，最下方文字慢慢淡出，不挡点击 */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 z-[1] h-16 bg-gradient-to-t from-background to-transparent"
+              style={{ bottom: COWORK_COMPOSER_INSET_VALUE }}
+            />
 
             {/* Turn navigation rail removed: message content remains scrollable in the conversation. */}
             {!isSessionSwitching && turns.length > 1 && (

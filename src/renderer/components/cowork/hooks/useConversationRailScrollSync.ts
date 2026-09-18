@@ -4,7 +4,10 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useMemo,
 } from 'react';
+
+import { debounce, SCROLL_DEBOUNCE_MS } from '../../../utils/debounce';
 
 const CONVERSATION_SCROLL_SELECTOR = '.cowork-conversation-scroll';
 const BOTTOM_PROXIMITY_PX = 24;
@@ -111,6 +114,12 @@ export function useConversationRailScrollSync({
     setCurrentRailIndex,
   ]);
 
+  // 2026/09/16 lixiang  滚动/内容尺寸变化时防抖同步轨道索引
+  const scheduleSync = useMemo(
+    () => debounce(syncRailIndexToScrollPosition, SCROLL_DEBOUNCE_MS),
+    [syncRailIndexToScrollPosition],
+  );
+
   useEffect(() => {
     if (!sessionId) return undefined;
 
@@ -118,15 +127,6 @@ export function useConversationRailScrollSync({
       CONVERSATION_SCROLL_SELECTOR,
     );
     if (!scrollElement) return undefined;
-
-    let frameId: number | null = null;
-    const scheduleSync = () => {
-      if (frameId !== null) return;
-      frameId = window.requestAnimationFrame(() => {
-        frameId = null;
-        syncRailIndexToScrollPosition();
-      });
-    };
 
     scrollElement.addEventListener('scroll', scheduleSync, { passive: true });
 
@@ -141,9 +141,7 @@ export function useConversationRailScrollSync({
     return () => {
       scrollElement.removeEventListener('scroll', scheduleSync);
       resizeObserver?.disconnect();
-      if (frameId !== null) {
-        window.cancelAnimationFrame(frameId);
-      }
+      scheduleSync.cancel();
     };
-  }, [rootRef, scrollContainerRef, sessionId, syncRailIndexToScrollPosition]);
+  }, [rootRef, scheduleSync, scrollContainerRef, sessionId]);
 }

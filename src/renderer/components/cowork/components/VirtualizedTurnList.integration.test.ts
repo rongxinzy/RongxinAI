@@ -159,7 +159,6 @@ test('cancels pending scroll debounce timers before disposing the viewport', asy
   const viewport = installViewport();
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: makeTurns(100),
       renderAll: false,
       renderTurn: (turn: ConversationTurn) =>
@@ -195,7 +194,6 @@ test('renders a short session at the top of a non-overflowing viewport', async (
 
   render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn: (turn: ConversationTurn) =>
@@ -228,7 +226,6 @@ test('keeps a long variable-height session at the tail without overlapping rows'
 
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn,
@@ -252,7 +249,6 @@ test('keeps a long variable-height session at the tail without overlapping rows'
   }
   view.rerender(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn,
@@ -288,7 +284,6 @@ test('preserves the visible turn and viewport offset when older turns are prepen
     });
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       onInitialTailPositioned,
       renderAll: false,
@@ -317,7 +312,6 @@ test('preserves the visible turn and viewport offset when older turns are prepen
   const prepended = [...makeTurns(50, 'older'), ...turns];
   view.rerender(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: prepended,
       onInitialTailPositioned,
       renderAll: false,
@@ -361,7 +355,6 @@ test('preserves visible content when a missing turn prefix is prepended', async 
     });
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns,
       renderAll: false,
       renderTurn,
@@ -408,7 +401,6 @@ test('preserves visible content when a missing turn prefix is prepended', async 
   );
   view.rerender(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: [...makeTurns(50, 'older'), ...expandedTurns],
       renderAll: false,
       renderTurn,
@@ -438,7 +430,6 @@ test('finishes initial tail positioning when history is prepended concurrently',
     });
   const view = render(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: initialTurns,
       onInitialTailPositioned,
       renderAll: false,
@@ -449,7 +440,6 @@ test('finishes initial tail positioning when history is prepended concurrently',
 
   view.rerender(
     React.createElement(VirtualizedTurnList, {
-      isStreaming: false,
       turns: [...makeTurns(10, 'older'), ...initialTurns],
       onInitialTailPositioned,
       renderAll: false,

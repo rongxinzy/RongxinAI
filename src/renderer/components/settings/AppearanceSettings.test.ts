@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -8,7 +8,10 @@ import { AppearanceSettings } from './AppearanceSettings';
 vi.mock('../../services/i18n', () => ({
   i18nService: { t: (key: string) => key, getLanguage: () => 'en' },
 }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 function systemAppearance() {
   const events = new EventTarget();
@@ -42,7 +45,7 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   const daming = screen.getByRole('button', { name: 'Daming Fenghua' });
   daming.focus();
   await userEvent.setup().keyboard('{Enter}');
-  expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming');
+  await vi.waitFor(() => expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming'));
   expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
   expect(screen.getByRole('tablist', { name: 'appearanceMode' }).querySelector('[data-theme-preview]')).toBeNull();
   await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
@@ -51,6 +54,36 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   expect(view.container.querySelector('[data-theme-preview="classic-dark"]')).not.toBeNull();
   expect(view.container.querySelector('[data-theme-preview="daming-dark"]')).not.toBeNull();
   expect(screen.getByRole('button', { name: 'Daming Fenghua' })).toBe(daming);
+  expect(daming).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('shows an applying spinner on the selected style before the change runs', () => {
+  vi.useFakeTimers();
+  systemAppearance();
+  const callbacks = props();
+  const view = render(createElement(AppearanceSettings, callbacks));
+  const daming = screen.getByRole('button', { name: 'Daming Fenghua' });
+
+  act(() => {
+    fireEvent.click(daming);
+  });
+
+  expect(callbacks.onStyleChange).not.toHaveBeenCalled();
+  expect(daming).toHaveAttribute('aria-busy', 'true');
+  expect(daming).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText('themeStyleApplying')).toBeTruthy();
+
+  act(() => {
+    vi.runAllTimers();
+  });
+
+  expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming');
+  // pending 等到 styleId 同步后才清，避免转圈结束与高亮之间空窗
+  expect(daming).toHaveAttribute('aria-busy', 'true');
+  expect(daming).toHaveAttribute('aria-pressed', 'true');
+
+  view.rerender(createElement(AppearanceSettings, { ...callbacks, styleId: 'daming' }));
+  expect(daming).not.toHaveAttribute('aria-busy');
   expect(daming).toHaveAttribute('aria-pressed', 'true');
 });
 
