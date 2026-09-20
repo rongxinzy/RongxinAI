@@ -27,10 +27,31 @@ function withLocalBinPath(env) {
   };
 }
 
+function installMacDevelopmentIcon() {
+  if (process.platform !== 'darwin') return;
+
+  const sourceIcon = path.join(projectRoot, 'build', 'icons', 'mac', 'icon.icns');
+  const electronApp = path.join(projectRoot, 'node_modules', 'electron', 'dist', 'Electron.app');
+  const bundledIcon = path.join(electronApp, 'Contents', 'Resources', 'electron.icns');
+  if (!fs.existsSync(sourceIcon) || !fs.existsSync(bundledIcon)) return;
+
+  const source = fs.readFileSync(sourceIcon);
+  if (source.equals(fs.readFileSync(bundledIcon))) return;
+
+  // Launchpad reads the .app bundle icon. Dock.setIcon does not change it.
+  fs.copyFileSync(sourceIcon, bundledIcon);
+  const now = new Date();
+  fs.utimesSync(bundledIcon, now, now);
+  fs.utimesSync(electronApp, now, now);
+  console.log('[electron:dev] Installed the app icon for Launchpad');
+}
+
 async function main() {
   if (!fs.existsSync(localBinDirectory)) {
     throw new Error(`Missing ${localBinDirectory}; run npm/bun install first.`);
   }
+
+  installMacDevelopmentIcon();
 
   const port = await resolveDevPort();
   const startUrl = `http://localhost:${port}`;
