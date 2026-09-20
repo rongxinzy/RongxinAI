@@ -120,7 +120,9 @@ function classifyConnectionFailure(
   ) {
     return ProviderModelConnectionFailureKind.Model;
   }
-  if (status === undefined) {
+  // status 0 is the transport sentinel for aborted / unreachable requests
+  // (visibleApiTransport page-fetch path and main-process fetch failures).
+  if (status === undefined || status === 0) {
     return ProviderModelConnectionFailureKind.Network;
   }
   return ProviderModelConnectionFailureKind.Unknown;
