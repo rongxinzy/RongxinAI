@@ -12,6 +12,11 @@ test('keeps execution groups and nested thinking collapsed by default', () => {
   expect(source).toMatch(/<PersistentReasoning[\s\S]*?defaultOpen=\{false\}/);
 });
 
+test('embeds pending tool permission actions in the matching tool card', () => {
+  expect(source).toContain('pendingPermission={isPendingTool ? pendingPermission : null}');
+  expect(source).toContain('forceOpen={Boolean(');
+});
+
 test('settles execution counts after an answer or when the turn reaches a terminal state', () => {
   expect(source).toContain('const flush = (followedByAnswer = false) => {');
   expect(source).toMatch(
@@ -19,16 +24,19 @@ test('settles execution counts after an answer or when the turn reaches a termin
   );
   expect(source).toContain('flush(isAnswer);');
   expect(source).toContain(
-    'const showCompletedSummary = group.followedByAnswer || isTurnComplete;',
+    'const showCompletedSummary = group.followedByAnswer || isTurnComplete || toolsSettled;',
   );
 });
 
-test('keeps recoverable interruptions outside reasoning and exposes a message action', () => {
+test('keeps recoverable interruptions outside reasoning and exposes a resume button', () => {
+  // 2026/09/17 lixiang  继续执行改为同行主题色 Button，不再用 MessageAction 图标
   expect(source).toContain('Boolean(item.message.metadata?.interruption)');
   expect(source).toContain('interruption.taskId === recoverableTaskId');
-  expect(source).toContain('<MessageAction');
+  expect(source).toContain('<Button');
+  expect(source).toContain('variant="default"');
   expect(source).toContain("i18nService.t('coworkResumeTaskAction')");
   expect(source).toContain('onClick={() => onResumeTask(interruption)}');
+  expect(source).not.toContain('<MessageAction');
 });
 
 test('keeps terminal errors visible outside execution summaries', () => {

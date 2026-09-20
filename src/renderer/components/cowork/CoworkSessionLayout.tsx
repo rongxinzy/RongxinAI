@@ -62,6 +62,7 @@ export function CoworkSessionLayout({
       }}
       className="h-full min-h-0 flex-1 gap-0 overflow-hidden bg-background"
     >
+      {/* 2026/09/18 lixiang  产物侧栏展开/收起还原到页头（窗口控件左侧） */}
       <PageHeader
         title={isSessionSwitching ? undefined : title}
         leftContent={isSessionSwitching ? <CoworkSessionTitleLoadingSkeleton /> : undefined}

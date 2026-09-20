@@ -7,6 +7,7 @@ import {
   buildDisplayItems,
   buildTurnRailIndices,
   getVisibleAssistantItems,
+  omitSupersededSessionInterruptions,
   stabilizeConversationTurns,
 } from './messageGrouping';
 
@@ -132,6 +133,44 @@ test('keeps empty interruption messages visible while hiding other empty system 
   ]);
 });
 
+test('keeps only the latest session interruption message', () => {
+  const older: CoworkMessage = {
+    ...message('interruption-1', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 'session-1',
+        interruptionId: 'interruption-1',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: 'task-1',
+        recoverable: true,
+      },
+    },
+  };
+  const newer: CoworkMessage = {
+    ...message('interruption-2', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 'session-1',
+        interruptionId: 'interruption-2',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: 'task-1',
+        recoverable: true,
+      },
+    },
+  };
+  const filtered = omitSupersededSessionInterruptions([
+    message('user-1', 'user', 'run task'),
+    older,
+    message('assistant-1', 'assistant', 'partial'),
+    newer,
+  ]);
+
+  expect(filtered.map(item => item.id)).toEqual(['user-1', 'assistant-1', 'interruption-2']);
+
+  const turn = buildTurns([message('user-1', 'user', 'run task'), older, newer])[0];
+  expect(getVisibleAssistantItems(turn.assistantItems)).toEqual([{ type: 'system', message: newer }]);
+});
+
 // ── Scale fixtures (issue #141: 20/200/1000-turn sessions) ──
 
 const buildFixtureMessages = (turnCount: number): CoworkMessage[] => {
@@ -231,4 +270,36 @@ test('pagination assigns unique keys when an earlier page also starts mid-turn',
 
   expect(turnIds).toEqual(['orphan:assistant-a', 'orphan:assistant-b', 'user-c']);
   expect(new Set(turnIds).size).toBe(turnIds.length);
+});
+
+test('marks commands before a pause as interrupted and leaves the resumed command running', () => {
+  const paused: CoworkMessage = {
+    ...message('pause-1', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 's1',
+        interruptionId: 'i1',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: 'task-1',
+        recoverable: true,
+      },
+    },
+  };
+  const items = buildDisplayItems([
+    message('user-1', 'user', 'list files'),
+    {
+      ...message('tool-old', 'tool_use', 'ls'),
+      metadata: { toolName: 'bash', toolUseId: 'call-old' },
+    },
+    paused,
+    {
+      ...message('tool-new', 'tool_use', 'whisper'),
+      metadata: { toolName: 'bash', toolUseId: 'call-new' },
+    },
+  ]);
+  const groups = items.filter(item => item.type === 'tool_group');
+
+  expect(groups).toHaveLength(2);
+  expect(groups[0]?.toolResult?.metadata?.error).toBe('interrupted');
+  expect(groups[1]?.toolResult).toBeUndefined();
 });

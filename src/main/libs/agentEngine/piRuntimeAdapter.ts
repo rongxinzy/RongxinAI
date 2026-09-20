@@ -1836,6 +1836,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
     const active = this.activeSessions.get(sessionId);
     if (!active) {
+      this.closeInterruptedToolUses(sessionId);
       this.workbenchTaskService?.pauseRun?.(sessionId, reason);
       this.clearApprovalsBySession(sessionId);
       if (cause && !this.retainedSessionIds.has(sessionId)) {
@@ -1847,6 +1848,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!wasRunning && active.aborted) return;
 
     this.finalizeActiveThinking(sessionId, active);
+    // Close in-flight tools before the turn is marked paused. Otherwise resume
+    // starts a new command while the previous one still looks "running".
+    this.closeInterruptedToolUses(sessionId);
 
     // Mark the session as aborted so continueSession knows not to reuse the Pi
     // session object, which may be in an inconsistent state after abort.
@@ -1884,6 +1888,49 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         CoworkQueueDelivery.FollowUp,
       );
       if (next) void this.followUpPendingMessage(sessionId, next.id);
+    }
+  }
+
+  /** Persist a terminal result for tool calls still open when the user pauses. */
+  private closeInterruptedToolUses(sessionId: string): void {
+    const store = this.store;
+    if (!store || typeof store.getSession !== 'function') return;
+
+    let session: ReturnType<CoworkStore['getSession']> = null;
+    try {
+      session = store.getSession(sessionId, null);
+    } catch {
+      return;
+    }
+    if (!session?.messages?.length) return;
+
+    const closed = new Set<string>();
+    for (const message of session.messages) {
+      if (message.type !== 'tool_result') continue;
+      const toolUseId = message.metadata?.toolUseId;
+      if (typeof toolUseId === 'string' && toolUseId) closed.add(toolUseId);
+    }
+
+    for (const message of session.messages) {
+      if (message.type !== 'tool_use') continue;
+      const toolUseId = message.metadata?.toolUseId;
+      if (typeof toolUseId !== 'string' || !toolUseId || closed.has(toolUseId)) continue;
+      const result: CoworkMessage = {
+        id: randomUUID(),
+        type: 'tool_result',
+        content: 'The command was interrupted because the task was paused.',
+        timestamp: Date.now(),
+        metadata: {
+          toolUseId,
+          isError: true,
+          error: 'interrupted',
+          isStreaming: false,
+          isFinal: true,
+        },
+      };
+      const persisted = store.addMessage(sessionId, result);
+      this.emit('message', sessionId, persisted);
+      closed.add(toolUseId);
     }
   }
 

@@ -243,6 +243,10 @@ import {
 } from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
+
+import { setPlatformFetchNetworkLogger } from './aisphere/transport';
+import { registerDevNetworkProtocol, trackDevNetworkRequest, publishDevNetworkLog } from './devNetworkLog';
+import { sanitizeNetworkUrl, truncateNetworkBody } from '../shared/devNetworkLog';
 import { ZhiyuanEnterpriseSkillBridge } from './enterpriseExtension/skillBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
@@ -339,6 +343,21 @@ protocol.registerSchemesAsPrivileged([
     scheme: ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
     privileges: ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES,
   },
+  // 2026/09/17 lixiang  开发态 xr-net beacon，主进程请求可出现在 DevTools Network
+  ...(process.env.NODE_ENV === 'development'
+    ? [
+        {
+          scheme: 'xr-net',
+          privileges: {
+            standard: true,
+            secure: true,
+            supportFetchAPI: true,
+            corsEnabled: true,
+            bypassCSP: true,
+          },
+        },
+      ]
+    : []),
 ]);
 
 const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
@@ -6809,52 +6828,86 @@ if (!gotTheLock) {
       };
     };
 
-    try {
-      let result = await doFetch(options.headers);
-      console.log(
-        `[api:fetch] ${options.method} ${options.url} -> ${result.status} ${result.statusText}`,
-        typeof result.data === 'object' ? JSON.stringify(result.data) : result.data,
-      );
+    // 2026/09/17 lixiang  开发态把主进程 api:fetch 镜像到 DevTools Network（xr-net beacon）
+    return trackDevNetworkRequest({
+      source: 'api-fetch',
+      method: options.method,
+      url: options.url,
+      getStatus: result => result.status,
+      getRequestBody: () => truncateNetworkBody(options.body),
+      getResponseBody: result =>
+        truncateNetworkBody('error' in result ? result.error : (result.data ?? result.statusText)),
+      run: async () => {
+        try {
+          let result = await doFetch(options.headers);
+          console.log(
+            `[api:fetch] ${options.method} ${options.url} -> ${result.status} ${result.statusText}`,
+            typeof result.data === 'object' ? JSON.stringify(result.data) : result.data,
+          );
 
-      // Auto-retry once for Copilot 401/403
-      if (
-        !result.ok &&
-        (result.status === 401 || result.status === 403) &&
-        isCopilotUrl(options.url)
-      ) {
-        console.log('[api:fetch] Copilot auth error, attempting token refresh and retry');
-        const { headers: refreshedHeaders, retried } =
-          await retryCopilotWithRefreshedToken(options);
-        if (retried) {
-          result = await doFetch(refreshedHeaders);
-          console.log(`[api:fetch] retry -> ${result.status} ${result.statusText}`);
+          // Auto-retry once for Copilot 401/403
+          if (
+            !result.ok &&
+            (result.status === 401 || result.status === 403) &&
+            isCopilotUrl(options.url)
+          ) {
+            console.log('[api:fetch] Copilot auth error, attempting token refresh and retry');
+            const { headers: refreshedHeaders, retried } =
+              await retryCopilotWithRefreshedToken(options);
+            if (retried) {
+              result = await doFetch(refreshedHeaders);
+              console.log(`[api:fetch] retry -> ${result.status} ${result.statusText}`);
+            }
+          }
+
+          return result;
+        } catch (error) {
+          console.error(
+            `[api:fetch] ${options.method} ${options.url} -> ERROR:`,
+            error instanceof Error ? error.message : error,
+          );
+          return {
+            ok: false,
+            status: 0,
+            statusText: error instanceof Error ? error.message : 'Network error',
+            headers: {},
+            data: null as null,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
         }
-      }
-
-      return result;
-    } catch (error) {
-      console.error(
-        `[api:fetch] ${options.method} ${options.url} -> ERROR:`,
-        error instanceof Error ? error.message : error,
-      );
-      return {
-        ok: false,
-        status: 0,
-        statusText: error instanceof Error ? error.message : 'Network error',
-        headers: {},
-        data: null,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+      },
+    });
   });
 
   // SSE 流式 API 代理
   ipcMain.handle('api:stream', async (event, rawOptions: unknown) => {
     const options = ApiStreamSchema.input.parse(rawOptions);
     const controller = new AbortController();
+    const streamStartedAt = Date.now();
+    const streamLogId = `${streamStartedAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
     // 存储 controller 以便后续取消
     activeStreamControllers.set(options.requestId, controller);
+
+    const logStream = (status: number, error?: string, responseBody?: string) => {
+      // 2026/09/17 lixiang  开发态镜像 api:stream 到 DevTools Network
+      publishDevNetworkLog({
+        id: streamLogId,
+        source: 'api-stream',
+        method: options.method,
+        url: sanitizeNetworkUrl(options.url),
+        status,
+        durationMs: Date.now() - streamStartedAt,
+        requestBody: truncateNetworkBody(options.body),
+        responseBody:
+          responseBody ??
+          (error
+            ? truncateNetworkBody(error)
+            : '[streaming — response chunks go over IPC, not mirrored here]'),
+        error,
+        startedAt: streamStartedAt,
+      });
+    };
 
     try {
       let response = await session.defaultSession.fetch(options.url, {
@@ -6887,6 +6940,7 @@ if (!gotTheLock) {
       if (!response.ok) {
         const errorData = await response.text();
         activeStreamControllers.delete(options.requestId);
+        logStream(response.status, errorData.slice(0, 200), truncateNetworkBody(errorData));
         return {
           ok: false,
           status: response.status,
@@ -6897,6 +6951,7 @@ if (!gotTheLock) {
 
       if (!response.body) {
         activeStreamControllers.delete(options.requestId);
+        logStream(response.status, 'No response body');
         return {
           ok: false,
           status: response.status,
@@ -6935,6 +6990,7 @@ if (!gotTheLock) {
 
       // 异步读取流，立即返回成功状态
       readStream();
+      logStream(response.status);
 
       return {
         ok: true,
@@ -6943,6 +6999,7 @@ if (!gotTheLock) {
       };
     } catch (error) {
       activeStreamControllers.delete(options.requestId);
+      logStream(0, error instanceof Error ? error.message : 'Unknown error');
       return {
         ok: false,
         status: 0,
@@ -7060,7 +7117,8 @@ if (!gotTheLock) {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
-        webSecurity: true,
+        // 2026/09/17 lixiang  开发环境关闭 webSecurity，页面 fetch 才能跨域并出现在 DevTools Network
+        webSecurity: !isDev,
         preload: PRELOAD_PATH,
         backgroundThrottling: false,
         devTools: isDev,
@@ -7504,6 +7562,11 @@ if (!gotTheLock) {
       const filePath = decodeURIComponent(url.pathname);
       return net.fetch(`file://${filePath}`);
     });
+    // 2026/09/17 lixiang  仅开发态挂 Network 镜像，避免生产 clone 响应体
+    if (isDev) {
+      registerDevNetworkProtocol();
+      setPlatformFetchNetworkLogger(publishDevNetworkLog);
+    }
 
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
@@ -7610,32 +7673,37 @@ if (!gotTheLock) {
           amendment || 'Continue the current task from its persisted state and verify the result.';
         const previousProduction =
           getWorkbenchTaskService().productionLoop.repository.getLatestForTask(task.id, run.id);
-        await getPiRuntimeAdapter().continueSession(session.id, prompt, {
-          systemPrompt: session.systemPrompt,
-          skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
-          sessionMode: session.mode,
-          workspaceRoot: session.cwd,
-          agentId: session.agentId,
-          expertIds:
-            resumeInput?.expertIds === undefined
-              ? session.experts.slice(0, 1).map(expert => expert.expertId)
-              : normalizeSingleExpertIds(resumeInput.expertIds),
-          modelOverride: session.modelOverride,
-          approvalMode:
-            config.permissionMode === CoworkPermissionMode.AllowAll
-              ? WorkbenchApprovalMode.AllowAll
-              : WorkbenchApprovalMode.Ask,
-          goalMode: resumeInput?.goalMode,
-          productionLoopMode: resumeInput?.productionLoopMode,
-          imageAttachments: resumeInput?.imageAttachments,
-          fileAttachments: resumeInput?.fileAttachments,
-          _workbenchRunId: run.id,
-          _productionWorkflowRequired: shouldRequireProductionOnResume(
-            task.contract.kind,
-            previousProduction,
-          ),
-          _skipUserMessage: !amendment,
-        });
+        // 2026/09/17 lixiang  resume 不等待整段跑完（对齐 Continue IPC），否则底部无法切到停止
+        void getPiRuntimeAdapter()
+          .continueSession(session.id, prompt, {
+            systemPrompt: session.systemPrompt,
+            skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
+            sessionMode: session.mode,
+            workspaceRoot: session.cwd,
+            agentId: session.agentId,
+            expertIds:
+              resumeInput?.expertIds === undefined
+                ? session.experts.slice(0, 1).map(expert => expert.expertId)
+                : normalizeSingleExpertIds(resumeInput.expertIds),
+            modelOverride: session.modelOverride,
+            approvalMode:
+              config.permissionMode === CoworkPermissionMode.AllowAll
+                ? WorkbenchApprovalMode.AllowAll
+                : WorkbenchApprovalMode.Ask,
+            goalMode: resumeInput?.goalMode,
+            productionLoopMode: resumeInput?.productionLoopMode,
+            imageAttachments: resumeInput?.imageAttachments,
+            fileAttachments: resumeInput?.fileAttachments,
+            _workbenchRunId: run.id,
+            _productionWorkflowRequired: shouldRequireProductionOnResume(
+              task.contract.kind,
+              previousProduction,
+            ),
+            _skipUserMessage: !amendment,
+          })
+          .catch(error => {
+            console.error('[WorkbenchTask] resume continue error:', error);
+          });
       },
     });
     todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());

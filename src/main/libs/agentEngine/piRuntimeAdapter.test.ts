@@ -2179,6 +2179,49 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
     });
 
+    it('closes in-flight tool calls so resume does not show two running commands', async () => {
+      await adapter.startSession('paused-tools', 'Run a command');
+      const messages: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [
+        {
+          id: 'tool-use-1',
+          type: 'tool_use',
+          content: 'Using tool: bash',
+          metadata: { toolName: 'bash', toolUseId: 'call-bash-1', toolInput: { command: 'npm test' } },
+        },
+      ];
+      const addMessage = vi.fn((_sessionId: string, message: { type: string; metadata?: unknown }) => {
+        const persisted = { ...message, id: `persisted-${message.type}`, timestamp: Date.now() };
+        messages.push(persisted as (typeof messages)[number]);
+        return persisted;
+      });
+      adapter.setCoworkStore({
+        getSession: () => ({ messages }),
+        addMessage,
+        updateSession: vi.fn(),
+      } as unknown as CoworkStore);
+
+      adapter.stopSession('paused-tools');
+
+      const toolResults = addMessage.mock.calls
+        .map(call => call[1] as { type: string; metadata?: { toolUseId?: string; error?: string } })
+        .filter(message => message.type === 'tool_result');
+      expect(toolResults).toEqual([
+        expect.objectContaining({
+          type: 'tool_result',
+          metadata: expect.objectContaining({
+            toolUseId: 'call-bash-1',
+            error: 'interrupted',
+            isError: true,
+          }),
+        }),
+      ]);
+    });
+
     it('should be safe to call on unknown session', () => {
       adapter.stopSession('unknown');
       // Should not throw

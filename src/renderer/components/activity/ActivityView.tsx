@@ -124,15 +124,17 @@ const ActivityView: React.FC<ActivityViewProps> = ({
       />
 
       {/* 2026/09/15 lixiang  内容区底部留白，避免贴边 */}
-      <div className="flex min-h-0 w-full flex-1 flex-col px-8 pb-[20px]">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-8 pb-[20px]">
         <ActivityHero />
 
-        {/* 2026/09/15 lixiang  按设计稿重构活动内容区：来源 Tab + 状态胶囊 + 列表/空态 */}
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-sm">
+        {/* 2026/09/15 lixiang  内容区高度：最小半屏，最大为当前可用高度，超出滚动 */}
+        <section className="flex h-fit min-h-[50vh] max-h-full flex-col overflow-hidden rounded-xl border border-border shadow-sm">
           {/* Source tabs */}
           {/* 2026/09/15 lixiang  仅 Tab 行保留表面色，下半区透出页面底色 */}
-          <div className="flex shrink-0 items-center border-b border-border bg-surface px-6">
+          {/* 2026/09/15 lixiang  活动页来源 Tab 加高，贴近设计稿点击热区 */}
+          <div className="flex h-12 shrink-0 items-center border-b border-border bg-surface px-6">
             <PageTabs
+              className="h-full [&_.theme-page-tabs-list]:h-full [&_.theme-page-tabs-trigger]:h-full"
               value={triggerFilter}
               onValueChange={setTriggerFilter}
               items={triggerOptions.map(option => ({

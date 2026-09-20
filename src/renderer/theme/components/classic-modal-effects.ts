@@ -1,3 +1,4 @@
+import { modalOverlayBlur, modalOverlayScrim } from './modal-overlay-style';
 import { recipe } from './recipe';
 
 export function classicModalEffects(dark: boolean) {
@@ -16,11 +17,12 @@ export function classicModalEffects(dark: boolean) {
     'animation-duration': '200ms',
     'animation-timing-function': 'ease-out',
   };
+  // 2026/09/18 lixiang  只去掉 scale，避免获焦/失焦边框内收；光晕尺寸保持原样
   const aura = {
     'border-radius': 'inherit',
     opacity: '0',
-    scale: '0.985',
-    'transition-property': 'opacity, scale',
+    scale: '1',
+    'transition-property': 'opacity',
     'transition-duration': '520ms',
     'transition-timing-function': 'cubic-bezier(0.4, 0, 0.2, 1)',
   };
@@ -34,8 +36,7 @@ export function classicModalEffects(dark: boolean) {
     'legacy-modal-backdrop': recipe({
       base: {
         ...entrance,
-        'background-color':
-          'color-mix(in oklab, var(--zy-component-palette-black) 10%, transparent)',
+        ...modalOverlayScrim,
       },
       motionStart: { opacity: '0' },
       motionEnd: { opacity: '1' },
@@ -71,6 +72,7 @@ export function classicModalEffects(dark: boolean) {
       base: {
         'background-color':
           'color-mix(in oklab, var(--zy-component-palette-black) 60%, transparent)',
+        ...modalOverlayBlur,
       },
     }),
     'skill-security-modal': recipe({
@@ -82,17 +84,19 @@ export function classicModalEffects(dark: boolean) {
     'composer-near': recipe({
       base: {
         ...aura,
+        // 近层线框：单圈 1px + 轻柔近光，避免与 input-group 边框叠成粗线
         'box-shadow':
-          '0 0 0 1px color-mix(in srgb, var(--zy-primary) 38%, transparent), 0 0 10px color-mix(in srgb, var(--zy-primary) 15%, transparent), 0 4px 14px -6px color-mix(in srgb, var(--zy-primary) 16%, transparent)',
+          '0 0 0 1px color-mix(in oklch, var(--zy-primary) 45%, transparent), 0 0 6px color-mix(in oklch, var(--zy-primary) 28%, transparent)',
       },
       composerFocus: focused,
     }),
     'composer-far': recipe({
       base: {
         ...aura,
+        // 远层光晕：缩小模糊与扩散，保留轻微呼吸感
         'box-shadow': dark
-          ? '0 0 26px 2px color-mix(in srgb, var(--zy-primary) 14%, transparent), 0 0 60px 10px color-mix(in srgb, var(--zy-primary) 8%, transparent)'
-          : '0 0 22px 1px color-mix(in srgb, var(--zy-primary) 10%, transparent), 0 0 52px 8px color-mix(in srgb, var(--zy-primary) 5%, transparent)',
+          ? '0 0 10px 0 color-mix(in oklch, var(--zy-primary) 42%, transparent), 0 0 22px 2px color-mix(in oklch, var(--zy-primary) 22%, transparent)'
+          : '0 0 8px 0 color-mix(in oklch, var(--zy-primary) 36%, transparent), 0 0 18px 2px color-mix(in oklch, var(--zy-primary) 18%, transparent)',
       },
       composerFocus: {
         ...focused,
@@ -103,8 +107,9 @@ export function classicModalEffects(dark: boolean) {
         'animation-iteration-count': 'infinite',
         'animation-direction': 'alternate',
       },
-      motionStart: { opacity: '0.6', scale: '0.995' },
-      motionEnd: { opacity: '1', scale: '1.005' },
+      // 2026/09/18 lixiang  呼吸动画不再改 scale，避免失焦时边框内收
+      motionStart: { opacity: '0.6' },
+      motionEnd: { opacity: '1' },
     }),
   };
 }

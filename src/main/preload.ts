@@ -13,7 +13,6 @@ import {
   ApiIpc,
   AppConfigIpc,
   AppIpc,
-  CommunityAuthIpc,
   ContextMenuIpc,
   CoworkBootstrapIpc,
   CoworkConfigIpc,
@@ -32,8 +31,8 @@ import {
   LogIpc,
   ManagedProviderIpc,
   McpIpc,
-  ModelPoolIpc,
   NetworkIpc,
+  DevNetworkIpc,
   OpenAICodexOAuthIpc,
   PermissionsIpc,
   ProjectIpc,
@@ -1040,32 +1039,10 @@ contextBridge.exposeInMainWorld('electron', {
     send: (status: 'online' | 'offline') => ipcRenderer.send(NetworkIpc.StatusChange, status),
   },
 
-  auth: {
-    communityLogin: () => ipcRenderer.invoke(CommunityAuthIpc.Login),
-    getCommunityUser: () => ipcRenderer.invoke(CommunityAuthIpc.GetCommunityUser),
-    communityLogout: () => ipcRenderer.invoke(CommunityAuthIpc.Logout),
-    onCommunityCallback: (
-      callback: (data: {
-        success: boolean;
-        user?: { id: string; email: string; name: string };
-        error?: string;
-      }) => void,
-    ) => onPush(CommunityAuthIpc.Callback, callback),
-  },
-
-  modelPool: {
-    listModels: () => ipcRenderer.invoke(ModelPoolIpc.ListModels),
-    stream: (input: { requestId: string; conversationId: string; body: Record<string, unknown> }) =>
-      ipcRenderer.invoke(ModelPoolIpc.Stream, input),
-    cancelStream: (requestId: string) => ipcRenderer.invoke(ModelPoolIpc.CancelStream, requestId),
-    onStreamData: (requestId: string, callback: (data: string) => void) =>
-      onPush(ModelPoolIpc.streamData(requestId), callback),
-    onStreamDone: (requestId: string, callback: () => void) =>
-      onPushVoid(ModelPoolIpc.streamDone(requestId), callback),
-    onStreamError: (requestId: string, callback: (error: string) => void) =>
-      onPush(ModelPoolIpc.streamError(requestId), callback),
-    onStreamAbort: (requestId: string, callback: () => void) =>
-      onPushVoid(ModelPoolIpc.streamAbort(requestId), callback),
+  // 2026/09/17 lixiang  开发态主进程网络日志 → 渲染进程 Network beacon
+  devNetwork: {
+    onEntry: (callback: (entry: import('../shared/devNetworkLog').DevNetworkLogEntry) => void) =>
+      onPush(DevNetworkIpc.Entry, callback),
   },
 
   feishu: {

@@ -427,6 +427,28 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 {selectedArtifact.fileName || selectedArtifact.title}
               </span>
               <span className="flex-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => void handleToggleWorkspace()}
+                className="theme-action-icon-muted"
+                title={t(
+                  layoutMode === ArtifactLayoutMode.Workspace
+                    ? 'artifactExitFullWindow'
+                    : 'artifactEnterFullWindow',
+                )}
+                aria-label={t(
+                  layoutMode === ArtifactLayoutMode.Workspace
+                    ? 'artifactExitFullWindow'
+                    : 'artifactEnterFullWindow',
+                )}
+              >
+                {layoutMode === ArtifactLayoutMode.Workspace ? (
+                  <Shrink className="h-3.5 w-3.5" />
+                ) : (
+                  <Expand className="h-3.5 w-3.5" />
+                )}
+              </Button>
               {selectedArtifact.filePath && selectedArtifact.type !== 'unsupported' && (
                 <Button
                   variant="ghost"
@@ -482,28 +504,6 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <FolderIcon />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => void handleToggleWorkspace()}
-                className="theme-action-icon-muted"
-                title={t(
-                  layoutMode === ArtifactLayoutMode.Workspace
-                    ? 'artifactExitFullWindow'
-                    : 'artifactEnterFullWindow',
-                )}
-                aria-label={t(
-                  layoutMode === ArtifactLayoutMode.Workspace
-                    ? 'artifactExitFullWindow'
-                    : 'artifactEnterFullWindow',
-                )}
-              >
-                {layoutMode === ArtifactLayoutMode.Workspace ? (
-                  <Shrink className="h-3.5 w-3.5" />
-                ) : (
-                  <Expand className="h-3.5 w-3.5" />
-                )}
-              </Button>
               {document.fullscreenEnabled && (
                 <Button
                   variant="ghost"

@@ -17,6 +17,14 @@ import {
 } from './apiConfigResolver';
 import { buildAnthropicMessagesUrl, ProviderName } from '../../shared/providers';
 import { streamOverBridge, type StreamBridge } from './chatStream/bridge';
+import {
+  apiCancelStream,
+  apiOnStreamAbort,
+  apiOnStreamData,
+  apiOnStreamDone,
+  apiOnStreamError,
+  apiStream,
+} from './visibleApiTransport';
 
 export interface IpcChatTransportOptions {
   provider?: string;
@@ -270,18 +278,18 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
   ): ReadableStream<UIMessageChunk> {
     return this.streamOverBridge(chatId, abortSignal, apiFormat, {
       start: requestId =>
-        window.electron.api.stream({
+        apiStream({
           url,
           method: 'POST',
           headers,
           body: JSON.stringify(body),
           requestId,
         }),
-      cancel: requestId => window.electron.api.cancelStream(requestId),
-      onData: (requestId, callback) => window.electron.api.onStreamData(requestId, callback),
-      onDone: (requestId, callback) => window.electron.api.onStreamDone(requestId, callback),
-      onError: (requestId, callback) => window.electron.api.onStreamError(requestId, callback),
-      onAbort: (requestId, callback) => window.electron.api.onStreamAbort(requestId, callback),
+      cancel: requestId => apiCancelStream(requestId),
+      onData: (requestId, callback) => apiOnStreamData(requestId, callback),
+      onDone: (requestId, callback) => apiOnStreamDone(requestId, callback),
+      onError: (requestId, callback) => apiOnStreamError(requestId, callback),
+      onAbort: (requestId, callback) => apiOnStreamAbort(requestId, callback),
     });
   }
 

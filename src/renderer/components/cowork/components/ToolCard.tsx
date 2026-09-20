@@ -21,9 +21,11 @@ import { Check, ChevronDown } from 'lucide-react';
 import React, { useMemo } from 'react';
 
 import { i18nService } from '../../../services/i18n';
+import type { CoworkPermissionRequest, CoworkPermissionResult } from '../../../types/cowork';
 import DiffView, { extractDiffFromToolInput } from '../DiffView';
 import type { ToolGroupItem } from '../helpers/messageGrouping';
 import { usePersistentToggle } from '../hooks/usePersistentToggle';
+import { ToolPermissionActions } from './ToolPermissionActions';
 import type { ParsedTodoItem } from '../helpers/toolUtils';
 import {
   formatToolInput,
@@ -75,7 +77,18 @@ export const ToolCard: React.FC<{
   mapDisplayText?: (value: string) => string;
   /** Bypass the collapsed-result preview (e.g. image export capture). */
   forceExpand?: boolean;
-}> = ({ group, isLastInSequence = true, muted = false, mapDisplayText, forceExpand = false }) => {
+  // 2026/09/16 lixiang  待授权请求挂到对应工具卡片上，按钮画在卡片/终端里
+  pendingPermission?: CoworkPermissionRequest | null;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void;
+}> = ({
+  group,
+  isLastInSequence = true,
+  muted = false,
+  mapDisplayText,
+  forceExpand = false,
+  pendingPermission = null,
+  onRespondToPermission,
+}) => {
   const { toolUse, toolResult } = group;
   const rawToolName =
     typeof toolUse.metadata?.toolName === 'string' ? toolUse.metadata.toolName : 'Tool';
@@ -95,15 +108,29 @@ export const ToolCard: React.FC<{
   const isEditWithDiff = diffDataList !== null && diffDataList.length > 0;
 
   const hasResult = Boolean(toolResult);
+  // 2026/09/16 lixiang  Bash 把按钮放进黑色终端，其它工具放在卡片内容区，避免和第二张白底卡重复
+  const permissionBar =
+    pendingPermission && onRespondToPermission ? (
+      <ToolPermissionActions
+        permission={pendingPermission}
+        onRespond={onRespondToPermission}
+        variant={isBashTool ? 'terminal' : 'light'}
+      />
+    ) : null;
+  const awaitingPermission = Boolean(permissionBar);
   const isError = Boolean(toolResult?.metadata?.isError || toolResult?.metadata?.error);
-  const toolState = hasResult
-    ? isError
-      ? ('output-error' as const)
-      : ('output-available' as const)
-    : ('input-available' as const);
+  const toolState = awaitingPermission
+    ? ('approval-requested' as const)
+    : hasResult
+      ? isError
+        ? ('output-error' as const)
+        : ('output-available' as const)
+      : ('input-available' as const);
   const toolResultDisplay = toolResult ? mapText(getToolResultDisplay(toolResult)) : '';
   // Expansion persists across virtualization unmounts and export remounts.
   const [isToolOpen, setIsToolOpen] = usePersistentToggle(`tool-${toolUse.id}`, false);
+  // 2026/09/16 lixiang  等待授权期间强制展开工具卡片，保证拒绝/允许可见
+  const isCardOpen = awaitingPermission || isToolOpen;
   const [isResultExpanded, setIsResultExpanded] = usePersistentToggle(
     `toolresult-${toolUse.id}`,
     false,
@@ -132,13 +159,18 @@ export const ToolCard: React.FC<{
       )}
       <Tool
         className={cn('mb-0', muted && 'text-muted-foreground')}
-        open={isToolOpen}
-        onOpenChange={setIsToolOpen}
+        open={isCardOpen}
+        onOpenChange={next => {
+          if (!awaitingPermission) setIsToolOpen(next);
+        }}
       >
         <ToolHeader
           type={`tool-${rawToolName}` as ToolUIPart['type']}
           state={toolState}
           title={displayName}
+          statusLabel={
+            awaitingPermission ? i18nService.t('codingAgentPermissionEvent') : undefined
+          }
         />
         <ToolContent className="flex flex-col gap-4">
           {isBashTool ? (
@@ -153,6 +185,7 @@ export const ToolCard: React.FC<{
                 </div>
               </TerminalHeader>
               <TerminalContent />
+              {permissionBar}
             </Terminal>
           ) : isTodoWriteTool && todoItems ? (
             <TodoWriteInputView items={todoItems} />
@@ -202,6 +235,7 @@ export const ToolCard: React.FC<{
               )}
             </>
           )}
+          {!isBashTool && permissionBar}
         </ToolContent>
       </Tool>
     </div>
