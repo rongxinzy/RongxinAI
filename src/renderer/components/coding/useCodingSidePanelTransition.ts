@@ -21,6 +21,7 @@ export const useCodingSidePanelTransition = ({
   const [isClosing, setIsClosing] = useState(false);
   const entryFrameRef = useRef<number | null>(null);
   const closeFallbackRef = useRef<number | null>(null);
+  const previousNarrowViewportRef = useRef(isNarrowViewport);
 
   const cancelEntryFrame = useCallback(() => {
     if (entryFrameRef.current === null) return;
@@ -45,8 +46,13 @@ export const useCodingSidePanelTransition = ({
   useEffect(() => reset, [reset]);
 
   useEffect(() => {
-    if (isNarrowViewport) reset();
-  }, [isNarrowViewport, reset]);
+    const enteredNarrowViewport = isNarrowViewport && !previousNarrowViewportRef.current;
+    previousNarrowViewportRef.current = isNarrowViewport;
+    if (!enteredNarrowViewport) return;
+    reset();
+    // A breakpoint change bypasses hide(), so notify the owner explicitly.
+    onCloseComplete();
+  }, [isNarrowViewport, onCloseComplete, reset]);
 
   const show = useCallback(() => {
     if (isNarrowViewport) return;

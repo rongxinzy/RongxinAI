@@ -75,3 +75,22 @@ test('finishes closing when the browser does not dispatch transitionend', () => 
   expect(view.result.current).toMatchObject({ isPresent: false, isClosing: false });
   expect(onCloseComplete).toHaveBeenCalledOnce();
 });
+
+test('completes the close state when the viewport becomes narrow', () => {
+  const onCloseComplete = vi.fn();
+  const view = renderHook(
+    ({ isNarrowViewport }: { isNarrowViewport: boolean }) =>
+      useCodingSidePanelTransition({ isNarrowViewport, onCloseComplete }),
+    { initialProps: { isNarrowViewport: false } },
+  );
+
+  act(() => view.result.current.show());
+  expect(view.result.current.isPresent).toBe(true);
+
+  act(() => view.rerender({ isNarrowViewport: true }));
+  expect(view.result.current).toMatchObject({ isPresent: false, isClosing: false });
+  expect(onCloseComplete).toHaveBeenCalledOnce();
+
+  act(() => view.rerender({ isNarrowViewport: true }));
+  expect(onCloseComplete).toHaveBeenCalledOnce();
+});
