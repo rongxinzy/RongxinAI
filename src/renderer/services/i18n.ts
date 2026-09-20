@@ -6531,7 +6531,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityStatusCompleted: 'Completed',
     activityStatusFailed: 'Failed',
     activityEmpty: 'No channel or scheduled task runs yet',
-    activityEmptyAction: 'View scheduled tasks',
     activityFilterEmpty: 'No related activity data',
     activityFilterClear: 'Clear filters',
     activityGroupToday: 'Today',

@@ -24,6 +24,7 @@ import {
 import { probeRuntimeModelCapabilities } from './modelCapabilityProbe';
 import { StreamRequestRegistry } from './streamRequestRegistry';
 import { isToolCallUnsupportedError } from './toolCallUnsupported';
+
 import {
   apiCancelStream,
   apiOnStreamAbort,
@@ -32,6 +33,7 @@ import {
   apiOnStreamError,
   apiStream,
 } from './visibleApiTransport';
+
 import { WebSearchToolEventType, type WebSearchToolEventHandler } from './webSearchToolEvents';
 
 export interface ApiConfig {

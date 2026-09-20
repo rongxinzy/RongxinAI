@@ -54,6 +54,10 @@ test('starts at the estimated end and anchors dynamic measurements to the end', 
     expect.objectContaining({
       anchorTo: 'end',
       followOnAppend: true,
+<<<<<<< HEAD
+=======
+      useAnimationFrameWithResizeObserver: false,
+>>>>>>> be4995e5 (fix(scroll): 修复【流式输出，页面一直抖动】问题。)
       initialOffset: 0,
       initialRect: { width: 0, height: 1200 },
     }),
