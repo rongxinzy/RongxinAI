@@ -21,8 +21,6 @@ test('development startup waits for Vite readiness before launching Electron', (
   const findDevPortScript = readFileSync(path.join(root, 'scripts', 'find-dev-port.mjs'), 'utf8');
   const preloadEntryIndex = viteConfig.indexOf("entry: 'src/main/preload.ts'");
   const mainEntryIndex = viteConfig.indexOf("entry: 'src/main/main.ts'");
-  const viteListenIndex = developmentLauncher.indexOf('await server.listen()');
-  const electronSpawnIndex = developmentLauncher.indexOf("spawn(electron, ['.']");
 
   assert.match(viteConfig, /extractExternalDeps\(packageJson, true\)/);
   assert.match(viteConfig, /electronDevelopmentExternalRoots\.has\(packageRoot\(id\)\)/);

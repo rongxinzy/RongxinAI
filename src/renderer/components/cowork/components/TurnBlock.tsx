@@ -97,13 +97,10 @@ const TurnBlockComponent: React.FC<{
   // 2026/09/17 lixiang  流式/恢复中禁用继续执行，避免重复点击
   resumeDisabled?: boolean;
   onResumeTask?: (interruption: CoworkSessionInterruption) => void;
-<<<<<<< HEAD
   hideDefaultAssistantHeader?: boolean;
-=======
   // 2026/09/16 lixiang  把当前轮次的工具授权嵌进对应 ToolCard，不再叠在底部输入框上
   pendingPermission?: CoworkPermissionRequest | null;
   onRespondToPermission?: (result: CoworkPermissionResult) => void;
->>>>>>> df5c1652 (fix(chat): 1、修复【工具授权重叠在底部输入框上】问题；2、【工具授权框和流式对话中的授权框重复】问题。)
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
 }> = ({
@@ -119,25 +116,19 @@ const TurnBlockComponent: React.FC<{
   resumeTaskId,
   resumeDisabled = false,
   onResumeTask,
-<<<<<<< HEAD
   hideDefaultAssistantHeader = false,
-=======
   pendingPermission = null,
   onRespondToPermission,
->>>>>>> df5c1652 (fix(chat): 1、修复【工具授权重叠在底部输入框上】问题；2、【工具授权框和流式对话中的授权框重复】问题。)
   expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
   const primaryExpert = getTurnPrimaryExpert(turn);
-<<<<<<< HEAD
   const showAssistantHeader = Boolean(primaryExpert) || !hideDefaultAssistantHeader;
-=======
   // 2026/09/16 lixiang  只把授权挂到匹配到的那一个正在执行的工具上
   const pendingToolGroup =
     pendingPermission && onRespondToPermission
       ? findToolGroupForPermission(visibleAssistantItems, pendingPermission)
       : null;
->>>>>>> df5c1652 (fix(chat): 1、修复【工具授权重叠在底部输入框上】问题；2、【工具授权框和流式对话中的授权框重复】问题。)
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
