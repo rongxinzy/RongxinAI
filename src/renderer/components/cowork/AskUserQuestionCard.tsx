@@ -244,7 +244,8 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
         })}
       </ul>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+      {/* 2026/09/20  次要动作 ghost + gap-3，与授权卡/验收卡操作行一致 */}
+      <div className="flex items-center justify-end gap-3 border-t border-border pt-3">
         {!isComplete && (
           <p className="mr-auto text-xs text-muted-foreground" role="status">
             {i18nService.t('coworkQuestionWizardAnswerRequired')}
@@ -252,7 +253,7 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
         )}
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           onClick={() => void respond(buildAskUserQuestionDenyResult())}
           disabled={isSubmitting}
         >
