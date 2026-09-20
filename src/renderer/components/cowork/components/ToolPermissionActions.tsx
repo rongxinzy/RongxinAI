@@ -26,7 +26,7 @@ export const ToolPermissionActions = ({
       <Button
         variant="ghost"
         size="sm"
-        className={isTerminal ? 'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100' : undefined}
+        className={isTerminal ? 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100' : undefined}
         onClick={() => onRespond({ behavior: 'deny', message: 'Permission denied' })}
       >
         {i18nService.t('coworkDeny')}

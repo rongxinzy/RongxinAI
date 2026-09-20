@@ -2,7 +2,6 @@ import { Message, MessageContent } from '@shared/components/ai-elements/message'
 import React, { useState } from 'react';
 
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
-import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
 

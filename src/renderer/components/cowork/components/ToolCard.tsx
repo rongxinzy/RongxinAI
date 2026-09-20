@@ -168,7 +168,6 @@ export const ToolCard: React.FC<{
           type={`tool-${rawToolName}` as ToolUIPart['type']}
           state={toolState}
           title={displayName}
-          isOpen={isCardOpen}
           statusLabel={
             awaitingPermission ? i18nService.t('codingAgentPermissionEvent') : undefined
           }

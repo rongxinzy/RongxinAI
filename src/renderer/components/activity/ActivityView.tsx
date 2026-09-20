@@ -198,6 +198,16 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                       {i18nService.t('activityFilterClear')}
                     </button>
                   </EmptyContent>
+                ) : !hasAnyRun && onShowScheduledTasks ? (
+                  <EmptyContent>
+                    <button
+                      type="button"
+                      onClick={onShowScheduledTasks}
+                      className="text-xs text-primary transition-colors hover:text-primary-hover"
+                    >
+                      {i18nService.t('activityEmptyAction')}
+                    </button>
+                  </EmptyContent>
                 ) : null}
               </Empty>
             ) : (
