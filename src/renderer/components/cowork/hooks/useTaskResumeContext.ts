@@ -31,35 +31,60 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
 
   const resume = useCallback(
     async (input: Omit<WorkbenchTaskResumeInput, 'taskId'>): Promise<boolean> => {
-      if (!interruption?.taskId || isResuming) return false;
+      const taskId = interruption?.taskId;
+      if (!taskId || interruption.sessionId !== sessionId || isResuming) return false;
+      const target = interruption;
       setIsResuming(true);
+      // 2026/09/17 lixiang  开始继续执行时立刻清掉输入框里的暂停任务嵌入
+      setInterruption(null);
+      // 2026/09/17 lixiang  与普通 continue 一致：发起前先标 Running，才能显示停止按钮
+      if (sessionId) {
+        dispatch(
+          updateSessionStatus({
+            sessionId,
+            status: CoworkSessionStatusValue.Running,
+          }),
+        );
+      }
       try {
         const result = await window.electron.workbenchTask.resume({
           ...input,
-          taskId: interruption.taskId,
+          taskId,
         });
         if (!result.success) {
-          showAppErrorToast(normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')));
+          showAppErrorToast(
+            normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')),
+          );
+          // 2026/09/17 lixiang  启动失败时恢复嵌入，方便用户重试
+          setInterruption(target);
+          if (sessionId) {
+            dispatch(
+              updateSessionStatus({
+                sessionId,
+                status: CoworkSessionStatusValue.Idle,
+              }),
+            );
+          }
           return false;
         }
+        return true;
+      } catch {
+        showAppErrorToast(i18nService.t('coworkResumeTaskFailed'));
+        setInterruption(target);
         if (sessionId) {
           dispatch(
             updateSessionStatus({
               sessionId,
-              status: CoworkSessionStatusValue.Running,
+              status: CoworkSessionStatusValue.Idle,
             }),
           );
         }
-        setInterruption(null);
-        return true;
-      } catch {
-        showAppErrorToast(i18nService.t('coworkResumeTaskFailed'));
         return false;
       } finally {
         setIsResuming(false);
       }
     },
-    [dispatch, interruption?.taskId, isResuming, sessionId],
+    [dispatch, interruption, isResuming, sessionId],
   );
 
   return { cancel, interruption, isResuming, resume, select };

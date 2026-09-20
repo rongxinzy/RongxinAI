@@ -6,6 +6,7 @@ import {
   type ProviderConfig,
 } from '../../shared/providers';
 import { i18nService } from './i18n';
+import { apiFetch } from './visibleApiTransport';
 
 export interface ProviderModelConnectionTarget {
   id: string;
@@ -119,7 +120,9 @@ function classifyConnectionFailure(
   ) {
     return ProviderModelConnectionFailureKind.Model;
   }
-  if (status === undefined) {
+  // status 0 is the transport sentinel for aborted / unreachable requests
+  // (visibleApiTransport page-fetch path and main-process fetch failures).
+  if (status === undefined || status === 0) {
     return ProviderModelConnectionFailureKind.Network;
   }
   return ProviderModelConnectionFailureKind.Unknown;
@@ -169,7 +172,7 @@ export async function testProviderModelConnection(
 
   try {
     if (apiFormat === ApiFormat.Anthropic) {
-      const response = await window.electron.api.fetch({
+      const response = await apiFetch({
         url: buildAnthropicMessagesUrl(baseUrl),
         method: 'POST',
         headers: {
@@ -216,7 +219,7 @@ export async function testProviderModelConnection(
       ] = CONNECTIVITY_TEST_TOKEN_BUDGET;
     }
 
-    const response = await window.electron.api.fetch({
+    const response = await apiFetch({
       url: useResponsesApi
         ? buildOpenAIResponsesUrl(baseUrl)
         : buildOpenAICompatibleChatCompletionsUrl(baseUrl, input.providerId),

@@ -107,6 +107,22 @@ test('unpacks ACP adapters without bundling external agent binaries', () => {
   }
 });
 
+test('macOS Launchpad uses icon.icns instead of an asset-catalog icon name', () => {
+  const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
+    mac?: { icon?: string; extendInfo?: Record<string, unknown> };
+  };
+  assert.equal(config.mac?.icon, 'build/icons/mac/icon.icns');
+  assert.equal(config.mac?.extendInfo?.CFBundleIconName, undefined);
+
+  const hooks = readFileSync(path.join(root, 'scripts', 'electron-builder-hooks.cjs'), 'utf8');
+  assert.match(hooks, /'-remove', 'CFBundleIconName'/);
+  assert.doesNotMatch(hooks, /'-insert', 'CFBundleIconName'/);
+
+  const fixScript = readFileSync(path.join(root, 'scripts', 'fix-mac-icon-display.sh'), 'utf8');
+  assert.match(fixScript, /plutil -remove CFBundleIconName/);
+  assert.doesNotMatch(fixScript, /plutil -insert CFBundleIconName/);
+});
+
 test('stable release metadata does not inherit the build prerelease channel', () => {
   const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
     detectUpdateChannel?: boolean;

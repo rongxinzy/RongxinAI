@@ -1,10 +1,11 @@
 #!/bin/bash
 set -e
 
-# Post-build script to fix macOS icon display issue on Apple Silicon
-# This script ensures the app icon is displayed correctly in "About" dialog
+# Post-build script so Launchpad and the Dock use icon.icns.
+# CFBundleIconName without an Assets.car makes macOS ignore icon.icns and
+# show the Electron default icon.
 
-echo "🔧 Applying macOS icon fix for Apple Silicon compatibility..."
+echo "Applying macOS Launchpad icon fix..."
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <path-to-app>"
@@ -28,15 +29,21 @@ fi
 
 echo "  App: $APP_PATH"
 
-# Check if CFBundleIconName is already set
+# CFBundleIconName is for Asset Catalog icons. This bundle only has icon.icns.
 if plutil -extract CFBundleIconName raw "$INFO_PLIST" &>/dev/null; then
-    ICON_NAME=$(plutil -extract CFBundleIconName raw "$INFO_PLIST")
-    echo "  ✓ CFBundleIconName already set: $ICON_NAME"
+    echo "  Removing CFBundleIconName so Launchpad uses icon.icns..."
+    plutil -remove CFBundleIconName "$INFO_PLIST"
+    echo "  ✓ CFBundleIconName removed"
 else
-    echo "  ℹ️  Adding CFBundleIconName to Info.plist..."
-    plutil -insert CFBundleIconName -string "icon" "$INFO_PLIST"
-    echo "  ✓ CFBundleIconName added"
+    echo "  ✓ CFBundleIconName is not set"
 fi
+
+if plutil -extract CFBundleIconFile raw "$INFO_PLIST" &>/dev/null; then
+    plutil -replace CFBundleIconFile -string "icon.icns" "$INFO_PLIST"
+else
+    plutil -insert CFBundleIconFile -string "icon.icns" "$INFO_PLIST"
+fi
+echo "  ✓ CFBundleIconFile set to icon.icns"
 
 # Verify icon file exists
 ICON_FILE="$RESOURCES_PATH/icon.icns"
@@ -68,4 +75,4 @@ echo "   2. Clear system icon cache (optional, may require restart):"
 echo "      sudo rm -rf /Library/Caches/com.apple.iconservices.store"
 echo "      killall Dock"
 echo ""
-echo "   3. Test the app to verify the icon appears in About dialog"
+echo "   3. Open Launchpad and confirm the app icon is the product logo"

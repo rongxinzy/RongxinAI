@@ -4,8 +4,7 @@ import { ensurePreviewColorScheme } from './HtmlRenderer';
 
 describe('ensurePreviewColorScheme', () => {
   test('injects light color-scheme when the document does not declare one', () => {
-    const html =
-      '<!DOCTYPE html><html><head><title>Resume</title></head><body><h1>About</h1></body></html>';
+    const html = '<!DOCTYPE html><html><head><title>简历</title></head><body><h1>关于</h1></body></html>';
     const result = ensurePreviewColorScheme(html);
     expect(result).toContain('name="color-scheme" content="light"');
     expect(result).toContain(':root{color-scheme:light;}');

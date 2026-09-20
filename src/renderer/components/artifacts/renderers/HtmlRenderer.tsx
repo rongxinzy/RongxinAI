@@ -28,14 +28,14 @@ function hasRelativeResources(html: string): boolean {
   return false;
 }
 
-// Keep the application color scheme from leaking into self-contained previews.
+// 2026/09/17 lixiang  阻断应用深色 color-scheme 渗入 srcDoc，避免简历等浅底页白字不可见
 export function ensurePreviewColorScheme(html: string): string {
   if (/name\s*=\s*["']color-scheme["']/i.test(html) || /color-scheme\s*:/i.test(html)) {
     return html;
   }
   const inject =
     '<meta name="color-scheme" content="light">' +
-    '<style data-zhiyuan-preview-color-scheme>:root{color-scheme:light;}</style>';
+    '<style data-xiaoruan-preview-color-scheme>:root{color-scheme:light;}</style>';
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/(<head[^>]*>)/i, `$1${inject}`);
   }
@@ -85,7 +85,9 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
         if (!cancelled) setProcessedHtml(ensurePreviewColorScheme(html));
       } catch {
         if (!cancelled) {
-          setProcessedHtml(artifact.content ? ensurePreviewColorScheme(artifact.content) : null);
+          setProcessedHtml(
+            artifact.content ? ensurePreviewColorScheme(artifact.content) : null,
+          );
         }
       }
     };

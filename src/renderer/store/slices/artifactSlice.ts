@@ -129,6 +129,52 @@ function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
     : merged;
 }
 
+// 2026/09/17 lixiang  交付物首次出现或升级时自动打开右侧产物面板
+function shouldRevealArtifactPanel(previous: Artifact | undefined, next: Artifact): boolean {
+  if (next.role !== ArtifactRole.Deliverable) return false;
+  if (!previous) return true;
+  return (
+    previous.role !== ArtifactRole.Deliverable ||
+    (!previous.declared && Boolean(next.declared)) ||
+    (!previous.content && Boolean(next.content))
+  );
+}
+
+function revealArtifactInPanel(state: ArtifactState, sessionId: string, fallbackArtifactId: string) {
+  const artifacts = state.artifactsBySession[sessionId] ?? [];
+  const deliverables = artifacts.filter(artifact => artifact.role === ArtifactRole.Deliverable);
+  const firstDeliverableId = deliverables[0]?.id ?? fallbackArtifactId;
+  // 2026/09/17 lixiang  仅一个交付物时强制预览该文件；多个时保留已有选中，否则选第一个
+  const onlyOneDeliverable = deliverables.length === 1;
+
+  if (state.activeSessionId !== sessionId) {
+    const view = state.viewStateBySession[sessionId] ?? getDefaultSessionViewState();
+    const keepSelection =
+      !onlyOneDeliverable &&
+      view.isPanelOpen &&
+      view.selectedArtifactId &&
+      artifacts.some(artifact => artifact.id === view.selectedArtifactId);
+    state.viewStateBySession[sessionId] = {
+      ...view,
+      selectedArtifactId: keepSelection ? view.selectedArtifactId : firstDeliverableId,
+      isPanelOpen: true,
+      panelView: ArtifactPanelView.Preview,
+      activeTab: 'preview',
+    };
+    return;
+  }
+
+  const keepSelection =
+    !onlyOneDeliverable &&
+    state.isPanelOpen &&
+    state.selectedArtifactId &&
+    artifacts.some(artifact => artifact.id === state.selectedArtifactId);
+  state.selectedArtifactId = keepSelection ? state.selectedArtifactId : firstDeliverableId;
+  state.isPanelOpen = true;
+  state.panelView = ArtifactPanelView.Preview;
+  state.activeTab = 'preview';
+}
+
 const artifactSlice = createSlice({
   name: 'artifact',
   initialState,
@@ -172,24 +218,35 @@ const artifactSlice = createSlice({
         const merged = mergeArtifact(old, projectedArtifact);
         if (merged !== old) {
           state.artifactsBySession[sessionId][existing] = merged;
-        }
-      } else {
-        // Deduplicate by filePath: if another artifact with same filePath already exists, update it
-        if (projectedArtifact.filePath) {
-          const normalizedPath = normalizeFilePathForDedup(projectedArtifact.filePath);
-          const dupIndex = state.artifactsBySession[sessionId].findIndex(
-            a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedPath,
-          );
-          if (dupIndex >= 0) {
-            const old = state.artifactsBySession[sessionId][dupIndex];
-            const merged = mergeArtifact(old, projectedArtifact);
-            if (merged !== old) {
-              state.artifactsBySession[sessionId][dupIndex] = merged;
-            }
-            return;
+          if (shouldRevealArtifactPanel(old, merged)) {
+            revealArtifactInPanel(state, sessionId, merged.id);
           }
         }
-        state.artifactsBySession[sessionId].push(projectedArtifact);
+        return;
+      }
+
+      // Deduplicate by filePath: if another artifact with same filePath already exists, update it
+      if (projectedArtifact.filePath) {
+        const normalizedPath = normalizeFilePathForDedup(projectedArtifact.filePath);
+        const dupIndex = state.artifactsBySession[sessionId].findIndex(
+          a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedPath,
+        );
+        if (dupIndex >= 0) {
+          const old = state.artifactsBySession[sessionId][dupIndex];
+          const merged = mergeArtifact(old, projectedArtifact);
+          if (merged !== old) {
+            state.artifactsBySession[sessionId][dupIndex] = merged;
+            if (shouldRevealArtifactPanel(old, merged)) {
+              revealArtifactInPanel(state, sessionId, merged.id);
+            }
+          }
+          return;
+        }
+      }
+
+      state.artifactsBySession[sessionId].push(projectedArtifact);
+      if (shouldRevealArtifactPanel(undefined, projectedArtifact)) {
+        revealArtifactInPanel(state, sessionId, projectedArtifact.id);
       }
     },
 
@@ -218,6 +275,18 @@ const artifactSlice = createSlice({
       state.isPanelOpen = !state.isPanelOpen;
       if (!state.isPanelOpen) {
         state.layoutMode = ArtifactLayoutMode.Split;
+        return;
+      }
+
+      // 2026/09/17 lixiang  打开面板且仅有一个交付物时，直接进入该文件预览
+      if (!state.activeSessionId) return;
+      const deliverables = (state.artifactsBySession[state.activeSessionId] ?? []).filter(
+        artifact => artifact.role === ArtifactRole.Deliverable,
+      );
+      if (deliverables.length === 1) {
+        state.selectedArtifactId = deliverables[0].id;
+        state.panelView = ArtifactPanelView.Preview;
+        state.activeTab = 'preview';
       }
     },
 
