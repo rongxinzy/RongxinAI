@@ -244,9 +244,6 @@ import {
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
 
-import { AISphere, AISphereIpc } from '../shared/aisphere';
-import { aisphereService } from './aisphere/service';
-import { startAISphereGateway } from './aisphere/gateway';
 import { setPlatformFetchNetworkLogger } from './aisphere/transport';
 import { registerDevNetworkProtocol, trackDevNetworkRequest, publishDevNetworkLog } from './devNetworkLog';
 import { sanitizeNetworkUrl, truncateNetworkBody } from '../shared/devNetworkLog';
@@ -6839,7 +6836,7 @@ if (!gotTheLock) {
       getStatus: result => result.status,
       getRequestBody: () => truncateNetworkBody(options.body),
       getResponseBody: result =>
-        truncateNetworkBody(result.error ?? result.data ?? result.statusText),
+        truncateNetworkBody('error' in result ? result.error : (result.data ?? result.statusText)),
       run: async () => {
         try {
           let result = await doFetch(options.headers);
@@ -6874,7 +6871,7 @@ if (!gotTheLock) {
             status: 0,
             statusText: error instanceof Error ? error.message : 'Network error',
             headers: {},
-            data: null,
+            data: null as null,
             error: error instanceof Error ? error.message : 'Unknown error',
           };
         }

@@ -31,7 +31,8 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
 
   const resume = useCallback(
     async (input: Omit<WorkbenchTaskResumeInput, 'taskId'>): Promise<boolean> => {
-      if (!interruption?.taskId || interruption.sessionId !== sessionId || isResuming) return false;
+      const taskId = interruption?.taskId;
+      if (!taskId || interruption.sessionId !== sessionId || isResuming) return false;
       const target = interruption;
       setIsResuming(true);
       // 2026/09/17 lixiang  开始继续执行时立刻清掉输入框里的暂停任务嵌入
@@ -48,10 +49,12 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
       try {
         const result = await window.electron.workbenchTask.resume({
           ...input,
-          taskId: target.taskId,
+          taskId,
         });
         if (!result.success) {
-          toast.error(normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')));
+          showAppErrorToast(
+            normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')),
+          );
           // 2026/09/17 lixiang  启动失败时恢复嵌入，方便用户重试
           setInterruption(target);
           if (sessionId) {
@@ -66,7 +69,7 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
         }
         return true;
       } catch {
-        toast.error(i18nService.t('coworkResumeTaskFailed'));
+        showAppErrorToast(i18nService.t('coworkResumeTaskFailed'));
         setInterruption(target);
         if (sessionId) {
           dispatch(
