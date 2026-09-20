@@ -138,7 +138,10 @@ import {
   buildPiConversationPrompt,
   calculatePiConversationHistoryCharLimit,
 } from './piConversationContext';
-import { getPiBashCommandViolation } from './piBashToolGuidelines';
+import {
+  getPiBashCommandViolation,
+  normalizePiBashTimeoutSeconds,
+} from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piWriteTokenLimit';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { McpPiAdapter } from './mcpPiAdapter';
@@ -2428,6 +2431,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             ) {
               return undefined;
             }
+            const input = event.input as Record<string, unknown>;
+            input.timeout = normalizePiBashTimeoutSeconds(input.timeout);
             const command = (event.input as Record<string, unknown>).command;
             if (typeof command !== 'string') return undefined;
             const reason = getPiBashCommandViolation(command);
