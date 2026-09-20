@@ -43,7 +43,7 @@ beforeEach(() => {
   mocks.state.cowork.loadingSessionId = null;
 });
 
-test('keeps the detail shell mounted while its conversation switches sessions', () => {
+test('keeps the detail shell mounted while its conversation switches sessions', async () => {
   mocks.state.cowork.currentSession = { id: 'session-a' };
   mocks.state.cowork.loadingSessionId = 'session-b';
 
@@ -55,13 +55,13 @@ test('keeps the detail shell mounted while its conversation switches sessions', 
     }),
   );
 
-  const detail = screen.getByTestId('session-detail');
+  const detail = await screen.findByTestId('session-detail');
   expect(detail).toHaveAttribute('data-displayed-session-id', 'session-b');
   expect(detail).toHaveAttribute('data-session-switching', 'true');
   expect(screen.queryByTestId('session-skeleton')).not.toBeInTheDocument();
 });
 
-test('renders the target session as soon as its data is ready', () => {
+test('renders the target session as soon as its data is ready', async () => {
   mocks.state.cowork.currentSession = { id: 'session-b' };
   mocks.state.cowork.loadingSessionId = 'session-b';
 
@@ -73,13 +73,13 @@ test('renders the target session as soon as its data is ready', () => {
     }),
   );
 
-  expect(screen.getByTestId('session-detail')).toBeInTheDocument();
+  expect(await screen.findByTestId('session-detail')).toBeInTheDocument();
   expect(screen.getByTestId('session-detail')).toHaveAttribute('data-session-switching', 'false');
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
   expect(screen.queryByTestId('session-skeleton')).not.toBeInTheDocument();
 });
 
-test('renders the current session when no switch is pending', () => {
+test('renders the current session when no switch is pending', async () => {
   mocks.state.cowork.currentSession = { id: 'session-b' };
 
   render(
@@ -90,7 +90,7 @@ test('renders the current session when no switch is pending', () => {
     }),
   );
 
-  expect(screen.getByTestId('session-detail')).toBeInTheDocument();
+  expect(await screen.findByTestId('session-detail')).toBeInTheDocument();
   expect(screen.getByTestId('session-detail')).toHaveAttribute('data-session-switching', 'false');
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });

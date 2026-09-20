@@ -44,7 +44,9 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({
         let loadedSession: CoworkSession | null = null;
 
         if (sessionId) {
-          const result = await window.electron?.cowork?.getSession(sessionId);
+          const result = await window.electron?.cowork?.getSession(sessionId, {
+            messageLimit: null,
+          });
           if (result?.success && result.session) {
             const s = result.session;
             loadedSession = {

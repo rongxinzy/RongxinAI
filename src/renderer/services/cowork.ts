@@ -14,6 +14,7 @@ import {
 } from '../../shared/cowork/constants';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
+import { clearSessionArtifacts } from '../store/slices/artifactSlice';
 import {
   addMessage,
   addSession,
@@ -253,9 +254,19 @@ class CoworkService {
     const sessionsChangedCleanup = cowork.onSessionsChanged(data => {
       const beforeState = store.getState().cowork;
       const changedSessionId = data?.sessionId;
+      const deletedSessionIds = data?.deletedSessionIds ?? [];
+      if (deletedSessionIds.length > 0) {
+        store.dispatch(deleteSessionsAction(deletedSessionIds));
+        for (const sessionId of deletedSessionIds) {
+          store.dispatch(clearPendingPermissionsForSession(sessionId));
+          store.dispatch(clearSessionArtifacts(sessionId));
+        }
+      }
       console.log(
         '[CoworkService] onSessionsChanged: received IPC event, changedSessionId:',
         changedSessionId,
+        'deletedSessionIds:',
+        deletedSessionIds.length,
         'before sessions:',
         beforeState.sessions.length,
         'sessionIds:',
@@ -509,6 +520,8 @@ class CoworkService {
     const result = await cowork.deleteSession(sessionId);
     if (result.success) {
       store.dispatch(deleteSessionAction(sessionId));
+      store.dispatch(clearPendingPermissionsForSession(sessionId));
+      store.dispatch(clearSessionArtifacts(sessionId));
       const permissionModeBySession = { ...store.getState().cowork.config.permissionModeBySession };
       if (permissionModeBySession?.[sessionId]) {
         delete permissionModeBySession[sessionId];
@@ -528,6 +541,10 @@ class CoworkService {
     const result = await cowork.deleteSessions(sessionIds);
     if (result.success) {
       store.dispatch(deleteSessionsAction(sessionIds));
+      for (const sessionId of sessionIds) {
+        store.dispatch(clearPendingPermissionsForSession(sessionId));
+        store.dispatch(clearSessionArtifacts(sessionId));
+      }
       const permissionModeBySession = { ...store.getState().cowork.config.permissionModeBySession };
       let changed = false;
       for (const sessionId of sessionIds) {

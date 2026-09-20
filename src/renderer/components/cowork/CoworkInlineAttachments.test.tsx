@@ -116,18 +116,7 @@ describe('CoworkInlineAttachments', () => {
     expect(screen.queryByText(CoworkAttachmentMediaType.Binary)).not.toBeInTheDocument();
   });
 
-  test('loads local image previews and supports keyboard opening', async () => {
-    Object.defineProperty(window, 'electron', {
-      configurable: true,
-      value: {
-        dialog: {
-          readFileAsDataUrl: vi.fn().mockResolvedValue({
-            success: true,
-            dataUrl: 'data:image/png;base64,aGVsbG8=',
-          }),
-        },
-      },
-    });
+  test('loads local image previews via localfile URL and supports keyboard opening', async () => {
     const onOpenImage = vi.fn();
 
     render(
@@ -144,12 +133,13 @@ describe('CoworkInlineAttachments', () => {
     );
 
     const preview = await screen.findByRole('img', { name: 'reference.png' });
+    expect(preview).toHaveAttribute('src', 'localfile:///C:/images/reference.png');
     const attachment = preview.closest('[role="button"]');
     expect(attachment).toHaveClass('h-8');
 
     fireEvent.keyDown(attachment!, { key: 'Enter' });
     expect(onOpenImage).toHaveBeenCalledWith({
-      src: 'data:image/png;base64,aGVsbG8=',
+      src: 'localfile:///C:/images/reference.png',
       alt: 'reference.png',
       name: 'reference.png',
     });

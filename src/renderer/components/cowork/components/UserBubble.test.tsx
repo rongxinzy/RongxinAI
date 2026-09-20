@@ -107,18 +107,6 @@ describe('UserBubble', () => {
   });
 
   test('renders a local preview for an image kept as a file attachment', async () => {
-    Object.defineProperty(window, 'electron', {
-      configurable: true,
-      value: {
-        dialog: {
-          readFileAsDataUrl: vi.fn().mockResolvedValue({
-            success: true,
-            dataUrl: 'data:image/png;base64,aGVsbG8=',
-          }),
-        },
-      },
-    });
-
     render(
       <UserBubble
         message={{
@@ -140,7 +128,7 @@ describe('UserBubble', () => {
 
     const preview = await screen.findByAltText('reference.png');
     const attachment = preview.closest('[role="button"]');
-    expect(preview).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8=');
+    expect(preview).toHaveAttribute('src', 'localfile:///tmp/reference.png');
     expect(attachment).toHaveClass('h-8');
     expect(screen.queryByText('PNG')).not.toBeInTheDocument();
   });

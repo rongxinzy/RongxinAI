@@ -77,7 +77,9 @@ export type PiThinkingLevel = (typeof PiThinkingLevel)[keyof typeof PiThinkingLe
 export type PiImageAttachment = {
   name: string;
   mimeType: string;
-  base64Data: string;
+  /** Present only for the in-flight model request. Persisted copies keep `path`. */
+  base64Data?: string;
+  path?: string;
 };
 
 export type PiConversationHistoryMessage = {

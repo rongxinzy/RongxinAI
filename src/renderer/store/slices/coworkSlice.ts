@@ -472,6 +472,8 @@ const coworkSlice = createSlice({
     },
 
     deleteSession(state, action: PayloadAction<string>) {
+      delete state.draftAttachments[action.payload];
+      delete state.draftPrompts[action.payload];
       removeSessionFromState(state, action.payload);
       state.chatSessions = state.chatSessions.filter(session => session.id !== action.payload);
       setSessionStreaming(state, action.payload, false);
@@ -482,6 +484,8 @@ const coworkSlice = createSlice({
       const sessionIdSet = new Set(action.payload);
       state.chatSessions = state.chatSessions.filter(session => !sessionIdSet.has(session.id));
       for (const sessionId of action.payload) {
+        delete state.draftAttachments[sessionId];
+        delete state.draftPrompts[sessionId];
         setSessionStreaming(state, sessionId, false);
       }
     },

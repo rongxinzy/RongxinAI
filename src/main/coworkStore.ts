@@ -1638,6 +1638,7 @@ export class CoworkStore {
     sessionId: string,
     messageId: string,
     updates: { content?: string; metadata?: CoworkMessageMetadata },
+    options?: { touchUpdatedAt?: boolean },
   ): void {
     const now = Date.now();
     const setClauses: string[] = [];
@@ -1665,7 +1666,7 @@ export class CoworkStore {
     `,
       )
       .run(...values);
-    if (result.changes > 0) {
+    if (result.changes > 0 && options?.touchUpdatedAt !== false) {
       this.db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
     }
   }
