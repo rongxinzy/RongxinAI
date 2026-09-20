@@ -84,18 +84,19 @@ export function classicModalEffects(dark: boolean) {
     'composer-near': recipe({
       base: {
         ...aura,
-        // 2026/09/18 lixiang  阴影用主题色原饱和度，不与灰色混色冲淡
+        // 近层线框：单圈 1px + 轻柔近光，避免与 input-group 边框叠成粗线
         'box-shadow':
-          '0 0 0 1px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 0 10px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 4px 14px -6px color-mix(in oklch, var(--zy-primary) 90%, transparent)',
+          '0 0 0 1px color-mix(in oklch, var(--zy-primary) 45%, transparent), 0 0 6px color-mix(in oklch, var(--zy-primary) 28%, transparent)',
       },
       composerFocus: focused,
     }),
     'composer-far': recipe({
       base: {
         ...aura,
+        // 远层光晕：缩小模糊与扩散，保留轻微呼吸感
         'box-shadow': dark
-          ? '0 0 22px 2px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 0 48px 8px color-mix(in oklch, var(--zy-primary) 90%, transparent)'
-          : '0 0 18px 2px color-mix(in oklch, var(--zy-primary) 90%, transparent), 0 0 44px 8px color-mix(in oklch, var(--zy-primary) 90%, transparent)',
+          ? '0 0 10px 0 color-mix(in oklch, var(--zy-primary) 42%, transparent), 0 0 22px 2px color-mix(in oklch, var(--zy-primary) 22%, transparent)'
+          : '0 0 8px 0 color-mix(in oklch, var(--zy-primary) 36%, transparent), 0 0 18px 2px color-mix(in oklch, var(--zy-primary) 18%, transparent)',
       },
       composerFocus: {
         ...focused,

@@ -100,7 +100,7 @@ const TurnBlockComponent: React.FC<{
   hideDefaultAssistantHeader?: boolean;
   // 2026/09/16 lixiang  把当前轮次的工具授权嵌进对应 ToolCard，不再叠在底部输入框上
   pendingPermission?: CoworkPermissionRequest | null;
-  onRespondToPermission?: (result: CoworkPermissionResult) => void;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
 }> = ({
@@ -123,12 +123,15 @@ const TurnBlockComponent: React.FC<{
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
   const primaryExpert = getTurnPrimaryExpert(turn);
+
   const showAssistantHeader = Boolean(primaryExpert) || !hideDefaultAssistantHeader;
+
   // 2026/09/16 lixiang  只把授权挂到匹配到的那一个正在执行的工具上
   const pendingToolGroup =
     pendingPermission && onRespondToPermission
       ? findToolGroupForPermission(visibleAssistantItems, pendingPermission)
       : null;
+
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;

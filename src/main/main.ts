@@ -243,6 +243,7 @@ import {
 } from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
+
 import { AISphere, AISphereIpc } from '../shared/aisphere';
 import { aisphereService } from './aisphere/service';
 import { startAISphereGateway } from './aisphere/gateway';

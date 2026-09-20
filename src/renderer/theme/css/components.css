@@ -375,13 +375,11 @@ select::-ms-expand {
   transition-duration: 340ms;
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
-/* 2026/09/18 lixiang  获焦边框与阴影都保持主题色高饱和，仅用透明度控制轻重 */
+/* 获焦只改边框色，光晕交给 ::before/::after，避免再叠一圈描边 */
 .input-aura:focus-within [data-slot='input-group'] {
-  border-color: color-mix(in oklch, var(--ring) 45%, transparent);
+  border-color: color-mix(in oklch, var(--ring) 40%, transparent);
   border-width: 1px;
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--ring) 50%, transparent),
-    0 0 10px color-mix(in oklch, var(--primary) 50%, transparent);
+  box-shadow: none;
 }
 
 /* Skeleton loading */
