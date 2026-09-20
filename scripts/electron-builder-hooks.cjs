@@ -267,9 +267,7 @@ function findPackagedPythonExecutable(appOutDir) {
 }
 
 function applyMacIconFix(appPath) {
-  console.log(
-    '[electron-builder-hooks] Applying macOS icon fix for Apple Silicon compatibility...',
-  );
+  console.log('[electron-builder-hooks] Applying macOS Launchpad icon fix...');
 
   const infoPlistPath = path.join(appPath, 'Contents', 'Info.plist');
   const resourcesPath = path.join(appPath, 'Contents', 'Resources');
@@ -285,37 +283,48 @@ function applyMacIconFix(appPath) {
     return;
   }
 
-  // Check if CFBundleIconName already exists
-  const checkResult = spawnSync('plutil', ['-extract', 'CFBundleIconName', 'raw', infoPlistPath], {
+  // CFBundleIconName is only valid with an Assets.car icon. This app ships
+  // icon.icns, so leaving the key set makes Launchpad ignore that file and
+  // show the Electron default icon.
+  const iconName = spawnSync('plutil', ['-extract', 'CFBundleIconName', 'raw', infoPlistPath], {
     encoding: 'utf-8',
   });
-
-  if (checkResult.status !== 0) {
-    // CFBundleIconName doesn't exist, add it
-    console.log('[electron-builder-hooks] Adding CFBundleIconName to Info.plist...');
-    const addResult = spawnSync(
-      'plutil',
-      ['-insert', 'CFBundleIconName', '-string', 'icon', infoPlistPath],
-      { encoding: 'utf-8' },
-    );
-
-    if (addResult.status === 0) {
-      console.log('[electron-builder-hooks] ✓ CFBundleIconName added successfully');
-    } else {
-      console.warn('[electron-builder-hooks] Failed to add CFBundleIconName:', addResult.stderr);
+  if (iconName.status === 0) {
+    const removeResult = spawnSync('plutil', ['-remove', 'CFBundleIconName', infoPlistPath], {
+      encoding: 'utf-8',
+    });
+    if (removeResult.status !== 0) {
+      console.warn(
+        '[electron-builder-hooks] Failed to remove CFBundleIconName:',
+        removeResult.stderr,
+      );
     }
-  } else {
-    console.log('[electron-builder-hooks] ✓ CFBundleIconName already present');
   }
 
-  // Clear extended attributes
-  spawnSync('xattr', ['-cr', appPath], { encoding: 'utf-8' });
+  const iconFile = spawnSync('plutil', ['-extract', 'CFBundleIconFile', 'raw', infoPlistPath], {
+    encoding: 'utf-8',
+  });
+  const iconFileName = iconFile.status === 0 ? iconFile.stdout.trim() : '';
+  if (iconFileName !== 'icon.icns') {
+    const args =
+      iconFile.status === 0
+        ? ['-replace', 'CFBundleIconFile', '-string', 'icon.icns', infoPlistPath]
+        : ['-insert', 'CFBundleIconFile', '-string', 'icon.icns', infoPlistPath];
+    const fileResult = spawnSync('plutil', args, { encoding: 'utf-8' });
+    if (fileResult.status !== 0) {
+      console.warn(
+        '[electron-builder-hooks] Failed to set CFBundleIconFile:',
+        fileResult.stderr,
+      );
+    }
+  }
 
-  // Touch the app to update modification time
+  spawnSync('xattr', ['-cr', appPath], { encoding: 'utf-8' });
   spawnSync('touch', [appPath], { encoding: 'utf-8' });
   spawnSync('touch', [resourcesPath], { encoding: 'utf-8' });
+  spawnSync('touch', [iconPath], { encoding: 'utf-8' });
 
-  console.log('[electron-builder-hooks] ✓ macOS icon fix applied');
+  console.log('[electron-builder-hooks] macOS Launchpad icon fix applied');
 }
 
 /**
