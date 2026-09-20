@@ -477,7 +477,12 @@ contextBridge.exposeInMainWorld('electron', {
       expertIds?: string[];
       modelOverride?: string;
       permissionMode?: CoworkPermissionMode;
-      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      imageAttachments?: Array<{
+        name: string;
+        mimeType: string;
+        base64Data?: string;
+        path?: string;
+      }>;
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Start, options),
 
@@ -490,7 +495,12 @@ contextBridge.exposeInMainWorld('electron', {
       productionLoopMode?: ProductionLoopMode;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
-      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      imageAttachments?: Array<{
+        name: string;
+        mimeType: string;
+        base64Data?: string;
+        path?: string;
+      }>;
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 
@@ -498,7 +508,12 @@ contextBridge.exposeInMainWorld('electron', {
     enqueuePendingMessage: (options: {
       sessionId: string;
       text: string;
-      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      imageAttachments?: Array<{
+        name: string;
+        mimeType: string;
+        base64Data?: string;
+        path?: string;
+      }>;
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       skillIds?: string[];
       skillPrompt?: string;
@@ -525,7 +540,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkSessionIpc.Rename, options),
     updateSessionModel: (options: { sessionId: string; modelOverride: string }) =>
       ipcRenderer.invoke(CoworkSessionIpc.UpdateModel, options),
-    getSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId),
+    getSession: (sessionId: string, options?: { messageLimit?: number | null }) =>
+      ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId, options),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
     listSessions: (options?: {
@@ -603,8 +619,13 @@ contextBridge.exposeInMainWorld('electron', {
     onStreamQueueUpdated: (
       callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
     ) => onPush(CoworkStreamIpc.QueueUpdated, callback),
-    onSessionsChanged: (callback: (data: { sessionId?: string }) => void) =>
-      onPush(CoworkStreamIpc.SessionsChanged, callback),
+    onSessionsChanged: (
+      callback: (data: {
+        sessionId?: string;
+        deletedSessionIds?: string[];
+        agentId?: string;
+      }) => void,
+    ) => onPush(CoworkStreamIpc.SessionsChanged, callback),
   },
 
   workbenchTask: {

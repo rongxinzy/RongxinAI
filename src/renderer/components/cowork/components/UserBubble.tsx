@@ -130,11 +130,14 @@ export const UserBubble: React.FC<{
   const inlineAttachments = useMemo<CoworkInlineAttachment[]>(
     () => [
       ...imageAttachments.map((image, index) => ({
-        path: `inline:${message.id}:${index}`,
+        path: image.path || `inline:${message.id}:${index}`,
         name: image.name,
         isImage: true,
         mediaType: image.mimeType,
-        dataUrl: `data:${image.mimeType};base64,${image.base64Data}`,
+        // Prefer disk path preview; only fall back to inline base64 for legacy rows.
+        ...(!image.path && image.base64Data
+          ? { dataUrl: `data:${image.mimeType};base64,${image.base64Data}` }
+          : {}),
       })),
       ...fileAttachments,
     ],

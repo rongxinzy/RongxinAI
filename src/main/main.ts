@@ -133,9 +133,18 @@ import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges'
 import type { CoworkPromptLanguage } from './coworkLanguagePrompt';
 import { composeCoworkSystemPrompt } from './coworkPrompt/composer';
 import { reconcileWorkSessionRuntimeState } from './coworkSessionRuntimeState';
+import {
+  coworkImageRoot,
+  deleteCoworkSessionImages,
+  persistCoworkImageAttachments,
+  persistMessageImageMetadata,
+  slimImageAttachmentsForIpc,
+  slimQueuedMessagesForIpc,
+} from './coworkImageAttachments';
 import { resolveCoworkContinuationSkillState } from './coworkSessionSkills';
 import {
   type CoworkExecutionMode,
+  type CoworkMessageMetadata,
   type CoworkMessageType,
   type CoworkSessionStatus,
   CoworkStore,
@@ -516,8 +525,7 @@ const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
   }
   const messageRecord = message as { metadata?: unknown; content?: unknown };
 
-  // Preserve imageAttachments in metadata as-is (base64 data can be very large
-  // and must not be truncated by the generic sanitizer).
+  // Stream forwarding: truncate large payloads so a single frame cannot stall IPC.
   let sanitizedMetadata: unknown;
   if (messageRecord.metadata && typeof messageRecord.metadata === 'object') {
     const { imageAttachments, fileAttachments, ...rest } = messageRecord.metadata as Record<
@@ -525,11 +533,10 @@ const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
       unknown
     >;
     const sanitizedRest = sanitizeIpcPayload(rest) as Record<string, unknown> | undefined;
+    const slimImages = slimImageAttachmentsForIpc(imageAttachments);
     sanitizedMetadata = {
       ...(sanitizedRest && typeof sanitizedRest === 'object' ? sanitizedRest : {}),
-      ...(Array.isArray(imageAttachments) && imageAttachments.length > 0
-        ? { imageAttachments }
-        : {}),
+      ...(slimImages ? { imageAttachments: slimImages } : {}),
       ...(Array.isArray(fileAttachments) && fileAttachments.length > 0
         ? {
             fileAttachments: fileAttachments
@@ -558,6 +565,117 @@ const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
         ? truncateIpcString(messageRecord.content, IPC_MESSAGE_CONTENT_MAX_CHARS)
         : '',
     metadata: sanitizedMetadata,
+  };
+};
+
+/** Session load/save: drop image bytes + redundant toolResult copies. */
+const slimCoworkMessageForIpc = (message: unknown): unknown => {
+  if (!message || typeof message !== 'object') {
+    return message;
+  }
+  const messageRecord = message as {
+    type?: unknown;
+    content?: unknown;
+    metadata?: unknown;
+  };
+  const content =
+    typeof messageRecord.content === 'string' ? messageRecord.content : undefined;
+  const shouldTruncateToolResult =
+    messageRecord.type === 'tool_result' &&
+    typeof content === 'string' &&
+    content.length > IPC_MESSAGE_CONTENT_MAX_CHARS;
+
+  if (!messageRecord.metadata || typeof messageRecord.metadata !== 'object') {
+    if (!shouldTruncateToolResult) return message;
+    return {
+      ...message,
+      content: truncateIpcString(content!, IPC_MESSAGE_CONTENT_MAX_CHARS),
+    };
+  }
+
+  const { imageAttachments, toolResult, ...rest } = messageRecord.metadata as Record<
+    string,
+    unknown
+  >;
+  const slimImages = slimImageAttachmentsForIpc(imageAttachments);
+  // Prefer content; only keep metadata.toolResult when content is empty (legacy rows).
+  const keepToolResult =
+    typeof toolResult === 'string' &&
+    toolResult.length > 0 &&
+    !(typeof content === 'string' && content.length > 0);
+
+  return {
+    ...message,
+    ...(shouldTruncateToolResult
+      ? { content: truncateIpcString(content!, IPC_MESSAGE_CONTENT_MAX_CHARS) }
+      : {}),
+    metadata: {
+      ...rest,
+      ...(slimImages ? { imageAttachments: slimImages } : {}),
+      ...(keepToolResult ? { toolResult } : {}),
+    },
+  };
+};
+
+const getCoworkImageRoot = (): string => coworkImageRoot(app.getPath('userData'));
+
+const materializeSessionImages = (
+  sessionId: string,
+  messages: Array<{ id: string; metadata?: unknown }>,
+): void => {
+  const root = getCoworkImageRoot();
+  const store = getCoworkStore();
+  for (const message of messages) {
+    if (!message.metadata || typeof message.metadata !== 'object') continue;
+    const next = persistMessageImageMetadata(
+      root,
+      sessionId,
+      message.metadata as Record<string, unknown>,
+    );
+    if (!next.changed || !next.metadata) continue;
+    store.updateMessage(
+      sessionId,
+      message.id,
+      { metadata: next.metadata as CoworkMessageMetadata },
+      { touchUpdatedAt: false },
+    );
+    message.metadata = next.metadata;
+  }
+};
+
+const listAllMatchingSessionIds = (filter: {
+  agentId?: string;
+  workspaceId?: string;
+}): string[] => {
+  const store = getCoworkStore();
+  const ids: string[] = [];
+  const pageSize = 200;
+  for (let offset = 0; ; offset += pageSize) {
+    const batch = store.listSessions(pageSize, offset, filter.agentId, filter.workspaceId);
+    ids.push(...batch.map(session => session.id));
+    if (batch.length < pageSize) break;
+  }
+  return ids;
+};
+
+const forgetCoworkSession = (sessionId: string): void => {
+  try {
+    getPiRuntimeAdapter().onSessionDeleted(sessionId);
+  } catch (error) {
+    console.error('[Cowork] failed to release session runtime:', error);
+  }
+  try {
+    deleteCoworkSessionImages(getCoworkImageRoot(), sessionId);
+  } catch (error) {
+    console.error('[Cowork] failed to delete session images:', error);
+  }
+};
+
+const sanitizeCoworkSessionForIpc = <T extends { messages?: unknown[] }>(session: T): T => {
+  if (!session?.messages?.length) return session;
+  return {
+    ...session,
+    messages: session.messages.map(message => slimCoworkMessageForIpc(message)),
   };
 };
 
@@ -837,6 +955,11 @@ if (enableVerboseLogging) {
   app.commandLine.appendSwitch('enable-logging');
   app.commandLine.appendSwitch('v', '1');
 }
+
+// Mild Chromium cache/GPU tweaks (ceiling flags like max-old-space-size are not used:
+// they do not lower baseline RSS and can OOM heavy chat/document sessions).
+app.commandLine.appendSwitch('disable-gpu-memory-buffer-videos');
+app.commandLine.appendSwitch('disk-cache-size', String(50 * 1024 * 1024)); // 50MB
 
 // 配置网络服务
 app.on('ready', () => {
@@ -1329,6 +1452,7 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
       injected.length > 0 ? injected.join(', ') : '(none — provider config may be empty)',
     );
     piRuntimeAdapter = new PiRuntimeAdapter();
+    piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
     piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
@@ -1917,11 +2041,12 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   });
 
   runtime.on('queueUpdated', (sessionId, items) => {
+    const safeItems = slimQueuedMessagesForIpc(items);
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
       try {
-        win.webContents.send(CoworkStreamIpc.QueueUpdated, { sessionId, items });
+        win.webContents.send(CoworkStreamIpc.QueueUpdated, { sessionId, items: safeItems });
       } catch (error) {
         console.error('[PiWorkbenchForwarder] failed to forward queue update:', error);
       }
@@ -4028,6 +4153,9 @@ if (!gotTheLock) {
       if (isDefaultConversationWorkspacePath(workspace.path)) {
         return { success: false, error: 'The default conversation workspace cannot be removed' };
       }
+      for (const sessionId of listAllMatchingSessionIds({ workspaceId: id })) {
+        forgetCoworkSession(sessionId);
+      }
       const deletedSessionIds = coworkStore.deleteWorkspace(id);
       console.log(
         `[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`,
@@ -4227,6 +4355,9 @@ if (!gotTheLock) {
         if (options.activeSkillIds?.length) {
           messageMetadata.skillIds = options.activeSkillIds;
         }
+        let storedImages:
+          | ReturnType<typeof persistCoworkImageAttachments>
+          | undefined;
         if (options.imageAttachments?.length) {
           console.log('[Cowork:StartSession] imageAttachments received via IPC:', {
             count: options.imageAttachments.length,
@@ -4236,7 +4367,13 @@ if (!gotTheLock) {
               base64Length: img.base64Data?.length ?? 0,
             })),
           });
-          messageMetadata.imageAttachments = options.imageAttachments;
+          // Persist once at the IPC boundary; runtime receives paths only.
+          storedImages = persistCoworkImageAttachments(
+            getCoworkImageRoot(),
+            session.id,
+            options.imageAttachments,
+          );
+          messageMetadata.imageAttachments = storedImages;
         }
         if (options.fileAttachments?.length) {
           messageMetadata.fileAttachments = options.fileAttachments;
@@ -4274,7 +4411,7 @@ if (!gotTheLock) {
               options.permissionMode === CoworkPermissionMode.AllowAll
                 ? WorkbenchApprovalMode.AllowAll
                 : WorkbenchApprovalMode.Ask,
-            imageAttachments: options.imageAttachments,
+            imageAttachments: storedImages,
             fileAttachments: options.fileAttachments,
             agentId: options.agentId,
             expertIds: expertSnapshots.map(expert => expert.expertId),
@@ -4309,7 +4446,7 @@ if (!gotTheLock) {
           ...session,
           status: 'running' as const,
         };
-        return { success: true, session: sessionWithMessages };
+        return { success: true, session: sanitizeCoworkSessionForIpc(sessionWithMessages) };
       } catch (error) {
         return {
           success: false,
@@ -4350,6 +4487,7 @@ if (!gotTheLock) {
           existingSession = store.getSession(options.sessionId);
         }
       }
+      let storedImages: ReturnType<typeof persistCoworkImageAttachments> | undefined;
       if (options.imageAttachments?.length) {
         console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
           sessionId: options.sessionId,
@@ -4360,6 +4498,12 @@ if (!gotTheLock) {
             base64Length: img.base64Data?.length ?? 0,
           })),
         });
+        // Persist once at the IPC boundary; runtime receives paths only.
+        storedImages = persistCoworkImageAttachments(
+          getCoworkImageRoot(),
+          options.sessionId,
+          options.imageAttachments,
+        );
       }
 
       const continuationSkillState = resolveCoworkContinuationSkillState({
@@ -4402,7 +4546,7 @@ if (!gotTheLock) {
               : CoworkSessionMode.Work,
           goalMode: options.goalMode,
           productionLoopMode: options.productionLoopMode,
-          imageAttachments: options.imageAttachments,
+          imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
           workspaceRoot: existingSession?.cwd,
           agentId: existingSession?.agentId,
@@ -4436,7 +4580,8 @@ if (!gotTheLock) {
         });
 
       const session = getCoworkStore().getSession(options.sessionId);
-      return { success: true, session };
+      if (session) materializeSessionImages(options.sessionId, session.messages);
+      return { success: true, session: session ? sanitizeCoworkSessionForIpc(session) : session };
     } catch (error) {
       return {
         success: false,
@@ -4448,7 +4593,10 @@ if (!gotTheLock) {
   ipcMain.handle(CoworkQueueIpc.List, async (_event, rawInput: unknown) => {
     try {
       const sessionId = CoworkQueueSessionSchema.parse(rawInput);
-      return { success: true, items: getPiRuntimeAdapter().listPendingMessages(sessionId) };
+      return {
+        success: true,
+        items: slimQueuedMessagesForIpc(getPiRuntimeAdapter().listPendingMessages(sessionId)),
+      };
     } catch (error) {
       return {
         success: false,
@@ -4460,10 +4608,17 @@ if (!gotTheLock) {
   ipcMain.handle(CoworkQueueIpc.Enqueue, async (_event, rawInput: unknown) => {
     try {
       const input = CoworkQueueEnqueueSchema.parse(rawInput);
+      const storedImages = input.imageAttachments?.length
+        ? persistCoworkImageAttachments(
+            getCoworkImageRoot(),
+            input.sessionId,
+            input.imageAttachments,
+          )
+        : undefined;
       return getPiRuntimeAdapter().enqueuePendingMessage(
         input.sessionId,
         input.text,
-        input.imageAttachments,
+        storedImages,
         input.fileAttachments,
         input.skillIds,
         input.skillPrompt,
@@ -4573,11 +4728,15 @@ if (!gotTheLock) {
               type: msg.type as CoworkMessageType,
               content: msg.content,
               timestamp: msg.timestamp,
-              metadata: msg.metadata,
+              metadata: persistMessageImageMetadata(
+                getCoworkImageRoot(),
+                session.id,
+                msg.metadata,
+              ).metadata as CoworkMessageMetadata | undefined,
             });
           }
           const updated = coworkStore.getSession(session.id);
-          return { success: true, session: updated };
+          return { success: true, session: updated ? sanitizeCoworkSessionForIpc(updated) : updated };
         }
         // Create new session in SQLite
         const newSession = coworkStore.createSession(
@@ -4598,13 +4757,17 @@ if (!gotTheLock) {
             type: msg.type as CoworkMessageType,
             content: msg.content,
             timestamp: msg.timestamp,
-            metadata: msg.metadata,
+            metadata: persistMessageImageMetadata(
+              getCoworkImageRoot(),
+              newSession.id,
+              msg.metadata,
+            ).metadata as CoworkMessageMetadata | undefined,
           });
         }
         // Update status
         coworkStore.updateSession(newSession.id, { status: session.status as CoworkSessionStatus });
         const saved = coworkStore.getSession(newSession.id);
-        return { success: true, session: saved };
+        return { success: true, session: saved ? sanitizeCoworkSessionForIpc(saved) : saved };
       } catch (error) {
         console.error('[Cowork] Failed to save session:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -4616,7 +4779,7 @@ if (!gotTheLock) {
     try {
       // Purge runtime state first so late events cannot write to the session
       // after the DB row is removed.
-      getPiRuntimeAdapter().onSessionDeleted(sessionId);
+      forgetCoworkSession(sessionId);
       const coworkStoreInstance = getCoworkStore();
       coworkStoreInstance.deleteSession(sessionId);
       // Clean up IM session mapping so that new channel messages
@@ -4637,11 +4800,10 @@ if (!gotTheLock) {
 
   ipcMain.handle('cowork:session:deleteBatch', async (_event, sessionIds: string[]) => {
     try {
-      const runtime = getPiRuntimeAdapter();
       // Purge runtime state before deleting DB rows so late events cannot
       // recreate or write to sessions that are being removed.
       for (const sessionId of sessionIds) {
-        runtime.onSessionDeleted(sessionId);
+        forgetCoworkSession(sessionId);
       }
       const coworkStoreInstance = getCoworkStore();
       coworkStoreInstance.deleteSessions(sessionIds);
@@ -4723,30 +4885,40 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle(CoworkSessionIpc.Get, async (_event, sessionId: string) => {
-    try {
-      const store = getCoworkStore();
-      // The renderer virtualizes turns, so it needs the complete local data
-      // model up front to expose the full scroll range without mounting the
-      // entire transcript in the DOM.
-      const session = store.getSession(sessionId, null);
-      if (!session) return { success: true, session: null };
+  ipcMain.handle(
+    CoworkSessionIpc.Get,
+    async (
+      _event,
+      sessionId: string,
+      options?: { messageLimit?: number | null },
+    ) => {
+      try {
+        const store = getCoworkStore();
+        // Default: latest page only for the main transcript UI. Callers that need
+        // the full history (e.g. scheduled-task run viewer) pass messageLimit: null.
+        const session =
+          options && 'messageLimit' in options
+            ? store.getSession(sessionId, options.messageLimit)
+            : store.getSession(sessionId);
+        if (!session) return { success: true, session: null };
+        materializeSessionImages(sessionId, session.messages);
 
-      const reconciledSession = reconcileWorkSessionRuntimeState(
-        session,
-        getPiRuntimeAdapter().isSessionRunning(sessionId),
-      );
-      if (reconciledSession.status !== session.status) {
-        store.updateSession(sessionId, { status: reconciledSession.status });
+        const reconciledSession = reconcileWorkSessionRuntimeState(
+          session,
+          getPiRuntimeAdapter().isSessionRunning(sessionId),
+        );
+        if (reconciledSession.status !== session.status) {
+          store.updateSession(sessionId, { status: reconciledSession.status });
+        }
+        return { success: true, session: sanitizeCoworkSessionForIpc(reconciledSession) };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to get session',
+        };
       }
-      return { success: true, session: reconciledSession };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get session',
-      };
-    }
-  });
+    },
+  );
 
   ipcMain.handle('cowork:session:remoteManaged', async (_event, sessionId: string) => {
     try {
@@ -4815,7 +4987,13 @@ if (!gotTheLock) {
         const store = getCoworkStore();
         const total = store.countSessionMessages(sessionId);
         const messages = store.getPagedSessionMessages(sessionId, limit, offset);
-        return { success: true, messages, offset, total };
+        materializeSessionImages(sessionId, messages);
+        return {
+          success: true,
+          messages: messages.map(message => slimCoworkMessageForIpc(message)),
+          offset,
+          total,
+        };
       } catch (error) {
         return {
           success: false,
@@ -4890,6 +5068,9 @@ if (!gotTheLock) {
 
       // Cascade delete all Cowork sessions belonging to the deleted agent
       const coworkStore = getCoworkStore();
+      for (const sessionId of listAllMatchingSessionIds({ agentId: id })) {
+        forgetCoworkSession(sessionId);
+      }
       const deletedSessionIds = coworkStore.deleteSessionsByAgentId(id);
 
       // Clean up IM session mappings for deleted sessions
