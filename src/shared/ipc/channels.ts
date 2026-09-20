@@ -241,6 +241,7 @@ export const ShellIpc = {
   ShowItemInFolder: 'shell:showItemInFolder',
   OpenExternal: 'shell:openExternal',
   OpenHtmlInBrowser: 'shell:openHtmlInBrowser',
+  PathExists: 'shell:pathExists',
 } as const;
 export type ShellIpc = (typeof ShellIpc)[keyof typeof ShellIpc];
 

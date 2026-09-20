@@ -210,7 +210,7 @@ test('does not use a streaming answer as the completed fallback', () => {
   expect(getFinalAnswerIndex([completedAnswer, streamingAnswer], true)).toBe(-1);
 });
 
-test('does not use the completed fallback while a tool is incomplete', () => {
+test('uses the completed fallback even when a tool result is missing after the turn ends', () => {
   const completedAnswer: AssistantTurnItem = {
     type: 'assistant',
     message: {
@@ -222,10 +222,17 @@ test('does not use the completed fallback while a tool is incomplete', () => {
     },
   };
 
+  // 2026/09/20 lixiang  issue #805：轮次结束后不因孤儿工具态隐藏最终回答
   expect(
     getFinalAnswerIndex(
       [completedAnswer, toolGroup('read-1', 'read', { path: 'src/app.ts' })],
       true,
+    ),
+  ).toBe(0);
+  expect(
+    getFinalAnswerIndex(
+      [completedAnswer, toolGroup('read-1', 'read', { path: 'src/app.ts' })],
+      false,
     ),
   ).toBe(-1);
 });
