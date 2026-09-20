@@ -61,10 +61,16 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(source.slice(overlay, promptInput)).toContain(
     'className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4"',
   );
-  expect(turnBlockSource).toContain('className="mx-auto w-full max-w-5xl min-w-[320px] pl-4"');
+  expect(turnBlockSource).toContain('className="mx-auto w-full max-w-6xl min-w-[320px] pl-4"');
   expect(turnBlockSource).toContain('className="flex min-w-0 flex-1 flex-col gap-3 py-3"');
   expect(userBubbleSource).toContain(
-    'className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end pl-4"',
+    'className="mx-auto flex w-full max-w-6xl min-w-[320px] flex-col items-end pl-4"',
+  );
+  // 2026/09/20 lixiang  验收卡改由末轮 TurnBlock.beforeCopySlot 注入，不再挂在对话流底部
+  expect(source).toContain('beforeCopySlot={');
+  expect(source).toContain('<WorkbenchTaskAcceptanceCard sessionId={sessionId} />');
+  expect(source).not.toMatch(
+    /\{sessionId && \(\s*<div className="px-3 pt-3">\s*<WorkbenchTaskAcceptanceCard/,
   );
   expect(source).toMatch(/<ConversationContent\r?\n\s+className="pt-3"/);
   expect(promptInput).toBeGreaterThan(overlay);

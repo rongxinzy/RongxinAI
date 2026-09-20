@@ -863,6 +863,7 @@ contextBridge.exposeInMainWorld('electron', {
     openExternal: (url: string) => ipcRenderer.invoke(ShellIpc.OpenExternal, url),
     openHtmlInBrowser: (htmlContent: string) =>
       ipcRenderer.invoke(ShellIpc.OpenHtmlInBrowser, htmlContent),
+    pathExists: (filePath: string) => ipcRenderer.invoke(ShellIpc.PathExists, filePath),
   },
 
   autoLaunch: {

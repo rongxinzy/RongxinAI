@@ -15,6 +15,7 @@ dist-eval/
 !.env.example
 .npmrc
 .npm-cache/
+.cache/
 .claude/
 __pycache__/
 .codebuddy/

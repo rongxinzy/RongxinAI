@@ -124,8 +124,9 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
     }
   };
 
+  // 2026/09/20 lixiang  与对话列同宽（issue #805）
   return (
-    <Queue className="mx-auto w-full max-w-[800px] rounded-lg bg-card shadow-none">
+    <Queue className="w-full rounded-lg bg-card shadow-none">
       <div className="flex items-center gap-2 px-1 text-sm font-medium text-foreground">
         <ListChecks className="size-4 text-muted-foreground" />
         <span>{i18nService.t('coworkQuestionWizardTitle')}</span>
@@ -244,7 +245,7 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
         })}
       </ul>
 
-      {/* 2026/09/20  次要动作 ghost + gap-3，与授权卡/验收卡操作行一致 */}
+      {/* 2026/09/20 lixiang  次要动作 ghost + gap-3，与授权卡/验收卡操作行一致 */}
       <div className="flex items-center justify-end gap-3 border-t border-border pt-3">
         {!isComplete && (
           <p className="mr-auto text-xs text-muted-foreground" role="status">
