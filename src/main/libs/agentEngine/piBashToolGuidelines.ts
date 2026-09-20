@@ -1,5 +1,9 @@
 const WINDOWS_PLATFORM = 'win32';
 
+/** Keep model-issued shell commands from holding a run open indefinitely. */
+export const PI_BASH_DEFAULT_TIMEOUT_SECONDS = 5 * 60;
+export const PI_BASH_MAX_TIMEOUT_SECONDS = 15 * 60;
+
 const EXPLICIT_WINDOWS_SHELL = /(?:^|[\s;&|])(?:powershell(?:\.exe)?|pwsh|cmd(?:\.exe)?)(?:\s|$)/i;
 const POWERSHELL_CMDLET =
   /(?:^|[\s;&|])(?:Get|Set|Remove|Copy|Move|New|Select|Write|Test)-[A-Za-z]+\b/;
@@ -18,7 +22,22 @@ export const PiBashToolSystemPrompt = [
 
 export const createPiBashToolSystemPrompt = (
   platform: NodeJS.Platform = process.platform,
-): string => (platform === WINDOWS_PLATFORM ? PiBashToolSystemPrompt : '');
+): string =>
+  platform === WINDOWS_PLATFORM
+    ? `${PiBashToolSystemPrompt}\n- Bash commands have a ${PI_BASH_DEFAULT_TIMEOUT_SECONDS}-second default timeout; use a shorter timeout for bounded operations.`
+    : `- Bash commands have a ${PI_BASH_DEFAULT_TIMEOUT_SECONDS}-second default timeout; use a shorter timeout for bounded operations.`;
+
+/**
+ * Normalize model-provided timeouts before Pi executes the command. Pi's
+ * built-in Bash has no default timeout, so missing or invalid values must be
+ * bounded by the runtime rather than trusting the model to provide one.
+ */
+export const normalizePiBashTimeoutSeconds = (timeout: unknown): number => {
+  if (typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0) {
+    return Math.min(timeout, PI_BASH_MAX_TIMEOUT_SECONDS);
+  }
+  return PI_BASH_DEFAULT_TIMEOUT_SECONDS;
+};
 
 /**
  * Return an actionable block reason for command dialects that are certainly
