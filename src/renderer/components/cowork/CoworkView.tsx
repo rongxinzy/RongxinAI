@@ -954,7 +954,16 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         expertIds,
         goalMode,
         productionLoopMode,
-        imageAttachments,
+        imageAttachments: imageAttachments
+          ?.filter(
+            (image): image is CoworkImageAttachment & { base64Data: string } =>
+              typeof image.base64Data === 'string',
+          )
+          .map(image => ({
+            name: image.name,
+            mimeType: image.mimeType,
+            base64Data: image.base64Data,
+          })),
         fileAttachments,
       });
     }

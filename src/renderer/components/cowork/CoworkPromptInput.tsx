@@ -674,7 +674,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         console.log('[CoworkPromptInput] handleSubmit: passing imageAtts to onSubmit', {
           count: imageAtts.length,
           names: imageAtts.map(a => a.name),
-          base64Lengths: imageAtts.map(a => a.base64Data.length),
+          base64Lengths: imageAtts.map(a => a.base64Data?.length ?? 0),
         });
       } else if (attachments.some(a => a.isImage || isImagePath(a.path))) {
         console.warn(
