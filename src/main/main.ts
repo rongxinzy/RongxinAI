@@ -7164,6 +7164,15 @@ if (!gotTheLock) {
       enableLargerThanScreen: false,
     });
 
+    // Windows 任务栏在设置 AppUserModelID 后仍要显式套用 ico，否则继续显示 Electron 图标
+    if (process.platform === 'win32') {
+      const iconPath = getAppIconPath();
+      if (iconPath && fs.existsSync(iconPath)) {
+        const icon = nativeImage.createFromPath(iconPath);
+        if (!icon.isEmpty()) mainWindow.setIcon(icon);
+      }
+    }
+
     // 设置 macOS Dock 图标（开发模式下 Electron 默认图标不是应用 Logo）
     if (isMac && isDev) {
       // Use a PNG with extra transparent padding. NativeImage reliably loads
@@ -7554,6 +7563,11 @@ if (!gotTheLock) {
     await app.whenReady();
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
+    // Windows taskbar icon comes from electron.exe unless this id is set
+    // before the window is created.
+    if (process.platform === 'win32') {
+      app.setAppUserModelId(APP_USER_MODEL_ID);
+    }
 
     protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
       const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
