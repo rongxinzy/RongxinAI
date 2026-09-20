@@ -23,9 +23,7 @@ import {
 } from './localInferenceSlotRetry';
 import { probeRuntimeModelCapabilities } from './modelCapabilityProbe';
 import { StreamRequestRegistry } from './streamRequestRegistry';
-<<<<<<< HEAD
 import { isToolCallUnsupportedError } from './toolCallUnsupported';
-=======
 import {
   apiCancelStream,
   apiOnStreamAbort,
@@ -34,7 +32,6 @@ import {
   apiOnStreamError,
   apiStream,
 } from './visibleApiTransport';
->>>>>>> 345d4a65 (feat(dev fetch): 新增【开发环境主进程向渲染设置请求镜像】功能。)
 import { WebSearchToolEventType, type WebSearchToolEventHandler } from './webSearchToolEvents';
 
 export interface ApiConfig {
