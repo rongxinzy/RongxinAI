@@ -73,8 +73,10 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
     activeRun?.verificationResult?.summary ??
     i18nService.t('workbenchTaskAcceptanceCardNoSummary');
 
+  // 2026/09/20 lixiang  与对话列同宽，避免验收卡显得过窄（issue #805）
+  // 2026/09/20 lixiang  与上方文件卡留出间隙（TurnBlock 段内 gap-1 专为文件↔复制收紧）
   return (
-    <Queue className="mx-auto w-full max-w-[800px] rounded-lg bg-card shadow-none">
+    <Queue className="mt-3 w-full rounded-lg bg-card shadow-none">
       <div className="flex items-center gap-2 px-1 text-sm font-medium text-foreground">
         <ClipboardCheck className="size-4 text-muted-foreground" />
         <span>{i18nService.t('workbenchTaskAcceptanceCardTitle')}</span>
@@ -91,10 +93,11 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
         {verificationSummary}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+      {/* 2026/09/20 lixiang  次要动作用 ghost（同授权卡），避免 outline 白底+边框与卡片糊成「贴死」主按钮 */}
+      <div className="flex items-center justify-end gap-3 border-t border-border pt-3">
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           disabled={busy}
           onClick={() => void runAction(() => window.electron.workbenchTask.retry(task.id))}
         >

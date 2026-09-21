@@ -56,6 +56,13 @@ test('renders the working indicator instead of the retired typing dots', () => {
   expect(source).not.toContain('TypingDots');
 });
 
+test('places beforeCopySlot above the copy button for acceptance cards', () => {
+  // 2026/09/20 lixiang  issue #805：验收卡在复制按钮之上
+  expect(source).toContain('beforeCopySlot?: React.ReactNode');
+  expect(source).toContain('{beforeCopySlot}');
+  expect(source).toContain('hasDeliverableArtifacts || copyContent || beforeCopySlot');
+});
+
 test('keeps active tool details in the total summary without adding a child row', () => {
   expect(source).toContain('key="transient-working-summary"');
   expect(source).toContain('<ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>');

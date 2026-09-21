@@ -1,10 +1,15 @@
 import { Button } from '@shared/components/ui/button';
 import { ExternalLink } from 'lucide-react';
 import React from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '@/services/i18n';
-import { selectArtifact } from '@/store/slices/artifactSlice';
+import {
+  closePanel,
+  selectArtifact,
+  selectIsPanelOpen,
+  selectSelectedArtifact,
+} from '@/store/slices/artifactSlice';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 const t = (key: string) => i18nService.t(key);
@@ -172,34 +177,87 @@ interface ArtifactPreviewCardProps {
 
 const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) => {
   const dispatch = useDispatch();
+  const isPanelOpen = useSelector(selectIsPanelOpen);
+  const selectedArtifact = useSelector(selectSelectedArtifact);
 
-  const handleClick = () => {
+  // 2026/09/20 lixiang  右侧预览面板 toggle：同文件已打开则关闭，否则打开/切换（issue #805）
+  const handleOpenPreview = () => {
+    if (isPanelOpen && selectedArtifact?.id === artifact.id) {
+      dispatch(closePanel());
+      return;
+    }
     dispatch(selectArtifact(artifact.id));
+  };
+
+  // 2026/09/20 lixiang  仅文件名打开所在文件夹；阻止冒泡，避免触发整卡预览 toggle（issue #805）
+  const handleOpenLocalFolder = async (
+    event: React.MouseEvent | React.KeyboardEvent,
+  ) => {
+    const path = artifact.filePath?.trim();
+    if (!path) return;
+    event.preventDefault();
+    event.stopPropagation();
+    try {
+      const result = await window.electron.shell.showItemInFolder(path);
+      if (!result?.success) {
+        console.error('[Artifact] Failed to show item in folder:', path, result?.error);
+      }
+    } catch (error) {
+      console.error('[Artifact] Failed to show item in folder:', path, error);
+    }
   };
 
   const IconComponent = TYPE_ICON_MAP[artifact.type];
   const title = artifact.fileName || artifact.title;
   const subtitle = t(TYPE_LABEL_KEY[artifact.type]);
+  const localPath = artifact.filePath?.trim() || '';
+  const canOpenLocal = Boolean(localPath);
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={handleClick}
-      className="theme-page-artifact-preview-card-button-1 flex items-center cursor-pointer max-w-sm w-full text-left"
-    >
-      <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-        <IconComponent className="w-5 h-5 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-foreground truncate">{title}</div>
-        <div className="text-xs text-muted-foreground">{subtitle}</div>
-      </div>
-      <div className="shrink-0 flex items-center gap-1 text-primary text-sm font-medium">
-        <ExternalLink className="w-4 h-4" />
-        <span>{t('artifactOpen')}</span>
-      </div>
-    </Button>
+    <div className="theme-page-artifact-preview-card-button-1 flex max-w-sm w-full items-center gap-3 text-left">
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={handleOpenPreview}
+        className="flex min-w-0 flex-1 items-center justify-start gap-3 px-0 hover:bg-transparent"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <IconComponent className="h-5 w-5 text-primary" />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+          {canOpenLocal ? (
+            // 文件名独立命中：阻止冒泡到整卡 toggle，只打开本地文件夹
+            <span
+              role="link"
+              tabIndex={0}
+              title={localPath}
+              className="theme-surface-markdown-link inline-block max-w-full cursor-pointer truncate text-sm font-medium"
+              onMouseDown={event => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={handleOpenLocalFolder}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  void handleOpenLocalFolder(event);
+                }
+              }}
+            >
+              {title}
+            </span>
+          ) : (
+            <span className="truncate text-sm font-medium text-foreground">{title}</span>
+          )}
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
+          <ExternalLink className="h-4 w-4" />
+          <span>{t('artifactOpen')}</span>
+        </div>
+      </Button>
+    </div>
   );
 };
 

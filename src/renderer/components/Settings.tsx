@@ -2811,11 +2811,16 @@ const Settings: React.FC<SettingsProps> = ({
       // 一次 app:showToast 就覆盖文案并重置自动关闭计时器，所以最后留在屏幕上的是这条结果，
       // 进度提示会被原地替换而不是挂在顶部（调度上 finally 是 microtask，interval 是 macrotask，
       // 不可能插在两者之间多刷一条进度）。这条顺序由 modelConnectionTestToast.test.ts 锁住。
+      const firstFailed = results.find(({ result }) => !result.success);
+      const firstFailureMessage =
+        firstFailed && !firstFailed.result.success ? firstFailed.result.message : undefined;
+
       window.dispatchEvent(
         new CustomEvent('app:showToast', {
           detail: buildProviderModelConnectionTestNotification({
             total: results.length,
             successCount,
+            firstFailureMessage,
           }),
         }),
       );

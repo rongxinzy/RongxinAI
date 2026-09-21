@@ -76,6 +76,7 @@ import {
   McpIpc,
   ManagedProviderIpc,
   ProjectIpc,
+  ShellIpc,
   SkillsIpc,
   WeixinLoginErrorCode,
   WeixinInstallIpc,
@@ -337,7 +338,12 @@ import {
 // 设置应用程序名称
 app.name = APP_NAME;
 app.setName(APP_NAME);
-if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
+// 2026/09/20 lixiang  Windows 任务栏：打包态用产品 AUMID；开发态不要设自定义 AUMID，
+// 否则 Windows 会按 AUMID 找快捷方式，找不到时任务栏常继续显示缓存的 Electron 原子图标。
+// 开发态依赖 scripts/patch-windows-electron-icon.mjs 写入 electron.exe 内嵌图标。
+if (process.platform === 'win32' && app.isPackaged) {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -2727,9 +2733,25 @@ const getAppIconPath = (): string | undefined => {
     return path.join(process.resourcesPath, 'app-icons', packagedIconName);
   }
 
-  const developmentIconPath =
-    process.platform === 'win32' ? path.join('win', 'icon.ico') : path.join('png', '256x256.png');
-  return path.join(__dirname, '..', 'build', 'icons', developmentIconPath);
+  // 2026/09/20 lixiang  开发态优先用 PNG：Windows NativeImage/setIcon 对 ico 偶发仍显示默认图标
+  if (process.platform === 'win32') {
+    const pngPath = path.join(__dirname, '..', 'build', 'icons', 'png', '256x256.png');
+    if (fs.existsSync(pngPath)) return pngPath;
+    return path.join(__dirname, '..', 'build', 'icons', 'win', 'icon.ico');
+  }
+  return path.join(__dirname, '..', 'build', 'icons', 'png', '256x256.png');
+};
+
+const applyWindowsWindowIcon = (window: BrowserWindow): void => {
+  if (process.platform !== 'win32') return;
+  const iconPath = getAppIconPath();
+  if (!iconPath || !fs.existsSync(iconPath)) {
+    console.warn('[Main] Windows app icon file is missing:', iconPath);
+    return;
+  }
+  // Prefer path string — Electron updates both window and taskbar icons from it.
+  window.setIcon(iconPath);
+  console.log('[Main] Applied Windows window icon:', iconPath);
 };
 
 // 保存对主窗口的引用
@@ -6727,6 +6749,23 @@ if (!gotTheLock) {
     }
   });
 
+  // 2026/09/20 lixiang  供对话内本地路径高亮：仅当磁盘上存在对应文件时才可点（issue #805）
+  ipcMain.handle(ShellIpc.PathExists, async (_event, filePath: string) => {
+    try {
+      if (typeof filePath !== 'string' || !filePath.trim()) {
+        return { success: true, exists: false };
+      }
+      const normalizedPath = normalizeWindowsShellPath(filePath);
+      return { success: true, exists: fs.existsSync(normalizedPath) };
+    } catch (error) {
+      return {
+        success: false,
+        exists: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  });
+
   ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     try {
       await shell.openExternal(url);
@@ -7164,6 +7203,9 @@ if (!gotTheLock) {
       enableLargerThanScreen: false,
     });
 
+    // Windows 任务栏在设置 AppUserModelID 后仍要显式套用 ico，否则继续显示 Electron 图标
+    applyWindowsWindowIcon(mainWindow);
+
     // 设置 macOS Dock 图标（开发模式下 Electron 默认图标不是应用 Logo）
     if (isMac && isDev) {
       // Use a PNG with extra transparent padding. NativeImage reliably loads
@@ -7357,10 +7399,17 @@ if (!gotTheLock) {
 
     // 等待内容加载完成后再显示窗口
     mainWindow.once('ready-to-show', () => {
+      // 2026/09/20 lixiang  显示前再套一次图标，避免 Windows 任务栏仍缓存 electron 默认图标
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        applyWindowsWindowIcon(mainWindow);
+      }
       emitWindowState();
       // 开机自启时不显示窗口，仅显示托盘图标
       if (isLinuxRendererSmoke || !isAutoLaunched()) {
         mainWindow?.show();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          applyWindowsWindowIcon(mainWindow);
+        }
       }
       // Initialize main-process i18n from stored language before creating UI elements.
       const initLang = getStore().get<{ language?: string }>('app_config')?.language;
@@ -7554,6 +7603,7 @@ if (!gotTheLock) {
     await app.whenReady();
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
+    // AppUserModelID already set at process start (before ready) for Windows taskbar icons.
 
     protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
       const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);

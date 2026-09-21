@@ -45,6 +45,40 @@ export function ensurePreviewColorScheme(html: string): string {
   return `<!DOCTYPE html><html><head>${inject}</head><body>${html}</body></html>`;
 }
 
+/**
+ * 2026/09/20 lisa srcDoc 预览里相对页面跳转会变空白（手机菜单常见）；拦截非 hash 导航，
+ * 优先滚到同页锚点/同名区块，否则留在当前页（issue #805）
+ */
+export function injectPreviewNavigationGuard(html: string): string {
+  if (html.includes('data-xiaoruan-preview-nav-guard')) return html;
+  const script =
+    '<script data-xiaoruan-preview-nav-guard>' +
+    '(function(){' +
+    'document.addEventListener("click",function(e){' +
+    'var a=e.target&&e.target.closest?e.target.closest("a"):null;' +
+    'if(!a)return;' +
+    'var href=a.getAttribute("href");' +
+    'if(!href||href.charAt(0)==="#"||/^javascript:/i.test(href)||/^mailto:/i.test(href)||/^tel:/i.test(href)||/^https?:/i.test(href)||/^file:/i.test(href))return;' +
+    'e.preventDefault();e.stopPropagation();' +
+    'var id=href.replace(/^\\.\\/?/,"").replace(/\\.html?$/i,"").replace(/[\\\\/]/g,"-");' +
+    'var el=document.getElementById(id)||document.querySelector("[name=\\""+id+"\\"]")||document.querySelector("[data-section=\\""+id+"\\"]");' +
+    'if(el&&el.scrollIntoView)el.scrollIntoView({behavior:"smooth",block:"start"});' +
+    '},true);' +
+    '})();' +
+    '</script>';
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${script}</body>`);
+  }
+  if (/<\/html>/i.test(html)) {
+    return html.replace(/<\/html>/i, `${script}</html>`);
+  }
+  return `${html}${script}`;
+}
+
+function preparePreviewHtml(html: string): string {
+  return injectPreviewNavigationGuard(ensurePreviewColorScheme(html));
+}
+
 const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   const [processedHtml, setProcessedHtml] = useState<string | null>(null);
 
@@ -82,11 +116,11 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
         if (artifact.filePath && !hasRelativeResources(html)) {
           html = await inlineLocalResources(html, artifact.filePath);
         }
-        if (!cancelled) setProcessedHtml(ensurePreviewColorScheme(html));
+        if (!cancelled) setProcessedHtml(preparePreviewHtml(html));
       } catch {
         if (!cancelled) {
           setProcessedHtml(
-            artifact.content ? ensurePreviewColorScheme(artifact.content) : null,
+            artifact.content ? preparePreviewHtml(artifact.content) : null,
           );
         }
       }
@@ -109,11 +143,16 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   // Content with relative resources and a filePath: inline resources not possible,
   // render via srcDoc with a <base> tag so relative URLs resolve
   if (artifact.filePath && artifact.content && hasRelativeResources(artifact.content)) {
-    const dirPath = artifact.filePath.slice(0, artifact.filePath.lastIndexOf('/') + 1);
-    const baseTag = `<base href="file://${dirPath}">`;
-    const htmlWithBase = ensurePreviewColorScheme(
-      artifact.content.replace(/(<head[^>]*>)/i, `$1${baseTag}`),
+    const lastSlash = Math.max(
+      artifact.filePath.lastIndexOf('/'),
+      artifact.filePath.lastIndexOf('\\'),
     );
+    const dirPath = lastSlash >= 0 ? artifact.filePath.slice(0, lastSlash + 1) : '';
+    const baseTag = dirPath ? `<base href="file://${dirPath.replace(/\\/g, '/')}">` : '';
+    const withBase = baseTag
+      ? artifact.content.replace(/(<head[^>]*>)/i, `$1${baseTag}`)
+      : artifact.content;
+    const htmlWithBase = preparePreviewHtml(withBase);
     return (
       <iframe
         srcDoc={htmlWithBase}
@@ -137,7 +176,7 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   // Self-contained HTML (no relative resources): use srcDoc
   return (
     <iframe
-      srcDoc={processedHtml || ensurePreviewColorScheme(artifact.content)}
+      srcDoc={processedHtml || preparePreviewHtml(artifact.content)}
       className="w-full h-full border-0"
       style={{ colorScheme: 'light' }}
       sandbox="allow-scripts"

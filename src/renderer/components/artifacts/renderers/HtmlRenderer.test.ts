@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { ensurePreviewColorScheme } from './HtmlRenderer';
+import { ensurePreviewColorScheme, injectPreviewNavigationGuard } from './HtmlRenderer';
 
 describe('ensurePreviewColorScheme', () => {
   test('injects light color-scheme when the document does not declare one', () => {
@@ -15,5 +15,15 @@ describe('ensurePreviewColorScheme', () => {
     const html =
       '<html><head><meta name="color-scheme" content="dark"><style>:root{color-scheme:dark}</style></head><body></body></html>';
     expect(ensurePreviewColorScheme(html)).toBe(html);
+  });
+});
+
+describe('injectPreviewNavigationGuard', () => {
+  test('injects a click guard once before </body>', () => {
+    const html = '<html><body><a href="about.html">关于</a></body></html>';
+    const once = injectPreviewNavigationGuard(html);
+    expect(once).toContain('data-xiaoruan-preview-nav-guard');
+    expect(once.indexOf('data-xiaoruan-preview-nav-guard')).toBeLessThan(once.indexOf('</body>'));
+    expect(injectPreviewNavigationGuard(once)).toBe(once);
   });
 });
