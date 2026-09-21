@@ -5,6 +5,8 @@ import type { ToastNotificationOptions } from '../../services/toastNotification'
 export interface ProviderModelConnectionTestSummary {
   readonly total: number;
   readonly successCount: number;
+  /** 全部不通时附带首个失败原因，避免只剩笼统摘要、看不出是鉴权还是网络问题。 */
+  readonly firstFailureMessage?: string;
 }
 
 export interface ProviderModelConnectionTestNotification extends ToastNotificationOptions {
@@ -72,9 +74,12 @@ export function buildProviderModelConnectionTestNotification(
     const reason = i18nService
       .t('modelConnectionTestAllFailed')
       .replace('{total}', String(summary.total));
+    const detail = summary.firstFailureMessage?.trim();
     const separator = i18nService.getLanguage() === 'zh' ? '：' : ': ';
     return {
-      message: `${i18nService.t('operationFailed')}${separator}${reason}`,
+      message: detail
+        ? `${i18nService.t('operationFailed')}${separator}${reason}（${detail}）`
+        : `${i18nService.t('operationFailed')}${separator}${reason}`,
       isError: true,
       isSuccess: false,
       autoClose: true,
