@@ -1,5 +1,5 @@
-import { request as httpRequest } from 'node:http';
-import { request as httpsRequest, type IncomingMessage, type RequestOptions } from 'node:https';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest, type RequestOptions } from 'node:https';
 import { Readable } from 'node:stream';
 
 import type { DevNetworkLogEntry } from '../../shared/devNetworkLog';
