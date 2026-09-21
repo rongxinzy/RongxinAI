@@ -25,6 +25,17 @@ test('reports an all-failed connectivity result as an error toast', () => {
   expect(notification.isSuccess).toBe(false);
 });
 
+test('all-failed connectivity reports include the first concrete failure reason', () => {
+  const notification = buildProviderModelConnectionTestNotification({
+    total: 1,
+    successCount: 0,
+    firstFailureMessage: '无效的令牌',
+  });
+
+  expect(notification.message).toBe('操作失败：1 个模型全部未通过连接测试（无效的令牌）');
+  expect(notification.isError).toBe(true);
+});
+
 test('the all-failed report keeps its wording through error normalization', () => {
   const notification = buildProviderModelConnectionTestNotification({ total: 3, successCount: 0 });
 
