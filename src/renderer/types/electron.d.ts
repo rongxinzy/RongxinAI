@@ -709,6 +709,8 @@ interface IElectronAPI {
     close: () => void;
     isMaximized: () => Promise<boolean>;
     showSystemMenu: (position: { x: number; y: number }) => void;
+    toggleDevTools: () => Promise<boolean>;
+    openDevTools: () => Promise<boolean>;
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
   memory: {
@@ -1320,6 +1322,7 @@ interface IElectronAPI {
   };
   appInfo: {
     getVersion: () => Promise<string>;
+    isDev: () => Promise<boolean>;
     getSystemLocale: () => Promise<string>;
     consumePendingLocalInferenceInstall: () => Promise<string | null>;
     relaunch: () => Promise<void>;
