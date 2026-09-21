@@ -16,6 +16,9 @@ import {
 } from './providerModelConnection';
 
 type ConnectionFetchRequest = {
+  url?: string;
+  method?: string;
+  headers?: Record<string, string>;
   body?: string;
 };
 
@@ -235,6 +238,91 @@ test('applies a bounded timeout to each connectivity request', async () => {
   // 每个请求都必须带一个有界的超时，否则单个卡死的模型会拖住整批测试。
   expect(request?.timeoutMs).toBeGreaterThan(0);
   expect(request?.timeoutMs).toBeLessThanOrEqual(30_000);
+});
+
+test('uses the native Gemini generateContent endpoint over IPC', async () => {
+  const fetchMock = vi.fn<
+    (request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>
+  >(async () => ({ ok: true, status: 200 }));
+  vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
+
+  await expect(
+    testProviderModelConnection({
+      providerId: 'gemini',
+      provider: { ...provider, apiKey: 'gemini-key' },
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      apiFormat: ApiFormat.Gemini,
+      model: { id: 'gemini-3-flash', name: 'Gemini 3 Flash' },
+    }),
+  ).resolves.toEqual({ success: true });
+
+  const request = fetchMock.mock.calls[0]?.[0];
+  expect(request?.url).toBe(
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent',
+  );
+  expect(request?.method).toBe('POST');
+  expect(request?.headers).toMatchObject({
+    'x-goog-api-key': 'gemini-key',
+    'Content-Type': 'application/json',
+  });
+  expect(request?.headers?.Authorization).toBeUndefined();
+  expect(JSON.parse(request?.body ?? '{}')).toMatchObject({
+    contents: [{ role: 'user', parts: [{ text: 'Hi' }] }],
+    generationConfig: { maxOutputTokens: 64 },
+  });
+});
+
+test('tests DeepSeek Anthropic-compatible providers through the main-process fetch bridge', async () => {
+  const fetchMock = vi.fn<
+    (request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>
+  >(async () => ({ ok: true, status: 200 }));
+  vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
+
+  await expect(
+    testProviderModelConnection({
+      providerId: 'deepseek',
+      provider: { ...provider, apiKey: 'deepseek-key' },
+      baseUrl: 'https://api.deepseek.com/anthropic',
+      apiFormat: ApiFormat.Anthropic,
+      model: { id: 'deepseek-chat', name: 'DeepSeek Chat' },
+    }),
+  ).resolves.toEqual({ success: true });
+
+  const request = fetchMock.mock.calls[0]?.[0];
+  expect(request?.url).toBe('https://api.deepseek.com/anthropic/v1/messages');
+  expect(request?.headers).toMatchObject({
+    'x-api-key': 'deepseek-key',
+    'anthropic-version': '2023-06-01',
+  });
+});
+
+test('tests custom OpenAI-compatible providers through the main-process fetch bridge', async () => {
+  const fetchMock = vi.fn<
+    (request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>
+  >(async () => ({ ok: true, status: 200 }));
+  const pageFetchMock = vi.fn(() => {
+    throw new Error('page fetch must not be used');
+  });
+  vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
+  vi.stubGlobal('fetch', pageFetchMock);
+
+  await expect(
+    testProviderModelConnection({
+      providerId: 'custom_0',
+      provider: { ...provider, apiKey: 'custom-key' },
+      baseUrl: 'https://custom.test/v1',
+      apiFormat: ApiFormat.OpenAI,
+      model: { id: 'custom-model', name: 'Custom model' },
+    }),
+  ).resolves.toEqual({ success: true });
+
+  const request = fetchMock.mock.calls[0]?.[0];
+  expect(request?.url).toBe('https://custom.test/v1/chat/completions');
+  expect(request?.headers).toMatchObject({
+    Authorization: 'Bearer custom-key',
+    'Content-Type': 'application/json',
+  });
+  expect(pageFetchMock).not.toHaveBeenCalled();
 });
 
 test('keeps testing the remaining models when an onResult callback throws', async () => {
