@@ -738,7 +738,7 @@ const Settings: React.FC<SettingsProps> = ({
     void window.electron.enterprise.renderer
       .settingsPages()
       .then(pages => {
-        if (active) setEnterpriseSettingsPages(pages);
+        if (active) setEnterpriseSettingsPages(Array.isArray(pages) ? pages : []);
       })
       .catch(() => {
         if (active) setEnterpriseSettingsPages([]);
@@ -874,9 +874,17 @@ const Settings: React.FC<SettingsProps> = ({
 
   // About tab
   const [appVersion, setAppVersion] = useState('');
+  const [isDevBuild, setIsDevBuild] = useState(false);
   const [isExportingLogs, setIsExportingLogs] = useState(false);
   useEffect(() => {
-    window.electron.appInfo.getVersion().then(setAppVersion);
+    void window.electron.appInfo.getVersion().then(setAppVersion);
+    // Preload may lag behind Vite HMR after adding appInfo.isDev; never crash Settings on mount.
+    const isDev = window.electron.appInfo.isDev;
+    if (typeof isDev === 'function') {
+      void isDev()
+        .then(setIsDevBuild)
+        .catch(() => setIsDevBuild(false));
+    }
   }, []);
 
   useEffect(() => {
@@ -5287,26 +5295,28 @@ const Settings: React.FC<SettingsProps> = ({
                 </a>
               </div>
             </div>
-
-            {/* Footer */}
-            <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center">
-              <div className="flex items-center justify-center text-sm text-muted-foreground">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={e => {
-                    e.stopPropagation();
-                    void handleExportLogs();
-                  }}
-                  disabled={isExportingLogs}
-                  className="theme-action-muted-accent"
-                >
-                  {isExportingLogs
-                    ? i18nService.t('aboutExportingLogs')
-                    : i18nService.t('aboutExportLogs')}
-                </Button>
-              </div>
+            <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center gap-2">
+              {isDevBuild && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={e => {
+                      e.stopPropagation();
+                      void window.electron.window.openDevTools?.();
+                    }}
+                  >
+                    {i18nService.t('aboutOpenDevTools')}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {i18nService.t('aboutDevToolsHint')}
+                  </span>
+                </>
+              )}
+              <Button type="button" variant="ghost" size="sm" onClick={e => { e.stopPropagation(); void handleExportLogs(); }} disabled={isExportingLogs}>
+                {isExportingLogs ? i18nService.t('aboutExportingLogs') : i18nService.t('aboutExportLogs')}
+              </Button>
             </div>
           </div>
         );
