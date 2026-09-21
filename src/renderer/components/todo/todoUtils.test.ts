@@ -7,6 +7,7 @@ import {
   fromDateInputValue,
   parseTodoInput,
   toDateInputValue,
+  validateTodoSchedule,
 } from './todoUtils';
 
 const now = new Date(2026, 8, 3, 10, 30, 0, 0);
@@ -85,6 +86,37 @@ test('creates tasks in the active custom list', () => {
     listId: 'release-list',
     myDayDate: null,
   });
+});
+
+test('marks tasks created in the Important view as important', () => {
+  expect(
+    buildTodoCreateInput(
+      'Ship the release',
+      { dueAt: null, important: false },
+      TodoView.Important,
+      null,
+      '2026-09-03',
+    ),
+  ).toMatchObject({
+    title: 'Ship the release',
+    important: true,
+  });
+});
+
+test('validates due and reminder schedule rules', () => {
+  const now = new Date(2026, 8, 3, 10, 0, 0, 0).getTime();
+  const todayEnd = new Date(2026, 8, 3, 23, 59, 59, 999).getTime();
+  const yesterdayEnd = new Date(2026, 8, 2, 23, 59, 59, 999).getTime();
+  const tomorrowEnd = new Date(2026, 8, 4, 23, 59, 59, 999).getTime();
+  const laterReminder = new Date(2026, 8, 4, 12, 0, 0, 0).getTime();
+
+  expect(validateTodoSchedule(yesterdayEnd, null, now)).toBe('todoDueDateMustBeFuture');
+  expect(validateTodoSchedule(todayEnd, null, now)).toBeNull();
+  expect(validateTodoSchedule(tomorrowEnd, now - 1000, now)).toBe('todoReminderMustBeFuture');
+  expect(validateTodoSchedule(tomorrowEnd, tomorrowEnd + 1, now)).toBe(
+    'todoReminderMustBeforeDue',
+  );
+  expect(validateTodoSchedule(tomorrowEnd, laterReminder, now)).toBeNull();
 });
 
 test('includes completed tasks in contextual counts', () => {
