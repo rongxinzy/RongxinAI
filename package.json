@@ -275,7 +275,7 @@
     "docx-preview": "^0.3.7",
     "dompurify": "^3.3.1",
     "electron": "^40.2.1",
-    "electron-builder": "^26.15.3",
+    "electron-builder": "26.16.1",
     "electron-log": "^5.4.3",
     "esbuild": "^0.28.0",
     "extract-zip": "^2.0.1",
