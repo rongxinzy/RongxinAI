@@ -14,12 +14,12 @@ test('formatAgentTaskRelativeTime uses Chinese compact minute hour and day units
   i18nService.setLanguage('zh', { persist: false });
   vi.spyOn(Date, 'now').mockReturnValue(now);
 
-  expect(formatAgentTaskRelativeTime(now - 30 * 1000).compact).toBe('1 分钟');
-  expect(formatAgentTaskRelativeTime(now - 4 * 60000).compact).toBe('4 分钟');
-  expect(formatAgentTaskRelativeTime(now - 60 * 60000).compact).toBe('60 分钟');
-  expect(formatAgentTaskRelativeTime(now - 61 * 60000).compact).toBe('1 小时');
-  expect(formatAgentTaskRelativeTime(now - 10 * 3600000).compact).toBe('10 小时');
-  expect(formatAgentTaskRelativeTime(now - 25 * 3600000).compact).toBe('1 天');
+  expect(formatAgentTaskRelativeTime(now - 30 * 1000).compact).toBe('1 分钟前');
+  expect(formatAgentTaskRelativeTime(now - 4 * 60000).compact).toBe('4 分钟前');
+  expect(formatAgentTaskRelativeTime(now - 60 * 60000).compact).toBe('60 分钟前');
+  expect(formatAgentTaskRelativeTime(now - 61 * 60000).compact).toBe('1 小时前');
+  expect(formatAgentTaskRelativeTime(now - 10 * 3600000).compact).toBe('10 小时前');
+  expect(formatAgentTaskRelativeTime(now - 25 * 3600000).compact).toBe('1 天前');
 });
 
 test('formatAgentTaskRelativeTime uses English compact minute hour and day units', () => {
@@ -38,7 +38,7 @@ test('formatAgentTaskRelativeTime switches to week month and year units', () => 
   i18nService.setLanguage('zh', { persist: false });
   vi.spyOn(Date, 'now').mockReturnValue(now);
 
-  expect(formatAgentTaskRelativeTime(now - 7 * 86400000).compact).toBe('1 周');
-  expect(formatAgentTaskRelativeTime(now - 30 * 86400000).compact).toBe('1 月');
-  expect(formatAgentTaskRelativeTime(now - 360 * 86400000).compact).toBe('1 年');
+  expect(formatAgentTaskRelativeTime(now - 7 * 86400000).compact).toBe('1 周前');
+  expect(formatAgentTaskRelativeTime(now - 30 * 86400000).compact).toBe('1 月前');
+  expect(formatAgentTaskRelativeTime(now - 360 * 86400000).compact).toBe('1 年前');
 });
