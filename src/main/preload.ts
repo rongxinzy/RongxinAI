@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { CoworkError } from '../common/coworkError';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
@@ -42,12 +41,11 @@ import {
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import type {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../shared/cowork/constants';
-import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
-import type { CoworkPendingMessage } from '../shared/cowork/pendingMessageQueue';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
@@ -319,9 +317,6 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   api: {
-    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) =>
-      ipcRenderer.invoke(ApiIpc.WebSearch, input),
-
     fetch: (options: {
       url: string;
       method: string;
@@ -332,28 +327,6 @@ contextBridge.exposeInMainWorld('electron', {
 
     fetchModels: (input: ProviderModelDiscoveryRequest): Promise<ProviderModelDiscoveryResult> =>
       ipcRenderer.invoke(ApiIpc.FetchModels, input),
-
-    stream: (options: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body?: string;
-      requestId: string;
-    }) => ipcRenderer.invoke(ApiIpc.Stream, options),
-
-    cancelStream: (requestId: string) => ipcRenderer.invoke(ApiIpc.CancelStream, requestId),
-
-    onStreamData: (requestId: string, callback: (chunk: string) => void) =>
-      onPush<string>(ApiIpc.streamData(requestId), callback),
-
-    onStreamDone: (requestId: string, callback: () => void) =>
-      onPushVoid(ApiIpc.streamDone(requestId), callback),
-
-    onStreamError: (requestId: string, callback: (error: CoworkError) => void) =>
-      onPush<CoworkError>(ApiIpc.streamError(requestId), callback),
-
-    onStreamAbort: (requestId: string, callback: () => void) =>
-      onPushVoid(ApiIpc.streamAbort(requestId), callback),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -539,6 +512,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkSessionIpc.UpdateModel, options),
     getSession: (sessionId: string, options?: { messageLimit?: number | null }) =>
       ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId, options),
+    getRuntimeSnapshots: (sessionId?: string) =>
+      ipcRenderer.invoke(CoworkStreamIpc.RuntimeSnapshots, sessionId),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
     listSessions: (options?: {
@@ -572,7 +547,7 @@ contextBridge.exposeInMainWorld('electron', {
     getConfig: () => ipcRenderer.invoke(CoworkConfigIpc.Get),
     setConfig: (config: {
       workingDirectory?: string;
-      executionMode?: 'auto' | 'local' | 'sandbox';
+      executionMode?: CoworkExecutionMode;
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       embeddingEnabled?: boolean;
@@ -588,34 +563,9 @@ contextBridge.exposeInMainWorld('electron', {
     writeBootstrapFile: (filename: string, content: string) =>
       ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
 
-    onStreamMessage: (callback: (data: { sessionId: string; message: unknown }) => void) =>
-      onPush(CoworkStreamIpc.Message, callback),
-    onStreamMessageUpdate: (
-      callback: (data: {
-        sessionId: string;
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }) => void,
-    ) => onPush(CoworkStreamIpc.MessageUpdate, callback),
-    onStreamToolActivity: (
-      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
-    ) => onPush(CoworkStreamIpc.ToolActivity, callback),
-    onStreamPermission: (callback: (data: { sessionId: string; request: unknown }) => void) =>
-      onPush(CoworkStreamIpc.Permission, callback),
-    onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) =>
-      onPush(CoworkStreamIpc.PermissionDismiss, callback),
-    onStreamInterrupted: (
-      callback: (data: import('../shared/cowork/interruption').CoworkSessionInterruption) => void,
-    ) => onPush(CoworkStreamIpc.Interrupted, callback),
-    onStreamComplete: (
-      callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
-    ) => onPush(CoworkStreamIpc.Complete, callback),
-    onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) =>
-      onPush(CoworkStreamIpc.Error, callback),
-    onStreamQueueUpdated: (
-      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
-    ) => onPush(CoworkStreamIpc.QueueUpdated, callback),
+    onStreamUiEvent: (
+      callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void,
+    ) => onPush(CoworkStreamIpc.UiEvent, callback),
     onSessionsChanged: (
       callback: (data: {
         sessionId?: string;

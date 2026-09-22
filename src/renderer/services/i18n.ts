@@ -6,8 +6,6 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
-    chatStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
-    chatStreamLengthLimit: '回答达到输出长度上限，内容可能不完整。可以要求继续。',
     operationFailed: '操作失败',
     authenticationExpired: '登录状态已过期，请重新登录',
     apiKeyMissing: '缺少 API Key，请先完成配置',
@@ -570,8 +568,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceModelStartedDescription: '“{name}”已启动并同步到模型设置。是否立即配置模型信息？',
     localInferenceConfigureLater: '稍后配置',
     localInferenceOpenModelSettings: '前往模型设置',
-    chatThinkingToggle: '思考',
-    chatThinkingToggleHint: '控制模型是否输出思考过程',
     localInferenceLoadingHint: '正在加载这个模型，其他模型加载操作已暂时锁定。',
     localInferenceUnloading: '卸载中...',
     localInferenceUnloadingHint: '正在卸载这个模型，按钮已暂时锁定。',
@@ -3389,10 +3385,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     linkSafetyConfirmOpen: '打开链接',
   },
   en: {
-    chatStreamInterrupted:
-      'The response was interrupted. Received content is preserved. Retry or ask to continue.',
-    chatStreamLengthLimit:
-      'The response reached its output limit and may be incomplete. You can ask to continue.',
     operationFailed: 'Operation failed',
     authenticationExpired: 'Authentication expired. Please sign in again',
     apiKeyMissing: 'API key is missing. Check your configuration',
@@ -3995,8 +3987,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '“{name}” has started and was added to Model Settings. Configure its details now?',
     localInferenceConfigureLater: 'Configure later',
     localInferenceOpenModelSettings: 'Open Model Settings',
-    chatThinkingToggle: 'Thinking',
-    chatThinkingToggleHint: 'Choose whether the model produces reasoning before replying',
     localInferenceLoadingHint:
       'This model is loading and other model load actions are temporarily locked.',
     localInferenceUnloading: 'Unloading...',

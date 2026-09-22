@@ -64,7 +64,7 @@ test('keeps the session permission selector available during an active run', () 
   expect(permissionMenu).not.toContain('disabled={disabled || isStreaming}');
 });
 
-test('keeps model, thinking, and permission controls reachable in compact toolbars', () => {
+test('keeps model and permission controls reachable in compact toolbars', () => {
   const compactControlsStart = source.lastIndexOf('<div className="flex items-center gap-1.5">');
   const compactControls = source.slice(compactControlsStart);
 
@@ -93,7 +93,6 @@ test('keeps streaming controls gated without obscuring the prompt', () => {
   expect(source).not.toContain('bg-input/50 dark:bg-input/80');
   expect(source).not.toContain("className={isStreaming ? 'relative z-20' : undefined}");
   expect(source).toContain('disabled={disabled || isStreaming || isAddingFile}');
-  expect(source.match(/disabled=\{disabled \|\| isStreaming\}/g)).toHaveLength(2);
   expect(source).toContain("status={isStreaming ? 'streaming' : 'ready'}");
   expect(source).toContain('onStop={isStreaming ? onStop : undefined}');
 });

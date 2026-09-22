@@ -66,7 +66,6 @@ import {
 import { shouldAutoDetectProviderModels } from './settings/providerModelAutoDetection';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
-import { apiService } from '../services/api';
 import { apiFetch } from '../services/visibleApiTransport';
 import { LLAMACPP_RUNNING_MODELS_CHANGED_EVENT } from '../services/availableModels';
 import { configService } from '../services/config';
@@ -2098,15 +2097,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       // 应用语言
       i18nService.setLanguage(language, { persist: false });
-
-      // Set API with the primary provider - handle Qwen OAuth
-      let apiKeyToUse = primaryProvider.apiKey;
-      let baseUrlToUse = primaryProvider.baseUrl;
-
-      apiService.setConfig({
-        apiKey: apiKeyToUse,
-        baseUrl: baseUrlToUse,
-      });
 
       if (hasCoworkConfigChanges) {
         const updated = await coworkService.updateConfig({

@@ -1,5 +1,9 @@
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkFileAttachment, CoworkImageAttachment } from '../types/cowork';
+import {
+  PiUiEventSequenceTracker,
+  PiUiEventType,
+} from '../../shared/cowork/piUiEvent';
 
 type QueueListener = (items: CoworkPendingMessage[]) => void;
 
@@ -8,6 +12,7 @@ class CoworkQueueService {
   private readonly listenersBySession = new Map<string, Set<QueueListener>>();
   private readonly revisionsBySession = new Map<string, number>();
   private streamCleanup: (() => void) | null = null;
+  private readonly sequenceTracker = new PiUiEventSequenceTracker();
 
   subscribe(sessionId: string, listener: QueueListener): () => void {
     this.ensureStreamListener();
@@ -76,9 +81,17 @@ class CoworkQueueService {
   }
 
   private ensureStreamListener(): void {
-    if (this.streamCleanup || !window.electron?.cowork?.onStreamQueueUpdated) return;
-    this.streamCleanup = window.electron.cowork.onStreamQueueUpdated(({ sessionId, items }) => {
-      this.publish(sessionId, items);
+    if (this.streamCleanup || !window.electron?.cowork?.onStreamUiEvent) return;
+    this.streamCleanup = window.electron.cowork.onStreamUiEvent(event => {
+      if (!this.sequenceTracker.accept(event)) return;
+      if (this.sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
+        void this.load(event.sessionId).catch(error =>
+          console.error('[CoworkQueueService] failed to recover after a UI event sequence gap:', error),
+        );
+      }
+      if (event.type === PiUiEventType.QueueUpdated) {
+        this.publish(event.sessionId, event.items);
+      }
     });
   }
 

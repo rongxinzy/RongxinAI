@@ -23,7 +23,9 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
-import { classifyCoworkError } from '../common/coworkError';
+import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
+import { reportPiSessionFailure } from './piSessionFailure';
+import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
@@ -51,6 +53,7 @@ import {
   AppUpdateIpc,
 } from '../shared/appUpdate/constants';
 import {
+  CoworkExecutionMode,
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
@@ -92,7 +95,6 @@ import {
 } from '../shared/ipc/queueSchemas';
 import {
   ApiFetchSchema,
-  ApiStreamSchema,
   CoworkSessionContinueSchema,
   CoworkSessionStartSchema,
   CoworkSessionUpdateModelSchema,
@@ -123,7 +125,6 @@ import { registerMemoryIpcHandlers } from './memory/ipc';
 import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 import { resolveMemorySessionTitles } from './memory/sessionTitleResolver';
 import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
-import { searchAnySearchGateway } from './libs/anysearchGateway';
 import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
@@ -145,7 +146,6 @@ import {
 } from './coworkImageAttachments';
 import { resolveCoworkContinuationSkillState } from './coworkSessionSkills';
 import {
-  type CoworkExecutionMode,
   type CoworkMessageMetadata,
   type CoworkMessageType,
   type CoworkSessionStatus,
@@ -190,7 +190,15 @@ import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRe
 import { GitWorktreeService } from './codingAgent/gitWorktreeService';
 import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
 import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
+import { PiUiRuntimeSnapshots } from '../shared/cowork/piUiRuntimeSnapshot';
 import { CoworkInterruptionCause } from '../shared/cowork/interruption';
+import {
+  type PiUiEvent,
+  type PiUiEventPayload,
+  type PiUiMessage,
+  PiUiEventType,
+  PiUiEventSequencer,
+} from '../shared/cowork/piUiEvent';
 import { normalizePiMessage, normalizePiToolActivity } from './codingAgent/piCodingEventAdapter';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
@@ -251,7 +259,7 @@ import {
   trackDevNetworkRequest,
   publishDevNetworkLog,
 } from './devNetworkLog';
-import { sanitizeNetworkUrl, truncateNetworkBody } from '../shared/devNetworkLog';
+import { truncateNetworkBody } from '../shared/devNetworkLog';
 import { ZhiyuanEnterpriseSkillBridge } from './enterpriseExtension/skillBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
@@ -1135,9 +1143,8 @@ const getCodingRoomService = (): CodingRoomService => {
                 resolveSnapshots: resolveSessionExpertSnapshots,
               })
             : null;
-          // Resolving comes first: a stale expert id throws, and the lane must
-          // not be left marked as running when the turn never starts.
-          coworkStoreInstance.updateSession(sessionId, { status: 'running' });
+          // Resolving comes first: a stale expert id throws. Pi's agent_start
+          // event is the single source of truth for the running state.
           const sharedOptions = {
             workspaceRoot,
             sessionMode: 'work' as const,
@@ -2021,96 +2028,61 @@ const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
 
 /** Project Pi Work/Chat events to renderer-owned cowork streams. */
 const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
-  // 流式 content 常整段 Replace；不合并时主进程每 token 序列化大字符串 IPC，
-  // 16G 机器上易造成窗口「未响应」。按 messageId 合并到约一帧一次。
-  const pendingMessageUpdates = new Map<
-    string,
-    { sessionId: string; messageId: string; content: string; metadata?: Record<string, unknown> }
-  >();
-  let messageUpdateFlushTimer: NodeJS.Timeout | null = null;
-  const MESSAGE_UPDATE_FLUSH_MS = 32;
-
-  const flushMessageUpdates = (): void => {
-    if (messageUpdateFlushTimer !== null) {
-      clearTimeout(messageUpdateFlushTimer);
-      messageUpdateFlushTimer = null;
-    }
-    if (pendingMessageUpdates.size === 0) return;
-    const updates = Array.from(pendingMessageUpdates.values());
-    pendingMessageUpdates.clear();
-    const windows = BrowserWindow.getAllWindows();
-    for (const update of updates) {
-      const safeContent = truncateIpcString(update.content, IPC_UPDATE_CONTENT_MAX_CHARS);
-      for (const win of windows) {
-        if (win.isDestroyed()) continue;
-        try {
-          win.webContents.send(CoworkStreamIpc.MessageUpdate, {
-            sessionId: update.sessionId,
-            messageId: update.messageId,
-            content: safeContent,
-            metadata: update.metadata,
-          });
-        } catch (error) {
-          console.error('[PiWorkbenchForwarder] failed to forward a message update:', error);
-        }
-      }
-    }
-  };
-
-  const scheduleMessageUpdateFlush = (): void => {
-    if (messageUpdateFlushTimer !== null) return;
-    messageUpdateFlushTimer = setTimeout(flushMessageUpdates, MESSAGE_UPDATE_FLUSH_MS);
-  };
-
-  runtime.on('message', (sessionId: string, message: unknown) => {
-    const safeMessage = sanitizeCoworkMessageForIpc(message);
+  const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
+  const runtimeSnapshots = new PiUiRuntimeSnapshots();
+  ipcMain.handle(CoworkStreamIpc.RuntimeSnapshots, (_event, sessionId?: string) =>
+    runtimeSnapshots.read(sessionId),
+  );
+  const broadcastUiEvent = (event: PiUiEvent): void => {
+    runtimeSnapshots.observe(event);
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
       try {
-        win.webContents.send(CoworkStreamIpc.Message, { sessionId, message: safeMessage });
+        win.webContents.send(CoworkStreamIpc.UiEvent, event);
       } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a message:', error);
+        console.error('[PiWorkbenchForwarder] failed to forward a Pi UI event:', error);
       }
+    });
+  };
+  const emitUiEvent = createPiUiEventBatcher((payload: PiUiEventPayload) => {
+    broadcastUiEvent(sequencer.next(payload));
+  });
+
+  runtime.on('started', (sessionId: string) => {
+    emitUiEvent({ type: PiUiEventType.Started, sessionId });
+  });
+
+  runtime.on('message', (sessionId: string, message: unknown) => {
+    const safeMessage = sanitizeCoworkMessageForIpc(message);
+    emitUiEvent({
+      type: PiUiEventType.Message,
+      sessionId,
+      message: safeMessage as PiUiMessage,
     });
   });
 
   runtime.on(
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
-      pendingMessageUpdates.set(`${sessionId}:${messageId}`, {
+      const safeContent = truncateIpcString(content, IPC_UPDATE_CONTENT_MAX_CHARS);
+      emitUiEvent({
+        type: PiUiEventType.MessageUpdate,
         sessionId,
         messageId,
-        content,
+        content: safeContent,
         metadata,
       });
-      scheduleMessageUpdateFlush();
     },
   );
 
   runtime.on('toolActivity', (sessionId, event) => {
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.ToolActivity, { sessionId, event });
-      } catch (error) {
-        console.error('[CoworkForwarder] failed to forward tool activity:', error);
-      }
-    });
+    emitUiEvent({ type: PiUiEventType.ToolActivity, sessionId, event });
   });
 
   runtime.on('queueUpdated', (sessionId, items) => {
     const safeItems = slimQueuedMessagesForIpc(items);
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.QueueUpdated, { sessionId, items: safeItems });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward queue update:', error);
-      }
-    });
+    emitUiEvent({ type: PiUiEventType.QueueUpdated, sessionId, items: safeItems });
   });
 
   runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
@@ -2118,53 +2090,54 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       return;
     }
     const safeRequest = sanitizePermissionRequestForIpc(request);
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.Permission, { sessionId, request: safeRequest });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a permission request:', error);
-      }
+    if (!safeRequest || typeof safeRequest !== 'object') return;
+    const requestRecord = safeRequest as Record<string, unknown>;
+    if (typeof requestRecord.requestId !== 'string' || typeof requestRecord.toolName !== 'string') {
+      console.warn('[PiWorkbenchForwarder] ignored a malformed permission request');
+      return;
+    }
+    const toolInput =
+      requestRecord.toolInput && typeof requestRecord.toolInput === 'object'
+        ? (requestRecord.toolInput as Record<string, unknown>)
+        : {};
+    emitUiEvent({
+      type: PiUiEventType.PermissionRequest,
+      sessionId,
+      request: {
+        requestId: requestRecord.requestId,
+        toolName: requestRecord.toolName,
+        toolInput,
+        ...(typeof requestRecord.toolUseId === 'string'
+          ? { toolUseId: requestRecord.toolUseId }
+          : {}),
+      },
     });
   });
 
   runtime.on('permissionDismiss', (requestId: string) => {
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.PermissionDismiss, { requestId });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to dismiss a permission request:', error);
-      }
-    });
+    emitUiEvent({ type: PiUiEventType.PermissionDismiss, sessionId: null, requestId });
   });
 
   runtime.on('sessionInterrupted', interruption => {
-    flushMessageUpdates();
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.Interrupted, interruption);
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a session interruption:', error);
-      }
+    emitUiEvent({
+      type: PiUiEventType.Interrupted,
+      sessionId: interruption.sessionId,
+      interruption,
     });
   });
 
-  runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
-    flushMessageUpdates();
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      win.webContents.send(CoworkStreamIpc.Complete, { sessionId, claudeSessionId });
+  runtime.on('sessionStopped', (sessionId: string) => {
+    emitUiEvent({ type: PiUiEventType.Stopped, sessionId });
+  });
+
+  runtime.on('complete', (sessionId: string) => {
+    emitUiEvent({
+      type: PiUiEventType.Completed,
+      sessionId,
     });
   });
 
   runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
-    flushMessageUpdates();
     try {
       persistCoworkTerminalError(
         getStore().getDatabase(),
@@ -2179,11 +2152,9 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
         persistenceError,
       );
     }
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      win.webContents.send(CoworkStreamIpc.Error, { sessionId, error });
-    });
+    // Persisting the terminal message emits the canonical `message` event
+    // first. The UI protocol keeps that ordering before the terminal error.
+    emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
   });
 };
 
@@ -2851,8 +2822,6 @@ let mainWindow: BrowserWindow | null = null;
 
 let isQuitting = false;
 
-// 存储活跃的流式请求控制器
-const activeStreamControllers = new Map<string, AbortController>();
 let lastReloadAt = 0;
 let windowStateSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const MIN_RELOAD_INTERVAL_MS = 5000;
@@ -4451,13 +4420,17 @@ if (!gotTheLock) {
         // The renderer already includes the selected non-expert agent prompt when
         // present. Treat that request value as the source prompt instead of
         // appending the same agent prompt again in the main process.
-        const basePrompt =
-          options.systemPrompt ?? selectedAgent?.systemPrompt ?? config.systemPrompt;
-        const systemPrompt = composeCoworkSystemPrompt({
-          basePrompt,
-          expertSnapshots,
-          language: resolveCoworkPromptLanguage(),
-        });
+        const isChatSession = options.mode === CoworkSessionMode.Chat;
+        const basePrompt = isChatSession
+          ? options.systemPrompt ?? ''
+          : (options.systemPrompt ?? selectedAgent?.systemPrompt ?? config.systemPrompt);
+        const systemPrompt = isChatSession
+          ? basePrompt.trim()
+          : composeCoworkSystemPrompt({
+              basePrompt,
+              expertSnapshots,
+              language: resolveCoworkPromptLanguage(),
+            });
         const workspace = options.workspaceId
           ? coworkStoreInstance.getWorkspace(options.workspaceId)
           : null;
@@ -4485,7 +4458,7 @@ if (!gotTheLock) {
           title,
           taskWorkingDirectory,
           systemPrompt,
-          config.executionMode || 'local',
+          config.executionMode || CoworkExecutionMode.Local,
           options.activeSkillIds || [],
           options.agentId || 'main',
           options.modelOverride || '',
@@ -4502,10 +4475,6 @@ if (!gotTheLock) {
             options.modelOverride,
           );
         }
-
-        // Update session status to 'running' before starting async task
-        // This ensures the frontend receives the correct status immediately
-        coworkStoreInstance.updateSession(session.id, { status: 'running' });
 
         // Build metadata, include imageAttachments if present
         const messageMetadata: Record<string, unknown> = {};
@@ -4547,10 +4516,6 @@ if (!gotTheLock) {
         });
         coworkStoreInstance.touchWorkspace(session.workspaceId);
 
-        // Update session status to 'running' before starting async task
-        // This ensures the frontend receives the correct status immediately
-        coworkStoreInstance.updateSession(session.id, { status: 'running' });
-
         // Start the session asynchronously (skip initial user message since we already added it)
         const runtime = getPiRuntimeAdapter();
         const runtimeSkillIds = [
@@ -4581,20 +4546,8 @@ if (!gotTheLock) {
           .catch(error => {
             console.error('[Cowork] session error:', error);
             try {
-              // The engine router already emits an 'error' event (handled at line ~990)
-              // which sends cowork:stream:error to the renderer. Only send here if the
-              // session hasn't been marked as error yet, to avoid duplicate messages.
               const existing = coworkStoreInstance.getSession(session.id);
-              if (existing?.status === 'error') return;
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              const windows = BrowserWindow.getAllWindows();
-              windows.forEach(win => {
-                if (win.isDestroyed()) return;
-                win.webContents.send(CoworkStreamIpc.Error, {
-                  sessionId: session.id,
-                  error: classifyCoworkError(errorMessage),
-                });
-              });
+              reportPiSessionFailure(runtime, session.id, error, existing?.status);
             } catch (handlerError) {
               console.error(
                 '[Cowork] failed to send error notification to renderer:',
@@ -4605,7 +4558,7 @@ if (!gotTheLock) {
 
         const sessionWithMessages = coworkStoreInstance.getSession(session.id) || {
           ...session,
-          status: 'running' as const,
+          status: 'idle' as const,
         };
         return { success: true, session: sanitizeCoworkSessionForIpc(sessionWithMessages) };
       } catch (error) {
@@ -4631,12 +4584,15 @@ if (!gotTheLock) {
           haveSameExpertIds(previousExpertSnapshots, options.expertIds)
             ? previousExpertSnapshots.slice(0, 1)
             : resolveSessionExpertSnapshots(options.expertIds);
-        const nextSystemPrompt = composeCoworkSystemPrompt({
-          basePrompt: existingSession.systemPrompt || options.systemPrompt,
-          expertSnapshots,
-          previousExpertSnapshots,
-          language: resolveCoworkPromptLanguage(),
-        });
+        const isChatSession = existingSession?.mode === CoworkSessionMode.Chat;
+        const nextSystemPrompt = isChatSession
+          ? (options.systemPrompt ?? '').trim()
+          : composeCoworkSystemPrompt({
+              basePrompt: existingSession.systemPrompt || options.systemPrompt,
+              expertSnapshots,
+              previousExpertSnapshots,
+              language: resolveCoworkPromptLanguage(),
+            });
         const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
         if (expertsChanged) {
           store.replaceSessionExperts(options.sessionId, expertSnapshots);
@@ -4685,13 +4641,16 @@ if (!gotTheLock) {
       }
 
       const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
+      const sessionMode = existingSession?.mode ?? CoworkSessionMode.Work;
 
       const runtimeSystemPrompt = existingSession
         ? existingSession.systemPrompt
-        : composeCoworkSystemPrompt({
-            basePrompt: options.systemPrompt,
-            language: resolveCoworkPromptLanguage(),
-          });
+        : sessionMode === CoworkSessionMode.Chat
+          ? (options.systemPrompt ?? '').trim()
+          : composeCoworkSystemPrompt({
+              basePrompt: options.systemPrompt,
+              language: resolveCoworkPromptLanguage(),
+            });
 
       if (existingSession && options.prompt.trim()) {
         store.touchWorkspace(existingSession.workspaceId);
@@ -4701,10 +4660,7 @@ if (!gotTheLock) {
         .continueSession(options.sessionId, options.prompt, {
           systemPrompt: runtimeSystemPrompt,
           skillIds: runtimeSkillIds,
-          sessionMode:
-            existingSession?.mode === CoworkSessionMode.Chat
-              ? CoworkSessionMode.Chat
-              : CoworkSessionMode.Work,
+          sessionMode,
           goalMode: options.goalMode,
           imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
@@ -4722,20 +4678,8 @@ if (!gotTheLock) {
         .catch(error => {
           console.error('[Cowork] continue error:', error);
           try {
-            // The engine router already emits an 'error' event (handled at line ~990)
-            // which sends cowork:stream:error to the renderer. Only send here if the
-            // session hasn't been marked as error yet, to avoid duplicate messages.
             const existing = getCoworkStore().getSession(options.sessionId);
-            if (existing?.status === 'error') return;
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const windows = BrowserWindow.getAllWindows();
-            windows.forEach(win => {
-              if (win.isDestroyed()) return;
-              win.webContents.send(CoworkStreamIpc.Error, {
-                sessionId: options.sessionId,
-                error: classifyCoworkError(errorMessage),
-              });
-            });
+            reportPiSessionFailure(getPiRuntimeAdapter(), options.sessionId, error, existing?.status);
           } catch (handlerError) {
             console.error('[Cowork] failed to send error notification to renderer:', handlerError);
           }
@@ -4904,7 +4848,7 @@ if (!gotTheLock) {
           session.title,
           session.cwd,
           session.systemPrompt || '',
-          (session.executionMode as CoworkExecutionMode) || 'local',
+          parseCoworkExecutionMode(session.executionMode) ?? CoworkExecutionMode.Local,
           session.activeSkillIds || [],
           session.agentId || 'main',
           session.modelOverride || '',
@@ -5619,7 +5563,7 @@ if (!gotTheLock) {
       _event,
       config: {
         workingDirectory?: string;
-        executionMode?: 'auto' | 'local' | 'sandbox';
+        executionMode?: CoworkExecutionMode;
         permissionMode?: CoworkPermissionMode;
         permissionModeBySession?: Record<string, CoworkPermissionMode>;
         embeddingEnabled?: boolean;
@@ -5632,10 +5576,6 @@ if (!gotTheLock) {
       },
     ) => {
       try {
-        const normalizedExecutionMode =
-          config.executionMode && String(config.executionMode) === 'container'
-            ? 'local'
-            : config.executionMode;
         const normalizedPermissionMode =
           config.permissionMode === CoworkPermissionMode.Ask ||
           config.permissionMode === CoworkPermissionMode.AllowAll
@@ -5653,7 +5593,7 @@ if (!gotTheLock) {
         const normalizedEmbedding = normalizeEmbeddingConfig(config);
         const normalizedConfig: Parameters<CoworkStore['setConfig']>[0] = {
           ...config,
-          executionMode: normalizedExecutionMode,
+          executionMode: parseCoworkExecutionMode(config.executionMode),
           permissionMode: normalizedPermissionMode,
           permissionModeBySession: normalizedPermissionModeBySession,
           ...normalizedEmbedding,
@@ -6927,26 +6867,7 @@ if (!gotTheLock) {
     }
   };
 
-  // API 代理处理程序 - 解决 CORS 问题
-  ipcMain.handle(ApiIpc.WebSearch, async (_event, rawInput: unknown) => {
-    const input =
-      rawInput && typeof rawInput === 'object' ? (rawInput as Record<string, unknown>) : {};
-    const requestId = typeof input.requestId === 'string' ? input.requestId : null;
-    const controller = new AbortController();
-    if (requestId) activeStreamControllers.set(requestId, controller);
-    try {
-      const data = await searchAnySearchGateway(input, controller.signal);
-      return { ok: true, data };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Search unavailable.' };
-    } finally {
-      if (requestId && activeStreamControllers.get(requestId) === controller) {
-        activeStreamControllers.delete(requestId);
-      }
-    }
-  });
-
-  ipcMain.handle('api:fetch', async (_event, rawOptions: unknown) => {
+  ipcMain.handle(ApiIpc.Fetch, async (_event, rawOptions: unknown) => {
     const options = ApiFetchSchema.input.parse(rawOptions);
     console.log(
       `[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`,
@@ -7029,147 +6950,6 @@ if (!gotTheLock) {
         }
       },
     });
-  });
-
-  // SSE 流式 API 代理
-  ipcMain.handle('api:stream', async (event, rawOptions: unknown) => {
-    const options = ApiStreamSchema.input.parse(rawOptions);
-    const controller = new AbortController();
-    const streamStartedAt = Date.now();
-    const streamLogId = `${streamStartedAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
-    // 存储 controller 以便后续取消
-    activeStreamControllers.set(options.requestId, controller);
-
-    const logStream = (status: number, error?: string, responseBody?: string) => {
-      // 2026/09/17 lixiang  开发态镜像 api:stream 到 DevTools Network
-      publishDevNetworkLog({
-        id: streamLogId,
-        source: 'api-stream',
-        method: options.method,
-        url: sanitizeNetworkUrl(options.url),
-        status,
-        durationMs: Date.now() - streamStartedAt,
-        requestBody: truncateNetworkBody(options.body),
-        responseBody:
-          responseBody ??
-          (error
-            ? truncateNetworkBody(error)
-            : '[streaming — response chunks go over IPC, not mirrored here]'),
-        error,
-        startedAt: streamStartedAt,
-      });
-    };
-
-    try {
-      let response = await session.defaultSession.fetch(options.url, {
-        method: options.method,
-        headers: options.headers,
-        body: options.body,
-        signal: controller.signal,
-      });
-
-      // Auto-retry once for Copilot 401/403
-      if (
-        !response.ok &&
-        (response.status === 401 || response.status === 403) &&
-        isCopilotUrl(options.url)
-      ) {
-        console.log('[api:stream] Copilot auth error, attempting token refresh and retry');
-        const { headers: refreshedHeaders, retried } =
-          await retryCopilotWithRefreshedToken(options);
-        if (retried) {
-          response = await session.defaultSession.fetch(options.url, {
-            method: options.method,
-            headers: refreshedHeaders,
-            body: options.body,
-            signal: controller.signal,
-          });
-          console.log(`[api:stream] retry -> ${response.status} ${response.statusText}`);
-        }
-      }
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        activeStreamControllers.delete(options.requestId);
-        logStream(response.status, errorData.slice(0, 200), truncateNetworkBody(errorData));
-        return {
-          ok: false,
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData,
-        };
-      }
-
-      if (!response.body) {
-        activeStreamControllers.delete(options.requestId);
-        logStream(response.status, 'No response body');
-        return {
-          ok: false,
-          status: response.status,
-          statusText: 'No response body',
-        };
-      }
-
-      // 读取流式响应并通过 IPC 发送
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      const readStream = async () => {
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) {
-              event.sender.send(`api:stream:${options.requestId}:done`);
-              break;
-            }
-            const chunk = decoder.decode(value);
-            event.sender.send(`api:stream:${options.requestId}:data`, chunk);
-          }
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
-            event.sender.send(`api:stream:${options.requestId}:abort`);
-          } else {
-            event.sender.send(
-              `api:stream:${options.requestId}:error`,
-              error instanceof Error ? error.message : 'Stream error',
-            );
-          }
-        } finally {
-          activeStreamControllers.delete(options.requestId);
-        }
-      };
-
-      // 异步读取流，立即返回成功状态
-      readStream();
-      logStream(response.status);
-
-      return {
-        ok: true,
-        status: response.status,
-        statusText: response.statusText,
-      };
-    } catch (error) {
-      activeStreamControllers.delete(options.requestId);
-      logStream(0, error instanceof Error ? error.message : 'Unknown error');
-      return {
-        ok: false,
-        status: 0,
-        statusText: error instanceof Error ? error.message : 'Network error',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  });
-
-  // 取消流式请求
-  ipcMain.handle('api:stream:cancel', (_event, requestId: string) => {
-    const controller = activeStreamControllers.get(requestId);
-    if (controller) {
-      controller.abort();
-      activeStreamControllers.delete(requestId);
-      return true;
-    }
-    return false;
   });
 
   // ─── end OAuth ───
@@ -8012,9 +7792,9 @@ if (!gotTheLock) {
       const hadEnterprise = store.get('enterprise_config');
       if (hadEnterprise) {
         store.delete('enterprise_config');
-        // Reset executionMode to default so sandbox mode reverts to "off".
+        // Restore the default execution mode after removing enterprise configuration.
         const cs = getCoworkStore();
-        cs.setConfig({ executionMode: 'local' });
+        cs.setConfig({ executionMode: CoworkExecutionMode.Local });
         console.log(
           '[Enterprise] config package removed, cleared enterprise mode and reset executionMode',
         );
