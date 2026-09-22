@@ -249,7 +249,8 @@ export function classicConditionalControls(dark: boolean) {
       base: {
         'border-color': 'var(--zy-border)',
         'background-color': 'var(--card)',
-        'font-weight': 'var(--zy-component-font-weight-medium)',
+        // 2026/09/22 lixiang  选中快捷技能加粗，与侧栏导航选中态一致
+        'font-weight': 'var(--zy-component-font-weight-semibold)',
         color: 'var(--zy-foreground)',
       },
       hover: {
@@ -259,7 +260,8 @@ export function classicConditionalControls(dark: boolean) {
       },
     }),
     'page-chat-skill-shortcuts-button-variant-3': recipe({
-      base: { color: 'var(--muted-foreground)' },
+      // 2026/09/22 lixiang  快捷技能未选中项文字用正文色，与侧栏导航一致
+      base: { color: 'var(--foreground)' },
     }),
     'page-coding-workspace-sidebar-button-variant-1': recipe({
       base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
