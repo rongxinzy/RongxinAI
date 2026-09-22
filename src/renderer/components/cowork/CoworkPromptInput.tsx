@@ -10,17 +10,18 @@ import {
   usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@shared/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
-import {
-  ProductionLoopMode,
-  type ProductionLoopMode as ProductionLoopModeValue,
-} from '../../../shared/productionLoop';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -181,7 +182,6 @@ interface CoworkPromptInputProps {
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,
-    productionLoopMode?: ProductionLoopModeValue,
   ) => boolean | void | Promise<boolean | void>;
   onStop?: () => void;
   isStreaming?: boolean;
@@ -285,14 +285,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       () => currentSession?.experts?.slice(0, 1).map(expert => expert.expertId) ?? [],
       [currentSession?.experts],
     );
-    const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(() =>
-      persistedExpertIds,
-    );
+    const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(() => persistedExpertIds);
     const [value, setValue] = useState(draftPrompt);
     const [goalMode, setGoalMode] = useState(false);
-    const [productionLoopMode, setProductionLoopMode] = useState<ProductionLoopModeValue>(
-      ProductionLoopMode.Off,
-    );
 
     // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
     // Without this, every controller reference change triggers a re-render cascade
@@ -436,11 +431,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     // Load skills on mount
     useEffect(() => {
       setSelectedExpertIds(persistedExpertIds);
-    }, [
-      currentSession?.id,
-      currentAgentId,
-      persistedExpertIds,
-    ]);
+    }, [currentSession?.id, currentAgentId, persistedExpertIds]);
 
     const syncSkills = useCallback(async () => {
       const loadedSkills = await skillService.loadSkills();
@@ -702,7 +693,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         fileAtts.length > 0 ? fileAtts : undefined,
         selectedExpertIds,
         goalMode,
-        productionLoopMode,
       );
       if (result === false) {
         // Submission rejected — restore the prompt so the user can retry.
@@ -735,7 +725,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       modelSupportsImage,
       selectedExpertIds,
       goalMode,
-      productionLoopMode,
       canQueueWhileStreaming,
       resumeTaskActive,
     ]);
@@ -1260,8 +1249,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     }
                     goalMode={goalMode}
                     onGoalModeChange={setGoalMode}
-                    productionLoopMode={productionLoopMode}
-                    onProductionLoopModeChange={setProductionLoopMode}
                     disabled={disabled || isStreaming || isAddingFile}
                   />
                   {!isCompactToolbar && isWorkVariant && (
@@ -1365,9 +1352,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       className="cursor-not-allowed opacity-40"
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {i18nService.t('chatSubmitEmptyHint')}
-                  </TooltipContent>
+                  <TooltipContent side="top">{i18nService.t('chatSubmitEmptyHint')}</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (

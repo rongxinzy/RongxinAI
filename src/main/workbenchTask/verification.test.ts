@@ -88,36 +88,6 @@ test('generic work without user acceptance passes on baseline checks alone', () 
   expect(failed.outcome).toBe(WorkbenchVerificationOutcome.Failed);
 });
 
-test('dormant production controls do not force acceptance for a direct Work answer', () => {
-  const result = verifyWorkbenchRun({
-    contract: {
-      kind: WorkbenchContractKind.GenericWork,
-      requiresUserAcceptance: true,
-    },
-    finalAnswer: '你好，有什么可以帮你？',
-    streamClosedCleanly: true,
-    workflowCompleted: true,
-    workflowSnapshot: { productionActive: false, skipped: false },
-  });
-
-  expect(result.outcome).toBe(WorkbenchVerificationOutcome.Passed);
-  expect(result.checks.some(check => check.name === 'production_not_activated')).toBe(true);
-});
-
-test('a skipped production workflow passes without manual acceptance', () => {
-  const result = verifyWorkbenchRun({
-    contract: {
-      kind: WorkbenchContractKind.GenericWork,
-      requiresUserAcceptance: true,
-    },
-    finalAnswer: '2',
-    streamClosedCleanly: true,
-    workflowSnapshot: { skipped: true, phase: 'plan' },
-  });
-  expect(result.outcome).toBe(WorkbenchVerificationOutcome.Passed);
-  expect(result.checks.some(check => check.name === 'workflow_skipped')).toBe(true);
-});
-
 test('generic work cannot use acceptance to override baseline failures', () => {
   const contract = {
     kind: WorkbenchContractKind.GenericWork,

@@ -16,8 +16,6 @@ const SURFACE_PREFIXES = [
 const KERNEL_PREFIXES = [
   'src/main/workbenchTask/',
   'src/shared/workbenchTask/',
-  'src/main/productionLoop/',
-  'src/shared/productionLoop/',
   'src/main/libs/agentEngine/',
   'src/main/ipcHandlers/',
   'src/main/preload.ts',
