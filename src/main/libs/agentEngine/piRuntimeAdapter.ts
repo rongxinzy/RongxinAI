@@ -163,6 +163,7 @@ import { createPiWorkLoop } from './piWorkLoop';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import { createPiPromptOverrides } from './piPromptOverrides';
+import { buildPiWebSearchTool } from './piWebSearchTool';
 import {
   getPiPreparingToolActivity,
   ToolActivityTracker,
@@ -956,6 +957,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // Each call creates a distinct tool instance for this Pi session, so its
       // sequential execution mode cannot block another session.
       const customTools: Record<string, unknown>[] = [];
+      if (resourceState.chatMode) customTools.push(buildPiWebSearchTool());
       if (this.workbenchTaskService && options.sessionMode !== CoworkSessionMode.Chat) {
         customTools.push(
           buildPiTaskOutputTool(requirements => {

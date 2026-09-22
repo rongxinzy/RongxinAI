@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
+import { PiWebSearchToolName } from './constants';
 
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -743,6 +744,7 @@ describe('PiRuntimeAdapter', () => {
         customTools?: Array<{ name?: string }>;
       };
       const customToolNames = sessionOptions.customTools?.map(tool => tool.name) ?? [];
+      expect(customToolNames).toContain(PiWebSearchToolName);
       expect(customToolNames).not.toContain(PiMcpTool.Name);
       expect(customToolNames).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
       expect(customToolNames).not.toContain(PiDocumentReaderToolName);

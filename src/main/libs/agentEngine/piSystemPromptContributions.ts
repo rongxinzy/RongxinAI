@@ -19,6 +19,7 @@ import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { PiTaskOutputSystemPrompt } from './piTaskOutputTool';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
+import { PiWebSearchSystemPrompt } from './piWebSearchTool';
 
 export interface PiSystemPromptContext {
   /** Whether the session is a direct Chat lane without Work orchestration. */
@@ -52,6 +53,11 @@ export interface PiSystemPromptContribution {
 
 // Order matters: entries are appended to the system prompt in this sequence.
 export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
+  {
+    id: 'web-search',
+    enabled: context => context.chatMode === true,
+    prompt: PiWebSearchSystemPrompt,
+  },
   {
     id: 'ask-user-question',
     enabled: context => context.unattended !== true,
