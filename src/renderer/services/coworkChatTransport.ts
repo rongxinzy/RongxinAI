@@ -58,7 +58,7 @@ function extractImages(
 }
 
 /**
- * A `ChatTransport` that bridges the existing Cowork IPC protocol into the
+ * A `ChatTransport` that bridges the Pi UI event protocol into the
  * AI SDK v6 `useChat` hook.
  *
  * Key design decisions:
@@ -70,9 +70,9 @@ function extractImages(
  * 2. `tool_result` messages are emitted as `tool-output-available` chunks,
  *    matching the toolCallId so ai-sdk links them to the same ToolInvocation.
  *
- * 3. `onStreamMessageUpdate` sends the FULL accumulating content snapshot,
- *    NOT a delta.  We track the last-known content per messageId and emit only
- *    the diff so ai-elements renders without duplication.
+ * 3. Pi message updates send the FULL accumulating content snapshot, NOT a
+ *    delta. We track the last-known content per messageId and emit only the
+ *    diff so ai-elements renders without duplication.
  *
  * 4. Permission requests are mapped to `tool-approval-request` so the
  *    frontend can call `addToolApprovalResponse(approved)` and the transport
