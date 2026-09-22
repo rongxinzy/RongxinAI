@@ -1356,6 +1356,18 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(3);
     });
 
+    it('resolves the newly selected model before continuing a cached session', async () => {
+      await adapter.startSession('test', 'First', { modelOverride: 'openai/gpt-5.2' });
+      mockResolveRawApiConfigForModelRef.mockClear();
+      await adapter.continueSession('test', 'Second', { modelOverride: 'zhipu/glm-5.3-flash' });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('zhipu/glm-5.3-flash');
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      await adapter.continueSession('test', 'Third', { modelOverride: 'zhipu/glm-5.3-flash' });
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+    });
+
     it('should recreate the session when skill tool topology changes', async () => {
       await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
       await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
