@@ -178,6 +178,13 @@ import type {
 
 // ── Types ──
 
+const PiChatRuntimeLimit = {
+  /** Keep chat restores bounded even when the selected model has a huge window. */
+  ContextWindowTokens: 32_768,
+  HistoryChars: 16_000,
+  MaxOutputTokens: 8_192,
+} as const;
+
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 interface PiSession {
   prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
@@ -290,6 +297,13 @@ interface ActivePiSession {
   completionPending?: Promise<void>;
   requestStartedAt: number | null;
   firstVisibleTextAt: number | null;
+  /** Timestamp when this in-process Pi AgentSession finished creation. */
+  piSessionCreatedAt: number;
+  /** First agent_start timestamp for this Pi AgentSession. */
+  agentStartedAt: number | null;
+  /** Startup timings are recorded once, on the first visible token. */
+  startupLatencyRecorded: boolean;
+  startupLatency?: PiStartupLatency;
   confirmationMode: 'modal' | 'text';
   unsubscribe: () => void;
   /** Set to true once stopSession has aborted the turn. continueSession must not
@@ -381,8 +395,19 @@ interface PiResourceState {
   maxOutputTokens: number;
   fileToolsEnabled: boolean;
   unattended: boolean;
+  /** Chat keeps the Pi kernel but opts out of Work resource discovery. */
+  chatMode: boolean;
   /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
   expertSkillDirs: string[];
+}
+
+interface PiStartupLatency {
+  sessionCreatedAt: number;
+  agentStartedAt: number;
+  firstTokenAt: number;
+  sessionCreateToAgentStartMs: number;
+  agentStartToFirstTokenMs: number;
+  sessionCreateToFirstTokenMs: number;
 }
 
 interface InitializingPiSession {
@@ -797,12 +822,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // pi's formatSkillsForPrompt — no manual injection here to avoid
       // duplicating the skills section.
       const basePrompt = options.systemPrompt?.trim() || '';
+      const chatMode = options.sessionMode === CoworkSessionMode.Chat;
       const resourceState: PiResourceState = {
         systemPrompt: basePrompt,
         skillIds: normalizeSkillIds(options.skillIds),
         maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
         fileToolsEnabled: options.confirmationMode !== 'text',
         unattended: options.unattended === true,
+        chatMode,
         expertSkillDirs: this.resolveExpertPresetSkillDirs(options.expertIds),
       };
 
@@ -813,7 +840,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         options.sessionMode,
         resourceState.skillIds,
       );
-      if (this.workbenchTaskService) {
+      if (this.workbenchTaskService && !chatMode) {
         const workbench = this.workbenchTaskService.beginRun({
           sessionId,
           goal: prompt,
@@ -870,7 +897,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.workbenchTaskService?.measurement?.recordActivation(currentRunId, event);
       };
       if (
-        options.sessionMode === 'work' &&
+        options.sessionMode === CoworkSessionMode.Work &&
         isLocalProviderName(resolvedModel.providerName) &&
         resolvedModel.capabilities?.toolCalling !== ModelCapabilityStatus.Supported
       ) {
@@ -881,7 +908,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         );
       }
       resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
-      sessionOptions.model = resolvedModel.model;
+      const sessionModel = this.resolvePiSessionModel(resolvedModel.model, resourceState.chatMode);
+      if (resourceState.chatMode) {
+        resourceState.maxOutputTokens = Math.min(
+          resourceState.maxOutputTokens,
+          PiChatRuntimeLimit.MaxOutputTokens,
+        );
+      }
+      sessionOptions.model = sessionModel;
       if (options.thinkingLevel) {
         // Pi clamps the level to what the resolved model actually supports.
         sessionOptions.thinkingLevel = options.thinkingLevel;
@@ -898,7 +932,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           : undefined;
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
-        taskOutputEnabled: Boolean(this.workbenchTaskService) && options.sessionMode !== 'chat',
+        taskOutputEnabled:
+          Boolean(this.workbenchTaskService) && options.sessionMode !== CoworkSessionMode.Chat,
         getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
         settingsManager,
         getApprovalMode: () =>
@@ -906,7 +941,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           options.approvalMode ??
           WorkbenchApprovalMode.Ask,
       });
-      this.applyPiCompactionOverrides(settingsManager, contextWindowTokens);
+      this.applyPiCompactionOverrides(
+        settingsManager,
+        this.resolvePiContextWindowTokens(contextWindowTokens, resourceState.chatMode),
+      );
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
       if (settingsManager) {
@@ -917,7 +955,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // Each call creates a distinct tool instance for this Pi session, so its
       // sequential execution mode cannot block another session.
       const customTools: Record<string, unknown>[] = [];
-      if (this.workbenchTaskService && options.sessionMode !== 'chat') {
+      if (this.workbenchTaskService && options.sessionMode !== CoworkSessionMode.Chat) {
         customTools.push(
           buildPiTaskOutputTool(requirements => {
             const runId = this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
@@ -956,7 +994,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           ),
         );
       }
-      if (this.projectMemoryService) {
+      if (!resourceState.chatMode && this.projectMemoryService) {
         customTools.push(
           buildPiProjectMemoryTool({
             service: this.projectMemoryService,
@@ -972,7 +1010,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           }),
         );
       }
-      if (this.conversationHistoryService) {
+      if (!resourceState.chatMode && this.conversationHistoryService) {
         customTools.push(
           buildPiConversationHistoryTool({
             service: this.conversationHistoryService,
@@ -980,7 +1018,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           }),
         );
       }
-      if (this.scheduledTaskService && options.sessionMode === 'work') {
+      if (this.scheduledTaskService && options.sessionMode === CoworkSessionMode.Work) {
         customTools.push(
           buildPiScheduledTaskTool({
             service: this.scheduledTaskService,
@@ -989,7 +1027,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           }),
         );
       }
-      if (resourceState.fileToolsEnabled) {
+      if (!resourceState.chatMode && resourceState.fileToolsEnabled) {
         customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
         customTools.push(
           buildDeclareArtifactTool({
@@ -1019,9 +1057,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
-      const mcpProxyTool = this.buildMcpProxyTool();
-      if (mcpProxyTool) {
-        customTools.push(mcpProxyTool);
+      if (!resourceState.chatMode) {
+        const mcpProxyTool = this.buildMcpProxyTool();
+        if (mcpProxyTool) {
+          customTools.push(mcpProxyTool);
+        }
       }
 
       // Academic research is a controlled workflow, not a prompt-only label.
@@ -1059,7 +1099,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         customTools.push(buildPiShortcutWorkflowStateTool(shortcutWorkflow));
       }
 
-      if (options.sessionMode === 'work' && resourceState.skillIds?.length) {
+      if (options.sessionMode === CoworkSessionMode.Work && resourceState.skillIds?.length) {
         customTools.push(buildPiSkillRuntimeCapabilitiesTool());
         customTools.push(
           buildPiSkillScriptTool({
@@ -1073,7 +1113,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // agent is a Team Lead from a package, its presetId additionally exposes
       // the team member agents alongside the built-in profiles.
       let subagentPresetId: string | undefined;
-      if (this.store) {
+      if (!resourceState.chatMode && this.store) {
         const candidateAgentIds = expertIds.length
           ? expertIds
           : options.agentId
@@ -1087,53 +1127,57 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           );
         subagentPresetId = leadAgent?.presetId;
       }
-      const subagentTool = buildPiSubagentTool({
-        getPiAgentsDir: () => this.getPiAgentsDir(),
-        presetId: subagentPresetId,
-        loadBundledMembers: subagentPresetId
-          ? presetId =>
-              this.resolveBundledMemberProfiles(presetId)?.map(member => ({
-                ...member,
-                source: 'member' as const,
-              })) ?? null
-          : undefined,
-        resolvedModel,
-        workspaceRoot,
-        webSearchSkillPath:
-          researchRun ||
-          (options.sessionMode !== CoworkSessionMode.Chat &&
-            shortcutKind === ShortcutWorkflowKind.DeepResearch)
-            ? path.join(getSkillsRoot(), 'web-search')
-            : undefined,
-        createPiResourceLoader: (
-          cwd,
-          systemPrompt,
-          maxOutputTokens,
-          skillIds,
-          extensionFactories,
-        ) =>
-          this.createPiResourceLoader(
-            pi,
-            cwd,
-            {
+      const subagentTool = resourceState.chatMode
+        ? null
+        : buildPiSubagentTool({
+            getPiAgentsDir: () => this.getPiAgentsDir(),
+            presetId: subagentPresetId,
+            loadBundledMembers: subagentPresetId
+              ? presetId =>
+                  this.resolveBundledMemberProfiles(presetId)?.map(member => ({
+                    ...member,
+                    source: 'member' as const,
+                  })) ?? null
+              : undefined,
+            resolvedModel,
+            workspaceRoot,
+            webSearchSkillPath:
+              researchRun ||
+              (options.sessionMode !== CoworkSessionMode.Chat &&
+                shortcutKind === ShortcutWorkflowKind.DeepResearch)
+                ? path.join(getSkillsRoot(), 'web-search')
+                : undefined,
+            createPiResourceLoader: (
+              cwd,
               systemPrompt,
-              skillIds,
               maxOutputTokens,
-              fileToolsEnabled: true,
-              unattended: resourceState.unattended,
-              expertSkillDirs: [],
-            },
-            {
-              sessionId,
-              getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-              getApprovalMode: () =>
-                this.activeSessions.get(sessionId)?.approvalMode ??
-                options.approvalMode ??
-                WorkbenchApprovalMode.Ask,
-            },
-            extensionFactories,
-          ),
-      });
+              skillIds,
+              extensionFactories,
+            ) =>
+              this.createPiResourceLoader(
+                pi,
+                cwd,
+                {
+                  systemPrompt,
+                  skillIds,
+                  maxOutputTokens,
+                  fileToolsEnabled: true,
+                  unattended: resourceState.unattended,
+                  chatMode: resourceState.chatMode,
+                  expertSkillDirs: [],
+                },
+                {
+                  sessionId,
+                  getRunId: () =>
+                    this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
+                  getApprovalMode: () =>
+                    this.activeSessions.get(sessionId)?.approvalMode ??
+                    options.approvalMode ??
+                    WorkbenchApprovalMode.Ask,
+                },
+                extensionFactories,
+              ),
+          });
       if (subagentTool) {
         customTools.push(subagentTool);
       }
@@ -1162,9 +1206,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.noTools = 'all';
       }
 
+      const piSessionCreateStartedAt = Date.now();
       console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
+      const piSessionCreatedAt = Date.now();
       if (!isCurrentInitialization()) {
         void session.abort();
         return;
@@ -1174,7 +1220,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionId,
         piSession: session,
         abortController,
-        model: resolvedModel.model,
+        model: sessionModel,
         modelRuntime: resolvedModel.modelRuntime,
         modelRequestOptions: resolvedModel.requestOptions,
         capabilities: {
@@ -1209,6 +1255,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         lastCompletedAnswerText: '',
         requestStartedAt: null,
         firstVisibleTextAt: null,
+        piSessionCreatedAt,
+        agentStartedAt: null,
+        startupLatencyRecorded: false,
         confirmationMode: options.confirmationMode || 'modal',
         unsubscribe: () => {},
         aborted: false,
@@ -1221,7 +1270,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         shortcutWorkflow,
         goalMode: options.goalMode === true,
         planMode: options.planMode === true,
-        writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
+        writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resourceState.maxOutputTokens),
         pendingError: null,
         workbenchRunId,
         workbenchContract,
@@ -1235,6 +1284,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         mcpToolManifestGeneration: this.mcpToolManifestGeneration,
       };
       activeSession = active;
+
+      console.debug(
+        `[PiRuntime] Pi session created for ${sessionId} in ${piSessionCreatedAt - piSessionCreateStartedAt}ms`,
+      );
 
       // Subscribe to Pi events before sending the prompt
       active.unsubscribe = session.subscribe(event => {
@@ -1266,19 +1319,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (options.planMode === true) {
         initialPrompt = `${PiPlanModePrompt}\n\n${initialPrompt}`;
       }
-      const projectMemoryContext = await buildProjectMemoryContextSafe(
-        this.projectMemoryService,
-        workspaceRoot,
-        sessionId,
-        prompt,
-      );
+      const projectMemoryContext = resourceState.chatMode
+        ? null
+        : await buildProjectMemoryContextSafe(
+            this.projectMemoryService,
+            workspaceRoot,
+            sessionId,
+            prompt,
+          );
       if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
       if (projectMemoryContext) initialPrompt = `${projectMemoryContext}\n\n${initialPrompt}`;
-      initialPrompt = prependWorkbenchTaskBoundary(
-        initialPrompt,
-        this.workbenchTaskService,
-        sessionId,
-      );
+      if (!resourceState.chatMode) {
+        initialPrompt = prependWorkbenchTaskBoundary(
+          initialPrompt,
+          this.workbenchTaskService,
+          sessionId,
+        );
+      }
 
       // The user may stop the session while the execution-mode question is
       // open. Do not revive an aborted Pi turn when that question resolves.
@@ -1332,11 +1389,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       );
       const storedSession = this.store?.getSession(sessionId);
       const history = storedSession?.messages ?? [];
+      const chatMode =
+        options.sessionMode === CoworkSessionMode.Chat ||
+        storedSession?.mode === CoworkSessionMode.Chat;
       const piPrompt = buildPiConversationPrompt(history, prompt, {
-        maxChars: calculatePiConversationHistoryCharLimit(),
+        maxChars: this.resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
       });
       return this.startSession(sessionId, prompt, {
         ...options,
+        sessionMode: chatMode ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
         skipInitialUserMessage: options._skipUserMessage,
         systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
         expertIds:
@@ -1368,6 +1429,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // Plan mode is per-turn: an ordinary follow-up clears it again.
     const nextPlanMode = options.planMode === true;
     const mcpToolTopologyChanged =
+      !active.resourceState.chatMode &&
       active.mcpToolManifestGeneration !== this.mcpToolManifestGeneration;
     const unattendedTopologyChanged = nextUnattended !== active.unattended;
     if (
@@ -1392,9 +1454,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         goalMode: nextGoalMode,
         unattended: nextUnattended,
         _piPromptOverride: buildPiConversationPrompt(history, prompt, {
-          maxChars: calculatePiConversationHistoryCharLimit(
+          maxChars: this.resolveConversationHistoryCharLimit(
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
             typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+            active.resourceState.chatMode,
           ),
         }),
       });
@@ -1421,9 +1484,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         goalMode: nextGoalMode,
         unattended: nextUnattended,
         _piPromptOverride: buildPiConversationPrompt(history, prompt, {
-          maxChars: calculatePiConversationHistoryCharLimit(
+          maxChars: this.resolveConversationHistoryCharLimit(
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
             typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+            active.resourceState.chatMode,
           ),
         }),
       });
@@ -1446,7 +1510,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.applyPiShellOverride(active.settingsManager);
         this.applyPiCompactionOverrides(
           active.settingsManager,
-          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          this.resolvePiContextWindowTokens(
+            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+            active.resourceState.chatMode,
+          ),
         );
         active.requestedSystemPrompt = nextSystemPrompt;
         active.requestedSkillIds = requestedSkillIds;
@@ -1461,7 +1528,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     }
 
-    if (this.workbenchTaskService) {
+    if (this.workbenchTaskService && !active.resourceState.chatMode) {
       const workbenchContract = this.createWorkbenchContract(
         requestedSessionMode,
         requestedSkillIds,
@@ -1576,14 +1643,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     }
     try {
-      const projectMemoryContext = await buildProjectMemoryContextSafe(
-        this.projectMemoryService,
-        active.workspaceRoot,
-        sessionId,
-        prompt,
-      );
+      const projectMemoryContext = active.resourceState.chatMode
+        ? null
+        : await buildProjectMemoryContextSafe(
+            this.projectMemoryService,
+            active.workspaceRoot,
+            sessionId,
+            prompt,
+          );
       if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;
-      nextPrompt = prependWorkbenchTaskBoundary(nextPrompt, this.workbenchTaskService, sessionId);
+      if (!active.resourceState.chatMode) {
+        nextPrompt = prependWorkbenchTaskBoundary(nextPrompt, this.workbenchTaskService, sessionId);
+      }
       await sendPiPrompt(
         active.piSession,
         nextPrompt,
@@ -1628,7 +1699,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             ? ZhiyuanModelPoolWorkload.Chat
             : ZhiyuanModelPoolWorkload.Work,
       });
-      const model = resolvedModel.model;
+      const model = this.resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
       await active.piSession.setModel(model);
       active.model = model;
       active.requestedModelOverride = patch.model;
@@ -1648,14 +1719,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workflowKind: active.workbenchContract.kind,
         harnessVersion: HarnessVersion,
       };
-      active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens);
-      if (active.resourceState.maxOutputTokens !== resolvedModel.maxOutputTokens) {
-        active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
+      const maxOutputTokens = active.resourceState.chatMode
+        ? Math.min(resolvedModel.maxOutputTokens, PiChatRuntimeLimit.MaxOutputTokens)
+        : resolvedModel.maxOutputTokens;
+      active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(maxOutputTokens);
+      if (active.resourceState.maxOutputTokens !== maxOutputTokens) {
+        active.resourceState.maxOutputTokens = maxOutputTokens;
         await active.piSession.reload();
         this.applyPiShellOverride(active.settingsManager);
         this.applyPiCompactionOverrides(
           active.settingsManager,
-          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          this.resolvePiContextWindowTokens(
+            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+            active.resourceState.chatMode,
+          ),
         );
       }
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
@@ -2114,7 +2191,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     };
     const persisted = this.store ? this.store.addMessage(sessionId, message) : message;
     this.emit('message', sessionId, persisted);
-    if (this.store) this.store.updateSession(sessionId, { status: 'running' });
     return persisted;
   }
 
@@ -2207,7 +2283,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.clearThrottleStateBySession(sessionId, true);
   }
 
-  // ── Chat mode: direct LLM without agent loop ──
+  // ── Pi session resources and context limits ──
 
   private createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsManager | null {
     if (!pi.SettingsManager) return null;
@@ -2237,6 +2313,48 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         keepRecentTokens,
       },
     });
+  }
+
+  private resolvePiContextWindowTokens(
+    contextWindowTokens: number | undefined,
+    chatMode: boolean,
+  ): number | undefined {
+    if (!chatMode) return contextWindowTokens;
+    const resolved =
+      Number.isFinite(contextWindowTokens) && (contextWindowTokens ?? 0) > 0
+        ? Math.floor(contextWindowTokens!)
+        : PiChatRuntimeLimit.ContextWindowTokens;
+    return Math.min(resolved, PiChatRuntimeLimit.ContextWindowTokens);
+  }
+
+  private resolvePiSessionModel(
+    model: Record<string, unknown>,
+    chatMode: boolean,
+  ): Record<string, unknown> {
+    if (!chatMode) return model;
+    const contextWindow = this.resolvePiContextWindowTokens(
+      typeof model.contextWindow === 'number' ? model.contextWindow : undefined,
+      true,
+    );
+    return {
+      ...model,
+      ...(contextWindow ? { contextWindow } : {}),
+      ...(typeof model.maxTokens === 'number'
+        ? { maxTokens: Math.min(model.maxTokens, PiChatRuntimeLimit.MaxOutputTokens) }
+        : {}),
+    };
+  }
+
+  private resolveConversationHistoryCharLimit(
+    contextWindowTokens: number | undefined,
+    maxOutputTokens: number | undefined,
+    chatMode: boolean,
+  ): number {
+    const calculated = calculatePiConversationHistoryCharLimit(
+      this.resolvePiContextWindowTokens(contextWindowTokens, chatMode),
+      maxOutputTokens,
+    );
+    return chatMode ? Math.min(calculated, PiChatRuntimeLimit.HistoryChars) : calculated;
   }
 
   private applyPiShellOverride(settingsManager: PiSettingsManager | null): void {
@@ -2273,7 +2391,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
-      additionalSkillPaths: [...this.resolveZhiyuanSkillDirs(), ...resourceState.expertSkillDirs],
+      // Work discovers the app-managed skill roots. Chat only loads explicitly
+      // selected skills and expert preset roots, so a plain conversation does
+      // not scan the full bundled Skill tree during startup.
+      additionalSkillPaths: [
+        ...(resourceState.chatMode
+          ? this.resolveSelectedSkillDirs(resourceState.skillIds)
+          : this.resolveZhiyuanSkillDirs()),
+        ...resourceState.expertSkillDirs,
+      ],
       skillsOverride: (base: {
         skills: Array<{ name?: string; id?: string }>;
         diagnostics: unknown[];
@@ -2299,13 +2425,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       appendSystemPromptOverride: (base: string[] = []): string[] => [
         ...base,
         ...collectPiSystemPromptContributions({
+          chatMode: resourceState.chatMode,
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
           platform: process.platform,
           unattended: resourceState.unattended,
           taskOutputEnabled: approvalContext?.taskOutputEnabled,
-          mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
-          mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
+          mcpToolManifest: resourceState.chatMode ? [] : this.mcpServerManager?.toolManifest ?? [],
+          mcpServerStatuses: resourceState.chatMode
+            ? []
+            : this.mcpServerManager?.serverStatuses ?? [],
         }),
       ],
       extensionFactories: [
@@ -2410,6 +2539,27 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     push(getFeishuConnectorSkillsRoot(app.getPath('userData')));
     if (!app.isPackaged) {
       push(path.join(app.getPath('userData'), 'SKILLs'));
+    }
+    return dirs;
+  }
+
+  /**
+   * Resolve only the skill directories explicitly selected for a Chat turn.
+   * This performs bounded existence checks instead of enumerating every Skill
+   * root, keeping default Chat startup independent of the bundled Skill tree.
+   */
+  private resolveSelectedSkillDirs(skillIds: string[] | undefined): string[] {
+    if (!skillIds?.length) return [];
+    const dirs: string[] = [];
+    const roots = this.resolveZhiyuanSkillDirs();
+    for (const skillId of skillIds) {
+      if (!skillId || path.basename(skillId) !== skillId) continue;
+      for (const root of roots) {
+        const candidate = path.join(root, skillId);
+        if (fs.existsSync(path.join(candidate, 'SKILL.md')) && !dirs.includes(candidate)) {
+          dirs.push(candidate);
+        }
+      }
     }
     return dirs;
   }
@@ -2526,6 +2676,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   // ── Private: event mapping ──
 
+  private recordFirstVisibleToken(sessionId: string, active: ActivePiSession): void {
+    const firstTokenAt = active.firstVisibleTextAt ?? Date.now();
+    active.firstVisibleTextAt = firstTokenAt;
+    if (active.startupLatencyRecorded || active.agentStartedAt === null) return;
+
+    const startupLatency: PiStartupLatency = {
+      sessionCreatedAt: active.piSessionCreatedAt,
+      agentStartedAt: active.agentStartedAt,
+      firstTokenAt,
+      sessionCreateToAgentStartMs: Math.max(
+        0,
+        active.agentStartedAt - active.piSessionCreatedAt,
+      ),
+      agentStartToFirstTokenMs: Math.max(0, firstTokenAt - active.agentStartedAt),
+      sessionCreateToFirstTokenMs: Math.max(0, firstTokenAt - active.piSessionCreatedAt),
+    };
+    active.startupLatency = startupLatency;
+    active.startupLatencyRecorded = true;
+    console.log(
+      `[PiRuntime] startup latency for ${sessionId}: ` +
+        `create-to-agent_start=${startupLatency.sessionCreateToAgentStartMs}ms, ` +
+        `agent_start-to-first_token=${startupLatency.agentStartToFirstTokenMs}ms, ` +
+        `create-to-first_token=${startupLatency.sessionCreateToFirstTokenMs}ms`,
+    );
+  }
+
   private handlePiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
     // Debug: log all Pi events to diagnose frontend rendering issues
     if (event.type !== 'message_update') {
@@ -2540,6 +2716,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       case 'agent_start':
         active.isRunning = true;
         this.store?.updateSession(sessionId, { status: 'running' });
+        if (active.agentStartedAt === null) {
+          active.agentStartedAt = Date.now();
+          console.log(
+            `[PiRuntime] agent_start for ${sessionId} after ${active.agentStartedAt - active.piSessionCreatedAt}ms from Pi session creation`,
+          );
+        }
         this.emit('started', sessionId);
         break;
 
@@ -2606,7 +2788,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.finalizeActiveThinking(sessionId, active);
         }
         if (text && text !== active.answerText) {
-          active.firstVisibleTextAt ??= Date.now();
+          this.recordFirstVisibleToken(sessionId, active);
           this.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
           this.streamInto(sessionId, active, 'answer', text);
@@ -2625,7 +2807,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             }
             if (text) {
               active.answerText = text;
-              active.firstVisibleTextAt ??= Date.now();
+              this.recordFirstVisibleToken(sessionId, active);
             }
             this.finalizeActiveThinking(sessionId, active);
             const errMsg = event.message.errorMessage || 'Pi agent error';
@@ -2668,6 +2850,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           }
           // Finalize the answer bubble on its own id.
           if (finalAnswer.trim()) {
+            this.recordFirstVisibleToken(sessionId, active);
+            const startupLatency = active.startupLatency;
+            active.startupLatency = undefined;
             active.answerText = finalAnswer;
             this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
             if (isPiFinalResponse(event.message)) {
@@ -2681,6 +2866,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               event.message.model,
               active.requestStartedAt,
               active.firstVisibleTextAt,
+              startupLatency,
             );
           }
 
@@ -2890,20 +3076,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           () => {
             if (this.store) {
               this.store.updateSession(sessionId, { status: 'idle' });
-              try {
-                this.store.refreshSessionArtifacts(sessionId);
-              } catch (error) {
-                console.error(
-                  `[PiRuntimeAdapter] artifact refresh failed for session ${sessionId}:`,
-                  error,
-                );
+              if (!active.resourceState.chatMode) {
+                try {
+                  this.store.refreshSessionArtifacts(sessionId);
+                } catch (error) {
+                  console.error(
+                    `[PiRuntimeAdapter] artifact refresh failed for session ${sessionId}:`,
+                    error,
+                  );
+                }
               }
             }
-            void this.runPostTurnMemoryMaintenance(
-              sessionId,
-              active.workspaceRoot,
-              this.createSessionMemoryCompletion(active),
-            );
+            if (!active.resourceState.chatMode) {
+              void this.runPostTurnMemoryMaintenance(
+                sessionId,
+                active.workspaceRoot,
+                this.createSessionMemoryCompletion(active),
+              );
+            }
             this.emit('complete', sessionId, null);
             void this.flushFollowUpQueue(sessionId, active);
           },
@@ -3137,34 +3327,39 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     model: string | undefined,
     requestStartedAt: number | null,
     firstVisibleTextAt: number | null,
+    startupLatency?: PiStartupLatency,
   ): void {
     if (!messageId) return;
     setTimeout(() => {
       const active = this.activeSessions.get(sessionId);
       const contextUsage = active?.piSession.getContextUsage?.();
-      if (
-        !contextUsage ||
-        contextUsage.tokens == null ||
-        !Number.isFinite(contextUsage.tokens) ||
-        !Number.isFinite(contextUsage.contextWindow) ||
-        contextUsage.tokens < 0 ||
-        contextUsage.contextWindow <= 0
-      ) {
+      const hasValidContextUsage = Boolean(
+        contextUsage &&
+          contextUsage.tokens != null &&
+          Number.isFinite(contextUsage.tokens) &&
+          Number.isFinite(contextUsage.contextWindow) &&
+          contextUsage.tokens >= 0 &&
+          contextUsage.contextWindow > 0,
+      );
+      if (!hasValidContextUsage && !piUsage && requestStartedAt === null && !startupLatency) {
         return;
       }
 
-      const usage = {
-        usedTokens: Math.round(contextUsage.tokens),
-        contextWindowTokens: Math.round(contextUsage.contextWindow),
-        updatedAt: Date.now(),
-      };
       const message = this.store
         ?.getSession(sessionId)
         ?.messages.find(item => item.id === messageId);
       if (!message) return;
+
+      const usage = hasValidContextUsage
+        ? {
+            usedTokens: Math.round(contextUsage!.tokens!),
+            contextWindowTokens: Math.round(contextUsage!.contextWindow),
+            updatedAt: Date.now(),
+          }
+        : undefined;
       const metadata = {
-        ...message?.metadata,
-        contextUsage: usage,
+        ...message.metadata,
+        ...(usage ? { contextUsage: usage } : {}),
         ...(model ? { model } : {}),
         ...(requestStartedAt !== null
           ? {
@@ -3172,6 +3367,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 requestStartedAt,
                 ...(firstVisibleTextAt !== null ? { firstVisibleTextAt } : {}),
                 completedAt: Date.now(),
+                ...(startupLatency ?? {}),
               },
             }
           : {}),
@@ -3487,7 +3683,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const research = isAcademicResearchSkillSet(skillIds);
     const shortcut = research ? null : resolveShortcutWorkflowKind(skillIds);
     const kind =
-      sessionMode === 'chat'
+      sessionMode === CoworkSessionMode.Chat
         ? WorkbenchContractKind.Chat
         : research
           ? WorkbenchContractKind.Research
@@ -3496,7 +3692,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             : WorkbenchContractKind.GenericWork;
     return {
       kind,
-      ...(sessionMode !== 'chat' ? { outputRequirements: [] } : {}),
+      ...(sessionMode !== CoworkSessionMode.Chat ? { outputRequirements: [] } : {}),
       requiresUserAcceptance: false,
       metadata: {
         ...(skillIds?.length ? { skillIds } : {}),

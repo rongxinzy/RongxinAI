@@ -20,6 +20,8 @@ import { PiTaskOutputSystemPrompt } from './piTaskOutputTool';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 
 export interface PiSystemPromptContext {
+  /** Whether the session is a direct Chat lane without Work orchestration. */
+  chatMode?: boolean;
   /** Whether file tools (read/write/edit/read_document) are active. */
   fileToolsEnabled: boolean;
   /** Current per-session output token budget, used by the large-write policy. */
@@ -67,6 +69,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
   {
     id: 'document-reader',
     requiresFileTools: true,
+    enabled: context => context.chatMode !== true,
     prompt: PiDocumentReaderSystemPrompt,
   },
   {
@@ -90,7 +93,11 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     requiresFileTools: true,
     prompt: context => createPiLargeFileWriteSystemPrompt(context.maxOutputTokens),
   },
-  { id: 'declare-artifact', prompt: DeclareArtifactSystemPrompt },
+  {
+    id: 'declare-artifact',
+    enabled: context => context.chatMode !== true,
+    prompt: DeclareArtifactSystemPrompt,
+  },
   {
     id: 'task-output',
     enabled: context => context.taskOutputEnabled === true,
