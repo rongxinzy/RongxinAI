@@ -159,6 +159,25 @@ export interface CodingEvent {
   createdAt: number;
 }
 
+export interface CodingEventWindow {
+  laneId: string;
+  oldestSequence: number | null;
+  newestSequence: number | null;
+  hasMore: boolean;
+}
+
+export interface CodingEventPage {
+  laneId: string;
+  events: CodingEvent[];
+  hasMore: boolean;
+  nextCursor: number | null;
+}
+
+export interface CodingRoomEventDelta {
+  workspaceRoot: string;
+  events: CodingEvent[];
+}
+
 export interface CodingPermissionResponse {
   requestId: string;
   outcome: CodingPermissionOutcome;
@@ -204,6 +223,7 @@ export interface CodingRoomSnapshot {
   lanes: CodingAgentLane[];
   assignments: CodingAssignment[];
   events: CodingEvent[];
+  eventWindows?: CodingEventWindow[];
   elicitations: CodingElicitation[];
 }
 
