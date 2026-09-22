@@ -31,7 +31,7 @@ test.each([PiUiEventType.Stopped, PiUiEventType.Completed])(
   type => {
     const { events, send, update } = setup();
     update('final');
-    send({ type, sessionId: 'session', claudeSessionId: null });
+    send({ type, sessionId: 'session' });
     expect(events.map(event => event.type)).toEqual([PiUiEventType.MessageUpdate, type]);
     expect(events.map(event => event.sequence)).toEqual([1, 2]);
     expect(vi.getTimerCount()).toBe(0);

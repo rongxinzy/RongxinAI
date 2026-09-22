@@ -1,3 +1,4 @@
+import { CoworkExecutionMode } from '../../shared/cowork/constants';
 import { expect, test, vi } from 'vitest';
 import {
   CoworkSessionMode,
@@ -20,13 +21,12 @@ const session: CoworkSession = {
   id: 'A',
   status: CoworkSessionStatus.Running,
   title: 'A',
-  claudeSessionId: null,
   mode: CoworkSessionMode.Work,
   pinned: false,
   cwd: '/tmp',
   systemPrompt: '',
   modelOverride: '',
-  executionMode: 'local',
+  executionMode: CoworkExecutionMode.Local,
   activeSkillIds: [],
   workspaceId: '',
   agentId: '',
@@ -60,7 +60,7 @@ test('an old completion snapshot cannot stop a newer turn during render preparat
   const preparation = deferred<void>();
   dependencies.prepare.mockReturnValue(preparation.promise);
   recovery.observe(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
-  sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A', claudeSessionId: null });
+  sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' });
   const pending = recovery.recover('A');
   await vi.waitFor(() => expect(dependencies.prepare).toHaveBeenCalled());
   recovery.observe(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
@@ -80,7 +80,7 @@ test('a running bootstrap response cannot revive execution after a newer complet
   const pending = recovery.bootstrap();
   recovery.observe(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
   recovery.observe(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A', claudeSessionId: null }),
+    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
   );
   response.resolve([{ sessionId: 'A', sequence: 1, status: CoworkSessionStatus.Running }]);
   await pending;

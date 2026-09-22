@@ -55,7 +55,7 @@ export interface PiRuntimeEvents {
   ) => void;
   /** A plan-mode turn published its structured plan. */
   plan: (sessionId: string, plan: { entries: PiPlanEntry[] }) => void;
-  complete: (sessionId: string, claudeSessionId: string | null) => void;
+  complete: (sessionId: string) => void;
   error: (sessionId: string, error: CoworkError) => void;
   sessionStopped: (sessionId: string) => void;
   sessionInterrupted: (event: CoworkSessionInterruption) => void;

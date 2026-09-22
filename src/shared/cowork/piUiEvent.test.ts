@@ -41,7 +41,6 @@ test('event validation rejects unversioned or incomplete payloads', () => {
   const event = sequencer.next({
     type: PiUiEventType.Completed,
     sessionId: 'session-a',
-    claudeSessionId: null,
   });
   expect(event.protocolVersion).toBe(1);
   expect(event.sequence).toBe(1);
@@ -79,7 +78,6 @@ test('sequence tracker drops duplicate and late deliveries per session', () => {
   const second = sequencer.next({
     type: PiUiEventType.Completed,
     sessionId: 'session-a',
-    claudeSessionId: null,
   });
 
   expect(tracker.accept(first)).toBe(true);

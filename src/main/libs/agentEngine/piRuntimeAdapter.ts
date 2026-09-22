@@ -3094,7 +3094,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 this.createSessionMemoryCompletion(active),
               );
             }
-            this.emit('complete', sessionId, null);
+            this.emit('complete', sessionId);
             void this.flushFollowUpQueue(sessionId, active);
           },
           error => {

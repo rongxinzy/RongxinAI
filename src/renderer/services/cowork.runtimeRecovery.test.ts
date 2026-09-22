@@ -1,3 +1,4 @@
+import { CoworkExecutionMode } from '../../shared/cowork/constants';
 import { configureStore, type UnknownAction } from '@reduxjs/toolkit';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import coworkReducer, {
@@ -52,13 +53,12 @@ const session = (id: string): CoworkSession => ({
   id,
   status: CoworkSessionStatus.Idle,
   title: id,
-  claudeSessionId: null,
   mode: CoworkSessionMode.Work,
   pinned: false,
   cwd: '/tmp',
   systemPrompt: '',
   modelOverride: '',
-  executionMode: 'local',
+  executionMode: CoworkExecutionMode.Local,
   activeSkillIds: [],
   workspaceId: `workspace-${id}`,
   agentId: `agent-${id}`,
@@ -120,7 +120,7 @@ test('lost completion is recovered and background resync preserves all user sele
   state.dispatch(setRemoteManaged(true));
   publish(sequencer.next({ type: PiUiEventType.Started, sessionId: 'B' }));
   publish(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'B', claudeSessionId: null }),
+    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'B' }),
     true,
   );
   publish(sequencer.next({ type: PiUiEventType.QueueUpdated, sessionId: 'B', items: [] }));
@@ -142,7 +142,7 @@ test('lost completion replaces stale live state and content in the current conve
   );
   publish(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
   publish(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A', claudeSessionId: null }),
+    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
     true,
   );
   publish(sequencer.next({ type: PiUiEventType.QueueUpdated, sessionId: 'A', items: [] }));
@@ -195,7 +195,7 @@ test('reattaching clears previously tracked execution when runtime already compl
   state.dispatch(addSession(session('A')));
   state.dispatch(updateSessionStatus({ sessionId: 'A', status: CoworkSessionStatus.Running }));
   publish(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A', claudeSessionId: null }),
+    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
     true,
   );
   await coworkService.init();

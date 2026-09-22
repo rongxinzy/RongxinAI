@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { CoworkError } from '../common/coworkError';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
@@ -42,6 +41,7 @@ import {
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import type {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
@@ -317,9 +317,6 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   api: {
-    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) =>
-      ipcRenderer.invoke(ApiIpc.WebSearch, input),
-
     fetch: (options: {
       url: string;
       method: string;
@@ -330,28 +327,6 @@ contextBridge.exposeInMainWorld('electron', {
 
     fetchModels: (input: ProviderModelDiscoveryRequest): Promise<ProviderModelDiscoveryResult> =>
       ipcRenderer.invoke(ApiIpc.FetchModels, input),
-
-    stream: (options: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body?: string;
-      requestId: string;
-    }) => ipcRenderer.invoke(ApiIpc.Stream, options),
-
-    cancelStream: (requestId: string) => ipcRenderer.invoke(ApiIpc.CancelStream, requestId),
-
-    onStreamData: (requestId: string, callback: (chunk: string) => void) =>
-      onPush<string>(ApiIpc.streamData(requestId), callback),
-
-    onStreamDone: (requestId: string, callback: () => void) =>
-      onPushVoid(ApiIpc.streamDone(requestId), callback),
-
-    onStreamError: (requestId: string, callback: (error: CoworkError) => void) =>
-      onPush<CoworkError>(ApiIpc.streamError(requestId), callback),
-
-    onStreamAbort: (requestId: string, callback: () => void) =>
-      onPushVoid(ApiIpc.streamAbort(requestId), callback),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -572,7 +547,7 @@ contextBridge.exposeInMainWorld('electron', {
     getConfig: () => ipcRenderer.invoke(CoworkConfigIpc.Get),
     setConfig: (config: {
       workingDirectory?: string;
-      executionMode?: 'auto' | 'local' | 'sandbox';
+      executionMode?: CoworkExecutionMode;
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       embeddingEnabled?: boolean;
