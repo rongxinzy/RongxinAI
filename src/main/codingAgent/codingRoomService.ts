@@ -36,6 +36,8 @@ import {
   type CodingLaneViewStateInput,
   type CodingPermissionResponse,
   CodingElicitationStatus,
+  CodingEventWindowPageSize,
+  type CodingEventPage,
   type CodingElicitationResponse,
   type CodingPromptAttachment,
   type CodingPromptInput,
@@ -54,6 +56,8 @@ import { CollaborationService } from './collaborationService';
 import { CodingGitController } from './codingGitController';
 import { WorkspaceBroker } from './workspaceBroker';
 import { CodingRoomRepository } from './codingRoomRepository';
+import { CodingEventWindowReader } from './codingEventWindowReader';
+import { CodingEventDeltaBatcher } from './codingEventDeltaBatcher';
 import { isAssistantResponseEvent } from './codingTurnResponse';
 import {
   persistCodingSessionRecord,
@@ -207,15 +211,14 @@ export class CodingRoomService extends EventEmitter {
   private readonly collaboration = new CollaborationService();
   private readonly authTerminals = new AuthTerminalService();
   private readonly git: CodingGitController;
+  private readonly eventWindowReader: CodingEventWindowReader;
+  private readonly eventDeltaBatcher: CodingEventDeltaBatcher;
   private readonly laneTurnGenerations = new Map<string, number>();
   private readonly cancelledTurnGenerations = new Map<string, number>();
   private readonly acpPendingMessages = new Map<string, CoworkPendingMessage[]>();
   private readonly stagedLaneIds = new Set<string>();
   /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
   private readonly builtinSessionLaneMap = new Map<string, string>();
-  /** Per-workspace throttle timers so streamed events publish snapshots in batches. */
-  private readonly publishTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly PUBLISH_THROTTLE_MS = 100;
 
   constructor(
     private readonly repository: CodingRoomRepository,
@@ -225,6 +228,10 @@ export class CodingRoomService extends EventEmitter {
   ) {
     super();
     this.git = new CodingGitController(repository);
+    this.eventWindowReader = new CodingEventWindowReader(repository.getDatabase());
+    this.eventDeltaBatcher = new CodingEventDeltaBatcher(delta =>
+      this.emit('eventDelta', delta),
+    );
     const patchBuiltinSession = this.runtime.patchBuiltinSession?.bind(this.runtime);
     const listCommandChoices = this.runtime.listCommandChoices?.bind(this.runtime);
     const commandCatalogGeneration = this.runtime.commandCatalogGeneration?.bind(this.runtime);
@@ -263,21 +270,45 @@ export class CodingRoomService extends EventEmitter {
     });
   }
 
-  bootstrap(workspaceRoot: string): CodingRoomSnapshot {
+  bootstrap(
+    workspaceRoot: string,
+    options: { eventLimitPerLane?: number } = {},
+  ): CodingRoomSnapshot {
     this.registry.refreshBuiltinReadiness();
     const room = this.repository.getOrCreateRoom(workspaceRoot);
     const missions = this.repository.listMissions(room.id);
     const lanes = this.repository.listLanes(missions.map(mission => mission.id));
     const assignments = this.repository.listAssignments(missions.map(mission => mission.id));
+    const eventWindow =
+      options.eventLimitPerLane === undefined
+        ? { events: this.repository.listEvents(lanes.map(lane => lane.id)), windows: [] }
+        : this.eventWindowReader.listRecent(
+            lanes.map(lane => lane.id),
+            options.eventLimitPerLane,
+          );
     return {
       room,
       profiles: this.registry.list(),
       missions,
       lanes,
       assignments,
-      events: this.repository.listEvents(lanes.map(lane => lane.id)),
+      events: eventWindow.events,
+      ...(eventWindow.windows.length > 0 ? { eventWindows: eventWindow.windows } : {}),
       elicitations: this.repository.listElicitations(lanes.map(lane => lane.id)),
     };
+  }
+
+  loadEventPage(
+    workspaceRoot: string,
+    laneId: string,
+    beforeSequence: number | null,
+  ): CodingEventPage {
+    const room = this.repository.getRoomByRoot(workspaceRoot);
+    const laneRoom = this.repository.getRoomByLaneId(laneId);
+    if (!room || !laneRoom || laneRoom.id !== room.id) {
+      throw new Error('The coding event lane does not belong to this workspace.');
+    }
+    return this.eventWindowReader.loadPage(laneId, beforeSequence, CodingEventWindowPageSize);
   }
 
   listProfiles() {
@@ -1661,7 +1692,7 @@ export class CodingRoomService extends EventEmitter {
     kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],
     payload: Record<string, unknown>,
   ): void {
-    this.repository.appendOrMergeStreamEvent(lane.id, kind, payload);
+    const event = this.repository.appendOrMergeStreamEvent(lane.id, kind, payload);
     if (kind === CodingEventKind.Permission) {
       this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
       this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
@@ -1683,24 +1714,7 @@ export class CodingRoomService extends EventEmitter {
       this.publish(workspaceRoot);
       return;
     }
-    // Throttle streaming events to avoid flooding the renderer with publishes.
-    this.schedulePublish(workspaceRoot);
-  }
-
-  private schedulePublish(workspaceRoot: string): void {
-    if (this.publishTimers.has(workspaceRoot) || this.isDisposed) return;
-    const timer = setTimeout(() => {
-      this.publishTimers.delete(workspaceRoot);
-      if (!this.isDisposed) {
-        try {
-          this.publish(workspaceRoot);
-        } catch (error) {
-          // The database may have been closed during test teardown.
-          console.debug('[CodingRoom] Skipped publish because the service is disposed:', error);
-        }
-      }
-    }, this.PUBLISH_THROTTLE_MS);
-    this.publishTimers.set(workspaceRoot, timer);
+    this.eventDeltaBatcher.enqueue(workspaceRoot, event);
   }
 
   private isDisposed = false;
@@ -1726,6 +1740,7 @@ export class CodingRoomService extends EventEmitter {
 
   async dispose(): Promise<void> {
     this.isDisposed = true;
+    this.eventDeltaBatcher.dispose();
     this.repository.flushPendingStreamWrites();
     await Promise.all([...this.drivers.values()].map(driver => driver.dispose()));
     this.drivers.clear();
@@ -1734,8 +1749,6 @@ export class CodingRoomService extends EventEmitter {
     this.driverSessionPromises.clear();
     this.authTerminals.dispose();
     this.builtinSessionLaneMap.clear();
-    for (const timer of this.publishTimers.values()) clearTimeout(timer);
-    this.publishTimers.clear();
   }
 
   private getDriver(lane: CodingAgentLane): CodingAgentDriver {
@@ -2021,7 +2034,11 @@ export class CodingRoomService extends EventEmitter {
         modelOverride: lane.modelOverride,
       })) {
         if (isAssistantResponseEvent(event)) receivedAssistantResponse = true;
-        this.repository.appendOrMergeStreamEvent(lane.id, event.kind, event.payload);
+        const storedEvent = this.repository.appendOrMergeStreamEvent(
+          lane.id,
+          event.kind,
+          event.payload,
+        );
         this.repository.updateLaneConfigOptions(lane.id, driver.getSessionConfigOptions(sessionId));
         this.repository.updateLaneAvailableCommands(
           lane.id,
@@ -2041,9 +2058,11 @@ export class CodingRoomService extends EventEmitter {
             );
           }
         }
-        // Rebuilding and broadcasting a full snapshot per streamed event makes
-        // streaming cost grow with session size, so publish in batches instead.
-        this.schedulePublish(roomWorkspaceRoot);
+        if (event.kind === CodingEventKind.Permission) {
+          this.publish(roomWorkspaceRoot);
+        } else {
+          this.eventDeltaBatcher.enqueue(roomWorkspaceRoot, storedEvent);
+        }
       }
       if (this.consumeCancelledTurn(lane.id, turnGeneration)) {
         if (queuedItemId) this.deletePendingMessage(lane.id, queuedItemId);
@@ -2309,14 +2328,19 @@ export class CodingRoomService extends EventEmitter {
   }
 
   private publish(workspaceRoot: string): CodingRoomSnapshot {
-    const snapshot = this.bootstrap(workspaceRoot);
+    this.eventDeltaBatcher.flush(workspaceRoot);
+    const snapshot = this.bootstrap(workspaceRoot, {
+      eventLimitPerLane: CodingEventWindowPageSize,
+    });
     this.emit('changed', snapshot);
     return snapshot;
   }
 
   private publishLane(laneId: string): void {
     for (const workspaceRoot of this.knownRooms()) {
-      const snapshot = this.bootstrap(workspaceRoot);
+      const snapshot = this.bootstrap(workspaceRoot, {
+        eventLimitPerLane: CodingEventWindowPageSize,
+      });
       if (!snapshot.lanes.some(lane => lane.id === laneId)) continue;
       this.emit('changed', snapshot);
       return;

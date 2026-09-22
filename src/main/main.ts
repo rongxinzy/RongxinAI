@@ -181,6 +181,7 @@ import {
 } from './ipcHandlers/scheduledTask';
 import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerCodingAgentIpcHandlers } from './ipcHandlers/codingAgent';
+import { agentResourceDiagnostics } from './agentResourceDiagnostics';
 import { CodingRoomRepository } from './codingAgent/codingRoomRepository';
 import { CodingRoomService } from './codingAgent/codingRoomService';
 import { resolveCodingExpertSelection } from './codingAgent/builtinCodingExpertSelection';
@@ -999,6 +1000,7 @@ app.commandLine.appendSwitch('disk-cache-size', String(50 * 1024 * 1024)); // 50
 
 // 配置网络服务
 app.on('ready', () => {
+  agentResourceDiagnostics.setElectronMetricsProvider(() => app.getAppMetrics());
   // 配置网络服务重启策略
   app.configureHostResolver({
     enableBuiltInResolver: true,
@@ -1009,6 +1011,7 @@ app.on('ready', () => {
 // 添加错误处理
 app.on('render-process-gone', (_event, webContents, details) => {
   console.error('[RendererProcess] Render process exited:', details);
+  agentResourceDiagnostics.logRendererProcessGone(details.reason);
   if (shouldReloadRendererProcess(details.reason, isQuitting)) {
     scheduleReload(`render-process-gone (${details.reason})`, webContents);
   }

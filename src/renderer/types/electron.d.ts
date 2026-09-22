@@ -1173,6 +1173,18 @@ interface IElectronAPI {
     onChanged: (
       callback: (snapshot: import('../../shared/codingAgent').CodingRoomSnapshot) => void,
     ) => () => void;
+    onEventDelta: (
+      callback: (delta: import('../../shared/codingAgent').CodingRoomEventDelta) => void,
+    ) => () => void;
+    loadEventPage: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      beforeSequence: number | null;
+    }) => Promise<{
+      success: boolean;
+      page?: import('../../shared/codingAgent').CodingEventPage;
+      error?: string;
+    }>;
     onPendingMessagesChanged: (
       callback: (
         event: import('../../shared/codingAgent').CodingPendingMessagesChangedEvent,

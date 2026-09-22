@@ -132,6 +132,10 @@ export class CodingRoomRepository {
   private static readonly STREAM_FLUSH_MAX_BACKOFF_MS = 30_000;
 
   constructor(private readonly db: Database.Database) {}
+
+  getDatabase(): Database.Database {
+    return this.db;
+  }
   listRooms(): CodingRoom[] {
     return (
       this.db
