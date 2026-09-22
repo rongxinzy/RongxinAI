@@ -86,7 +86,7 @@ export function SidebarNavigationView({
   entries,
 }: SidebarNavigationViewProps) {
   return (
-    <div className={cn('mt-1 flex flex-col gap-0.5 px-3', isChat ? 'pb-0' : 'pb-3')}>
+    <div className={cn('mt-2.5 flex flex-col gap-0.5 px-3', isChat ? 'pb-0' : 'pb-3')}>
       <div className="relative h-7 w-full">
         <Switch
           checked={isChat}
