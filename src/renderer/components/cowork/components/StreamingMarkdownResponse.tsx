@@ -1,9 +1,5 @@
 import { MessageResponse } from '@shared/components/ai-elements/message';
-import {
-  isPlainTextStreamingTail,
-  useAdaptiveTextReveal,
-  useStreamingTextSegments,
-} from '@shared/components/ai-elements/streamingText';
+import { useStreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 
 import type { StreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 import type { ComponentProps, MouseEvent, ReactNode } from 'react';
@@ -24,9 +20,12 @@ const LocalAwareAnchor = ({
   children,
   className,
   resolveLocalFilePath,
+  skipPathExistsCheck = false,
   ...props
 }: AnchorProps & {
   resolveLocalFilePath?: (href: string, text: string) => string | null;
+  /** 流式输出时跳过 pathExists IPC，避免每个 token 打主进程把 UI 拖死。 */
+  skipPathExistsCheck?: boolean;
 }) => {
   const text = Array.isArray(children)
     ? children.map(child => (typeof child === 'string' ? child : '')).join('')
@@ -39,11 +38,13 @@ const LocalAwareAnchor = ({
   const { linkSafety } = useContext(StreamdownContext);
   const [confirmOpen, setConfirmOpen] = useState(false);
   // null = 检查中：先当普通文本，避免 1.42GB / 不存在文件误高亮
-  const [exists, setExists] = useState<boolean | null>(candidatePath ? null : false);
+  const [exists, setExists] = useState<boolean | null>(
+    candidatePath && !skipPathExistsCheck ? null : false,
+  );
 
   useEffect(() => {
     let cancelled = false;
-    if (!candidatePath) {
+    if (!candidatePath || skipPathExistsCheck) {
       setExists(false);
       return;
     }
@@ -64,7 +65,7 @@ const LocalAwareAnchor = ({
     return () => {
       cancelled = true;
     };
-  }, [candidatePath]);
+  }, [candidatePath, skipPathExistsCheck]);
 
   // 2026/09/20 lixiang  仅磁盘上存在的文件才主题色+下划线+可点（issue #805）
   if (candidatePath && exists === true) {
@@ -150,13 +151,18 @@ const LocalAwareAnchor = ({
 const renderMessage = (
   content: string,
   resolveLocalFilePath?: (href: string, text: string) => string | null,
+  skipPathExistsCheck = false,
 ): ReactNode => {
   const linkified = linkifyLocalPathsInMarkdown(content);
   return (
     <MessageResponse
       components={{
         a: (props: AnchorProps) => (
-          <LocalAwareAnchor {...props} resolveLocalFilePath={resolveLocalFilePath} />
+          <LocalAwareAnchor
+            {...props}
+            resolveLocalFilePath={resolveLocalFilePath}
+            skipPathExistsCheck={skipPathExistsCheck}
+          />
         ),
       }}
     >
@@ -164,6 +170,11 @@ const renderMessage = (
     </MessageResponse>
   );
 };
+
+/** 流式尾段：纯文本，不做 Markdown/Shiki 重解析。 */
+const StreamingPlainTail = ({ content }: { content: string }) => (
+  <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</div>
+);
 
 export const StreamingMarkdownResponse = ({
   content,
@@ -175,18 +186,23 @@ export const StreamingMarkdownResponse = ({
   resolveLocalFilePath?: (href: string, text: string) => string | null;
 }) => {
   const { committed, tail }: StreamingTextSegments = useStreamingTextSegments(content, isStreaming);
-  const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
-  const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
   const resolve = useMemo(() => resolveLocalFilePath, [resolveLocalFilePath]);
 
-  if (!committed || !tail) {
-    return <>{renderMessage(committed || revealedTail, resolve)}</>;
+  // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径检查）。
+  if (!isStreaming) {
+    return <>{renderMessage(content, resolve)}</>;
+  }
+
+  // 流式中：只对已闭合的稳定块跑 Streamdown；正在增长的 tail 用纯文本。
+  // 否则每个 token + 逐字 reveal 都会重解析 Markdown，16G 机器上易把渲染进程拖到「未响应」。
+  if (!committed && !tail) {
+    return null;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {renderMessage(committed, resolve)}
-      {renderMessage(revealedTail, resolve)}
+      {committed ? renderMessage(committed, resolve, true) : null}
+      {tail ? <StreamingPlainTail content={tail} /> : null}
     </div>
   );
 };
