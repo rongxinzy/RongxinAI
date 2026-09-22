@@ -114,7 +114,8 @@ const ChatSkillShortcuts: React.FC = () => {
     <MotionConfig reducedMotion="user">
       <div className="mb-2">
         <div className="flex h-9 items-center px-1.5">
-          <h2 className="min-w-0 truncate text-sm font-normal text-muted-foreground">
+          {/* 2026/09/22 lixiang  快捷技能标题与侧栏导航一致，用正文色 */}
+          <h2 className="min-w-0 truncate text-sm font-normal text-foreground">
             {i18nService.t('chatQuickSkillsTitle')}
           </h2>
         </div>
