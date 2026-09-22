@@ -33,6 +33,7 @@ import {
   NetworkIpc,
   DevNetworkIpc,
   OpenAICodexOAuthIpc,
+  CommunityAuthIpc,
   PermissionsIpc,
   ProjectIpc,
   ShellIpc,
@@ -1076,6 +1077,19 @@ contextBridge.exposeInMainWorld('electron', {
     cancel: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Cancel),
     logout: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Logout),
     status: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Status),
+  },
+
+  auth: {
+    communityLogin: () => ipcRenderer.invoke(CommunityAuthIpc.Login),
+    getCommunityUser: () => ipcRenderer.invoke(CommunityAuthIpc.GetCommunityUser),
+    communityLogout: () => ipcRenderer.invoke(CommunityAuthIpc.Logout),
+    onCommunityCallback: (
+      callback: (data: {
+        success: boolean;
+        user?: { id: string; email: string; name: string };
+        error?: string;
+      }) => void,
+    ) => onPush(CommunityAuthIpc.Callback, callback),
   },
 
   activity: {
