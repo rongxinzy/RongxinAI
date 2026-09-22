@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
+import type { ApiRequestPurpose } from '../shared/ipc/apiRequest';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
 import { AgentIpcChannel } from '../shared/agent/constants';
@@ -325,6 +326,7 @@ contextBridge.exposeInMainWorld('electron', {
       headers: Record<string, string>;
       body?: string;
       timeoutMs?: number;
+      purpose?: ApiRequestPurpose;
     }) => ipcRenderer.invoke(ApiIpc.Fetch, options),
 
     fetchModels: (input: ProviderModelDiscoveryRequest): Promise<ProviderModelDiscoveryResult> =>

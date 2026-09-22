@@ -100,6 +100,7 @@ import {
   CoworkSessionUpdateModelSchema,
   ProjectCreateDirectorySchema,
 } from '../shared/ipc/schemas';
+import { shouldRecordApiRequest } from '../shared/ipc/apiRequest';
 import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import {
   WorkbenchApprovalMode,
@@ -6894,9 +6895,12 @@ if (!gotTheLock) {
 
   ipcMain.handle(ApiIpc.Fetch, async (_event, rawOptions: unknown) => {
     const options = ApiFetchSchema.input.parse(rawOptions);
-    console.log(
-      `[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`,
-    );
+    const shouldRecord = shouldRecordApiRequest(options.purpose);
+    if (shouldRecord) {
+      console.log(
+        `[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`,
+      );
+    }
 
     const doFetch = async (headers: Record<string, string>) => {
       const response = await session.defaultSession.fetch(options.url, {
@@ -6926,6 +6930,56 @@ if (!gotTheLock) {
       };
     };
 
+    const runApiFetch = async () => {
+      try {
+        let result = await doFetch(options.headers);
+        if (shouldRecord) {
+          console.log(
+            `[api:fetch] ${options.method} ${options.url} -> ${result.status} ${result.statusText}`,
+            typeof result.data === 'object' ? JSON.stringify(result.data) : result.data,
+          );
+        }
+
+        // Auto-retry once for Copilot 401/403
+        if (
+          !result.ok &&
+          (result.status === 401 || result.status === 403) &&
+          isCopilotUrl(options.url)
+        ) {
+          if (shouldRecord) {
+            console.log('[api:fetch] Copilot auth error, attempting token refresh and retry');
+          }
+          const { headers: refreshedHeaders, retried } =
+            await retryCopilotWithRefreshedToken(options);
+          if (retried) {
+            result = await doFetch(refreshedHeaders);
+            if (shouldRecord) {
+              console.log(`[api:fetch] retry -> ${result.status} ${result.statusText}`);
+            }
+          }
+        }
+
+        return result;
+      } catch (error) {
+        if (shouldRecord) {
+          console.error(
+            `[api:fetch] ${options.method} ${options.url} -> ERROR:`,
+            error instanceof Error ? error.message : error,
+          );
+        }
+        return {
+          ok: false,
+          status: 0,
+          statusText: error instanceof Error ? error.message : 'Network error',
+          headers: {},
+          data: null as null,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    };
+
+    if (!shouldRecord) return runApiFetch();
+
     // 2026/09/17 lixiang  开发态把主进程 api:fetch 镜像到 DevTools Network（xr-net beacon）
     return trackDevNetworkRequest({
       source: 'api-fetch',
@@ -6935,45 +6989,7 @@ if (!gotTheLock) {
       getRequestBody: () => truncateNetworkBody(options.body),
       getResponseBody: result =>
         truncateNetworkBody('error' in result ? result.error : (result.data ?? result.statusText)),
-      run: async () => {
-        try {
-          let result = await doFetch(options.headers);
-          console.log(
-            `[api:fetch] ${options.method} ${options.url} -> ${result.status} ${result.statusText}`,
-            typeof result.data === 'object' ? JSON.stringify(result.data) : result.data,
-          );
-
-          // Auto-retry once for Copilot 401/403
-          if (
-            !result.ok &&
-            (result.status === 401 || result.status === 403) &&
-            isCopilotUrl(options.url)
-          ) {
-            console.log('[api:fetch] Copilot auth error, attempting token refresh and retry');
-            const { headers: refreshedHeaders, retried } =
-              await retryCopilotWithRefreshedToken(options);
-            if (retried) {
-              result = await doFetch(refreshedHeaders);
-              console.log(`[api:fetch] retry -> ${result.status} ${result.statusText}`);
-            }
-          }
-
-          return result;
-        } catch (error) {
-          console.error(
-            `[api:fetch] ${options.method} ${options.url} -> ERROR:`,
-            error instanceof Error ? error.message : error,
-          );
-          return {
-            ok: false,
-            status: 0,
-            statusText: error instanceof Error ? error.message : 'Network error',
-            headers: {},
-            data: null as null,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      },
+      run: runApiFetch,
     });
   });
 
