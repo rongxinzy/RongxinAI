@@ -190,6 +190,7 @@ import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRe
 import { GitWorktreeService } from './codingAgent/gitWorktreeService';
 import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
 import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
+import { PiUiRuntimeSnapshots } from '../shared/cowork/piUiRuntimeSnapshot';
 import { CoworkInterruptionCause } from '../shared/cowork/interruption';
 import {
   type PiUiEvent,
@@ -2026,7 +2027,12 @@ const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
 /** Project Pi Work/Chat events to renderer-owned cowork streams. */
 const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
   const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
+  const runtimeSnapshots = new PiUiRuntimeSnapshots();
+  ipcMain.handle(CoworkStreamIpc.RuntimeSnapshots, (_event, sessionId?: string) =>
+    runtimeSnapshots.read(sessionId),
+  );
   const broadcastUiEvent = (event: PiUiEvent): void => {
+    runtimeSnapshots.observe(event);
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;

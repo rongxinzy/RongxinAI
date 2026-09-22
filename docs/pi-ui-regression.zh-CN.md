@@ -41,6 +41,21 @@ Message(user) -> Started -> Message / MessageUpdate / ToolActivity / PermissionR
 
 旧的拆分 IPC 通道暂时只为兼容遗留投影和非主 UI 消费者保留；`cowork.ts` 和 `coworkQueue.ts` 的主 UI 路径只监听统一事件。
 
+## 运行状态恢复回归
+
+`cowork:stream:runtimeSnapshots` 返回主进程从 Pi 生命周期事件维护的状态和事件序号，不从数据库的 `running` 字段推断是否正在执行。渲染监听器接入时读取快照；首次收到大于 1 的序号或后续出现序号缺口时，后台补读会话。补读不改变当前会话、工作区、智能体、技能、草稿或未读状态。
+
+自动化回归位于 `cowork.runtimeRecovery.test.ts`、`piUiRecovery.test.ts`、`piUiRuntimeSnapshot.test.ts` 和 `piUiEvent.test.ts`，覆盖：
+
+- Started 已发生且运行时暂时不再发送事件时，重新接入仍恢复运行指示。
+- 首个 Started 丢失后，通过下一个事件恢复运行状态。
+- Completed 丢失后，通过序号缺口清除运行状态和旧 live snapshot。
+- 后台会话补同步不触发页面导航或清除用户选择。
+- 旧快照不覆盖新的 Started/Completed，同步期间的新文本及已加载旧历史得到保留。
+- 重复缺口合并执行，销毁监听器后不再应用未完成请求。
+
+真实 Electron 复验时，额外执行长任务期间重新加载渲染进程，确认运行指示及停止按钮恢复并可停止任务。自动化测试不代替这项实机验收。
+
 ## 记录
 
 2026-09-22 开发版真实验收：

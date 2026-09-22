@@ -67,7 +67,10 @@ test('event validation rejects unversioned or incomplete payloads', () => {
 });
 
 test('sequence tracker drops duplicate and late deliveries per session', () => {
-  const sequencer = new PiUiEventSequencer(() => crypto.randomUUID(), () => 123);
+  const sequencer = new PiUiEventSequencer(
+    () => crypto.randomUUID(),
+    () => 123,
+  );
   const tracker = new PiUiEventSequenceTracker();
   const first = sequencer.next({
     type: PiUiEventType.Started,
@@ -101,4 +104,14 @@ test('sequence tracker exposes gaps so consumers can resync from persisted state
   expect(tracker.accept(third)).toBe(true);
   expect(tracker.consumeGap('session-a')).toBe(1);
   expect(tracker.consumeGap('session-a')).toBe(0);
+});
+
+test('first delivery above sequence one requests recovery for a late subscriber', () => {
+  const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
+  sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' });
+  const tracker = new PiUiEventSequenceTracker();
+  expect(
+    tracker.accept(sequencer.next({ type: PiUiEventType.QueueUpdated, sessionId: 'A', items: [] })),
+  ).toBe(true);
+  expect(tracker.consumeGap('A')).toBe(1);
 });

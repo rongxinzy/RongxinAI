@@ -26,6 +26,7 @@ import {
   dequeuePendingPermission,
   enqueuePendingPermission,
   prependMessages,
+  recoverSession,
   setConfig,
   setChatSessions,
   setCurrentSession,
@@ -61,6 +62,7 @@ import {
 } from './coworkTerminalError';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
+import { PiUiRecovery } from './piUiRecovery';
 import {
   PiUiEventSequenceTracker,
   PiUiEventType,
@@ -119,15 +121,32 @@ class CoworkService {
     };
     this.streamListenerCleanups.push(messageUpdateRafCleanup);
 
+    const recovery = new PiUiRecovery({
+      readRuntime: sessionId => cowork.getRuntimeSnapshots(sessionId),
+      readSession: async sessionId => {
+        const result = await cowork.getSession(sessionId);
+        if (!result.success) throw new Error(result.error || 'Failed to recover session');
+        return result.session ?? null;
+      },
+      prepare: prepareCoworkSessionRender,
+      applyStatus: snapshot => store.dispatch(updateSessionStatus({ ...snapshot, recovered: true })),
+      applySession: (session, preserveLiveContent) =>
+        store.dispatch(recoverSession({ session, preserveLiveContent })),
+      flush: () => updateBatcher.flush(),
+    });
+    this.streamListenerCleanups.push(() => recovery.dispose());
+
     const sequenceTracker = new PiUiEventSequenceTracker();
     const uiEventCleanup = cowork.onStreamUiEvent((event: PiUiEvent) => {
       if (!sequenceTracker.accept(event)) return;
+      const applyEvent = recovery.observe(event);
       if (sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
         console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
-        void this.loadSession(event.sessionId).catch(error =>
+        void recovery.recover(event.sessionId).catch(error =>
           console.error('[CoworkService] failed to recover after a UI event sequence gap:', error),
         );
       }
+      if (!applyEvent) return;
       switch (event.type) {
         case PiUiEventType.Message: {
           const { sessionId, message } = event;
@@ -214,6 +233,9 @@ class CoworkService {
       }
     });
     this.streamListenerCleanups.push(uiEventCleanup);
+    void recovery.bootstrap().catch(error =>
+      console.error('[CoworkService] failed to recover Pi runtime state on attach:', error),
+    );
 
     // Sessions changed listener (new channel sessions discovered by polling,
     // or reconcileWithHistory replaced messages for a channel session)
