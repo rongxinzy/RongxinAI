@@ -43,6 +43,10 @@ Message(user) -> Started -> Message / MessageUpdate / ToolActivity / PermissionR
 
 旧 renderer API 聊天服务及其专属搜索、重试和流式请求辅助模块已删除。设置保存仍通过配置服务生效，模型能力探测保留独立入口。会话与完成事件只使用产品会话 ID，不再携带旧 SDK 会话 ID；新数据库不创建旧列，既有数据库中的旧列不再读写且不主动删除。执行模式由共享常量限定为 `auto / local`，IPC 拒绝已移除的运行模式。
 
+## Chat 身份追加路径验证
+
+`piPromptAppend.integration.test.ts` 直接使用已安装 Pi SDK 的 `DefaultResourceLoader` 和 `buildSystemPrompt`，验证追加身份后默认提示词及工具规则完整保留、非空覆盖会跳过默认规则、重复 reload 不重复追加，以及自动发现 `SYSTEM.md` 时需要显式返回 `undefined` 才能保留默认提示词。测试使用隔离临时目录，不调用模型；它验证提示词合成行为，不等同于真实对话或模型遵循身份的验收。生产 Chat 身份注入尚未启用。
+
 ## 运行状态恢复回归
 
 `cowork:stream:runtimeSnapshots` 返回主进程从 Pi 生命周期事件维护的状态和事件序号，不从数据库的 `running` 字段推断是否正在执行。渲染监听器接入时读取快照；首次收到大于 1 的序号或后续出现序号缺口时，后台补读会话。补读不改变当前会话、工作区、智能体、技能、草稿或未读状态。
