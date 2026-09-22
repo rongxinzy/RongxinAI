@@ -2,7 +2,8 @@
  * Unified registry for tool-usage system-prompt contributions.
  *
  * Pi drops every tool's `promptGuidelines` whenever a custom system prompt is
- * supplied, and ZhiYuan always supplies one. Each tool module exports its own
+ * supplied, as Work sessions may do. Chat preserves Pi's default prompt.
+ * Each tool module exports its own
  * `*SystemPrompt` policy; this registry is the single place that collects them
  * into the session's appendSystemPromptOverride. Adding a tool policy without
  * registering it here means the model never sees it — piRuntimeAdapter and its

@@ -45,7 +45,11 @@ Message(user) -> Started -> Message / MessageUpdate / ToolActivity / PermissionR
 
 ## Chat 身份追加路径验证
 
-`piPromptAppend.integration.test.ts` 直接使用已安装 Pi SDK 的 `DefaultResourceLoader` 和 `buildSystemPrompt`，验证追加身份后默认提示词及工具规则完整保留、非空覆盖会跳过默认规则、重复 reload 不重复追加，以及自动发现 `SYSTEM.md` 时需要显式返回 `undefined` 才能保留默认提示词。测试使用隔离临时目录，不调用模型；它验证提示词合成行为，不等同于真实对话或模型遵循身份的验收。生产 Chat 身份注入尚未启用。
+`piPromptAppend.integration.test.ts` 直接使用已安装 Pi SDK 的 `DefaultResourceLoader` 和 `buildSystemPrompt`，验证追加身份后默认提示词及工具规则完整保留、非空覆盖会跳过默认规则、重复 reload 不重复追加，以及自动发现 `SYSTEM.md` 时需要显式返回 `undefined` 才能保留默认提示词。测试使用隔离临时目录，不调用模型；它验证提示词合成行为，不等同于真实对话或模型遵循身份的验收。
+
+生产 Chat 已通过 `piPromptOverrides.ts` 接入：默认提示词由 Pi 构建，显式 Chat 提示片段与知远身份走追加通道；Work 保持原有行为。回归直接调用同一实现，覆盖续聊 reload 后片段更新、身份不重复和 Work 隔离。
+
+2026-09-22 使用本地生产构建，在实际 Electron 界面和已配置的 GLM-5.3-Flash 上验收：新会话询问“你是谁”，回答以“我是知远智能体（ZhiYuan Agent）”开头；同一会话继续要求一句话介绍，仍使用知远身份。运行日志显示一次 Pi session 创建、两次 `agent_start`。首轮回答仍列举了编码能力，不能把身份正确等同于文风完全符合提示，也不能据此保证所有模型表现一致。
 
 ## 运行状态恢复回归
 
