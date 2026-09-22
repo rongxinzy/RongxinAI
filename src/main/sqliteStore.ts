@@ -22,7 +22,6 @@ import {
 } from './libs/sqliteBackup/sqliteBackupManager';
 import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
 import { initializeCodingAgentSchema } from './codingAgent/schema';
-import { initializeProductionLoopSchema } from './productionLoop/schema';
 import { initializeTodoSchema } from './todo/schema';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
@@ -191,7 +190,6 @@ export class SqliteStore {
 
     initializeWorkbenchTaskSchema(this.db);
     initializeCodingAgentSchema(this.db);
-    initializeProductionLoopSchema(this.db);
     initializeTodoSchema(this.db);
 
     this.db.exec(`

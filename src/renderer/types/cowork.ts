@@ -11,7 +11,6 @@ import type {
   CoworkSessionExpertSnapshot,
 } from '../../shared/cowork/sessionExperts';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
-import type { ProductionLoopMode } from '../../shared/productionLoop';
 
 export interface CoworkImageAttachment {
   name: string;
@@ -234,7 +233,6 @@ export interface CoworkStartOptions {
   title?: string;
   mode?: CoworkSessionMode;
   goalMode?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   activeSkillIds?: string[];
   workspaceId?: string;
   agentId?: string;
@@ -252,7 +250,6 @@ export interface CoworkContinueOptions {
   systemPrompt?: string;
   activeSkillIds?: string[];
   goalMode?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   expertIds?: string[];
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];

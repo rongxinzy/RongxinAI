@@ -78,13 +78,9 @@ export function buildPiSkillScriptTool(options: {
         ? params.args.filter((value): value is string => typeof value === 'string')
         : [];
       if (!allowedSkillIds.has(skillId)) {
-        const denied: SkillScriptToolResult = {
-          content: [
-            { type: 'text', text: `Skill script denied: ${skillId || '(missing skillId)'}.` },
-          ],
-          details: { errorCode: 'SKILL_NOT_SELECTED', skillId, script },
-        };
-        return denied;
+        throw new Error(
+          `Skill script denied [SKILL_NOT_SELECTED]: ${skillId || '(missing skillId)'}.`,
+        );
       }
 
       const result = await runManagedSkillScript({
@@ -95,6 +91,8 @@ export function buildPiSkillScriptTool(options: {
         timeoutMs: typeof params.timeoutMs === 'number' ? params.timeoutMs : undefined,
         signal,
       });
+      // Pi marks a normally resolved custom tool as successful, even with ok:false.
+      if (!result.ok) throw new Error(resultText(result));
       return {
         content: [{ type: 'text', text: resultText(result) }],
         details: {

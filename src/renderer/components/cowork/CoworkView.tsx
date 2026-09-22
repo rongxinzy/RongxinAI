@@ -1,3 +1,4 @@
+import { createDirectChatErrorMessage } from '../../services/coworkTerminalError';
 import { configService } from '../../services/config';
 import { cn } from '@shared/lib/utils';
 import React, { useEffect, useRef, useState } from 'react';
@@ -11,10 +12,6 @@ import {
 } from '../../../shared/cowork/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
-import {
-  ProductionLoopMode,
-  type ProductionLoopMode as ProductionLoopModeValue,
-} from '../../../shared/productionLoop';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
 import {
@@ -363,7 +360,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
-    productionLoopMode: ProductionLoopModeValue = ProductionLoopMode.Off,
   ): Promise<boolean | void> => {
     console.log('[CoworkView] handleStartSession: imageAttachments diagnosis', {
       hasImageAttachments: !!imageAttachments,
@@ -793,14 +789,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           dispatch(
             addMessage({
               sessionId: tempSessionId,
-              message: {
-                id: `error-${Date.now()}`,
-                type: 'system',
-                content: i18nService
-                  .t('chatErrorMessage')
-                  .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-                timestamp: Date.now(),
-              },
+              message: createDirectChatErrorMessage(error),
             }),
           );
           if (persistTimer) clearTimeout(persistTimer);
@@ -882,7 +871,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           agentId: currentAgentId,
           expertIds,
           goalMode,
-          productionLoopMode,
           modelOverride: sessionModelOverride,
           permissionMode: sessionPermissionMode,
           imageAttachments,
@@ -944,7 +932,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
-    productionLoopMode: ProductionLoopModeValue = ProductionLoopMode.Off,
   ) => {
     if (!currentSession) return;
     if (taskResume.interruption) {
@@ -953,7 +940,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         skillIds: [...activeSkillIds],
         expertIds,
         goalMode,
-        productionLoopMode,
         imageAttachments: imageAttachments
           ?.filter(
             (image): image is CoworkImageAttachment & { base64Data: string } =>
@@ -984,7 +970,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         fileAttachments,
         [...activeSkillIds],
         skillPrompt,
-        productionLoopMode,
       );
       if (!result.success) {
         window.dispatchEvent(
@@ -1344,14 +1329,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         dispatch(
           addMessage({
             sessionId: currentSession.id,
-            message: {
-              id: `error-${Date.now()}`,
-              type: 'system',
-              content: i18nService
-                .t('chatErrorMessage')
-                .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-              timestamp: Date.now(),
-            },
+            message: createDirectChatErrorMessage(error),
           }),
         );
         if (persistTimer) clearTimeout(persistTimer);
@@ -1389,7 +1367,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         expertIds,
         permissionMode: sessionPermissionMode,
         goalMode,
-        productionLoopMode,
         imageAttachments,
         fileAttachments,
       });

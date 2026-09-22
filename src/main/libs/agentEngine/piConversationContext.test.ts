@@ -89,3 +89,61 @@ test('scales history budget down for small and invalid model contexts', () => {
   expect(calculatePiConversationHistoryCharLimit(0, 0)).toBe(10_240);
   expect(calculatePiConversationHistoryCharLimit(Number.NaN, -1)).toBe(10_240);
 });
+
+test('preserves the request and recent evidence when the last tool result exceeds the budget', () => {
+  const prompt = buildPiConversationPrompt(
+    [
+      message('request', 'user', 'Keep the approved budget at 180000.'),
+      message('call', 'tool_use', '', { toolName: 'bash', toolInput: { command: 'check budget' } }),
+      message('result', 'tool_result', `Budget check: ${'x'.repeat(9000)}`),
+    ],
+    'Continue.',
+    { maxChars: calculatePiConversationHistoryCharLimit(16384, 4096) },
+  );
+  expect(prompt).toContain('Keep the approved budget at 180000.');
+  expect(prompt).toContain('Budget check:');
+  expect(prompt).toContain('[truncated]');
+  expect(prompt.length).toBeLessThan(2300);
+});
+
+test('restores references for image-only and file-only messages without leaking base64', () => {
+  const prompt = buildPiConversationPrompt(
+    [
+      message('image', 'user', '', {
+        imageAttachments: [
+          {
+            name: 'reference.png',
+            path: '/workspace/reference.png',
+            mimeType: 'image/png',
+            base64Data: 'PRIVATE_IMAGE_BYTES',
+          },
+        ],
+      }),
+      message('file', 'user', '', {
+        fileAttachments: [
+          { name: 'requirements.pdf', path: '/workspace/requirements.pdf', extension: '.pdf' },
+        ],
+      }),
+    ],
+    'Continue.',
+  );
+  expect(prompt).toContain('/workspace/reference.png');
+  expect(prompt).toContain('/workspace/requirements.pdf');
+  expect(prompt).toContain('Reopen with the file/image tools');
+  expect(prompt).not.toContain('PRIVATE_IMAGE_BYTES');
+});
+
+test('explicitly marks attachments that cannot be restored', () => {
+  const prompt = buildPiConversationPrompt(
+    [
+      message('image', 'user', '', {
+        imageAttachments: [
+          { name: 'reference.png', mimeType: 'image/png', base64Data: 'PRIVATE_IMAGE_BYTES' },
+        ],
+      }),
+    ],
+    'Continue.',
+  );
+  expect(prompt).toContain('unavailable after restore');
+  expect(prompt).not.toContain('PRIVATE_IMAGE_BYTES');
+});
