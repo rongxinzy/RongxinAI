@@ -89,6 +89,11 @@ test('places the active expert identity between permissions and MCP controls', (
   );
 });
 
+test('seeds the prompt expert chip when opening a new conversation from an expert agent', () => {
+  expect(source).toContain('resolveInitialSelectedExpertIds({');
+  expect(source).toContain('currentAgentSource: currentAgent?.source');
+});
+
 test('keeps streaming controls gated without obscuring the prompt', () => {
   expect(source).not.toContain('bg-input/50 dark:bg-input/80');
   expect(source).not.toContain("className={isStreaming ? 'relative z-20' : undefined}");
