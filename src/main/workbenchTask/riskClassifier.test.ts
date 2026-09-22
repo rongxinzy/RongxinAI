@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
-import { ProductionLoopAction, ProductionLoopToolName } from '../../shared/productionLoop';
 import {
   classifyWorkbenchToolRisk,
   createToolIdempotencyKey,
@@ -29,14 +28,6 @@ test('idempotency hashing is stable across object key order', () => {
   expect(createToolIdempotencyKey('run', 'call', { a: 1, b: 2 })).toBe(
     createToolIdempotencyKey('run', 'call', { b: 2, a: 1 }),
   );
-});
-
-test('all production loop control actions bypass user approval', () => {
-  for (const action of Object.values(ProductionLoopAction)) {
-    expect(classifyWorkbenchToolRisk(ProductionLoopToolName, { action })).toBe(
-      WorkbenchApprovalRiskLevel.ReadOnly,
-    );
-  }
 });
 
 test('artifact declarations bypass user approval', () => {

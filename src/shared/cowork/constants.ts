@@ -45,7 +45,7 @@ export const CoworkScheduledSessionTitlePrefix = {
 
 /**
  * Desktop permission mode for cowork sessions.
- * Ask: the agent requests authorization before acting (current behavior).
+ * Ask: the agent requests authorization before acting.
  * AllowAll: tools execute without asking for authorization.
  */
 export const CoworkPermissionMode = {
@@ -54,6 +54,8 @@ export const CoworkPermissionMode = {
 } as const;
 
 export type CoworkPermissionMode = (typeof CoworkPermissionMode)[keyof typeof CoworkPermissionMode];
+
+export const DEFAULT_COWORK_PERMISSION_MODE = CoworkPermissionMode.AllowAll;
 
 export const CoworkPermissionBehavior = {
   Allow: 'allow',

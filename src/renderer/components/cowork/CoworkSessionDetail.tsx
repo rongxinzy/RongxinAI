@@ -11,7 +11,6 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
-import type { ProductionLoopMode } from '../../../shared/productionLoop';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
@@ -100,8 +99,6 @@ import {
   COWORK_COMPOSER_INSET_VALUE,
   useCoworkComposerInset,
 } from './hooks/useCoworkComposerInset';
-import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
-import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
 import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
@@ -126,7 +123,6 @@ interface CoworkSessionDetailProps {
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,
-    productionLoopMode?: ProductionLoopMode,
   ) => boolean | void | Promise<boolean | void>;
   onStop: () => void;
   isSidebarCollapsed?: boolean;
@@ -950,10 +946,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   );
 
   const messages = currentSession?.messages;
-  const todoQueue = useTodoQueueLifecycle({
-    isStreaming,
-    sessionId,
-  });
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
@@ -1541,7 +1533,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                               isStreaming={isStreaming}
                             />
                           )}
-                        <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
                       </>
                     )
                   }

@@ -16,7 +16,6 @@ import type {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
 } from './constants';
-import type { ProductionLoopMode, ProductionPlanItem } from '../productionLoop';
 
 export type WorkbenchJsonObject = Record<string, unknown>;
 
@@ -140,13 +139,6 @@ export interface WorkbenchTaskDetail {
   events: WorkbenchRunEvent[];
   artifacts: WorkbenchArtifact[];
   approvals: WorkbenchApproval[];
-  productionPlan?: WorkbenchProductionPlan | null;
-}
-
-export interface WorkbenchProductionPlan {
-  runId: string;
-  progressVersion: number;
-  items: ProductionPlanItem[];
 }
 
 export interface WorkbenchTaskChangedEvent {
@@ -179,7 +171,6 @@ export interface WorkbenchTaskResumeInput {
   skillIds?: string[];
   expertIds?: string[];
   goalMode?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: Array<{
     name: string;
     mimeType: string;

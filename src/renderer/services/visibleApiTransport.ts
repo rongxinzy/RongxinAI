@@ -50,7 +50,7 @@ export function shouldExposeApiInDevtoolsNetwork(): boolean {
   // Vitest also runs with DEV=true under Vite. Unit tests stub window.electron.api
   // and must keep the production IPC transport; otherwise mocks never fire and
   // page-level fetch hits real URLs (e.g. example.com) in CI.
-  if (import.meta.env.MODE === 'test' || process.env.VITEST === 'true') {
+  if (import.meta.env.MODE === 'test') {
     return false;
   }
   return import.meta.env.DEV === true;

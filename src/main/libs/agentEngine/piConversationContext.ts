@@ -1,4 +1,5 @@
 import type { CoworkMessage } from '../../coworkStore';
+import { formatConversationAttachments } from './piConversationAttachments';
 
 const PiConversationContextLimit = {
   TotalChars: 60_000,
@@ -31,10 +32,14 @@ export const calculatePiConversationHistoryCharLimit = (
   );
 };
 
-const truncateEntry = (value: string): string => {
+const truncateEntry = (
+  value: string,
+  maxChars: number = PiConversationContextLimit.EntryChars,
+): string => {
   const normalized = value.trim();
-  if (normalized.length <= PiConversationContextLimit.EntryChars) return normalized;
-  return `${normalized.slice(0, PiConversationContextLimit.EntryChars)}\n[truncated]`;
+  if (normalized.length <= maxChars) return normalized;
+  const suffix = '\n[truncated]';
+  return `${normalized.slice(0, Math.max(0, maxChars - suffix.length))}${suffix}`;
 };
 
 const formatHistoryMessage = (message: CoworkMessage): string | null => {
@@ -45,7 +50,9 @@ const formatHistoryMessage = (message: CoworkMessage): string | null => {
   }
   if (message.type === 'user') {
     const content = truncateEntry(message.content);
-    return content ? `User: ${content}` : null;
+    const attachments = formatConversationAttachments(message);
+    const entry = [attachments, content].filter(Boolean).join('\n');
+    return entry ? `User: ${entry}` : null;
   }
   if (message.type === 'tool_use') {
     const toolName =
@@ -74,10 +81,12 @@ export const buildPiConversationPrompt = (
     Math.max(2_000, Math.floor(options.maxChars ?? PiConversationContextLimit.TotalChars)),
   );
   const entries = messages.map(formatHistoryMessage).filter((entry): entry is string => !!entry);
+  // Reserve space for several messages even when one tool observation is huge.
+  const entryBudget = Math.min(PiConversationContextLimit.EntryChars, Math.floor(totalChars / 4));
   const selected: string[] = [];
   let selectedChars = 0;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index];
+    const entry = truncateEntry(entries[index], entryBudget);
     const nextChars = selectedChars + entry.length + 2;
     if (nextChars > totalChars) break;
     selected.unshift(entry);

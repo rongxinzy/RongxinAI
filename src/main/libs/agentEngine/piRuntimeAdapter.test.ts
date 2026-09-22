@@ -21,16 +21,15 @@ import {
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { ProductionLoopAction } from '../../../shared/productionLoop';
 import {
   WorkbenchApprovalMode,
+  WorkbenchRunTrigger,
+  WorkbenchOutputToolName,
   WorkbenchContractKind,
   WorkbenchOutputMode,
-  WorkbenchRunTrigger,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
-import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
@@ -264,7 +263,6 @@ import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
-import { initializeProductionLoopSchema } from '../../productionLoop/schema';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
@@ -474,192 +472,78 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('keeps final acceptance out of model tools for production work', async () => {
+    it('uses native completion for ordinary Work, including resume and expert turns', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
-      const onPermissionRequest = vi.fn();
-      const onComplete = vi.fn();
-      adapter.on('permissionRequest', onPermissionRequest);
-      adapter.on('complete', onComplete);
-
+      const workspaceRoot = createTemporaryWorkspace();
       try {
-        await adapter.startSession(
-          'generic-work-skill',
-          'Analyze this codebase, write a review report, and verify the findings',
-          {
-            skillIds: ['code-review'],
-            sessionMode: 'work',
-            workspaceRoot: createTemporaryWorkspace(),
-          },
-        );
-
-        expect(mockSession.prompt).toHaveBeenCalledWith(
-          expect.not.stringContaining('## Production workflow decision'),
-        );
-        expect(
-          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 0 });
-
-        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{
-            name: string;
-            execute(
-              toolCallId: string,
-              params: Record<string, unknown>,
-            ): Promise<{ content: Array<{ text: string }> }>;
-          }>;
-        };
-        const toolNames = sessionOptions.customTools.map(tool => tool.name);
-        const loopTool = sessionOptions.customTools.find(tool => tool.name === 'agent_loop');
-        const productionTool = sessionOptions.customTools.find(
-          tool => tool.name === 'production_loop',
-        );
-        expect(toolNames).toContain('production_loop');
-        expect(toolNames).toContain('run_skill_script');
-        expect(toolNames).not.toContain('work_acceptance');
-
-        await productionTool!.execute('start-production', {
-          action: ProductionLoopAction.CommitPlan,
-          items: [{ title: 'Analyze and report' }],
-          constraints: [],
-          acceptanceCriteria: ['Report findings are verified'],
-          expectedArtifacts: [{ kind: 'report', description: 'Review report' }],
-          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
+        await adapter.startSession('native-work', 'Write and verify a report', {
+          sessionMode: 'work',
+          workspaceRoot,
+          expertIds: ['report-expert'],
         });
-        const runId = service.getCurrent('generic-work-skill')?.runs[0]?.id;
-        expect(runId).toBeDefined();
-        expect(service.productionLoop.getState(runId!).planItems).toHaveLength(1);
-
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-          type: string;
-        }) => void;
-        await loopTool!.execute('done-too-early', {
-          action: 'done',
-          reason: 'I think it is complete',
+        await adapter.continueSession('native-work', 'Check the calculations', {
+          sessionMode: 'work',
+          workspaceRoot,
         });
+        const task = service.getCurrent('native-work')!.task;
+        adapter.stopSession('native-work');
+        const prepared = service.prepareRun(task.id, WorkbenchRunTrigger.Resume);
+        await adapter.continueSession('native-work', 'Continue', {
+          sessionMode: 'work',
+          workspaceRoot,
+          _workbenchRunId: prepared.run.id,
+        });
+        for (const [options] of mockCreateAgentSession.mock.calls) {
+          const names = (options.customTools as Array<{ name: string }>).map(tool => tool.name);
+          expect(names).not.toContain('production_loop');
+          expect(names).not.toContain(PiAgentLoopToolName);
+          expect(names).toContain(WorkbenchOutputToolName);
+        }
+        const promptCount = mockSession.prompt.mock.calls.length;
+        const onComplete = vi.fn();
+        adapter.on('complete', onComplete);
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0];
         listener({ type: 'agent_end' });
-        await Promise.resolve();
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Production workflow continuation'),
-          { streamingBehavior: 'followUp' },
-        );
-        expect(onPermissionRequest).not.toHaveBeenCalled();
-        expect(onComplete).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+        expect(adapter.isSessionRunning('native-work')).toBe(false);
+        expect(mockSession.prompt).toHaveBeenCalledTimes(promptCount);
+        expect(service.getCurrent('native-work')!.task.id).toBe(task.id);
+        expect(
+          db
+            .prepare("SELECT name FROM sqlite_master WHERE name = 'workbench_production_loops'")
+            .get(),
+        ).toBeUndefined();
       } finally {
-        db.close();
-      }
-    });
-    it('keeps production controls available but dormant for ordinary Work turns', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('production-work', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('production-simple', '为什么天空是蓝色的？', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('production-light', '你好', {
-          sessionMode: 'work',
-          skillIds: ['presentation-studio'],
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('production-chat', 'Create and validate a release report', {
-          sessionMode: 'chat',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-
-        const workOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const simpleOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const lightOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const chatOptions = mockCreateAgentSession.mock.calls[3]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(workOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(simpleOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(lightOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
-        expect(mockSession.prompt.mock.calls[0]?.[0]).not.toContain(
-          '## Production workflow decision',
-        );
-        expect(mockSession.prompt.mock.calls[1]?.[0]).not.toContain(
-          '## Production workflow decision',
-        );
-        expect(
-          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 0 });
-        expect(
-          service.getCurrent('production-work')?.task.contract.metadata
-            ?.productionControlsAvailable,
-        ).toBe(true);
-        expect(
-          service.getCurrent('production-simple')?.task.contract.metadata
-            ?.productionControlsAvailable,
-        ).toBe(true);
-      } finally {
+        await adapter.stopAllSessions();
         db.close();
       }
     });
 
-    it('lets the model activate expert production only for substantive requests', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('expert-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          expertIds: ['release-expert'],
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('expert-direct', '为什么天空是蓝色的？', {
-          sessionMode: 'work',
-          expertIds: ['science-expert'],
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-
-        const productionPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-        const directPrompt = mockSession.prompt.mock.calls[1]?.[0] as string;
-        const directOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-
-        expect(productionPrompt).toContain(ExpertProductionWorkflowHeading);
-        expect(productionPrompt).toContain('expert workflow only as the domain method');
-        expect(directPrompt).toContain(ExpertProductionWorkflowHeading);
-        expect(directPrompt).toContain('answer normally without calling production_loop');
-        expect(directOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(
-          service.getCurrent('expert-direct')?.task.contract.metadata?.productionControlsAvailable,
-        ).toBe(true);
-      } finally {
-        db.close();
-      }
+    it('changes loop tools only when Goal mode is explicitly toggled', async () => {
+      await adapter.startSession('goal-toggle', 'First', { sessionMode: 'work' });
+      await adapter.continueSession('goal-toggle', 'Keep working', {
+        sessionMode: 'work',
+        goalMode: true,
+      });
+      await adapter.continueSession('goal-toggle', 'Answer directly', {
+        sessionMode: 'work',
+        goalMode: false,
+      });
+      const toolNames = mockCreateAgentSession.mock.calls.map(([options]) =>
+        (options.customTools as Array<{ name: string }>).map(tool => tool.name),
+      );
+      expect(toolNames).toHaveLength(3);
+      expect(toolNames[0]).not.toContain(PiAgentLoopToolName);
+      expect(toolNames[1]).toContain(PiAgentLoopToolName);
+      expect(toolNames[2]).not.toContain(PiAgentLoopToolName);
     });
 
     it('records non-sensitive runtime context on initial and reused workbench runs', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const workspaceRoot = createTemporaryWorkspace();
@@ -701,140 +585,9 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('restores the production gate from the owning task on an explicit resume', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = createTemporaryWorkspace();
-
-      try {
-        await adapter.startSession('resume-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot,
-        });
-        const originalTask = service.getCurrent('resume-production')!.task;
-        const originalOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{
-            name: string;
-            execute(
-              toolCallId: string,
-              params: Record<string, unknown>,
-            ): Promise<{ content: Array<{ text: string }> }>;
-          }>;
-        };
-        const productionTool = originalOptions.customTools.find(
-          tool => tool.name === 'production_loop',
-        );
-        await productionTool!.execute('start-production', {
-          action: ProductionLoopAction.CommitPlan,
-          items: [{ title: 'Create release report' }],
-          constraints: [],
-          acceptanceCriteria: ['Release report is verified'],
-          expectedArtifacts: [{ kind: 'report', description: 'Release report' }],
-          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
-        });
-        await adapter.stopSession('resume-production');
-        const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
-
-        await adapter.continueSession('resume-production', 'Continue', {
-          sessionMode: 'work',
-          workspaceRoot,
-          _workbenchRunId: prepared.run.id,
-          _productionWorkflowRequired: true,
-          _skipUserMessage: true,
-        });
-
-        const resumedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(service.getCurrent('resume-production')?.task.id).toBe(originalTask.id);
-        expect(service.productionLoop.getState(prepared.run.id).goal).toBe(originalTask.goal);
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Persistent phase: execute'),
-        );
-      } finally {
-        db.close();
-      }
-    });
-
-    it('keeps production optional when resuming a task that never activated it', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = createTemporaryWorkspace();
-
-      try {
-        await adapter.startSession('resume-dormant', '你好', {
-          sessionMode: 'work',
-          workspaceRoot,
-        });
-        const originalTask = service.getCurrent('resume-dormant')!.task;
-        await adapter.stopSession('resume-dormant');
-        const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
-
-        await adapter.continueSession('resume-dormant', 'Please expand this into a report', {
-          sessionMode: 'work',
-          workspaceRoot,
-          _workbenchRunId: prepared.run.id,
-          _productionWorkflowRequired: false,
-          _skipUserMessage: true,
-        });
-
-        const resumedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(
-          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 0 });
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.not.stringContaining('## Production workflow decision'),
-        );
-      } finally {
-        db.close();
-      }
-    });
-
-    it('keeps production dormant when a reused runtime starts a new task', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = createTemporaryWorkspace();
-
-      try {
-        await adapter.startSession('reused-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot,
-        });
-        await adapter.continueSession(
-          'reused-production',
-          'Create and validate a second release report',
-          {
-            sessionMode: 'work',
-            workspaceRoot,
-          },
-        );
-
-        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          'Create and validate a second release report',
-        );
-      } finally {
-        db.close();
-      }
-    });
-
     it('does not continue after the owning workbench run is paused', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
@@ -861,116 +614,6 @@ describe('PiRuntimeAdapter', () => {
             recoverable: true,
           }),
         ]);
-      } finally {
-        db.close();
-      }
-    });
-
-    it('pauses production after three stale continuations', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('stale-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-          type: string;
-        }) => void;
-        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{
-            name: string;
-            execute(
-              toolCallId: string,
-              params: Record<string, unknown>,
-            ): Promise<{ content: Array<{ text: string }> }>;
-          }>;
-        };
-        const productionTool = sessionOptions.customTools.find(
-          tool => tool.name === 'production_loop',
-        );
-        await productionTool!.execute('start-production', {
-          action: ProductionLoopAction.CommitPlan,
-          items: [{ title: 'Create report' }],
-          constraints: [],
-          acceptanceCriteria: ['Report is verified'],
-          expectedArtifacts: [{ kind: 'report', description: 'Release report' }],
-          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
-        });
-
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_end' });
-
-        expect(mockSession.prompt).toHaveBeenCalledTimes(4);
-        expect(mockSession.abort).toHaveBeenCalledOnce();
-        expect(service.getCurrent('stale-production')?.runs[0].status).toBe(
-          WorkbenchRunStatus.Paused,
-        );
-        expect(adapter.isSessionRunning('stale-production')).toBe(false);
-      } finally {
-        db.close();
-      }
-    });
-
-    it('keeps a stable production tool topology across Work follow-ups', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('adaptive-gate', '你好', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-
-        const greetingPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-        expect(greetingPrompt).toBe('你好');
-        expect(greetingPrompt).not.toContain('## Production workflow decision');
-        const greetingRunId = service.getCurrent('adaptive-gate')?.runs[0]?.id;
-        expect(greetingRunId).toBeDefined();
-        setWorkbenchOutputRequirements(service.repository, 'adaptive-gate', greetingRunId!, [{ mode: WorkbenchOutputMode.Text, formats: [] }]);
-        expect(service.productionLoop.repository.get(greetingRunId!)).toBeNull();
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: unknown) => void;
-        listener({
-          type: 'message_end',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: '你好，有什么可以帮你？' }],
-            stopReason: 'stop',
-          },
-        });
-        listener({ type: 'agent_end' });
-        await Promise.resolve();
-        expect(mockSession.prompt).toHaveBeenCalledOnce();
-        expect(service.getCurrent('adaptive-gate')?.runs[0].status).toBe(
-          WorkbenchRunStatus.Succeeded,
-        );
-
-        await adapter.continueSession('adaptive-gate', '修复登录流程中的刷新问题', {
-          sessionMode: 'work',
-        });
-        await adapter.continueSession('adaptive-gate', '解释一下事件循环', {
-          sessionMode: 'work',
-        });
-
-        const simpleStart = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(simpleStart.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-        expect(mockSession.abort).not.toHaveBeenCalled();
-        expect(mockSession.prompt).toHaveBeenCalledTimes(3);
-        for (const [sentPrompt] of mockSession.prompt.mock.calls) {
-          expect(sentPrompt).not.toContain('## Production workflow decision');
-        }
       } finally {
         db.close();
       }
@@ -1557,13 +1200,11 @@ describe('PiRuntimeAdapter', () => {
       const action = vi.fn(async () => undefined);
       expect(adapter.enqueueControlAction('failed-session', action)).toEqual({ success: true });
 
-      const sessions = (
-        adapter as unknown as {
-          activeSessions: Map<string, { turnFailed: boolean }>;
-          flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
-          queuedControlActions: Map<string, Array<() => Promise<void>>>;
-        }
-      );
+      const sessions = adapter as unknown as {
+        activeSessions: Map<string, { turnFailed: boolean }>;
+        flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
+        queuedControlActions: Map<string, Array<() => Promise<void>>>;
+      };
       const active = sessions.activeSessions.get('failed-session');
       if (!active) throw new Error('The test session was not registered.');
       // Pi sets turnFailed when a settled run surfaces a deferred error.
@@ -1713,6 +1354,18 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.reload).not.toHaveBeenCalled();
       expect(mockCreateAgentSession).toHaveBeenCalledOnce();
       expect(mockSession.prompt).toHaveBeenCalledTimes(3);
+    });
+
+    it('resolves the newly selected model before continuing a cached session', async () => {
+      await adapter.startSession('test', 'First', { modelOverride: 'openai/gpt-5.2' });
+      mockResolveRawApiConfigForModelRef.mockClear();
+      await adapter.continueSession('test', 'Second', { modelOverride: 'zhipu/glm-5.3-flash' });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('zhipu/glm-5.3-flash');
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      await adapter.continueSession('test', 'Third', { modelOverride: 'zhipu/glm-5.3-flash' });
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
     });
 
     it('should recreate the session when skill tool topology changes', async () => {
@@ -1884,9 +1537,7 @@ describe('PiRuntimeAdapter', () => {
       });
       expect(published).toEqual([
         {
-          entries: [
-            { content: 'Extract the auth module', status: 'pending', priority: 'high' },
-          ],
+          entries: [{ content: 'Extract the auth module', status: 'pending', priority: 'high' }],
         },
       ]);
 
@@ -2020,7 +1671,6 @@ describe('PiRuntimeAdapter', () => {
     it('starts a fresh model-decided task after a shortcut approval is denied', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const workspaceRoot = createTemporaryWorkspace();
@@ -2032,7 +1682,12 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot,
         });
         const first = service.getCurrent('denied-shortcut')!;
-        setWorkbenchOutputRequirements(service.repository, 'denied-shortcut', first.task.activeRunId!, [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }]);
+        setWorkbenchOutputRequirements(
+          service.repository,
+          'denied-shortcut',
+          first.task.activeRunId!,
+          [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }],
+        );
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-shortcut',
           runId: first.task.activeRunId!,
@@ -2059,7 +1714,9 @@ describe('PiRuntimeAdapter', () => {
         const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
-        expect(greetingOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(greetingOptions.customTools?.map(tool => tool.name)).not.toContain(
+          'production_loop',
+        );
       } finally {
         db.close();
       }
@@ -2079,7 +1736,6 @@ describe('PiRuntimeAdapter', () => {
     it('keeps agent-backed chat interruptions on the normal continuation path', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const interruptions: Array<{ taskId: string | null; recoverable: boolean }> = [];
@@ -2191,14 +1847,20 @@ describe('PiRuntimeAdapter', () => {
           id: 'tool-use-1',
           type: 'tool_use',
           content: 'Using tool: bash',
-          metadata: { toolName: 'bash', toolUseId: 'call-bash-1', toolInput: { command: 'npm test' } },
+          metadata: {
+            toolName: 'bash',
+            toolUseId: 'call-bash-1',
+            toolInput: { command: 'npm test' },
+          },
         },
       ];
-      const addMessage = vi.fn((_sessionId: string, message: { type: string; metadata?: unknown }) => {
-        const persisted = { ...message, id: `persisted-${message.type}`, timestamp: Date.now() };
-        messages.push(persisted as (typeof messages)[number]);
-        return persisted;
-      });
+      const addMessage = vi.fn(
+        (_sessionId: string, message: { type: string; metadata?: unknown }) => {
+          const persisted = { ...message, id: `persisted-${message.type}`, timestamp: Date.now() };
+          messages.push(persisted as (typeof messages)[number]);
+          return persisted;
+        },
+      );
       adapter.setCoworkStore({
         getSession: () => ({ messages }),
         addMessage,
@@ -2354,7 +2016,6 @@ describe('PiRuntimeAdapter', () => {
     it('aborts the active Pi turn when a workbench approval is denied', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const requests: string[] = [];
@@ -2372,7 +2033,12 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot: createTemporaryWorkspace(),
         });
         const detail = service.getCurrent('denied-workbench');
-        setWorkbenchOutputRequirements(service.repository, 'denied-workbench', detail!.task.activeRunId!, [{ mode: WorkbenchOutputMode.File, formats: ['md'] }]);
+        setWorkbenchOutputRequirements(
+          service.repository,
+          'denied-workbench',
+          detail!.task.activeRunId!,
+          [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
+        );
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-workbench',
           runId: detail!.task.activeRunId!,
@@ -2964,7 +2630,10 @@ describe('PiRuntimeAdapter', () => {
         updates.push({ messageId, content, metadata }),
       );
 
-      await adapter.startSession('test', 'Produce two iterations');
+      await adapter.startSession('test', 'Produce two iterations', {
+        goalMode: true,
+        sessionMode: 'work',
+      });
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{
           name: string;
@@ -3497,7 +3166,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('does not complete or continue the agent loop on a failed turn', async () => {
-      await adapter.startSession('test', 'Hi');
+      await adapter.startSession('test', 'Hi', { goalMode: true, sessionMode: 'work' });
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{
           name: string;

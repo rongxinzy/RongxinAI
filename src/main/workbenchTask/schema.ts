@@ -2,6 +2,9 @@ import type Database from 'better-sqlite3';
 
 export function initializeWorkbenchTaskSchema(db: Database.Database): void {
   db.exec(`
+    -- Retired workflow state must not retain foreign keys to live tasks/runs.
+    DROP TABLE IF EXISTS workbench_production_loops;
+
     CREATE TABLE IF NOT EXISTS workbench_tasks (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
