@@ -13,6 +13,7 @@ import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types
 import coworkReducer, {
   addMessage,
   addSession,
+  prependMessages,
   clearCurrentSessionForWorkspaceChange,
   clearPendingPermissionsForSession,
   clearLoadingSessionId,
@@ -428,6 +429,47 @@ test('merges complete loaded history into a tracked streaming session', () => {
   expect(restoredState.currentSession?.messages[2]?.content).toBe('complete live response');
   expect(restoredState.currentSession?.messagesOffset).toBe(0);
   expect(restoredState.currentSession?.status).toBe(CoworkSessionStatusValue.Running);
+});
+
+test('reloading a recent page keeps the initial prompt before replies and preserves its offset', () => {
+  const messages = Array.from({ length: 65 }, (_, index) => ({
+    id: `message-${index}`,
+    type: index === 0 ? 'user' as const : 'assistant' as const,
+    content: `content-${index}`,
+    timestamp: 1,
+  }));
+  const running = makeSession({
+    status: CoworkSessionStatusValue.Running,
+    messages,
+    totalMessages: messages.length,
+  });
+  let state = coworkReducer(undefined, addSession(running));
+  state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
+  state = coworkReducer(state, setCurrentSession({
+    ...running, messages: messages.slice(15), messagesOffset: 15,
+  }));
+  expect(state.currentSession?.messages.map(message => message.id))
+    .toEqual(messages.map(message => message.id));
+  expect(state.currentSession?.messagesOffset).toBe(0);
+  expect(state.currentSession?.totalMessages).toBe(65);
+  expect(state.streamingSessions[running.id].messages[0].type).toBe('user');
+});
+
+test('loaded older pages survive switching away from a running session', () => {
+  const older = { id: 'user', type: 'user' as const, content: 'question', timestamp: 1 };
+  const recent = { id: 'reply', type: 'assistant' as const, content: 'reply', timestamp: 2 };
+  const running = makeSession({
+    status: CoworkSessionStatusValue.Running,
+    messages: [recent], messagesOffset: 1, totalMessages: 2,
+  });
+  let state = coworkReducer(undefined, addSession(running));
+  state = coworkReducer(state, prependMessages({
+    sessionId: running.id, messages: [older], newOffset: 0,
+  }));
+  state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
+  state = coworkReducer(state, setCurrentSession(running));
+  expect(state.currentSession?.messages).toEqual([older, recent]);
+  expect(state.currentSession?.messagesOffset).toBe(0);
 });
 
 test('tracks parallel transient tool activities by session and call id', () => {
