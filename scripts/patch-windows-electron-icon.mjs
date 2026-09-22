@@ -1,9 +1,6 @@
 /**
- * Patch the development electron.exe embedded icon/version strings so the
- * Windows taskbar shows the 晓软智能体 logo instead of the default Electron atom.
- *
- * BrowserWindow.setIcon alone is not enough while running unpackaged electron.exe;
- * Windows still prefers the executable's resource icon for the taskbar button.
+ * 强制把知远 logo（build/icons/win/icon.ico）写入开发态 electron.exe。
+ * Windows 任务栏看的是 exe 内嵌图标，只调 BrowserWindow.setIcon 不够。
  */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -28,7 +25,9 @@ const APP_BUILDER_PATH = path.join(
   'x64',
   'app-builder.exe',
 );
-const PRODUCT_NAME = '晓软智能体';
+const PRODUCT_NAME = '知远';
+const forcePatch =
+  process.argv.includes('--force') || process.env.FORCE_PATCH_ELECTRON_ICON === '1';
 
 function fileSha256(filePath) {
   return createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
@@ -52,14 +51,6 @@ function ensureRcedit() {
   }
 }
 
-function readStamp() {
-  try {
-    return JSON.parse(fs.readFileSync(stampPath, 'utf8'));
-  } catch {
-    return null;
-  }
-}
-
 function writeStamp(payload) {
   fs.mkdirSync(cacheDirectory, { recursive: true });
   fs.writeFileSync(stampPath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -70,29 +61,39 @@ function patchElectronIcon() {
     return;
   }
   if (!fs.existsSync(electronExePath)) {
-    console.warn('[patch-windows-electron-icon] electron.exe is missing; skip.');
-    return;
+    throw new Error(`electron.exe is missing: ${electronExePath}`);
   }
   if (!fs.existsSync(iconPath)) {
-    console.warn('[patch-windows-electron-icon] app icon is missing; skip:', iconPath);
-    return;
+    throw new Error(`知远 logo 不存在: ${iconPath}`);
   }
 
   const iconHash = fileSha256(iconPath);
   const electronStat = fs.statSync(electronExePath);
-  const stamp = readStamp();
-  if (
-    stamp &&
-    stamp.iconHash === iconHash &&
-    stamp.electronSize === electronStat.size &&
-    stamp.electronMtimeMs === electronStat.mtimeMs
-  ) {
-    console.log('[patch-windows-electron-icon] Development electron.exe icon already patched.');
-    return;
+
+  // 默认每次强制写入；只有明确带 --skip-if-fresh 才跳过。
+  const skipIfFresh = process.argv.includes('--skip-if-fresh') && !forcePatch;
+  if (skipIfFresh) {
+    try {
+      const stamp = JSON.parse(fs.readFileSync(stampPath, 'utf8'));
+      if (
+        stamp.iconHash === iconHash &&
+        stamp.productName === PRODUCT_NAME &&
+        stamp.electronSize === electronStat.size &&
+        stamp.electronMtimeMs === electronStat.mtimeMs
+      ) {
+        console.log('[patch-windows-electron-icon] already patched, skip.');
+        return;
+      }
+    } catch {
+      /* fall through and write */
+    }
   }
 
   ensureRcedit();
-  console.log('[patch-windows-electron-icon] Patching development electron.exe icon...');
+  console.log('[patch-windows-electron-icon] 强制写入知远 logo:');
+  console.log(`  icon: ${iconPath}`);
+  console.log(`  exe:  ${electronExePath}`);
+
   const result = spawnSync(
     rceditPath,
     [
@@ -111,18 +112,20 @@ function patchElectronIcon() {
   if (result.status !== 0) {
     const detail = (result.stderr || result.stdout || '').trim();
     throw new Error(
-      `rcedit failed to patch electron.exe${detail ? `: ${detail}` : ''}. Close running Electron processes and retry.`,
+      `rcedit 写入失败${detail ? `: ${detail}` : ''}。请先关闭所有 Electron 进程后重试。`,
     );
   }
 
   const patchedStat = fs.statSync(electronExePath);
   writeStamp({
     iconHash,
+    productName: PRODUCT_NAME,
     electronSize: patchedStat.size,
     electronMtimeMs: patchedStat.mtimeMs,
     patchedAt: new Date().toISOString(),
+    forced: true,
   });
-  console.log('[patch-windows-electron-icon] Development electron.exe icon patched.');
+  console.log('[patch-windows-electron-icon] 已强制写入知远 logo。');
 }
 
 try {
@@ -132,4 +135,5 @@ try {
     '[patch-windows-electron-icon]',
     error instanceof Error ? error.message : String(error),
   );
+  process.exitCode = 1;
 }
