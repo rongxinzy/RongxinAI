@@ -1,3 +1,4 @@
+import { CoworkExecutionMode } from '../../shared/cowork/constants';
 import { configureStore, type UnknownAction } from '@reduxjs/toolkit';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -37,14 +38,13 @@ const temporarySessionId = 'temp-startup';
 const makeSession = (id: string, mode: CoworkSession['mode']): CoworkSession => ({
   id,
   title: 'Same title',
-  claudeSessionId: null,
   status: CoworkSessionStatusValue.Running,
   mode,
   pinned: false,
   cwd: '/workspace',
   systemPrompt: '',
   modelOverride: '',
-  executionMode: 'local',
+  executionMode: CoworkExecutionMode.Local,
   activeSkillIds: [],
   workspaceId: 'workspace-1',
   agentId: 'main',

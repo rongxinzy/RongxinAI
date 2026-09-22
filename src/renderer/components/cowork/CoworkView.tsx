@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
@@ -319,7 +320,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const tempSession: CoworkSession = {
         id: tempSessionId,
         title: fallbackTitle,
-        claudeSessionId: null,
         status: 'idle',
         mode: workMode,
         pinned: false,
@@ -328,7 +328,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         cwd: currentWorkspacePath,
         systemPrompt: '',
         modelOverride: currentAgentSelectedModel ? toAgentModelRef(currentAgentSelectedModel) : '',
-        executionMode: config.executionMode || 'local',
+        executionMode: config.executionMode || CoworkExecutionMode.Local,
         activeSkillIds: sessionSkillIds,
         workspaceId: currentWorkspaceId || '',
         agentId: currentAgentId,

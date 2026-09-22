@@ -28,6 +28,7 @@ import {
 } from '../shared/agent/avatar';
 import {
   COWORK_MESSAGE_PAGE_SIZE,
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
@@ -60,7 +61,6 @@ function setupDb(): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       title_user_renamed INTEGER NOT NULL DEFAULT 0,
-      claude_session_id TEXT,
       status TEXT NOT NULL DEFAULT 'idle',
       mode TEXT NOT NULL DEFAULT 'work',
       pinned INTEGER NOT NULL DEFAULT 0,
@@ -171,8 +171,8 @@ function setupDb(): void {
 function insertSession(id: string): void {
   const now = Date.now();
   db.prepare(
-    `INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at)
-     VALUES (?, 'test', NULL, 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', NULL, 'main', ?, ?)`,
+    `INSERT INTO cowork_sessions (id, title, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at)
+     VALUES (?, 'test', 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', NULL, 'main', ?, ?)`,
   ).run(id, now, now);
 }
 
@@ -300,6 +300,20 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(
     store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
   ).toEqual(expect.arrayContaining([first.id, second.id]));
+});
+
+test('round-trips sessions using only the product session identity', () => {
+  const session = store.createSession('contract', '/tmp/contract', '', CoworkExecutionMode.Local);
+  store.updateSession(session.id, { systemPrompt: 'updated prompt' });
+  const restored = store.getSession(session.id);
+  expect(restored).toMatchObject({
+    id: session.id,
+    systemPrompt: 'updated prompt',
+    executionMode: CoworkExecutionMode.Local,
+  });
+  expect(restored).not.toHaveProperty('claudeSessionId');
+  const columns = db.prepare('PRAGMA table_info(cowork_sessions)').all() as Array<{ name: string }>;
+  expect(columns.map(column => column.name)).not.toContain('claude_session_id');
 });
 
 test('creates independent workspaces for the same directory', () => {

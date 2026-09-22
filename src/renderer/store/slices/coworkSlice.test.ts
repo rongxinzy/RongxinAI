@@ -1,3 +1,4 @@
+import { CoworkExecutionMode } from '../../../shared/cowork/constants';
 import { expect, test } from 'vitest';
 
 import {
@@ -34,13 +35,12 @@ import coworkReducer, {
 const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) => ({
   id: 'session-1',
   title: 'Test Session',
-  claudeSessionId: null,
   status: CoworkSessionStatusValue.Completed,
   pinned: false,
   cwd: '/tmp',
   systemPrompt: '',
   modelOverride: '',
-  executionMode: 'local' as const,
+  executionMode: CoworkExecutionMode.Local,
   activeSkillIds: [],
   workspaceId: 'workspace-test',
   agentId: 'main',
@@ -63,7 +63,7 @@ test('setConfig loads Pi-owned cowork configuration', () => {
     setConfig({
       workingDirectory: '/tmp',
       systemPrompt: '',
-      executionMode: 'local',
+      executionMode: CoworkExecutionMode.Local,
       permissionMode: CoworkPermissionMode.Ask,
       embeddingEnabled: false,
       embeddingProvider: 'openai',

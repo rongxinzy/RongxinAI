@@ -23,6 +23,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
+import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
 import { reportPiSessionFailure } from './piSessionFailure';
 import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
@@ -52,6 +53,7 @@ import {
   AppUpdateIpc,
 } from '../shared/appUpdate/constants';
 import {
+  CoworkExecutionMode,
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
@@ -93,7 +95,6 @@ import {
 } from '../shared/ipc/queueSchemas';
 import {
   ApiFetchSchema,
-  ApiStreamSchema,
   CoworkSessionContinueSchema,
   CoworkSessionStartSchema,
   CoworkSessionUpdateModelSchema,
@@ -124,7 +125,6 @@ import { registerMemoryIpcHandlers } from './memory/ipc';
 import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 import { resolveMemorySessionTitles } from './memory/sessionTitleResolver';
 import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
-import { searchAnySearchGateway } from './libs/anysearchGateway';
 import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
@@ -146,7 +146,6 @@ import {
 } from './coworkImageAttachments';
 import { resolveCoworkContinuationSkillState } from './coworkSessionSkills';
 import {
-  type CoworkExecutionMode,
   type CoworkMessageMetadata,
   type CoworkMessageType,
   type CoworkSessionStatus,
@@ -260,7 +259,7 @@ import {
   trackDevNetworkRequest,
   publishDevNetworkLog,
 } from './devNetworkLog';
-import { sanitizeNetworkUrl, truncateNetworkBody } from '../shared/devNetworkLog';
+import { truncateNetworkBody } from '../shared/devNetworkLog';
 import { ZhiyuanEnterpriseSkillBridge } from './enterpriseExtension/skillBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
@@ -2131,11 +2130,10 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     emitUiEvent({ type: PiUiEventType.Stopped, sessionId });
   });
 
-  runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
+  runtime.on('complete', (sessionId: string) => {
     emitUiEvent({
       type: PiUiEventType.Completed,
       sessionId,
-      claudeSessionId,
     });
   });
 
@@ -2824,8 +2822,6 @@ let mainWindow: BrowserWindow | null = null;
 
 let isQuitting = false;
 
-// 存储活跃的流式请求控制器
-const activeStreamControllers = new Map<string, AbortController>();
 let lastReloadAt = 0;
 let windowStateSaveTimer: ReturnType<typeof setTimeout> | null = null;
 const MIN_RELOAD_INTERVAL_MS = 5000;
@@ -4462,7 +4458,7 @@ if (!gotTheLock) {
           title,
           taskWorkingDirectory,
           systemPrompt,
-          config.executionMode || 'local',
+          config.executionMode || CoworkExecutionMode.Local,
           options.activeSkillIds || [],
           options.agentId || 'main',
           options.modelOverride || '',
@@ -4852,7 +4848,7 @@ if (!gotTheLock) {
           session.title,
           session.cwd,
           session.systemPrompt || '',
-          (session.executionMode as CoworkExecutionMode) || 'local',
+          parseCoworkExecutionMode(session.executionMode) ?? CoworkExecutionMode.Local,
           session.activeSkillIds || [],
           session.agentId || 'main',
           session.modelOverride || '',
@@ -5567,7 +5563,7 @@ if (!gotTheLock) {
       _event,
       config: {
         workingDirectory?: string;
-        executionMode?: 'auto' | 'local' | 'sandbox';
+        executionMode?: CoworkExecutionMode;
         permissionMode?: CoworkPermissionMode;
         permissionModeBySession?: Record<string, CoworkPermissionMode>;
         embeddingEnabled?: boolean;
@@ -5580,10 +5576,6 @@ if (!gotTheLock) {
       },
     ) => {
       try {
-        const normalizedExecutionMode =
-          config.executionMode && String(config.executionMode) === 'container'
-            ? 'local'
-            : config.executionMode;
         const normalizedPermissionMode =
           config.permissionMode === CoworkPermissionMode.Ask ||
           config.permissionMode === CoworkPermissionMode.AllowAll
@@ -5601,7 +5593,7 @@ if (!gotTheLock) {
         const normalizedEmbedding = normalizeEmbeddingConfig(config);
         const normalizedConfig: Parameters<CoworkStore['setConfig']>[0] = {
           ...config,
-          executionMode: normalizedExecutionMode,
+          executionMode: parseCoworkExecutionMode(config.executionMode),
           permissionMode: normalizedPermissionMode,
           permissionModeBySession: normalizedPermissionModeBySession,
           ...normalizedEmbedding,
@@ -6875,26 +6867,7 @@ if (!gotTheLock) {
     }
   };
 
-  // API 代理处理程序 - 解决 CORS 问题
-  ipcMain.handle(ApiIpc.WebSearch, async (_event, rawInput: unknown) => {
-    const input =
-      rawInput && typeof rawInput === 'object' ? (rawInput as Record<string, unknown>) : {};
-    const requestId = typeof input.requestId === 'string' ? input.requestId : null;
-    const controller = new AbortController();
-    if (requestId) activeStreamControllers.set(requestId, controller);
-    try {
-      const data = await searchAnySearchGateway(input, controller.signal);
-      return { ok: true, data };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Search unavailable.' };
-    } finally {
-      if (requestId && activeStreamControllers.get(requestId) === controller) {
-        activeStreamControllers.delete(requestId);
-      }
-    }
-  });
-
-  ipcMain.handle('api:fetch', async (_event, rawOptions: unknown) => {
+  ipcMain.handle(ApiIpc.Fetch, async (_event, rawOptions: unknown) => {
     const options = ApiFetchSchema.input.parse(rawOptions);
     console.log(
       `[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`,
@@ -6977,147 +6950,6 @@ if (!gotTheLock) {
         }
       },
     });
-  });
-
-  // SSE 流式 API 代理
-  ipcMain.handle('api:stream', async (event, rawOptions: unknown) => {
-    const options = ApiStreamSchema.input.parse(rawOptions);
-    const controller = new AbortController();
-    const streamStartedAt = Date.now();
-    const streamLogId = `${streamStartedAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
-    // 存储 controller 以便后续取消
-    activeStreamControllers.set(options.requestId, controller);
-
-    const logStream = (status: number, error?: string, responseBody?: string) => {
-      // 2026/09/17 lixiang  开发态镜像 api:stream 到 DevTools Network
-      publishDevNetworkLog({
-        id: streamLogId,
-        source: 'api-stream',
-        method: options.method,
-        url: sanitizeNetworkUrl(options.url),
-        status,
-        durationMs: Date.now() - streamStartedAt,
-        requestBody: truncateNetworkBody(options.body),
-        responseBody:
-          responseBody ??
-          (error
-            ? truncateNetworkBody(error)
-            : '[streaming — response chunks go over IPC, not mirrored here]'),
-        error,
-        startedAt: streamStartedAt,
-      });
-    };
-
-    try {
-      let response = await session.defaultSession.fetch(options.url, {
-        method: options.method,
-        headers: options.headers,
-        body: options.body,
-        signal: controller.signal,
-      });
-
-      // Auto-retry once for Copilot 401/403
-      if (
-        !response.ok &&
-        (response.status === 401 || response.status === 403) &&
-        isCopilotUrl(options.url)
-      ) {
-        console.log('[api:stream] Copilot auth error, attempting token refresh and retry');
-        const { headers: refreshedHeaders, retried } =
-          await retryCopilotWithRefreshedToken(options);
-        if (retried) {
-          response = await session.defaultSession.fetch(options.url, {
-            method: options.method,
-            headers: refreshedHeaders,
-            body: options.body,
-            signal: controller.signal,
-          });
-          console.log(`[api:stream] retry -> ${response.status} ${response.statusText}`);
-        }
-      }
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        activeStreamControllers.delete(options.requestId);
-        logStream(response.status, errorData.slice(0, 200), truncateNetworkBody(errorData));
-        return {
-          ok: false,
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData,
-        };
-      }
-
-      if (!response.body) {
-        activeStreamControllers.delete(options.requestId);
-        logStream(response.status, 'No response body');
-        return {
-          ok: false,
-          status: response.status,
-          statusText: 'No response body',
-        };
-      }
-
-      // 读取流式响应并通过 IPC 发送
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      const readStream = async () => {
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) {
-              event.sender.send(`api:stream:${options.requestId}:done`);
-              break;
-            }
-            const chunk = decoder.decode(value);
-            event.sender.send(`api:stream:${options.requestId}:data`, chunk);
-          }
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
-            event.sender.send(`api:stream:${options.requestId}:abort`);
-          } else {
-            event.sender.send(
-              `api:stream:${options.requestId}:error`,
-              error instanceof Error ? error.message : 'Stream error',
-            );
-          }
-        } finally {
-          activeStreamControllers.delete(options.requestId);
-        }
-      };
-
-      // 异步读取流，立即返回成功状态
-      readStream();
-      logStream(response.status);
-
-      return {
-        ok: true,
-        status: response.status,
-        statusText: response.statusText,
-      };
-    } catch (error) {
-      activeStreamControllers.delete(options.requestId);
-      logStream(0, error instanceof Error ? error.message : 'Unknown error');
-      return {
-        ok: false,
-        status: 0,
-        statusText: error instanceof Error ? error.message : 'Network error',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  });
-
-  // 取消流式请求
-  ipcMain.handle('api:stream:cancel', (_event, requestId: string) => {
-    const controller = activeStreamControllers.get(requestId);
-    if (controller) {
-      controller.abort();
-      activeStreamControllers.delete(requestId);
-      return true;
-    }
-    return false;
   });
 
   // ─── end OAuth ───
@@ -7960,9 +7792,9 @@ if (!gotTheLock) {
       const hadEnterprise = store.get('enterprise_config');
       if (hadEnterprise) {
         store.delete('enterprise_config');
-        // Reset executionMode to default so sandbox mode reverts to "off".
+        // Restore the default execution mode after removing enterprise configuration.
         const cs = getCoworkStore();
-        cs.setConfig({ executionMode: 'local' });
+        cs.setConfig({ executionMode: CoworkExecutionMode.Local });
         console.log(
           '[Enterprise] config package removed, cleared enterprise mode and reset executionMode',
         );

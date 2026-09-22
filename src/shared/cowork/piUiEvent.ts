@@ -76,7 +76,6 @@ export type PiUiEvent =
   | (PiUiEventBase & {
       type: typeof PiUiEventType.Completed;
       sessionId: string;
-      claudeSessionId: string | null;
     })
   | (PiUiEventBase & { type: typeof PiUiEventType.Error; sessionId: string; error: CoworkError })
   | (PiUiEventBase & {
@@ -251,10 +250,7 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
     case PiUiEventType.Interrupted:
       return isSessionId(candidate.sessionId) && isInterruption(candidate.interruption);
     case PiUiEventType.Completed:
-      return (
-        isSessionId(candidate.sessionId) &&
-        (candidate.claudeSessionId === null || isNonEmptyString(candidate.claudeSessionId))
-      );
+      return isSessionId(candidate.sessionId);
     case PiUiEventType.Error:
       return isSessionId(candidate.sessionId) && isCoworkError(candidate.error);
     case PiUiEventType.QueueUpdated:

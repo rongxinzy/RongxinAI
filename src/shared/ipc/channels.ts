@@ -94,14 +94,6 @@ export type ManagedProviderIpc = (typeof ManagedProviderIpc)[keyof typeof Manage
 export const ApiIpc = {
   Fetch: 'api:fetch',
   FetchModels: 'api:fetch-models',
-  WebSearch: 'api:web-search',
-  Stream: 'api:stream',
-  CancelStream: 'api:stream:cancel',
-  /** Dynamic: `api:stream:${requestId}:data` */
-  streamData: (requestId: string) => `api:stream:${requestId}:data`,
-  streamDone: (requestId: string) => `api:stream:${requestId}:done`,
-  streamError: (requestId: string) => `api:stream:${requestId}:error`,
-  streamAbort: (requestId: string) => `api:stream:${requestId}:abort`,
 } as const;
 
 // ─── ZhiYuan Model Pool ────────────────────────────────────────────────────

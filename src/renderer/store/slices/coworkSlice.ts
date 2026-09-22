@@ -10,6 +10,7 @@ import {
   type CoworkSessionSummary,
 } from '../../types/cowork';
 import {
+  CoworkExecutionMode,
   DEFAULT_COWORK_PERMISSION_MODE,
   CoworkSessionMode,
 } from '../../../shared/cowork/constants';
@@ -73,7 +74,7 @@ const initialState: CoworkState = {
   config: {
     workingDirectory: '',
     systemPrompt: '',
-    executionMode: 'local',
+    executionMode: CoworkExecutionMode.Local,
     permissionMode: DEFAULT_COWORK_PERMISSION_MODE,
     permissionModeBySession: {},
     embeddingEnabled: false,

@@ -1,10 +1,10 @@
-import type { CoworkError } from '../../common/coworkError';
 import type { PiUiRuntimeSnapshot } from '../../shared/cowork/piUiRuntimeSnapshot';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ActivityRun } from '../../shared/activity/types';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
@@ -135,25 +135,17 @@ interface ApiResponse {
   error?: string;
 }
 
-interface ApiStreamResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  error?: string;
-}
-
 // Cowork types for IPC
 interface CoworkSession {
   id: string;
   title: string;
-  claudeSessionId: string | null;
   status: 'idle' | 'running' | 'completed' | 'error';
   pinned: boolean;
   pinOrder?: number | null;
   cwd: string;
   systemPrompt: string;
   modelOverride: string;
-  executionMode: 'auto' | 'local' | 'sandbox';
+  executionMode: CoworkExecutionMode;
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
@@ -190,7 +182,7 @@ interface CoworkSessionSummary {
 interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
-  executionMode: 'auto' | 'local' | 'sandbox';
+  executionMode: CoworkExecutionMode;
   permissionMode: CoworkPermissionMode;
   embeddingEnabled: boolean;
   embeddingProvider: string;
@@ -649,14 +641,6 @@ interface IElectronAPI {
     }>;
   };
   api: {
-    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) => Promise<{
-      ok: boolean;
-      data?: {
-        query: string;
-        results: Array<{ title: string; url: string; snippet: string; content?: string }>;
-      };
-      error?: string;
-    }>;
     fetch: (options: {
       url: string;
       method: string;
@@ -665,18 +649,6 @@ interface IElectronAPI {
       timeoutMs?: number;
     }) => Promise<ApiResponse>;
     fetchModels: (input: ProviderModelDiscoveryRequest) => Promise<ProviderModelDiscoveryResult>;
-    stream: (options: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body?: string;
-      requestId: string;
-    }) => Promise<ApiStreamResponse>;
-    cancelStream: (requestId: string) => Promise<boolean>;
-    onStreamData: (requestId: string, callback: (chunk: string) => void) => () => void;
-    onStreamDone: (requestId: string, callback: () => void) => () => void;
-    onStreamError: (requestId: string, callback: (error: CoworkError) => void) => () => void;
-    onStreamAbort: (requestId: string, callback: () => void) => () => void;
   };
   getApiConfig: () => Promise<CoworkApiConfig | null>;
   checkApiConfig: (options?: {
