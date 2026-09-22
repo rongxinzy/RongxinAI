@@ -75,6 +75,11 @@ export interface CoworkMessageMetadata {
     requestStartedAt?: number;
     firstVisibleTextAt?: number;
     completedAt?: number;
+    sessionCreatedAt?: number;
+    agentStartedAt?: number;
+    sessionCreateToAgentStartMs?: number;
+    agentStartToFirstTokenMs?: number;
+    sessionCreateToFirstTokenMs?: number;
     toolDurationMs?: number;
   };
   contextPercent?: number;

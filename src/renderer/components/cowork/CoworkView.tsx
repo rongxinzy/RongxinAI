@@ -374,7 +374,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         currentAgent?.source === CoworkSessionExpertSource.Package ||
         currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
-      const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
+      // Chat uses Pi's agent kernel without inheriting the complete Work
+      // system prompt. Explicitly selected skills still travel as the prompt
+      // fragment assembled below.
+      const baseSystemPrompt = isChatAgentExecution
+        ? ''
+        : agentSystemPrompt || config.systemPrompt || '';
       // Combine skill prompt with system prompt. Including skillPrompt here is
       // what lets chat-mode skill submissions reach the model (issue #117).
       const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
@@ -550,13 +555,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         currentAgent?.source === CoworkSessionExpertSource.Package ||
         currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
-      const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
+      const isChatMode = workMode === WorkMode.Chat;
+      const baseSystemPrompt = isChatMode ? '' : agentSystemPrompt || config.systemPrompt || '';
       const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
 
       await coworkService.continueSession({
         sessionId: currentSession.id,
         prompt,
-        systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
+        systemPrompt: isChatMode ? combinedSystemPrompt : currentSession.systemPrompt || combinedSystemPrompt,
         activeSkillIds: sessionSkillIds,
         expertIds,
         permissionMode: sessionPermissionMode,

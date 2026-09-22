@@ -1140,9 +1140,8 @@ const getCodingRoomService = (): CodingRoomService => {
                 resolveSnapshots: resolveSessionExpertSnapshots,
               })
             : null;
-          // Resolving comes first: a stale expert id throws, and the lane must
-          // not be left marked as running when the turn never starts.
-          coworkStoreInstance.updateSession(sessionId, { status: 'running' });
+          // Resolving comes first: a stale expert id throws. Pi's agent_start
+          // event is the single source of truth for the running state.
           const sharedOptions = {
             workspaceRoot,
             sessionMode: 'work' as const,
@@ -4441,13 +4440,17 @@ if (!gotTheLock) {
         // The renderer already includes the selected non-expert agent prompt when
         // present. Treat that request value as the source prompt instead of
         // appending the same agent prompt again in the main process.
-        const basePrompt =
-          options.systemPrompt ?? selectedAgent?.systemPrompt ?? config.systemPrompt;
-        const systemPrompt = composeCoworkSystemPrompt({
-          basePrompt,
-          expertSnapshots,
-          language: resolveCoworkPromptLanguage(),
-        });
+        const isChatSession = options.mode === CoworkSessionMode.Chat;
+        const basePrompt = isChatSession
+          ? options.systemPrompt ?? ''
+          : (options.systemPrompt ?? selectedAgent?.systemPrompt ?? config.systemPrompt);
+        const systemPrompt = isChatSession
+          ? basePrompt.trim()
+          : composeCoworkSystemPrompt({
+              basePrompt,
+              expertSnapshots,
+              language: resolveCoworkPromptLanguage(),
+            });
         const workspace = options.workspaceId
           ? coworkStoreInstance.getWorkspace(options.workspaceId)
           : null;
@@ -4533,10 +4536,6 @@ if (!gotTheLock) {
         });
         coworkStoreInstance.touchWorkspace(session.workspaceId);
 
-        // Update session status to 'running' before starting async task
-        // This ensures the frontend receives the correct status immediately
-        coworkStoreInstance.updateSession(session.id, { status: 'running' });
-
         // Start the session asynchronously (skip initial user message since we already added it)
         const runtime = getPiRuntimeAdapter();
         const runtimeSkillIds = [
@@ -4591,7 +4590,7 @@ if (!gotTheLock) {
 
         const sessionWithMessages = coworkStoreInstance.getSession(session.id) || {
           ...session,
-          status: 'running' as const,
+          status: 'idle' as const,
         };
         return { success: true, session: sanitizeCoworkSessionForIpc(sessionWithMessages) };
       } catch (error) {
@@ -4617,12 +4616,15 @@ if (!gotTheLock) {
           haveSameExpertIds(previousExpertSnapshots, options.expertIds)
             ? previousExpertSnapshots.slice(0, 1)
             : resolveSessionExpertSnapshots(options.expertIds);
-        const nextSystemPrompt = composeCoworkSystemPrompt({
-          basePrompt: existingSession.systemPrompt || options.systemPrompt,
-          expertSnapshots,
-          previousExpertSnapshots,
-          language: resolveCoworkPromptLanguage(),
-        });
+        const isChatSession = existingSession?.mode === CoworkSessionMode.Chat;
+        const nextSystemPrompt = isChatSession
+          ? (options.systemPrompt ?? '').trim()
+          : composeCoworkSystemPrompt({
+              basePrompt: existingSession.systemPrompt || options.systemPrompt,
+              expertSnapshots,
+              previousExpertSnapshots,
+              language: resolveCoworkPromptLanguage(),
+            });
         const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
         if (expertsChanged) {
           store.replaceSessionExperts(options.sessionId, expertSnapshots);
@@ -4671,13 +4673,16 @@ if (!gotTheLock) {
       }
 
       const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
+      const sessionMode = existingSession?.mode ?? CoworkSessionMode.Work;
 
       const runtimeSystemPrompt = existingSession
         ? existingSession.systemPrompt
-        : composeCoworkSystemPrompt({
-            basePrompt: options.systemPrompt,
-            language: resolveCoworkPromptLanguage(),
-          });
+        : sessionMode === CoworkSessionMode.Chat
+          ? (options.systemPrompt ?? '').trim()
+          : composeCoworkSystemPrompt({
+              basePrompt: options.systemPrompt,
+              language: resolveCoworkPromptLanguage(),
+            });
 
       if (existingSession && options.prompt.trim()) {
         store.touchWorkspace(existingSession.workspaceId);
@@ -4687,10 +4692,7 @@ if (!gotTheLock) {
         .continueSession(options.sessionId, options.prompt, {
           systemPrompt: runtimeSystemPrompt,
           skillIds: runtimeSkillIds,
-          sessionMode:
-            existingSession?.mode === CoworkSessionMode.Chat
-              ? CoworkSessionMode.Chat
-              : CoworkSessionMode.Work,
+          sessionMode,
           goalMode: options.goalMode,
           imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
