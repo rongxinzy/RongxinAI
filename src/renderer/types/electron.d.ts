@@ -647,6 +647,7 @@ interface IElectronAPI {
       headers: Record<string, string>;
       body?: string;
       timeoutMs?: number;
+      purpose?: import('../../shared/ipc/apiRequest').ApiRequestPurpose;
     }) => Promise<ApiResponse>;
     fetchModels: (input: ProviderModelDiscoveryRequest) => Promise<ProviderModelDiscoveryResult>;
   };
