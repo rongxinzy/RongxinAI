@@ -39,7 +39,7 @@ Message(user) -> Started -> Message / MessageUpdate / ToolActivity / PermissionR
 
 `Message` 到达不能把会话标记为运行中；运行中只能由 `Started` 事件建立，完成、错误、中断和停止只能由对应 Pi 事件结束。消息到达顺序不能用 renderer 的时间戳或当前状态重新推断。
 
-旧的拆分 IPC 通道暂时只为兼容遗留投影和非主 UI 消费者保留；`cowork.ts` 和 `coworkQueue.ts` 的主 UI 路径只监听统一事件。
+已删除旧的拆分流式 IPC 通道；`cowork.ts` 和 `coworkQueue.ts` 只监听统一事件。启动和续聊的异步失败也通过运行时错误监听器持久化，再按消息、错误的顺序发布统一事件。
 
 ## 运行状态恢复回归
 

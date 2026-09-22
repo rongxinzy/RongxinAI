@@ -23,7 +23,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
-import { classifyCoworkError } from '../common/coworkError';
+import { reportPiSessionFailure } from './piSessionFailure';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
@@ -2060,15 +2060,6 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       sessionId,
       message: safeMessage as PiUiMessage,
     });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.Message, { sessionId, message: safeMessage });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a message:', error);
-      }
-    });
   });
 
   runtime.on(
@@ -2082,48 +2073,16 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
         content: safeContent,
         metadata,
       });
-      const windows = BrowserWindow.getAllWindows();
-      windows.forEach(win => {
-        if (win.isDestroyed()) return;
-        try {
-          win.webContents.send(CoworkStreamIpc.MessageUpdate, {
-            sessionId,
-            messageId,
-            content: safeContent,
-            metadata,
-          });
-        } catch (error) {
-          console.error('[PiWorkbenchForwarder] failed to forward a message update:', error);
-        }
-      });
     },
   );
 
   runtime.on('toolActivity', (sessionId, event) => {
     emitUiEvent({ type: PiUiEventType.ToolActivity, sessionId, event });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.ToolActivity, { sessionId, event });
-      } catch (error) {
-        console.error('[CoworkForwarder] failed to forward tool activity:', error);
-      }
-    });
   });
 
   runtime.on('queueUpdated', (sessionId, items) => {
     const safeItems = slimQueuedMessagesForIpc(items);
     emitUiEvent({ type: PiUiEventType.QueueUpdated, sessionId, items: safeItems });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.QueueUpdated, { sessionId, items: safeItems });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward queue update:', error);
-      }
-    });
   });
 
   runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
@@ -2153,28 +2112,10 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
           : {}),
       },
     });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.Permission, { sessionId, request: safeRequest });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a permission request:', error);
-      }
-    });
   });
 
   runtime.on('permissionDismiss', (requestId: string) => {
     emitUiEvent({ type: PiUiEventType.PermissionDismiss, sessionId: null, requestId });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.PermissionDismiss, { requestId });
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to dismiss a permission request:', error);
-      }
-    });
   });
 
   runtime.on('sessionInterrupted', interruption => {
@@ -2182,15 +2123,6 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       type: PiUiEventType.Interrupted,
       sessionId: interruption.sessionId,
       interruption,
-    });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      try {
-        win.webContents.send(CoworkStreamIpc.Interrupted, interruption);
-      } catch (error) {
-        console.error('[PiWorkbenchForwarder] failed to forward a session interruption:', error);
-      }
     });
   });
 
@@ -2203,11 +2135,6 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       type: PiUiEventType.Completed,
       sessionId,
       claudeSessionId,
-    });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      win.webContents.send(CoworkStreamIpc.Complete, { sessionId, claudeSessionId });
     });
   });
 
@@ -2229,11 +2156,6 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     // Persisting the terminal message emits the canonical `message` event
     // first. The UI protocol keeps that ordering before the terminal error.
     emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(win => {
-      if (win.isDestroyed()) return;
-      win.webContents.send(CoworkStreamIpc.Error, { sessionId, error });
-    });
   });
 };
 
@@ -4572,20 +4494,8 @@ if (!gotTheLock) {
           .catch(error => {
             console.error('[Cowork] session error:', error);
             try {
-              // The engine router already emits an 'error' event (handled at line ~990)
-              // which sends cowork:stream:error to the renderer. Only send here if the
-              // session hasn't been marked as error yet, to avoid duplicate messages.
               const existing = coworkStoreInstance.getSession(session.id);
-              if (existing?.status === 'error') return;
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              const windows = BrowserWindow.getAllWindows();
-              windows.forEach(win => {
-                if (win.isDestroyed()) return;
-                win.webContents.send(CoworkStreamIpc.Error, {
-                  sessionId: session.id,
-                  error: classifyCoworkError(errorMessage),
-                });
-              });
+              reportPiSessionFailure(runtime, session.id, error, existing?.status);
             } catch (handlerError) {
               console.error(
                 '[Cowork] failed to send error notification to renderer:',
@@ -4716,20 +4626,8 @@ if (!gotTheLock) {
         .catch(error => {
           console.error('[Cowork] continue error:', error);
           try {
-            // The engine router already emits an 'error' event (handled at line ~990)
-            // which sends cowork:stream:error to the renderer. Only send here if the
-            // session hasn't been marked as error yet, to avoid duplicate messages.
             const existing = getCoworkStore().getSession(options.sessionId);
-            if (existing?.status === 'error') return;
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const windows = BrowserWindow.getAllWindows();
-            windows.forEach(win => {
-              if (win.isDestroyed()) return;
-              win.webContents.send(CoworkStreamIpc.Error, {
-                sessionId: options.sessionId,
-                error: classifyCoworkError(errorMessage),
-              });
-            });
+            reportPiSessionFailure(getPiRuntimeAdapter(), options.sessionId, error, existing?.status);
           } catch (handlerError) {
             console.error('[Cowork] failed to send error notification to renderer:', handlerError);
           }

@@ -11,7 +11,7 @@ import {
 } from '../../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
-import { buildChatAgentSystemPrompt } from '../../services/chatExecutionRouter';
+import { buildCoworkSystemPrompt } from '../../services/coworkSystemPrompt';
 import {
   isChatSkillShortcutSelection,
   resolveChatSkillShortcutPermissionMode,
@@ -381,7 +381,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         : agentSystemPrompt || config.systemPrompt || '';
       // Combine skill prompt with system prompt. Including skillPrompt here is
       // what lets chat-mode skill submissions reach the model (issue #117).
-      const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
+      const combinedSystemPrompt = buildCoworkSystemPrompt(skillPrompt, baseSystemPrompt);
 
       // Chat hides the folder selector, so the engine relies on
       // the configured default working directory. Bail out early with a toast
@@ -555,7 +555,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
       const isChatMode = workMode === WorkMode.Chat;
       const baseSystemPrompt = isChatMode ? '' : agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
+      const combinedSystemPrompt = buildCoworkSystemPrompt(skillPrompt, baseSystemPrompt);
 
       await coworkService.continueSession({
         sessionId: currentSession.id,

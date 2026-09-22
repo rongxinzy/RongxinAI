@@ -46,8 +46,6 @@ import type {
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../shared/cowork/constants';
-import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
-import type { CoworkPendingMessage } from '../shared/cowork/pendingMessageQueue';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
@@ -590,37 +588,9 @@ contextBridge.exposeInMainWorld('electron', {
     writeBootstrapFile: (filename: string, content: string) =>
       ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
 
-    onStreamMessage: (callback: (data: { sessionId: string; message: unknown }) => void) =>
-      onPush(CoworkStreamIpc.Message, callback),
     onStreamUiEvent: (
       callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void,
     ) => onPush(CoworkStreamIpc.UiEvent, callback),
-    onStreamMessageUpdate: (
-      callback: (data: {
-        sessionId: string;
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }) => void,
-    ) => onPush(CoworkStreamIpc.MessageUpdate, callback),
-    onStreamToolActivity: (
-      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
-    ) => onPush(CoworkStreamIpc.ToolActivity, callback),
-    onStreamPermission: (callback: (data: { sessionId: string; request: unknown }) => void) =>
-      onPush(CoworkStreamIpc.Permission, callback),
-    onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) =>
-      onPush(CoworkStreamIpc.PermissionDismiss, callback),
-    onStreamInterrupted: (
-      callback: (data: import('../shared/cowork/interruption').CoworkSessionInterruption) => void,
-    ) => onPush(CoworkStreamIpc.Interrupted, callback),
-    onStreamComplete: (
-      callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
-    ) => onPush(CoworkStreamIpc.Complete, callback),
-    onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) =>
-      onPush(CoworkStreamIpc.Error, callback),
-    onStreamQueueUpdated: (
-      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
-    ) => onPush(CoworkStreamIpc.QueueUpdated, callback),
     onSessionsChanged: (
       callback: (data: {
         sessionId?: string;

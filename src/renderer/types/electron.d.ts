@@ -6,12 +6,10 @@ import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/conte
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
   CoworkPermissionMode,
-  CoworkPermissionOrigin,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
-import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type {
   ProviderModelDiscoveryRequest,
   ProviderModelDiscoveryResult,
@@ -218,15 +216,6 @@ type CoworkConfigUpdate = Partial<
     | 'embeddingRemoteApiKey'
   >
 >;
-
-interface CoworkPermissionRequest {
-  origin: CoworkPermissionOrigin;
-  sessionId: string;
-  toolName: string;
-  toolInput: Record<string, unknown>;
-  requestId: string;
-  toolUseId?: string | null;
-}
 
 interface CoworkApiConfig {
   apiKey: string;
@@ -945,43 +934,8 @@ interface IElectronAPI {
       filename: string,
       content: string,
     ) => Promise<{ success: boolean; error?: string }>;
-    onStreamMessage: (
-      callback: (data: { sessionId: string; message: CoworkMessage }) => void,
-    ) => () => void;
     onStreamUiEvent: (
       callback: (event: import('../../shared/cowork/piUiEvent').PiUiEvent) => void,
-    ) => () => void;
-    onStreamMessageUpdate: (
-      callback: (data: {
-        sessionId: string;
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }) => void,
-    ) => () => void;
-    onStreamToolActivity: (
-      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
-    ) => () => void;
-    onStreamPermission: (
-      callback: (data: {
-        sessionId: string;
-        request: Omit<CoworkPermissionRequest, 'origin'>;
-      }) => void,
-    ) => () => void;
-    onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) => () => void;
-    onStreamInterrupted: (
-      callback: (
-        data: import('../../shared/cowork/interruption').CoworkSessionInterruption,
-      ) => void,
-    ) => () => void;
-    onStreamComplete: (
-      callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
-    ) => () => void;
-    onStreamError: (
-      callback: (data: { sessionId: string; error: CoworkError }) => void,
-    ) => () => void;
-    onStreamQueueUpdated: (
-      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
     ) => () => void;
     onSessionsChanged: (
       callback: (data: {
