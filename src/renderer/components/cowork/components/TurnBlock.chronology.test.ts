@@ -5,6 +5,26 @@ import { CoworkInterruptionCause } from '../../../../shared/cowork/interruption'
 import type { AssistantTurnItem } from '../helpers/messageGrouping';
 import { i18nService } from '../../../services/i18n';
 import { TurnBlock } from './TurnBlock';
+import { createDirectChatErrorMessage } from '../../../services/coworkTerminalError';
+
+test('a persisted direct chat failure stays visible without a working summary', () => {
+  const message = JSON.parse(
+    JSON.stringify(createDirectChatErrorMessage(new Error('503 unavailable'))),
+  ) as ReturnType<typeof createDirectChatErrorMessage>;
+  const html = renderToStaticMarkup(
+    React.createElement(TurnBlock, {
+      turn: {
+        id: 'failed-chat',
+        userMessage: null,
+        assistantItems: [{ type: 'system', message }],
+      },
+      showCopyButtons: false,
+      isTurnComplete: true,
+    }),
+  );
+  expect(html).toContain(i18nService.t('coworkErrorServerError'));
+  expect(html).not.toContain(i18nService.t('coworkIntermediateProcess'));
+});
 
 const stop: AssistantTurnItem = {
   type: 'system',

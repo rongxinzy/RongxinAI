@@ -12,11 +12,7 @@
 import { z } from 'zod';
 
 import { CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
-import { ProductionLoopMode } from '../productionLoop';
-import {
-  CoworkToolActivityEventType,
-  CoworkToolActivityPhase,
-} from '../cowork/toolActivity';
+import { CoworkToolActivityEventType, CoworkToolActivityPhase } from '../cowork/toolActivity';
 import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -282,7 +278,6 @@ export const CoworkSessionStartSchema = {
     title: z.string().optional(),
     mode: z.enum([CoworkSessionMode.Work, CoworkSessionMode.Chat]).optional(),
     goalMode: z.boolean().optional(),
-    productionLoopMode: z.enum([ProductionLoopMode.Auto, ProductionLoopMode.Off]).optional(),
     activeSkillIds: z.array(z.string()).optional(),
     workspaceId: z.string().optional(),
     agentId: z.string().optional(),
@@ -313,7 +308,6 @@ export const CoworkSessionContinueSchema = {
     systemPrompt: z.string().optional(),
     activeSkillIds: z.array(z.string()).optional(),
     goalMode: z.boolean().optional(),
-    productionLoopMode: z.enum([ProductionLoopMode.Auto, ProductionLoopMode.Off]).optional(),
     expertIds: z.array(z.string().min(1)).max(1).optional(),
     permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),

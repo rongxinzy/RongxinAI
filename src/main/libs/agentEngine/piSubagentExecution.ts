@@ -79,6 +79,7 @@ export const runPiSubagent = (
     const startedAt = Date.now();
     const recovery = new PiWriteTokenLimitRecovery(options.maxOutputTokens);
     let latestAnswer = '';
+    let pendingError: string | undefined;
     let settled = false;
     let assistantTurns = 0;
     let toolCalls = 0;
@@ -148,12 +149,11 @@ export const runPiSubagent = (
           assistantTurns += 1;
           recovery.queueIfNeeded(message, session);
           if (message.stopReason === PiAssistantStopReason.Error) {
-            finish(
-              `Error: ${message.errorMessage || 'Subagent encountered an error'}`,
-              PiSubagentTerminationReason.Error,
-            );
+            // Pi retries after message_end. Only agent_settled is terminal.
+            pendingError = message.errorMessage || 'Subagent encountered an error';
             return;
           }
+          pendingError = undefined;
 
           const answer = extractAssistantText(message);
           if (answer) latestAnswer = answer;
@@ -176,7 +176,10 @@ export const runPiSubagent = (
             requestSteer();
           }
         } else if (event.type === PiSubagentEventType.AgentSettled) {
-          finish(latestAnswer || '(no output)', PiSubagentTerminationReason.Settled);
+          finish(
+            pendingError ? `Error: ${pendingError}` : latestAnswer || '(no output)',
+            pendingError ? PiSubagentTerminationReason.Error : PiSubagentTerminationReason.Settled,
+          );
         }
       });
       unsubscribe = subscribedUnsubscribe;

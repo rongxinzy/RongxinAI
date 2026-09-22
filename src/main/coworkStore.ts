@@ -10,6 +10,7 @@ import {
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
+  DEFAULT_COWORK_PERMISSION_MODE,
   CoworkSessionMode,
   CoworkSessionSource,
   type CoworkPermissionMode as CoworkPermissionModeType,
@@ -85,7 +86,7 @@ function parseBooleanConfig(value: string | undefined, fallback: boolean): boole
 
 function normalizePermissionMode(value: string | undefined): CoworkPermissionModeType {
   if (value === CoworkPermissionMode.Ask || value === CoworkPermissionMode.AllowAll) return value;
-  return CoworkPermissionMode.Ask;
+  return DEFAULT_COWORK_PERMISSION_MODE;
 }
 
 function parseEmbeddingVectorWeight(value: string | undefined): number {
