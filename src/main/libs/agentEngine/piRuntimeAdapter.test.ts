@@ -728,9 +728,11 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       expect(loaderOptions.additionalSkillPaths).toEqual([]);
-      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe(
-        'Pi default prompt\n\nOnly the explicitly selected chat prompt.',
+      expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBeUndefined();
+      expect(loaderOptions.appendSystemPromptOverride()).toContain(
+        'Only the explicitly selected chat prompt.',
       );
+      expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain('知远智能体');
       expect(loaderOptions.appendSystemPromptOverride().join('\n')).not.toContain('Supabase');
       expect(loaderOptions.appendSystemPromptOverride()).not.toContain(
         PiDocumentReaderSystemPrompt,

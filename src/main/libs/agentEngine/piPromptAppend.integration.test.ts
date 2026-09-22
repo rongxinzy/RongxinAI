@@ -8,6 +8,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import { DefaultResourceLoader } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js';
 import { SettingsManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js';
 import { buildSystemPrompt } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/system-prompt.js';
+import { CHAT_IDENTITY_PROMPT, createPiPromptOverrides } from './piPromptOverrides';
 
 const identity = '你是知远智能体（ZhiYuan Agent）。自我介绍时使用这一名称；回答简洁、准确。';
 const toolSnippet = 'Read a file for this integration test.';
@@ -122,4 +123,32 @@ test('append alone cannot restore defaults replaced by a discovered SYSTEM.md', 
   expectDefaultPrompt(renderPrompt(defaults));
   expect(renderPrompt(defaults)).toContain(identity);
   expect(renderPrompt(defaults)).not.toContain('Custom file prompt.');
+});
+
+test('production Chat overrides preserve defaults and update fragments on continuation reload', async () => {
+  await writeFile(path.join(agentDir, 'SYSTEM.md'), 'Ambient custom prompt.');
+  const state = { chatMode: true, systemPrompt: 'Selected Chat skill.' };
+  const loader = createLoader(createPiPromptOverrides(state, () => [toolGuideline]));
+  await loader.reload();
+  expectDefaultPrompt(renderPrompt(loader));
+  expect(renderPrompt(loader)).toContain(state.systemPrompt);
+  expect(renderPrompt(loader)).not.toContain('Ambient custom prompt.');
+  expect(renderPrompt(loader).split(CHAT_IDENTITY_PROMPT)).toHaveLength(2);
+
+  state.systemPrompt = 'Updated Chat skill.';
+  await loader.reload();
+  expectDefaultPrompt(renderPrompt(loader));
+  expect(renderPrompt(loader)).toContain(state.systemPrompt);
+  expect(renderPrompt(loader)).not.toContain('Selected Chat skill.');
+  expect(renderPrompt(loader).split(CHAT_IDENTITY_PROMPT)).toHaveLength(2);
+});
+
+test('production Work overrides retain their existing prompt behavior without Chat identity', async () => {
+  await writeFile(path.join(agentDir, 'SYSTEM.md'), 'Work base.');
+  const state = { chatMode: false, systemPrompt: 'Work expert.' };
+  const loader = createLoader(createPiPromptOverrides(state, () => [toolGuideline]));
+  await loader.reload();
+  expect(loader.getSystemPrompt()).toBe('Work base.\n\nWork expert.');
+  expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, toolGuideline]);
+  expect(renderPrompt(loader)).not.toContain(CHAT_IDENTITY_PROMPT);
 });

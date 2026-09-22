@@ -162,6 +162,7 @@ import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { createPiWorkLoop } from './piWorkLoop';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
+import { createPiPromptOverrides } from './piPromptOverrides';
 import {
   getPiPreparingToolActivity,
   ToolActivityTracker,
@@ -2414,17 +2415,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                   resourceState.skillIds?.includes(skill.name || ''),
               ),
             },
-      systemPromptOverride: (base: string | undefined): string | undefined => {
-        const custom = resourceState.systemPrompt.trim();
-        if (!custom) return base;
-        if (!base?.trim()) return custom;
-        return `${base.trim()}\n\n${custom}`;
-      },
-      // Pi bypasses tool promptGuidelines when systemPromptOverride is non-empty.
-      // The registry is the single collection point for tool-usage policies.
-      appendSystemPromptOverride: (base: string[] = []): string[] => [
-        ...base,
-        ...collectPiSystemPromptContributions({
+      ...createPiPromptOverrides(resourceState, () =>
+        collectPiSystemPromptContributions({
           chatMode: resourceState.chatMode,
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
@@ -2436,7 +2428,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             ? []
             : this.mcpServerManager?.serverStatuses ?? [],
         }),
-      ],
+      ),
       extensionFactories: [
         ...(approvalContext?.getRunId()
           ? [
