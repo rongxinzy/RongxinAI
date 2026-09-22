@@ -9,7 +9,7 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import { DEFAULT_COWORK_PERMISSION_MODE, CoworkSessionMode } from '../../../shared/cowork/constants';
 import {
   type CoworkToolActivity,
   type CoworkToolActivityEvent,
@@ -70,7 +70,7 @@ const initialState: CoworkState = {
     workingDirectory: '',
     systemPrompt: '',
     executionMode: 'local',
-    permissionMode: CoworkPermissionMode.Ask,
+    permissionMode: DEFAULT_COWORK_PERMISSION_MODE,
     permissionModeBySession: {},
     embeddingEnabled: false,
     embeddingProvider: 'openai',

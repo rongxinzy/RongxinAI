@@ -21,7 +21,7 @@ import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import { DEFAULT_COWORK_PERMISSION_MODE, CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -1253,7 +1253,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   />
                   {!isCompactToolbar && isWorkVariant && (
                     <PermissionModeMenu
-                      value={permissionMode ?? CoworkPermissionMode.Ask}
+                      value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
                       onChange={mode => onPermissionModeChange?.(mode)}
                       disabled={disabled}
                     />
@@ -1320,7 +1320,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   )}
                   {isCompactToolbar && isWorkVariant && (
                     <PermissionModeMenu
-                      value={permissionMode ?? CoworkPermissionMode.Ask}
+                      value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
                       onChange={mode => onPermissionModeChange?.(mode)}
                       disabled={disabled}
                       compact

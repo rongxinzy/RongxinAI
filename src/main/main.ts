@@ -4476,7 +4476,7 @@ if (!gotTheLock) {
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
             approvalMode:
-              options.permissionMode === CoworkPermissionMode.AllowAll
+              (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
                 ? WorkbenchApprovalMode.AllowAll
                 : WorkbenchApprovalMode.Ask,
             imageAttachments: storedImages,
@@ -4620,7 +4620,9 @@ if (!gotTheLock) {
           expertIds: existingSession?.experts.map(expert => expert.expertId),
           modelOverride: existingSession?.modelOverride,
           approvalMode:
-            options.permissionMode === CoworkPermissionMode.AllowAll
+            (options.permissionMode ??
+              store.getConfig().permissionModeBySession[options.sessionId] ??
+              store.getConfig().permissionMode) === CoworkPermissionMode.AllowAll
               ? WorkbenchApprovalMode.AllowAll
               : WorkbenchApprovalMode.Ask,
         })
