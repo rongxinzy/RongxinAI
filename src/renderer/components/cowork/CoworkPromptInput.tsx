@@ -65,7 +65,7 @@ import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
 import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
 import { resolveInitialSelectedExpertIds } from './resolveInitialSelectedExpertIds';
-import { useCoworkModelSelection } from './useCoworkModelSelection';
+import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
 // so that attachment state survives view switches (cowork ↔ skills, etc.)
