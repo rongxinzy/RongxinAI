@@ -304,6 +304,19 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
     });
 
+    it('publishes a started lifecycle event from Pi agent_start', async () => {
+      const started = vi.fn();
+      adapter.on('started', started);
+      await adapter.startSession('started-session', 'Hello Pi');
+
+      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+        type: string;
+      }) => void;
+      listener({ type: 'agent_start' });
+
+      expect(started).toHaveBeenCalledWith('started-session');
+    });
+
     it('uses an in-memory Pi session manager so SQLite remains the only restore source', async () => {
       await adapter.startSession('memory-session', 'Hello Pi');
 

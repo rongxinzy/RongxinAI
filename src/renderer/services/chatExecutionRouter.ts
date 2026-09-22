@@ -1,15 +1,13 @@
 /**
  * Chat execution routing.
  *
- * Chat-mode sessions normally stream directly from the configured LLM
- * (ChatChatTransport). When a skill is attached — either on the outgoing
- * submission or persisted on the existing chat session — the session must
- * execute via the agent runtime instead, while staying tagged as a chat
- * session so it remains in the Chat sidebar list.
+ * Chat-mode sessions use the Pi agent runtime while staying tagged as chat
+ * sessions so they remain in the Chat sidebar list. Keeping one execution
+ * kernel makes tools, permissions, ordering, and terminal states observable
+ * through the same event protocol as Work sessions.
  */
 
 export const ChatExecution = {
-  Direct: 'direct',
   Agent: 'agent',
 } as const;
 
@@ -23,20 +21,16 @@ export interface ChatExecutionContext {
 }
 
 /**
- * Returns 'agent' when the submission carries skills or the existing chat
- * session has persisted skill ids; otherwise 'direct'.
+ * The runtime is the source of truth for every Chat turn, including plain
+ * text turns without attached skills.
  */
 export const resolveChatExecution = ({
   activeSkillIds,
   session,
 }: ChatExecutionContext): ChatExecution => {
-  if (activeSkillIds.length > 0) {
-    return ChatExecution.Agent;
-  }
-  if (session?.activeSkillIds && session.activeSkillIds.length > 0) {
-    return ChatExecution.Agent;
-  }
-  return ChatExecution.Direct;
+  void activeSkillIds;
+  void session;
+  return ChatExecution.Agent;
 };
 
 /**

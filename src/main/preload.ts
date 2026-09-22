@@ -590,6 +590,9 @@ contextBridge.exposeInMainWorld('electron', {
 
     onStreamMessage: (callback: (data: { sessionId: string; message: unknown }) => void) =>
       onPush(CoworkStreamIpc.Message, callback),
+    onStreamUiEvent: (
+      callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void,
+    ) => onPush(CoworkStreamIpc.UiEvent, callback),
     onStreamMessageUpdate: (
       callback: (data: {
         sessionId: string;

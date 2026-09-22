@@ -945,6 +945,9 @@ interface IElectronAPI {
     onStreamMessage: (
       callback: (data: { sessionId: string; message: CoworkMessage }) => void,
     ) => () => void;
+    onStreamUiEvent: (
+      callback: (event: import('../../shared/cowork/piUiEvent').PiUiEvent) => void,
+    ) => () => void;
     onStreamMessageUpdate: (
       callback: (data: {
         sessionId: string;

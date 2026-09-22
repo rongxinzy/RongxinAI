@@ -1,5 +1,6 @@
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkFileAttachment, CoworkImageAttachment } from '../types/cowork';
+import { PiUiEventType } from '../../shared/cowork/piUiEvent';
 
 type QueueListener = (items: CoworkPendingMessage[]) => void;
 
@@ -76,9 +77,11 @@ class CoworkQueueService {
   }
 
   private ensureStreamListener(): void {
-    if (this.streamCleanup || !window.electron?.cowork?.onStreamQueueUpdated) return;
-    this.streamCleanup = window.electron.cowork.onStreamQueueUpdated(({ sessionId, items }) => {
-      this.publish(sessionId, items);
+    if (this.streamCleanup || !window.electron?.cowork?.onStreamUiEvent) return;
+    this.streamCleanup = window.electron.cowork.onStreamUiEvent(event => {
+      if (event.type === PiUiEventType.QueueUpdated) {
+        this.publish(event.sessionId, event.items);
+      }
     });
   }
 

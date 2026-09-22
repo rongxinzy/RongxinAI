@@ -685,9 +685,7 @@ test('a refreshed session list keeps the run start of a session that is still ru
   expect(settled.sessions[0]?.runStartedAt ?? null).toBeNull();
 });
 
-test('addMessage stamps a run start for a session that arrives already running', () => {
-  // Channel and IM turns flip no status in the renderer, so the first message
-  // of such a turn is what dates the run.
+test('addMessage does not infer a run start from message arrival', () => {
   const state = coworkReducer(
     undefined,
     setSessions([makeSummary('session-1', { status: CoworkSessionStatusValue.Running })]),
@@ -701,5 +699,5 @@ test('addMessage stamps a run start for a session that arrives already running',
     }),
   );
 
-  expect(withMessage.sessions[0]?.runStartedAt).toBe(700);
+  expect(withMessage.sessions[0]?.runStartedAt).toBeUndefined();
 });

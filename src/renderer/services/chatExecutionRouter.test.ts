@@ -7,8 +7,8 @@ import {
 } from './chatExecutionRouter';
 
 describe('resolveChatExecution', () => {
-  test('returns direct when no skills and no session', () => {
-    expect(resolveChatExecution({ activeSkillIds: [] })).toBe(ChatExecution.Direct);
+  test('returns agent for a plain chat turn', () => {
+    expect(resolveChatExecution({ activeSkillIds: [] })).toBe(ChatExecution.Agent);
   });
 
   test('returns agent when submission has skills', () => {
@@ -24,21 +24,21 @@ describe('resolveChatExecution', () => {
     ).toBe(ChatExecution.Agent);
   });
 
-  test('returns direct when neither submission nor session has skills', () => {
+  test('returns agent when neither submission nor session has skills', () => {
     expect(
       resolveChatExecution({
         activeSkillIds: [],
         session: { activeSkillIds: [] },
       }),
-    ).toBe(ChatExecution.Direct);
+    ).toBe(ChatExecution.Agent);
   });
 
-  test('returns direct when session has no activeSkillIds field', () => {
-    expect(resolveChatExecution({ activeSkillIds: [], session: {} })).toBe(ChatExecution.Direct);
+  test('returns agent when session has no activeSkillIds field', () => {
+    expect(resolveChatExecution({ activeSkillIds: [], session: {} })).toBe(ChatExecution.Agent);
   });
 
-  test('returns direct when session is null', () => {
-    expect(resolveChatExecution({ activeSkillIds: [], session: null })).toBe(ChatExecution.Direct);
+  test('returns agent when session is null', () => {
+    expect(resolveChatExecution({ activeSkillIds: [], session: null })).toBe(ChatExecution.Agent);
   });
 });
 
