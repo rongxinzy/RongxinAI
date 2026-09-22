@@ -196,7 +196,6 @@ import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { registerTodoIpcHandlers } from './todo/ipc';
 import { TodoReminderScheduler } from './todo/reminderScheduler';
-import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
@@ -247,7 +246,11 @@ import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBri
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
 
 import { setPlatformFetchNetworkLogger } from './aisphere/transport';
-import { registerDevNetworkProtocol, trackDevNetworkRequest, publishDevNetworkLog } from './devNetworkLog';
+import {
+  registerDevNetworkProtocol,
+  trackDevNetworkRequest,
+  publishDevNetworkLog,
+} from './devNetworkLog';
 import { sanitizeNetworkUrl, truncateNetworkBody } from '../shared/devNetworkLog';
 import { ZhiyuanEnterpriseSkillBridge } from './enterpriseExtension/skillBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
@@ -263,10 +266,7 @@ import {
   runCcConnectWeixinSetup,
 } from './libs/ccConnectWeixinSetup';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
-import {
-  getFeishuCliRoot,
-  getFeishuConnectorSkillsRoot,
-} from './libs/feishuConnectorPaths';
+import { getFeishuCliRoot, getFeishuConnectorSkillsRoot } from './libs/feishuConnectorPaths';
 import { getFeishuCliLauncherPath, writeFeishuCliLauncher } from './libs/feishuCliLauncher';
 import { installDownloadedFeishuCli } from './libs/feishuCliDownloader';
 import { McpCredentialVault } from './libs/mcpCredentialVault';
@@ -606,8 +606,7 @@ const slimCoworkMessageForIpc = (message: unknown): unknown => {
     content?: unknown;
     metadata?: unknown;
   };
-  const content =
-    typeof messageRecord.content === 'string' ? messageRecord.content : undefined;
+  const content = typeof messageRecord.content === 'string' ? messageRecord.content : undefined;
   const shouldTruncateToolResult =
     messageRecord.type === 'tool_result' &&
     typeof content === 'string' &&
@@ -4250,7 +4249,8 @@ if (!gotTheLock) {
           await fs.promises.mkdir(resolvedWorkspacePath, { recursive: true });
         }
         const stat = await fs.promises.stat(resolvedWorkspacePath);
-        if (!stat.isDirectory()) return { success: false, error: 'Workspace path is not a directory' };
+        if (!stat.isDirectory())
+          return { success: false, error: 'Workspace path is not a directory' };
 
         const workspace = getCoworkStore().createWorkspace(resolvedWorkspacePath, workspaceName);
         return { success: true, workspace };
@@ -4519,9 +4519,7 @@ if (!gotTheLock) {
         if (options.activeSkillIds?.length) {
           messageMetadata.skillIds = options.activeSkillIds;
         }
-        let storedImages:
-          | ReturnType<typeof persistCoworkImageAttachments>
-          | undefined;
+        let storedImages: ReturnType<typeof persistCoworkImageAttachments> | undefined;
         if (options.imageAttachments?.length) {
           console.log('[Cowork:StartSession] imageAttachments received via IPC:', {
             count: options.imageAttachments.length,
@@ -4570,9 +4568,8 @@ if (!gotTheLock) {
             confirmationMode: 'modal',
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
-            productionLoopMode: options.productionLoopMode,
             approvalMode:
-              options.permissionMode === CoworkPermissionMode.AllowAll
+              (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
                 ? WorkbenchApprovalMode.AllowAll
                 : WorkbenchApprovalMode.Ask,
             imageAttachments: storedImages,
@@ -4709,7 +4706,6 @@ if (!gotTheLock) {
               ? CoworkSessionMode.Chat
               : CoworkSessionMode.Work,
           goalMode: options.goalMode,
-          productionLoopMode: options.productionLoopMode,
           imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
           workspaceRoot: existingSession?.cwd,
@@ -4717,7 +4713,9 @@ if (!gotTheLock) {
           expertIds: existingSession?.experts.map(expert => expert.expertId),
           modelOverride: existingSession?.modelOverride,
           approvalMode:
-            options.permissionMode === CoworkPermissionMode.AllowAll
+            (options.permissionMode ??
+              store.getConfig().permissionModeBySession[options.sessionId] ??
+              store.getConfig().permissionMode) === CoworkPermissionMode.AllowAll
               ? WorkbenchApprovalMode.AllowAll
               : WorkbenchApprovalMode.Ask,
         })
@@ -4786,7 +4784,6 @@ if (!gotTheLock) {
         input.fileAttachments,
         input.skillIds,
         input.skillPrompt,
-        input.productionLoopMode,
       );
     } catch (error) {
       return {
@@ -4892,15 +4889,15 @@ if (!gotTheLock) {
               type: msg.type as CoworkMessageType,
               content: msg.content,
               timestamp: msg.timestamp,
-              metadata: persistMessageImageMetadata(
-                getCoworkImageRoot(),
-                session.id,
-                msg.metadata,
-              ).metadata as CoworkMessageMetadata | undefined,
+              metadata: persistMessageImageMetadata(getCoworkImageRoot(), session.id, msg.metadata)
+                .metadata as CoworkMessageMetadata | undefined,
             });
           }
           const updated = coworkStore.getSession(session.id);
-          return { success: true, session: updated ? sanitizeCoworkSessionForIpc(updated) : updated };
+          return {
+            success: true,
+            session: updated ? sanitizeCoworkSessionForIpc(updated) : updated,
+          };
         }
         // Create new session in SQLite
         const newSession = coworkStore.createSession(
@@ -4921,11 +4918,8 @@ if (!gotTheLock) {
             type: msg.type as CoworkMessageType,
             content: msg.content,
             timestamp: msg.timestamp,
-            metadata: persistMessageImageMetadata(
-              getCoworkImageRoot(),
-              newSession.id,
-              msg.metadata,
-            ).metadata as CoworkMessageMetadata | undefined,
+            metadata: persistMessageImageMetadata(getCoworkImageRoot(), newSession.id, msg.metadata)
+              .metadata as CoworkMessageMetadata | undefined,
           });
         }
         // Update status
@@ -5051,11 +5045,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(
     CoworkSessionIpc.Get,
-    async (
-      _event,
-      sessionId: string,
-      options?: { messageLimit?: number | null },
-    ) => {
+    async (_event, sessionId: string, options?: { messageLimit?: number | null }) => {
       try {
         const store = getCoworkStore();
         // Default: latest page only for the main transcript UI. Callers that need
@@ -7864,8 +7854,6 @@ if (!gotTheLock) {
         const amendment = resumeInput?.amendment?.trim() ?? '';
         const prompt =
           amendment || 'Continue the current task from its persisted state and verify the result.';
-        const previousProduction =
-          getWorkbenchTaskService().productionLoop.repository.getLatestForTask(task.id, run.id);
         // 2026/09/17 lixiang  resume 不等待整段跑完（对齐 Continue IPC），否则底部无法切到停止
         void getPiRuntimeAdapter()
           .continueSession(session.id, prompt, {
@@ -7884,14 +7872,9 @@ if (!gotTheLock) {
                 ? WorkbenchApprovalMode.AllowAll
                 : WorkbenchApprovalMode.Ask,
             goalMode: resumeInput?.goalMode,
-            productionLoopMode: resumeInput?.productionLoopMode,
             imageAttachments: resumeInput?.imageAttachments,
             fileAttachments: resumeInput?.fileAttachments,
             _workbenchRunId: run.id,
-            _productionWorkflowRequired: shouldRequireProductionOnResume(
-              task.contract.kind,
-              previousProduction,
-            ),
             _skipUserMessage: !amendment,
           })
           .catch(error => {

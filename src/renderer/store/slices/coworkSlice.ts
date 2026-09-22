@@ -9,13 +9,14 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import { DEFAULT_COWORK_PERMISSION_MODE, CoworkSessionMode } from '../../../shared/cowork/constants';
 import {
   type CoworkToolActivity,
   type CoworkToolActivityEvent,
   CoworkToolActivityEventType,
 } from '../../../shared/cowork/toolActivity';
 import { removeSessionFromState, removeSessionsFromState } from './coworkDeleteState';
+import { mergeMessageHistory } from './mergeMessageHistory';
 
 export interface DraftAttachment {
   path: string;
@@ -70,7 +71,7 @@ const initialState: CoworkState = {
     workingDirectory: '',
     systemPrompt: '',
     executionMode: 'local',
-    permissionMode: CoworkPermissionMode.Ask,
+    permissionMode: DEFAULT_COWORK_PERMISSION_MODE,
     permissionModeBySession: {},
     embeddingEnabled: false,
     embeddingProvider: 'openai',
@@ -119,24 +120,13 @@ const mergeSessionWithLiveSnapshot = (
   session: CoworkSession,
   liveSession: CoworkSession,
 ): CoworkSession => {
-  const liveMessagesById = new Map(liveSession.messages.map(message => [message.id, message]));
-  const mergedMessages = session.messages.map(
-    message => liveMessagesById.get(message.id) ?? message,
-  );
-  const mergedMessageIds = new Set(mergedMessages.map(message => message.id));
-
-  for (const message of liveSession.messages) {
-    if (!mergedMessageIds.has(message.id)) {
-      mergedMessages.push(message);
-      mergedMessageIds.add(message.id);
-    }
-  }
+  const mergedMessages = mergeMessageHistory(session.messages, liveSession.messages);
 
   return {
     ...session,
     ...liveSession,
     messages: mergedMessages,
-    messagesOffset: session.messagesOffset ?? 0,
+    messagesOffset: Math.min(session.messagesOffset ?? 0, liveSession.messagesOffset ?? 0),
     totalMessages: Math.max(
       session.totalMessages ?? session.messages.length,
       liveSession.totalMessages ?? liveSession.messages.length,
@@ -547,6 +537,7 @@ const coworkSlice = createSlice({
       const toInsert = messages.filter(m => !existingIds.has(m.id));
       state.currentSession.messages = [...toInsert, ...state.currentSession.messages];
       state.currentSession.messagesOffset = newOffset;
+      cacheStreamingSession(state, state.currentSession);
     },
 
     updateMessageContent(state, action: PayloadAction<MessageContentUpdate>) {

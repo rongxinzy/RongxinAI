@@ -28,15 +28,11 @@ import {
   type WorkbenchTaskChangedEvent,
   type WorkbenchTaskContract,
   type WorkbenchTaskDetail,
-  type WorkbenchProductionPlan,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { HarnessActivationType } from '../../shared/harness';
-import { ProductionLoopRecoveryReason } from '../../shared/productionLoop';
 import { HarnessMeasurementService } from '../harness/measurementService';
 import { t } from '../i18n';
-import { ProductionLoopRepository } from '../productionLoop/repository';
-import { ProductionLoopService } from '../productionLoop/service';
 import { collectWorkbenchArtifactsAsync } from './artifactWorkerPool';
 import { applyWorkbenchDeliveryGate } from './deliveryGate';
 import { getCurrentDeclaredArtifacts } from './artifactCompletion';
@@ -81,7 +77,6 @@ const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
   readonly measurement: HarnessMeasurementService;
-  readonly productionLoop: ProductionLoopService;
   private readonly pendingApprovals = new Map<string, PendingApproval>();
 
   constructor(
@@ -91,23 +86,15 @@ export class WorkbenchTaskService extends EventEmitter {
     super();
     this.repository = new WorkbenchTaskRepository(db);
     this.measurement = new HarnessMeasurementService(this.repository);
-    this.productionLoop = new ProductionLoopService(
-      new ProductionLoopRepository(db),
-      this.measurement,
-      state => {
-        const task = this.repository.getTask(state.taskId);
-        if (task) this.emitChanged(task);
-      },
-    );
   }
 
   getCurrent(sessionId: string): WorkbenchTaskDetail | null {
     const task = this.repository.getLatestTaskForSession(sessionId);
-    return task ? this.withProductionPlan(this.repository.getDetail(task.id)) : null;
+    return task ? this.repository.getDetail(task.id) : null;
   }
 
   getDetail(taskId: string): WorkbenchTaskDetail | null {
-    return this.withProductionPlan(this.repository.getDetail(taskId));
+    return this.repository.getDetail(taskId);
   }
 
   listForSession(sessionId: string): WorkbenchTask[] {
@@ -156,21 +143,6 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     this.emitChanged(task);
     return registered;
-  }
-
-  private withProductionPlan(detail: WorkbenchTaskDetail | null): WorkbenchTaskDetail | null {
-    if (!detail) return null;
-    const state = detail.task.activeRunId
-      ? this.productionLoop.repository.get(detail.task.activeRunId)
-      : this.productionLoop.repository.getLatestForTask(detail.task.id);
-    const productionPlan: WorkbenchProductionPlan | null = state
-      ? {
-          runId: state.runId,
-          progressVersion: state.progressVersion,
-          items: state.planItems,
-        }
-      : null;
-    return { ...detail, productionPlan };
   }
 
   beginRun(input: {
@@ -362,11 +334,7 @@ export class WorkbenchTaskService extends EventEmitter {
       const artifacts = this.repository
         .getDetail(task.id)!
         .artifacts.filter(artifact => artifact.runId === run.id);
-      finalResult = applyWorkbenchDeliveryGate(
-        finalResult,
-        artifacts,
-        task.contract,
-      );
+      finalResult = applyWorkbenchDeliveryGate(finalResult, artifacts, task.contract);
       if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
           verificationResult: finalResult,
@@ -391,7 +359,6 @@ export class WorkbenchTaskService extends EventEmitter {
         outcome: finalResult.outcome,
         checks: finalResult.checks.map(check => ({ name: check.name, status: check.status })),
       });
-      this.productionLoop.recordVerificationResult(run.id, finalResult.outcome, finalResult.summary);
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
@@ -457,17 +424,16 @@ export class WorkbenchTaskService extends EventEmitter {
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
       // Acceptance attests final deliverables, never intermediate execution evidence.
-      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id, detail.task.contract, runArtifacts);
+      const verifiedArtifacts = this.repository.markArtifactsVerified(
+        run.id,
+        detail.task.contract,
+        runArtifacts,
+      );
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
         verifiedArtifacts,
       });
-      this.productionLoop.recordVerificationResult(
-        run.id,
-        WorkbenchVerificationOutcome.Passed,
-        acceptedResult.summary,
-      );
     });
     const accepted = this.repository.getDetail(taskId);
     if (!accepted) throw new Error('Workbench task not found after acceptance.');
@@ -567,7 +533,10 @@ export class WorkbenchTaskService extends EventEmitter {
       !task.contract.outputRequirements?.length &&
       riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
     ) {
-      return { allow: false, reason: 'Commit the requested outputs with set_task_output before executing this task.' };
+      return {
+        allow: false,
+        reason: 'Commit the requested outputs with set_task_output before executing this task.',
+      };
     }
     if (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly) {
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ToolRead, {
@@ -584,13 +553,6 @@ export class WorkbenchTaskService extends EventEmitter {
         mechanism: 'tool_effect_idempotency',
         evidence: { toolCallId: input.toolCallId, toolName: input.toolName },
       });
-      if (this.productionLoop.repository.get(run.id)) {
-        this.productionLoop.recordRecovery(
-          run.id,
-          ProductionLoopRecoveryReason.RepeatedToolCall,
-          `Blocked duplicate side effect for ${input.toolName}.`,
-        );
-      }
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
     // Ask prompts for every side effect; Auto auto-approves only reversible
@@ -777,7 +739,6 @@ export class WorkbenchTaskService extends EventEmitter {
   deleteSession(sessionId: string): void {
     const pendingApprovals = this.repository.listPendingApprovalsForSession(sessionId);
     this.repository.transaction(() => {
-      this.productionLoop.deleteSession(sessionId);
       this.repository.deleteSessionDomainData(sessionId);
     });
     this.resolvePendingApprovals(pendingApprovals, 'The session was deleted.');
