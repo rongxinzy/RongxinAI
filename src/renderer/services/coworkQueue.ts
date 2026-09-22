@@ -1,5 +1,4 @@
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
-import type { ProductionLoopMode } from '../../shared/productionLoop';
 import type { CoworkFileAttachment, CoworkImageAttachment } from '../types/cowork';
 
 type QueueListener = (items: CoworkPendingMessage[]) => void;
@@ -41,7 +40,6 @@ class CoworkQueueService {
     fileAttachments?: CoworkFileAttachment[],
     skillIds?: string[],
     skillPrompt?: string,
-    productionLoopMode?: ProductionLoopMode,
   ) {
     return window.electron.cowork.enqueuePendingMessage({
       sessionId,
@@ -50,7 +48,6 @@ class CoworkQueueService {
       fileAttachments,
       skillIds,
       skillPrompt,
-      productionLoopMode,
     });
   }
 

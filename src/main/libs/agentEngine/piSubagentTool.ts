@@ -32,7 +32,6 @@ import {
   type PiSubagentSession,
 } from './piSubagentExecution';
 import type { PiExtensionFactory } from './piExtensionTypes';
-import { createPiReviewerReadBudgetExtension, PiReviewerReadBudget } from './piReviewerReadBudget';
 
 // ── Constants ──
 
@@ -40,15 +39,6 @@ export { PiSubagentToolName } from './piSubagentConstants';
 
 /** Per-subagent run timeout. */
 export const SUBAGENT_TIMEOUT_MS = 600_000;
-
-export const PRODUCTION_REVIEWER_SOFT_TIMEOUT_MS = 120_000;
-export const PRODUCTION_REVIEWER_HARD_TIMEOUT_MS = 180_000;
-export const PRODUCTION_REVIEWER_MAX_ASSISTANT_TURNS = 6;
-export const PRODUCTION_REVIEWER_MAX_TOOL_CALLS = 6;
-export const PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS = 4_000;
-
-const PRODUCTION_REVIEWER_STEER_PROMPT =
-  'Stop investigating now. Return the best supported verdict immediately as exactly one JSON object matching the required production critic contract.';
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
@@ -174,23 +164,6 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
       'task or plan. Check correctness, test coverage, edge cases, and unnecessary ' +
       'complexity. Report findings ordered by severity with file references.',
   },
-  {
-    id: PiSubagentProfileId.ProductionReviewer,
-    description: 'Validates a production workflow and returns its strict critic contract.',
-    systemPrompt: [
-      'You are the independent, read-only critic for a production workflow.',
-      'Review the implementation and supplied execution evidence only against the assigned contract.',
-      'Do not add requirements, preferences, best practices, style opinions, or quality gates that are absent from the contract.',
-      'Check correctness, required artifacts, and deterministic verification. Check an edge case or regression only when it is directly implied by a contract entry and affected by this work.',
-      'Each finding is blocking and must name one exact contract ref supplied in the task plus concrete evidence. Omit non-blocking advice.',
-      'Inspect at most 3 files, and only when evidence required by the contract is insufficient or contradictory.',
-      'Read files in targeted ranges. Do not repeat an exact range; each file allows at most 3 ranges and 6000 requested lines.',
-      'Never modify files. Return revise for insufficient evidence only when that evidence is required by the referenced contract entry.',
-      'Respond with exactly one JSON object and no Markdown or surrounding text:',
-      '{"verdict":"pass"|"revise","findings":[{"severity":"critical"|"major"|"minor","contractRef":"acceptanceCriteria[0]","summary":"...","evidence":"toolCallId or file:line"}]}',
-      'A pass requires an empty findings array. A revise verdict requires at least one finding.',
-    ].join('\n'),
-  },
 ];
 
 // ── Pi module loading ──
@@ -271,7 +244,6 @@ function resolveAgentProfiles(deps: PiSubagentToolDeps): SubagentProfile[] {
       deps.loadBundledMembers?.(deps.presetId) ??
       loadMemberProfiles(deps.getPiAgentsDir(), deps.presetId);
     for (const member of bundled) {
-      if (member.id === PiSubagentProfileId.ProductionReviewer) continue;
       profiles.set(member.id, member);
     }
   }
@@ -291,21 +263,8 @@ async function runSubagent(
   try {
     const pi = await getPiSubagentModules();
     const cwd = deps.workspaceRoot || process.cwd();
-    const isProductionReviewer = profile.id === PiSubagentProfileId.ProductionReviewer;
-    const maxOutputTokens = isProductionReviewer
-      ? Math.min(deps.resolvedModel.maxOutputTokens, PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS)
-      : deps.resolvedModel.maxOutputTokens;
-    const model = isProductionReviewer
-      ? {
-          ...deps.resolvedModel.model,
-          maxTokens: Math.min(
-            typeof deps.resolvedModel.model.maxTokens === 'number'
-              ? deps.resolvedModel.model.maxTokens
-              : maxOutputTokens,
-            maxOutputTokens,
-          ),
-        }
-      : deps.resolvedModel.model;
+    const maxOutputTokens = deps.resolvedModel.maxOutputTokens;
+    const model = deps.resolvedModel.model;
     const subOptions: Record<string, unknown> = {
       cwd,
       model,
@@ -314,7 +273,6 @@ async function runSubagent(
     };
     if (
       profile.id === PiSubagentProfileId.Reviewer ||
-      profile.id === PiSubagentProfileId.ProductionReviewer ||
       profile.id === PiSubagentProfileId.Planner ||
       profile.id === PiSubagentProfileId.Scout
     ) {
@@ -322,21 +280,16 @@ async function runSubagent(
     }
     const researcherUsesWebSearch =
       profile.id === PiSubagentProfileId.Researcher && Boolean(deps.webSearchSkillPath);
-    const reviewerReadBudget = isProductionReviewer ? new PiReviewerReadBudget(cwd) : undefined;
     const systemPrompt = researcherUsesWebSearch
       ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill with Bash:\n` +
         `bash "${path.join(deps.webSearchSkillPath || '', 'scripts/search.sh')}" "<query>" 10\n` +
         'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
       : profile.systemPrompt;
-    const resourceLoader = reviewerReadBudget
-      ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, undefined, [
-          createPiReviewerReadBudgetExtension(reviewerReadBudget),
+    const resourceLoader = researcherUsesWebSearch
+      ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, [
+          CoreSkillId.WebSearch,
         ])
-      : researcherUsesWebSearch
-        ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, [
-            CoreSkillId.WebSearch,
-          ])
-        : await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
+      : await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
     subOptions.resourceLoader = resourceLoader;
     if (
       resourceLoader &&
@@ -354,18 +307,7 @@ async function runSubagent(
     subSession = session;
     const result = await runPiSubagent(session, task, {
       maxOutputTokens,
-      hardTimeoutMs: isProductionReviewer
-        ? PRODUCTION_REVIEWER_HARD_TIMEOUT_MS
-        : SUBAGENT_TIMEOUT_MS,
-      ...(isProductionReviewer
-        ? {
-            softTimeoutMs: PRODUCTION_REVIEWER_SOFT_TIMEOUT_MS,
-            maxAssistantTurns: PRODUCTION_REVIEWER_MAX_ASSISTANT_TURNS,
-            maxToolCalls: PRODUCTION_REVIEWER_MAX_TOOL_CALLS,
-            steerPrompt: PRODUCTION_REVIEWER_STEER_PROMPT,
-            steerSignal: reviewerReadBudget,
-          }
-        : {}),
+      hardTimeoutMs: SUBAGENT_TIMEOUT_MS,
     });
     const { output, ...execution } = result;
     return {

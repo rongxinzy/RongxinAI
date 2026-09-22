@@ -10,7 +10,6 @@ import type {
   CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
-import type { ProductionLoopMode } from '../../shared/productionLoop';
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type {
   ProviderModelDiscoveryRequest,
@@ -789,7 +788,6 @@ interface IElectronAPI {
       title?: string;
       activeSkillIds?: string[];
       goalMode?: boolean;
-      productionLoopMode?: ProductionLoopMode;
       workspaceId?: string;
       agentId?: string;
       expertIds?: string[];
@@ -814,7 +812,6 @@ interface IElectronAPI {
       systemPrompt?: string;
       activeSkillIds?: string[];
       goalMode?: boolean;
-      productionLoopMode?: ProductionLoopMode;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{
@@ -845,7 +842,6 @@ interface IElectronAPI {
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       skillIds?: string[];
       skillPrompt?: string;
-      productionLoopMode?: ProductionLoopMode;
     }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     updatePendingMessage: (options: {
       sessionId: string;
@@ -981,11 +977,13 @@ interface IElectronAPI {
     onStreamQueueUpdated: (
       callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
     ) => () => void;
-    onSessionsChanged: (callback: (data: {
-      sessionId?: string;
-      deletedSessionIds?: string[];
-      agentId?: string;
-    }) => void) => () => void;
+    onSessionsChanged: (
+      callback: (data: {
+        sessionId?: string;
+        deletedSessionIds?: string[];
+        agentId?: string;
+      }) => void,
+    ) => () => void;
   };
   workbenchTask: {
     getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
@@ -1070,17 +1068,12 @@ interface IElectronAPI {
       workspaceRoot: string;
       prompt: import('../../shared/codingAgent').CodingPromptInput;
     }) => Promise<CodingAgentActionResult>;
-    listPendingMessages: (
-      laneId: string,
-    ) => Promise<{
+    listPendingMessages: (laneId: string) => Promise<{
       success: boolean;
       items?: import('../../shared/cowork/pendingMessageQueue').CoworkPendingMessage[];
       error?: string;
     }>;
-    enqueuePendingMessage: (input: {
-      laneId: string;
-      text: string;
-    }) => Promise<{
+    enqueuePendingMessage: (input: { laneId: string; text: string }) => Promise<{
       success: boolean;
       item?: import('../../shared/cowork/pendingMessageQueue').CoworkPendingMessage;
       error?: string;

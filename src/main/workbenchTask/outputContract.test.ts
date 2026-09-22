@@ -19,7 +19,6 @@ import {
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { setWorkbenchOutputRequirements, normalizeOutputRequirements } from './outputContract';
 import { initializeWorkbenchTaskSchema } from './schema';
-import { initializeProductionLoopSchema } from '../productionLoop/schema';
 import { WorkbenchTaskService } from './taskService';
 import { classifyWorkbenchToolRisk } from './riskClassifier';
 
@@ -31,7 +30,6 @@ vi.mock('./artifactWorkerPool', () => ({
 const fixture = () => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
-  initializeProductionLoopSchema(db);
   const service = new WorkbenchTaskService(db);
   const { task, run } = service.beginRun({
     sessionId: 'session',

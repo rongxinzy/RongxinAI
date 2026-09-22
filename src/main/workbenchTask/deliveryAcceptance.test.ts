@@ -13,7 +13,6 @@ import {
   WorkbenchTaskStatus,
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
-import { initializeProductionLoopSchema } from '../productionLoop/schema';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { collectWorkbenchArtifactsAsync } from './artifactWorkerPool';
 import { initializeWorkbenchTaskSchema } from './schema';
@@ -30,7 +29,6 @@ const fixtures: Array<{ db: Database.Database; workspace: string }> = [];
 const createFixture = () => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
-  initializeProductionLoopSchema(db);
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'delivery-acceptance-'));
   fixtures.push({ db, workspace });
   const onVerifiedRun = vi.fn();

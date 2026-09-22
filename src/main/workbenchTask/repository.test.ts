@@ -186,14 +186,14 @@ test('promotes an existing pending artifact when verified evidence arrives', () 
       contentHash: 'hash',
       provenance: WorkbenchArtifactProvenance.Controller,
       verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: { verifier: 'production_inspection' },
+      metadata: { verifier: 'domain_workflow' },
     });
 
     expect(verified).toMatchObject({
       id: pending.id,
       provenance: WorkbenchArtifactProvenance.Controller,
       verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      metadata: { role: 'deliverable', verifier: 'production_inspection' },
+      metadata: { role: 'deliverable', verifier: 'domain_workflow' },
     });
     expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
   } finally {
@@ -274,7 +274,11 @@ test('marks only pending final deliverables of a run as verified', () => {
       metadata: {},
     });
 
-    const changes = repository.markArtifactsVerified(run.id, task.contract, repository.getDetail(task.id)!.artifacts);
+    const changes = repository.markArtifactsVerified(
+      run.id,
+      task.contract,
+      repository.getDetail(task.id)!.artifacts,
+    );
 
     expect(changes).toBe(1);
     const artifacts = repository.getDetail(task.id)?.artifacts ?? [];

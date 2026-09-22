@@ -148,7 +148,7 @@ test('queues Pi write recovery and keeps waiting after a truncated subagent writ
   await expect(output).resolves.toMatchObject({ output: 'Completed' });
 });
 
-test('returns a subagent error without waiting for agent_end', async () => {
+test('returns the final provider error only after the session settles', async () => {
   const { session, emit } = createSession();
   const output = runPiSubagent(session, 'Fail', {
     maxOutputTokens: 4096,
@@ -165,9 +165,48 @@ test('returns a subagent error without waiting for agent_end', async () => {
     },
   });
 
+  emit({ type: PiSubagentEventType.AgentSettled });
+
   await expect(output).resolves.toMatchObject({
     output: 'Error: provider failed',
     terminationReason: 'error',
+  });
+});
+
+test('allows Pi to retry a transient provider error before cleanup', async () => {
+  const { session, emit } = createSession();
+  const done = vi.fn();
+  const output = runPiSubagent(session, 'Retry', {
+    maxOutputTokens: 4096,
+    hardTimeoutMs: 10_000,
+  }).then(result => {
+    done();
+    return result;
+  });
+  emit({
+    type: PiSubagentEventType.MessageEnd,
+    message: {
+      role: PiMessageRole.Assistant,
+      stopReason: PiAssistantStopReason.Error,
+      errorMessage: '429 rate limit',
+      content: [],
+    },
+  });
+  emit({ type: PiSubagentEventType.AgentEnd });
+  await Promise.resolve();
+  expect(done).not.toHaveBeenCalled();
+  emit({
+    type: PiSubagentEventType.MessageEnd,
+    message: {
+      role: PiMessageRole.Assistant,
+      stopReason: PiAssistantStopReason.Stop,
+      content: [{ type: PiContentBlockType.Text, text: 'Recovered answer' }],
+    },
+  });
+  emit({ type: PiSubagentEventType.AgentSettled });
+  await expect(output).resolves.toMatchObject({
+    output: 'Recovered answer',
+    terminationReason: 'settled',
   });
 });
 

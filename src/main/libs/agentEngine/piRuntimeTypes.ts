@@ -3,7 +3,6 @@ import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivit
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
-import type { ProductionLoopMode } from '../../../shared/productionLoop';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import type { PiPlanEntry } from './piPlanTool';
@@ -105,7 +104,6 @@ export type PiStartOptions = {
   planMode?: boolean;
   /** Registers plan_write for the whole session, so plan mode also works on a live session. */
   planTool?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: PiImageAttachment[];
   fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   agentId?: string;
@@ -119,8 +117,6 @@ export type PiStartOptions = {
   _piPromptOverride?: string;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
-  /** Internal: the owning task already has a controlled production workflow. */
-  _productionWorkflowRequired?: boolean;
 };
 
 export type PiContinueOptions = {
@@ -133,7 +129,6 @@ export type PiContinueOptions = {
   planMode?: boolean;
   /** Registers plan_write when the runtime has to recreate the session. */
   planTool?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: PiImageAttachment[];
   fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
@@ -151,8 +146,6 @@ export type PiContinueOptions = {
   unattended?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
-  /** Internal: the owning task already has a controlled production workflow. */
-  _productionWorkflowRequired?: boolean;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
   /** Internal: marks a queued follow-up in the persisted transcript. */
