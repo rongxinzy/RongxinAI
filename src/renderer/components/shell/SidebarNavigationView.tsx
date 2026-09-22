@@ -43,9 +43,11 @@ function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
       type="button"
       variant="navigation"
       size="navigation"
-      data-active={entry.active}
+      data-active={entry.active || undefined}
       data-testid={entry.testId}
       aria-current={entry.currentPage ? 'page' : undefined}
+      // Class toggle matches chat skill shortcuts: selected card bg must not rely only on data-active.
+      className={cn(entry.active && 'theme-page-sidebar-navigation-button-selected')}
       onClick={entry.onClick}
       onMouseEnter={() => {
         if (!reducedMotion) iconRef.current?.startAnimation();
