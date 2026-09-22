@@ -49,6 +49,21 @@ test('event validation rejects unversioned or incomplete payloads', () => {
   expect(isPiUiEvent({ ...event, protocolVersion: 0 })).toBe(false);
   expect(isPiUiEvent({ ...event, eventId: '' })).toBe(false);
   expect(isPiUiEvent({ type: PiUiEventType.Started })).toBe(false);
+  expect(
+    isPiUiEvent({
+      ...event,
+      type: PiUiEventType.Message,
+      message: { id: 'm', type: 'assistant' },
+    }),
+  ).toBe(false);
+  expect(
+    isPiUiEvent({
+      ...event,
+      type: PiUiEventType.PermissionDismiss,
+      sessionId: 'session-a',
+      requestId: 'request-1',
+    }),
+  ).toBe(false);
 });
 
 test('sequence tracker drops duplicate and late deliveries per session', () => {
@@ -68,4 +83,22 @@ test('sequence tracker drops duplicate and late deliveries per session', () => {
   expect(tracker.accept(second)).toBe(true);
   expect(tracker.accept(second)).toBe(false);
   expect(tracker.accept({ ...first, sequence: 1 })).toBe(false);
+});
+
+test('sequence tracker exposes gaps so consumers can resync from persisted state', () => {
+  const tracker = new PiUiEventSequenceTracker();
+  const first = {
+    protocolVersion: 1 as const,
+    eventId: 'event-1',
+    sequence: 1,
+    emittedAt: 1,
+    type: PiUiEventType.Started,
+    sessionId: 'session-a',
+  };
+  const third = { ...first, eventId: 'event-3', sequence: 3 };
+
+  expect(tracker.accept(first)).toBe(true);
+  expect(tracker.accept(third)).toBe(true);
+  expect(tracker.consumeGap('session-a')).toBe(1);
+  expect(tracker.consumeGap('session-a')).toBe(0);
 });

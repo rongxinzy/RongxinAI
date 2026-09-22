@@ -345,6 +345,16 @@ test('updateSessionStatus marks the active session as streaming while it is runn
   expect(runningState.streamingSessionIds).toEqual(['session-1']);
 });
 
+test('loading a persisted running snapshot does not create a live stream', () => {
+  const state = coworkReducer(
+    undefined,
+    addSession(makeSession({ status: CoworkSessionStatusValue.Running })),
+  );
+
+  expect(state.streamingSessionIds).toEqual([]);
+  expect(state.streamingSessions).toEqual({});
+});
+
 test('a stale completed snapshot does not clear a tracked live session stream', () => {
   const runningState = coworkReducer(
     coworkReducer(undefined, addSession(makeSession())),
@@ -363,7 +373,10 @@ test('a stale completed snapshot does not clear a tracked live session stream', 
 test('keeps streaming messages when another session is selected', () => {
   const sessionOne = makeSession({ id: 'session-1', status: CoworkSessionStatusValue.Running });
   const sessionTwo = makeSession({ id: 'session-2' });
-  const streamingState = coworkReducer(undefined, addSession(sessionOne));
+  const streamingState = coworkReducer(
+    coworkReducer(undefined, addSession(sessionOne)),
+    updateSessionStatus({ sessionId: sessionOne.id, status: CoworkSessionStatusValue.Running }),
+  );
   const switchedState = coworkReducer(streamingState, setCurrentSession(sessionTwo));
   const updatedState = coworkReducer(
     switchedState,
@@ -397,7 +410,10 @@ test('merges complete loaded history into a tracked streaming session', () => {
     messagesOffset: 30,
     totalMessages: 31,
   });
-  const streamingState = coworkReducer(undefined, addSession(runningSession));
+  const streamingState = coworkReducer(
+    coworkReducer(undefined, addSession(runningSession)),
+    updateSessionStatus({ sessionId: runningSession.id, status: CoworkSessionStatusValue.Running }),
+  );
   const updatedState = coworkReducer(
     streamingState,
     updateMessageContents([
@@ -443,7 +459,10 @@ test('reloading a recent page keeps the initial prompt before replies and preser
     messages,
     totalMessages: messages.length,
   });
-  let state = coworkReducer(undefined, addSession(running));
+  let state = coworkReducer(
+    coworkReducer(undefined, addSession(running)),
+    updateSessionStatus({ sessionId: running.id, status: CoworkSessionStatusValue.Running }),
+  );
   state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
   state = coworkReducer(state, setCurrentSession({
     ...running, messages: messages.slice(15), messagesOffset: 15,
@@ -462,7 +481,10 @@ test('loaded older pages survive switching away from a running session', () => {
     status: CoworkSessionStatusValue.Running,
     messages: [recent], messagesOffset: 1, totalMessages: 2,
   });
-  let state = coworkReducer(undefined, addSession(running));
+  let state = coworkReducer(
+    coworkReducer(undefined, addSession(running)),
+    updateSessionStatus({ sessionId: running.id, status: CoworkSessionStatusValue.Running }),
+  );
   state = coworkReducer(state, prependMessages({
     sessionId: running.id, messages: [older], newOffset: 0,
   }));

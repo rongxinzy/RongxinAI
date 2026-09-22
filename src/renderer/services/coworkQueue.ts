@@ -84,6 +84,11 @@ class CoworkQueueService {
     if (this.streamCleanup || !window.electron?.cowork?.onStreamUiEvent) return;
     this.streamCleanup = window.electron.cowork.onStreamUiEvent(event => {
       if (!this.sequenceTracker.accept(event)) return;
+      if (this.sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
+        void this.load(event.sessionId).catch(error =>
+          console.error('[CoworkQueueService] failed to recover after a UI event sequence gap:', error),
+        );
+      }
       if (event.type === PiUiEventType.QueueUpdated) {
         this.publish(event.sessionId, event.items);
       }

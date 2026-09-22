@@ -171,6 +171,7 @@ interface CoworkMessage {
   type: 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
   content: string;
   timestamp: number;
+  sequence?: number;
   metadata?: Record<string, unknown>;
 }
 

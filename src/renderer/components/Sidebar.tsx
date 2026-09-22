@@ -31,7 +31,6 @@ import {
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
-import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import {
@@ -185,12 +184,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     });
 
     // If the target session is actively streaming in the background, restore its
-    // live snapshot immediately so the user sees the active stream without
-    // waiting for the DB round-trip. Only do this when the sidebar summary still
-    // reports a running status, so a stale snapshot cannot override a completed
-    // session after the renderer reloads.
+    // event-derived live snapshot immediately so the user sees the active stream
+    // without waiting for the DB round-trip.
     const streamingSnapshot = store.getState().cowork.streamingSessions[session.id];
-    if (streamingSnapshot && session.status === CoworkSessionStatusValue.Running) {
+    if (streamingSnapshot) {
       dispatch(setCurrentSession(streamingSnapshot));
     }
 

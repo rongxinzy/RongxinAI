@@ -108,8 +108,10 @@ const setSessionStreaming = (state: CoworkState, sessionId: string, streaming: b
 };
 
 const cacheStreamingSession = (state: CoworkState, session: CoworkSession) => {
-  if (session.status !== CoworkSessionStatusValue.Running) return;
-  setSessionStreaming(state, session.id, true);
+  // A persisted `running` status is only a historical snapshot.  Active
+  // execution is established by the Pi `started` event in updateSessionStatus;
+  // loading or selecting a session must never manufacture a live stream.
+  if (!state.streamingSessionIds.includes(session.id)) return;
   state.streamingSessions[session.id] = {
     ...session,
     messages: [...session.messages],

@@ -412,6 +412,8 @@ export interface CoworkMessage {
   type: CoworkMessageType;
   content: string;
   timestamp: number;
+  /** Monotonic persisted order within a session. */
+  sequence?: number;
   metadata?: CoworkMessageMetadata;
 }
 
@@ -1353,6 +1355,7 @@ export class CoworkStore {
       type: row.type as CoworkMessageType,
       content: row.content,
       timestamp: row.created_at,
+      ...(row.sequence != null ? { sequence: row.sequence } : {}),
       metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
     }));
   }
@@ -1388,6 +1391,7 @@ export class CoworkStore {
         type: row.type as CoworkMessageType,
         content: row.content,
         timestamp: row.created_at,
+        ...(row.sequence != null ? { sequence: row.sequence } : {}),
         metadata,
       };
     });
@@ -1432,6 +1436,7 @@ export class CoworkStore {
       type: message.type,
       content: message.content,
       timestamp: now,
+      sequence,
       metadata: message.metadata,
     };
   }
@@ -1473,7 +1478,10 @@ export class CoworkStore {
         sequence,
       );
     this.db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(now, sessionId);
-    return message;
+    return {
+      ...message,
+      sequence,
+    };
   }
 
   /**
@@ -1534,6 +1542,7 @@ export class CoworkStore {
       type: message.type,
       content: message.content,
       timestamp: now,
+      sequence: targetSequence,
       metadata: message.metadata,
     };
   }

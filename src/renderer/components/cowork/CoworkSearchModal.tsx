@@ -9,8 +9,9 @@ import { matchesShortcut } from '../../services/shortcuts';
 import { formatShortcutLabel } from '../../services/shortcutLabel';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
+import { selectStreamingSessionIds } from '../../store/selectors/coworkSelectors';
 import { WorkMode } from '../../store/workMode/constants';
-import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
+import type { CoworkSessionSummary } from '../../types/cowork';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
 import { getWorkspaceDisplayName } from '../../utils/path';
 import { TaskSearchDialog } from './TaskSearchDialog';
@@ -38,6 +39,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
 }) => {
   const agents = useSelector((state: RootState) => state.agent.agents);
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
+  const streamingSessionIds = useSelector(selectStreamingSessionIds);
   const [query, setQuery] = useState('');
   const [searchSessions, setSearchSessions] = useState(sessions);
   const [loading, setLoading] = useState(false);
@@ -120,12 +122,12 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
             title: session.title,
             context,
             current: session.id === currentSessionId,
-            running: session.status === CoworkSessionStatusValue.Running,
+            running: streamingSessionIds.includes(session.id),
           },
         ];
       });
     return { items, sessionById };
-  }, [searchSessions, agents, workspaces, query, isChat, currentSessionId]);
+  }, [searchSessions, agents, workspaces, query, isChat, currentSessionId, streamingSessionIds]);
 
   const handleSelect = async (id: string) => {
     const session = sessionById.get(id);

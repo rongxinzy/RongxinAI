@@ -37,7 +37,6 @@ import {
   addSession,
   clearCurrentSession,
   updateMessageContents,
-  updateSessionStatus,
 } from '../../store/slices/coworkSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
@@ -456,7 +455,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             },
           }),
         );
-        dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
         return;
       }
 
@@ -674,7 +672,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   }, [dispatch, currentSession]);
 
   useEffect(() => {
-    if (!currentSession || currentSession.status !== 'running') return;
+    if (!currentSession || !isStreaming) return;
 
     const runningSessionId = currentSession.id;
     let lastFocusTime = 0;
@@ -691,7 +689,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     return () => {
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [currentSession]);
+  }, [currentSession, isStreaming]);
 
   if (!isInitialized) {
     return (
