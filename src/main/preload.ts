@@ -539,6 +539,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkSessionIpc.UpdateModel, options),
     getSession: (sessionId: string, options?: { messageLimit?: number | null }) =>
       ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId, options),
+    getRuntimeSnapshots: (sessionId?: string) =>
+      ipcRenderer.invoke(CoworkStreamIpc.RuntimeSnapshots, sessionId),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
     listSessions: (options?: {

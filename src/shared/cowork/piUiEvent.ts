@@ -116,8 +116,8 @@ export class PiUiEventSequencer {
 
 /**
  * Guards a renderer consumer against duplicate or late IPC deliveries. Gaps
- * are tolerated because a listener can attach after a session has started;
- * ordering is still enforced for every event it has observed.
+ * trigger recovery, including a first delivery above sequence one after a
+ * late listener attachment. Ordering is enforced for every observed event.
  */
 export class PiUiEventSequenceTracker {
   private readonly lastSequenceBySession = new Map<string, number>();
@@ -128,7 +128,7 @@ export class PiUiEventSequenceTracker {
     const sequenceKey = event.sessionId ?? '__global__';
     const previous = this.lastSequenceBySession.get(sequenceKey);
     if (previous !== undefined && event.sequence <= previous) return false;
-    if (previous !== undefined && event.sequence !== previous + 1) {
+    if (event.sequence !== (previous ?? 0) + 1) {
       this.gapsBySession.set(sequenceKey, (this.gapsBySession.get(sequenceKey) ?? 0) + 1);
     }
     this.lastSequenceBySession.set(sequenceKey, event.sequence);

@@ -1,4 +1,5 @@
 import type { CoworkError } from '../../common/coworkError';
+import type { PiUiRuntimeSnapshot } from '../../shared/cowork/piUiRuntimeSnapshot';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ActivityRun } from '../../shared/activity/types';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
@@ -881,6 +882,7 @@ interface IElectronAPI {
       sessionId: string,
       options?: { messageLimit?: number | null },
     ) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
+    getRuntimeSnapshots: (sessionId?: string) => Promise<PiUiRuntimeSnapshot[]>;
     remoteManaged: (
       sessionId: string,
     ) => Promise<{ success: boolean; remoteManaged: boolean; error?: string }>;

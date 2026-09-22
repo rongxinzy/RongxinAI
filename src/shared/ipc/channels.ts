@@ -201,6 +201,7 @@ export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof Cowork
 
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {
+  RuntimeSnapshots: 'cowork:stream:runtimeSnapshots',
   UiEvent: 'cowork:stream:uiEvent',
   Message: 'cowork:stream:message',
   MessageUpdate: 'cowork:stream:messageUpdate',
