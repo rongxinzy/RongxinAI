@@ -24,6 +24,7 @@ import { pathToFileURL } from 'url';
 
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import { reportPiSessionFailure } from './piSessionFailure';
+import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
@@ -346,11 +347,13 @@ import {
 // 设置应用程序名称
 app.name = APP_NAME;
 app.setName(APP_NAME);
-// 2026/09/20 lixiang  Windows 任务栏：打包态用产品 AUMID；开发态不要设自定义 AUMID，
-// 否则 Windows 会按 AUMID 找快捷方式，找不到时任务栏常继续显示缓存的 Electron 原子图标。
-// 开发态依赖 scripts/patch-windows-electron-icon.mjs 写入 electron.exe 内嵌图标。
-if (process.platform === 'win32' && app.isPackaged) {
-  app.setAppUserModelId(APP_USER_MODEL_ID);
+// 2026/09/21 lixiang  开发态用独立 AUMID，并配套开始菜单快捷方式（见 ensureWindowsTaskbarBrand），
+// 避免 Windows 继续拿 Electron 默认原子图标的任务栏缓存。打包态仍用产品 AUMID。
+const WINDOWS_TASKBAR_APP_USER_MODEL_ID = app.isPackaged
+  ? APP_USER_MODEL_ID
+  : `${APP_USER_MODEL_ID}.dev`;
+if (process.platform === 'win32') {
+  app.setAppUserModelId(WINDOWS_TASKBAR_APP_USER_MODEL_ID);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -2043,11 +2046,9 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       }
     });
   };
-  const emitUiEvent = (
-    payload: PiUiEventPayload,
-  ): void => {
+  const emitUiEvent = createPiUiEventBatcher((payload: PiUiEventPayload) => {
     broadcastUiEvent(sequencer.next(payload));
-  };
+  });
 
   runtime.on('started', (sessionId: string) => {
     emitUiEvent({ type: PiUiEventType.Started, sessionId });
@@ -2742,11 +2743,13 @@ const getAppIconPath = (): string | undefined => {
     return path.join(process.resourcesPath, 'app-icons', packagedIconName);
   }
 
-  // 2026/09/20 lixiang  开发态优先用 PNG：Windows NativeImage/setIcon 对 ico 偶发仍显示默认图标
+  // 2026/09/21 lixiang  开发态优先用 ico：任务栏按 Windows Shell 取图标，png 常仍显示 Electron 原子图。
   if (process.platform === 'win32') {
+    const icoPath = path.join(__dirname, '..', 'build', 'icons', 'win', 'icon.ico');
+    if (fs.existsSync(icoPath)) return icoPath;
     const pngPath = path.join(__dirname, '..', 'build', 'icons', 'png', '256x256.png');
     if (fs.existsSync(pngPath)) return pngPath;
-    return path.join(__dirname, '..', 'build', 'icons', 'win', 'icon.ico');
+    return undefined;
   }
   return path.join(__dirname, '..', 'build', 'icons', 'png', '256x256.png');
 };
@@ -2761,6 +2764,59 @@ const applyWindowsWindowIcon = (window: BrowserWindow): void => {
   // Prefer path string — Electron updates both window and taskbar icons from it.
   window.setIcon(iconPath);
   console.log('[Main] Applied Windows window icon:', iconPath);
+};
+
+/**
+ * Windows 任务栏：开发态必须有一条「相同 AUMID + 知远 .ico」的开始菜单快捷方式。
+ * 文件名只用 ASCII，避免控制台/文件系统编码把「知远 (开发).lnk」写成乱码后对不上。
+ */
+const ensureWindowsTaskbarBrand = (): void => {
+  if (process.platform !== 'win32' || app.isPackaged) return;
+  const iconPath = path.join(__dirname, '..', 'build', 'icons', 'win', 'icon.ico');
+  if (!fs.existsSync(iconPath)) {
+    console.warn('[Main] 知远 logo 不存在，无法绑定任务栏图标:', iconPath);
+    return;
+  }
+  const programsDir = path.join(
+    app.getPath('appData'),
+    'Microsoft',
+    'Windows',
+    'Start Menu',
+    'Programs',
+  );
+  fs.mkdirSync(programsDir, { recursive: true });
+  const shortcutPath = path.join(programsDir, 'ZhiYuan-Dev.lnk');
+  try {
+    // 清掉历史上编码损坏的中文快捷方式名，避免 Shell 继续命中坏缓存。
+    for (const name of fs.readdirSync(programsDir)) {
+      if (!name.endsWith('.lnk')) continue;
+      if (name === 'ZhiYuan-Dev.lnk') continue;
+      if (name.includes('开发') || name.includes('知远') || /ZhiYuan|zhiyuan/i.test(name)) {
+        try {
+          fs.unlinkSync(path.join(programsDir, name));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    // create：文件不存在时 replace 会失败且不抛错，快捷方式实际没写上，任务栏继续用原子图标缓存。
+    const wrote = shell.writeShortcutLink(shortcutPath, 'create', {
+      target: process.execPath,
+      args: process.argv.slice(1).join(' '),
+      cwd: process.cwd(),
+      appUserModelId: WINDOWS_TASKBAR_APP_USER_MODEL_ID,
+      icon: iconPath,
+      iconIndex: 0,
+      description: APP_NAME,
+    });
+    if (!wrote || !fs.existsSync(shortcutPath)) {
+      console.warn('[Main] Failed to write Windows taskbar brand shortcut:', shortcutPath);
+      return;
+    }
+    console.log('[Main] Windows taskbar brand shortcut ready:', shortcutPath, iconPath);
+  } catch (error) {
+    console.warn('[Main] Failed to write Windows taskbar brand shortcut:', error);
+  }
 };
 
 // 保存对主窗口的引用
@@ -7164,7 +7220,10 @@ if (!gotTheLock) {
         // 2026/09/17 lixiang  开发环境关闭 webSecurity，页面 fetch 才能跨域并出现在 DevTools Network
         webSecurity: !isDev,
         preload: PRELOAD_PATH,
-        backgroundThrottling: false,
+        // 2026/09/21 lixiang  恢复 Chromium 默认节流：窗口隐藏/最小化后暂停渲染进程定时器与动画，
+        // 降低常驻内存与 CPU（下载、流式对话均在主进程完成，不受影响）。
+        // officePreviewRenderer 的隐藏截图窗口仍单独关闭节流，勿在此全局放开。
+        backgroundThrottling: true,
         devTools: isDev,
         spellcheck: false,
         enableWebSQL: false,
@@ -7578,7 +7637,8 @@ if (!gotTheLock) {
     await app.whenReady();
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
-    // AppUserModelID already set at process start (before ready) for Windows taskbar icons.
+    // 开发态写入带知远 .ico 的开始菜单快捷方式，任务栏按 AUMID 取图标。
+    ensureWindowsTaskbarBrand();
 
     protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
       const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
