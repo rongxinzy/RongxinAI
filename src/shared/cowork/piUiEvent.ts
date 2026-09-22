@@ -64,7 +64,6 @@ export type PiUiEvent =
     })
   | (PiUiEventBase & {
       type: typeof PiUiEventType.PermissionDismiss;
-      sessionId: null;
       requestId: string;
     })
   | (PiUiEventBase & {
