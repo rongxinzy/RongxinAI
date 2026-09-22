@@ -106,6 +106,8 @@ export interface CoworkMessage {
   type: CoworkMessageType;
   content: string;
   timestamp: number;
+  /** Monotonic persisted order within a session. */
+  sequence?: number;
   metadata?: CoworkMessageMetadata;
 }
 

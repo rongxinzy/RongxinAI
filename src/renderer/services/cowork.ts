@@ -122,6 +122,12 @@ class CoworkService {
     const sequenceTracker = new PiUiEventSequenceTracker();
     const uiEventCleanup = cowork.onStreamUiEvent((event: PiUiEvent) => {
       if (!sequenceTracker.accept(event)) return;
+      if (sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
+        console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
+        void this.loadSession(event.sessionId).catch(error =>
+          console.error('[CoworkService] failed to recover after a UI event sequence gap:', error),
+        );
+      }
       switch (event.type) {
         case PiUiEventType.Message: {
           const { sessionId, message } = event;
@@ -416,9 +422,9 @@ class CoworkService {
       const terminalError = result.error
         ? resolveCoworkTerminalError(result.error, result.code)
         : null;
-      if (result.code !== ENGINE_NOT_READY_CODE) {
-        store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'error' }));
-      }
+      // Runtime status is owned by Pi UI events.  A synchronous IPC failure is
+      // surfaced as a terminal message, but cannot synthesize an execution
+      // state that Pi never emitted.
       if (terminalError) {
         const state = store.getState().cowork;
         const alreadyReceived = hasMatchingLatestTerminalError(

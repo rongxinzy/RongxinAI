@@ -3351,11 +3351,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (!message) return;
 
       const usage = hasValidContextUsage
-        ? {
-            usedTokens: Math.round(contextUsage!.tokens!),
-            contextWindowTokens: Math.round(contextUsage!.contextWindow),
-            updatedAt: Date.now(),
-          }
+        ? (() => {
+            const configuredContextWindow = Math.round(contextUsage!.contextWindow);
+            const contextWindowTokens = active?.resourceState.chatMode
+              ? Math.min(configuredContextWindow, PiChatRuntimeLimit.ContextWindowTokens)
+              : configuredContextWindow;
+            return {
+              usedTokens: Math.min(Math.round(contextUsage!.tokens!), contextWindowTokens),
+              contextWindowTokens,
+              updatedAt: Date.now(),
+            };
+          })()
         : undefined;
       const metadata = {
         ...message.metadata,

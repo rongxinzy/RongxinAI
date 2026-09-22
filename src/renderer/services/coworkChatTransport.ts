@@ -8,6 +8,12 @@ import {
 
 import type { CoworkPermissionResult } from '../types/cowork';
 import { createToolInputAvailableChunk, createToolOutputAvailableChunk } from './toolChunkAdapter';
+import {
+  isPiUiEvent,
+  PiUiEventSequenceTracker,
+  PiUiEventType,
+  type PiUiEvent,
+} from '../../shared/cowork/piUiEvent';
 
 export interface CoworkChatTransportOptions {
   /** Session to send messages to. If omitted, a new session is created. */
@@ -197,121 +203,117 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
 
         const cleanup: Array<() => void> = [];
 
-        // -- onStreamMessage: new discrete messages --
-        const unsubMsg = cowork.onStreamMessage(({ sessionId: sid, message }) => {
-          if (sid !== sessionId) return;
-          if (message.type === 'user') return;
+        // The Pi UI event protocol is the sole stream source. Legacy per-event
+        // listeners are not consumed here, preventing duplicate or reordered UI.
+        const sequenceTracker = new PiUiEventSequenceTracker();
+        const unsubUiEvent = cowork.onStreamUiEvent((event: PiUiEvent) => {
+          if (!isPiUiEvent(event) || event.sessionId !== sessionId) return;
+          if (!sequenceTracker.accept(event)) return;
 
-          if (message.type === 'assistant') {
-            const prev = lastContentByCoworkId.get(message.id) || '';
-            const full = message.content || '';
-            const delta = full.startsWith(prev) ? full.slice(prev.length) : full;
-            lastContentByCoworkId.set(message.id, full);
-
-            if (delta) {
+          if (event.type === PiUiEventType.Message) {
+            const { message } = event;
+            if (message.type === 'assistant') {
+              const prev = lastContentByCoworkId.get(message.id) || '';
+              const full = message.content || '';
+              const delta = full.startsWith(prev) ? full.slice(prev.length) : full;
+              lastContentByCoworkId.set(message.id, full);
+              if (!delta) return;
               if (!textId) {
                 textId = message.id || generateId();
                 enqueue({ type: 'text-start', id: textId });
               }
               enqueue({ type: 'text-delta', id: textId, delta });
+              return;
+            }
+
+            if (message.type === 'tool_use') {
+              const meta = message.metadata;
+              const toolName =
+                (typeof meta?.toolName === 'string' && meta.toolName) ||
+                message.content ||
+                'unknown';
+              const toolUseId =
+                (typeof meta?.toolUseId === 'string' && meta.toolUseId) || message.id;
+              const toolCallId = message.id || generateId();
+              toolUseIdMap.set(toolUseId, toolCallId);
+              enqueue(
+                createToolInputAvailableChunk(
+                  toolCallId,
+                  toolName,
+                  (meta?.toolInput as Record<string, unknown>) ?? {},
+                ),
+              );
+              return;
+            }
+
+            if (message.type === 'tool_result') {
+              const meta = message.metadata;
+              const toolUseId = typeof meta?.toolUseId === 'string' ? meta.toolUseId : '';
+              const toolCallId = toolUseIdMap.get(toolUseId) || message.id;
+              enqueue(
+                createToolOutputAvailableChunk(
+                  toolCallId,
+                  typeof meta?.toolResult === 'string' ? meta.toolResult : message.content || '',
+                ),
+              );
+              return;
+            }
+
+            if (message.type === 'system' && message.content) {
+              enqueue({ type: 'start-step' });
+              enqueue({ type: 'finish-step' });
             }
             return;
           }
 
-          if (message.type === 'tool_use') {
-            const meta = message.metadata as Record<string, unknown> | undefined;
-            const toolName = (meta?.toolName as string) || message.content || 'unknown';
-            const toolUseId = (meta?.toolUseId as string) || message.id;
-            const toolCallId = message.id || generateId();
-
-            if (toolUseId) toolUseIdMap.set(toolUseId, toolCallId);
-
-            enqueue(
-              createToolInputAvailableChunk(
-                toolCallId,
-                toolName,
-                (meta?.toolInput as Record<string, unknown>) ?? {},
-              ),
-            );
+          if (event.type === PiUiEventType.MessageUpdate) {
+            const prev = lastContentByCoworkId.get(event.messageId) || '';
+            const delta = event.content.startsWith(prev)
+              ? event.content.slice(prev.length)
+              : event.content;
+            lastContentByCoworkId.set(event.messageId, event.content);
+            if (!delta) return;
+            if (!textId) {
+              textId = event.messageId || generateId();
+              enqueue({ type: 'text-start', id: textId });
+            }
+            enqueue({ type: 'text-delta', id: textId, delta });
             return;
           }
 
-          if (message.type === 'tool_result') {
-            const meta = message.metadata as Record<string, unknown> | undefined;
-            const toolUseId = (meta?.toolUseId as string) || '';
-            const toolCallId = toolUseIdMap.get(toolUseId) || message.id;
-
-            enqueue(
-              createToolOutputAvailableChunk(
-                toolCallId,
-                (meta?.toolResult as string) || message.content || '',
-              ),
-            );
+          if (event.type === PiUiEventType.PermissionRequest) {
+            if (emittedApprovals.has(event.request.requestId)) return;
+            emittedApprovals.add(event.request.requestId);
+            enqueue({
+              type: 'tool-approval-request',
+              approvalId: event.request.requestId,
+              toolCallId: event.request.toolUseId || event.request.requestId,
+            });
             return;
           }
 
-          if (message.type === 'system' && message.content) {
-            enqueue({ type: 'start-step' });
-            enqueue({ type: 'finish-step' });
+          if (event.type === PiUiEventType.PermissionDismiss) {
+            if (!emittedApprovals.has(event.requestId)) return;
+            emittedApprovals.delete(event.requestId);
+            enqueue({ type: 'tool-output-denied', toolCallId: event.requestId });
+            return;
+          }
+
+          if (event.type === PiUiEventType.Error) {
+            enqueue({ type: 'error', errorText: event.error.message });
+            close('error');
+            return;
+          }
+
+          if (
+            event.type === PiUiEventType.Completed ||
+            event.type === PiUiEventType.Stopped ||
+            event.type === PiUiEventType.Interrupted
+          ) {
+            close('stop');
           }
         });
-        cleanup.push(unsubMsg);
-
-        // -- onStreamMessageUpdate: streaming deltas --
-        const unsubUpd = cowork.onStreamMessageUpdate(({ sessionId: sid, messageId, content }) => {
-          if (sid !== sessionId) return;
-
-          const prev = lastContentByCoworkId.get(messageId) || '';
-          const delta = content.startsWith(prev) ? content.slice(prev.length) : content;
-          lastContentByCoworkId.set(messageId, content);
-
-          if (!delta) return;
-
-          if (!textId) {
-            textId = messageId || generateId();
-            enqueue({ type: 'text-start', id: textId });
-          }
-          enqueue({ type: 'text-delta', id: textId, delta });
-        });
-        cleanup.push(unsubUpd);
-
-        // -- onStreamPermission: tool execution requires user approval --
-        const unsubPerm = cowork.onStreamPermission(({ sessionId: sid, request }) => {
-          if (sid !== sessionId) return;
-          if (emittedApprovals.has(request.requestId)) return;
-          emittedApprovals.add(request.requestId);
-
-          enqueue({
-            type: 'tool-approval-request',
-            approvalId: request.requestId,
-            toolCallId: request.toolUseId || request.requestId,
-          });
-        });
-        cleanup.push(unsubPerm);
-
-        // Dismiss permission when the agent cancels it before user responds.
-        const unsubPermDismiss = cowork.onStreamPermissionDismiss(({ requestId }) => {
-          if (!emittedApprovals.has(requestId)) return;
-          emittedApprovals.delete(requestId);
-          enqueue({ type: 'tool-output-denied', toolCallId: requestId });
-        });
-        cleanup.push(unsubPermDismiss);
-
-        // -- onStreamComplete --
-        const unsubComplete = cowork.onStreamComplete(({ sessionId: sid }) => {
-          if (sid !== sessionId) return;
-          close('stop');
-        });
-        cleanup.push(unsubComplete);
-
-        // -- onStreamError --
-        const unsubErr = cowork.onStreamError(({ sessionId: sid, error }) => {
-          if (sid !== sessionId) return;
-          const message = typeof error === 'string' ? error : error.message;
-          enqueue({ type: 'error', errorText: message });
-          close('error');
-        });
-        cleanup.push(unsubErr);
+        cleanup.push(unsubUiEvent);
 
         // -- abort --
         const handleAbort = () => {
