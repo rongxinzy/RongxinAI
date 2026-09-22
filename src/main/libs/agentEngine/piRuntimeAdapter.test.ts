@@ -710,6 +710,12 @@ describe('PiRuntimeAdapter', () => {
       } as never);
       adapter.setProjectMemoryService({} as never);
       adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
+      const beginRun = vi.fn();
+      adapter.setWorkbenchTaskService({
+        on: vi.fn(),
+        off: vi.fn(),
+        beginRun,
+      } as unknown as WorkbenchTaskService);
 
       await adapter.startSession('chat-resources', 'Hello', {
         sessionMode: 'chat',
@@ -739,6 +745,7 @@ describe('PiRuntimeAdapter', () => {
       expect(customToolNames).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
       expect(customToolNames).not.toContain(PiDocumentReaderToolName);
       expect(customToolNames).not.toContain(PiSubagentToolName);
+      expect(beginRun).not.toHaveBeenCalled();
     });
 
     it('reuses one Pi AgentSession across Chat continuations', async () => {
