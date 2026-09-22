@@ -128,6 +128,10 @@ const App: React.FC = () => {
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
+  const [isLocalInferenceDormant, setIsLocalInferenceDormant] = useState(false);
+  // 2026/09/21 lixiang  keep-alive 视图隐藏超过该时长后真正卸载以释放内存，
+  // 回到视图时重挂载（activeTab 等会话状态经 localStorage 恢复）。
+  const LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS = 10 * 60 * 1000;
   const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -397,8 +401,18 @@ const App: React.FC = () => {
   useEffect(() => {
     if (mainView === 'localInference') {
       setHasMountedLocalInference(true);
+      setIsLocalInferenceDormant(false);
+      return;
     }
-  }, [mainView]);
+    // 视图切走后仍保留 keep-alive 渲染一小段时间（快速往返不闪加载态），
+    // 超时后置为休眠：卸载组件树、释放 CodeMirror/图标/模型列表等内存；
+    // 进行中的运行时安装不依赖本视图存活（进度挂在主进程，重挂载可恢复）。
+    if (!hasMountedLocalInference) return;
+    const timer = window.setTimeout(() => {
+      setIsLocalInferenceDormant(true);
+    }, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [mainView, hasMountedLocalInference, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS]);
 
   useEffect(() => {
     if (!managedProviderPolicy || managedModelsOnly) return;
@@ -953,7 +967,7 @@ const App: React.FC = () => {
               data-main-canvas
               className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]"
             >
-              {hasMountedLocalInference && !managedModelsOnly && (
+              {hasMountedLocalInference && !isLocalInferenceDormant && !managedModelsOnly && (
                 <div
                   className={
                     mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
