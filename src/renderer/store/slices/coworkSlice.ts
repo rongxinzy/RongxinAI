@@ -514,10 +514,6 @@ const coworkSlice = createSlice({
 
       const applyMessageTime = (session: CoworkSessionSummary) => {
         session.updatedAt = message.timestamp;
-        const running =
-          session.status === CoworkSessionStatusValue.Running ||
-          state.streamingSessionIds.includes(sessionId);
-        if (running && !session.runStartedAt) session.runStartedAt = message.timestamp;
       };
       updateSessionSummary(state.sessions, sessionId, applyMessageTime);
       updateSessionSummary(state.chatSessions, sessionId, applyMessageTime);

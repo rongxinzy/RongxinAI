@@ -191,6 +191,13 @@ import { GitWorktreeService } from './codingAgent/gitWorktreeService';
 import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
 import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
 import { CoworkInterruptionCause } from '../shared/cowork/interruption';
+import {
+  type PiUiEvent,
+  type PiUiEventPayload,
+  type PiUiMessage,
+  PiUiEventType,
+  PiUiEventSequencer,
+} from '../shared/cowork/piUiEvent';
 import { normalizePiMessage, normalizePiToolActivity } from './codingAgent/piCodingEventAdapter';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
@@ -2019,8 +2026,35 @@ const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
 
 /** Project Pi Work/Chat events to renderer-owned cowork streams. */
 const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
+  const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
+  const broadcastUiEvent = (event: PiUiEvent): void => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.send(CoworkStreamIpc.UiEvent, event);
+      } catch (error) {
+        console.error('[PiWorkbenchForwarder] failed to forward a Pi UI event:', error);
+      }
+    });
+  };
+  const emitUiEvent = (
+    payload: PiUiEventPayload,
+  ): void => {
+    broadcastUiEvent(sequencer.next(payload));
+  };
+
+  runtime.on('started', (sessionId: string) => {
+    emitUiEvent({ type: PiUiEventType.Started, sessionId });
+  });
+
   runtime.on('message', (sessionId: string, message: unknown) => {
     const safeMessage = sanitizeCoworkMessageForIpc(message);
+    emitUiEvent({
+      type: PiUiEventType.Message,
+      sessionId,
+      message: safeMessage as PiUiMessage,
+    });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2036,6 +2070,13 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
       const safeContent = truncateIpcString(content, IPC_UPDATE_CONTENT_MAX_CHARS);
+      emitUiEvent({
+        type: PiUiEventType.MessageUpdate,
+        sessionId,
+        messageId,
+        content: safeContent,
+        metadata,
+      });
       const windows = BrowserWindow.getAllWindows();
       windows.forEach(win => {
         if (win.isDestroyed()) return;
@@ -2054,6 +2095,7 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   );
 
   runtime.on('toolActivity', (sessionId, event) => {
+    emitUiEvent({ type: PiUiEventType.ToolActivity, sessionId, event });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2067,6 +2109,7 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
 
   runtime.on('queueUpdated', (sessionId, items) => {
     const safeItems = slimQueuedMessagesForIpc(items);
+    emitUiEvent({ type: PiUiEventType.QueueUpdated, sessionId, items: safeItems });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2083,6 +2126,28 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       return;
     }
     const safeRequest = sanitizePermissionRequestForIpc(request);
+    if (!safeRequest || typeof safeRequest !== 'object') return;
+    const requestRecord = safeRequest as Record<string, unknown>;
+    if (typeof requestRecord.requestId !== 'string' || typeof requestRecord.toolName !== 'string') {
+      console.warn('[PiWorkbenchForwarder] ignored a malformed permission request');
+      return;
+    }
+    const toolInput =
+      requestRecord.toolInput && typeof requestRecord.toolInput === 'object'
+        ? (requestRecord.toolInput as Record<string, unknown>)
+        : {};
+    emitUiEvent({
+      type: PiUiEventType.PermissionRequest,
+      sessionId,
+      request: {
+        requestId: requestRecord.requestId,
+        toolName: requestRecord.toolName,
+        toolInput,
+        ...(typeof requestRecord.toolUseId === 'string'
+          ? { toolUseId: requestRecord.toolUseId }
+          : {}),
+      },
+    });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2095,6 +2160,7 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   });
 
   runtime.on('permissionDismiss', (requestId: string) => {
+    emitUiEvent({ type: PiUiEventType.PermissionDismiss, sessionId: null, requestId });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2107,6 +2173,11 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   });
 
   runtime.on('sessionInterrupted', interruption => {
+    emitUiEvent({
+      type: PiUiEventType.Interrupted,
+      sessionId: interruption.sessionId,
+      interruption,
+    });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2118,7 +2189,16 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     });
   });
 
+  runtime.on('sessionStopped', (sessionId: string) => {
+    emitUiEvent({ type: PiUiEventType.Stopped, sessionId });
+  });
+
   runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
+    emitUiEvent({
+      type: PiUiEventType.Completed,
+      sessionId,
+      claudeSessionId,
+    });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -2141,6 +2221,9 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
         persistenceError,
       );
     }
+    // Persisting the terminal message emits the canonical `message` event
+    // first. The UI protocol keeps that ordering before the terminal error.
+    emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -4409,10 +4492,6 @@ if (!gotTheLock) {
             options.modelOverride,
           );
         }
-
-        // Update session status to 'running' before starting async task
-        // This ensures the frontend receives the correct status immediately
-        coworkStoreInstance.updateSession(session.id, { status: 'running' });
 
         // Build metadata, include imageAttachments if present
         const messageMetadata: Record<string, unknown> = {};

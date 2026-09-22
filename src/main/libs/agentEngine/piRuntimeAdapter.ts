@@ -2539,6 +2539,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     switch (event.type) {
       case 'agent_start':
         active.isRunning = true;
+        this.store?.updateSession(sessionId, { status: 'running' });
+        this.emit('started', sessionId);
         break;
 
       case 'turn_start':

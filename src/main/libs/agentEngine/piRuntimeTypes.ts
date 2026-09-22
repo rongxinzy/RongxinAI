@@ -37,6 +37,7 @@ export interface PiPermissionRequest {
 }
 
 export interface PiRuntimeEvents {
+  started: (sessionId: string) => void;
   message: (sessionId: string, message: CoworkMessage) => void;
   messageUpdate: (
     sessionId: string,
