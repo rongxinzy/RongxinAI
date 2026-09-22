@@ -1,3 +1,4 @@
+import { createDirectChatErrorMessage } from '../../services/coworkTerminalError';
 import { configService } from '../../services/config';
 import { cn } from '@shared/lib/utils';
 import React, { useEffect, useRef, useState } from 'react';
@@ -788,14 +789,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           dispatch(
             addMessage({
               sessionId: tempSessionId,
-              message: {
-                id: `error-${Date.now()}`,
-                type: 'system',
-                content: i18nService
-                  .t('chatErrorMessage')
-                  .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-                timestamp: Date.now(),
-              },
+              message: createDirectChatErrorMessage(error),
             }),
           );
           if (persistTimer) clearTimeout(persistTimer);
@@ -1335,14 +1329,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         dispatch(
           addMessage({
             sessionId: currentSession.id,
-            message: {
-              id: `error-${Date.now()}`,
-              type: 'system',
-              content: i18nService
-                .t('chatErrorMessage')
-                .replace('{error}', error instanceof Error ? error.message : 'Unknown error'),
-              timestamp: Date.now(),
-            },
+            message: createDirectChatErrorMessage(error),
           }),
         );
         if (persistTimer) clearTimeout(persistTimer);

@@ -34,6 +34,11 @@ export const createCoworkTerminalErrorMessage = (
   },
 });
 
+export const createDirectChatErrorMessage = (error: unknown): CoworkMessage =>
+  createCoworkTerminalErrorMessage(
+    resolveCoworkTerminalError(error instanceof Error ? error.message : String(error)),
+  );
+
 export const hasMatchingLatestTerminalError = (
   sessions: Array<CoworkMessageSession | null | undefined>,
   sessionId: string,
