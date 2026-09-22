@@ -52,6 +52,10 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   ...overrides,
 });
 
+test('initial permission mode allows all tools', () => {
+  expect(coworkReducer(undefined, { type: 'init' }).config.permissionMode).toBe(CoworkPermissionMode.AllowAll);
+});
+
 test('setConfig loads Pi-owned cowork configuration', () => {
   const state = coworkReducer(
     undefined,

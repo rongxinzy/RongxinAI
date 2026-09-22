@@ -28,12 +28,21 @@ import {
 } from '../shared/agent/avatar';
 import {
   COWORK_MESSAGE_PAGE_SIZE,
+  CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import { CoworkStore } from './coworkStore';
+
+test('defaults to allow-all while retaining an explicit permission choice', () => {
+  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.AllowAll);
+  db.prepare('INSERT OR REPLACE INTO cowork_config (key, value) VALUES (?, ?)').run(
+    'permissionMode', CoworkPermissionMode.Ask,
+  );
+  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.Ask);
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
