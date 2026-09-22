@@ -16,6 +16,10 @@ export type LanguageType = 'zh' | 'en';
 
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    webSearchToolLabel: '联网搜索',
+    webSearchInvalidInput: '搜索词或结果数量无效。',
+    webSearchInvalidResponse: '搜索服务返回了无效或过大的结果。',
+    webSearchRequestFailed: '搜索请求失败（HTTP {status}）。',
     workbenchTaskOutputToolLabel: '输出要求',
     workbenchDeliveryHashFailed: '最终交付物内容校验失败。',
     workbenchOutputContractMissing: '尚未确认任务输出要求，结果暂不能验收。',
@@ -390,6 +394,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
   en: {
+    webSearchToolLabel: 'Web search',
+    webSearchInvalidInput: 'Invalid search query or result count.',
+    webSearchInvalidResponse: 'Search returned an invalid or oversized response.',
+    webSearchRequestFailed: 'Search request failed (HTTP {status}).',
     workbenchTaskOutputToolLabel: 'Output Requirements',
     workbenchDeliveryHashFailed: 'Final deliverable content verification failed.',
     workbenchOutputContractMissing: 'The task output requirements have not been committed; the result cannot be accepted yet.',

@@ -51,6 +51,14 @@ Message(user) -> Started -> Message / MessageUpdate / ToolActivity / PermissionR
 
 2026-09-22 使用本地生产构建，在实际 Electron 界面和已配置的 GLM-5.3-Flash 上验收：新会话询问“你是谁”，回答以“我是知远智能体（ZhiYuan Agent）”开头；同一会话继续要求一句话介绍，仍使用知远身份。运行日志显示一次 Pi session 创建、两次 `agent_start`。首轮回答仍列举了编码能力，不能把身份正确等同于文风完全符合提示，也不能据此保证所有模型表现一致。
 
+## Chat 联网搜索回归
+
+Chat 默认注册 `web_search` 工具，直接复用 AnySearch 网关凭据与 `/v1/search`，无需显式选择搜索技能。搜索规则通过提示词贡献机制追加，保留默认提示词；Work 继续使用原有技能路径。工具支持取消、25 秒超时、结果数量限制和 128 KiB 响应上限，不将网关凭据传入模型结果。
+
+`piWebSearchTool.test.ts` 覆盖正常响应、预先取消、HTTP 401/429/500、无结果、无效 JSON、超大响应、无效参数和 Chat/Work 提示词隔离；运行时回归确认 Chat 实际注册该工具。2026-09-22 本轮 4 个相关测试文件、142 项测试通过，lint、Electron 类型检查、生产构建及包体积检查通过。
+
+真实 Electron + GLM-5.3-Flash 新会话输入“请联网搜索 TypeScript 官方文档，给我官方文档链接和一句简介。”，自动执行一次网页搜索，工具参数为 query 与 maxResults，结果包含官方文档标题、URL 和摘要；最终回复引用 `https://www.typescriptlang.org/docs/`。该验收证明当前配置的调用链可用，不保证搜索服务始终可用或所有模型均主动搜索。
+
 ## 运行状态恢复回归
 
 `cowork:stream:runtimeSnapshots` 返回主进程从 Pi 生命周期事件维护的状态和事件序号，不从数据库的 `running` 字段推断是否正在执行。渲染监听器接入时读取快照；首次收到大于 1 的序号或后续出现序号缺口时，后台补读会话。补读不改变当前会话、工作区、智能体、技能、草稿或未读状态。
