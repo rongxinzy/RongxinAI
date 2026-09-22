@@ -2,7 +2,8 @@
  * Unified registry for tool-usage system-prompt contributions.
  *
  * Pi drops every tool's `promptGuidelines` whenever a custom system prompt is
- * supplied, and ZhiYuan always supplies one. Each tool module exports its own
+ * supplied, as Work sessions may do. Chat preserves Pi's default prompt.
+ * Each tool module exports its own
  * `*SystemPrompt` policy; this registry is the single place that collects them
  * into the session's appendSystemPromptOverride. Adding a tool policy without
  * registering it here means the model never sees it — piRuntimeAdapter and its
@@ -18,8 +19,11 @@ import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { PiTaskOutputSystemPrompt } from './piTaskOutputTool';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
+import { PiWebSearchSystemPrompt } from './piWebSearchTool';
 
 export interface PiSystemPromptContext {
+  /** Whether the session is a direct Chat lane without Work orchestration. */
+  chatMode?: boolean;
   /** Whether file tools (read/write/edit/read_document) are active. */
   fileToolsEnabled: boolean;
   /** Current per-session output token budget, used by the large-write policy. */
@@ -50,6 +54,11 @@ export interface PiSystemPromptContribution {
 // Order matters: entries are appended to the system prompt in this sequence.
 export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
   {
+    id: 'web-search',
+    enabled: context => context.chatMode === true,
+    prompt: PiWebSearchSystemPrompt,
+  },
+  {
     id: 'ask-user-question',
     enabled: context => context.unattended !== true,
     prompt: PiAskUserQuestionSystemPrompt,
@@ -67,6 +76,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
   {
     id: 'document-reader',
     requiresFileTools: true,
+    enabled: context => context.chatMode !== true,
     prompt: PiDocumentReaderSystemPrompt,
   },
   {
@@ -90,7 +100,11 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     requiresFileTools: true,
     prompt: context => createPiLargeFileWriteSystemPrompt(context.maxOutputTokens),
   },
-  { id: 'declare-artifact', prompt: DeclareArtifactSystemPrompt },
+  {
+    id: 'declare-artifact',
+    enabled: context => context.chatMode !== true,
+    prompt: DeclareArtifactSystemPrompt,
+  },
   {
     id: 'task-output',
     enabled: context => context.taskOutputEnabled === true,

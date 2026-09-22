@@ -130,9 +130,6 @@ interface CoworkSessionDetailProps {
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
   workMode?: 'work' | 'chat';
-  isDirectChat?: boolean;
-  localThinkingEnabled?: boolean;
-  onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
   inlineQuestionPermission?: CoworkPermissionRequest | null;
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
   inlinePermission?: CoworkPermissionRequest | null;
@@ -199,9 +196,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onNewChat,
   updateBadge,
   workMode = 'work',
-  isDirectChat = false,
-  localThinkingEnabled,
-  onLocalThinkingEnabledChange,
   inlineQuestionPermission,
   onRespondToInlineQuestion,
   inlinePermission,
@@ -1526,7 +1520,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                     isSessionSwitching ? null : (
                       <>
                         {workMode === CoworkSessionMode.Work &&
-                          !isDirectChat &&
                           currentSession?.id && (
                             <PendingMessageQueue
                               sessionId={currentSession.id}
@@ -1561,10 +1554,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   permissionMode={permissionMode}
                   onPermissionModeChange={onPermissionModeChange}
                   showModelSelector={true}
-                  isDirectChat={isDirectChat}
-                  showLocalThinkingToggle={isDirectChat}
-                  localThinkingEnabled={localThinkingEnabled}
-                  onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
                   resumeTaskActive={Boolean(resumeTaskId)}
                   onCancelTaskResume={onCancelTaskResume}
                   sessionId={displayedSessionId ?? currentSession?.id}

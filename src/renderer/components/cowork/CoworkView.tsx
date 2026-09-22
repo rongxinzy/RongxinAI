@@ -1,4 +1,3 @@
-import { createDirectChatErrorMessage } from '../../services/coworkTerminalError';
 import { configService } from '../../services/config';
 import { cn } from '@shared/lib/utils';
 import React, { useEffect, useRef, useState } from 'react';
@@ -6,19 +5,14 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../../../shared/cowork/constants';
-import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
-import { ChatChatTransport } from '../../services/chatChatTransport';
-import {
-  buildChatAgentSystemPrompt,
-  ChatExecution,
-  resolveChatExecution,
-} from '../../services/chatExecutionRouter';
+import { buildCoworkSystemPrompt } from '../../services/coworkSystemPrompt';
 import {
   isChatSkillShortcutSelection,
   resolveChatSkillShortcutPermissionMode,
@@ -26,7 +20,6 @@ import {
 } from '../chat/constants';
 import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
-import { DirectChatTurnState } from '../../services/directChatTurnState';
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
 import { quickActionService } from '../../services/quickAction';
@@ -44,15 +37,12 @@ import {
   addMessage,
   addSession,
   clearCurrentSession,
-  updateMessageContent,
   updateMessageContents,
-  updateSessionStatus,
 } from '../../store/slices/coworkSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import {
-  CoworkSessionStatusValue,
   type CoworkImageAttachment,
   type CoworkFileAttachment,
   type CoworkPermissionRequest,
@@ -67,7 +57,6 @@ import PageHeader from '../PageHeader';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
-import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
 import {
   quickActionSkillIds,
@@ -89,84 +78,6 @@ export interface CoworkViewProps {
   inlinePermission?: CoworkPermissionRequest | null;
   onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
 }
-
-const DirectChatDataChunkType = {
-  Context: 'data-context',
-  SessionMetrics: 'data-session-metrics',
-} as const;
-
-type DirectChatPart =
-  | { type: 'text'; text: string }
-  | { type: 'file'; mediaType: string; url: string; filename: string };
-
-interface DirectChatContextData {
-  cacheReadTokens?: number;
-  cacheWriteTokens?: number;
-  contextWindowTokens: number;
-  inputTokens: number;
-  outputTokens: number;
-  usedTokens: number;
-}
-
-interface DirectChatSessionMetrics {
-  requestStartedAt: number;
-  firstVisibleTextAt?: number;
-  completedAt: number;
-}
-
-const isDirectChatContextData = (value: unknown): value is DirectChatContextData => {
-  if (!value || typeof value !== 'object') return false;
-  const data = value as Record<string, unknown>;
-  const contextWindowTokens = data.contextWindowTokens;
-  const inputTokens = data.inputTokens;
-  const outputTokens = data.outputTokens;
-  const usedTokens = data.usedTokens;
-  const cacheReadTokens = data.cacheReadTokens;
-  const cacheWriteTokens = data.cacheWriteTokens;
-  if (
-    typeof contextWindowTokens !== 'number' ||
-    typeof inputTokens !== 'number' ||
-    typeof outputTokens !== 'number' ||
-    typeof usedTokens !== 'number' ||
-    !Number.isFinite(contextWindowTokens) ||
-    !Number.isFinite(inputTokens) ||
-    !Number.isFinite(outputTokens) ||
-    !Number.isFinite(usedTokens)
-  ) {
-    return false;
-  }
-  return (
-    contextWindowTokens > 0 &&
-    inputTokens >= 0 &&
-    outputTokens >= 0 &&
-    usedTokens >= 0 &&
-    (cacheReadTokens === undefined ||
-      (typeof cacheReadTokens === 'number' &&
-        Number.isFinite(cacheReadTokens) &&
-        cacheReadTokens >= 0)) &&
-    (cacheWriteTokens === undefined ||
-      (typeof cacheWriteTokens === 'number' &&
-        Number.isFinite(cacheWriteTokens) &&
-        cacheWriteTokens >= 0))
-  );
-};
-
-const isDirectChatSessionMetrics = (value: unknown): value is DirectChatSessionMetrics => {
-  if (!value || typeof value !== 'object') return false;
-  const data = value as Record<string, unknown>;
-  const start = data.requestStartedAt;
-  const first = data.firstVisibleTextAt;
-  const end = data.completedAt;
-  return (
-    typeof start === 'number' &&
-    typeof end === 'number' &&
-    Number.isFinite(start) &&
-    Number.isFinite(end) &&
-    end >= start &&
-    (first === undefined ||
-      (typeof first === 'number' && Number.isFinite(first) && first >= start && first <= end))
-  );
-};
 
 const CoworkView: React.FC<CoworkViewProps> = ({
   onRequestAppSettings,
@@ -193,11 +104,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   useEffect(() => () => contentBatcher.dispose(), [contentBatcher]);
   const [isInitialized, setIsInitialized] = useState(false);
-  // Track in-flight direct-chat operations per session so switching to another
-  // chat window does not block submission on a global boolean ref.
   const startingSessionIdsRef = useRef(new Set<string>());
   const continuingSessionIdsRef = useRef(new Set<string>());
-  const directChatAbortControllersRef = useRef(new Map<string, AbortController>());
   // Track pending start request so stop can cancel delayed startup.
   const pendingStartRef = useRef<{
     requestId: number;
@@ -209,15 +117,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
   const quickActionActivationRef = useRef<string | null>(null);
 
-  const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
   const currentSession = useSelector(selectCurrentSession);
   const taskResume = useTaskResumeContext(currentSession?.id);
   const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
-  const directChatModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
-  const directChatModelId = directChatModel.id;
-
   // Clear session when workMode changes and current session mode doesn't match.
   // Sessions without an explicit mode field (legacy) are treated as work mode.
   const prevWorkModeRef = useRef(workMode);
@@ -276,15 +180,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     currentAgentId,
     currentAgent?.model ?? '',
   );
-
-  // Agent-backed chat sessions (skills attached, or persisted on the session)
-  // execute via the agent runtime, so the prompt input must use work-style
-  // agent model/control semantics instead of direct-chat ones — otherwise the
-  // model selector would bind to the direct-chat default model while the
-  // engine actually runs the agent model.
-  const isAgentBackedChat =
-    workMode === WorkMode.Chat &&
-    resolveChatExecution({ activeSkillIds, session: currentSession }) === ChatExecution.Agent;
 
   const buildApiConfigNotice = (
     error?: string,
@@ -418,17 +313,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       // Capture active skill IDs before clearing them
       const sessionSkillIds = [...activeSkillIds];
 
-      // Chat sessions with skills attached execute via the agent runtime while
-      // staying tagged as chat sessions; plain chat streams directly (direct LLM).
-      const isChatAgentExecution =
-        workMode === WorkMode.Chat &&
-        resolveChatExecution({ activeSkillIds: sessionSkillIds }) === ChatExecution.Agent;
+      // Chat sessions stay tagged as chat sessions while every turn executes
+      // through the Pi agent runtime.
+      const isChatAgentExecution = workMode === WorkMode.Chat;
 
       const tempSession: CoworkSession = {
         id: tempSessionId,
         title: fallbackTitle,
-        claudeSessionId: null,
-        status: 'running',
+        status: 'idle',
         mode: workMode,
         pinned: false,
         createdAt: now,
@@ -436,7 +328,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         cwd: currentWorkspacePath,
         systemPrompt: '',
         modelOverride: currentAgentSelectedModel ? toAgentModelRef(currentAgentSelectedModel) : '',
-        executionMode: config.executionMode || 'local',
+        executionMode: config.executionMode || CoworkExecutionMode.Local,
         activeSkillIds: sessionSkillIds,
         workspaceId: currentWorkspaceId || '',
         agentId: currentAgentId,
@@ -465,350 +357,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         totalMessages: 1,
       };
 
-      // Direct chat sessions use the temporary session as their UI identity
-      // until the direct model stream finishes. Add it to the sidebar now so
-      // the user's message is visible in history immediately after submit.
-      // Agent-backed chat sessions follow the work flow: the temp session is
-      // replaced by the real engine-created session (tagged mode: 'chat').
-      if (workMode === WorkMode.Chat && !isChatAgentExecution) {
-        dispatch(addSession(tempSession));
-      } else {
-        // Keep a new Work session in the list while the backend creates its
-        // persistent record, so attachments and the initial prompt remain
-        // visible if startup takes time or fails.
-        dispatch(addSession(tempSession));
-      }
+      // Keep the temporary session in the list while the backend creates its
+      // persistent Pi session, so attachments and the initial prompt remain
+      // visible if startup takes time or fails.
+      dispatch(addSession(tempSession));
       // Clear quick action selection after starting session
       dispatch(clearSelection());
 
-      // Direct chat: stream from the configured LLM via apiService, skip the agent runtime
-      if (workMode === WorkMode.Chat && !isChatAgentExecution) {
-        const abortController = new AbortController();
-        directChatAbortControllersRef.current.set(tempSessionId, abortController);
-        const assistantMsgId = `msg-${now}-assistant`;
-        const thinkingMsgId = `msg-${now}-thinking`;
-        const turnState = new DirectChatTurnState(assistantMsgId, thinkingMsgId);
-        let assistantContent = '';
-        let assistantMessageAdded = false;
-        let directContextData: DirectChatContextData | undefined;
-        let directSessionMetrics: DirectChatSessionMetrics | undefined;
-        const finishThinking = () => {
-          const finished = turnState.finishReasoning();
-          if (!finished) return;
-          contentBatcher.discard(tempSessionId, finished.message.id);
-          if (finished.messageWasAdded) {
-            dispatch(
-              updateMessageContent({
-                sessionId: tempSessionId,
-                messageId: finished.message.id,
-                content: finished.message.content,
-                metadata: finished.message.metadata,
-              }),
-            );
-          }
-        };
-        let persistTimer: ReturnType<typeof setTimeout> | null = null;
-        const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
-          const snapshot = store.getState().cowork.currentSession;
-          const streamingSnapshot = store.getState().cowork.streamingSessions[tempSessionId];
-          const baseSession =
-            snapshot?.id === tempSessionId ? snapshot : (streamingSnapshot ?? tempSession);
-          const messages = mergeDirectChatSnapshotMessages(
-            baseSession.messages,
-            turnState.messagesSnapshot,
-          );
-          return {
-            ...baseSession,
-            status,
-            updatedAt: Date.now(),
-            messages,
-            totalMessages: messages.length,
-          };
-        };
-        const persistChatSnapshot = (force = false) => {
-          const persist = () => {
-            persistTimer = null;
-            void coworkService
-              .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Running))
-              .catch(error => console.error('[CoworkView] Failed to persist chat session:', error));
-          };
-          if (force) {
-            if (persistTimer) clearTimeout(persistTimer);
-            persist();
-          } else if (!persistTimer) {
-            persistTimer = setTimeout(persist, 250);
-          }
-        };
-        try {
-          const created = await coworkService.saveChatSession(tempSession);
-          if (!created.success) {
-            throw new Error(created.error || 'Failed to create chat session');
-          }
-          const transport = new ChatChatTransport({
-            contextWindowTokens:
-              directChatModel.llamaCppRuntimeContextWindow ?? directChatModel.contextWindow,
-            modelId: directChatModelId,
-            modelProviderKey: directChatModel.providerKey,
-            localThinkingEnabled,
-          });
-          const userParts: DirectChatPart[] = [
-            { type: 'text' as const, text: prompt },
-            ...(imageAttachments ?? [])
-              .filter(image => image.base64Data)
-              .map(image => ({
-                type: 'file' as const,
-                mediaType: image.mimeType,
-                url: `data:${image.mimeType};base64,${image.base64Data}`,
-                filename: image.name,
-              })),
-          ];
-          const stream = await transport.sendMessages({
-            trigger: 'submit-message',
-            chatId: tempSessionId,
-            messageId: undefined,
-            messages: [{ id: `msg-${now}`, role: 'user', parts: userParts }],
-            abortSignal: abortController.signal,
-          });
-          const reader = stream.getReader();
-          while (true) {
-            const { done, value: chunk } = await reader.read();
-            if (done || isPendingStartCancelled()) break;
-            if (!chunk) continue;
-            switch (chunk.type) {
-              case DirectChatDataChunkType.Context:
-                if (isDirectChatContextData(chunk.data)) {
-                  directContextData = chunk.data;
-                }
-                break;
-              case DirectChatDataChunkType.SessionMetrics:
-                if (isDirectChatSessionMetrics(chunk.data)) {
-                  directSessionMetrics = chunk.data;
-                }
-                break;
-              case 'text-start':
-                {
-                  const result = turnState.startAssistant();
-                  if (!assistantMessageAdded && result.isNew) {
-                    dispatch(
-                      addMessage({
-                        sessionId: tempSessionId,
-                        message: result.message,
-                      }),
-                    );
-                    assistantMessageAdded = true;
-                    persistChatSnapshot();
-                  }
-                }
-                break;
-              case 'text-delta':
-                finishThinking();
-                assistantContent += chunk.delta;
-                {
-                  const result = turnState.appendAssistant(chunk.delta);
-                  if (!assistantMessageAdded && result.isNew) {
-                    dispatch(
-                      addMessage({
-                        sessionId: tempSessionId,
-                        message: result.message,
-                      }),
-                    );
-                    assistantMessageAdded = true;
-                  } else {
-                    contentBatcher.enqueue({
-                      sessionId: tempSessionId,
-                      messageId: assistantMsgId,
-                      content: result.message.content,
-                      metadata: result.message.metadata,
-                    });
-                  }
-                }
-                persistChatSnapshot();
-                break;
-              case 'reasoning-start':
-                {
-                  const result = turnState.startReasoning();
-                  if (result.isNew) {
-                    dispatch(
-                      addMessage({
-                        sessionId: tempSessionId,
-                        message: result.message,
-                      }),
-                    );
-                    turnState.markReasoningMessageAdded();
-                    persistChatSnapshot();
-                  }
-                }
-                break;
-              case 'reasoning-delta':
-                {
-                  const result = turnState.appendReasoning(chunk.delta);
-                  if (result.isNew) {
-                    dispatch(
-                      addMessage({
-                        sessionId: tempSessionId,
-                        message: result.message,
-                      }),
-                    );
-                    turnState.markReasoningMessageAdded();
-                  } else {
-                    contentBatcher.enqueue({
-                      sessionId: tempSessionId,
-                      messageId: result.message.id,
-                      content: result.message.content,
-                      metadata: result.message.metadata,
-                    });
-                  }
-                }
-                break;
-              case 'reasoning-end':
-                finishThinking();
-                persistChatSnapshot();
-                break;
-              case 'tool-input-available':
-                finishThinking();
-                dispatch(
-                  addMessage({
-                    sessionId: tempSessionId,
-                    message: turnState.addToolUse(
-                      chunk.toolCallId,
-                      chunk.input && typeof chunk.input === 'object'
-                        ? (chunk.input as Record<string, unknown>)
-                        : {},
-                    ),
-                  }),
-                );
-                persistChatSnapshot();
-                break;
-              case 'tool-output-available':
-                dispatch(
-                  addMessage({
-                    sessionId: tempSessionId,
-                    message: turnState.addToolResult(chunk.toolCallId, chunk.output),
-                  }),
-                );
-                persistChatSnapshot();
-                break;
-              case 'tool-output-error':
-                dispatch(
-                  addMessage({
-                    sessionId: tempSessionId,
-                    message: turnState.addToolResult(chunk.toolCallId, undefined, chunk.errorText),
-                  }),
-                );
-                persistChatSnapshot();
-                break;
-              case 'error':
-                throw new Error(chunk.errorText);
-            }
-          }
-          if (abortController.signal.aborted || isPendingStartCancelled()) {
-            contentBatcher.discard(tempSessionId, assistantMsgId);
-            finishThinking();
-            if (assistantMessageAdded) {
-              turnState.updateAssistantMetadata({ isStreaming: false, isFinal: true });
-              dispatch(
-                updateMessageContent({
-                  sessionId: tempSessionId,
-                  messageId: assistantMsgId,
-                  content: assistantContent,
-                  metadata: { isStreaming: false, isFinal: true },
-                }),
-              );
-            }
-            dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'idle' }));
-            if (persistTimer) clearTimeout(persistTimer);
-            await coworkService.saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Idle));
-            return;
-          }
-          contentBatcher.discard(tempSessionId, assistantMsgId);
-          finishThinking();
-          // Finalize message metadata to prevent streaming replay on reload
-          if (assistantMessageAdded) {
-            const finalMetadata = {
-              isStreaming: false,
-              isFinal: true,
-              isFinalAnswer: true,
-              ...(directContextData
-                ? {
-                    contextUsage: {
-                      contextWindowTokens: directContextData.contextWindowTokens,
-                      updatedAt: Date.now(),
-                      usedTokens: directContextData.usedTokens,
-                    },
-                    model: directChatModelId,
-                    modelProviderKey: directChatModel.providerKey,
-                    usage: {
-                      inputTokens: directContextData.inputTokens,
-                      outputTokens: directContextData.outputTokens,
-                      ...(directContextData.cacheReadTokens !== undefined
-                        ? { cacheReadTokens: directContextData.cacheReadTokens }
-                        : {}),
-                      ...(directContextData.cacheWriteTokens !== undefined
-                        ? { cacheWriteTokens: directContextData.cacheWriteTokens }
-                        : {}),
-                      totalTokens: directContextData.usedTokens,
-                    },
-                  }
-                : {}),
-              ...(directSessionMetrics ? { metrics: directSessionMetrics } : {}),
-            };
-            turnState.updateAssistantMetadata(finalMetadata);
-            dispatch(
-              updateMessageContent({
-                sessionId: tempSessionId,
-                messageId: assistantMsgId,
-                content: assistantContent,
-                metadata: finalMetadata,
-              }),
-            );
-          }
-          if (persistTimer) clearTimeout(persistTimer);
-          const savedSession = buildChatSnapshot(CoworkSessionStatusValue.Completed);
-          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'completed' }));
-          if (store.getState().cowork.currentSessionId === tempSessionId) {
-            dispatch(addSession(savedSession));
-          }
-          await coworkService.saveChatSession(savedSession);
-        } catch (error) {
-          contentBatcher.discard(tempSessionId, assistantMsgId);
-          finishThinking();
-          // Finalize the partial answer so the turn does not render as still
-          // streaming after the failure.
-          if (assistantMessageAdded) {
-            turnState.updateAssistantMetadata({ isStreaming: false, isFinal: true });
-            dispatch(
-              updateMessageContent({
-                sessionId: tempSessionId,
-                messageId: assistantMsgId,
-                content: assistantContent,
-                metadata: { isStreaming: false, isFinal: true },
-              }),
-            );
-          }
-          dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
-          dispatch(
-            addMessage({
-              sessionId: tempSessionId,
-              message: createDirectChatErrorMessage(error),
-            }),
-          );
-          if (persistTimer) clearTimeout(persistTimer);
-          await coworkService
-            .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Error))
-            .catch(saveError =>
-              console.error('[CoworkView] Failed to persist failed chat session:', saveError),
-            );
-        } finally {
-          if (persistTimer) clearTimeout(persistTimer);
-          if (directChatAbortControllersRef.current.get(tempSessionId) === abortController) {
-            directChatAbortControllersRef.current.delete(tempSessionId);
-          }
-          startingSessionIdsRef.current.delete(startSessionKey);
-        }
-        return;
-      }
-      // Engine path: work sessions, and chat sessions with skills attached
-      // (agent-backed chat). The engine loads skills natively via
+      // Engine path: Work and Chat sessions. The engine loads skills natively via
       // skills.load.extraDirs, so skip the auto-routing prompt to avoid
       // injecting Claude SDK tool-calling instructions that confuse non-Claude
       // models (e.g. kimi-k2.5 falls back to text-based tool calls, producing
@@ -817,12 +373,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         currentAgent?.source === CoworkSessionExpertSource.Package ||
         currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
-      const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
+      // Chat uses Pi's agent kernel without inheriting the complete Work
+      // system prompt. Explicitly selected skills still travel as the prompt
+      // fragment assembled below.
+      const baseSystemPrompt = isChatAgentExecution
+        ? ''
+        : agentSystemPrompt || config.systemPrompt || '';
       // Combine skill prompt with system prompt. Including skillPrompt here is
       // what lets chat-mode skill submissions reach the model (issue #117).
-      const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
+      const combinedSystemPrompt = buildCoworkSystemPrompt(skillPrompt, baseSystemPrompt);
 
-      // Agent-backed chat hides the folder selector, so the engine relies on
+      // Chat hides the folder selector, so the engine relies on
       // the configured default working directory. Bail out early with a toast
       // when no working directory is available at all.
       if (isChatAgentExecution && !currentWorkspacePath) {
@@ -863,8 +424,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           title: fallbackTitle,
           cwd: currentWorkspacePath || undefined,
           systemPrompt: combinedSystemPrompt,
-          // Agent-backed chat stays tagged as a chat session so it remains in
-          // the Chat sidebar list; work sessions keep the default work mode.
+          // Chat stays tagged as a chat session so it remains in the Chat
+          // sidebar list; Work sessions keep the default work mode.
           mode: isChatAgentExecution ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
           activeSkillIds: sessionSkillIds,
           workspaceId: currentWorkspaceId || undefined,
@@ -894,7 +455,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             },
           }),
         );
-        dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
         return;
       }
 
@@ -956,8 +516,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
 
     // Work keeps the prompt editable while Pi is running. Normal input during
-    // a live turn becomes an ordered Follow-up item; Chat retains its existing
-    // direct/agent multi-turn behavior and never enters this queue.
+    // a live Work turn becomes an ordered Follow-up item; Chat uses Pi's
+    // regular continuation path.
     if (
       workMode === WorkMode.Work &&
       isStreaming &&
@@ -985,370 +545,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       return true;
     }
 
-    // Direct chat: stream from the configured LLM via apiService. Chat
-    // sessions that are agent-backed (skills attached now or persisted on the
-    // session) fall through to the engine continue path below.
-    if (
-      workMode === WorkMode.Chat &&
-      resolveChatExecution({ activeSkillIds, session: currentSession }) === ChatExecution.Direct
-    ) {
-      continuingSessionIdsRef.current.add(currentSession.id);
-      const abortController = new AbortController();
-      directChatAbortControllersRef.current.set(currentSession.id, abortController);
-      const assistantMsgId = `msg-${Date.now()}-assistant`;
-      const thinkingMsgId = `msg-${Date.now()}-thinking`;
-      const turnState = new DirectChatTurnState(assistantMsgId, thinkingMsgId);
-      const userMsgId = `msg-${Date.now()}`;
-      const userMessage = {
-        id: userMsgId,
-        type: 'user' as const,
-        content: prompt,
-        timestamp: Date.now(),
-        ...(imageAttachments?.length || fileAttachments?.length
-          ? {
-              metadata: {
-                ...(imageAttachments?.length ? { imageAttachments } : {}),
-                ...(fileAttachments?.length ? { fileAttachments } : {}),
-              },
-            }
-          : {}),
-      };
-      let assistantContent = '';
-      let assistantMessageAdded = false;
-      let directContextData: DirectChatContextData | undefined;
-      let directSessionMetrics: DirectChatSessionMetrics | undefined;
-      const finishThinking = () => {
-        const finished = turnState.finishReasoning();
-        if (!finished) return;
-        contentBatcher.discard(currentSession.id, finished.message.id);
-        if (finished.messageWasAdded) {
-          dispatch(
-            updateMessageContent({
-              sessionId: currentSession.id,
-              messageId: finished.message.id,
-              content: finished.message.content,
-              metadata: finished.message.metadata,
-            }),
-          );
-        }
-      };
-      let persistTimer: ReturnType<typeof setTimeout> | null = null;
-      const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
-        const snapshot = store.getState().cowork.currentSession;
-        const streamingSnapshot = store.getState().cowork.streamingSessions[currentSession.id];
-        const baseSession =
-          snapshot?.id === currentSession.id ? snapshot : (streamingSnapshot ?? currentSession);
-        const messages = mergeDirectChatSnapshotMessages(
-          baseSession.messages,
-          turnState.messagesSnapshot,
-        );
-        return {
-          ...baseSession,
-          status,
-          updatedAt: Date.now(),
-          messages,
-          totalMessages: messages.length,
-        };
-      };
-      const persistChatSnapshot = (force = false) => {
-        const persist = () => {
-          persistTimer = null;
-          void coworkService
-            .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Running))
-            .catch(error => console.error('[CoworkView] Failed to persist chat continue:', error));
-        };
-        if (force) {
-          if (persistTimer) clearTimeout(persistTimer);
-          persist();
-        } else if (!persistTimer) {
-          persistTimer = setTimeout(persist, 250);
-        }
-      };
-      try {
-        // Direct Chat does not emit engine stream events. Keep its per-session
-        // status in sync with Work so the shared streaming UI remains visible.
-        dispatch(
-          updateSessionStatus({
-            sessionId: currentSession.id,
-            status: CoworkSessionStatusValue.Running,
-          }),
-        );
-        // Add user message to session first
-        dispatch(
-          addMessage({
-            sessionId: currentSession.id,
-            message: userMessage,
-          }),
-        );
-        const initialSnapshot = store.getState().cowork.currentSession;
-        if (initialSnapshot?.id === currentSession.id) {
-          await coworkService.saveChatSession(initialSnapshot);
-        }
-
-        const transport = new ChatChatTransport({
-          contextWindowTokens:
-            directChatModel.llamaCppRuntimeContextWindow ?? directChatModel.contextWindow,
-          modelId: directChatModelId,
-          modelProviderKey: directChatModel.providerKey,
-          localThinkingEnabled,
-        });
-        const stream = await transport.sendMessages({
-          trigger: 'submit-message',
-          chatId: currentSession.id,
-          messageId: undefined,
-          messages: (currentSession.messages || [])
-            .filter(
-              m =>
-                m.type === 'user' ||
-                (m.type === 'assistant' && !(m.metadata && m.metadata.isThinking === true)),
-            )
-            .map(m => ({
-              id: m.id,
-              role: m.type as 'user' | 'assistant',
-              parts: [{ type: 'text' as const, text: m.content }] as DirectChatPart[],
-            }))
-            .concat({
-              id: userMsgId,
-              role: 'user' as const,
-              parts: [
-                { type: 'text' as const, text: prompt },
-                ...(imageAttachments ?? [])
-                  .filter(image => image.base64Data)
-                  .map(image => ({
-                    type: 'file' as const,
-                    mediaType: image.mimeType,
-                    url: `data:${image.mimeType};base64,${image.base64Data}`,
-                    filename: image.name,
-                  })),
-              ],
-            }),
-          abortSignal: abortController.signal,
-        });
-        const reader = stream.getReader();
-        while (true) {
-          const { done, value: chunk } = await reader.read();
-          if (done) break;
-          if (!chunk) continue;
-          switch (chunk.type) {
-            case DirectChatDataChunkType.Context:
-              if (isDirectChatContextData(chunk.data)) {
-                directContextData = chunk.data;
-              }
-              break;
-            case DirectChatDataChunkType.SessionMetrics:
-              if (isDirectChatSessionMetrics(chunk.data)) {
-                directSessionMetrics = chunk.data;
-              }
-              break;
-            case 'text-start':
-              {
-                const result = turnState.startAssistant();
-                if (!assistantMessageAdded && result.isNew) {
-                  dispatch(
-                    addMessage({
-                      sessionId: currentSession.id,
-                      message: result.message,
-                    }),
-                  );
-                  assistantMessageAdded = true;
-                  persistChatSnapshot();
-                }
-              }
-              break;
-            case 'text-delta':
-              finishThinking();
-              assistantContent += chunk.delta;
-              {
-                const result = turnState.appendAssistant(chunk.delta);
-                if (!assistantMessageAdded && result.isNew) {
-                  dispatch(
-                    addMessage({
-                      sessionId: currentSession.id,
-                      message: result.message,
-                    }),
-                  );
-                  assistantMessageAdded = true;
-                } else {
-                  contentBatcher.enqueue({
-                    sessionId: currentSession.id,
-                    messageId: assistantMsgId,
-                    content: result.message.content,
-                    metadata: result.message.metadata,
-                  });
-                }
-              }
-              persistChatSnapshot();
-              break;
-            case 'reasoning-start':
-              {
-                const result = turnState.startReasoning();
-                if (result.isNew) {
-                  dispatch(
-                    addMessage({
-                      sessionId: currentSession.id,
-                      message: result.message,
-                    }),
-                  );
-                  turnState.markReasoningMessageAdded();
-                  persistChatSnapshot();
-                }
-              }
-              break;
-            case 'reasoning-delta':
-              {
-                const result = turnState.appendReasoning(chunk.delta);
-                if (result.isNew) {
-                  dispatch(
-                    addMessage({
-                      sessionId: currentSession.id,
-                      message: result.message,
-                    }),
-                  );
-                  turnState.markReasoningMessageAdded();
-                } else {
-                  contentBatcher.enqueue({
-                    sessionId: currentSession.id,
-                    messageId: result.message.id,
-                    content: result.message.content,
-                    metadata: result.message.metadata,
-                  });
-                }
-              }
-              break;
-            case 'reasoning-end':
-              finishThinking();
-              persistChatSnapshot();
-              break;
-            case 'tool-input-available':
-              finishThinking();
-              dispatch(
-                addMessage({
-                  sessionId: currentSession.id,
-                  message: turnState.addToolUse(
-                    chunk.toolCallId,
-                    chunk.input && typeof chunk.input === 'object'
-                      ? (chunk.input as Record<string, unknown>)
-                      : {},
-                  ),
-                }),
-              );
-              persistChatSnapshot();
-              break;
-            case 'tool-output-available':
-              dispatch(
-                addMessage({
-                  sessionId: currentSession.id,
-                  message: turnState.addToolResult(chunk.toolCallId, chunk.output),
-                }),
-              );
-              persistChatSnapshot();
-              break;
-            case 'tool-output-error':
-              dispatch(
-                addMessage({
-                  sessionId: currentSession.id,
-                  message: turnState.addToolResult(chunk.toolCallId, undefined, chunk.errorText),
-                }),
-              );
-              persistChatSnapshot();
-              break;
-            case 'error':
-              throw new Error(chunk.errorText);
-          }
-        }
-        contentBatcher.discard(currentSession.id, assistantMsgId);
-        finishThinking();
-        const finalStatus = abortController.signal.aborted
-          ? CoworkSessionStatusValue.Idle
-          : CoworkSessionStatusValue.Completed;
-        // Finalize message metadata to prevent streaming replay on reload
-        if (assistantMessageAdded) {
-          const finalMetadata = {
-            isStreaming: false,
-            isFinal: true,
-            ...(finalStatus === CoworkSessionStatusValue.Completed && { isFinalAnswer: true }),
-            ...(directContextData
-              ? {
-                  contextUsage: {
-                    contextWindowTokens: directContextData.contextWindowTokens,
-                    updatedAt: Date.now(),
-                    usedTokens: directContextData.usedTokens,
-                  },
-                  model: directChatModelId,
-                  modelProviderKey: directChatModel.providerKey,
-                  usage: {
-                    inputTokens: directContextData.inputTokens,
-                    outputTokens: directContextData.outputTokens,
-                    ...(directContextData.cacheReadTokens !== undefined
-                      ? { cacheReadTokens: directContextData.cacheReadTokens }
-                      : {}),
-                    ...(directContextData.cacheWriteTokens !== undefined
-                      ? { cacheWriteTokens: directContextData.cacheWriteTokens }
-                      : {}),
-                    totalTokens: directContextData.usedTokens,
-                  },
-                }
-              : {}),
-            ...(directSessionMetrics ? { metrics: directSessionMetrics } : {}),
-          };
-          turnState.updateAssistantMetadata(finalMetadata);
-          dispatch(
-            updateMessageContent({
-              sessionId: currentSession.id,
-              messageId: assistantMsgId,
-              content: assistantContent,
-              metadata: finalMetadata,
-            }),
-          );
-        }
-        if (persistTimer) clearTimeout(persistTimer);
-        dispatch(
-          updateSessionStatus({
-            sessionId: currentSession.id,
-            status: finalStatus,
-          }),
-        );
-        await coworkService.saveChatSession(buildChatSnapshot(finalStatus));
-      } catch (error) {
-        contentBatcher.discard(currentSession.id, assistantMsgId);
-        finishThinking();
-        // Finalize the partial answer so the turn does not render as still
-        // streaming after the failure.
-        if (assistantMessageAdded) {
-          turnState.updateAssistantMetadata({ isStreaming: false, isFinal: true });
-          dispatch(
-            updateMessageContent({
-              sessionId: currentSession.id,
-              messageId: assistantMsgId,
-              content: assistantContent,
-              metadata: { isStreaming: false, isFinal: true },
-            }),
-          );
-        }
-        dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
-        dispatch(
-          addMessage({
-            sessionId: currentSession.id,
-            message: createDirectChatErrorMessage(error),
-          }),
-        );
-        if (persistTimer) clearTimeout(persistTimer);
-        await coworkService
-          .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Error))
-          .catch(saveError =>
-            console.error('[CoworkView] Failed to persist failed chat continuation:', saveError),
-          );
-      } finally {
-        if (persistTimer) clearTimeout(persistTimer);
-        if (directChatAbortControllersRef.current.get(currentSession.id) === abortController) {
-          directChatAbortControllersRef.current.delete(currentSession.id);
-        }
-        continuingSessionIdsRef.current.delete(currentSession.id);
-      }
-      return;
-    }
-
-    // Engine path: work sessions and agent-backed chat sessions
+    // Pi continuation path for Work and Chat sessions.
     continuingSessionIdsRef.current.add(currentSession.id);
     try {
       const sessionSkillIds = [...activeSkillIds];
@@ -1356,13 +553,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         currentAgent?.source === CoworkSessionExpertSource.Package ||
         currentAgent?.source === CoworkSessionExpertSource.Member;
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
-      const baseSystemPrompt = agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt = buildChatAgentSystemPrompt(skillPrompt, baseSystemPrompt);
+      const isChatMode = workMode === WorkMode.Chat;
+      const baseSystemPrompt = isChatMode ? '' : agentSystemPrompt || config.systemPrompt || '';
+      const combinedSystemPrompt = buildCoworkSystemPrompt(skillPrompt, baseSystemPrompt);
 
       await coworkService.continueSession({
         sessionId: currentSession.id,
         prompt,
-        systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
+        systemPrompt: isChatMode ? combinedSystemPrompt : currentSession.systemPrompt || combinedSystemPrompt,
         activeSkillIds: sessionSkillIds,
         expertIds,
         permissionMode: sessionPermissionMode,
@@ -1377,43 +575,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleStopSession = async () => {
     if (!currentSession) return;
-    // Stop the transport that actually started: a live direct-chat stream is
-    // controlled by its per-session AbortController, so check for one first
-    // instead of re-deriving the transport from mutable skill state (the user
-    // can attach skills mid-stream, which would otherwise misroute the stop
-    // to the engine and leave the direct stream running).
-    const directChatController = directChatAbortControllersRef.current.get(currentSession.id);
-    if (directChatController) {
-      const interruptionId = crypto.randomUUID();
-      directChatController.abort();
-      dispatch(
-        addMessage({
-          sessionId: currentSession.id,
-          message: {
-            id: `interruption-${interruptionId}`,
-            type: 'system',
-            content: '',
-            timestamp: Date.now(),
-            metadata: {
-              interruption: {
-                sessionId: currentSession.id,
-                interruptionId,
-                cause: CoworkInterruptionCause.UserStop,
-                taskId: null,
-                recoverable: false,
-              },
-            },
-          },
-        }),
-      );
-      dispatch(
-        updateSessionStatus({
-          sessionId: currentSession.id,
-          status: CoworkSessionStatusValue.Idle,
-        }),
-      );
-      return;
-    }
     if (currentSession.id.startsWith('temp-') && pendingStartRef.current) {
       pendingStartRef.current.cancelled = true;
       pendingStartRef.current.cancellationAction = 'stop';
@@ -1511,7 +672,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   }, [dispatch, currentSession]);
 
   useEffect(() => {
-    if (!currentSession || currentSession.status !== 'running') return;
+    if (!currentSession || !isStreaming) return;
 
     const runningSessionId = currentSession.id;
     let lastFocusTime = 0;
@@ -1528,7 +689,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     return () => {
       window.removeEventListener('focus', handleWindowFocus);
     };
-  }, [currentSession]);
+  }, [currentSession, isStreaming]);
 
   if (!isInitialized) {
     return (
@@ -1575,9 +736,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onNewChat={onNewChat}
           updateBadge={updateBadge}
           workMode={workMode}
-          isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
-          localThinkingEnabled={localThinkingEnabled}
-          onLocalThinkingEnabledChange={setLocalThinkingEnabled}
           inlineQuestionPermission={inlineQuestionPermission}
           onRespondToInlineQuestion={onRespondToInlineQuestion}
           inlinePermission={inlinePermission}
@@ -1687,10 +845,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
                   showNoFolderAction={!currentWorkspaceId}
                   showModelSelector
-                  isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
-                  showLocalThinkingToggle={workMode === WorkMode.Chat && !isAgentBackedChat}
-                  localThinkingEnabled={localThinkingEnabled}
-                  onLocalThinkingEnabledChange={setLocalThinkingEnabled}
                   onManageSkills={() => onShowSkills?.()}
                   onManageConnectors={() => onShowConnectors?.()}
                   showPermissionModeSelector={workMode !== WorkMode.Chat}

@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
+import { PiWebSearchToolName } from './constants';
 
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -253,9 +254,11 @@ vi.mock('../coworkUtil', async importOriginal => {
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { PiDocumentReaderSystemPrompt, PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
+import { PiSubagentToolName } from './piSubagentTool';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import type { CoworkStore } from '../../coworkStore';
@@ -302,6 +305,19 @@ describe('PiRuntimeAdapter', () => {
       expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledWith(process.env);
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
+    });
+
+    it('publishes a started lifecycle event from Pi agent_start', async () => {
+      const started = vi.fn();
+      adapter.on('started', started);
+      await adapter.startSession('started-session', 'Hello Pi');
+
+      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+        type: string;
+      }) => void;
+      listener({ type: 'agent_start' });
+
+      expect(started).toHaveBeenCalledWith('started-session');
     });
 
     it('uses an in-memory Pi session manager so SQLite remains the only restore source', async () => {
@@ -550,7 +566,7 @@ describe('PiRuntimeAdapter', () => {
 
       try {
         await adapter.startSession('audited-runtime', 'Summarize the report', {
-          sessionMode: 'chat',
+          sessionMode: 'work',
           workspaceRoot,
           skillIds: ['documents'],
         });
@@ -565,7 +581,7 @@ describe('PiRuntimeAdapter', () => {
 
         service.pauseRun('audited-runtime', 'Paused for the next turn.');
         await adapter.continueSession('audited-runtime', 'Summarize the appendix', {
-          sessionMode: 'chat',
+          sessionMode: 'work',
           skillIds: ['documents'],
         });
 
@@ -686,6 +702,83 @@ describe('PiRuntimeAdapter', () => {
         }),
       );
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('systemPrompt');
+    });
+
+    it('keeps Chat on Pi while skipping Work prompt, default Skill, and MCP resources', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [{ name: 'list_projects', description: 'List projects' }],
+        serverStatuses: [{ name: 'Supabase', connected: true, toolCount: 1 }],
+      } as never);
+      adapter.setProjectMemoryService({} as never);
+      adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
+      const beginRun = vi.fn();
+      adapter.setWorkbenchTaskService({
+        on: vi.fn(),
+        off: vi.fn(),
+        beginRun,
+      } as unknown as WorkbenchTaskService);
+
+      await adapter.startSession('chat-resources', 'Hello', {
+        sessionMode: 'chat',
+        systemPrompt: 'Only the explicitly selected chat prompt.',
+      });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        additionalSkillPaths?: string[];
+        systemPromptOverride: (base: string | undefined) => string | undefined;
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.additionalSkillPaths).toEqual([]);
+      expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBeUndefined();
+      expect(loaderOptions.appendSystemPromptOverride()).toContain(
+        'Only the explicitly selected chat prompt.',
+      );
+      expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain('知远智能体');
+      expect(loaderOptions.appendSystemPromptOverride().join('\n')).not.toContain('Supabase');
+      expect(loaderOptions.appendSystemPromptOverride()).not.toContain(
+        PiDocumentReaderSystemPrompt,
+      );
+      expect(loaderOptions.appendSystemPromptOverride()).not.toContain(DeclareArtifactSystemPrompt);
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name?: string }>;
+      };
+      const customToolNames = sessionOptions.customTools?.map(tool => tool.name) ?? [];
+      expect(customToolNames).toContain(PiWebSearchToolName);
+      expect(customToolNames).not.toContain(PiMcpTool.Name);
+      expect(customToolNames).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
+      expect(customToolNames).not.toContain(PiDocumentReaderToolName);
+      expect(customToolNames).not.toContain(PiSubagentToolName);
+      expect(beginRun).not.toHaveBeenCalled();
+    });
+
+    it('reuses one Pi AgentSession across Chat continuations', async () => {
+      await adapter.startSession('chat-continuation', 'First', {
+        sessionMode: 'chat',
+      });
+      await adapter.continueSession('chat-continuation', 'Second', {
+        sessionMode: 'chat',
+      });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(mockSession.reload).not.toHaveBeenCalled();
+      expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('caps Chat compaction for models with a larger context window', async () => {
+      await adapter.startSession('chat-context-limit', 'First', {
+        sessionMode: 'chat',
+        modelOverride: 'openai/gpt-5.2',
+      });
+
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        compaction: {
+          enabled: true,
+          reserveTokens: 8_192,
+          keepRecentTokens: 16_384,
+        },
+      });
     });
 
     it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
@@ -2524,6 +2617,26 @@ describe('PiRuntimeAdapter', () => {
       const finalUpdate = updates[updates.length - 1];
       expect(finalUpdate.messageId).toBe(assistantMessages[0].id);
       expect(finalUpdate.content).toBe('Hello world');
+    });
+
+    it('records Pi startup latency from AgentSession creation to first token', async () => {
+      const logSpy = vi.spyOn(console, 'log');
+      await adapter.startSession('startup-latency', 'Hi');
+
+      listener!({ type: 'agent_start' });
+      listener!({ type: 'turn_start' });
+      listener!({ type: 'message_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] },
+      });
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\[PiRuntime\] startup latency for startup-latency: create-to-agent_start=\d+ms, agent_start-to-first_token=\d+ms, create-to-first_token=\d+ms/,
+        ),
+      );
+      logSpy.mockRestore();
     });
 
     it('should keep the same message id across stream and finalize', async () => {

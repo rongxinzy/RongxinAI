@@ -1,20 +1,17 @@
-import type { CoworkSessionSummary } from '../../types/cowork';
-import { CoworkSessionStatusValue } from '../../types/cowork';
+import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import { AgentSidebarIndicator } from './constants';
 import type { AgentSidebarTaskNode } from './types';
 
 const normalizeAgentId = (agentId?: string) => agentId?.trim() || 'main';
 
 /**
- * A session shows the running indicator while a task is executing: either the
- * persisted status says so, or the live stream registry still holds an open run.
+ * A session shows the running indicator only while its Pi event stream is
+ * registered as live. Persisted status is historical and may be stale.
  */
 export const isSessionExecuting = (
   session: CoworkSessionSummary,
   streamingSessionIds?: ReadonlySet<string>,
-): boolean =>
-  session.status === CoworkSessionStatusValue.Running ||
-  (streamingSessionIds?.has(session.id) ?? false);
+): boolean => streamingSessionIds?.has(session.id) ?? false;
 
 export const deriveAgentSidebarIndicator = (
   session: CoworkSessionSummary,

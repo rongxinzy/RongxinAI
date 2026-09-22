@@ -26,6 +26,7 @@ import {
   dequeuePendingPermission,
   enqueuePendingPermission,
   prependMessages,
+  recoverSession,
   setConfig,
   setChatSessions,
   setCurrentSession,
@@ -61,6 +62,12 @@ import {
 } from './coworkTerminalError';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
+import { PiUiRecovery } from './piUiRecovery';
+import {
+  PiUiEventSequenceTracker,
+  PiUiEventType,
+  type PiUiEvent,
+} from '../../shared/cowork/piUiEvent';
 
 const classifyError = (error: string | CoworkError): string => {
   if (typeof error === 'object' && 'kind' in error) {
@@ -104,150 +111,131 @@ class CoworkService {
     // Clean up any existing listeners
     this.cleanupListeners();
 
-    // Message listener - also check if session exists (for IM-created sessions)
-    const messageCleanup = cowork.onStreamMessage(async ({ sessionId, message }) => {
-      // Debug: log user messages to check if imageAttachments are preserved
-      if (message.type === 'user') {
-        const meta = message.metadata as Record<string, unknown> | undefined;
-        console.log('[CoworkService] onStreamMessage received user message', {
-          sessionId,
-          messageId: message.id,
-          hasMetadata: !!meta,
-          metadataKeys: meta ? Object.keys(meta) : [],
-          hasImageAttachments: !!meta?.imageAttachments,
-          imageAttachmentsCount: Array.isArray(meta?.imageAttachments)
-            ? (meta.imageAttachments as unknown[]).length
-            : 0,
-        });
-      }
-      // Check if session exists in current list
-      const state = store.getState().cowork;
-      const sessionExists = [...state.sessions, ...state.chatSessions].some(
-        session => session.id === sessionId,
-      );
-
-      console.log(
-        '[CoworkService] onStreamMessage: sessionId=',
-        sessionId,
-        'type=',
-        message.type,
-        'sessionExists=',
-        sessionExists,
-        'totalSessions=',
-        state.sessions.length,
-      );
-      if (!sessionExists) {
-        // Session was created by IM or another source, refresh the session list
-        console.log(
-          '[CoworkService] onStreamMessage: session NOT found in Redux, calling loadSessions...',
-        );
-        await Promise.all([this.loadSessions(), this.loadChatSessions()]);
-        const newState = store.getState().cowork;
-        const nowExists = [...newState.sessions, ...newState.chatSessions].some(
-          session => session.id === sessionId,
-        );
-        console.log(
-          '[CoworkService] onStreamMessage: after loadSessions, sessionExists=',
-          nowExists,
-          'totalSessions=',
-          newState.sessions.length,
-        );
-      }
-
-      // A new user turn means this session is actively running again
-      // (especially important for IM-triggered turns that do not call continueSession from renderer).
-      if (message.type === 'user') {
-        store.dispatch(updateSessionStatus({ sessionId, status: 'running' }));
-      }
-
-      // Do not force status back to "running" on arbitrary messages.
-      // Late stream chunks can arrive after an error/complete event.
-      store.dispatch(addMessage({ sessionId, message }));
-    });
-    this.streamListenerCleanups.push(messageCleanup);
-
     // Keep the latest update per message for the next frame. Thinking and answer
     // messages can be finalized back-to-back, so a single pending slot loses one.
     const updateBatcher = new RafMessageUpdateBatcher(updates => {
       store.dispatch(updateMessageContents(updates));
     });
-    const messageUpdateCleanup = cowork.onStreamMessageUpdate(update => {
-      updateBatcher.enqueue(update);
-    });
     const messageUpdateRafCleanup = () => {
       updateBatcher.dispose();
-      messageUpdateCleanup();
     };
     this.streamListenerCleanups.push(messageUpdateRafCleanup);
 
-    const toolActivityCleanup = cowork.onStreamToolActivity(payload => {
-      store.dispatch(updateToolActivity(payload));
+    const recovery = new PiUiRecovery({
+      readRuntime: sessionId => cowork.getRuntimeSnapshots(sessionId),
+      readSession: async sessionId => {
+        const result = await cowork.getSession(sessionId);
+        if (!result.success) throw new Error(result.error || 'Failed to recover session');
+        return result.session ?? null;
+      },
+      prepare: prepareCoworkSessionRender,
+      applyStatus: snapshot => store.dispatch(updateSessionStatus({ ...snapshot, recovered: true })),
+      applySession: (session, preserveLiveContent) =>
+        store.dispatch(recoverSession({ session, preserveLiveContent })),
+      flush: () => updateBatcher.flush(),
     });
-    this.streamListenerCleanups.push(toolActivityCleanup);
+    this.streamListenerCleanups.push(() => recovery.dispose());
 
-    // Permission request listener
-    const permissionCleanup = cowork.onStreamPermission(({ sessionId, request }) => {
-      store.dispatch(
-        enqueuePendingPermission({
-          origin: CoworkPermissionOrigin.PiWorkbench,
-          sessionId,
-          toolName: request.toolName,
-          toolInput: request.toolInput,
-          requestId: request.requestId,
-          toolUseId: request.toolUseId ?? null,
-        }),
-      );
-    });
-    this.streamListenerCleanups.push(permissionCleanup);
-
-    // Permission dismiss listener (timeout or server-side resolution)
-    const permissionDismissCleanup = cowork.onStreamPermissionDismiss(({ requestId }) => {
-      store.dispatch(dequeuePendingPermission({ requestId }));
-    });
-    this.streamListenerCleanups.push(permissionDismissCleanup);
-
-    const interruptedCleanup = cowork.onStreamInterrupted(({ sessionId }) => {
-      store.dispatch(clearPendingPermissionsForSession(sessionId));
-      store.dispatch(updateSessionStatus({ sessionId, status: 'idle' }));
-    });
-    this.streamListenerCleanups.push(interruptedCleanup);
-
-    // Complete listener
-    const completeCleanup = cowork.onStreamComplete(({ sessionId }) => {
-      store.dispatch(updateSessionStatus({ sessionId, status: 'completed' }));
-    });
-    this.streamListenerCleanups.push(completeCleanup);
-
-    // Error listener
-    const errorCleanup = cowork.onStreamError(({ sessionId, error }) => {
-      const stateBeforeStatusUpdate = store.getState().cowork;
-      const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
-        [
-          stateBeforeStatusUpdate.currentSession,
-          stateBeforeStatusUpdate.streamingSessions[sessionId],
-        ],
-        sessionId,
-        error,
-      );
-      store.dispatch(updateSessionStatus({ sessionId, status: 'error' }));
-
-      // The runtime normally sends the persisted terminal message first. The
-      // error event owns status/global side effects and only supplies a message
-      // fallback when that canonical message was not delivered.
-      if (error.kind === CoworkErrorKind.AuthExpired) {
-        window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
-      }
-
-      if (error.message && !terminalMessageAlreadyReceived) {
-        store.dispatch(
-          addMessage({
-            sessionId,
-            message: createCoworkTerminalErrorMessage(error),
-          }),
+    const sequenceTracker = new PiUiEventSequenceTracker();
+    const uiEventCleanup = cowork.onStreamUiEvent((event: PiUiEvent) => {
+      if (!sequenceTracker.accept(event)) return;
+      const applyEvent = recovery.observe(event);
+      if (sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
+        console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
+        void recovery.recover(event.sessionId).catch(error =>
+          console.error('[CoworkService] failed to recover after a UI event sequence gap:', error),
         );
       }
+      if (!applyEvent) return;
+      switch (event.type) {
+        case PiUiEventType.Message: {
+          const { sessionId, message } = event;
+          const state = store.getState().cowork;
+          const sessionExists = [...state.sessions, ...state.chatSessions].some(
+            session => session.id === sessionId,
+          );
+          if (!sessionExists) {
+            void Promise.all([this.loadSessions(), this.loadChatSessions()]).catch(error =>
+              console.error('[CoworkService] failed to refresh an unknown stream session:', error),
+            );
+          }
+          store.dispatch(addMessage({ sessionId, message }));
+          break;
+        }
+        case PiUiEventType.Started:
+          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'running' }));
+          break;
+        case PiUiEventType.MessageUpdate:
+          updateBatcher.enqueue({
+            sessionId: event.sessionId,
+            messageId: event.messageId,
+            content: event.content,
+            metadata: event.metadata,
+          });
+          break;
+        case PiUiEventType.ToolActivity:
+          store.dispatch(updateToolActivity({ sessionId: event.sessionId, event: event.event }));
+          break;
+        case PiUiEventType.PermissionRequest:
+          store.dispatch(
+            enqueuePendingPermission({
+              origin: CoworkPermissionOrigin.PiWorkbench,
+              sessionId: event.sessionId,
+              toolName: event.request.toolName,
+              toolInput: event.request.toolInput,
+              requestId: event.request.requestId,
+              toolUseId: event.request.toolUseId ?? null,
+            }),
+          );
+          break;
+        case PiUiEventType.PermissionDismiss:
+          store.dispatch(dequeuePendingPermission({ requestId: event.requestId }));
+          break;
+        case PiUiEventType.Interrupted:
+          store.dispatch(clearPendingPermissionsForSession(event.sessionId));
+          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
+          break;
+        case PiUiEventType.Completed:
+          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'completed' }));
+          break;
+        case PiUiEventType.Error: {
+          const stateBeforeStatusUpdate = store.getState().cowork;
+          const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
+            [
+              stateBeforeStatusUpdate.currentSession,
+              stateBeforeStatusUpdate.streamingSessions[event.sessionId],
+            ],
+            event.sessionId,
+            event.error,
+          );
+          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'error' }));
+          if (event.error.kind === CoworkErrorKind.AuthExpired) {
+            window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
+          }
+          if (event.error.message && !terminalMessageAlreadyReceived) {
+            store.dispatch(
+              addMessage({
+                sessionId: event.sessionId,
+                message: createCoworkTerminalErrorMessage(event.error),
+              }),
+            );
+          }
+          break;
+        }
+        case PiUiEventType.QueueUpdated:
+          break;
+        case PiUiEventType.Stopped:
+          store.dispatch(clearPendingPermissionsForSession(event.sessionId));
+          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
+          break;
+        default:
+          break;
+      }
     });
-    this.streamListenerCleanups.push(errorCleanup);
+    this.streamListenerCleanups.push(uiEventCleanup);
+    void recovery.bootstrap().catch(error =>
+      console.error('[CoworkService] failed to recover Pi runtime state on attach:', error),
+    );
 
     // Sessions changed listener (new channel sessions discovered by polling,
     // or reconcileWithHistory replaced messages for a channel session)
@@ -441,8 +429,6 @@ class CoworkService {
       return false;
     }
 
-    store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'running' }));
-
     const result = await cowork.continueSession({
       sessionId: options.sessionId,
       prompt: options.prompt,
@@ -458,9 +444,9 @@ class CoworkService {
       const terminalError = result.error
         ? resolveCoworkTerminalError(result.error, result.code)
         : null;
-      if (result.code !== ENGINE_NOT_READY_CODE) {
-        store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'error' }));
-      }
+      // Runtime status is owned by Pi UI events.  A synchronous IPC failure is
+      // surfaced as a terminal message, but cannot synthesize an execution
+      // state that Pi never emitted.
       if (terminalError) {
         const state = store.getState().cowork;
         const alreadyReceived = hasMatchingLatestTerminalError(
@@ -493,10 +479,7 @@ class CoworkService {
     if (!cowork) return false;
 
     const result = await cowork.stopSession(sessionId);
-    if (result.success) {
-      store.dispatch(updateSessionStatus({ sessionId, status: 'idle' }));
-      return true;
-    }
+    if (result.success) return true;
 
     console.error('Failed to stop session:', result.error);
     return false;

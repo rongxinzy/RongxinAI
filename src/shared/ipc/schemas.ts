@@ -11,8 +11,7 @@
 
 import { z } from 'zod';
 
-import { CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
-import { CoworkToolActivityEventType, CoworkToolActivityPhase } from '../cowork/toolActivity';
+import { CoworkExecutionMode, CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
 import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -235,17 +234,6 @@ export const ProviderModelDiscoverySchema = {
   ]),
 };
 
-export const ApiStreamSchema = {
-  input: z.object({
-    url: z.string().url(),
-    method: z.enum(['GET', 'POST']),
-    headers: z.record(z.string(), z.string()),
-    body: z.string().optional(),
-    requestId: z.string().min(1),
-  }),
-  output: z.void(),
-};
-
 // ─── Window ─────────────────────────────────────────────────────────────────
 
 export const WindowShowSystemMenuSchema = {
@@ -440,7 +428,7 @@ export const CoworkPermissionRespondSchema = {
 export const CoworkConfigSetSchema = {
   input: z.object({
     workingDirectory: z.string().optional(),
-    executionMode: z.enum(['auto', 'local', 'sandbox']).optional(),
+    executionMode: z.enum(CoworkExecutionMode).optional(),
     embeddingEnabled: z.boolean().optional(),
     embeddingProvider: z.string().optional(),
     embeddingModel: z.string().optional(),
@@ -782,55 +770,6 @@ export const OpenAICodexOAuthStatusSchema = {
 };
 
 // ─── Cowork Stream Events (main → renderer push) ────────────────────────────
-
-export const CoworkStreamMessageSchema = {
-  output: z.object({ sessionId: z.string(), message: z.object({}).passthrough() }),
-};
-
-export const CoworkStreamMessageUpdateSchema = {
-  output: z.object({
-    sessionId: z.string(),
-    messageId: z.string(),
-    content: z.string(),
-    metadata: z.record(z.string(), z.unknown()).optional(),
-  }),
-};
-
-export const CoworkStreamToolActivitySchema = {
-  output: z.object({
-    sessionId: z.string(),
-    event: z.discriminatedUnion('type', [
-      z.object({
-        type: z.literal(CoworkToolActivityEventType.Upsert),
-        activity: z.object({
-          toolCallId: z.string(),
-          phase: z.enum([CoworkToolActivityPhase.Preparing, CoworkToolActivityPhase.Running]),
-          toolName: z.string().optional(),
-          toolInput: z.record(z.string(), z.unknown()).optional(),
-          updatedAt: z.number(),
-        }),
-      }),
-      z.object({ type: z.literal(CoworkToolActivityEventType.Remove), toolCallId: z.string() }),
-      z.object({ type: z.literal(CoworkToolActivityEventType.Clear) }),
-    ]),
-  }),
-};
-
-export const CoworkStreamPermissionSchema = {
-  output: z.object({ sessionId: z.string(), request: z.object({}).passthrough() }),
-};
-
-export const CoworkStreamPermissionDismissSchema = {
-  output: z.object({ requestId: z.string() }),
-};
-
-export const CoworkStreamCompleteSchema = {
-  output: z.object({ sessionId: z.string(), claudeSessionId: z.string().nullable() }),
-};
-
-export const CoworkStreamErrorSchema = {
-  output: z.object({ sessionId: z.string(), error: z.string() }),
-};
 
 export const CoworkSessionsChangedSchema = {
   output: z.object({ sessionId: z.string().optional() }),
