@@ -3229,6 +3229,12 @@
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -4924,7 +4930,8 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -5430,6 +5437,13 @@
 }
 }
 @media (hover: hover) {
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -5888,7 +5902,8 @@
   font-weight: var(--zy-component-font-weight-semibold);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -7132,6 +7147,7 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -10850,6 +10866,12 @@ to {
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -12547,7 +12569,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -13054,6 +13077,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -13522,7 +13552,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="classic-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -14768,6 +14799,7 @@ to {
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -18486,6 +18518,12 @@ to {
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -20181,7 +20219,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -20687,6 +20726,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -21145,7 +21191,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="daming-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -22389,6 +22436,7 @@ to {
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -26107,6 +26155,12 @@ to {
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -27804,7 +27858,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -28311,6 +28366,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -28779,7 +28841,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="daming-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -30025,6 +30088,7 @@ to {
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -33745,6 +33809,12 @@ to {
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -35440,7 +35510,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -35946,6 +36017,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -36404,7 +36482,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="changan-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -37651,6 +37730,7 @@ to {
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -41371,6 +41451,12 @@ to {
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -43068,7 +43154,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -43575,6 +43662,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -44043,7 +44137,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="changan-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -45292,6 +45387,7 @@ to {
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -49012,6 +49108,12 @@ to {
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -50707,7 +50809,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -51213,6 +51316,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -51671,7 +51781,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="weiyang-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -52918,6 +53029,7 @@ to {
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -56638,6 +56750,12 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--foreground);
 }
+[data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-foreground);
+}
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -58335,7 +58453,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -58842,6 +58961,13 @@ to {
 }
 }
 @media (hover: hover) {
+[data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-border);
+  background-color: var(--card);
+  color: var(--zy-foreground);
+}
+}
+@media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -59310,7 +59436,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="weiyang-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -60559,6 +60686,7 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
+[data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),

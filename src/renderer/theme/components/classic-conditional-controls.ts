@@ -263,6 +263,20 @@ export function classicConditionalControls(dark: boolean) {
       // 2026/09/22 lixiang  快捷技能未选中项文字用正文色，与侧栏导航一致
       base: { color: 'var(--foreground)' },
     }),
+    // Same selected surface as chat skill shortcuts: card on surface-raised sidebar.
+    'page-sidebar-navigation-button-selected': recipe({
+      base: {
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--card)',
+        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        color: 'var(--zy-foreground)',
+      },
+      hover: {
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--card)',
+        color: 'var(--zy-foreground)',
+      },
+    }),
     'page-coding-workspace-sidebar-button-variant-1': recipe({
       base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
       parentHover: { opacity: '0.3' },
