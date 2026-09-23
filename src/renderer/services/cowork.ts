@@ -107,6 +107,12 @@ class CoworkService {
   private setupStreamListeners(): void {
     const cowork = window.electron?.cowork;
     if (!cowork) return;
+    if (typeof cowork.onStreamUiEvent !== 'function') {
+      console.error(
+        '[CoworkService] onStreamUiEvent is unavailable; restart the app to reload preload',
+      );
+      return;
+    }
 
     // Clean up any existing listeners
     this.cleanupListeners();
