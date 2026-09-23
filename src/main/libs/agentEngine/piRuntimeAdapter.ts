@@ -3459,7 +3459,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (elapsed >= STORE_UPDATE_THROTTLE_MS) {
       this.clearPendingStoreUpdate(messageId);
       this.lastStoreUpdateTime.set(messageId, now);
-      this.store.updateMessage(sessionId, messageId, { content, metadata });
+      this.store.updateMessage(
+        sessionId,
+        messageId,
+        { content, metadata },
+        { touchUpdatedAt: false },
+      );
       return;
     }
 
@@ -3474,7 +3479,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.pendingStoreUpdate.delete(messageId);
           this.lastStoreUpdateTime.set(messageId, Date.now());
           if (pending && this.store) {
-            this.store.updateMessage(sessionId, messageId, pending);
+            this.store.updateMessage(sessionId, messageId, pending, { touchUpdatedAt: false });
           }
         }, STORE_UPDATE_THROTTLE_MS - elapsed),
       );

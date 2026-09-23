@@ -618,6 +618,24 @@ test('updateMessage refreshes the session updated time', () => {
   expect(session?.messages[0]?.content).toBe('final');
 });
 
+test('updateMessage can skip refreshing the session updated time', () => {
+  const sid = 'sess-update-time-skipped';
+  insertSession(sid);
+  insertMessage('msg-edit-skipped', sid, 'assistant', 'draft', null, 1);
+  db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(1000, sid);
+
+  store.updateMessage(
+    sid,
+    'msg-edit-skipped',
+    { content: 'streaming update' },
+    { touchUpdatedAt: false },
+  );
+
+  const session = store.getSession(sid);
+  expect(session?.updatedAt).toBe(1000);
+  expect(session?.messages[0]?.content).toBe('streaming update');
+});
+
 test('upsertMessage preserves the caller message id and replaces streaming content', () => {
   const sid = 'sess-upsert-message';
   insertSession(sid);
