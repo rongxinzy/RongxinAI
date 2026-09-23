@@ -257,6 +257,18 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
       textNodes.forEach(node => node.remove());
       if (value) editor.append(document.createTextNode(value));
       emittedValueRef.current = value;
+      // 2026/09/22 lixiang  外部 setValue（如消息再编辑）后把光标放到末尾
+      requestAnimationFrame(() => {
+        if (editorRef.current !== editor) return;
+        editor.focus();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        selectionRef.current = range.cloneRange();
+      });
     }, [value]);
 
     const handleInput = useCallback(() => {
