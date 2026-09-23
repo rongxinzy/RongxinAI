@@ -17,7 +17,6 @@ export function classicInteractiveSurfaces(dark: boolean) {
     'border-style': 'solid',
     'border-color': 'var(--border)',
   };
-  const sidebar = 'color-mix(in srgb, var(--zy-text-primary) 4%, transparent)';
   const session = dark
     ? 'color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent)'
     : 'color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent)';

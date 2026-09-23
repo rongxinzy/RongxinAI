@@ -557,6 +557,7 @@ const TodoView: React.FC<TodoViewProps> = ({
               lists={lists}
               language={language}
               onUpdated={loadData}
+              onError={showError}
               onSaved={() => setSelectedTodoId(null)}
               onDelete={() => setDeleteTodo(selectedTodo)}
             />
