@@ -412,6 +412,23 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       void syncSkills();
     }, [syncSkills, workMode]);
 
+    // 2026/09/23 切换工作/对话模式时清空输入、首页草稿与已挂载 skill（两端共用 __home__ 键，否则会残留）
+    const prevWorkModeForDraftRef = useRef(workMode);
+    useEffect(() => {
+      if (prevWorkModeForDraftRef.current === workMode) return;
+      prevWorkModeForDraftRef.current = workMode;
+      setValue('');
+      setImageVisionHint(false);
+      dispatch(setDraftPrompt({ sessionId: '__home__', draft: '' }));
+      dispatch(clearDraftAttachments('__home__'));
+      if (draftKey !== '__home__') {
+        dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
+        dispatch(clearDraftAttachments(draftKey));
+      }
+      dispatch(clearActiveSkills());
+      dispatch(clearSelection());
+    }, [workMode, dispatch, draftKey]);
+
     useEffect(() => {
       const unsubscribe = skillService.onSkillsChanged(() => {
         void syncSkills();
