@@ -9,7 +9,11 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import { DEFAULT_COWORK_PERMISSION_MODE, CoworkSessionMode } from '../../../shared/cowork/constants';
+import {
+  CoworkExecutionMode,
+  DEFAULT_COWORK_PERMISSION_MODE,
+  CoworkSessionMode,
+} from '../../../shared/cowork/constants';
 import {
   type CoworkToolActivity,
   type CoworkToolActivityEvent,
@@ -70,7 +74,7 @@ const initialState: CoworkState = {
   config: {
     workingDirectory: '',
     systemPrompt: '',
-    executionMode: 'local',
+    executionMode: CoworkExecutionMode.Local,
     permissionMode: DEFAULT_COWORK_PERMISSION_MODE,
     permissionModeBySession: {},
     embeddingEnabled: false,
@@ -108,8 +112,10 @@ const setSessionStreaming = (state: CoworkState, sessionId: string, streaming: b
 };
 
 const cacheStreamingSession = (state: CoworkState, session: CoworkSession) => {
-  if (session.status !== CoworkSessionStatusValue.Running) return;
-  setSessionStreaming(state, session.id, true);
+  // A persisted `running` status is only a historical snapshot.  Active
+  // execution is established by the Pi `started` event in updateSessionStatus;
+  // loading or selecting a session must never manufacture a live stream.
+  if (!state.streamingSessionIds.includes(session.id)) return;
   state.streamingSessions[session.id] = {
     ...session,
     messages: [...session.messages],
@@ -397,6 +403,43 @@ const coworkSlice = createSlice({
       }
     },
 
+    recoverSession(
+      state,
+      action: PayloadAction<{ session: CoworkSession; preserveLiveContent: boolean }>,
+    ) {
+      const { session, preserveLiveContent } = action.payload;
+      const previous =
+        state.currentSession?.id === session.id
+          ? state.currentSession
+          : state.streamingSessions[session.id];
+      // Preserve older loaded pages. A raced IPC response fills missing messages
+      // without replacing newer live text; otherwise persisted content wins.
+      const recovered = previous
+        ? {
+            ...session,
+            messages: preserveLiveContent
+              ? mergeMessageHistory(session.messages, previous.messages)
+              : mergeMessageHistory(previous.messages, session.messages),
+            messagesOffset: Math.min(previous.messagesOffset ?? 0, session.messagesOffset ?? 0),
+            totalMessages: Math.max(previous.totalMessages, session.totalMessages),
+          }
+        : session;
+      setSessionStreaming(state, session.id, session.status === CoworkSessionStatusValue.Running);
+      cacheStreamingSession(state, recovered);
+      if (state.currentSession?.id === session.id) state.currentSession = recovered;
+      const summaries =
+        session.mode === CoworkSessionMode.Chat ? state.chatSessions : state.sessions;
+      // Do not insert a background session into another workspace's list.
+      updateSessionSummary(summaries, session.id, summary =>
+        applySessionStatus(summary, session.status, session.updatedAt),
+      );
+      if (session.status !== CoworkSessionStatusValue.Running) {
+        state.pendingPermissions = state.pendingPermissions.filter(
+          item => item.sessionId !== session.id,
+        );
+      }
+    },
+
     addSession: {
       prepare: (session: CoworkSession, temporarySessionId?: string) => ({
         payload: session,
@@ -434,29 +477,41 @@ const coworkSlice = createSlice({
 
     updateSessionStatus(
       state,
-      action: PayloadAction<{ sessionId: string; status: CoworkSessionStatus }>,
+      action: PayloadAction<{
+        sessionId: string;
+        status: CoworkSessionStatus;
+        recovered?: boolean;
+      }>,
     ) {
       const { sessionId, status } = action.payload;
       setSessionStreaming(state, sessionId, status === CoworkSessionStatusValue.Running);
 
       const updatedAt = Date.now();
       updateSessionSummary(state.sessions, sessionId, session =>
-        applySessionStatus(session, status, updatedAt),
+        applySessionStatus(
+          session,
+          status,
+          action.payload.recovered ? session.updatedAt : updatedAt,
+        ),
       );
       updateSessionSummary(state.chatSessions, sessionId, session =>
-        applySessionStatus(session, status, updatedAt),
+        applySessionStatus(
+          session,
+          status,
+          action.payload.recovered ? session.updatedAt : updatedAt,
+        ),
       );
 
       // Update current session if applicable
       if (state.currentSession?.id === sessionId) {
         state.currentSession.status = status;
-        state.currentSession.updatedAt = Date.now();
+        if (!action.payload.recovered) state.currentSession.updatedAt = updatedAt;
         if (status === CoworkSessionStatusValue.Running) {
           cacheStreamingSession(state, state.currentSession);
         }
       }
 
-      if (status === CoworkSessionStatusValue.Completed) {
+      if (status === CoworkSessionStatusValue.Completed && !action.payload.recovered) {
         markSessionUnread(state, sessionId);
       }
     },
@@ -514,10 +569,6 @@ const coworkSlice = createSlice({
 
       const applyMessageTime = (session: CoworkSessionSummary) => {
         session.updatedAt = message.timestamp;
-        const running =
-          session.status === CoworkSessionStatusValue.Running ||
-          state.streamingSessionIds.includes(sessionId);
-        if (running && !session.runStartedAt) session.runStartedAt = message.timestamp;
       };
       updateSessionSummary(state.sessions, sessionId, applyMessageTime);
       updateSessionSummary(state.chatSessions, sessionId, applyMessageTime);
@@ -713,6 +764,7 @@ export const {
   clearLoadingSessionId,
   setCurrentSession,
   setDraftPrompt,
+  recoverSession,
   setDraftAttachments,
   addDraftAttachment,
   clearDraftAttachments,

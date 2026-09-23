@@ -1,16 +1,15 @@
-import type { CoworkError } from '../../common/coworkError';
+import type { PiUiRuntimeSnapshot } from '../../shared/cowork/piUiRuntimeSnapshot';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ActivityRun } from '../../shared/activity/types';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
+  CoworkExecutionMode,
   CoworkPermissionMode,
-  CoworkPermissionOrigin,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
-import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type {
   ProviderModelDiscoveryRequest,
   ProviderModelDiscoveryResult,
@@ -136,25 +135,17 @@ interface ApiResponse {
   error?: string;
 }
 
-interface ApiStreamResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  error?: string;
-}
-
 // Cowork types for IPC
 interface CoworkSession {
   id: string;
   title: string;
-  claudeSessionId: string | null;
   status: 'idle' | 'running' | 'completed' | 'error';
   pinned: boolean;
   pinOrder?: number | null;
   cwd: string;
   systemPrompt: string;
   modelOverride: string;
-  executionMode: 'auto' | 'local' | 'sandbox';
+  executionMode: CoworkExecutionMode;
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
@@ -171,6 +162,7 @@ interface CoworkMessage {
   type: 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
   content: string;
   timestamp: number;
+  sequence?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -190,7 +182,7 @@ interface CoworkSessionSummary {
 interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
-  executionMode: 'auto' | 'local' | 'sandbox';
+  executionMode: CoworkExecutionMode;
   permissionMode: CoworkPermissionMode;
   embeddingEnabled: boolean;
   embeddingProvider: string;
@@ -216,15 +208,6 @@ type CoworkConfigUpdate = Partial<
     | 'embeddingRemoteApiKey'
   >
 >;
-
-interface CoworkPermissionRequest {
-  origin: CoworkPermissionOrigin;
-  sessionId: string;
-  toolName: string;
-  toolInput: Record<string, unknown>;
-  requestId: string;
-  toolUseId?: string | null;
-}
 
 interface CoworkApiConfig {
   apiKey: string;
@@ -658,14 +641,6 @@ interface IElectronAPI {
     }>;
   };
   api: {
-    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) => Promise<{
-      ok: boolean;
-      data?: {
-        query: string;
-        results: Array<{ title: string; url: string; snippet: string; content?: string }>;
-      };
-      error?: string;
-    }>;
     fetch: (options: {
       url: string;
       method: string;
@@ -674,18 +649,6 @@ interface IElectronAPI {
       timeoutMs?: number;
     }) => Promise<ApiResponse>;
     fetchModels: (input: ProviderModelDiscoveryRequest) => Promise<ProviderModelDiscoveryResult>;
-    stream: (options: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body?: string;
-      requestId: string;
-    }) => Promise<ApiStreamResponse>;
-    cancelStream: (requestId: string) => Promise<boolean>;
-    onStreamData: (requestId: string, callback: (chunk: string) => void) => () => void;
-    onStreamDone: (requestId: string, callback: () => void) => () => void;
-    onStreamError: (requestId: string, callback: (error: CoworkError) => void) => () => void;
-    onStreamAbort: (requestId: string, callback: () => void) => () => void;
   };
   getApiConfig: () => Promise<CoworkApiConfig | null>;
   checkApiConfig: (options?: {
@@ -880,6 +843,7 @@ interface IElectronAPI {
       sessionId: string,
       options?: { messageLimit?: number | null },
     ) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
+    getRuntimeSnapshots: (sessionId?: string) => Promise<PiUiRuntimeSnapshot[]>;
     remoteManaged: (
       sessionId: string,
     ) => Promise<{ success: boolean; remoteManaged: boolean; error?: string }>;
@@ -942,40 +906,8 @@ interface IElectronAPI {
       filename: string,
       content: string,
     ) => Promise<{ success: boolean; error?: string }>;
-    onStreamMessage: (
-      callback: (data: { sessionId: string; message: CoworkMessage }) => void,
-    ) => () => void;
-    onStreamMessageUpdate: (
-      callback: (data: {
-        sessionId: string;
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }) => void,
-    ) => () => void;
-    onStreamToolActivity: (
-      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
-    ) => () => void;
-    onStreamPermission: (
-      callback: (data: {
-        sessionId: string;
-        request: Omit<CoworkPermissionRequest, 'origin'>;
-      }) => void,
-    ) => () => void;
-    onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) => () => void;
-    onStreamInterrupted: (
-      callback: (
-        data: import('../../shared/cowork/interruption').CoworkSessionInterruption,
-      ) => void,
-    ) => () => void;
-    onStreamComplete: (
-      callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
-    ) => () => void;
-    onStreamError: (
-      callback: (data: { sessionId: string; error: CoworkError }) => void,
-    ) => () => void;
-    onStreamQueueUpdated: (
-      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
+    onStreamUiEvent: (
+      callback: (event: import('../../shared/cowork/piUiEvent').PiUiEvent) => void,
     ) => () => void;
     onSessionsChanged: (
       callback: (data: {

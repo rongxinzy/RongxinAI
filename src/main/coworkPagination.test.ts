@@ -95,7 +95,6 @@ const SESSION_SCHEMA = `
   CREATE TABLE IF NOT EXISTS cowork_sessions (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
-    claude_session_id TEXT,
     status TEXT NOT NULL DEFAULT 'idle',
     pinned INTEGER NOT NULL DEFAULT 0,
     pin_order INTEGER,

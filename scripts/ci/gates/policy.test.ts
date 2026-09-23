@@ -44,8 +44,8 @@ test.each([
 
 test.each([
   'src/renderer/services/cowork.ts',
-  'src/renderer/services/streamRequestRegistry.ts',
-  'src/renderer/hooks/useIpcChat.ts',
+  'src/renderer/services/piUiRecovery.ts',
+  'src/renderer/hooks/useSession.ts', // Synthetic path guards the hooks directory policy.
   'src/renderer/store/slices/coworkSlice.ts',
   'src/renderer/components/cowork/hooks/useTodoQueueLifecycle.ts',
   'src/shared/components/ai-elements/conversation.tsx',

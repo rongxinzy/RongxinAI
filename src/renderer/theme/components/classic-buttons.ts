@@ -11,8 +11,10 @@ const mix = (token: string, amount: number) =>
 export function classicButtons(dark: boolean): ButtonAppearances {
   const hover = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
   const raised = { 'background-color': 'var(--zy-surface-raised)' };
+  // Match chat quick-skill / session-row selected: card on surface-raised sidebar.
   const selected = {
-    'background-color': 'var(--muted)',
+    'border-color': 'var(--border)',
+    'background-color': 'var(--card)',
     color: 'var(--foreground)',
   };
   const small = { 'border-radius': 'var(--zy-style-radius-md)' };

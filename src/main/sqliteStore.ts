@@ -93,7 +93,6 @@ export class SqliteStore {
         id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
         title_user_renamed INTEGER NOT NULL DEFAULT 0,
-        claude_session_id TEXT,
         status TEXT NOT NULL DEFAULT 'idle',
         pinned INTEGER NOT NULL DEFAULT 0,
         pin_order INTEGER,
@@ -572,20 +571,6 @@ export class SqliteStore {
       }
     } catch (error) {
       console.warn('[SqliteStore] failed to backfill agent working directories:', error);
-    }
-
-    try {
-      this.db.exec(
-        `UPDATE cowork_sessions SET execution_mode = 'local' WHERE execution_mode = 'container';`,
-      );
-      this.db.exec(`
-        UPDATE cowork_config
-        SET value = 'local'
-        WHERE key = 'executionMode' AND value = 'container';
-      `);
-      this.didRunMigration = true;
-    } catch (error) {
-      console.warn('Failed to migrate cowork execution mode:', error);
     }
 
     this.migrateLegacyMemoryFileToUserMemories();
