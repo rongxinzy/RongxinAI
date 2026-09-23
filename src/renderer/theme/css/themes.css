@@ -4924,7 +4924,8 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -5888,7 +5889,8 @@
   font-weight: var(--zy-component-font-weight-semibold);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -12547,7 +12549,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -13522,7 +13525,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="classic-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -20181,7 +20185,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -21145,7 +21150,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="daming-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -27804,7 +27810,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -28779,7 +28786,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="daming-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -35440,7 +35448,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -36404,7 +36413,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="changan-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -43068,7 +43078,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -44043,7 +44054,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="changan-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -50707,7 +50719,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -51671,7 +51684,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="weiyang-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }
@@ -58335,7 +58349,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
 }
 }
@@ -59310,7 +59325,8 @@ to {
   font-weight: var(--zy-component-font-weight-semibold);
 }
 [data-theme="weiyang-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--muted);
+  border-color: var(--border);
+  background-color: var(--card);
   color: var(--foreground);
   font-weight: var(--zy-component-font-weight-semibold);
 }

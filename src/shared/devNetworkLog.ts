@@ -3,7 +3,7 @@
 export const DEV_NETWORK_SCHEME = 'xr-net';
 export const DEV_NETWORK_BODY_MAX_CHARS = 16_000;
 
-export type DevNetworkLogSource = 'api-fetch' | 'api-stream' | 'aisphere' | 'page';
+export type DevNetworkLogSource = 'api-fetch' | 'aisphere' | 'page';
 
 export type DevNetworkLogEntry = {
   id: string;

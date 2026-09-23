@@ -27,7 +27,6 @@ import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig } from './config';
 import { agentService } from './services/agent';
-import { apiService } from './services/api';
 import {
   collectAvailableModels,
   getManagedProviderAccessPolicy,
@@ -238,11 +237,6 @@ const App: React.FC = () => {
         mark('configService.init done');
 
         const config = configService.getConfig();
-        apiService.setConfig({
-          apiKey: config.api.key,
-          baseUrl: config.api.baseUrl,
-        });
-
         themeService.initialize();
         mark('themeService done');
 
@@ -326,11 +320,6 @@ const App: React.FC = () => {
     };
 
     const handleConfigUpdated = () => {
-      const config = configService.getConfig();
-      apiService.setConfig({
-        apiKey: config.api.key,
-        baseUrl: config.api.baseUrl,
-      });
       void refreshAvailableModels().catch(() => undefined);
     };
     const handleLlamaCppRunningModelsChanged = () => {
@@ -742,10 +731,6 @@ const App: React.FC = () => {
   const handleCloseSettings = () => {
     setShowSettings(false);
     const config = configService.getConfig();
-    apiService.setConfig({
-      apiKey: config.api.key,
-      baseUrl: config.api.baseUrl,
-    });
     void collectAvailableModels(config)
       .then(allModels => {
         dispatch(setAvailableModels(allModels));

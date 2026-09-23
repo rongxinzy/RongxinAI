@@ -23,10 +23,9 @@ test.each([
     },
   });
   const ipcFetch = vi.fn().mockResolvedValue({ ok: true });
-  const ipcStream = vi.fn().mockResolvedValue({ ok: true });
   const pageRequest = vi.fn().mockImplementation(async () => new Response('hello'));
   const context = {
-    window: { electron: { api: { fetch: ipcFetch, stream: ipcStream } } },
+    window: { electron: { api: { fetch: ipcFetch } } },
     fetch: pageRequest,
     AbortController,
     TextDecoder,
@@ -39,8 +38,6 @@ test.each([
   expect(transport.shouldExposeApiInDevtoolsNetwork()).toBe(pageFetch);
   const request = { url: 'https://example.invalid/chat', method: 'POST', headers: {} };
   expect((await transport.apiFetch(request)).ok).toBe(true);
-  expect((await transport.apiStream({ ...request, requestId: 'browser-test' })).ok).toBe(true);
-  expect(pageRequest).toHaveBeenCalledTimes(pageFetch ? 2 : 0);
+  expect(pageRequest).toHaveBeenCalledTimes(pageFetch ? 1 : 0);
   expect(ipcFetch).toHaveBeenCalledTimes(pageFetch ? 0 : 1);
-  expect(ipcStream).toHaveBeenCalledTimes(pageFetch ? 0 : 1);
 });

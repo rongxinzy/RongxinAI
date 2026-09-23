@@ -7,6 +7,13 @@ export const COWORK_MESSAGE_PAGE_SIZE = 30;
 /** Background page size used to keep scroll-up history ahead of the viewport. */
 export const COWORK_MESSAGE_HISTORY_PAGE_SIZE = 50;
 
+export const CoworkExecutionMode = {
+  Auto: 'auto',
+  Local: 'local',
+} as const;
+
+export type CoworkExecutionMode = (typeof CoworkExecutionMode)[keyof typeof CoworkExecutionMode];
+
 export const CoworkMessageType = {
   User: 'user',
   Assistant: 'assistant',

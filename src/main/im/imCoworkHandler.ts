@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 
 import { type CoworkError, CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
-import { CoworkSessionSource } from '../../shared/cowork/constants';
+import { CoworkExecutionMode, CoworkSessionSource } from '../../shared/cowork/constants';
 import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import type { Platform } from '../../shared/platform';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
@@ -217,12 +217,6 @@ export class IMCoworkHandler extends EventEmitter {
       return await this.processMessageInternal(message, false, signal, workspaceId);
     } catch (error) {
       if (!this.isSessionNotFoundError(error)) {
-        if (this.shouldRetryWithFreshSession(error, message)) {
-          console.warn(
-            `[IMCoworkHandler] Detected recoverable API 400 for ${message.platform}:${message.conversationId}, recreating session and retrying once`,
-          );
-          return this.processMessageInternal(message, true, signal, workspaceId);
-        }
         throw error;
       }
 
@@ -321,14 +315,11 @@ export class IMCoworkHandler extends EventEmitter {
         if (signal?.aborted) throw new Error('Channel request was cancelled');
         const hasAvailableSkills = systemPrompt.includes('<available_skills>');
         if (session && session.systemPrompt !== systemPrompt) {
-          // Claude resume sessions may ignore updated system prompt.
-          // Reset claudeSessionId so this turn starts a fresh SDK session with new prompt.
           this.coworkStore.updateSession(coworkSessionId, {
             systemPrompt,
-            claudeSessionId: null,
           });
           console.log(
-            `[IMCoworkHandler] System prompt changed, reset claudeSessionId for IM session coworkSessionId=${serializeForLog(coworkSessionId)} platform=${serializeForLog(message.platform)}`,
+            `[IMCoworkHandler] Updated system prompt for channel session ${serializeForLog(coworkSessionId)} platform=${serializeForLog(message.platform)}`,
           );
         }
         if (!hasAvailableSkills) {
@@ -443,7 +434,7 @@ export class IMCoworkHandler extends EventEmitter {
       title,
       workspace.path,
       systemPrompt,
-      config.executionMode || 'local',
+      config.executionMode || CoworkExecutionMode.Local,
       [],
       'main',
       '',
@@ -615,42 +606,6 @@ export class IMCoworkHandler extends EventEmitter {
   private isSessionNotFoundError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return /^Session\s.+\snot found$/i.test(message.trim());
-  }
-
-  private isRecoverableApi400Error(error: unknown): boolean {
-    const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
-    if (!message.includes('400')) {
-      return false;
-    }
-
-    return (
-      message.includes('api error') ||
-      message.includes('bad_response_status_code') ||
-      message.includes('invalid chat setting') ||
-      message.includes('signature: field required') ||
-      message.includes('too long') ||
-      message.includes('context length') ||
-      message.includes('range of input length') ||
-      message.includes('payload too large') ||
-      message.includes('entity too large') ||
-      message.includes('maximum context length') ||
-      message.includes('超过') ||
-      message.includes('上限')
-    );
-  }
-
-  private shouldRetryWithFreshSession(error: unknown, message: IMMessage): boolean {
-    if (!this.isRecoverableApi400Error(error)) {
-      return false;
-    }
-
-    const mapping = this.imStore.getSessionMapping(message.conversationId, message.platform);
-    if (!mapping) {
-      return false;
-    }
-
-    const session = this.coworkStore.getSession(mapping.coworkSessionId);
-    return Boolean(session?.claudeSessionId);
   }
 
   /**

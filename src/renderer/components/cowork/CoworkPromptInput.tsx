@@ -41,7 +41,6 @@ import {
 import { clearSelection } from '../../store/slices/quickActionSlice';
 import {
   type Model,
-  setDefaultSelectedModel,
   setSelectedModel,
 } from '../../store/slices/modelSlice';
 import { clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
@@ -62,10 +61,10 @@ import { SessionStatsLine } from './SessionStatsLine';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import InlineSkillPromptEditor from './InlineSkillPromptEditor';
-import { LocalThinkingToggle } from './LocalThinkingToggle';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
 import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
+import { resolveInitialSelectedExpertIds } from './resolveInitialSelectedExpertIds';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -207,10 +206,6 @@ interface CoworkPromptInputProps {
   sessionId?: string;
   /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
   remoteManaged?: boolean;
-  showLocalThinkingToggle?: boolean;
-  localThinkingEnabled?: boolean;
-  onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
-  isDirectChat?: boolean;
   topAccessory?: React.ReactNode;
   resumeTaskActive?: boolean;
   onCancelTaskResume?: () => void;
@@ -241,10 +236,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       onPermissionModeChange,
       sessionId,
       remoteManaged = false,
-      showLocalThinkingToggle = false,
-      localThinkingEnabled,
-      onLocalThinkingEnabledChange,
-      isDirectChat = false,
       topAccessory,
       resumeTaskActive = false,
       onCancelTaskResume,
@@ -264,9 +255,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const agents = useSelector((state: RootState) => state.agent.agents);
     const currentAgent = agents.find(agent => agent.id === currentAgentId);
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
-    const defaultSelectedModel = useSelector(
-      (state: RootState) => state.model.defaultSelectedModel,
-    );
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
     const contextMessage = useMemo(
       () =>
@@ -279,7 +267,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const workMode = useSelector(selectWorkMode);
     const canQueueWhileStreaming =
       workMode === WorkMode.Work &&
-      !isDirectChat &&
       (currentSession?.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work;
     const persistedExpertIds = useMemo(
       () => currentSession?.experts?.slice(0, 1).map(expert => expert.expertId) ?? [],
@@ -368,14 +355,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const handleModelSelect = useCallback(
       async (nextModel: Model) => {
         if (isPatchingModel || isPersistingAgentModel) return;
-        if (isDirectChat) {
-          dispatch(setDefaultSelectedModel(nextModel));
-          return;
-        }
         const modelRef = toAgentModelRef(nextModel);
-        // Always update the agent-level model selection so that CoworkView's
-        // currentAgentSelectedModel (used to build ChatChatTransport) reflects
-        // the user's latest choice — even when switching model inside a session.
+        // Keep the agent selection aligned with model changes inside a session.
         dispatch(setSelectedModel({ agentId: currentAgentId, model: nextModel }));
         if (sessionId) {
           const reqId = modelPatchRequestIdRef.current + 1;
@@ -409,7 +390,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       [
         isPatchingModel,
         isPersistingAgentModel,
-        isDirectChat,
         sessionId,
         currentSession,
         currentAgentId,
@@ -420,18 +400,30 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       ],
     );
 
-    const agentEffectiveModel = resolveEffectiveModel({
+    const effectiveSelectedModel = resolveEffectiveModel({
       sessionId,
       agentSelectedModel,
       globalSelectedModel: currentAgentSelectedModel,
     });
-    const effectiveSelectedModel = isDirectChat ? defaultSelectedModel : agentEffectiveModel;
     const modelSupportsImage = !!effectiveSelectedModel?.supportsImage;
 
     // Load skills on mount
     useEffect(() => {
-      setSelectedExpertIds(persistedExpertIds);
-    }, [currentSession?.id, currentAgentId, persistedExpertIds]);
+      // 2026/09/22 lixiang  从专家页进入新会话时选中当前专家 agent（#100）
+      setSelectedExpertIds(
+        resolveInitialSelectedExpertIds({
+          sessionId: currentSession?.id,
+          persistedExpertIds,
+          currentAgentId,
+          currentAgentSource: currentAgent?.source,
+        }),
+      );
+    }, [
+      currentSession?.id,
+      currentAgentId,
+      currentAgent?.source,
+      persistedExpertIds,
+    ]);
 
     const syncSkills = useCallback(async () => {
       const loadedSkills = await skillService.loadSkills();
@@ -542,7 +534,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         isPatchingModel
       )
         return;
-      if (!isDirectChat && hasUnavailableLlamaCppModel) {
+      if (hasUnavailableLlamaCppModel) {
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
             detail: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
@@ -711,7 +703,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       disabled,
       sessionContextPending,
       isPatchingModel,
-      isDirectChat,
       hasUnavailableLlamaCppModel,
       onSubmit,
       activeSkillIds,
@@ -1125,7 +1116,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     }, []);
     // Unified Kimi-style toolbar: "+" menu (+ permission selector in work mode)
     // on the left, model picker + submit on the right. remoteManaged sessions
-    // keep the minimal read-only layout (model picker + thinking toggle only).
+    // keep the minimal read-only layout with the model picker.
     const isPlusToolbar = !remoteManaged;
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     // 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip
@@ -1225,15 +1216,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   />
                 </>
               )}
-              {!isCompactToolbar && !isPlusToolbar && (
-                <LocalThinkingToggle
-                  model={effectiveSelectedModel}
-                  visible={showLocalThinkingToggle}
-                  enabled={localThinkingEnabled}
-                  disabled={disabled || isStreaming}
-                  onEnabledChange={onLocalThinkingEnabledChange}
-                />
-              )}
               {isPlusToolbar && (
                 <>
                   <PromptPlusMenu
@@ -1243,7 +1225,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     onManageSkills={handleManageSkills}
                     onManageConnectors={() => onManageConnectors?.()}
                     experts={
-                      isWorkVariant && !isDirectChat
+                      isWorkVariant
                         ? { selectedExpertIds, onChange: setSelectedExpertIds }
                         : undefined
                     }
@@ -1278,20 +1260,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               )}
             </PromptInputTools>
             {isPlusToolbar &&
-              (showLocalThinkingToggle ||
-                showModelSelector ||
-                (isCompactToolbar && isWorkVariant)) && (
+              (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
                 <div className="flex items-center gap-1.5">
-                  {!isWorkVariant && showLocalThinkingToggle && (
-                    <LocalThinkingToggle
-                      model={effectiveSelectedModel}
-                      visible={showLocalThinkingToggle}
-                      enabled={localThinkingEnabled}
-                      disabled={disabled || isStreaming}
-                      onEnabledChange={onLocalThinkingEnabledChange}
-                      compact={isCompactToolbar}
-                    />
-                  )}
                   {showModelSelector && (
                     <>
                       {!isCompactToolbar && (

@@ -211,7 +211,6 @@ test('backfills legacy scheduled sessions only when adding the source column', a
     CREATE TABLE cowork_sessions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      claude_session_id TEXT,
       status TEXT NOT NULL DEFAULT 'idle',
       mode TEXT NOT NULL DEFAULT 'work',
       cwd TEXT NOT NULL,
@@ -272,7 +271,6 @@ test('creates the artifact index after adding sequence to legacy messages', asyn
     CREATE TABLE cowork_sessions (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      claude_session_id TEXT,
       status TEXT NOT NULL DEFAULT 'idle',
       mode TEXT NOT NULL DEFAULT 'work',
       cwd TEXT NOT NULL,

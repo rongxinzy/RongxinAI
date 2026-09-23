@@ -94,14 +94,6 @@ export type ManagedProviderIpc = (typeof ManagedProviderIpc)[keyof typeof Manage
 export const ApiIpc = {
   Fetch: 'api:fetch',
   FetchModels: 'api:fetch-models',
-  WebSearch: 'api:web-search',
-  Stream: 'api:stream',
-  CancelStream: 'api:stream:cancel',
-  /** Dynamic: `api:stream:${requestId}:data` */
-  streamData: (requestId: string) => `api:stream:${requestId}:data`,
-  streamDone: (requestId: string) => `api:stream:${requestId}:done`,
-  streamError: (requestId: string) => `api:stream:${requestId}:error`,
-  streamAbort: (requestId: string) => `api:stream:${requestId}:abort`,
 } as const;
 
 // ─── ZhiYuan Model Pool ────────────────────────────────────────────────────
@@ -201,15 +193,8 @@ export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof Cowork
 
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {
-  Message: 'cowork:stream:message',
-  MessageUpdate: 'cowork:stream:messageUpdate',
-  ToolActivity: 'cowork:stream:toolActivity',
-  Permission: 'cowork:stream:permission',
-  PermissionDismiss: 'cowork:stream:permissionDismiss',
-  Interrupted: 'cowork:stream:interrupted',
-  Complete: 'cowork:stream:complete',
-  Error: 'cowork:stream:error',
-  QueueUpdated: 'cowork:stream:queueUpdated',
+  RuntimeSnapshots: 'cowork:stream:runtimeSnapshots',
+  UiEvent: 'cowork:stream:uiEvent',
   SessionsChanged: 'cowork:sessions:changed',
 } as const;
 export type CoworkStreamIpc = (typeof CoworkStreamIpc)[keyof typeof CoworkStreamIpc];
