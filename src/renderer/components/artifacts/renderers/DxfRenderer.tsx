@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 
-import MarkdownContent from '@/components/MarkdownContent';
 import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 
+import { dxfPreviewToSvg, parseDxfPreview } from './dxfPreview';
+
 const t = (key: string) => i18nService.t(key);
 
-interface MarkdownRendererProps {
+interface DxfRendererProps {
   artifact: Artifact;
 }
 
@@ -20,44 +21,42 @@ function dataUrlToText(dataUrl: string): string {
   return new TextDecoder('utf-8').decode(bytes);
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ artifact }) => {
-  const [content, setContent] = useState(artifact.content);
-  const [loading, setLoading] = useState(!artifact.content && Boolean(artifact.filePath));
+const DxfRenderer: React.FC<DxfRendererProps> = ({ artifact }) => {
+  const [svg, setSvg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (artifact.content) {
-      setContent(artifact.content);
-      setLoading(false);
-      setError(null);
-      return undefined;
-    }
-
-    if (!artifact.filePath) {
-      setContent('');
-      setLoading(false);
-      setError(null);
-      return undefined;
-    }
-
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    loadArtifactDataUrl(artifact.filePath)
-      .then(dataUrl => {
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      setSvg(null);
+
+      try {
+        let text = artifact.content;
+        if (!text) {
+          if (!artifact.filePath) throw new Error(t('artifactDocumentError'));
+          text = dataUrlToText(await loadArtifactDataUrl(artifact.filePath));
+        }
+        const rendered = dxfPreviewToSvg(parseDxfPreview(text));
         if (cancelled) return;
-        setContent(dataUrlToText(dataUrl));
-      })
-      .catch(loadError => {
+        if (!rendered) {
+          setError(t('artifactPreviewUnsupported'));
+          return;
+        }
+        setSvg(rendered);
+      } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : String(loadError));
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
 
+    void load();
     return () => {
       cancelled = true;
     };
@@ -71,27 +70,21 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ artifact }) => {
     );
   }
 
-  if (error) {
+  if (error || !svg) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {error}
-      </div>
-    );
-  }
-
-  if (!content) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {t('artifactDocumentError')}
+        {error || t('artifactPreviewUnsupported')}
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-auto p-6">
-      <MarkdownContent content={content} />
-    </div>
+    <div
+      className="flex h-full w-full items-center justify-center overflow-auto bg-background p-4 text-foreground"
+      // DXF → SVG is generated from trusted local workspace files only.
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 };
 
-export default MarkdownRenderer;
+export default DxfRenderer;
