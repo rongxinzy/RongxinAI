@@ -11,9 +11,11 @@ import {
   selectSessionSelectedArtifact,
   selectSelectedArtifact,
   setActiveArtifactProjection,
+  setActiveTab,
   setArtifactLayoutMode,
   setPanelView,
   setPanelWidth,
+  shouldRevealLiveArtifact,
   togglePanel,
 } from './artifactSlice';
 import artifactReducer from './artifactSlice';
@@ -268,23 +270,91 @@ describe('artifact reducer', () => {
     );
   });
 
-  test('opens the artifact panel when a deliverable is added to the active session', () => {
+  test('opens the artifact panel for a live deliverable, not for a silent backfill', () => {
+    const deliverable = makeArtifact({
+      id: 'deliverable-1',
+      role: ArtifactRole.Deliverable,
+      declared: true,
+    });
+
+    // Detection that runs while the panel view is merely being restored (history,
+    // persisted seeding) must not open anything.
+    const backfilled = artifactReducer(
+      artifactReducer(undefined, activateSessionArtifactView('session-1')),
+      addArtifact({ sessionId: 'session-1', artifact: deliverable }),
+    );
+    expect(backfilled.isPanelOpen).toBe(false);
+
+    const live = artifactReducer(
+      artifactReducer(undefined, activateSessionArtifactView('session-1')),
+      addArtifact({ sessionId: 'session-1', artifact: deliverable, reveal: true }),
+    );
+    expect(live.isPanelOpen).toBe(true);
+    expect(live.selectedArtifactId).toBe('deliverable-1');
+    expect(live.panelView).toBe(ArtifactPanelView.Preview);
+  });
+
+  test('keeps the tab the user is in when a reveal lands on an open panel', () => {
     let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
     state = artifactReducer(
       state,
       addArtifact({
         sessionId: 'session-1',
+        artifact: makeArtifact({ id: 'deliverable-1', role: ArtifactRole.Deliverable, declared: true }),
+        reveal: true,
+      }),
+    );
+    state = artifactReducer(state, setActiveTab('code'));
+
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
         artifact: makeArtifact({
-          id: 'deliverable-1',
+          id: 'deliverable-2',
+          filePath: 'D:/workspace/b.pptx',
           role: ArtifactRole.Deliverable,
           declared: true,
         }),
+        reveal: true,
       }),
     );
 
-    expect(state.isPanelOpen).toBe(true);
-    expect(state.selectedArtifactId).toBe('deliverable-1');
-    expect(state.panelView).toBe(ArtifactPanelView.Preview);
+    expect(state.activeTab).toBe('code');
+    expect(state.selectedArtifactId).toBe('deliverable-2');
+  });
+
+  test('does not open the panel for an artifact of a session the user is not viewing', () => {
+    const state = artifactReducer(
+      artifactReducer(undefined, activateSessionArtifactView('session-2')),
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({ id: 'deliverable-1', role: ArtifactRole.Deliverable, declared: true }),
+        reveal: true,
+      }),
+    );
+
+    expect(state.isPanelOpen).toBe(false);
+    expect(state.selectedArtifactId).toBeNull();
+  });
+
+  test('reveals only live, declared, previewable deliverables', () => {
+    const deliverable = makeArtifact({ role: ArtifactRole.Deliverable, declared: true });
+    const live = { isLiveSession: true, previewable: true };
+
+    expect(shouldRevealLiveArtifact(deliverable, live)).toBe(true);
+    expect(shouldRevealLiveArtifact(deliverable, { ...live, isLiveSession: false })).toBe(false);
+    expect(shouldRevealLiveArtifact(deliverable, { ...live, previewable: false })).toBe(false);
+    // Heuristic candidates (declared: false) never open the panel by themselves.
+    expect(shouldRevealLiveArtifact(makeArtifact({ role: ArtifactRole.Deliverable }), live)).toBe(
+      false,
+    );
+    expect(
+      shouldRevealLiveArtifact(
+        makeArtifact({ role: ArtifactRole.Intermediate, declared: true }),
+        live,
+      ),
+    ).toBe(false);
   });
 
   test('previews the sole deliverable when the panel is toggled open', () => {
@@ -309,7 +379,7 @@ describe('artifact reducer', () => {
     expect(state.panelView).toBe(ArtifactPanelView.Preview);
   });
 
-  test('keeps the first deliverable selected when more files are generated', () => {
+  test('follows the newest deliverable when more files are generated', () => {
     let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
     state = artifactReducer(
       state,
@@ -322,6 +392,7 @@ describe('artifact reducer', () => {
           declared: true,
           createdAt: 1,
         }),
+        reveal: true,
       }),
     );
     state = artifactReducer(
@@ -337,11 +408,12 @@ describe('artifact reducer', () => {
           declared: true,
           createdAt: 2,
         }),
+        reveal: true,
       }),
     );
 
     expect(state.isPanelOpen).toBe(true);
-    expect(state.selectedArtifactId).toBe('deliverable-1');
+    expect(state.selectedArtifactId).toBe('deliverable-2');
   });
 
   test('does not open the panel for intermediate artifacts or unchanged re-detects', () => {
@@ -355,20 +427,159 @@ describe('artifact reducer', () => {
     );
     expect(state.isPanelOpen).toBe(false);
 
-    state = artifactReducer(state, closePanel());
+    // Even a live event cannot open the panel for a non-deliverable.
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'intermediate-2',
+          filePath: 'D:/workspace/block.html',
+          role: ArtifactRole.Intermediate,
+          declared: true,
+        }),
+        reveal: true,
+      }),
+    );
+    expect(state.isPanelOpen).toBe(false);
+
     const deliverable = makeArtifact({
       id: 'deliverable-2',
       role: ArtifactRole.Deliverable,
       declared: true,
     });
-    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: deliverable }));
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: deliverable, reveal: true }),
+    );
     expect(state.isPanelOpen).toBe(true);
 
     state = artifactReducer(state, closePanel());
     state = artifactReducer(
       state,
-      addArtifact({ sessionId: 'session-1', artifact: { ...deliverable } }),
+      addArtifact({ sessionId: 'session-1', artifact: { ...deliverable }, reveal: true }),
     );
     expect(state.isPanelOpen).toBe(false);
+  });
+
+  test('selects the promoted artifact when a later declaration completes it', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'earlier-deliverable',
+          filePath: 'D:/workspace/earlier.pptx',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
+        reveal: true,
+      }),
+    );
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'candidate',
+          filePath: 'D:/workspace/candidate.md',
+          type: 'markdown',
+          role: ArtifactRole.Deliverable,
+          declared: false,
+        }),
+      }),
+    );
+
+    // The declaration of the candidate completes a delivery: it becomes the
+    // previewed artifact instead of the older deliverable.
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'candidate',
+          filePath: 'D:/workspace/candidate.md',
+          type: 'markdown',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
+        reveal: true,
+      }),
+    );
+
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('candidate');
+  });
+
+  test('picks the last deliverable of a batch that arrives in detection order', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    for (const [index, id] of ['report-a.md', 'report-b.md', 'report-c.md'].entries()) {
+      state = artifactReducer(
+        state,
+        addArtifact({
+          sessionId: 'session-1',
+          artifact: makeArtifact({
+            id: `deliverable-${index}`,
+            filePath: `D:/workspace/${id}`,
+            type: 'markdown',
+            role: ArtifactRole.Deliverable,
+            declared: true,
+          }),
+          reveal: true,
+        }),
+      );
+    }
+
+    expect(state.selectedArtifactId).toBe('deliverable-2');
+  });
+
+  test('respects an explicit close until a new artifact arrives', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'candidate',
+          role: ArtifactRole.Deliverable,
+          declared: false,
+          content: '',
+        }),
+      }),
+    );
+    state = artifactReducer(state, closePanel());
+
+    // The same artifact becoming a declared deliverable later stays closed…
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'candidate',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
+        reveal: true,
+      }),
+    );
+    expect(state.isPanelOpen).toBe(false);
+
+    // …while a newly added artifact opens it again.
+    state = artifactReducer(
+      state,
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({
+          id: 'fresh',
+          filePath: 'D:/workspace/fresh.pptx',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
+        reveal: true,
+      }),
+    );
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('fresh');
   });
 });
