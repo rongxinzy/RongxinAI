@@ -1,0 +1,161 @@
+name: Sign Xiaoruan Windows package
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful Xiaoruan unsigned windows-build Actions run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: xiaoruan-certum-signing
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'rongxinzy/RongxinAI' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/feat/sign-xiaoruan-windows')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      source-repository: ${{ steps.source.outputs.source-repository }}
+      source-run-id: ${{ steps.source.outputs.source-run-id }}
+      source-sha: ${{ steps.source.outputs.source-sha }}
+      artifact: ${{ steps.source.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - id: source
+        name: Validate Xiaoruan unsigned package run
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          # Prefer a Xiaoruan-scoped read token; fall back to the shared runtime token.
+          RUNTIME_ARTIFACT_READ_TOKEN: ${{ secrets.XIAORUAN_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+        run: node scripts/xiaoruan-signing/prepare.mjs
+      - name: Record handoff identity
+        env:
+          SOURCE_RUN_ID: ${{ steps.source.outputs.source-run-id }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+        run: |
+          {
+            echo '### Xiaoruan signing handoff'
+            echo
+            echo "- source run: \`$SOURCE_RUN_ID\`"
+            echo "- source commit: \`$SOURCE_SHA\`"
+            echo "- artifact: \`windows-build\` → signed \`signed-windows-build\`"
+            echo
+            echo "https://github.com/rongxinzy/xiaoruan-ai-agent/actions/runs/$SOURCE_RUN_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sign:
+    needs: prepare
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          repository: ${{ needs.prepare.outputs.source-repository }}
+          run-id: ${{ needs.prepare.outputs.source-run-id }}
+          name: ${{ needs.prepare.outputs.artifact }}
+          path: package-input
+          github-token: ${{ secrets.XIAORUAN_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+      - name: Require unsigned installer inputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem -LiteralPath package-input -Filter '*.exe' -File -Recurse)
+          if ($installers.Count -lt 1) {
+            throw 'Expected at least one Windows installer (.exe) in windows-build.'
+          }
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+            if ($signature.Status -ne 'NotSigned') {
+              throw "Installer starts unexpectedly signed ($($signature.Status)): $($installer.Name)"
+            }
+            Write-Output "Unsigned installer ready: $($installer.Name) ($([math]::Round($installer.Length / 1MB, 1)) MiB)"
+          }
+      - name: Connect Certum SimplySign
+        id: certum
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      - name: Sign Xiaoruan Windows installers
+        shell: pwsh
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem -LiteralPath package-input -Filter '*.exe' -File -Recurse)
+          foreach ($installer in $installers) {
+            & ./scripts/runtime-signing/sign-runtime.ps1 -Path $installer.FullName
+          }
+      - name: Verify installer Authenticode signatures
+        shell: pwsh
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $thumbprint = ($env:CERTUM_CERT_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
+          $certificate = @(
+            Get-ChildItem Cert:\CurrentUser\My |
+              Where-Object {
+                ($_.Thumbprint -replace '[^0-9A-Fa-f]', '').ToUpperInvariant() -eq $thumbprint
+              }
+          )
+          if ($certificate.Count -ne 1) {
+            throw "Expected exactly one Certum certificate; found $($certificate.Count)."
+          }
+          $expectedDer = [Convert]::ToBase64String($certificate[0].RawData)
+          $installers = @(Get-ChildItem -LiteralPath package-input -Filter '*.exe' -File -Recurse)
+          foreach ($installer in $installers) {
+            $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+            if ($signature.Status -ne 'Valid') {
+              throw "Authenticode status for $($installer.Name) is $($signature.Status)."
+            }
+            $actualDer = [Convert]::ToBase64String($signature.SignerCertificate.RawData)
+            if ($actualDer -ne $expectedDer) {
+              throw "Signer mismatch for $($installer.Name)."
+            }
+            if ($null -eq $signature.TimeStamperCertificate) {
+              throw "Missing trusted timestamp for $($installer.Name)."
+            }
+            Write-Output "Signed and verified: $($installer.Name)"
+          }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: signed-windows-build
+          path: package-input/**/*.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish signed package summary
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ needs.prepare.outputs.source-run-id }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source-sha }}
+        run: |
+          {
+            echo '### Signed Xiaoruan Windows package'
+            echo
+            echo "- signing run: \`$GITHUB_RUN_ID\`"
+            echo "- source run: \`$SOURCE_RUN_ID\`"
+            echo "- source commit: \`$SOURCE_SHA\`"
+            echo "- artifact: \`signed-windows-build\`"
+            echo
+            echo "https://github.com/rongxinzy/RongxinAI/actions/runs/$GITHUB_RUN_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
