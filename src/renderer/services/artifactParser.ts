@@ -91,6 +91,32 @@ export function parseCodeBlockArtifacts(
   return artifacts;
 }
 
+function findPairedToolResult(
+  messages: CoworkMessage[],
+  toolUseMsg: CoworkMessage,
+): CoworkMessage | undefined {
+  const toolUseId = toolUseMsg.metadata?.toolUseId;
+  if (typeof toolUseId === 'string' && toolUseId.length > 0) {
+    return messages.find(
+      message => message.type === 'tool_result' && message.metadata?.toolUseId === toolUseId,
+    );
+  }
+  const index = messages.findIndex(message => message.id === toolUseMsg.id);
+  const next = index >= 0 ? messages[index + 1] : undefined;
+  return next?.type === 'tool_result' ? next : undefined;
+}
+
+function isUnsuccessfulToolResult(
+  toolResultMsg: CoworkMessage | undefined,
+  toolUseMsg?: CoworkMessage,
+): boolean {
+  return (
+    (!toolResultMsg && typeof toolUseMsg?.metadata?.toolUseId === 'string') ||
+    Boolean(toolResultMsg?.metadata?.isError) ||
+    Boolean(toolResultMsg?.metadata?.error)
+  );
+}
+
 export function parseDeclareArtifactFromMessages(
   messages: CoworkMessage[],
   sessionId: string,
@@ -102,6 +128,8 @@ export function parseDeclareArtifactFromMessages(
   for (const msg of messages) {
     if (msg.type !== 'tool_use') continue;
     if (msg.metadata?.toolName !== DECLARE_ARTIFACT_TOOL_NAME) continue;
+
+    if (isUnsuccessfulToolResult(findPairedToolResult(messages, msg), msg)) continue;
 
     const input = msg.metadata?.toolInput as Record<string, unknown> | undefined;
     if (!input) continue;
@@ -269,7 +297,7 @@ export function parseToolArtifact(
     return null;
   }
 
-  if (toolResultMsg?.metadata?.isError) {
+  if (isUnsuccessfulToolResult(toolResultMsg, toolUseMsg)) {
     return null;
   }
 
