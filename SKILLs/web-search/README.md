@@ -113,7 +113,7 @@ Default configuration in `server/config.ts`:
   browser: {
     cdpPort: 9222,
     headless: true,
-    fallbackToHeadful: true,
+    fallbackToHeadful: false,
     chromeFlags: [/* ... */]
   },
   server: {

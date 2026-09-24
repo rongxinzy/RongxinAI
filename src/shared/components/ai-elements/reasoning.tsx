@@ -23,6 +23,7 @@ import React, {
 import { Streamdown, type StreamdownProps } from 'streamdown';
 
 import { LinkSafetyModal } from './linkSafetyModal';
+import { streamdownChatControls } from './streamdownChatControls';
 import { Shimmer } from './shimmer';
 import {
   isPlainTextStreamingTail,
@@ -226,14 +227,14 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
   const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
   const base = (
-    <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
+    <Streamdown plugins={basePlugins} linkSafety={linkSafety} controls={streamdownChatControls}>
       {text}
     </Streamdown>
   );
   const streamingContent = (
     <>
       {committed && (
-        <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
+        <Streamdown plugins={basePlugins} linkSafety={linkSafety} controls={streamdownChatControls}>
           {committed}
         </Streamdown>
       )}
