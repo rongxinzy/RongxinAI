@@ -621,25 +621,26 @@ export function classicConditionalControls(dark: boolean) {
         'border-radius': 'var(--zy-style-radius-md)',
       },
     }),
-    // The caption layer covers the whole tile so its hover wash reaches the artwork, but the
-    // scrim itself is bounded to the caption bar and kept as light as white-on-artwork legibility
-    // allows: 85% of the overlay token still clears 4.5:1 over the near-white tops of the bundled
-    // previews, while the ramp-in keeps the tile's top edge from reading as a hard dark bar.
+    // The caption sits on a light veil rather than a dark scrim. White text forced a dark bar that
+    // read as heavy on the small tiles; dark text on a 60% white veil holds ≥4.5:1 over any artwork
+    // (the veil lifts even a black preview top to ~0.6 sRGB) and all but disappears over the
+    // near-white tops most bundled previews have. The veil covers the whole tile so the hover wash
+    // reaches the artwork too.
     'page-case-gallery-body': recipe({
       base: {
         padding: '0.75rem',
-        color: 'var(--zy-component-palette-white)',
+        color: 'var(--zy-component-palette-zinc-950)',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': '500',
         'background-image':
-          'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem)',
+          'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem)',
         'transition-property': 'background-color',
         'transition-duration': '200ms',
         'transition-timing-function': 'ease-out',
       },
       hover: {
         'background-color':
-          'color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent)',
+          'color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent)',
       },
     }),
     'page-date-input-button-variant-1': recipe({

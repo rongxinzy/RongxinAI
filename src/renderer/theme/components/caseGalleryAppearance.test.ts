@@ -38,21 +38,21 @@ test('case thumbnails round their own corners instead of sitting inside a frame'
 
 /**
  * 说明层是图片之上唯一的图层，标题可读性与 hover 反馈都挂在它上面。
- * 遮罩取 overlay token 的 85%（实测 4.8:1，越过 4.5:1 下限即不再加深），在 2.75rem 内收干净，
- * 顶部渐入：示例缩略图顶部接近纯白，全强度遮罩或拖到整卡高度都会让卡片显得发黑。
+ * 标题走深色 + 60% 白纱：45 张内置缩略图顶部中位亮度 0.96（近白），白纱在它们之上几乎不可见，
+ * 因此卡片看起来是浅色的；对少数深色顶部的 web 截图，白纱把底色抬到 0.6 sRGB，实测最差 6.1:1。
  */
-test('case captions keep the lightest AA scrim and carry the tile hover', () => {
+test('case captions use a light veil with dark text and carry the tile hover', () => {
   const body = classicComponentAppearances(false)['page-case-gallery-body'];
 
-  expect(body.base.color).toBe('var(--zy-component-palette-white)');
+  expect(body.base.color).toBe('var(--zy-component-palette-zinc-950)');
   expect(body.base.padding).toBe('0.75rem');
   expect(body.base['font-size']).toBe('var(--zy-component-text-sm)');
   expect(body.base['font-weight']).toBe('500');
   expect(body.base['background-image']).toBe(
-    'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem)',
+    'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem)',
   );
   expect(body.base['transition-duration']).toBe('200ms');
   expect(body.hover['background-color']).toBe(
-    'color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent)',
+    'color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent)',
   );
 });

@@ -2875,10 +2875,10 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -5284,7 +5284,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -10508,10 +10508,10 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -12920,7 +12920,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -18156,10 +18156,10 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -20565,7 +20565,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -25789,10 +25789,10 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -28201,7 +28201,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -33439,10 +33439,10 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -35848,7 +35848,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -41077,10 +41077,10 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -43489,7 +43489,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -48730,10 +48730,10 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -51139,7 +51139,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
@@ -56368,10 +56368,10 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-case-gallery-body) {
   padding: 0.75rem;
-  color: var(--zy-component-palette-white);
+  color: var(--zy-component-palette-zinc-950);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem);
+  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
   transition-property: background-color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
@@ -58780,7 +58780,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent);
+  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
 }
 }
 @media (hover: hover) {
