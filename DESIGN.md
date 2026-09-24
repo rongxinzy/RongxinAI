@@ -66,7 +66,7 @@ Tailwind 的语义颜色、字体、圆角和阴影映射到插件变量。页�
 | 边框     | `border` / `border-subtle`                    | 分隔线、控件描边                                       |
 | 强调     | `primary` / `primary-hover` / `primary-muted` / `primary-strong` | 唯一的品牌强调色（品牌蓝），用于主按钮、激活态、链接、focus ring；`primary-strong` 为按钮实色档，深色主题下保证白字 AA 对比度 |
 | 状态     | `destructive` / `success` / `warning`         | 仅用于语义状态，不作装饰                               |
-| 技能着色 | `skill-blue`（`--zy-skill-blue-foreground/background`） | 已挂载技能胶囊（ActiveSkillBadge）的文字与 hover 底色；唯一的功能性蓝色例外，不推广到其他元素 |
+| 技能着色 | `skill-blue`（`--zy-skill-blue-foreground/background`） | 输入框内已挂载技能 token（`surface-skill-token` / `surface-skill-remove`）与目标模式胶囊的文字/底色；唯一的功能性蓝色例外，不推广到其他元素 |
 
 ### 当前色值参考（Light）
 
