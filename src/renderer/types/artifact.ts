@@ -10,6 +10,7 @@ export {
   getArtifactPreviewMode,
   getArtifactTypeByExtension,
   isBinaryArtifactFile,
+  resolveCoworkArtifactType,
   type ArtifactPreviewMode as ArtifactPreviewModeValue,
 } from '../../shared/cowork/artifactPreview';
 

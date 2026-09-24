@@ -412,6 +412,23 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       void syncSkills();
     }, [syncSkills, workMode]);
 
+    // 2026/09/23 切换工作/对话模式时清空输入、首页草稿与已挂载 skill（两端共用 __home__ 键，否则会残留）
+    const prevWorkModeForDraftRef = useRef(workMode);
+    useEffect(() => {
+      if (prevWorkModeForDraftRef.current === workMode) return;
+      prevWorkModeForDraftRef.current = workMode;
+      setValue('');
+      setImageVisionHint(false);
+      dispatch(setDraftPrompt({ sessionId: '__home__', draft: '' }));
+      dispatch(clearDraftAttachments('__home__'));
+      if (draftKey !== '__home__') {
+        dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
+        dispatch(clearDraftAttachments(draftKey));
+      }
+      dispatch(clearActiveSkills());
+      dispatch(clearSelection());
+    }, [workMode, dispatch, draftKey]);
+
     useEffect(() => {
       const unsubscribe = skillService.onSkillsChanged(() => {
         void syncSkills();
@@ -423,7 +440,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     useEffect(() => {
       const handleFocusInput = (event: Event) => {
-        const detail = (event as CustomEvent<{ clear?: boolean; text?: string }>).detail;
+        const detail = (
+          event as CustomEvent<{ clear?: boolean; clearExperts?: boolean; text?: string }>
+        ).detail;
         const shouldClear = detail?.clear ?? true;
         if (detail?.text !== undefined) {
           setValue(detail.text);
@@ -433,6 +452,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           setValue('');
           dispatch(clearDraftAttachments(draftKey));
           setImageVisionHint(false);
+        }
+        // Only clear when new-chat explicitly requests it; do not tie to shouldClear (avoids ask-ai side effects).
+        if (detail?.clearExperts === true) {
+          setSelectedExpertIds([]);
         }
         requestAnimationFrame(() => {
           textareaRef.current?.focus();

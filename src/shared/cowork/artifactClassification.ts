@@ -19,8 +19,16 @@ export const ArtifactTypeByLanguage: Readonly<Record<string, CoworkArtifactType>
   model: 'model',
   stl: 'model',
   obj: 'model',
-  step: 'model',
-  iges: 'model',
+  gltf: 'model',
+  glb: 'model',
+  ply: 'model',
+  '3mf': 'model',
+  dxf: 'document',
+  // BREP CAD formats have no in-app mesh loader yet.
+  step: 'unsupported',
+  stp: 'unsupported',
+  iges: 'unsupported',
+  igs: 'unsupported',
 };
 
 export const getInlineArtifactRole = (explicit: boolean): CoworkArtifactRole =>
