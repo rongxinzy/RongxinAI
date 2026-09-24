@@ -137,15 +137,23 @@ function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
     : merged;
 }
 
-/** A merge only reveals when it completes a live delivery: the artifact became a
- *  declared deliverable, or its previewable content finally arrived. */
-function shouldRevealArtifactPanel(previous: Artifact, next: Artifact): boolean {
+/**
+ * A merge reveals when the caller certified a live delivery (the artifact may
+ * already be in the store from the persisted-seeding pass, in which case the
+ * merge is a no-op), or when the merge itself completed a delivery: an
+ * intermediate became a deliverable, or its previewable content arrived.
+ */
+function shouldRevealMergedArtifact(
+  previous: Artifact,
+  next: Artifact,
+  revealRequested: boolean,
+): boolean {
   // Only deliverables may open the panel by themselves, whatever the caller's
   // event says: a merged code block or an intermediate file never does.
-  if (next.role !== ArtifactRole.Deliverable) return false;
+  if (!revealRequested || next.role !== ArtifactRole.Deliverable) return false;
+  if (next.declared === true) return true;
   return (
-    (previous.role !== ArtifactRole.Deliverable && next.role === ArtifactRole.Deliverable) ||
-    (!previous.declared && Boolean(next.declared)) ||
+    previous.role !== ArtifactRole.Deliverable ||
     (!previous.content && Boolean(next.content))
   );
 }
@@ -262,9 +270,9 @@ const artifactSlice = createSlice({
         const merged = mergeArtifact(old, projectedArtifact);
         if (merged !== old) {
           state.artifactsBySession[sessionId][existing] = merged;
-          if (reveal && shouldRevealArtifactPanel(old, merged)) {
-            revealArtifactInPanel(state, sessionId, RevealKind.Promotion, merged.id);
-          }
+        }
+        if (shouldRevealMergedArtifact(old, merged, reveal)) {
+          revealArtifactInPanel(state, sessionId, RevealKind.Promotion, merged.id);
         }
         return;
       }
@@ -280,9 +288,9 @@ const artifactSlice = createSlice({
           const merged = mergeArtifact(old, projectedArtifact);
           if (merged !== old) {
             state.artifactsBySession[sessionId][dupIndex] = merged;
-            if (reveal && shouldRevealArtifactPanel(old, merged)) {
-              revealArtifactInPanel(state, sessionId, RevealKind.Promotion, merged.id);
-            }
+          }
+          if (shouldRevealMergedArtifact(old, merged, reveal)) {
+            revealArtifactInPanel(state, sessionId, RevealKind.Promotion, merged.id);
           }
           return;
         }

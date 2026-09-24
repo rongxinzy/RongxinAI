@@ -462,6 +462,31 @@ describe('artifact reducer', () => {
     expect(state.isPanelOpen).toBe(false);
   });
 
+  test('reveals a live declared deliverable that the seeding pass already added', () => {
+    const persisted = makeArtifact({
+      id: 'seeded',
+      filePath: 'D:/workspace/report.md',
+      type: 'markdown',
+      role: ArtifactRole.Deliverable,
+      declared: true,
+      content: 'seeded body',
+    });
+
+    // Persisted seeding adds it silently…
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: persisted }));
+    expect(state.isPanelOpen).toBe(false);
+
+    // …and the live detection of the same declaration must still reveal it.
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: { ...persisted }, reveal: true }),
+    );
+
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('seeded');
+  });
+
   test('selects the promoted artifact when a later declaration completes it', () => {
     let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
     state = artifactReducer(
