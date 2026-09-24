@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 
 import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
+import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
+
+const t = (key: string) => i18nService.t(key);
 
 interface HtmlRendererProps {
   artifact: Artifact;
@@ -81,13 +84,18 @@ function preparePreviewHtml(html: string): string {
 
 const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   const [processedHtml, setProcessedHtml] = useState<string | null>(null);
+  // A missing or unreadable source must surface as an error: the preview used to
+  // stay on "Loading" forever, which reads as a hung panel.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!artifact.content && !artifact.filePath) {
       setProcessedHtml(null);
+      setFailed(true);
       return;
     }
 
+    setFailed(false);
     let cancelled = false;
 
     const process = async () => {
@@ -103,13 +111,19 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
             const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
             html = new TextDecoder('utf-8').decode(bytes);
           } catch {
-            if (!cancelled) setProcessedHtml(null);
+            if (!cancelled) {
+              setProcessedHtml(null);
+              setFailed(true);
+            }
             return;
           }
         }
 
         if (!html) {
-          if (!cancelled) setProcessedHtml(null);
+          if (!cancelled) {
+            setProcessedHtml(null);
+            setFailed(true);
+          }
           return;
         }
 
@@ -118,11 +132,13 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
         }
         if (!cancelled) setProcessedHtml(preparePreviewHtml(html));
       } catch {
-        if (!cancelled) {
-          setProcessedHtml(
-            artifact.content ? preparePreviewHtml(artifact.content) : null,
-          );
+        if (cancelled) return;
+        if (artifact.content) {
+          setProcessedHtml(preparePreviewHtml(artifact.content));
+          return;
         }
+        setProcessedHtml(null);
+        setFailed(true);
       }
     };
 
@@ -135,7 +151,7 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   if (!artifact.content && !artifact.filePath) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        Loading...
+        {t('artifactDocumentError')}
       </div>
     );
   }
@@ -164,11 +180,11 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
     );
   }
 
-  // Loading state: filePath exists but content not yet processed
+  // Nothing to show: either the load failed or it is still in flight.
   if (!processedHtml && !artifact.content) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        Loading...
+        {failed ? t('artifactDocumentError') : t('artifactDocumentLoading')}
       </div>
     );
   }
