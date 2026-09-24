@@ -33,6 +33,7 @@ const resultText = (result: SkillScriptRunResult): string => {
 export function buildPiSkillScriptTool(options: {
   workspaceRoot: string;
   allowedSkillIds: string[];
+  skillRoots?: Readonly<Record<string, string>>;
 }): Record<string, unknown> {
   const allowedSkillIds = new Set(
     options.allowedSkillIds.map(value => value.trim()).filter(Boolean),
@@ -88,6 +89,7 @@ export function buildPiSkillScriptTool(options: {
         script,
         args,
         workspaceRoot: options.workspaceRoot,
+        skillsRoot: options.skillRoots?.[skillId],
         timeoutMs: typeof params.timeoutMs === 'number' ? params.timeoutMs : undefined,
         signal,
       });
