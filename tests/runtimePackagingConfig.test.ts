@@ -349,7 +349,7 @@ test('installer-related pull requests build and exercise the Windows installer',
   assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
   assert.match(sizeSmoke, /MaximumInstallerBytes = 450MB/);
-  assert.match(sizeSmoke, /MaximumComponentBytes = 165MB/);
+  assert.match(sizeSmoke, /MaximumComponentBytes = 300MB/);
   assert.match(sizeSmoke, /MaximumNonComponentBytes = 150MB/);
 });
 
