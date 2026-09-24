@@ -50,4 +50,14 @@ describe('PromptPanel', () => {
 
     expect(screen.queryByText(action.label)).not.toBeInTheDocument();
   });
+
+  /**
+   * 案例面板与上方输入框同宽（max-w-3xl），四列网格才能和输入框对齐；
+   * 分类条留在更宽的列里，不受这个宽度约束。
+   */
+  test('matches the composer width so the grid lines up with the input', () => {
+    const { container } = render(<PromptPanel action={action} onPromptSelect={vi.fn()} />);
+
+    expect(container.firstChild).toHaveClass('mx-auto', 'w-full', 'max-w-3xl');
+  });
 });

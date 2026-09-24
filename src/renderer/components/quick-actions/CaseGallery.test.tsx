@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { LocalizedPrompt } from '../../types/quickAction';
 import CaseGallery from './CaseGallery';
+
+vi.mock('../../services/i18n', () => ({
+  i18nService: { t: (key: string) => key, getLanguage: () => 'zh' },
+}));
+vi.mock('./casePreviewSources', () => ({ loadCasePreview: async () => null }));
 
 const hoisted = vi.hoisted(() => ({
   selectedPromptId: null as string | null,
@@ -56,38 +61,61 @@ describe('CaseGallery', () => {
     expect(image).toHaveAttribute('loading', 'lazy');
   });
 
-  test('keeps the tiles dense enough to shrink the gallery to four columns', () => {
+  test('keeps the gallery aligned with the four-column prompt width', () => {
     const { container } = render(<CaseGallery prompts={prompts} onPromptSelect={vi.fn()} />);
     const grid = container.querySelector('.grid');
 
-    expect(grid).toHaveClass('grid-cols-2');
-    expect(grid).toHaveClass('sm:grid-cols-3');
+    expect(grid).toHaveClass('grid-cols-1');
+    expect(grid).toHaveClass('sm:grid-cols-2');
+    expect(grid).toHaveClass('md:grid-cols-3');
     expect(grid).toHaveClass('lg:grid-cols-4');
   });
 
   test('keeps every caption to one line so the rows stay even', () => {
     render(<CaseGallery prompts={prompts} onPromptSelect={vi.fn()} />);
     const label = screen.getByText('案例甲');
-    const description = screen.getByText('甲的描述');
 
     expect(label).toHaveClass('truncate');
-    expect(description).toHaveClass('line-clamp-1');
+    expect(screen.queryByText('甲的描述')).not.toBeInTheDocument();
+    expect(label.closest('button')).toHaveAttribute('title', '甲的描述');
   });
 
-  test('omits the description row when a case has none', () => {
+  test('announces each tile as a dialog trigger', () => {
+    render(<CaseGallery prompts={prompts} onPromptSelect={vi.fn()} />);
+
+    expect(screen.getByText('案例甲').closest('button')).toHaveAttribute('aria-haspopup', 'dialog');
+  });
+
+  test('falls back to the label when a case has no description', () => {
     render(<CaseGallery prompts={[prompts[1]]} onPromptSelect={vi.fn()} />);
 
-    expect(screen.queryByText('甲的描述')).not.toBeInTheDocument();
-    expect(screen.queryByText('乙的描述')).not.toBeInTheDocument();
+    expect(screen.getByText('案例乙').closest('button')).toHaveAttribute('title', '案例乙');
   });
 
-  test('selects a case and reports its prompt text', () => {
+  test('previews without changing the draft, then applies only on explicit use', async () => {
     const onPromptSelect = vi.fn();
     render(<CaseGallery prompts={prompts} onPromptSelect={onPromptSelect} />);
     fireEvent.click(screen.getByText('案例甲'));
 
-    expect(onPromptSelect).toHaveBeenCalledWith('prompt-a');
+    expect(onPromptSelect).not.toHaveBeenCalled();
+    expect(hoisted.dispatch).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /caseUseExample/ }));
+
+    await waitFor(() => expect(onPromptSelect).toHaveBeenCalledWith('prompt-a'));
+    expect(onPromptSelect).toHaveBeenCalledTimes(1);
     expect(hoisted.dispatch).toHaveBeenCalledWith(expect.objectContaining({ payload: 'case-a' }));
+  });
+
+  test('closing the preview keeps the applied case and the draft untouched', () => {
+    const onPromptSelect = vi.fn();
+    render(<CaseGallery prompts={prompts} onPromptSelect={onPromptSelect} />);
+    fireEvent.click(screen.getByText('案例甲'));
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+
+    expect(onPromptSelect).not.toHaveBeenCalled();
+    expect(hoisted.dispatch).not.toHaveBeenCalled();
+    expect(screen.getByText('案例甲').closest('button')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('marks the persisted selection as pressed', () => {

@@ -594,22 +594,22 @@ export function classicConditionalControls(dark: boolean) {
       base: { 'background-color': 'color-mix(in oklab, var(--muted) 30%, transparent)' },
     }),
     'page-models-panel-card-variant-4': recipe({ base: { opacity: '0.5' } }),
-    // Case tiles carry a thumbnail and a caption, nothing else: the frame would fight the
-    // artwork inside it. The tile is transparent at rest and paints a rounded surface on
-    // hover or selection, so the preview stays the only solid block in the cell.
+    // The artwork fills the tile, so a surface painted on the card itself would sit behind an
+    // opaque image and never be seen: the hover affordance belongs to the caption layer, which
+    // spans the tile and is the only layer above the artwork.
     'page-case-gallery-card': recipe({
       base: {
-        padding: '0.75rem',
-        gap: '0.5rem',
+        padding: '0',
         'border-style': 'none',
         'background-color': 'transparent',
         'border-radius': 'var(--zy-style-radius-lg)',
-        'transition-property': 'background-color',
-        'transition-duration': '200ms',
-        'transition-timing-function': 'ease-out',
       },
-      hover: { 'background-color': 'var(--zy-surface-raised)' },
-      selected: { 'background-color': 'var(--zy-primary-muted)' },
+      selected: {
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-color': 'var(--zy-primary)',
+        'outline-offset': '2px',
+      },
       pressed: { translate: '0 1px' },
       focus: {
         'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
@@ -621,8 +621,25 @@ export function classicConditionalControls(dark: boolean) {
         'border-radius': 'var(--zy-style-radius-md)',
       },
     }),
+    // The caption layer covers the whole tile so its hover wash reaches the artwork, but the
+    // scrim itself is bounded to the caption bar: it holds full strength across the label and
+    // clears within 3rem, so a small tile keeps most of its example visible.
     'page-case-gallery-body': recipe({
-      base: { gap: '0.25rem' },
+      base: {
+        padding: '0.75rem',
+        color: 'var(--zy-component-palette-white)',
+        'font-size': 'var(--zy-component-text-sm)',
+        'font-weight': '500',
+        'background-image':
+          'linear-gradient(to bottom, var(--zy-component-overlay-strong) 0, var(--zy-component-overlay-strong) 2.25rem, transparent 3rem)',
+        'transition-property': 'background-color',
+        'transition-duration': '200ms',
+        'transition-timing-function': 'ease-out',
+      },
+      hover: {
+        'background-color':
+          'color-mix(in oklab, var(--zy-component-overlay-strong) 30%, transparent)',
+      },
     }),
     'page-date-input-button-variant-1': recipe({
       base: {
