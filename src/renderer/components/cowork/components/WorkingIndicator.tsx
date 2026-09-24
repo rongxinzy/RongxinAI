@@ -36,8 +36,9 @@ export const getWorkingIndicatorPhase = (elapsedMs: number): WorkingIndicatorPha
  * activity timestamp. The companion is the single animated state indicator;
  * the elapsed ticker remains informational text under reduced motion.
  */
-export const WorkingIndicator: React.FC<{ showCompanion?: boolean }> = ({
+export const WorkingIndicator: React.FC<{ showCompanion?: boolean; animateText?: boolean }> = ({
   showCompanion = true,
+  animateText = !showCompanion,
 }) => {
   const startedAtRef = useRef(Date.now());
   const [now, setNow] = useState(startedAtRef.current);
@@ -66,7 +67,7 @@ export const WorkingIndicator: React.FC<{ showCompanion?: boolean }> = ({
     >
       {showCompanion && <AgentCompanion state={AgentCompanionState.Thinking} />}
       <div className="flex min-w-0 items-center gap-2">
-        {showCompanion ? (
+        {!animateText ? (
           <span className="text-sm text-muted-foreground">{statusText}</span>
         ) : (
           <Shimmer duration={1.5} className="text-sm">

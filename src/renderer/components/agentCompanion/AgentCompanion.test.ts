@@ -58,7 +58,7 @@ test('keeps active motion transform-only and respects reduced motion', () => {
 test('crossfades between dedicated thinking and completed assets', () => {
   expect(source).toContain('zhiyuan-scholar-thinking.png');
   expect(source).toContain('zhiyuan-scholar-completed.png');
-  expect(source).toContain('opacity: isCompleted ? 1 : 0');
+  expect(source).toContain('animate={isCompleted ? completedAnimation : hiddenCompletedAnimation}');
 });
 
 test('uses the same compact size for both companion states', () => {

@@ -523,10 +523,16 @@ const TurnBlockComponent: React.FC<{
                 />
                 <span className="truncate">{primaryExpert.expertName}</span>
               </div>
-            ) : !showTypingIndicator && !hideDefaultAssistantHeader ? (
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            ) : !hideDefaultAssistantHeader ? (
+              <div className="flex items-center gap-2">
                 <AgentCompanion state={defaultCompanionState} />
-                <span>{i18nService.t('cowork')}</span>
+                {showTypingIndicator ? (
+                  <WorkingIndicator showCompanion={false} animateText={false} />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">
+                    {i18nService.t('cowork')}
+                  </span>
+                )}
               </div>
             ) : null}
             {finalAnswerItem && executionItems.length > 0 && (
@@ -556,8 +562,8 @@ const TurnBlockComponent: React.FC<{
                 </ChainOfThoughtHeader>
               </ChainOfThought>
             )}
-            {showTypingIndicator && (
-              <WorkingIndicator showCompanion={!primaryExpert && !hideDefaultAssistantHeader} />
+            {showTypingIndicator && (primaryExpert || hideDefaultAssistantHeader) && (
+              <WorkingIndicator showCompanion={false} />
             )}
             {/* 2026/09/17 lixiang  文件卡片与复制按钮上下间距收紧 */}
             {/* 2026/09/20 lixiang  验收卡在复制按钮之上（issue #805） */}

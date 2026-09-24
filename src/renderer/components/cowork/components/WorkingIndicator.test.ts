@@ -40,6 +40,6 @@ test('escalates the copy after a long silence', () => {
 test('keeps expert-only waiting rows compact and avoids competing loops', () => {
   expect(source).toContain("showCompanion ? 'min-h-9' : 'min-h-6'");
   expect(source).toContain("<span className=\"text-sm text-muted-foreground\">{statusText}</span>");
-  expect(source).toContain('{showCompanion ? (');
+  expect(source).toContain('{!animateText ? (');
   expect(source).toContain('<Shimmer duration={1.5} className="text-sm">');
 });

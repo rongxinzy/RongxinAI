@@ -52,7 +52,7 @@ test('keeps terminal errors visible outside execution summaries', () => {
 
 test('renders the working indicator instead of the retired typing dots', () => {
   expect(source).toContain(
-    '<WorkingIndicator showCompanion={!primaryExpert && !hideDefaultAssistantHeader} />',
+    '<WorkingIndicator showCompanion={false} animateText={false} />',
   );
   expect(source).toContain("import { WorkingIndicator } from './WorkingIndicator';");
   expect(source).not.toContain('TypingDots');
@@ -64,7 +64,7 @@ test('keeps the default companion aligned with active and terminal turn outcomes
   expect(source).toContain(
     'hasTerminalOutcome: Boolean(lastVisibleItem && isStandaloneSystemItem(lastVisibleItem))',
   );
-  expect(source).toContain('!showTypingIndicator && !hideDefaultAssistantHeader');
+  expect(source).toContain(') : !hideDefaultAssistantHeader ? (');
   expect(source).not.toContain('className="size-9"');
 });
 
