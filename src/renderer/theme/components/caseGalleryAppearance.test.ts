@@ -38,10 +38,10 @@ test('case thumbnails round their own corners instead of sitting inside a frame'
 
 /**
  * 说明层是图片之上唯一的图层，标题可读性与 hover 反馈都挂在它上面。
- * 遮罩必须在标题字带内保持满强度，同时在 3rem 内收干净：示例缩略图顶部接近纯白，遮罩一旦在
- * 字带内就开始衰减，白字会掉到 4.5:1 以下；但遮罩拖到整卡高度又会让小卡几乎全黑。
+ * 遮罩取 overlay token 的 85%（实测 4.8:1，越过 4.5:1 下限即不再加深），在 2.75rem 内收干净，
+ * 顶部渐入：示例缩略图顶部接近纯白，全强度遮罩或拖到整卡高度都会让卡片显得发黑。
  */
-test('case captions hold the scrim across the label and carry the tile hover', () => {
+test('case captions keep the lightest AA scrim and carry the tile hover', () => {
   const body = classicComponentAppearances(false)['page-case-gallery-body'];
 
   expect(body.base.color).toBe('var(--zy-component-palette-white)');
@@ -49,7 +49,7 @@ test('case captions hold the scrim across the label and carry the tile hover', (
   expect(body.base['font-size']).toBe('var(--zy-component-text-sm)');
   expect(body.base['font-weight']).toBe('500');
   expect(body.base['background-image']).toBe(
-    'linear-gradient(to bottom, var(--zy-component-overlay-strong) 0, var(--zy-component-overlay-strong) 2.25rem, transparent 3rem)',
+    'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem)',
   );
   expect(body.base['transition-duration']).toBe('200ms');
   expect(body.hover['background-color']).toBe(

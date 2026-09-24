@@ -622,8 +622,9 @@ export function classicConditionalControls(dark: boolean) {
       },
     }),
     // The caption layer covers the whole tile so its hover wash reaches the artwork, but the
-    // scrim itself is bounded to the caption bar: it holds full strength across the label and
-    // clears within 3rem, so a small tile keeps most of its example visible.
+    // scrim itself is bounded to the caption bar and kept as light as white-on-artwork legibility
+    // allows: 85% of the overlay token still clears 4.5:1 over the near-white tops of the bundled
+    // previews, while the ramp-in keeps the tile's top edge from reading as a hard dark bar.
     'page-case-gallery-body': recipe({
       base: {
         padding: '0.75rem',
@@ -631,7 +632,7 @@ export function classicConditionalControls(dark: boolean) {
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': '500',
         'background-image':
-          'linear-gradient(to bottom, var(--zy-component-overlay-strong) 0, var(--zy-component-overlay-strong) 2.25rem, transparent 3rem)',
+          'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 0.75rem, color-mix(in oklab, var(--zy-component-overlay-strong) 85%, transparent) 2rem, transparent 2.75rem)',
         'transition-property': 'background-color',
         'transition-duration': '200ms',
         'transition-timing-function': 'ease-out',
