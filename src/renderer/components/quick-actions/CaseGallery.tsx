@@ -42,7 +42,8 @@ const CaseGallery: React.FC<CaseGalleryProps> = ({ prompts, onPromptSelect, capa
               key={prompt.id}
               type="button"
               aria-haspopup="dialog"
-              aria-pressed={isSelected}
+              aria-current={isSelected ? 'true' : undefined}
+              data-selected={isSelected ? 'true' : undefined}
               title={prompt.description || prompt.label}
               onClick={() => setPreviewId(prompt.id)}
               className="theme-page-case-gallery-card group relative flex aspect-[8/5] w-full flex-col overflow-hidden text-left"

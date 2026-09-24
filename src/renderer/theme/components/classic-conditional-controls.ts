@@ -596,7 +596,9 @@ export function classicConditionalControls(dark: boolean) {
     'page-models-panel-card-variant-4': recipe({ base: { opacity: '0.5' } }),
     // The artwork fills the tile, so a surface painted on the card itself would sit behind an
     // opaque image and never be seen: the hover affordance belongs to the caption layer, which
-    // spans the tile and is the only layer above the artwork.
+    // spans the tile and is the only layer above the artwork. Selection stays an outline because
+    // the artwork owns the fill, and there is no pressed state: the tile opens a dialog and the
+    // engine's pressed selector excludes [aria-haspopup], so a translate here would never paint.
     'page-case-gallery-card': recipe({
       base: {
         padding: '0',
@@ -610,7 +612,6 @@ export function classicConditionalControls(dark: boolean) {
         'outline-color': 'var(--zy-primary)',
         'outline-offset': '2px',
       },
-      pressed: { translate: '0 1px' },
       focus: {
         'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
       },

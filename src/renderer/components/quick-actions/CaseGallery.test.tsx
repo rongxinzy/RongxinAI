@@ -8,7 +8,11 @@ import type { LocalizedPrompt } from '../../types/quickAction';
 import CaseGallery from './CaseGallery';
 
 vi.mock('../../services/i18n', () => ({
-  i18nService: { t: (key: string) => key, getLanguage: () => 'zh' },
+  i18nService: {
+    t: (key: string) => key,
+    getLanguage: () => 'zh',
+    subscribe: () => () => {},
+  },
 }));
 vi.mock('./casePreviewSources', () => ({ loadCasePreview: async () => null }));
 
@@ -115,14 +119,20 @@ describe('CaseGallery', () => {
 
     expect(onPromptSelect).not.toHaveBeenCalled();
     expect(hoisted.dispatch).not.toHaveBeenCalled();
-    expect(screen.getByText('案例甲').closest('button')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('案例甲').closest('button')).not.toHaveAttribute('data-selected');
   });
 
-  test('marks the persisted selection as pressed', () => {
+  /**
+   * 卡片是对话框触发器，选中态不能再走 aria-pressed（读屏会当成开关按钮）：
+   * data-selected 供主题 recipe 描边，aria-current 供读屏播报。
+   */
+  test('marks the persisted selection as current', () => {
     hoisted.selectedPromptId = 'case-c';
     render(<CaseGallery prompts={prompts} onPromptSelect={vi.fn()} />);
 
-    expect(screen.getByText('案例丙').closest('button')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('案例甲').closest('button')).toHaveAttribute('aria-pressed', 'false');
+    const selectedCase = screen.getByText('案例丙').closest('button');
+    expect(selectedCase).toHaveAttribute('data-selected', 'true');
+    expect(selectedCase).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByText('案例甲').closest('button')).not.toHaveAttribute('aria-current');
   });
 });

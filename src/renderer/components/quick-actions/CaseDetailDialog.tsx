@@ -34,9 +34,13 @@ export default function CaseDetailDialog({
   const [html, setHtml] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const applying = useRef(false);
-  // The generated walkthrough pages embed copy, so a language switch has to rebuild them.
-  const language = i18nService.getLanguage();
   const t = (key: string) => i18nService.t(key);
+  // The generated walkthrough pages embed copy, so a language switch has to rebuild them.
+  // Subscribed instead of read once: the effect below has to re-run on its own, not because an
+  // ancestor happened to re-render the tree.
+  const [language, setLanguage] = useState(() => i18nService.getLanguage());
+
+  useEffect(() => i18nService.subscribe(() => setLanguage(i18nService.getLanguage())), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +95,8 @@ export default function CaseDetailDialog({
           <DialogDescription>{description || t('caseExampleNotice')}</DialogDescription>
           {capabilityLabel && <Badge variant="secondary">{capabilityLabel}</Badge>}
         </DialogHeader>
+        {/* The viewport reuses the gallery's thumbnail recipe on purpose: it holds the same
+            artwork, so it keeps the muted backing and radius instead of adding a second hook. */}
         <div className="theme-page-case-gallery-media min-h-0 flex-1 overflow-auto">
           {html ? (
             <iframe

@@ -24,6 +24,7 @@ describe('bundled case detail previews', () => {
         const html = await loadCasePreview(prompt.id);
         expect(html, prompt.id).toContain('<!');
         expect(html, prompt.id).toContain("connect-src 'none'");
+        expect(html, prompt.id).toContain('img-src data:;');
       }
     }
   });

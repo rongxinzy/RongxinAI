@@ -1,4 +1,6 @@
-// Keep HTML out of the initial renderer bundle; Vite packages each bundled example separately.
+// Keep HTML out of the initial renderer bundle: a non-eager glob compiles to one dynamic import
+// per example, so every bundled case lands in its own lazy chunk (45 files, ~400 KiB in total)
+// instead of being inlined into the startup graph.
 const sources = import.meta.glob<string>(
   ['/scripts/case-previews/*.html', '/SKILLs/frontend-design/templates/*.html'],
   { query: '?raw', import: 'default' },
@@ -70,8 +72,10 @@ export async function loadCasePreview(
   const entry = Object.entries(sources).find(([path]) => path.endsWith(`/${id}.html`));
   if (!entry) return null;
   const html = await entry[1]();
-  // Examples are isolated from application state and cannot fetch data or submit forms.
-  const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data: https:; font-src data:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
+  // Examples are isolated from application state: they cannot fetch data, submit a form or load a
+  // remote image. Every bundled case is self-contained markup, so data: is the only image source
+  // an example can reach.
+  const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
   const fitCover = entry[0].startsWith('/scripts/case-previews/')
     ? `<script>function fit(){document.body.style.zoom=Math.min(1,innerWidth/1100)}addEventListener('resize',fit);fit();</script>`
     : '';
