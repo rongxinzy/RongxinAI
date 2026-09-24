@@ -5,6 +5,7 @@ import {
   detectArtifactsFromMessages,
   parseCodeBlockArtifacts,
   parseDeclareArtifactFromMessages,
+  parseFinalAnswerPathArtifactsForMessage,
   parseToolArtifact,
 } from './artifactParser';
 import { ArtifactRole } from '../types/artifact';
@@ -607,4 +608,39 @@ describe('detectArtifactsFromMessages', () => {
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
   });
+});
+
+describe('parseFinalAnswerPathArtifactsForMessage', () => {
+  const finalAnswer = (content: string) => ({
+    id: 'message-final',
+    type: 'assistant' as const,
+    content,
+    timestamp: 0,
+    metadata: { isFinalAnswer: true },
+  });
+
+  test('keeps a real output path named in the final answer', () => {
+    const artifacts = parseFinalAnswerPathArtifactsForMessage(
+      finalAnswer('报告已生成：C:\\Users\\me\\.xiaoruan\\scratch\\AI市场调研.md，可直接打开。'),
+      'session-1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].filePath).toBe('C:\\Users\\me\\.xiaoruan\\scratch\\AI市场调研.md');
+    // Preview candidate only: the delivery gate still needs an explicit declaration.
+    expect(artifacts[0].declared).toBe(false);
+  });
+
+  test('ignores a sources table whose slash and URL only look like a path', () => {
+    // Verbatim excerpt of the answer that produced a phantom artifact named after
+    // a Yahoo Finance URL: the scan used to start at the "/" in "HPCwire" and
+    // swallow the table row up to the ".html" extension.
+    const content =
+      '-of-generative-ai-in-the-enterprise/ |\n' +
+      '| [13] | Yahoo Finance / HPCwire | Enterprise LLM Spend Reaches $8.4B | 2025 | https://finance.yahoo.com/news/enterprise-llm-spend-reaches-8-130000140.html |\n' +
+      '| [14] | Neel Mishra | Open Source LLM Landscape | 2024 | https://neelmishra.github.io/blog/ |\n';
+
+    expect(parseFinalAnswerPathArtifactsForMessage(finalAnswer(content), 'session-1')).toEqual([]);
+  });
+
 });

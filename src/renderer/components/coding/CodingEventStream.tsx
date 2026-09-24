@@ -155,16 +155,22 @@ export const CodingEventStream = ({
       detectableMessages,
       artifactSessionKey,
     )) {
-      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact }));
+      // The coding page keeps revealing its own stream artifacts; the cowork
+      // panel only opens for live declared deliverables.
+      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));
     }
     for (const { artifact, needsFileLoad, version } of fileArtifacts) {
-      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact }));
+      // The coding page keeps revealing its own stream artifacts; the cowork
+      // panel only opens for live declared deliverables.
+      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));
       if (!needsFileLoad) continue;
       const loadKey = `${artifactSessionKey}:${artifact.id}`;
       if (loadedFileVersionsRef.current.get(loadKey) === version) continue;
       loadedFileVersionsRef.current.set(loadKey, version);
       void loadCodingArtifactContent(artifact, artifactBaseDir).then(loaded => {
-        if (loaded) dispatch(addArtifact({ sessionId: artifactSessionKey, artifact: loaded }));
+        if (loaded) {
+          dispatch(addArtifact({ sessionId: artifactSessionKey, artifact: loaded, reveal: true }));
+        }
       });
     }
   }, [artifactSessionKey, artifactBaseDir, isStreaming, detectableMessages, fileArtifacts, dispatch]);

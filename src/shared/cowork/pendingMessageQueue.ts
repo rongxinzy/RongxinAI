@@ -48,7 +48,5 @@ export interface CoworkPendingMessage {
   imageAttachments?: CoworkQueuedImageAttachment[];
   fileAttachments?: CoworkQueuedFileAttachment[];
   skillIds?: string[];
-  /** Immutable prompt snapshot used when a queued item is immediately steered. */
-  skillPrompt?: string;
   error?: string;
 }

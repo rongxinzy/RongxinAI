@@ -1,6 +1,6 @@
 import type { CoworkStore } from '../main/coworkStore';
 import type { CoworkError } from '../common/coworkError';
-import type { PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
+import type { PiContinueOptions, PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
 import { getDefaultConversationWorkspacePath } from '../main/defaultConversationWorkspace';
 import { parseManagedSessionKey } from '../main/libs/channelSessionKey';
 import { CoworkSessionSource } from '../shared/cowork/constants';
@@ -50,7 +50,7 @@ export class PiScheduledTaskExecutor {
       session.id,
       task.payload.kind === PayloadKind.AgentTurn ? task.payload.timeoutSeconds : undefined,
     );
-    const options = {
+    const options: PiContinueOptions = {
       systemPrompt: session.systemPrompt,
       skillIds: session.activeSkillIds,
       workspaceRoot: session.cwd,
