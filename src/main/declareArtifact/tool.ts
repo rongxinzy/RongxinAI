@@ -1,3 +1,5 @@
+import { access, constants as FsConstants } from 'node:fs/promises';
+
 export const DeclareArtifactToolName = 'declare_artifact';
 
 export const DeclareArtifactSystemPrompt = [
@@ -6,6 +8,7 @@ export const DeclareArtifactSystemPrompt = [
   '- After creating or modifying a file, call `declare_artifact` with the absolute file path.',
   '- Set `role` to "intermediate" for work-in-progress files and "deliverable" for final outputs.',
   '- Prefer `declare_artifact` over mentioning file paths in prose — the UI reads tool calls, not text.',
+  '- Only declare paths that already exist on disk. Declaring a missing file fails.',
 ].join('\n');
 
 type DeclareArtifactToolResult = {
@@ -22,13 +25,33 @@ export interface DeclaredArtifactInput {
 
 export interface DeclareArtifactToolOptions {
   onDeclare?: (artifact: DeclaredArtifactInput) => void | Promise<void>;
+  fileExists?: (filePath: string) => Promise<boolean>;
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
+async function defaultFileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath, FsConstants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const failure = (
+  message: string,
+  details: Record<string, unknown> = {},
+): DeclareArtifactToolResult => ({
+  content: [{ type: 'text', text: message }],
+  details: { isError: true, error: message, ...details },
+});
+
 export function buildDeclareArtifactTool(
   options: DeclareArtifactToolOptions = {},
 ): Record<string, unknown> {
+  const fileExists = options.fileExists ?? defaultFileExists;
+
   return {
     name: DeclareArtifactToolName,
     label: 'Declare Artifact',
@@ -68,15 +91,13 @@ export function buildDeclareArtifactTool(
     ): Promise<DeclareArtifactToolResult> => {
       const filePath = text(params.filePath);
       if (!filePath) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'declare_artifact requires a non-empty file path.',
-            },
-          ],
-          details: {},
-        };
+        return failure('declare_artifact requires a non-empty file path.');
+      }
+      if (!(await fileExists(filePath))) {
+        return failure(
+          `declare_artifact failed: file does not exist at ${filePath}. Create the file before declaring it.`,
+          { filePath },
+        );
       }
       const role = params.role === 'intermediate' ? 'intermediate' : 'deliverable';
       const title = text(params.title);
@@ -91,10 +112,7 @@ export function buildDeclareArtifactTool(
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return {
-          content: [{ type: 'text', text: `Artifact declaration failed: ${message}` }],
-          details: { filePath, role, error: message },
-        };
+        return failure(`Artifact declaration failed: ${message}`, { filePath, role });
       }
       return {
         content: [

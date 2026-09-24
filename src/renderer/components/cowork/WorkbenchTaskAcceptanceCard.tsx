@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   WorkbenchTaskStatus,
   WorkbenchVerificationOutcome,
+  type WorkbenchTaskActionResult,
   type WorkbenchTaskDetail,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
@@ -42,13 +43,14 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
 
   const runAction = useCallback(
     async (
-      action: () => Promise<{ success: boolean; error?: string }>,
+      action: () => Promise<WorkbenchTaskActionResult>,
       confirmAcceptance = false,
     ) => {
       setBusy(true);
       try {
         const result = await action();
         if (!result.success) throw new Error(result.error);
+        if (result.detail) setDetail(result.detail);
         if (confirmAcceptance) showAppSuccessToast(i18nService.t('workbenchTaskAcceptedToast'));
       } catch (error) {
         console.error('[WorkbenchTask] Acceptance action failed:', error);
