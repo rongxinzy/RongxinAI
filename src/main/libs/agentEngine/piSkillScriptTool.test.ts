@@ -45,10 +45,14 @@ beforeEach(() => {
   vi.mocked(runManagedSkillScript).mockReset();
 });
 
-async function runTool(allowedSkillIds: string[]): Promise<AgentEvent[]> {
+async function runTool(
+  allowedSkillIds: string[],
+  skillRoots?: Readonly<Record<string, string>>,
+): Promise<AgentEvent[]> {
   const tool = buildPiSkillScriptTool({
     workspaceRoot: '/workspace',
     allowedSkillIds,
+    skillRoots,
   }) as unknown as AgentTool;
   const events: AgentEvent[] = [];
   const assistant: AssistantMessage = {
@@ -129,4 +133,20 @@ test('Pi reports successful scripts normally', async () => {
   expect(events.find(event => event.type === PiToolEventType.ExecutionEnd)).toMatchObject({
     isError: false,
   });
+});
+
+test('passes the trusted root for nested expert skills to the runner', async () => {
+  vi.mocked(runManagedSkillScript).mockResolvedValue({
+    ...result,
+    ok: true,
+    status: 'completed',
+    exitCode: 0,
+    error: undefined,
+    errorCode: undefined,
+    stderr: '',
+  });
+  await runTool(['pdf'], { pdf: '/skills' });
+  expect(runManagedSkillScript).toHaveBeenCalledWith(
+    expect.objectContaining({ skillsRoot: '/skills' }),
+  );
 });
