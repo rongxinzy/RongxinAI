@@ -1,7 +1,13 @@
-import { startManagedSkillProcess, type ManagedSkillProcess } from '../skillRuntimeRunner';
+import {
+  runManagedSkillScript,
+  startManagedSkillProcess,
+  type ManagedSkillProcess,
+} from '../skillRuntimeRunner';
 
 export const PiCadViewerToolName = 'start_cad_viewer';
 const CadViewerSkillId = 'text-to-cad';
+const CadViewerRuntimeSkillId = 'cad-viewer';
+const CadRuntimeBootstrapScript = 'scripts/bootstrap.py';
 const CadViewerScript = 'scripts/viewer/server_py/start_viewer.py';
 const CadViewerHost = '127.0.0.1';
 const CadViewerPort = 3245;
@@ -11,6 +17,7 @@ export class PiCadViewerService {
   private process: ManagedSkillProcess | null = null;
   private workspaceRoot: string | null = null;
   private skillRoot: string | null = null;
+  private runtimeRoot: string | null = null;
 
   async start(options: {
     workspaceRoot: string;
@@ -30,23 +37,50 @@ export class PiCadViewerService {
     }
     await this.stop();
 
-    const processHandle = await startManagedSkillProcess({
+    const bootstrap = await runManagedSkillScript({
       skillId: CadViewerSkillId,
-      script: CadViewerScript,
-      args: ['--host', CadViewerHost, '--json'],
+      script: CadRuntimeBootstrapScript,
+      args: ['--json'],
       workspaceRoot: options.workspaceRoot,
       skillsRoot: options.skillRoot,
       signal: options.signal,
     });
+    if (!bootstrap.ok) {
+      throw new Error(
+        `CAD runtime bootstrap failed [${bootstrap.errorCode || 'SKILL_SCRIPT_FAILED'}]: ${bootstrap.error || bootstrap.stderr}`,
+      );
+    }
+    let runtimeRoot: string | null = null;
+    for (const line of bootstrap.stdout.split(/\r?\n/).reverse()) {
+      try {
+        const parsed = JSON.parse(line) as { root?: unknown };
+        if (typeof parsed.root === 'string' && parsed.root.trim()) {
+          runtimeRoot = parsed.root.trim();
+          break;
+        }
+      } catch {
+        // Bootstrap may emit diagnostic lines before its JSON result.
+      }
+    }
+    if (!runtimeRoot) throw new Error('CAD runtime bootstrap did not return a runtime root.');
+
+    const processHandle = await startManagedSkillProcess({
+      skillId: CadViewerRuntimeSkillId,
+      script: CadViewerScript,
+      args: ['--host', CadViewerHost, '--json'],
+      workspaceRoot: options.workspaceRoot,
+      skillsRoot: runtimeRoot,
+      signal: options.signal,
+    });
     try {
       const ready = await processHandle.waitForOutput(
-        (stdout, stderr) =>
-          /(?:3245|listening|ready)/i.test(`${stdout}\n${stderr}`),
+        (stdout, stderr) => /(?:3245|listening|ready)/i.test(`${stdout}\n${stderr}`),
         CadViewerReadyTimeoutMs,
       );
       this.process = processHandle;
       this.workspaceRoot = options.workspaceRoot;
       this.skillRoot = options.skillRoot;
+      this.runtimeRoot = runtimeRoot;
       return {
         url: `http://${CadViewerHost}:${CadViewerPort}`,
         output: [ready.stdout, ready.stderr].filter(Boolean).join('\n'),
@@ -63,6 +97,7 @@ export class PiCadViewerService {
     this.process = null;
     this.workspaceRoot = null;
     this.skillRoot = null;
+    this.runtimeRoot = null;
     if (processHandle) await processHandle.stop();
   }
 }
