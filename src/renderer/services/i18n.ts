@@ -1013,6 +1013,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentEmpty: '创建任务后，向当前 Agent 说明你希望完成的编程工作。',
     codingAgentConversationTurn: '编程对话回合',
     codingAgentWaiting: '正在思考',
+    agentCompanionThinkingLabel: '知远正在思考',
+    agentCompanionCompletedLabel: '知远已完成回答',
+    agentCompanionIdleLabel: '知远未完成回答',
     codingAgentReasoningActive: '正在思考…',
     codingAgentReasoningComplete: '思考完成',
     codingAgentToolCalls: '工具调用',
@@ -1458,7 +1461,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     apiKeyNotConfigured: 'API密钥未配置。请在设置中设置您的API密钥。',
 
     // 知远智能体
-    cowork: '知远智能体',
+    cowork: '知远',
     coworkSettings: '知远智能体 设置',
     coworkHistory: '任务记录',
     coworkNoSessions: '暂无任务记录',
@@ -4495,6 +4498,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentEmpty: 'Create a task, then tell the current agent what to build.',
     codingAgentConversationTurn: 'Coding conversation turn',
     codingAgentWaiting: 'Thinking',
+    agentCompanionThinkingLabel: 'ZhiYuan is thinking',
+    agentCompanionCompletedLabel: 'ZhiYuan completed the response',
+    agentCompanionIdleLabel: 'ZhiYuan did not complete the response',
     codingAgentReasoningActive: 'Thinking…',
     codingAgentReasoningComplete: 'Thought complete',
     codingAgentToolCalls: 'Tool calls',
@@ -4952,7 +4958,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     apiKeyNotConfigured: 'API key not configured. Please set up your API key in settings.',
 
     // ZhiYuan Agent
-    cowork: 'ZhiYuan Agent',
+    cowork: 'ZhiYuan',
     coworkSettings: 'ZhiYuan Agent Settings',
     coworkHistory: 'Task History',
     coworkNoSessions: 'No tasks yet',
