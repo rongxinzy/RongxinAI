@@ -117,6 +117,74 @@ describe('getSessionStats', () => {
     });
   });
 
+  test('treats an all-zero usage record as unreported instead of a zero reading', () => {
+    const messages: CoworkMessage[] = [
+      { id: 'user', type: 'user', content: 'Task', timestamp: 1 },
+      {
+        id: 'assistant',
+        type: 'assistant',
+        content: 'Response',
+        timestamp: 2,
+        metadata: {
+          // Pi seeds usage with zeros when the provider reports none.
+          usage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
+            totalTokens: 0,
+          },
+          metrics: { requestStartedAt: 1_000, firstVisibleTextAt: 1_400, completedAt: 3_000 },
+        },
+      },
+    ];
+
+    expect(getSessionStats(messages)).toEqual({
+      turns: 1,
+      steps: 1,
+      inputTokens: null,
+      outputTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      cacheHitPercent: null,
+      llmDurationMs: 2_000,
+      toolDurationMs: null,
+      ttftAverageMs: 400,
+      throughputTokensPerSecond: null,
+    });
+  });
+
+  test('keeps a zero bucket inside a record the provider did report', () => {
+    const messages: CoworkMessage[] = [
+      { id: 'user', type: 'user', content: 'Task', timestamp: 1 },
+      {
+        id: 'assistant',
+        type: 'assistant',
+        content: 'Response',
+        timestamp: 2,
+        // A real reading: only an all-zero record means "not reported", so a
+        // zero cache bucket must survive.
+        metadata: {
+          usage: { inputTokens: 5, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+        },
+      },
+    ];
+
+    expect(getSessionStats(messages)).toEqual({
+      turns: 1,
+      steps: 0,
+      inputTokens: 5,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      cacheHitPercent: 0,
+      llmDurationMs: null,
+      toolDurationMs: null,
+      ttftAverageMs: null,
+      throughputTokensPerSecond: null,
+    });
+  });
+
   test('does not derive cache hit from partial usage across messages', () => {
     const messages: CoworkMessage[] = [
       { id: 'user', type: 'user', content: 'Task', timestamp: 1 },
