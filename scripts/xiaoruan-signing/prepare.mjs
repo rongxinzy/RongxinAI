@@ -11,9 +11,23 @@ function runId(value) {
   return String(value);
 }
 
+function packageVersion(value) {
+  const raw = String(value ?? '')
+    .trim()
+    .replace(/^v/i, '');
+  if (
+    !/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/.test(
+      raw,
+    )
+  ) {
+    throw new Error(`release_version must be SemVer (got: ${value})`);
+  }
+  return raw;
+}
+
 async function githubApi(repo, suffix, token) {
   if (!token) {
-    throw new Error('RUNTIME_ARTIFACT_READ_TOKEN is required to read Xiaoruan artifacts.');
+    throw new Error('RUNTIME_ARTIFACT_READ_TOKEN is required to read Xiaoruan provenance.');
   }
   const response = await fetch(`https://api.github.com/repos/${repo}/${suffix}`, {
     headers: {
@@ -27,6 +41,16 @@ async function githubApi(repo, suffix, token) {
     throw new Error(`GitHub provenance query failed (${response.status}): ${repo}/${suffix}`);
   }
   return response.json();
+}
+
+async function resolvePackageVersion(env, sourceSha, token) {
+  if (env.RELEASE_VERSION) return packageVersion(env.RELEASE_VERSION);
+  const file = await githubApi(SOURCE_REPO, `contents/package.json?ref=${sourceSha}`, token);
+  if (file.encoding !== 'base64' || typeof file.content !== 'string') {
+    throw new Error('Unable to read Xiaoruan package.json for the source commit.');
+  }
+  const pkg = JSON.parse(Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8'));
+  return packageVersion(pkg.version);
 }
 
 export async function prepareXiaoruanSigning(env = process.env) {
@@ -81,12 +105,15 @@ export async function prepareXiaoruanSigning(env = process.env) {
     throw new Error('Expected exactly one unexpired windows-build artifact.');
   }
 
+  const version = await resolvePackageVersion(env, run.head_sha, token);
+
   return {
     sourceRepository: SOURCE_REPO,
     sourceRunId: id,
     sourceSha: run.head_sha,
     artifact: SOURCE_ARTIFACT,
     artifactId: String(windowsArtifacts[0].id),
+    packageVersion: version,
   };
 }
 
@@ -101,12 +128,13 @@ async function main() {
         `source-sha=${result.sourceSha}`,
         `artifact=${result.artifact}`,
         `artifact-id=${result.artifactId}`,
+        `package-version=${result.packageVersion}`,
         '',
       ].join('\n'),
     );
   }
   console.log(
-    `Verified Xiaoruan windows-build ${result.artifactId} from run ${result.sourceRunId} (${result.sourceSha}).`,
+    `Verified Xiaoruan source run ${result.sourceRunId} (${result.sourceSha}); will rebuild signed package ${result.packageVersion}.`,
   );
 }
 
