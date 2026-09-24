@@ -63,6 +63,7 @@ import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
 import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
+import { resolveInitialSelectedExpertIds } from './resolveInitialSelectedExpertIds';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -383,8 +384,21 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     // Load skills on mount
     useEffect(() => {
-      setSelectedExpertIds(persistedExpertIds);
-    }, [currentSession?.id, currentAgentId, persistedExpertIds]);
+      // 2026/09/22 lixiang  从专家页进入新会话时选中当前专家 agent（#100）
+      setSelectedExpertIds(
+        resolveInitialSelectedExpertIds({
+          sessionId: currentSession?.id,
+          persistedExpertIds,
+          currentAgentId,
+          currentAgentSource: currentAgent?.source,
+        }),
+      );
+    }, [
+      currentSession?.id,
+      currentAgentId,
+      currentAgent?.source,
+      persistedExpertIds,
+    ]);
 
     const syncSkills = useCallback(async () => {
       const loadedSkills = await skillService.loadSkills();
