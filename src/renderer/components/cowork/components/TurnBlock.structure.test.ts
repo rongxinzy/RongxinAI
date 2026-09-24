@@ -51,9 +51,21 @@ test('keeps terminal errors visible outside execution summaries', () => {
 });
 
 test('renders the working indicator instead of the retired typing dots', () => {
-  expect(source).toContain('{showTypingIndicator && <WorkingIndicator />}');
+  expect(source).toContain(
+    '<WorkingIndicator showCompanion={false} animateText={false} />',
+  );
   expect(source).toContain("import { WorkingIndicator } from './WorkingIndicator';");
   expect(source).not.toContain('TypingDots');
+});
+
+test('keeps the default companion aligned with active and terminal turn outcomes', () => {
+  expect(source).toContain("import { AgentCompanion } from '../../agentCompanion/AgentCompanion';");
+  expect(source).toContain('resolveAgentCompanionState({');
+  expect(source).toContain(
+    'hasTerminalOutcome: Boolean(lastVisibleItem && isStandaloneSystemItem(lastVisibleItem))',
+  );
+  expect(source).toContain(') : !hideDefaultAssistantHeader ? (');
+  expect(source).not.toContain('className="size-9"');
 });
 
 test('places beforeCopySlot above the copy button for acceptance cards', () => {
