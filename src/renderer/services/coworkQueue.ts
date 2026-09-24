@@ -44,7 +44,6 @@ class CoworkQueueService {
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     skillIds?: string[],
-    skillPrompt?: string,
   ) {
     return window.electron.cowork.enqueuePendingMessage({
       sessionId,
@@ -52,7 +51,6 @@ class CoworkQueueService {
       imageAttachments,
       fileAttachments,
       skillIds,
-      skillPrompt,
     });
   }
 

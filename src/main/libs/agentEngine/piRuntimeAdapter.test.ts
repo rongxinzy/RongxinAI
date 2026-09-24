@@ -1319,6 +1319,43 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
 
+    it('persists only the skills the user attached to the turn, not the execution set', async () => {
+      const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      // Only the members this path reads; getSession backs both the transcript
+      // lookup and the experts/turn snapshot.
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => {
+          added.push(message as { content: string; metadata?: Record<string, unknown> });
+          return message;
+        },
+        getSession: () => ({ messages: [], experts: [] }),
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('attached-skills', 'First', {
+        skipInitialUserMessage: true,
+        skillIds: ['expert-preset'],
+      });
+      // Expert/turn execution set kept, nothing attached by the user this turn.
+      await adapter.continueSession('attached-skills', 'Second', {
+        skillIds: ['expert-preset'],
+        attachedSkillIds: [],
+      });
+      await adapter.continueSession('attached-skills', 'Third', {
+        skillIds: ['expert-preset'],
+        attachedSkillIds: ['marketing-copy'],
+      });
+      // A caller with no per-input selection (IM channel turn, scheduled run,
+      // workbench resume) records no attachment, so its turn shows no chips even
+      // though the session keeps running with its skills.
+      await adapter.continueSession('attached-skills', 'Fourth', { skillIds: ['queue-skill'] });
+
+      expect(added.map(message => message.metadata?.skillIds)).toEqual([
+        undefined,
+        ['marketing-copy'],
+        undefined,
+      ]);
+    });
+
     it('recreates the session after MCP discovery refreshes its tool topology', async () => {
       adapter.setMcpServerManager({
         toolManifest: [
@@ -3511,6 +3548,90 @@ describe('PiRuntimeAdapter', () => {
       await initialRun;
 
       expect(adapter.isSessionActive('queue-session')).toBe(true);
+    });
+
+    it('merges a queued turn picks into the session skills without losing the session own', async () => {
+      const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => {
+          added.push(message as { content: string; metadata?: Record<string, unknown> });
+          return message;
+        },
+        getSession: () => ({ messages: [], experts: [] }),
+      } as unknown as CoworkStore);
+
+      let listener: ((event: { type: string }) => void) | null = null;
+      mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
+        listener = callback;
+        return () => {};
+      });
+
+      await adapter.startSession('queued-skills', 'Start work', {
+        sessionMode: 'work',
+        skillIds: ['alpha-skill'],
+      });
+      const queued = adapter.enqueuePendingMessage(
+        'queued-skills',
+        'Second',
+        undefined,
+        undefined,
+        ['beta-skill'],
+      );
+      expect(queued.success).toBe(true);
+
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(2));
+
+      // The queued turn records only its own pick as the input attachment…
+      expect(added.map(message => message.metadata?.skillIds)).toEqual([undefined, ['beta-skill']]);
+
+      // …while the session keeps running with both skills loaded for the model.
+      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      const visible = loader.skillsOverride({
+        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
+        diagnostics: [],
+      });
+      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
+    });
+
+    it('loads a steered turn picks into the running session before sending', async () => {
+      await adapter.startSession('steer-skills', 'Start work', {
+        sessionMode: 'work',
+        skillIds: ['alpha-skill'],
+      });
+      const queued = adapter.enqueuePendingMessage(
+        'steer-skills',
+        'Change direction',
+        undefined,
+        undefined,
+        ['beta-skill'],
+      );
+      expect(queued.success).toBe(true);
+
+      const result = await adapter.steerPendingMessage('steer-skills', queued.item!.id);
+
+      expect(result.success).toBe(true);
+      // The steer text goes in raw — no inlined skill body — and the session's
+      // resources were reloaded so the model can see the newly attached skill.
+      expect(mockSession.reload).toHaveBeenCalled();
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Change direction', {
+        streamingBehavior: 'steer',
+      });
+      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      const visible = loader.skillsOverride({
+        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
+        diagnostics: [],
+      });
+      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
     });
 
     it('rejects queue controls for Chat sessions', async () => {

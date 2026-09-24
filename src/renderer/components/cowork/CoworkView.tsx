@@ -12,7 +12,6 @@ import {
 } from '../../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
-import { buildCoworkSystemPrompt } from '../../services/coworkSystemPrompt';
 import {
   isChatSkillShortcutSelection,
   resolveChatSkillShortcutPermissionMode,
@@ -250,7 +249,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleStartSession = async (
     prompt: string,
-    skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
@@ -379,9 +377,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const baseSystemPrompt = isChatAgentExecution
         ? ''
         : agentSystemPrompt || config.systemPrompt || '';
-      // Combine skill prompt with system prompt. Including skillPrompt here is
-      // what lets chat-mode skill submissions reach the model (issue #117).
-      const combinedSystemPrompt = buildCoworkSystemPrompt(skillPrompt, baseSystemPrompt);
+      // Skills are capabilities of the session, not text of the prompt: Pi
+      // renders them into the system prompt from their directories, so nothing
+      // from a skill is merged into the session prompt here.
+      const sessionSystemPrompt = baseSystemPrompt;
 
       // Chat hides the folder selector, so the engine relies on
       // the configured default working directory. Bail out early with a toast
@@ -414,8 +413,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         agentName: currentAgent?.name,
         agentSource: currentAgent?.source,
         agentSystemPrompt: agentSystemPrompt ? `${agentSystemPrompt.slice(0, 80)}...` : '(empty)',
-        combinedSystemPrompt: combinedSystemPrompt
-          ? `${combinedSystemPrompt.slice(0, 120)}...`
+        sessionSystemPrompt: sessionSystemPrompt
+          ? `${sessionSystemPrompt.slice(0, 120)}...`
           : '(undefined)',
       });
       const { session: startedSession, error: startError } = await coworkService.startSession(
@@ -423,7 +422,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           prompt,
           title: fallbackTitle,
           cwd: currentWorkspacePath || undefined,
-          systemPrompt: combinedSystemPrompt,
+          // An empty base prompt must stay undefined so main can fall back to the
+          // agent's/default system prompt instead of composing from ''.
+          systemPrompt: sessionSystemPrompt || undefined,
           // Chat stays tagged as a chat session so it remains in the Chat
           // sidebar list; Work sessions keep the default work mode.
           mode: isChatAgentExecution ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
@@ -487,7 +488,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleContinueSession = async (
     prompt: string,
-    skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
@@ -529,7 +529,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         imageAttachments,
         fileAttachments,
         [...activeSkillIds],
-        skillPrompt,
       );
       if (!result.success) {
         window.dispatchEvent(
@@ -555,12 +554,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const agentSystemPrompt = isExpertAgent ? undefined : currentAgent?.systemPrompt?.trim();
       const isChatMode = workMode === WorkMode.Chat;
       const baseSystemPrompt = isChatMode ? '' : agentSystemPrompt || config.systemPrompt || '';
-      const combinedSystemPrompt = buildCoworkSystemPrompt(skillPrompt, baseSystemPrompt);
 
       await coworkService.continueSession({
         sessionId: currentSession.id,
         prompt,
-        systemPrompt: isChatMode ? combinedSystemPrompt : currentSession.systemPrompt || combinedSystemPrompt,
+        systemPrompt: isChatMode
+          ? baseSystemPrompt || undefined
+          : currentSession.systemPrompt || baseSystemPrompt,
         activeSkillIds: sessionSkillIds,
         expertIds,
         permissionMode: sessionPermissionMode,

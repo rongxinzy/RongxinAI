@@ -118,7 +118,6 @@ interface CoworkSessionDetailProps {
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   onContinue: (
     prompt: string,
-    skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
