@@ -9,6 +9,7 @@ import {
   normalizePlatform,
   parseImportNames,
   rebaseEnvironmentSymlinks,
+  sharedLockPath,
   validateSkillDependencyDeclarations,
 } from '../scripts/setup-skill-python-runtime.js';
 
@@ -33,16 +34,27 @@ describe('setup-skill-python-runtime', () => {
     }
   });
 
-  it('finds requirements files only at Skill roots', () => {
+  it('finds requirements files in nested Skill roots', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skills-'));
     try {
       fs.mkdirSync(path.join(root, 'xlsx'), { recursive: true });
       fs.mkdirSync(path.join(root, 'docx'), { recursive: true });
       fs.writeFileSync(path.join(root, 'xlsx', 'requirements.txt'), 'openpyxl>=3\n');
       expect(listRequirementFiles(root).map(entry => entry.skillId)).toEqual(['xlsx']);
+
+      const nested = path.join(root, 'expert', 'presets', 'cad', 'skills', 'text-to-cad');
+      fs.mkdirSync(nested, { recursive: true });
+      fs.writeFileSync(path.join(nested, 'requirements.txt'), 'cadgen==0.4.28\n');
+      expect(listRequirementFiles(root).map(entry => entry.skillId)).toEqual(['text-to-cad', 'xlsx']);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('stores one aggregate lock for the shared environment', () => {
+    expect(sharedLockPath('/runtime/skill-python')).toBe(
+      path.join('/runtime/skill-python', 'locks', 'shared.txt'),
+    );
   });
 
   it('requires third-party Python imports to be declared by their Skill', () => {
