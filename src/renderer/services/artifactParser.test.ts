@@ -177,6 +177,49 @@ describe('parseDeclareArtifactFromMessages', () => {
     const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
     expect(artifacts).toHaveLength(0);
   });
+
+  test('does not create a card when declare has no tool result', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolUseId: 'call-1',
+          toolInput: { filePath: 'D:/workspace/report.pptx' },
+        },
+      },
+    ];
+
+    expect(parseDeclareArtifactFromMessages(messages, sessId, defaultRole)).toHaveLength(0);
+  });
+
+  test('does not create a card when declare tool result is an error', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolUseId: 'call-1',
+          toolInput: { filePath: 'D:/workspace/report.pptx' },
+        },
+      },
+      {
+        id: 'result-1',
+        type: 'tool_result' as const,
+        content: 'file does not exist',
+        timestamp: Date.now(),
+        metadata: { toolUseId: 'call-1', isError: true },
+      },
+    ];
+
+    expect(parseDeclareArtifactFromMessages(messages, sessId, defaultRole)).toHaveLength(0);
+  });
 });
 
 describe('parseCodeBlockArtifacts', () => {
