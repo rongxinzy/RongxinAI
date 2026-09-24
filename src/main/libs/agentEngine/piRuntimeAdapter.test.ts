@@ -51,6 +51,7 @@ const hoisted = vi.hoisted(() => {
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
+    getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
   };
@@ -1318,6 +1319,43 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
 
+    it('persists only the skills the user attached to the turn, not the execution set', async () => {
+      const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      // Only the members this path reads; getSession backs both the transcript
+      // lookup and the experts/turn snapshot.
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => {
+          added.push(message as { content: string; metadata?: Record<string, unknown> });
+          return message;
+        },
+        getSession: () => ({ messages: [], experts: [] }),
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('attached-skills', 'First', {
+        skipInitialUserMessage: true,
+        skillIds: ['expert-preset'],
+      });
+      // Expert/turn execution set kept, nothing attached by the user this turn.
+      await adapter.continueSession('attached-skills', 'Second', {
+        skillIds: ['expert-preset'],
+        attachedSkillIds: [],
+      });
+      await adapter.continueSession('attached-skills', 'Third', {
+        skillIds: ['expert-preset'],
+        attachedSkillIds: ['marketing-copy'],
+      });
+      // A caller with no per-input selection (IM channel turn, scheduled run,
+      // workbench resume) records no attachment, so its turn shows no chips even
+      // though the session keeps running with its skills.
+      await adapter.continueSession('attached-skills', 'Fourth', { skillIds: ['queue-skill'] });
+
+      expect(added.map(message => message.metadata?.skillIds)).toEqual([
+        undefined,
+        ['marketing-copy'],
+        undefined,
+      ]);
+    });
+
     it('recreates the session after MCP discovery refreshes its tool topology', async () => {
       adapter.setMcpServerManager({
         toolManifest: [
@@ -2566,6 +2604,26 @@ describe('PiRuntimeAdapter', () => {
       const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult!.metadata?.isError).toBe(true);
     });
+
+    it('should flag tool_result as error when result details contain isError', async () => {
+      const messages: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      await adapter.startSession('test', 'Do something');
+
+      listener!({
+        type: 'tool_execution_end',
+        toolCallId: 'call-details-err',
+        toolName: 'declare_artifact',
+        result: {
+          content: [{ type: 'text', text: 'file does not exist' }],
+          details: { isError: true, error: 'file does not exist' },
+        },
+        isError: false,
+      });
+
+      const toolResult = messages.find(m => m.type === 'tool_result');
+      expect(toolResult!.metadata?.isError).toBe(true);
+    });
   });
 
   // ── Event mapping: assistant streaming (duplicate-render regression) ──
@@ -2579,6 +2637,12 @@ describe('PiRuntimeAdapter', () => {
         listener = cb;
         return () => {};
       });
+    });
+
+    afterEach(() => {
+      // Only the usage-persistence test stubs a context snapshot; reset it so no
+      // sibling test starts persisting contextUsage it did not ask for.
+      mockSession.getContextUsage.mockReset();
     });
 
     /**
@@ -2708,6 +2772,76 @@ describe('PiRuntimeAdapter', () => {
 
       expect(mockSession.steer).toHaveBeenCalledOnce();
       expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('2048 characters'));
+    });
+
+    it('persists a token reading only when the provider reported usage', async () => {
+      const seededMessageIds: string[] = [];
+      adapter.on('message', (_sid, msg) => {
+        if ((msg as { type: string }).type === 'assistant') {
+          seededMessageIds.push((msg as { id: string }).id);
+        }
+      });
+      const updateMessage = vi.fn();
+      // Only the members this metadata path reads.
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => message,
+        getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
+        updateMessage,
+      } as unknown as CoworkStore);
+      mockSession.getContextUsage.mockReturnValue({ tokens: 1_200, contextWindow: 262_144 });
+
+      await adapter.startSession('usage-session', 'Hi');
+
+      const driveTurn = (usage: Record<string, number>): void => {
+        listener!({ type: 'turn_start' });
+        listener!({
+          type: 'message_update',
+          message: { role: 'assistant', content: [{ type: 'text', text: 'Answer' }] },
+        });
+        listener!({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Answer' }],
+            stopReason: 'stop',
+            usage,
+          },
+        });
+      };
+
+      // The deferred context-usage sync is the last writer per turn; select its
+      // writes by the contextUsage it stamps.
+      const usageWrites = (): Array<Record<string, unknown>> =>
+        updateMessage.mock.calls
+          .map(call => (call[2] as { metadata?: Record<string, unknown> }).metadata)
+          .filter(
+            (metadata): metadata is Record<string, unknown> =>
+              metadata !== undefined && 'contextUsage' in metadata,
+          );
+
+      // The provider reported nothing: Pi's zero-seeded default must not be
+      // persisted, or the stats line renders "0 tok" as a real reading.
+      driveTurn({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 });
+      await vi.waitFor(() => expect(usageWrites()).toHaveLength(1));
+      expect(usageWrites()[0]).not.toHaveProperty('usage');
+
+      driveTurn({
+        input: 900,
+        output: 120,
+        cacheRead: 300,
+        cacheWrite: 0,
+        reasoning: 60,
+        totalTokens: 1_320,
+      });
+      await vi.waitFor(() => expect(usageWrites()).toHaveLength(2));
+      expect(usageWrites()[1]?.usage).toEqual({
+        inputTokens: 900,
+        outputTokens: 120,
+        cacheReadTokens: 300,
+        cacheWriteTokens: 0,
+        reasoningTokens: 60,
+        totalTokens: 1_320,
+      });
     });
 
     it('should mark an answer as final only after the agent run ends', async () => {
@@ -3434,6 +3568,90 @@ describe('PiRuntimeAdapter', () => {
       await initialRun;
 
       expect(adapter.isSessionActive('queue-session')).toBe(true);
+    });
+
+    it('merges a queued turn picks into the session skills without losing the session own', async () => {
+      const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => {
+          added.push(message as { content: string; metadata?: Record<string, unknown> });
+          return message;
+        },
+        getSession: () => ({ messages: [], experts: [] }),
+      } as unknown as CoworkStore);
+
+      let listener: ((event: { type: string }) => void) | null = null;
+      mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
+        listener = callback;
+        return () => {};
+      });
+
+      await adapter.startSession('queued-skills', 'Start work', {
+        sessionMode: 'work',
+        skillIds: ['alpha-skill'],
+      });
+      const queued = adapter.enqueuePendingMessage(
+        'queued-skills',
+        'Second',
+        undefined,
+        undefined,
+        ['beta-skill'],
+      );
+      expect(queued.success).toBe(true);
+
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(2));
+
+      // The queued turn records only its own pick as the input attachment…
+      expect(added.map(message => message.metadata?.skillIds)).toEqual([undefined, ['beta-skill']]);
+
+      // …while the session keeps running with both skills loaded for the model.
+      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      const visible = loader.skillsOverride({
+        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
+        diagnostics: [],
+      });
+      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
+    });
+
+    it('loads a steered turn picks into the running session before sending', async () => {
+      await adapter.startSession('steer-skills', 'Start work', {
+        sessionMode: 'work',
+        skillIds: ['alpha-skill'],
+      });
+      const queued = adapter.enqueuePendingMessage(
+        'steer-skills',
+        'Change direction',
+        undefined,
+        undefined,
+        ['beta-skill'],
+      );
+      expect(queued.success).toBe(true);
+
+      const result = await adapter.steerPendingMessage('steer-skills', queued.item!.id);
+
+      expect(result.success).toBe(true);
+      // The steer text goes in raw — no inlined skill body — and the session's
+      // resources were reloaded so the model can see the newly attached skill.
+      expect(mockSession.reload).toHaveBeenCalled();
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Change direction', {
+        streamingBehavior: 'steer',
+      });
+      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      const visible = loader.skillsOverride({
+        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
+        diagnostics: [],
+      });
+      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
     });
 
     it('rejects queue controls for Chat sessions', async () => {

@@ -37,6 +37,7 @@ import {
   type CoworkSessionInterruption,
 } from '../../../shared/cowork/interruption';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
+import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import {
   HarnessVersion,
   type HarnessActivationEvent,
@@ -556,6 +557,17 @@ const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined
     ? undefined
     : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
 
+/**
+ * Skills are additive: a queued turn keeps whatever the session already runs
+ * and adds the ones the user attached to that queued input. Both sides unknown
+ * keeps the session's implicit "no explicit skill set" state instead of
+ * materializing an empty list, which would force a session rebuild.
+ */
+const mergeSkillIds = (base: string[] | undefined, added: string[] | undefined): string[] | undefined =>
+  base === undefined && added === undefined
+    ? undefined
+    : [...new Set([...(base ?? []), ...(added ?? [])])];
+
 const haveSameStringList = (left: string[] | undefined, right: string[] | undefined): boolean =>
   left === right ||
   (left !== undefined &&
@@ -767,18 +779,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // but never writes to SQLite, causing the prompt to vanish on session switch.
     if (!options.skipInitialUserMessage) {
       const storedImages = this.persistImageAttachments(sessionId, options.imageAttachments);
+      // The transcript shows what the user attached to this input, never the
+      // session's execution set (which also carries the expert preset bundle).
+      // A caller that passes nothing attaches nothing.
+      const attachedSkillIds = options.attachedSkillIds;
       const userMsg: CoworkMessage = {
         id: randomUUID(),
         type: 'user',
         content: prompt,
         timestamp: Date.now(),
         metadata:
-          options.skillIds?.length ||
+          attachedSkillIds?.length ||
           expertIds.length ||
           storedImages?.length ||
           options.fileAttachments?.length
             ? {
-                ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
+                ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
                 ...(expertIds.length
                   ? {
                       experts: (this.store?.getSession(sessionId)?.experts ?? [])
@@ -1599,19 +1615,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // Emit user message (persisted to SQLite, same as startSession).
     if (!options._skipUserMessage) {
       const storedImages = this.persistImageAttachments(sessionId, options.imageAttachments);
+      // Same rule as startSession: the chips on this user turn are the skills the
+      // user attached to this input, not the turn's execution set.
+      const attachedSkillIds = options.attachedSkillIds;
       const userMsg: CoworkMessage = {
         id: randomUUID(),
         type: 'user',
         content: prompt,
         timestamp: Date.now(),
         metadata:
-          options.skillIds?.length ||
+          attachedSkillIds?.length ||
           options._queueDelivery ||
           storedImages?.length ||
           options.fileAttachments?.length ||
           active.turnExperts.length
             ? {
-                ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
+                ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
                 ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
                 ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
                 ...(options.fileAttachments?.length
@@ -2055,7 +2074,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     imageAttachments?: PiContinueOptions['imageAttachments'],
     fileAttachments?: PiContinueOptions['fileAttachments'],
     skillIds?: string[],
-    skillPrompt?: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
     const active = this.activeSessions.get(sessionId);
     if (!this.isWorkSession(sessionId, active)) {
@@ -2075,7 +2093,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       storedImages,
       fileAttachments,
       skillIds,
-      skillPrompt,
     );
     this.emitQueueUpdated(sessionId);
     return { success: true, item };
@@ -2124,10 +2141,35 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const item = this.pendingMessageQueue.take(sessionId, itemId);
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
+    // A steer lands in the running session, so its picks must be loaded before
+    // the prompt is sent: Pi filters both <available_skills> and the
+    // run_skill_script whitelist from the session's skill set, and a skill
+    // attached to this queued input is additive exactly like a follow-up's.
+    const previousSkillIds = active.resourceState.skillIds;
+    const steeredSkillIds = mergeSkillIds(previousSkillIds, item.skillIds);
+    if (!haveSameStringList(steeredSkillIds, previousSkillIds)) {
+      active.resourceState.skillIds = steeredSkillIds;
+      try {
+        // Pi reloads the existing ResourceLoader without replacing transcript
+        // state, model, MCP tools, or custom expert tools.
+        await active.piSession.reload();
+        // AgentSession.reload() reloads SettingsManager from disk, so restore
+        // the per-process bundled PortableGit override after every reload.
+        this.applyPiShellOverride(active.settingsManager);
+        this.applyPiCompactionOverrides(
+          active.settingsManager,
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+        );
+        active.requestedSkillIds = steeredSkillIds;
+      } catch (error) {
+        active.resourceState.skillIds = previousSkillIds;
+        throw error;
+      }
+    }
     try {
       await sendPiPrompt(
         active.piSession,
-        item.skillPrompt ? `${item.skillPrompt}\n\n${item.text}` : item.text,
+        item.text,
         item.imageAttachments,
         active.capabilities,
         'steer',
@@ -2162,13 +2204,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
     try {
+      // The queued turn keeps the session's skills and adds its own picks; only
+      // the picks belong on the user message.
+      const activeSession = this.activeSessions.get(sessionId);
       await this.continueSession(sessionId, item.text, {
         sessionMode: CoworkSessionMode.Work,
         _queueDelivery: CoworkQueueDelivery.FollowUp,
         _streamingBehavior: 'followUp',
         imageAttachments: item.imageAttachments,
         fileAttachments: item.fileAttachments,
-        skillIds: item.skillIds,
+        skillIds: mergeSkillIds(activeSession?.resourceState.skillIds, item.skillIds),
+        attachedSkillIds: item.skillIds,
       });
       this.pendingMessageQueue.finishDelivery(item.id);
       return { success: true, item };
@@ -2250,7 +2296,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           _streamingBehavior: 'followUp',
           imageAttachments: next.imageAttachments,
           fileAttachments: next.fileAttachments,
-          skillIds: next.skillIds,
+          skillIds: mergeSkillIds(active.resourceState.skillIds, next.skillIds),
+          attachedSkillIds: next.skillIds,
         });
         this.pendingMessageQueue.finishDelivery(next.id);
       } catch (error) {
@@ -2935,24 +2982,25 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
         const resultText = extractToolResultText(event.result);
+        const resultIsError = Boolean(event.isError) || extractToolResultIsError(event.result);
         if (active.workbenchRunId) {
           this.workbenchTaskService?.recordToolResult(
             active.workbenchRunId,
             event.toolCallId,
             event.result,
-            Boolean(event.isError),
+            resultIsError,
           );
         }
         if (event.toolName === PiSubagentToolName) {
           active.researchRun?.recordSubagentResult(
             event.toolCallId,
             resultText,
-            Boolean(event.isError),
+            resultIsError,
           );
           active.shortcutWorkflow?.recordSubagentResult(
             event.toolCallId,
             resultText,
-            Boolean(event.isError),
+            resultIsError,
           );
         }
         // Keep the result only on `content` — duplicating into metadata.toolResult
@@ -2964,7 +3012,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           timestamp: Date.now(),
           metadata: {
             toolUseId: event.toolCallId,
-            isError: Boolean(event.isError),
+            isError: resultIsError,
             isStreaming: false,
             isFinal: true,
             ...(active.toolStartedAtByCallId.has(event.toolCallId)
@@ -3367,6 +3415,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             };
           })()
         : undefined;
+      // Pi materializes `usage` with zeros and only fills it once the provider
+      // reports one; persisting that default would read as a real zero in the
+      // stats line (see hasReportedTokenUsage).
+      const reportedUsage = piUsage
+        ? {
+            inputTokens: piUsage.input,
+            outputTokens: piUsage.output,
+            cacheReadTokens: piUsage.cacheRead,
+            cacheWriteTokens: piUsage.cacheWrite,
+            reasoningTokens: piUsage.reasoning,
+            totalTokens: piUsage.totalTokens,
+          }
+        : null;
       const metadata = {
         ...message.metadata,
         ...(usage ? { contextUsage: usage } : {}),
@@ -3381,18 +3442,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               },
             }
           : {}),
-        ...(piUsage
-          ? {
-              usage: {
-                inputTokens: piUsage.input,
-                outputTokens: piUsage.output,
-                cacheReadTokens: piUsage.cacheRead,
-                cacheWriteTokens: piUsage.cacheWrite,
-                reasoningTokens: piUsage.reasoning,
-                totalTokens: piUsage.totalTokens,
-              },
-            }
-          : {}),
+        ...(reportedUsage && hasReportedTokenUsage(reportedUsage) ? { usage: reportedUsage } : {}),
       };
       this.store?.updateMessage(sessionId, messageId, { metadata });
       this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
@@ -4033,4 +4083,11 @@ function extractToolResultText(result: unknown): string {
     }
   }
   return String(result);
+}
+
+function extractToolResultIsError(result: unknown): boolean {
+  if (!result || typeof result !== 'object') return false;
+  const details = (result as { details?: unknown }).details;
+  if (!details || typeof details !== 'object') return false;
+  return Boolean((details as { isError?: unknown }).isError);
 }

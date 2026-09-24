@@ -498,7 +498,6 @@ export const COMPONENT_SELECTORS = {
     '.theme-page-pi-runtime-model-config-select-trigger-1',
   'page-pi-runtime-model-config-select-trigger-2':
     '.theme-page-pi-runtime-model-config-select-trigger-2',
-  'page-active-skill-badge-button-1': '.theme-page-active-skill-badge-button-1',
   'page-installed-skill-grid-card-1': '.theme-page-installed-skill-grid-card-1',
   'page-installed-skill-grid-button-1': '.theme-page-installed-skill-grid-button-1',
   'page-marketplace-skill-grid-button-1': '.theme-page-marketplace-skill-grid-button-1',
@@ -554,6 +553,8 @@ export const COMPONENT_SELECTORS = {
   'page-chat-skill-shortcuts-button-variant-1': '.theme-page-chat-skill-shortcuts-button-variant-1',
   'page-chat-skill-shortcuts-button-variant-2': '.theme-page-chat-skill-shortcuts-button-variant-2',
   'page-chat-skill-shortcuts-button-variant-3': '.theme-page-chat-skill-shortcuts-button-variant-3',
+  // Selected nav row: same card+border language as chat skill shortcuts (class toggle, not only data-active).
+  'page-sidebar-navigation-button-selected': '.theme-page-sidebar-navigation-button-selected',
   'page-coding-workspace-sidebar-button-variant-1':
     '.theme-page-coding-workspace-sidebar-button-variant-1',
   'page-coding-workspace-sidebar-button-variant-2':
