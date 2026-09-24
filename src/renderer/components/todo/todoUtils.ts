@@ -157,10 +157,49 @@ export const buildTodoCreateInput = (
 ): TodoCreateInput => ({
   title,
   dueAt: parsed.dueAt,
-  important: parsed.important,
+  // 在「重要」视图底部新建时默认标记为重要
+  important: parsed.important || activeView === TodoView.Important,
   listId: activeListId,
   myDayDate: activeView === TodoView.MyDay ? referenceDate : null,
 });
+
+/** 校验截止日期 / 提醒时间；返回 i18n key，通过时返回 null。截止日期允许当天。 */
+export const validateTodoSchedule = (
+  dueAt: number | null,
+  remindAt: number | null,
+  now = Date.now(),
+): string | null => {
+  const todayKey = formatDateKey(new Date(now));
+  if (dueAt !== null) {
+    const dueKey = formatDateKey(new Date(dueAt));
+    if (dueKey < todayKey) return 'todoDueDateMustBeFuture';
+  }
+  if (remindAt !== null) {
+    if (remindAt <= now) return 'todoReminderMustBeFuture';
+    if (dueAt !== null && remindAt >= dueAt) return 'todoReminderMustBeforeDue';
+  }
+  return null;
+};
+
+/** 原生 date / datetime-local 的 min 值（本地时区） */
+export const toDateInputMinValue = (now = new Date()): string => formatDateKey(now);
+
+export const toDateTimeInputMinValue = (now = new Date()): string => {
+  const nextMinute = new Date(now);
+  nextMinute.setSeconds(0, 0);
+  nextMinute.setMinutes(nextMinute.getMinutes() + 1);
+  const dateKey = formatDateKey(nextMinute);
+  const hours = String(nextMinute.getHours()).padStart(2, '0');
+  const minutes = String(nextMinute.getMinutes()).padStart(2, '0');
+  return `${dateKey}T${hours}:${minutes}`;
+};
+
+/** 提醒时间的上限：有截止日期时取当天 23:59 */
+export const toDateTimeInputMaxValue = (dueAt: number | null): string | undefined => {
+  if (dueAt === null) return undefined;
+  const date = new Date(dueAt);
+  return `${formatDateKey(date)}T23:59`;
+};
 
 export const countTodosByView = (
   activeTodos: Todo[],
