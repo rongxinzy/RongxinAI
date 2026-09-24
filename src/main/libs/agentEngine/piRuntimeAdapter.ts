@@ -144,6 +144,7 @@ import {
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { resolvePiSkillRoots } from './piSkillRoots';
+import { buildPiCadViewerTool, PiCadViewerService } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { resolvePiBuiltinProviderId } from './piProviderIds';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
@@ -584,6 +585,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly retainedSessionIds = new Set<string>();
   private imageAttachmentRoot: string | null = null;
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
+  private readonly cadViewerService = new PiCadViewerService();
   /** Opaque application actions that run after queued Work prompts settle. */
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
   private readonly approvalSessionMap = new Map<string, string>();
@@ -1119,6 +1121,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             skillRoots: resourceState.skillRoots,
           }),
         );
+        const cadSkillRoot = resourceState.skillRoots['text-to-cad'];
+        if (cadSkillRoot) {
+          customTools.push(
+            buildPiCadViewerTool({
+              workspaceRoot,
+              skillRoot: cadSkillRoot,
+              service: this.cadViewerService,
+            }),
+          );
+        }
       }
 
       // Subagent tool: registered for every cowork session. When the session
@@ -1177,6 +1189,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                   unattended: resourceState.unattended,
                   chatMode: resourceState.chatMode,
                   expertSkillDirs: [],
+                  skillRoots: resolvePiSkillRoots(skillIds, this.resolveZhiyuanSkillDirs(), []),
                 },
                 {
                   sessionId,
@@ -1936,6 +1949,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     for (const sessionId of sessionIds) {
       this.stopActiveSession(sessionId, 'The application stopped the active session.', false);
     }
+    void this.cadViewerService.stop();
   }
 
   /** Applies the current approval mode to sessions that are already running. */

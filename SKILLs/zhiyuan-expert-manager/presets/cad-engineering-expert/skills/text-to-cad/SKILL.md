@@ -73,10 +73,15 @@ Common translations:
 | `python scripts/snapshot ...` | owning workflow, `scripts/snapshot`, then original arguments |
 | `python scripts/dfam_tool.py ...` | `dfam-check`, `scripts/dfam_tool.py`, then original arguments |
 | `python scripts/gcode_tool.py ...` | `gcode`, `scripts/gcode_tool.py`, then original arguments |
-| CAD Viewer `npm ... start` | `cad-viewer`, `scripts/viewer/server_py/start_viewer.py`, `--host`, `127.0.0.1`, `--json` |
+| CAD Viewer | `start_cad_viewer` (the application-managed viewer tool) |
 
 Run commands from the user's workspace so relative model and output paths stay
 there. The proxy preserves the current working directory.
+
+For local visual review, call `start_cad_viewer` instead of starting the
+viewer server through `run_skill_script`. The application owns its process
+lifetime, waits for readiness, reuses an existing viewer, and stops it with
+the managed process tree when the runtime shuts down.
 
 ## Non-Python tools
 
