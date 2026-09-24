@@ -498,7 +498,6 @@ export const COMPONENT_SELECTORS = {
     '.theme-page-pi-runtime-model-config-select-trigger-1',
   'page-pi-runtime-model-config-select-trigger-2':
     '.theme-page-pi-runtime-model-config-select-trigger-2',
-  'page-active-skill-badge-button-1': '.theme-page-active-skill-badge-button-1',
   'page-installed-skill-grid-card-1': '.theme-page-installed-skill-grid-card-1',
   'page-installed-skill-grid-button-1': '.theme-page-installed-skill-grid-button-1',
   'page-marketplace-skill-grid-button-1': '.theme-page-marketplace-skill-grid-button-1',

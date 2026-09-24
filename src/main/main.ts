@@ -4630,15 +4630,16 @@ if (!gotTheLock) {
         expertSkillIds: (existingSession?.experts || []).flatMap(expert => expert.skillIds),
       });
 
-      // Persist explicit selections, including [] when the user clears session skills.
-      if (continuationSkillState.sessionSkillIds !== undefined) {
-        try {
-          store.updateSession(options.sessionId, {
-            activeSkillIds: continuationSkillState.sessionSkillIds,
-          });
-        } catch (error) {
-          console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
-        }
+      // The session keeps a skill until the user removes it, so this turn's
+      // picks are added to the persisted capability set rather than replacing it.
+      try {
+        store.updateSession(
+          options.sessionId,
+          { activeSkillIds: continuationSkillState.sessionSkillIds },
+          { touchUpdatedAt: false },
+        );
+      } catch (error) {
+        console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
       }
 
       const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
@@ -4661,6 +4662,10 @@ if (!gotTheLock) {
         .continueSession(options.sessionId, options.prompt, {
           systemPrompt: runtimeSystemPrompt,
           skillIds: runtimeSkillIds,
+          // The user's per-input selection (empty when they attached none) is
+          // what the transcript shows; runtimeSkillIds also carries the expert
+          // preset bundle and must not reappear as chips on this turn.
+          attachedSkillIds: options.activeSkillIds,
           sessionMode,
           goalMode: options.goalMode,
           imageAttachments: storedImages,
@@ -4722,14 +4727,30 @@ if (!gotTheLock) {
             input.imageAttachments,
           )
         : undefined;
-      return getPiRuntimeAdapter().enqueuePendingMessage(
+      // Attaching a skill is a session-level action: a queued input's picks join
+      // the session's capability set like a directly submitted one. Commit them
+      // only once the queue accepts the item, so a rejected enqueue (e.g. the
+      // turn settled first) cannot leave a skill active that nothing revealed.
+      const enqueueResult = getPiRuntimeAdapter().enqueuePendingMessage(
         input.sessionId,
         input.text,
         storedImages,
         input.fileAttachments,
         input.skillIds,
-        input.skillPrompt,
       );
+      if (enqueueResult.success && input.skillIds?.length) {
+        const queuedSession = getCoworkStore().getSession(input.sessionId, 0);
+        if (queuedSession) {
+          getCoworkStore().updateSession(
+            input.sessionId,
+            {
+              activeSkillIds: [...new Set([...queuedSession.activeSkillIds, ...input.skillIds])],
+            },
+            { touchUpdatedAt: false },
+          );
+        }
+      }
+      return enqueueResult;
     } catch (error) {
       return {
         success: false,

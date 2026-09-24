@@ -49,7 +49,6 @@ describe('PiPendingMessageQueue', () => {
       [{ name: 'screen.png', mimeType: 'image/png', base64Data: 'image-data' }],
       [{ name: 'brief.docx', path: '/tmp/brief.docx', extension: 'DOCX' }],
       ['skill-docx'],
-      'Use the document skill.',
     );
 
     const taken = queue.takeNext('session-1', CoworkQueueDelivery.FollowUp);
@@ -63,7 +62,6 @@ describe('PiPendingMessageQueue', () => {
     expect(restored.fileAttachments?.[0]?.path).toBe('/tmp/brief.docx');
     expect(restored.imageAttachments?.[0]?.base64Data).toBe('image-data');
     expect(restored.skillIds).toEqual(['skill-docx']);
-    expect(restored.skillPrompt).toBe('Use the document skill.');
   });
 
   test('does not take an item through the wrong delivery path', () => {
