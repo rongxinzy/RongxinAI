@@ -29,7 +29,11 @@ test('resets active skills for every blank conversation entry point', () => {
 
 test('new chat clears the prompt expert chip while expert-page entry does not', () => {
   const openNewConversation = callbackBody(appSource, 'openNewConversation', 'handleNewChat');
-  const handleChatWithExpert = callbackBody(appSource, 'handleChatWithExpert', 'dismissToast');
+  const handleChatWithExpert = callbackBody(
+    appSource,
+    'handleChatWithExpert',
+    'dismissToast',
+  );
 
   expect(openNewConversation).toContain('clearExperts: options?.clearExperts === true');
   expect(handleChatWithExpert).toContain('openNewConversation();');
