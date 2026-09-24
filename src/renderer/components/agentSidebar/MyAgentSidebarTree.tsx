@@ -10,12 +10,12 @@ import { Input } from '@shared/components/ui/input';
 import { useReducedMotion } from 'motion/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { workspaceService } from '../../services/workspace';
-import { store } from '../../store';
+import { store, type RootState } from '../../store';
 import {
   clearLoadingSessionId,
   setCurrentSession,
@@ -60,6 +60,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   searchCorpus = [],
 }) => {
   const dispatch = useDispatch();
+  const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
   const {
     workspaceNodes,
     scheduledWorkspaceNodes,
@@ -117,6 +118,26 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     await workspaceService.selectWorkspace(workspace.id);
     coworkService.clearSession();
     onShowCowork();
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
+    }, 0);
+  };
+
+  // 点击左侧项目：右侧切换到该项目工作区；再点当前项目则折叠/展开
+  const handleSelectWorkspace = async (workspace: WorkspaceSidebarNode) => {
+    const previousId = store.getState().workspace.currentWorkspaceId;
+    const isCurrent = previousId === workspace.id;
+    if (isCurrent) {
+      toggleExpanded(workspace.id);
+      return;
+    }
+    await workspaceService.selectWorkspace(workspace.id);
+    if (!workspace.isExpanded) {
+      toggleExpanded(workspace.id);
+    }
+    coworkService.clearSession();
+    onShowCowork();
+    onDismissSearch?.();
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
     }, 0);
@@ -290,7 +311,9 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               workspace={workspace}
               isBatchMode={isBatchMode}
               selectedIds={selectedIds}
+              isActiveWorkspace={workspace.id === currentWorkspaceId}
               onToggleExpanded={toggleExpanded}
+              onSelectWorkspace={selectedWorkspace => void handleSelectWorkspace(selectedWorkspace)}
               onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
               onRenameWorkspace={handleRenameWorkspace}
               onToggleWorkspacePin={handleToggleWorkspacePin}

@@ -180,4 +180,20 @@ describe('collectSessionArtifactCandidates', () => {
 
     expect(candidates).toEqual([]);
   });
+
+  test('ignores declarations whose matching tool result failed', () => {
+    const candidates = collectSessionArtifactCandidates([
+      message('declare-1', 1, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolUseId: 'call-1',
+        toolInput: { filePath: 'failed.pptx' },
+      }),
+      message('result-1', 2, 'tool_result', 'file does not exist', {
+        toolUseId: 'call-1',
+        isError: true,
+      }),
+    ]);
+
+    expect(candidates).toEqual([]);
+  });
 });
