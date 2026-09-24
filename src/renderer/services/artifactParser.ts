@@ -10,6 +10,7 @@ import {
   ArtifactTypeByExtension,
   getArtifactTypeByExtension,
   isBinaryArtifactFile,
+  resolveCoworkArtifactType,
 } from '../../shared/cowork/artifactPreview';
 
 const DECLARE_ARTIFACT_TOOL_NAME = 'declare_artifact';
@@ -137,12 +138,8 @@ export function parseDeclareArtifactFromMessages(
     const filePath = typeof input.filePath === 'string' ? input.filePath.trim() : '';
     if (!filePath) continue;
 
-    const ext = getFileExtension(filePath);
     const declaredKind = typeof input.kind === 'string' ? input.kind.trim() : undefined;
-    const artifactType =
-      (declaredKind && getArtifactTypeFromLanguage(declaredKind)) ||
-      getArtifactTypeFromExtension(ext) ||
-      'unsupported';
+    const artifactType = resolveCoworkArtifactType(filePath, declaredKind) ?? 'unsupported';
     const fileName = getFileName(filePath);
     const declaredRole =
       input.role === 'intermediate'

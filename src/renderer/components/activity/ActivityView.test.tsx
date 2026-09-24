@@ -116,7 +116,7 @@ test('localizes an interrupted run instead of showing the persisted marker', () 
   expect(screen.queryByText(ActivityErrorCode.Interrupted)).toBeNull();
 });
 
-test('shows the trigger text until the run has a reply', () => {
+test('shows reply preview and keeps running rows quiet until a reply exists', () => {
   renderView([
     run({ id: 'running', platform: 'weixin', inputPreview: '帮我看下今天的日志', updatedAt: 3 }),
     run({
@@ -129,7 +129,7 @@ test('shows the trigger text until the run has a reply', () => {
   ]);
 
   clickStatusPill(t('activityFilterAll'));
-  expect(screen.getByText('帮我看下今天的日志')).toBeInTheDocument();
   expect(screen.getByText('已经处理好了')).toBeInTheDocument();
+  expect(screen.queryByText('帮我看下今天的日志')).toBeNull();
   expect(screen.queryByText('帮我处理一下')).toBeNull();
 });
