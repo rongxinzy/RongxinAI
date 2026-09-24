@@ -133,6 +133,27 @@ describe('UserBubble', () => {
     expect(screen.queryByText('PNG')).not.toBeInTheDocument();
   });
 
+  test('does not render a duplicate card when vision metadata and input-file path both exist', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content: '输入文件：C:\\Users\\whz\\Downloads\\screenshot.png\n\n请分析这张图',
+          metadata: {
+            imageAttachments: [
+              { name: 'screenshot.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' },
+            ],
+          },
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getAllByRole('img', { name: 'screenshot.png' })).toHaveLength(1);
+    expect(screen.getByText('请分析这张图')).toBeInTheDocument();
+    expect(screen.queryByText(/输入文件：C:/)).not.toBeInTheDocument();
+  });
+
   test('restores an attachment card from a legacy Windows input-file prompt line', () => {
     render(
       <UserBubble

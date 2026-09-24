@@ -120,3 +120,10 @@ test('allows an empty amendment only while an explicit task resume context is ac
   expect(source).toContain('!trimmedValue && attachments.length === 0 && !resumeTaskActive');
   expect(source).toContain('<ResumeTaskContextBadge onCancel={onCancelTaskResume} />');
 });
+
+test('omits vision-delivered images from input-file prompt lines to avoid duplicate cards', () => {
+  expect(source).toContain('const visionImageNames = new Set(imageAtts.map(image => image.name));');
+  expect(source).toContain(
+    '!(a.isImage && (Boolean(a.dataUrl) || visionImageNames.has(a.name)))',
+  );
+});
