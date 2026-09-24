@@ -1,7 +1,10 @@
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-  [int64]$MaximumInstallerBytes = 315MB,
-  [int64]$MaximumComponentBytes = 165MB,
+  # CAD expert runtime dependencies add a bounded shared Python layer to the
+  # installer. Keep explicit headroom for that payload while retaining the
+  # independent non-component ceiling below.
+  [int64]$MaximumInstallerBytes = 450MB,
+  [int64]$MaximumComponentBytes = 300MB,
   [int64]$MaximumNonComponentBytes = 150MB
 )
 
