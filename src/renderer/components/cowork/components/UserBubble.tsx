@@ -99,11 +99,15 @@ export const UserBubble: React.FC<{
     const persisted = ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
       []) as CoworkFileAttachment[];
     const knownPaths = new Set(persisted.map(file => file.path));
+    // Vision cards already render from imageAttachments; skip same-name prompt
+    // "输入文件:" fallbacks (path differs after disk persist, so match by name).
+    const visionImageNames = new Set(imageAttachments.map(image => image.name));
     const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
-      file => !knownPaths.has(file.path),
+      file =>
+        !knownPaths.has(file.path) && !(file.isImage && visionImageNames.has(file.name)),
     );
     return [...persisted, ...fallbacks];
-  }, [message.content, message.metadata]);
+  }, [imageAttachments, message.content, message.metadata]);
   const textContent = useMemo(() => {
     const contentWithoutFallbacks = removePromptAttachmentFallbacks(displayContent);
     if (fileAttachments.length === 0) return contentWithoutFallbacks;

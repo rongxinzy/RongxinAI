@@ -628,16 +628,16 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         }
       }
 
-      // Build prompt with ALL attachments that have real file paths (both regular files and images).
-      // Image attachments also need their file paths in the prompt so the model knows
-      // where the original files are located (e.g., for skills like seedream that need --image <path>).
-      // Note: inline/clipboard images have pseudo-paths starting with 'inline:' and are excluded.
-      // Note: image attachments that already carry base64 data are excluded — their content
-      // is delivered via the attachments parameter of chat.send. Including the file path
-      // would trigger native image-path detection, which rejects paths outside allowed
-      // directories and can drop the base64 image during sanitization (macOS-only bug).
+      // Build prompt with real file paths (files + images for skills like seedream).
+      // Skip inline:, draft dataUrl images, and anything already in imageAtts — repeating
+      // those paths makes UserBubble show a second card beside metadata.imageAttachments.
+      const visionImageNames = new Set(imageAtts.map(image => image.name));
       const attachmentLines = attachments
-        .filter(a => !a.path.startsWith('inline:') && !(a.isImage && a.dataUrl))
+        .filter(
+          a =>
+            !a.path.startsWith('inline:') &&
+            !(a.isImage && (Boolean(a.dataUrl) || visionImageNames.has(a.name))),
+        )
         .map(attachment => `${i18nService.t('inputFileLabel')}: ${attachment.path}`)
         .join('\n');
       const finalPrompt = trimmedValue
