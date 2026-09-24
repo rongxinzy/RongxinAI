@@ -45,7 +45,7 @@ Use the web-search skill when you need:
 2. **Bridge Server** - Express HTTP API (auto-started by Electron)
 3. **Playwright Manager** - Browser connection and session management
 4. **Search Engine Layer** - Google primary, Bing fallback
-5. **Chrome Browser** - Headless by default; automatically retries once with a visible browser when headless search appears blocked
+5. **Chrome Browser** - Headless by default; does not open a visible Chrome window (avoids covering the Agent UI). Set `fallbackToHeadful: true` only when debugging blocked searches locally.
 
 ## ZhiYuan/Pi execution
 
@@ -387,7 +387,7 @@ The search output is Markdown. Extract:
 - **Localhost only** - Bridge Server binds to 127.0.0.1 (no external access)
 - **No network exposure** - Not accessible from other machines
 - **Isolated browser** - Uses separate Chrome profile, won't affect user's main browser
-- **Low-disruption search** - Uses headless browser first, then falls back to a visible browser only when needed
+- **Low-disruption search** - Uses a headless browser only; no visible Chrome fallback by default
 - **No credentials** - Skill never handles passwords or sensitive data
 
 ### Privacy Considerations

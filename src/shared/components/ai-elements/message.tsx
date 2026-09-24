@@ -30,6 +30,7 @@ import {
   loadRichMessageResponse,
 } from './richMessageResponseLoader';
 import { LinkSafetyModal } from './linkSafetyModal';
+import { streamdownChatControls } from './streamdownChatControls';
 
 // Code/math/mermaid plugins (and their Shiki/KaTeX/Mermaid runtimes) load
 // on demand when the content actually needs them (issue #141).
@@ -305,8 +306,9 @@ export const MessageResponse = memo(
       <Streamdown
         className={cn('size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}
         plugins={basePlugins}
-        linkSafety={linkSafety}
         {...props}
+        linkSafety={linkSafety}
+        controls={streamdownChatControls}
       >
         {children}
       </Streamdown>

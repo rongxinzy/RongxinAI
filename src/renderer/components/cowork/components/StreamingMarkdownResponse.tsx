@@ -141,6 +141,25 @@ const LocalAwareAnchor = ({
     );
   }
 
+  // Never use a bare <a href> for http(s): main-window navigation replaces the Agent UI (issue #37).
+  if (href && /^https?:/i.test(href)) {
+    return (
+      <button
+        type="button"
+        className={
+          className ?? 'wrap-anywhere appearance-none text-left font-medium text-primary underline'
+        }
+        data-streamdown="link"
+        onClick={event => {
+          event.preventDefault();
+          window.open(href, '_blank', 'noreferrer');
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
     <a {...props} href={href} className={className}>
       {children}

@@ -27,5 +27,7 @@ test('keeps Markdown rendering for completed reasoning', () => {
 
   expect(contentSource).toContain('RICH_CONTENT_PATTERN.test(text)');
   expect(contentSource).toContain('<RichMessageResponse>{text}</RichMessageResponse>');
-  expect(contentSource).toContain('<Streamdown plugins={basePlugins} linkSafety={linkSafety}>');
+  expect(contentSource).toContain(
+    '<Streamdown plugins={basePlugins} linkSafety={linkSafety} controls={streamdownChatControls}>',
+  );
 });
