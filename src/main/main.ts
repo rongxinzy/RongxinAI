@@ -7164,6 +7164,26 @@ if (!gotTheLock) {
       return { action: 'deny' };
     });
 
+    // Block in-app navigation to external pages (e.g. bare <a href> in markdown).
+    // Otherwise the Agent UI is replaced by the webpage with no back affordance (issue #37).
+    mainWindow.webContents.on('will-navigate', (event, navUrl) => {
+      if (isWecomAuthUrl(navUrl)) return;
+      let parsed: URL;
+      try {
+        parsed = new URL(navUrl);
+      } catch {
+        event.preventDefault();
+        return;
+      }
+      const isAppLocal =
+        parsed.protocol === 'file:' ||
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1';
+      if (isAppLocal) return;
+      event.preventDefault();
+      void shell.openExternal(navUrl);
+    });
+
     // 监听子窗口创建事件（企微授权弹窗安全限制）
     mainWindow.webContents.on('did-create-window', childWindow => {
       // 限制子窗口只能导航到企微域名，防止被劫持到其他站点

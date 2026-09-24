@@ -11,6 +11,7 @@ import { Streamdown, type StreamdownProps } from 'streamdown';
 
 import { AiPre } from './streamdown-code-block';
 import { LinkSafetyModal } from './linkSafetyModal';
+import { streamdownChatControls } from './streamdownChatControls';
 
 const richPlugins = { cjk, code, math, mermaid };
 
@@ -35,8 +36,9 @@ const RichMessageResponse: React.FC<ComponentProps<typeof Streamdown>> = ({
     plugins={richPlugins}
     // 2026/09/20 lixiang  合并而非覆盖：否则调用方 components.a 会丢掉 pre:AiPre，代码块按钮掉出标题栏
     components={{ pre: AiPre, ...components }}
-    linkSafety={linkSafety}
     {...props}
+    linkSafety={linkSafety}
+    controls={streamdownChatControls}
   />
 );
 
