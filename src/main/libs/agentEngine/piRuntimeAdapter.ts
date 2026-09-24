@@ -1177,6 +1177,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                   unattended: resourceState.unattended,
                   chatMode: resourceState.chatMode,
                   expertSkillDirs: [],
+                  skillRoots: resolvePiSkillRoots(skillIds, this.resolveZhiyuanSkillDirs(), []),
                 },
                 {
                   sessionId,
