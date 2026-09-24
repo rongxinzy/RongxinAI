@@ -76,16 +76,60 @@ function normalizePlatform(value = process.platform) {
 
 function listRequirementFiles(skillsRoot = SKILLS_ROOT) {
   if (!fs.existsSync(skillsRoot)) return [];
-  return fs
-    .readdirSync(skillsRoot, { withFileTypes: true })
-    .filter(entry => entry.isDirectory())
-    .map(entry => {
-      const skillId = entry.name;
-      const requirementsPath = path.join(skillsRoot, skillId, 'requirements.txt');
-      return fs.existsSync(requirementsPath) ? { skillId, requirementsPath } : null;
-    })
-    .filter(Boolean)
-    .sort((left, right) => left.skillId.localeCompare(right.skillId));
+  const requirements = [];
+  const seenSkillIds = new Map();
+  const visit = current => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      const skillDir = path.join(current, entry.name);
+      const requirementsPath = path.join(skillDir, 'requirements.txt');
+      if (fs.existsSync(requirementsPath)) {
+        const skillId = entry.name;
+        const previous = seenSkillIds.get(skillId);
+        if (previous && previous !== skillDir) {
+          throw new Error(
+            `Duplicate Skill id '${skillId}' has requirements at both ${previous} and ${skillDir}.`,
+          );
+        }
+        seenSkillIds.set(skillId, skillDir);
+        requirements.push({ skillId, requirementsPath, skillDir });
+      }
+      visit(skillDir);
+    }
+  };
+  visit(skillsRoot);
+  return requirements.sort((left, right) =>
+    left.skillId.localeCompare(right.skillId) || left.skillDir.localeCompare(right.skillDir),
+  );
+}
+
+function listSkillDirectories(skillsRoot) {
+  if (!fs.existsSync(skillsRoot)) return [];
+  const skillDirs = [];
+  const visit = (current, isTopLevel = false) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      const skillDir = path.join(current, entry.name);
+      if (isTopLevel || fs.existsSync(path.join(skillDir, 'requirements.txt'))) {
+        skillDirs.push(skillDir);
+      }
+      visit(skillDir, false);
+    }
+  };
+  visit(skillsRoot, true);
+  return skillDirs;
 }
 
 function listPythonFiles(root) {
@@ -100,6 +144,7 @@ function listPythonFiles(root) {
     for (const entry of entries) {
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
+        if (fullPath !== root && fs.existsSync(path.join(fullPath, 'SKILL.md'))) continue;
         visit(fullPath);
       } else if (entry.isFile() && entry.name.endsWith('.py')) {
         files.push(fullPath);
@@ -135,10 +180,8 @@ function validateSkillDependencyDeclarations(skillsRoot = SKILLS_ROOT) {
   const missing = [];
   if (!fs.existsSync(skillsRoot)) return { ok: true, missing };
 
-  for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const skillId = entry.name;
-    const skillDir = path.join(skillsRoot, skillId);
+  for (const skillDir of listSkillDirectories(skillsRoot)) {
+    const skillId = path.basename(skillDir);
     const pythonFiles = listPythonFiles(skillDir);
     const localModules = new Set(pythonFiles.map(filePath => path.basename(filePath, '.py')));
     const requirementsPath = path.join(skillDir, 'requirements.txt');
