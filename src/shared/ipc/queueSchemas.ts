@@ -26,7 +26,6 @@ export const CoworkQueueEnqueueSchema = z.object({
     .optional(),
   fileAttachments: z.array(CoworkQueueFileAttachmentSchema).optional(),
   skillIds: z.array(z.string().min(1)).max(32).optional(),
-  skillPrompt: z.string().max(100_000).optional(),
 });
 
 export const CoworkQueueUpdateSchema = z.object({

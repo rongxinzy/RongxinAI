@@ -589,10 +589,6 @@ export function classicPageControls(dark: boolean) {
     'page-pi-runtime-model-config-select-trigger-2': recipe({
       base: { height: '2rem', width: '6rem', 'font-size': 'var(--zy-component-text-xs)' },
     }),
-    'page-active-skill-badge-button-1': recipe({
-      base: { height: '1rem', width: '1rem', 'border-radius': '9999px' },
-      hover: { 'background-color': 'var(--zy-background)' },
-    }),
     'page-installed-skill-grid-card-1': recipe({
       base: {
         'min-height': '5rem',
