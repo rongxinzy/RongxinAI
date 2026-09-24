@@ -2604,6 +2604,26 @@ describe('PiRuntimeAdapter', () => {
       const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult!.metadata?.isError).toBe(true);
     });
+
+    it('should flag tool_result as error when result details contain isError', async () => {
+      const messages: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      await adapter.startSession('test', 'Do something');
+
+      listener!({
+        type: 'tool_execution_end',
+        toolCallId: 'call-details-err',
+        toolName: 'declare_artifact',
+        result: {
+          content: [{ type: 'text', text: 'file does not exist' }],
+          details: { isError: true, error: 'file does not exist' },
+        },
+        isError: false,
+      });
+
+      const toolResult = messages.find(m => m.type === 'tool_result');
+      expect(toolResult!.metadata?.isError).toBe(true);
+    });
   });
 
   // ── Event mapping: assistant streaming (duplicate-render regression) ──
