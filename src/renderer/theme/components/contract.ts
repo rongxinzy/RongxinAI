@@ -553,6 +553,8 @@ export const COMPONENT_SELECTORS = {
   'page-chat-skill-shortcuts-button-variant-1': '.theme-page-chat-skill-shortcuts-button-variant-1',
   'page-chat-skill-shortcuts-button-variant-2': '.theme-page-chat-skill-shortcuts-button-variant-2',
   'page-chat-skill-shortcuts-button-variant-3': '.theme-page-chat-skill-shortcuts-button-variant-3',
+  // Selected nav row: same card+border language as chat skill shortcuts (class toggle, not only data-active).
+  'page-sidebar-navigation-button-selected': '.theme-page-sidebar-navigation-button-selected',
   'page-coding-workspace-sidebar-button-variant-1':
     '.theme-page-coding-workspace-sidebar-button-variant-1',
   'page-coding-workspace-sidebar-button-variant-2':
