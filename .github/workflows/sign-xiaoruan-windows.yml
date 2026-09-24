@@ -7,6 +7,11 @@ on:
         description: Successful Xiaoruan unsigned windows-build Actions run ID
         required: true
         type: string
+      release_version:
+        description: 'Package SemVer used for the unsigned build (e.g. 1.0.0). Optional leading v is stripped. Leave empty to use package.json at the source commit.'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -21,17 +26,14 @@ env:
 
 jobs:
   prepare:
-    if: >-
-      github.repository == 'rongxinzy/RongxinAI' &&
-      (github.ref == 'refs/heads/main' ||
-       github.ref == 'refs/heads/feat/sign-xiaoruan-windows')
+    if: github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       source-repository: ${{ steps.source.outputs.source-repository }}
       source-run-id: ${{ steps.source.outputs.source-run-id }}
       source-sha: ${{ steps.source.outputs.source-sha }}
-      artifact: ${{ steps.source.outputs.artifact }}
+      package-version: ${{ steps.source.outputs.package-version }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -41,20 +43,22 @@ jobs:
         name: Validate Xiaoruan unsigned package run
         env:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
-          # Prefer a Xiaoruan-scoped read token; fall back to the shared runtime token.
+          RELEASE_VERSION: ${{ inputs.release_version }}
           RUNTIME_ARTIFACT_READ_TOKEN: ${{ secrets.XIAORUAN_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
         run: node scripts/xiaoruan-signing/prepare.mjs
       - name: Record handoff identity
         env:
           SOURCE_RUN_ID: ${{ steps.source.outputs.source-run-id }}
           SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.package-version }}
         run: |
           {
             echo '### Xiaoruan signing handoff'
             echo
             echo "- source run: \`$SOURCE_RUN_ID\`"
             echo "- source commit: \`$SOURCE_SHA\`"
-            echo "- artifact: \`windows-build\` → signed \`signed-windows-build\`"
+            echo "- package version: \`$PACKAGE_VERSION\`"
+            echo "- method: rebuild with \`dist:win:signed\` (app + installer)"
             echo
             echo "https://github.com/rongxinzy/xiaoruan-ai-agent/actions/runs/$SOURCE_RUN_ID"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -63,91 +67,95 @@ jobs:
     needs: prepare
     runs-on: windows-latest
     environment: release
-    timeout-minutes: 45
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: xiaoruan
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
+      - name: Checkout ZhiYuan Certum action
+        uses: actions/checkout@v6
+        with:
+          path: zhiyuan
+      - name: Checkout Xiaoruan source commit
+        uses: actions/checkout@v6
         with:
           repository: ${{ needs.prepare.outputs.source-repository }}
-          run-id: ${{ needs.prepare.outputs.source-run-id }}
-          name: ${{ needs.prepare.outputs.artifact }}
-          path: package-input
-          github-token: ${{ secrets.XIAORUAN_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
-      - name: Require unsigned installer inputs
-        shell: pwsh
+          ref: ${{ needs.prepare.outputs.source-sha }}
+          path: xiaoruan
+          token: ${{ secrets.XIAORUAN_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+      - name: Enforce retired runtime decoupling
+        run: node scripts/ci/check-openclaw-decoupling.mjs
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            xiaoruan/vendor/engram-runtime
+            xiaoruan/vendor/channel-runtime
+          key: xiaoruan-signing-${{ runner.os }}-win-x64-node24-bun1.4.0-${{ hashFiles('xiaoruan/bun.lock', 'xiaoruan/package.json', 'xiaoruan/scripts/**') }}
+          restore-keys: |
+            xiaoruan-signing-${{ runner.os }}-win-x64-node24-bun1.4.0-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Set up Windows runtimes
         run: |
-          $ErrorActionPreference = 'Stop'
-          $installers = @(Get-ChildItem -LiteralPath package-input -Filter '*.exe' -File -Recurse)
-          if ($installers.Count -lt 1) {
-            throw 'Expected at least one Windows installer (.exe) in windows-build.'
-          }
-          foreach ($installer in $installers) {
-            $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
-            if ($signature.Status -ne 'NotSigned') {
-              throw "Installer starts unexpectedly signed ($($signature.Status)): $($installer.Name)"
-            }
-            Write-Output "Unsigned installer ready: $($installer.Name) ($([math]::Round($installer.Length / 1MB, 1)) MiB)"
-          }
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+          bun run engram:runtime:win-x64
       - name: Connect Certum SimplySign
         id: certum
-        uses: ./.github/actions/setup-certum-signing
+        uses: ./zhiyuan/.github/actions/setup-certum-signing
         with:
           user-id: ${{ secrets.CERTUM_USER_ID }}
           otp-uri: ${{ secrets.CERTUM_OTP_URI }}
           certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
-      - name: Sign Xiaoruan Windows installers
-        shell: pwsh
+      - name: Build signed Windows package
+        run: bun run dist:win:signed
         env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ needs.prepare.outputs.package-version }}
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $installers = @(Get-ChildItem -LiteralPath package-input -Filter '*.exe' -File -Recurse)
-          foreach ($installer in $installers) {
-            & ./scripts/runtime-signing/sign-runtime.ps1 -Path $installer.FullName
-          }
-      - name: Verify installer Authenticode signatures
-        shell: pwsh
-        env:
-          CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $thumbprint = ($env:CERTUM_CERT_THUMBPRINT -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
-          $certificate = @(
-            Get-ChildItem Cert:\CurrentUser\My |
-              Where-Object {
-                ($_.Thumbprint -replace '[^0-9A-Fa-f]', '').ToUpperInvariant() -eq $thumbprint
-              }
-          )
-          if ($certificate.Count -ne 1) {
-            throw "Expected exactly one Certum certificate; found $($certificate.Count)."
-          }
-          $expectedDer = [Convert]::ToBase64String($certificate[0].RawData)
-          $installers = @(Get-ChildItem -LiteralPath package-input -Filter '*.exe' -File -Recurse)
-          foreach ($installer in $installers) {
-            $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
-            if ($signature.Status -ne 'Valid') {
-              throw "Authenticode status for $($installer.Name) is $($signature.Status)."
-            }
-            $actualDer = [Convert]::ToBase64String($signature.SignerCertificate.RawData)
-            if ($actualDer -ne $expectedDer) {
-              throw "Signer mismatch for $($installer.Name)."
-            }
-            if ($null -eq $signature.TimeStamperCertificate) {
-              throw "Missing trusted timestamp for $($installer.Name)."
-            }
-            Write-Output "Signed and verified: $($installer.Name)"
-          }
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify packaged app version
+        shell: bash
+        run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare.outputs.package-version }}'
+      - name: Verify Windows Authenticode signatures
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/verify-windows-authenticode.ps1
+          -ProjectRoot '${{ github.workspace }}/xiaoruan'
+          -ExpectedThumbprint '${{ steps.certum.outputs.thumbprint }}'
+      - name: Verify Windows package runtimes with a clean PATH
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-runtime-smoke.ps1
+          -ProjectRoot '${{ github.workspace }}/xiaoruan'
       - uses: actions/upload-artifact@v6
         with:
           name: signed-windows-build
-          path: package-input/**/*.exe
+          path: xiaoruan/release/*.exe
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
       - name: Publish signed package summary
+        working-directory: ${{ github.workspace }}
         shell: bash
         env:
           SOURCE_RUN_ID: ${{ needs.prepare.outputs.source-run-id }}
           SOURCE_SHA: ${{ needs.prepare.outputs.source-sha }}
+          PACKAGE_VERSION: ${{ needs.prepare.outputs.package-version }}
         run: |
           {
             echo '### Signed Xiaoruan Windows package'
@@ -155,7 +163,8 @@ jobs:
             echo "- signing run: \`$GITHUB_RUN_ID\`"
             echo "- source run: \`$SOURCE_RUN_ID\`"
             echo "- source commit: \`$SOURCE_SHA\`"
-            echo "- artifact: \`signed-windows-build\`"
+            echo "- package version: \`$PACKAGE_VERSION\`"
+            echo "- artifact: \`signed-windows-build\` (app + installer signed during packaging)"
             echo
             echo "https://github.com/rongxinzy/RongxinAI/actions/runs/$GITHUB_RUN_ID"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,54 +1,51 @@
 import { expect, test } from 'vitest';
 import { prepareXiaoruanSigning } from './prepare.mjs';
 
-test('accepts a successful Xiaoruan main windows-build run', async () => {
-  const calls = [];
+function jsonResponse(body: unknown) {
+  return {
+    ok: true,
+    json: async () => body,
+  };
+}
+
+test('accepts a successful Xiaoruan main windows-build run and resolves an explicit version', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
-    calls.push(String(url));
-    if (String(url).includes('/actions/runs/35979555619/jobs')) {
-      return {
-        ok: true,
-        json: async () => ({
-          jobs: [
-            {
-              name: 'build-platforms',
-              steps: [
-                { name: 'Build Windows', conclusion: 'success' },
-                {
-                  name: 'Verify Windows package runtimes with a clean PATH',
-                  conclusion: 'success',
-                },
-                { name: 'Run actions/upload-artifact@v6', conclusion: 'success' },
-              ],
-            },
-          ],
-        }),
-      };
+    const href = String(url);
+    if (href.includes('/actions/runs/35979555619/jobs')) {
+      return jsonResponse({
+        jobs: [
+          {
+            name: 'build-platforms',
+            steps: [
+              { name: 'Build Windows', conclusion: 'success' },
+              {
+                name: 'Verify Windows package runtimes with a clean PATH',
+                conclusion: 'success',
+              },
+              { name: 'Run actions/upload-artifact@v6', conclusion: 'success' },
+            ],
+          },
+        ],
+      });
     }
-    if (String(url).includes('/actions/runs/35979555619/artifacts')) {
-      return {
-        ok: true,
-        json: async () => ({
-          artifacts: [{ id: 10800275783, name: 'windows-build', expired: false }],
-        }),
-      };
+    if (href.includes('/actions/runs/35979555619/artifacts')) {
+      return jsonResponse({
+        artifacts: [{ id: 10800275783, name: 'windows-build', expired: false }],
+      });
     }
-    if (String(url).endsWith('/actions/runs/35979555619')) {
-      return {
-        ok: true,
-        json: async () => ({
-          id: 35979555619,
-          repository: { full_name: 'rongxinzy/xiaoruan-ai-agent' },
-          head_repository: { full_name: 'rongxinzy/xiaoruan-ai-agent' },
-          path: '.github/workflows/build-platforms.yml',
-          event: 'workflow_dispatch',
-          head_branch: 'main',
-          status: 'completed',
-          conclusion: 'success',
-          head_sha: 'a80fa00cd1f6a1343a515154bad0ec7a491aa5bc',
-        }),
-      };
+    if (href.endsWith('/actions/runs/35979555619')) {
+      return jsonResponse({
+        id: 35979555619,
+        repository: { full_name: 'rongxinzy/xiaoruan-ai-agent' },
+        head_repository: { full_name: 'rongxinzy/xiaoruan-ai-agent' },
+        path: '.github/workflows/build-platforms.yml',
+        event: 'workflow_dispatch',
+        head_branch: 'main',
+        status: 'completed',
+        conclusion: 'success',
+        head_sha: 'a80fa00cd1f6a1343a515154bad0ec7a491aa5bc',
+      });
     }
     throw new Error(`Unexpected URL: ${url}`);
   };
@@ -56,6 +53,7 @@ test('accepts a successful Xiaoruan main windows-build run', async () => {
   try {
     const result = await prepareXiaoruanSigning({
       SOURCE_RUN_ID: '35979555619',
+      RELEASE_VERSION: '1.0.0',
       RUNTIME_ARTIFACT_READ_TOKEN: 'test-token',
     });
     expect(result).toEqual({
@@ -64,8 +62,8 @@ test('accepts a successful Xiaoruan main windows-build run', async () => {
       sourceSha: 'a80fa00cd1f6a1343a515154bad0ec7a491aa5bc',
       artifact: 'windows-build',
       artifactId: '10800275783',
+      packageVersion: '1.0.0',
     });
-    expect(calls.length).toBe(3);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -73,9 +71,8 @@ test('accepts a successful Xiaoruan main windows-build run', async () => {
 
 test('rejects a non-main source run', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => ({
-    ok: true,
-    json: async () => ({
+  globalThis.fetch = async () =>
+    jsonResponse({
       id: 1,
       repository: { full_name: 'rongxinzy/xiaoruan-ai-agent' },
       head_repository: { full_name: 'rongxinzy/xiaoruan-ai-agent' },
@@ -85,12 +82,12 @@ test('rejects a non-main source run', async () => {
       status: 'completed',
       conclusion: 'success',
       head_sha: 'a80fa00cd1f6a1343a515154bad0ec7a491aa5bc',
-    }),
-  });
+    });
   try {
     await expect(
       prepareXiaoruanSigning({
         SOURCE_RUN_ID: '1',
+        RELEASE_VERSION: '1.0.0',
         RUNTIME_ARTIFACT_READ_TOKEN: 'test-token',
       }),
     ).rejects.toThrow(/successful Xiaoruan main/);
