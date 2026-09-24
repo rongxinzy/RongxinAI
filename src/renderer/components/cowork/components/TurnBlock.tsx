@@ -28,6 +28,8 @@ import type {
   CoworkPermissionResult,
 } from '../../../types/cowork';
 import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
+import { AgentCompanion } from '../../agentCompanion/AgentCompanion';
+import { resolveAgentCompanionState } from '../../agentCompanion/constants';
 import {
   ExecutionStatusKind,
   getCompletedExecutionSummaryText,
@@ -126,8 +128,8 @@ const TurnBlockComponent: React.FC<{
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
   const primaryExpert = getTurnPrimaryExpert(turn);
-
-  const showAssistantHeader = Boolean(primaryExpert) || !hideDefaultAssistantHeader;
+  const renderActiveStatusText = (text: string) =>
+    primaryExpert ? <Shimmer duration={1}>{text}</Shimmer> : <span>{text}</span>;
 
   // 2026/09/16 lixiang  只把授权挂到匹配到的那一个正在执行的工具上
   const pendingToolGroup =
@@ -262,7 +264,7 @@ const TurnBlockComponent: React.FC<{
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
               if (isComplete) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
-              if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
+              if (s) return renderActiveStatusText('思考中…');
               return <p>思考内容</p>;
             }}
           />
@@ -395,6 +397,17 @@ const TurnBlockComponent: React.FC<{
       ? visibleAssistantItems[finalAnswerIndex]
       : null;
   const standaloneSystemItems = visibleAssistantItems.filter(isStandaloneSystemItem);
+  const lastVisibleItem = visibleAssistantItems[visibleAssistantItems.length - 1];
+  const defaultCompanionState = resolveAgentCompanionState({
+    isTurnComplete,
+    hasAssistantAnswer: visibleAssistantItems.some(
+      item =>
+        item.type === 'assistant' &&
+        !item.message.metadata?.isThinking &&
+        hasText(item.message.content),
+    ),
+    hasTerminalOutcome: Boolean(lastVisibleItem && isStandaloneSystemItem(lastVisibleItem)),
+  });
   const executionItems =
     finalAnswerIndex >= 0
       ? visibleAssistantItems.filter(
@@ -460,9 +473,9 @@ const TurnBlockComponent: React.FC<{
           {showCompletedSummary ? (
             getCompletedExecutionSummaryText(getExecutionSummary(group.items))
           ) : currentStatus ? (
-            <Shimmer duration={1}>{getExecutionStatusText(currentStatus)}</Shimmer>
+            renderActiveStatusText(getExecutionStatusText(currentStatus))
           ) : (
-            <Shimmer duration={1}>{i18nService.t('coworkIntermediateProcess')}</Shimmer>
+            renderActiveStatusText(i18nService.t('coworkIntermediateProcess'))
           )}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
@@ -501,22 +514,21 @@ const TurnBlockComponent: React.FC<{
       <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 py-3">
-            {showAssistantHeader && (
+            {primaryExpert ? (
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                {primaryExpert ? (
-                  <>
-                    <ExpertAvatar
-                      name={primaryExpert.presetId}
-                      label={primaryExpert.expertName}
-                      className="size-7 rounded-full border-0"
-                    />
-                    <span className="truncate">{primaryExpert.expertName}</span>
-                  </>
-                ) : (
-                  <span>{i18nService.t('cowork')}</span>
-                )}
+                <ExpertAvatar
+                  name={primaryExpert.presetId}
+                  label={primaryExpert.expertName}
+                  className="size-7 rounded-full border-0"
+                />
+                <span className="truncate">{primaryExpert.expertName}</span>
               </div>
-            )}
+            ) : !showTypingIndicator && !hideDefaultAssistantHeader ? (
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <AgentCompanion state={defaultCompanionState} />
+                <span>{i18nService.t('cowork')}</span>
+              </div>
+            ) : null}
             {finalAnswerItem && executionItems.length > 0 && (
               <ExecutionSummary summary={executionSummary} persistKey={`execsummary-${turn.id}`}>
                 {executionItems.map((item, index) => {
@@ -540,11 +552,13 @@ const TurnBlockComponent: React.FC<{
             {toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup && (
               <ChainOfThought key="transient-working-summary" defaultOpen={false}>
                 <ChainOfThoughtHeader icon={Wrench}>
-                  <Shimmer duration={1}>{getExecutionStatusText(toolActivityStatus)}</Shimmer>
+                  {renderActiveStatusText(getExecutionStatusText(toolActivityStatus))}
                 </ChainOfThoughtHeader>
               </ChainOfThought>
             )}
-            {showTypingIndicator && <WorkingIndicator />}
+            {showTypingIndicator && (
+              <WorkingIndicator showCompanion={!primaryExpert && !hideDefaultAssistantHeader} />
+            )}
             {/* 2026/09/17 lixiang  文件卡片与复制按钮上下间距收紧 */}
             {/* 2026/09/20 lixiang  验收卡在复制按钮之上（issue #805） */}
             {(hasDeliverableArtifacts || copyContent || beforeCopySlot) && (
