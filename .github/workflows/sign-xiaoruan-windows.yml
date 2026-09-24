@@ -21,7 +21,10 @@ env:
 
 jobs:
   prepare:
-    if: github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'rongxinzy/RongxinAI' &&
+      (github.ref == 'refs/heads/main' ||
+       github.ref == 'refs/heads/feat/sign-xiaoruan-windows')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
