@@ -4,7 +4,7 @@ Real-time web search capability for ZhiYuan Agent using Playwright-controlled br
 
 ## Overview
 
-The Web Search Skill enables ZhiYuan Agent to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance. It runs headless first to avoid interrupting the desktop, then retries once with a visible browser when headless search appears blocked.
+The Web Search Skill enables ZhiYuan to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance in headless mode so the desktop UI is not interrupted. Visible-browser retry (`fallbackToHeadful`) is off by default; enable it only for local debugging.
 
 ## Features
 
@@ -113,7 +113,7 @@ Default configuration in `server/config.ts`:
   browser: {
     cdpPort: 9222,
     headless: true,
-    fallbackToHeadful: true,
+    fallbackToHeadful: false,
     chromeFlags: [/* ... */]
   },
   server: {
