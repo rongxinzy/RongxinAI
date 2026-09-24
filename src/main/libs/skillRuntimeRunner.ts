@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execFile, spawn, type ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { StringDecoder } from 'string_decoder';
@@ -55,6 +55,20 @@ export type RunSkillScriptOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
   envOverrides?: Record<string, string | undefined>;
+};
+
+export type ManagedSkillProcess = {
+  pid: number | null;
+  isRunning(): boolean;
+  runtime: SkillScriptRuntime;
+  command: string;
+  args: string[];
+  scriptPath: string;
+  waitForOutput(
+    ready: (stdout: string, stderr: string) => boolean,
+    timeoutMs: number,
+  ): Promise<{ stdout: string; stderr: string }>;
+  stop(): Promise<void>;
 };
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -297,6 +311,91 @@ function resolveRuntime(
   };
 }
 
+type PreparedSkillScript = {
+  runtime: {
+    runtime: SkillScriptRuntime;
+    command: string;
+    prefixArgs: string[];
+    env: Record<string, string>;
+  };
+  scriptPath: string;
+  commandArgs: string[];
+  env: Record<string, string | undefined>;
+};
+
+async function prepareSkillScript(
+  options: RunSkillScriptOptions,
+): Promise<PreparedSkillScript | { result: SkillScriptRunResult }> {
+  const skillsRoot = options.skillsRoot || getSkillsRoot();
+  const resolved = resolveSkillScriptPath(skillsRoot, options.skillId, options.script);
+  if ('errorCode' in resolved) {
+    return {
+      result: invalidInputResult(
+        path.resolve(skillsRoot, options.skillId, options.script),
+        resolved.errorCode,
+        resolved.error,
+      ),
+    };
+  }
+
+  const args = options.args || [];
+  if (
+    args.length > MAX_ARGUMENTS ||
+    args.some(value => typeof value !== 'string' || value.length > MAX_ARGUMENT_LENGTH)
+  ) {
+    return {
+      result: invalidInputResult(
+        resolved.scriptPath,
+        'SKILL_SCRIPT_FAILED',
+        `Skill script arguments exceed the supported limit (${MAX_ARGUMENTS} arguments, ${MAX_ARGUMENT_LENGTH} characters each).`,
+      ),
+    };
+  }
+
+  const runtime = resolveRuntime(resolved.scriptPath, resolved.skillDir);
+  if ('errorCode' in runtime) {
+    return { result: invalidInputResult(resolved.scriptPath, runtime.errorCode, runtime.error) };
+  }
+
+  let env: Record<string, string | undefined>;
+  try {
+    env = await getEnhancedEnv('local');
+  } catch (error) {
+    console.warn(
+      '[skill-runtime] Falling back to process environment:',
+      error instanceof Error ? error.message : String(error),
+    );
+    env = { ...process.env };
+  }
+  try {
+    appendPythonRuntimeToEnv(env);
+  } catch (error) {
+    console.warn(
+      '[skill-runtime] Managed Python environment was not appended:',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  try {
+    appendUvRuntimeToEnv(env);
+    configureUvForManagedPython(env);
+  } catch (error) {
+    console.warn(
+      '[skill-runtime] Managed uv environment was not appended:',
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+  Object.assign(env, runtime.env, options.envOverrides || {});
+  env.SKILLS_ROOT = skillsRoot;
+  env.ZHIYUAN_SKILLS_ROOT = skillsRoot;
+
+  return {
+    runtime,
+    scriptPath: resolved.scriptPath,
+    commandArgs: [...runtime.prefixArgs, resolved.scriptPath, ...args],
+    env,
+  };
+}
+
 function invalidInputResult(
   scriptPath: string,
   errorCode: SkillScriptErrorCode,
@@ -327,73 +426,13 @@ function invalidInputResult(
 export async function runManagedSkillScript(
   options: RunSkillScriptOptions,
 ): Promise<SkillScriptRunResult> {
-  const skillsRoot = options.skillsRoot || getSkillsRoot();
-  const resolved = resolveSkillScriptPath(skillsRoot, options.skillId, options.script);
-  if ('errorCode' in resolved) {
-    return invalidInputResult(
-      path.resolve(skillsRoot, options.skillId, options.script),
-      resolved.errorCode,
-      resolved.error,
-    );
-  }
-
-  const args = options.args || [];
-  if (
-    args.length > MAX_ARGUMENTS ||
-    args.some(value => typeof value !== 'string' || value.length > MAX_ARGUMENT_LENGTH)
-  ) {
-    return invalidInputResult(
-      resolved.scriptPath,
-      'SKILL_SCRIPT_FAILED',
-      `Skill script arguments exceed the supported limit (${MAX_ARGUMENTS} arguments, ${MAX_ARGUMENT_LENGTH} characters each).`,
-    );
-  }
-
-  const runtime = resolveRuntime(resolved.scriptPath, resolved.skillDir);
-  if ('errorCode' in runtime) {
-    return invalidInputResult(resolved.scriptPath, runtime.errorCode, runtime.error);
-  }
-
+  const prepared = await prepareSkillScript(options);
+  if ('result' in prepared) return prepared.result;
+  const { runtime, scriptPath, commandArgs, env } = prepared;
   const timeoutMs = Math.min(
     Math.max(options.timeoutMs || DEFAULT_TIMEOUT_MS, 1_000),
     MAX_TIMEOUT_MS,
   );
-  let env: Record<string, string | undefined>;
-  try {
-    env = await getEnhancedEnv('local');
-  } catch (error) {
-    // Keep the direct runner usable in test harnesses and unusual embedded
-    // launches where Electron has not populated resourcesPath yet. The
-    // managed runtimes are still appended below; this fallback is not a
-    // request to use user-installed Python or Node binaries.
-    console.warn(
-      '[skill-runtime] Falling back to process environment:',
-      error instanceof Error ? error.message : String(error),
-    );
-    env = { ...process.env };
-  }
-  try {
-    appendPythonRuntimeToEnv(env);
-  } catch (error) {
-    console.warn(
-      '[skill-runtime] Managed Python environment was not appended:',
-      error instanceof Error ? error.message : String(error),
-    );
-  }
-  try {
-    appendUvRuntimeToEnv(env);
-    configureUvForManagedPython(env);
-  } catch (error) {
-    console.warn(
-      '[skill-runtime] Managed uv environment was not appended:',
-      error instanceof Error ? error.message : String(error),
-    );
-  }
-  Object.assign(env, runtime.env, options.envOverrides || {});
-  env.SKILLS_ROOT = skillsRoot;
-  env.ZHIYUAN_SKILLS_ROOT = skillsRoot;
-
-  const commandArgs = [...runtime.prefixArgs, resolved.scriptPath, ...args];
   const startedAt = Date.now();
 
   if (options.signal?.aborted) {
@@ -405,7 +444,7 @@ export async function runManagedSkillScript(
       runtime: runtime.runtime,
       command: runtime.command,
       args: commandArgs,
-      scriptPath: resolved.scriptPath,
+      scriptPath,
       exitCode: null,
       stdout: '',
       stderr: '',
@@ -494,7 +533,7 @@ export async function runManagedSkillScript(
         runtime: runtime.runtime,
         command: runtime.command,
         args: commandArgs,
-        scriptPath: resolved.scriptPath,
+        scriptPath,
         exitCode: null,
         stdout: output.stdout,
         stderr: output.stderr,
@@ -530,7 +569,7 @@ export async function runManagedSkillScript(
         runtime: runtime.runtime,
         command: runtime.command,
         args: commandArgs,
-        scriptPath: resolved.scriptPath,
+        scriptPath,
         exitCode,
         stdout: output.stdout,
         stderr: output.stderr,
@@ -541,4 +580,118 @@ export async function runManagedSkillScript(
       });
     });
   });
+}
+
+const stopManagedProcess = async (child: ChildProcess): Promise<void> => {
+  const pid = child.pid;
+  if (!pid || child.killed) return;
+  if (process.platform === 'win32') {
+    await new Promise<void>(resolve => {
+      execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () =>
+        resolve(),
+      );
+    });
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    child.kill('SIGTERM');
+  }
+  await new Promise(resolve => setTimeout(resolve, 2_000));
+  if (!child.killed) {
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      child.kill('SIGKILL');
+    }
+  }
+};
+
+/** Start a long-lived Skill process whose lifetime is managed by the caller. */
+export async function startManagedSkillProcess(
+  options: RunSkillScriptOptions,
+): Promise<ManagedSkillProcess> {
+  const prepared = await prepareSkillScript(options);
+  if ('result' in prepared) {
+    throw new Error(`${prepared.result.errorCode}: ${prepared.result.error}`);
+  }
+  if (options.signal?.aborted) throw new Error('Skill process was aborted before it started.');
+
+  const child = spawn(prepared.runtime.command, prepared.commandArgs, {
+    cwd: path.resolve(options.workspaceRoot),
+    env: prepared.env as NodeJS.ProcessEnv,
+    shell: false,
+    detached: true,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  let closed = false;
+  const waiters = new Set<{
+    ready: (stdout: string, stderr: string) => boolean;
+    resolve: (value: { stdout: string; stderr: string }) => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+  }>();
+  const notify = (): void => {
+    for (const waiter of [...waiters]) {
+      if (waiter.ready(stdout, stderr)) {
+        clearTimeout(waiter.timer);
+        waiters.delete(waiter);
+        waiter.resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+      }
+    }
+  };
+  child.stdout?.on('data', chunk => {
+    stdout = `${stdout}${String(chunk)}`.slice(-MAX_CAPTURED_OUTPUT_BYTES);
+    notify();
+  });
+  child.stderr?.on('data', chunk => {
+    stderr = `${stderr}${String(chunk)}`.slice(-MAX_CAPTURED_OUTPUT_BYTES);
+    notify();
+  });
+  child.once('close', code => {
+    closed = true;
+    for (const waiter of [...waiters]) {
+      clearTimeout(waiter.timer);
+      waiters.delete(waiter);
+      waiter.reject(
+        new Error(`Managed Skill process exited before readiness (${code ?? 'unknown'}).`),
+      );
+    }
+  });
+  child.once('error', error => {
+    closed = true;
+    for (const waiter of [...waiters]) {
+      clearTimeout(waiter.timer);
+      waiters.delete(waiter);
+      waiter.reject(error);
+    }
+  });
+
+  return {
+    pid: child.pid,
+    isRunning: () => !closed,
+    runtime: prepared.runtime.runtime,
+    command: prepared.runtime.command,
+    args: prepared.commandArgs,
+    scriptPath: prepared.scriptPath,
+    waitForOutput: (ready, timeoutMs) => {
+      if (ready(stdout, stderr))
+        return Promise.resolve({ stdout: stdout.trim(), stderr: stderr.trim() });
+      if (closed)
+        return Promise.reject(new Error('Managed Skill process exited before readiness.'));
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          waiters.delete(waiter);
+          reject(new Error(`Managed Skill process did not become ready within ${timeoutMs}ms.`));
+        }, timeoutMs);
+        const waiter = { ready, resolve, reject, timer };
+        waiters.add(waiter);
+      });
+    },
+    stop: () => stopManagedProcess(child),
+  };
 }
