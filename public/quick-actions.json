@@ -5,7 +5,7 @@
       "id": "pptx",
       "icon": "PresentationChartBarIcon",
       "color": "#F59E0B",
-      "skillMapping": "pptx",
+      "skillMapping": "presentation-studio",
       "prompts": [
         {
           "id": "pptx-work-report",

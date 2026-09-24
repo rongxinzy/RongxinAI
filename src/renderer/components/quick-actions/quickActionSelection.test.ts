@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 
-import { quickActionSkillIds, shouldClearQuickActionSelection } from './quickActionSelection';
+import { isCoreSkill } from '@shared/skills/constants';
+
+import {
+  isQuickActionSkill,
+  quickActionSkillIds,
+  shouldClearQuickActionSelection,
+} from './quickActionSelection';
 
 const action = {
   id: 'education',
@@ -31,7 +37,7 @@ const quickActionsConfig = JSON.parse(
     fileURLToPath(new URL('../../../../public/quick-actions.json', import.meta.url)),
     'utf8',
   ),
-) as { actions: Array<{ id: string; skillIds?: string[] }> };
+) as { actions: Array<{ id: string; skillMapping: string; skillIds?: string[] }> };
 
 test('keeps a quick action selected when its mapped skill is unavailable', () => {
   expect(shouldClearQuickActionSelection(action, [], [])).toBe(false);
@@ -63,7 +69,28 @@ test('requires every skill in a bundled quick action to remain active', () => {
   ).toBe(true);
 });
 
-test('declares the full research skill bundles in quick-action configuration', () => {
+test('identifies the skills that belong to a bundled quick action', () => {
+  const researchAction = {
+    ...action,
+    skillIds: ['deli-autoresearch', 'deep-research', 'web-search'],
+  };
+
+  expect(isQuickActionSkill(researchAction, 'deep-research')).toBe(true);
+  expect(isQuickActionSkill(researchAction, 'frontend-design')).toBe(false);
+});
+
+test('maps every configured quick action to core skills', () => {
+  for (const configuredAction of quickActionsConfig.actions) {
+    for (const skillId of configuredAction.skillIds ?? [configuredAction.skillMapping]) {
+      expect(isCoreSkill(skillId), `${configuredAction.id} -> ${skillId}`).toBe(true);
+    }
+  }
+});
+
+test('declares the current PPT and research skill mappings', () => {
+  expect(quickActionsConfig.actions.find(action => action.id === 'pptx')?.skillMapping).toBe(
+    'presentation-studio',
+  );
   expect(quickActionsConfig.actions.find(action => action.id === 'deep-research')?.skillIds).toEqual([
     'deep-research',
     'web-search',

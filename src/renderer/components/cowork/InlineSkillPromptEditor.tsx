@@ -14,8 +14,9 @@ import { i18nService } from '../../services/i18n';
 import { resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
 import { clearSelection } from '../../store/slices/quickActionSlice';
-import { clearActiveSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
+import { toggleActiveSkill } from '../../store/slices/skillSlice';
 import { findChatSkillShortcut } from '../chat/constants';
+import { isQuickActionSkill, quickActionSkillIds } from '../quick-actions/quickActionSelection';
 
 const TOKEN_SELECTOR = '[data-skill-token]';
 const REMOVE_SELECTOR = '[data-remove-skill-id]';
@@ -137,10 +138,16 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
     const selectedQuickAction = useSelector((state: RootState) =>
       state.quickAction.actions.find(action => action.id === selectedActionId),
     );
-    const quickActionSkillId = selectedQuickAction?.skillMapping;
+    const selectedQuickActionSkillIds = useMemo(
+      () => (selectedQuickAction ? quickActionSkillIds(selectedQuickAction) : []),
+      [selectedQuickAction],
+    );
     const renderedSkillIds = useMemo(
-      () => (activeSkillIds.length > 0 ? activeSkillIds : quickActionSkillId ? [quickActionSkillId] : []),
-      [activeSkillIds, quickActionSkillId],
+      () =>
+        activeSkillIds.length > 0
+          ? activeSkillIds
+          : selectedQuickActionSkillIds.filter(skillId => skills.some(skill => skill.id === skillId)),
+      [activeSkillIds, selectedQuickActionSkillIds, skills],
     );
 
     useImperativeHandle(forwardedRef, () => editorRef.current as HTMLDivElement, []);
@@ -167,14 +174,14 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
 
     const removeSkill = useCallback(
       (skillId: string) => {
-        if (quickActionSkillId === skillId && activeSkillIds.length === 0) {
+        if (selectedQuickAction && isQuickActionSkill(selectedQuickAction, skillId)) {
           dispatch(clearSelection());
-          dispatch(clearActiveSkills());
-          return;
         }
-        dispatch(toggleActiveSkill(skillId));
+        if (activeSkillIds.includes(skillId)) {
+          dispatch(toggleActiveSkill(skillId));
+        }
       },
-      [activeSkillIds.length, dispatch, quickActionSkillId],
+      [activeSkillIds, dispatch, selectedQuickAction],
     );
 
     useLayoutEffect(() => {
