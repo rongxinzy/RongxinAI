@@ -13,6 +13,8 @@ import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/co
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
+import type { DetectedArtifact } from '../../services/artifactParser';
+import { loadArtifactDataUrl } from '../../services/artifactFileLoader';
 import {
   detectArtifactsFromMessages,
   getArtifactTypeFromExtension,
@@ -40,6 +42,7 @@ import {
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
+  shouldRevealLiveArtifact,
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
@@ -118,7 +121,6 @@ interface CoworkSessionDetailProps {
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   onContinue: (
     prompt: string,
-    skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
@@ -283,6 +285,60 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   );
 
   const artifactDetectionServiceRef = useRef<ArtifactDetectionService | null>(null);
+  // Whether this session produced anything while we were watching it. Revealing the
+  // artifact panel is a live-delivery signal: opening an old session must not pop
+  // the panel for artifacts it already had.
+  const liveRunRef = useRef(false);
+  const isStreamingRef = useRef(isStreaming);
+  const detectionQueueRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+    // Sticky on purpose: detection runs once the run has settled, so liveness has
+    // to outlive the streaming flag.
+    if (isStreaming) liveRunRef.current = true;
+  }, [isStreaming]);
+  // A session that is already streaming has no transition to observe, so liveness
+  // follows the current streaming state on every session switch.
+  useEffect(() => {
+    liveRunRef.current = isStreamingRef.current;
+  }, [sessionId]);
+
+  // Adds a detection batch, revealing only the artifacts the agent declared as
+  // deliverables during a live run and whose file is actually readable. The
+  // readability probe runs for the whole batch before anything is dispatched, so
+  // insertion order (and therefore "newest deliverable wins") never depends on
+  // which file happened to be read first.
+  const addDetectedArtifacts = useCallback(
+    async (detected: DetectedArtifact[]) => {
+      const targetSessionId = sessionId;
+      if (!targetSessionId) return;
+
+      const shouldReveal = await Promise.all(
+        detected.map(async ({ artifact, needsFileLoad }) => {
+          const isLiveDeliverable = shouldRevealLiveArtifact(artifact, {
+            isLiveSession: liveRunRef.current,
+            previewable: true,
+          });
+          if (!isLiveDeliverable || !needsFileLoad || !artifact.filePath) return isLiveDeliverable;
+          try {
+            // Same call the HTML renderer will make, so a path it cannot show is
+            // never revealed automatically.
+            await loadArtifactDataUrl(artifact.filePath);
+            return true;
+          } catch {
+            return false;
+          }
+        }),
+      );
+
+      detected.forEach(({ artifact }, index) => {
+        dispatch(
+          addArtifact({ sessionId: targetSessionId, artifact, reveal: shouldReveal[index] }),
+        );
+      });
+    },
+    [dispatch, sessionId],
+  );
 
   // Initialize/replace artifact detection service when session changes
   useEffect(() => {
@@ -293,17 +349,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
 
     const service = new ArtifactDetectionService(detected => {
-      for (const { artifact } of detected) {
-        // Keep path-backed artifacts visible while their file contents remain deferred.
-        dispatch(addArtifact({ sessionId, artifact }));
-      }
+      // Batches must land in detection order: a slow readability probe in an older
+      // batch must not settle the selection after a newer batch was added.
+      detectionQueueRef.current = detectionQueueRef.current
+        .then(() => addDetectedArtifacts(detected))
+        .catch(error => {
+          console.error('[ArtifactDetection] failed to add detected artifacts:', error);
+        });
     });
     artifactDetectionServiceRef.current = service;
 
     return () => {
       service.terminate();
     };
-  }, [sessionId, dispatch]);
+  }, [sessionId, dispatch, addDetectedArtifacts]);
 
   useEffect(() => {
     let animationFrame: number | undefined;

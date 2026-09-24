@@ -94,6 +94,34 @@ test.each([true, false])(
   },
 );
 
+test('retry applies the returned running detail without waiting for a change event', async () => {
+  const retry = vi.fn().mockResolvedValue({
+    success: true,
+    detail: {
+      ...detail,
+      task: { ...detail.task, status: WorkbenchTaskStatus.Running },
+    },
+  });
+  (window as { electron?: unknown }).electron = {
+    workbenchTask: {
+      getCurrent: async () => ({ success: true, detail }),
+      onChanged: () => () => undefined,
+      retry,
+    },
+  };
+
+  render(React.createElement(WorkbenchTaskAcceptanceCard, { sessionId: 'session' }));
+  const button = await screen.findByRole('button', {
+    name: i18nService.t('workbenchTaskRetry'),
+  });
+  fireEvent.click(button);
+
+  await waitFor(() => expect(retry).toHaveBeenCalledWith('task'));
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: i18nService.t('workbenchTaskRetry') })).toBeNull(),
+  );
+});
+
 test('failed deterministic delivery does not render an acceptance button', async () => {
   (window as { electron?: unknown }).electron = {
     workbenchTask: {

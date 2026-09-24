@@ -43,5 +43,11 @@ test('shows removal in the icon slot only while hovering a token', () => {
 test('keeps token removal available by click and keyboard', () => {
   expect(source).toContain('data-remove-skill-id');
   expect(source).toContain("event.key === 'Backspace' || event.key === 'Delete'");
-  expect(source).toContain('dispatch(toggleActiveSkill(skillId));');
+  expect(source).toContain(
+    'if (selectedQuickAction && isQuickActionSkill(selectedQuickAction, skillId)) {\n' +
+      '          dispatch(clearSelection());',
+  );
+  expect(source).toContain(
+    'if (activeSkillIds.includes(skillId)) {\n          dispatch(toggleActiveSkill(skillId));',
+  );
 });

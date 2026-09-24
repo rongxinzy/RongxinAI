@@ -91,6 +91,32 @@ export function parseCodeBlockArtifacts(
   return artifacts;
 }
 
+function findPairedToolResult(
+  messages: CoworkMessage[],
+  toolUseMsg: CoworkMessage,
+): CoworkMessage | undefined {
+  const toolUseId = toolUseMsg.metadata?.toolUseId;
+  if (typeof toolUseId === 'string' && toolUseId.length > 0) {
+    return messages.find(
+      message => message.type === 'tool_result' && message.metadata?.toolUseId === toolUseId,
+    );
+  }
+  const index = messages.findIndex(message => message.id === toolUseMsg.id);
+  const next = index >= 0 ? messages[index + 1] : undefined;
+  return next?.type === 'tool_result' ? next : undefined;
+}
+
+function isUnsuccessfulToolResult(
+  toolResultMsg: CoworkMessage | undefined,
+  toolUseMsg?: CoworkMessage,
+): boolean {
+  return (
+    (!toolResultMsg && typeof toolUseMsg?.metadata?.toolUseId === 'string') ||
+    Boolean(toolResultMsg?.metadata?.isError) ||
+    Boolean(toolResultMsg?.metadata?.error)
+  );
+}
+
 export function parseDeclareArtifactFromMessages(
   messages: CoworkMessage[],
   sessionId: string,
@@ -102,6 +128,8 @@ export function parseDeclareArtifactFromMessages(
   for (const msg of messages) {
     if (msg.type !== 'tool_use') continue;
     if (msg.metadata?.toolName !== DECLARE_ARTIFACT_TOOL_NAME) continue;
+
+    if (isUnsuccessfulToolResult(findPairedToolResult(messages, msg), msg)) continue;
 
     const input = msg.metadata?.toolInput as Record<string, unknown> | undefined;
     if (!input) continue;
@@ -209,6 +237,23 @@ const FINAL_ANSWER_PATH_PATTERN = new RegExp(
   'gm',
 );
 
+/**
+ * The final-answer fallback is a text scan, so it can start at a bare "/" inside
+ * a sentence (e.g. a sources table "Yahoo Finance / HPCwire | ... report.html")
+ * and swallow everything up to the next artifact-like extension. A real candidate
+ * is a single path token: no whitespace, no URL scheme, no table separator.
+ */
+function isPlausibleLocalPath(candidate: string): boolean {
+  // Spaces and parentheses are legal in local paths, so they cannot disqualify a
+  // candidate; a URL scheme or a table separator inside it can.
+  return (
+    candidate.length > 0 &&
+    candidate.length <= 260 &&
+    !candidate.includes('://') &&
+    !candidate.includes('|')
+  );
+}
+
 function normalizeDetectedPath(rawPath: string): string {
   const withoutFileUrlPrefix = rawPath.replace(/^file:\/\/\/?/i, '');
   try {
@@ -233,6 +278,7 @@ export function parseFinalAnswerPathArtifactsForMessage(
     const rawPath = match[1];
     if (!rawPath) continue;
     const filePath = normalizeDetectedPath(rawPath);
+    if (!isPlausibleLocalPath(filePath)) continue;
     const artifactType = getArtifactTypeFromExtension(getFileExtension(filePath));
     if (!artifactType) continue;
 
@@ -269,7 +315,7 @@ export function parseToolArtifact(
     return null;
   }
 
-  if (toolResultMsg?.metadata?.isError) {
+  if (isUnsuccessfulToolResult(toolResultMsg, toolUseMsg)) {
     return null;
   }
 

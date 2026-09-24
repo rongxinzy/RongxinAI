@@ -1,7 +1,35 @@
+// @vitest-environment jsdom
+import { render, screen } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
-import { ensurePreviewColorScheme, injectPreviewNavigationGuard } from './HtmlRenderer';
+import { i18nService } from '@/services/i18n';
+import { ArtifactRole, type Artifact } from '@/types/artifact';
 
+import HtmlRenderer, { ensurePreviewColorScheme, injectPreviewNavigationGuard } from './HtmlRenderer';
+
+const makeArtifact = (overrides: Partial<Artifact> = {}): Artifact => ({
+  id: 'artifact-1',
+  messageId: 'message-1',
+  sessionId: 'session-1',
+  type: 'html',
+  title: 'broken.html',
+  content: '',
+  fileName: 'broken.html',
+  filePath: '',
+  source: 'tool',
+  role: ArtifactRole.Deliverable,
+  declared: true,
+  createdAt: 0,
+  ...overrides,
+});
+
+describe('HtmlRenderer', () => {
+  test('shows an error instead of loading forever when there is nothing to load', () => {
+    render(<HtmlRenderer artifact={makeArtifact()} />);
+
+    expect(screen.getByText(i18nService.t('artifactDocumentError'))).toBeTruthy();
+  });
+});
 describe('ensurePreviewColorScheme', () => {
   test('injects light color-scheme when the document does not declare one', () => {
     const html = '<!DOCTYPE html><html><head><title>简历</title></head><body><h1>关于</h1></body></html>';
