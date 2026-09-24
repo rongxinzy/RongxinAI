@@ -65,12 +65,38 @@ function extractWriteToolPath(input: Record<string, unknown>): string | null {
   return null;
 }
 
+function findPairedToolResult(
+  messages: CoworkArtifactMessage[],
+  toolUse: CoworkArtifactMessage,
+): CoworkArtifactMessage | undefined {
+  const toolUseId = toolUse.metadata?.toolUseId;
+  if (typeof toolUseId === 'string' && toolUseId.length > 0) {
+    return messages.find(
+      message => message.type === 'tool_result' && message.metadata?.toolUseId === toolUseId,
+    );
+  }
+  const index = messages.findIndex(message => message.id === toolUse.id);
+  const next = index >= 0 ? messages[index + 1] : undefined;
+  return next?.type === 'tool_result' ? next : undefined;
+}
+
+function isUnsuccessfulDeclaration(
+  toolUse: CoworkArtifactMessage,
+  toolResult: CoworkArtifactMessage | undefined,
+): boolean {
+  // Runtime tool calls always carry a toolUseId. A missing result means the
+  // call was truncated or interrupted and must not enter the persistent index.
+  if (!toolResult) return typeof toolUse.metadata?.toolUseId === 'string';
+  return Boolean(toolResult.metadata?.isError) || Boolean(toolResult.metadata?.error);
+}
+
 function collectDeclarations(messages: CoworkArtifactMessage[]): CoworkArtifactCandidate[] {
   const candidates: CoworkArtifactCandidate[] = [];
   for (const message of messages) {
     if (message.type !== 'tool_use' || message.metadata?.toolName !== DECLARE_ARTIFACT_TOOL) {
       continue;
     }
+    if (isUnsuccessfulDeclaration(message, findPairedToolResult(messages, message))) continue;
     const input = (message.metadata.toolInput ?? {}) as Record<string, unknown>;
     const filePath = typeof input.filePath === 'string' ? input.filePath.trim() : '';
     if (!filePath) continue;

@@ -14,7 +14,10 @@ type DeclareArtifactTool = {
 
 test('forwards structured declarations to the artifact ledger', async () => {
   const onDeclare = vi.fn<(artifact: DeclaredArtifactInput) => void>();
-  const tool = buildDeclareArtifactTool({ onDeclare }) as unknown as DeclareArtifactTool;
+  const tool = buildDeclareArtifactTool({
+    onDeclare,
+    fileExists: async () => true,
+  }) as unknown as DeclareArtifactTool;
 
   const result = await tool.execute('call-1', {
     filePath: 'D:/workspace/report.md',
@@ -34,6 +37,7 @@ test('forwards structured declarations to the artifact ledger', async () => {
 
 test('reports ledger rejection instead of claiming the artifact was declared', async () => {
   const tool = buildDeclareArtifactTool({
+    fileExists: async () => true,
     onDeclare: () => {
       throw new Error('path is outside the workspace');
     },
@@ -42,5 +46,21 @@ test('reports ledger rejection instead of claiming the artifact was declared', a
   const result = await tool.execute('call-1', { filePath: 'D:/outside/report.md' });
 
   expect(result.content[0].text).toContain('Artifact declaration failed');
-  expect(result.details.error).toBe('path is outside the workspace');
+  expect(result.details.error).toContain('path is outside the workspace');
+});
+
+test('rejects declarations when the file does not exist', async () => {
+  const onDeclare = vi.fn();
+  const tool = buildDeclareArtifactTool({
+    onDeclare,
+    fileExists: async () => false,
+  }) as unknown as DeclareArtifactTool;
+
+  const result = await tool.execute('call-1', {
+    filePath: 'C:/Users/Administrator/scratch/missing.pptx',
+  });
+
+  expect(onDeclare).not.toHaveBeenCalled();
+  expect(result.content[0].text).toContain('file does not exist');
+  expect(result.details.isError).toBe(true);
 });
