@@ -9,6 +9,7 @@ import {
   normalizePlatform,
   parseImportNames,
   rebaseEnvironmentSymlinks,
+  sharedLockPath,
   validateSkillDependencyDeclarations,
 } from '../scripts/setup-skill-python-runtime.js';
 
@@ -48,6 +49,12 @@ describe('setup-skill-python-runtime', () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('stores one aggregate lock for the shared environment', () => {
+    expect(sharedLockPath('/runtime/skill-python')).toBe(
+      path.join('/runtime/skill-python', 'locks', 'shared.txt'),
+    );
   });
 
   it('requires third-party Python imports to be declared by their Skill', () => {
