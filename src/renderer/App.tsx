@@ -551,25 +551,32 @@ const App: React.FC = () => {
     setIsSidebarCollapsed(prev => !prev);
   }, []);
 
-  const openNewConversation = useCallback(() => {
-    // Only clear when already on home (no session) 鈥?preserve __home__ draft when returning from a session
-    const shouldClearInput = mainView === 'cowork' && !currentSessionId;
-    if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
-    coworkService.clearSession();
-    dispatch(clearSelection());
-    setMainView('cowork');
-    window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent('cowork:focus-input', {
-          detail: { clear: shouldClearInput },
-        }),
-      );
-    }, 0);
-  }, [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView]);
+  const openNewConversation = useCallback(
+    (options?: { clearExperts?: boolean }) => {
+      // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
+      const shouldClearInput = mainView === 'cowork' && !currentSessionId;
+      if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
+      coworkService.clearSession();
+      dispatch(clearSelection());
+      setMainView('cowork');
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('cowork:focus-input', {
+            detail: {
+              clear: shouldClearInput,
+              // New-chat entry clears the prompt expert chip; expert-page entry omits this so #100 can seed.
+              clearExperts: options?.clearExperts === true,
+            },
+          }),
+        );
+      }, 0);
+    },
+    [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView],
+  );
 
   const handleNewChat = useCallback(() => {
     dispatch(clearActiveSkills());
-    openNewConversation();
+    openNewConversation({ clearExperts: true });
   }, [dispatch, openNewConversation]);
 
   const handleTryMcp = useCallback(

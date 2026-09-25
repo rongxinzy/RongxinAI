@@ -12,6 +12,9 @@ import PptxSlideNavigator from './PptxSlideNavigator';
 import { normalizePptxData } from './pptxDataNormalizer';
 import { buildPptxSlideDocument, type PptxPreviewSlide } from './pptxSlideNavigation';
 
+const MarkdownRenderer = React.lazy(() => import('./MarkdownRenderer'));
+const DxfRenderer = React.lazy(() => import('./DxfRenderer'));
+
 const t = (key: string) => i18nService.t(key);
 
 function getExtension(name: string): string {
@@ -1013,6 +1016,31 @@ const DocumentRenderer: React.FC<DocumentRendererProps> = ({ artifact }) => {
   const language = artifact.language?.toLowerCase();
 
   switch (ext) {
+    case '.md':
+    case '.markdown':
+      return (
+        <React.Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {t('artifactDocumentLoading')}
+            </div>
+          }
+        >
+          <MarkdownRenderer artifact={artifact} />
+        </React.Suspense>
+      );
+    case '.dxf':
+      return (
+        <React.Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {t('artifactDocumentLoading')}
+            </div>
+          }
+        >
+          <DxfRenderer artifact={artifact} />
+        </React.Suspense>
+      );
     case '.docm':
     case '.docx':
     case '.dotm':

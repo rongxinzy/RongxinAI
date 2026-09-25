@@ -94,6 +94,13 @@ test('seeds the prompt expert chip when opening a new conversation from an exper
   expect(source).toContain('currentAgentSource: currentAgent?.source');
 });
 
+test('clears the prompt expert chip on new-chat focus-input reset', () => {
+  expect(source).toContain('clearExperts?: boolean');
+  expect(source).toContain('detail?.clearExperts === true');
+  expect(source).not.toContain('detail?.clearExperts === true || shouldClear');
+  expect(source).toContain('setSelectedExpertIds([])');
+});
+
 test('keeps streaming controls gated without obscuring the prompt', () => {
   expect(source).not.toContain('bg-input/50 dark:bg-input/80');
   expect(source).not.toContain("className={isStreaming ? 'relative z-20' : undefined}");
