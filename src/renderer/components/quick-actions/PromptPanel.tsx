@@ -14,8 +14,14 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
   }
 
   return (
-    <div className="w-full animate-fade-in-up">
-      <CaseGallery prompts={action.prompts} onPromptSelect={onPromptSelect} />
+    // The case panel is the same width as the composer above it (CoworkView max-w-3xl), so the
+    // four-column grid lines up with the prompt input. The category bar keeps the wider column.
+    <div className="mx-auto w-full max-w-3xl animate-fade-in-up">
+      <CaseGallery
+        prompts={action.prompts}
+        capabilityLabel={action.label}
+        onPromptSelect={onPromptSelect}
+      />
     </div>
   );
 };
