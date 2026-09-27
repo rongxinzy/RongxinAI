@@ -594,23 +594,24 @@ export function classicConditionalControls(dark: boolean) {
       base: { 'background-color': 'color-mix(in oklab, var(--muted) 30%, transparent)' },
     }),
     'page-models-panel-card-variant-4': recipe({ base: { opacity: '0.5' } }),
-    // Case tiles carry a thumbnail and a caption, nothing else: the frame would fight the
-    // artwork inside it. The tile is transparent at rest and paints a rounded surface on
-    // hover or selection, so the preview stays the only solid block in the cell.
+    // The artwork fills the tile, so a surface painted on the card itself would sit behind an
+    // opaque image and never be seen: the hover affordance belongs to the caption layer, which
+    // spans the tile and is the only layer above the artwork. Selection stays an outline because
+    // the artwork owns the fill, and there is no pressed state: the tile opens a dialog and the
+    // engine's pressed selector excludes [aria-haspopup], so a translate here would never paint.
     'page-case-gallery-card': recipe({
       base: {
-        padding: '0.75rem',
-        gap: '0.5rem',
+        padding: '0',
         'border-style': 'none',
         'background-color': 'transparent',
         'border-radius': 'var(--zy-style-radius-lg)',
-        'transition-property': 'background-color',
-        'transition-duration': '200ms',
-        'transition-timing-function': 'ease-out',
       },
-      hover: { 'background-color': 'var(--zy-surface-raised)' },
-      selected: { 'background-color': 'var(--zy-primary-muted)' },
-      pressed: { translate: '0 1px' },
+      selected: {
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-color': 'var(--zy-primary)',
+        'outline-offset': '2px',
+      },
       focus: {
         'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
       },
@@ -621,8 +622,27 @@ export function classicConditionalControls(dark: boolean) {
         'border-radius': 'var(--zy-style-radius-md)',
       },
     }),
+    // The caption sits on a light veil rather than a dark scrim. White text forced a dark bar that
+    // read as heavy on the small tiles; dark text on a 60% white veil holds ≥4.5:1 over any artwork
+    // (the veil lifts even a black preview top to ~0.6 sRGB) and all but disappears over the
+    // near-white tops most bundled previews have. The veil covers the whole tile so the hover wash
+    // reaches the artwork too.
     'page-case-gallery-body': recipe({
-      base: { gap: '0.25rem' },
+      base: {
+        padding: '0.75rem',
+        color: 'var(--zy-component-palette-zinc-950)',
+        'font-size': 'var(--zy-component-text-sm)',
+        'font-weight': '500',
+        'background-image':
+          'linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem)',
+        'transition-property': 'background-color',
+        'transition-duration': '200ms',
+        'transition-timing-function': 'ease-out',
+      },
+      hover: {
+        'background-color':
+          'color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent)',
+      },
     }),
     'page-date-input-button-variant-1': recipe({
       base: {
