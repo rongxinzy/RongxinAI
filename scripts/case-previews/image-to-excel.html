@@ -1,91 +1,86 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>image-to-excel</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>image-to-excel</title><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased;display:grid;gap:26px;padding:30px;justify-items:center}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 40px 18px;display:flex;flex-direction:column}
+.ph{display:flex;align-items:flex-start;gap:20px;border-bottom:1px solid #edede9;padding-bottom:12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.18;margin-top:7px}
+h2{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:7px}
+.cap{margin-left:auto;text-align:right;font-size:11px;color:#8b8f97;line-height:1.75;padding-top:2px}
+.meta{display:flex;gap:18px;margin-top:8px;font-size:11.5px;color:#8b8f97;flex-wrap:wrap}
+.meta span{position:relative}
+.meta span+span::before{content:"";position:absolute;left:-10px;top:5px;width:3px;height:3px;background:#c9c9c3}
+.body{flex:1;min-height:0;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.body>*{flex:0 0 auto}
+.stack{flex:none}
+.bars{flex:none}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#8b8f97}
+.pf b{font-weight:500;color:#6f737b}
+.sec{font-size:11px;letter-spacing:.22em;color:#8b8f97;text-transform:uppercase}
+.sec.dark{color:#6f737b;letter-spacing:.16em}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:500;letter-spacing:.06em;color:#6f737b;background:#f6f6f3;text-align:left;padding:5px 10px;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+td{font-size:12.5px;color:#3d4046;padding:5px 10px;border-bottom:1px solid #edede9;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.dn th{padding:3px 9px}
+table.dn td{padding:3px 9px}
+table.dn2 th{padding:2px 8px}
+table.dn2 td{padding:2px 8px}
+.cols.mid{align-items:center}
+.cols.mid>*{min-width:0}
+th.r,td.r{text-align:right}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.hc,th.hc{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+td.mut{color:#8b8f97}
+.lead{font-size:12.5px;color:#4c5058;line-height:1.55}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{border:1px solid #e4e4e0;padding:8px 12px}
+.kpi .k{font-size:11px;color:#8b8f97;letter-spacing:.08em}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.kpi .n{font-size:11px;color:#8b8f97;margin-top:3px;line-height:1.5}
+.cols{display:flex;gap:26px;align-items:flex-start}
+.cols>*{min-width:0}
+.cols.g40{display:grid;grid-template-columns:1fr 300px;gap:26px}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:118px 1fr 64px;align-items:center;gap:11px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.bar .r{text-align:right;color:#3d4046}
+.bar.tight{grid-template-columns:96px 1fr 58px;gap:9px}
+.pts{display:grid;gap:6px}
+.pt{font-size:12.5px;color:#4c5058;line-height:1.55;padding-left:13px;position:relative}
+.pt::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;background:var(--accent)}
+.note{font-size:11px;color:#8b8f97;line-height:1.7}
+.stack{display:flex;height:10px;border:1px solid #e4e4e0}
+.stack i{display:block;height:100%;background:var(--accent)}
+.stack i:nth-child(2){opacity:.74}
+.stack i:nth-child(3){opacity:.56}
+.stack i:nth-child(4){opacity:.4}
+.stack i:nth-child(5){opacity:.27}
+.stack i:nth-child(6){opacity:.18}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:#6f737b}
+.legend b{font-weight:500;color:#3d4046;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:6px 11px;font-size:12.5px;color:#3d4046}
+.chip b{font-weight:600;font-variant-numeric:tabular-nums;color:#16171a}
+.badge{font-size:11px;padding:1px 6px;border:1px solid #e4e4e0;color:#6f737b;font-weight:400}
+.badge.ac{background:color-mix(in srgb,var(--accent) 10%,#fff);border-color:transparent;color:#16171a;font-weight:500}
+.tnote{font-size:11px;color:#8b8f97;line-height:1.5;margin-top:2px}
+.cv{display:grid;gap:3px}
+.cv div{font-size:11px;color:#4c5058;line-height:1.44;padding-left:11px;position:relative}
+.cv div::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;background:var(--accent)}
+.pg{font-size:11px;color:#6f737b;line-height:1.72}
+.pg b{color:#3d4046;font-weight:500;letter-spacing:.04em}
+.wrap{display:flex;flex-direction:column;gap:9px}
 
-body{padding:30px}
-.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
-.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
-.file{font-weight:600;margin-left:6px}
-.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
-.grid{flex:1;min-height:0;overflow:hidden}
-.row{display:grid;border-top:1px solid #edede9}
-.row:first-child{border-top:0}
-.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
-.row:last-child .cell{border-bottom:0}
-.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
-.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
-.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
-.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
-.split{flex:1;display:grid;grid-template-columns:1.15fr 1fr;min-height:0}
-.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
-.pane:last-child{border-right:0}
-.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
-.bars{margin-top:16px;display:grid;gap:11px}
-.bar{display:grid;grid-template-columns:56px 1fr 44px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-.shot{margin-top:14px;border:1px dashed #cfcfc9;background:#fafaf8;height:190px;padding:14px;display:flex;align-items:center;justify-content:center}
-.shot table{border-collapse:collapse;font-size:11px;color:#6f737b;background:#fff}
-.shot td,.shot th{border:1px solid #e4e4e0;padding:5px 9px}
-.arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:#b6bac0}
-.files{display:grid;gap:10px;margin-top:14px}
-.fcard{display:flex;align-items:center;gap:10px;border:1px solid #e4e4e0;background:#fafaf8;padding:10px 12px;font-size:12.5px}
-.fcard b{margin-left:auto;color:#6f737b;font-weight:500}
-.fcard .tag{background:#eceae4;color:#6f737b;font-size:11px;padding:2px 7px}
-.doc{background:#fff;border:1px solid #e4e4e0;height:100%;padding:22px 26px;overflow:hidden}
-.doc h2{font-size:19px}
-.doc .meta{margin-top:8px;font-size:11.5px;color:#9a9ea6}
-.doc p{margin-top:12px;font-size:12.5px;color:#4c5058;line-height:1.85}
-.doc .chart{margin-top:14px;height:96px;border:1px solid #edede9;background:linear-gradient(180deg,#fff,#fafaf8);display:flex;align-items:flex-end;gap:8px;padding:12px}
-.doc .chart i{flex:1;background:var(--accent);opacity:.8}
-.doc ul{margin-top:12px;list-style:none;display:grid;gap:6px}
-.doc li{font-size:12.5px;color:#4c5058;padding-left:14px;position:relative}
-.doc li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
 </style></head><body>
-<div class="win" style="--accent:#8B5CF6">
-  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="file">截图转表格.xlsx</span>
-    <span class="menu"><span>开始</span><span>插入</span><span>数据</span></span>
-  </div>
-  <div class="split" style="grid-template-columns:1fr 42px 1.1fr">
-    <div class="pane">
-      <h3>原始截图</h3>
-      <div class="shot">
-        <table>
-          <tr><th>姓名</th><th>部门</th><th>工时</th></tr>
-          <tr><td>蒋雪</td><td>增长</td><td>168</td></tr>
-          <tr><td>周曼</td><td>运营</td><td>152</td></tr>
-          <tr><td>徐海鹏</td><td>研发</td><td>176</td></tr>
-        </table>
-      </div>
-      <p style="margin-top:12px;font-size:12px;color:#8b8f97">PNG · 1200×640 · 识别到 3 列 8 行</p>
-    </div>
-    <div class="arrow">→</div>
-    <div class="grid">
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx"></div><div class="cell head">姓名</div><div class="cell head">部门</div><div class="cell head">工时</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx">2</div><div class="cell hi">蒋雪</div><div class="cell hi">增长</div><div class="cell mono">168</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx">3</div><div class="cell hi">周曼</div><div class="cell hi">运营</div><div class="cell mono">152</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx">4</div><div class="cell hi">徐海鹏</div><div class="cell hi">研发</div><div class="cell mono">176</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx">5</div><div class="cell">陈立群</div><div class="cell">客服</div><div class="cell mono">160</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx">6</div><div class="cell">谭亦文</div><div class="cell">设计</div><div class="cell mono">144</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px">
-        <div class="cell idx">7</div><div class="cell">高晓鹭</div><div class="cell">数据</div><div class="cell mono">168</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">8</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">9</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">10</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">14</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">15</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">16</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 74px 74px"><div class="cell idx">17</div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" style="--accent:#8B5CF6" data-page="1"><div class="ph"><div><div class="kicker">Data Analysis · 照片转表格</div><h1>纸质台账拍照批量识别转结构化表格</h1><div class="meta"><span>输入：10 张台账照片（A4 翻拍）</span><span>输出：80 行 × 10 字段（3 业务 / 4 结构 / 3 追溯）</span><span>280 个单元格，平均置信度 96.3%</span><span>阈值 ≥0.90 自动通过</span></div></div><div class="cap mono">台账识别_9月.xlsx<br>识别引擎 v4.1 · 2026-10-03</div></div><div class="body"><div class="lead">10 张台账照片合计 80 行记录、280 个单元格，平均置信度 96.3%；低于 0.90 的 14 个单元格全部进入人工复核队列并已修正，修正后字段准确率 100%。误差集中在 P-07（5 格，占 35.7%）与手写数字混淆（6 格，占 42.9%），单张端到端耗时 4.2 秒，较人工录入约 12 分钟提速 94.2%。</div><div class="kpis"><div class="kpi"><div class="k">识别记录</div><b class="mono">80 行</b><div class="n">10 张照片 × 8 行，单元格合计 280</div></div><div class="kpi"><div class="k">平均置信度</div><b class="mono">96.3%</b><div class="n">最低 90.3%（P-07 手写数字）</div></div><div class="kpi"><div class="k">人工复核修正</div><b class="mono">14 格</b><div class="n">占全部单元格 5.0%，修正后准确率 100%</div></div></div><div class="sec dark">表 1 识别明细（按照片）</div><table class="dn"><thead><tr><th>照片</th><th class="r">行数</th><th class="r">单元格</th><th class="r">低置信格</th><th class="r">已修正</th><th class="r hc">平均置信度</th></tr></thead><tbody><tr><td>P-01</td><td class="r">8</td><td class="r">28</td><td class="r">0</td><td class="r">0</td><td class="r hc">99.2%</td></tr><tr><td>P-02</td><td class="r">8</td><td class="r">28</td><td class="r">1</td><td class="r">1</td><td class="r hc">98.6%</td></tr><tr><td>P-03</td><td class="r">8</td><td class="r">28</td><td class="r">3</td><td class="r">3</td><td class="r hc">95.4%</td></tr><tr class='sum'><td>合计</td><td class="r">80</td><td class="r">280</td><td class="r">14</td><td class="r">14</td><td class="r">96.3%</td></tr></tbody></table><div class="stack"><i style="width:34.29%"></i><i style="width:42.14%"></i><i style="width:18.57%"></i><i style="width:5.00%"></i></div><div class="legend"><span>≥99% <b>96 格</b></span><span>95%–99% <b>118 格</b></span><span>90%–95% <b>52 格</b></span><span><90%（复核） <b>14 格</b></span></div><div class="tnote">校验：6 条规则命中 16 格，其中置信度不足 14 格；最大偏差倍数 4.00×（P-07 第 5 行工时，置信度 0.82，复核容差 0.02）。完整清单见第 6 页。</div><div class="cols"><div class="wrap"><div class="sec dark">口径与来源</div><div class="cv"><div>数据口径：单元格级置信度取双模型均值，阈值 0.90，复核容差 0.02</div><div>数据来源：10 张台账照片原图 + 识别引擎 v4.1 切图日志 + 人工复核记录 + HR 部门主数据</div><div>统计窗口：照片拍摄于 2026-09-28 ~ 09-30，2026-10-03 批量识别，10-05 完成复核</div></div></div><div class="wrap"><div class="sec dark">页面导读（共 9 页）</div><div class="pg"><b>P2–P4 数据与口径</b> P2 五段流水线与产物清单 · P3 10 个输出字段与四条识别… · P4 按照片的行数、置信度与修正…</div><div class="pg"><b>P5–P7 分析与校验</b> P5 14 个低置信格的成因与处… · P6 14 格低置信、6 类规则… · P7 6 条校验规则与质量分构成</div><div class="pg"><b>P8–P9 结论与附录</b> P8 结论、耗时结构与五步动作 · P9 数据来源、术语表与修订记录</div></div></div></div><div class="pf"><span>结论：10 张照片 80 行、平均置信度 96.3%，14 格低置信全部已修正</span><span class="mono">第 1 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="2"><div class="ph"><div><div class="kicker">Pipeline Map · 处理概览</div><h2>五段流水线与产物清单</h2></div><div class="cap mono">输入 10 张 · 输出 80 行<br>全流程留痕，可逐格回溯</div></div><div class="body"><div class="sec dark">表 2-1 处理阶段与产物</div><table class=""><thead><tr><th>阶段</th><th>输入</th><th>输出</th><th>耗时</th><th>状态</th></tr></thead><tbody><tr><td>S1 表格线检测</td><td>10 张原始照片</td><td>10 个单元格网格 + 4 个结构框</td><td>3s</td><td class="hc">已完成</td></tr><tr><td>S2 单元格 OCR</td><td>单元格切图 280 张</td><td>280 个原始识别值</td><td>22s</td><td class="hc">已完成</td></tr><tr><td>S3 规则校验</td><td>280 个识别值</td><td>264 通过 / 16 命中规则</td><td>2s</td><td class="hc">已完成</td></tr><tr><td>S4 人工复核</td><td>16 个命中格</td><td>14 格修正 + 2 格确认（6 张涉及）</td><td>6s</td><td class="hc">已完成</td></tr><tr><td>S5 入库导出</td><td>复核后全量</td><td>台账识别_9月.xlsx（3 业务 + 4 结构 + 3 追溯）</td><td>3s</td><td class="hc">已交付</td></tr><tr class='sum'><td>合计 5 阶段</td><td>280 张单元格切图</td><td>80 行 × 10 字段</td><td>36s（+ 拍摄上传 6s = 42s）</td><td>无待办</td></tr></tbody></table><div class="sec dark">端到端耗时分解（合计 42s）</div><div class="bars"><div class="bar"><span>拍摄与上传</span><i style="width:27.3%"></i><span class="r mono">6s</span></div><div class="bar"><span>表格线检测</span><i style="width:13.6%"></i><span class="r mono">3s</span></div><div class="bar"><span>单元格 OCR</span><i style="width:100.0%"></i><span class="r mono">22s</span></div><div class="bar"><span>规则校验</span><i style="width:9.1%"></i><span class="r mono">2s</span></div><div class="bar"><span>复核与导出</span><i style="width:40.9%"></i><span class="r mono">9s</span></div></div><div class="pts"><div class="pt">原图与识别结果按「照片 + 行号 + 列名」三级留痕，任一单元格可回溯到原始切图。</div><div class="pt">结构字段（日期 / 班次 / 签名 / 页码）单独成列，不参与字段准确率统计，避免口径混用。</div><div class="pt">复核队列按置信度升序推送，先处理风险最高的格子，14 格修正总耗时 9 分钟。</div></div></div><div class="pf"><span>五段流水线总耗时 42 秒，等价人工录入 12 分钟</span><span class="mono">第 2 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="3"><div class="ph"><div><div class="kicker">Schema · 字段字典</div><h2>10 个输出字段与四条识别约定</h2></div><div class="cap mono">字段级非空率按 80 行统计<br>置信度阈值 0.90（低于即复核），容差 0.02 仅用于衡量严重度</div></div><div class="body"><div class="sec dark">表 3-1 输出字段字典</div><table class="dn"><thead><tr><th>字段</th><th>类型</th><th>非空率</th><th>口径与取值域</th></tr></thead><tbody><tr><td>姓名</td><td>text</td><td class="hc">100.0%</td><td>中文 2–3 字，来自台账「姓名」列</td></tr><tr><td>部门</td><td>text</td><td class="hc">100.0%</td><td>枚举 8 值：研发 / 设计 / 数据 / 增长 / 运营 / 客服 / 市场 / 职能</td></tr><tr><td>周工时</td><td>int</td><td class="hc">98.8%</td><td>0–168 整数；1 格模糊经人工补录</td></tr><tr><td>日期</td><td>date</td><td class="hc">100.0%</td><td>取自照片页眉，精确到日</td></tr><tr><td>班次</td><td>text</td><td class="hc">97.5%</td><td>枚举 2 值：白班 / 夜班；2 张照片未标注</td></tr><tr><td>签名</td><td>text</td><td class="hc">91.3%</td><td>7 个字符合法姓名；缺失不阻断入库</td></tr><tr><td>页码</td><td>text</td><td class="hc">100.0%</td><td>结构字段，用于照片内排序</td></tr><tr><td>来源照片</td><td>text</td><td class="hc">100.0%</td><td>P-01 ~ P-10，追溯主键</td></tr><tr><td>识别置信度</td><td>decimal(3)</td><td class="hc">100.0%</td><td>单元格级平均，<0.90 进复核队列</td></tr><tr><td>复核状态</td><td>text</td><td class="hc">100.0%</td><td>枚举 3 值：通过 / 已修正 / 待复核</td></tr><tr class='sum'><td>合计 10 个字段</td><td>3 业务 / 4 结构 / 3 追溯</td><td>99.5% 平均</td><td>280 个单元格，14 格经人工修正</td></tr></tbody></table><div class="sec dark">非空率最低的三个字段</div><div class="bars"><div class="bar"><span>签名</span><i style="width:91.3%"></i><span class="r mono">91.3%</span></div><div class="bar"><span>班次</span><i style="width:97.5%"></i><span class="r mono">97.5%</span></div><div class="bar"><span>周工时</span><i style="width:98.8%"></i><span class="r mono">98.8%</span></div></div><div class="pts"><div class="pt">识别引擎对手写数字启用双模型投票：两模型一致才直接通过，不一致即降置信度并进队列。</div><div class="pt">数值字段统一转整数或两位小数，文本字段去首尾空格并做全半角归一化。</div><div class="pt">部门字段用后处理枚举约束，任一不在 8 值内的识别结果自动降级为「待复核」。</div><div class="pt">抽样复检：14 个低置信格 100% 复核，另按每张照片随机抽 3 格，共 30 格复检全部一致。</div></div></div><div class="pf"><span>10 个输出字段（3 业务 / 4 结构 / 3 追溯），非空率最低 91.3%</span><span class="mono">第 3 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="4"><div class="ph"><div><div class="kicker">Detail · 识别明细</div><h2>按照片的行数、置信度与修正量</h2></div><div class="cap mono">平均置信度 96.3%<br>低置信格 14 个全部已修正</div></div><div class="body"><div class="sec dark">表 4-1 照片级识别明细（10 张）</div><table class="dn2"><thead><tr><th>照片</th><th class="r">行数</th><th class="r">单元格</th><th class="r">低置信格</th><th class="r">已修正</th><th>平均置信度</th><th>复核状态</th></tr></thead><tbody><tr><td>P-01</td><td class="r">8</td><td class="r">28</td><td class="r">0</td><td class="r">0</td><td class="hc">99.2%</td><td>通过</td></tr><tr><td>P-02</td><td class="r">8</td><td class="r">28</td><td class="r">1</td><td class="r">1</td><td class="hc">98.6%</td><td>已修正</td></tr><tr><td>P-03</td><td class="r">8</td><td class="r">28</td><td class="r">3</td><td class="r">3</td><td class="hc">95.4%</td><td>已修正</td></tr><tr><td>P-04</td><td class="r">8</td><td class="r">28</td><td class="r">1</td><td class="r">1</td><td class="hc">97.1%</td><td>已修正</td></tr><tr><td>P-05</td><td class="r">8</td><td class="r">28</td><td class="r">0</td><td class="r">0</td><td class="hc">99.0%</td><td>通过</td></tr><tr><td>P-06</td><td class="r">8</td><td class="r">28</td><td class="r">2</td><td class="r">2</td><td class="hc">94.8%</td><td>已修正</td></tr><tr><td>P-07</td><td class="r">8</td><td class="r">28</td><td class="r">5</td><td class="r">5</td><td class="hc">90.3%</td><td>已修正</td></tr><tr><td>P-08</td><td class="r">8</td><td class="r">28</td><td class="r">1</td><td class="r">1</td><td class="hc">94.4%</td><td>已修正</td></tr><tr><td>P-09</td><td class="r">8</td><td class="r">28</td><td class="r">0</td><td class="r">0</td><td class="hc">96.8%</td><td>通过</td></tr><tr><td>P-10</td><td class="r">8</td><td class="r">28</td><td class="r">1</td><td class="r">1</td><td class="hc">97.4%</td><td>已修正</td></tr><tr class='sum'><td>合计</td><td class="r">80</td><td class="r">280</td><td class="r">14</td><td class="r">14</td><td>96.3%</td><td>全部闭环</td></tr></tbody></table><div class="cols mid"><div style="flex:1.35"><div class="sec dark">置信度最低的四张照片</div><div class="bars"><div class="bar"><span>P-07</span><i style="width:90.3%"></i><span class="r mono">90.3%</span></div><div class="bar"><span>P-08</span><i style="width:94.4%"></i><span class="r mono">94.4%</span></div><div class="bar"><span>P-06</span><i style="width:94.8%"></i><span class="r mono">94.8%</span></div><div class="bar"><span>P-03</span><i style="width:95.4%"></i><span class="r mono">95.4%</span></div></div></div><div style="flex:1"><div class="tnote">P-07 单张占全部低置信格的 35.7%，因其为最早拍摄、纸张折痕明显的一张；重拍后排入 P-11 计划。行数校验：10 张 × 8 行 = 80 行，与实际入库行数一致。</div></div></div></div><div class="pf"><span>照片级明细 10 张全部闭环，P-07 置信度 90.3% 最低</span><span class="mono">第 4 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="5"><div class="ph"><div><div class="kicker">Error Analysis · 误差分析</div><h2>14 个低置信格的成因与处理</h2></div><div class="cap mono">误差类型使用后只统计一次<br>平均置信度为格级平均</div></div><div class="body"><div class="sec dark">表 5-1 误差类型与处理方式</div><table class=""><thead><tr><th>误差类型</th><th class="r">命中格数</th><th>平均置信度</th><th>处理方式</th><th>责任人</th></tr></thead><tbody><tr><td>手写数字 7/1 混淆</td><td class="r">6</td><td class="hc">86.1%</td><td>双模型重识别后人工确认</td><td>蒋雪</td></tr><tr><td>表格线缺失导致串行</td><td class="r">3</td><td class="hc">87.8%</td><td>按行高重建网格后重识别</td><td>高晓鹭</td></tr><tr><td>印章遮挡字段</td><td class="r">2</td><td class="hc">88.4%</td><td>人工补录并标注来源格</td><td>周曼</td></tr><tr><td>反光导致漏识</td><td class="r">2</td><td class="hc">88.9%</td><td>更换曝光参数重拍复核</td><td>徐海鹏</td></tr><tr><td>单位符号误读（h/小时）</td><td class="r">1</td><td class="hc">89.5%</td><td>归一化为整数小时</td><td>谭亦文</td></tr><tr class='sum'><td>合计 5 类</td><td class="r">14</td><td>87.4%</td><td>全部修正并二次复检</td><td>4 人协同</td></tr></tbody></table><div class="sec dark">误差类型分布（格数）</div><div class="bars"><div class="bar"><span>手写数字 7/1</span><i style="width:100.0%"></i><span class="r mono">6 格</span></div><div class="bar"><span>表格线缺失导致串</span><i style="width:50.0%"></i><span class="r mono">3 格</span></div><div class="bar"><span>印章遮挡字段</span><i style="width:33.3%"></i><span class="r mono">2 格</span></div><div class="bar"><span>反光导致漏识</span><i style="width:33.3%"></i><span class="r mono">2 格</span></div><div class="bar"><span>单位符号误读</span><i style="width:16.7%"></i><span class="r mono">1 格</span></div></div><div class="pts"><div class="pt">手写数字混淆是主因：6 格（占 42.9%），双模型投票后置信度恢复到 0.97 以上。</div><div class="pt">表格线缺失 3 格集中在 P-03，该照片下边缘有一处折痕，按行高重建网格后重新识别即通过。</div><div class="pt">印章遮挡与反光合计 4 格，均为结构字段而非数值字段，不影响工作日汇总结果。</div></div></div><div class="pf"><span>14 个低置信格 5 类成因，手写数字混淆占 42.9%</span><span class="mono">第 5 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="6"><div class="ph"><div><div class="kicker">Anomaly · 差异与异常</div><h2>14 格低置信、6 类规则命中与最大 4.00× 偏差</h2></div><div class="cap mono">偏差倍数 =（阈值 − 置信度）÷ 0.02（严重度标尺）<br>低于 0.90 一律进人工队列</div></div><div class="body"><div class="sec dark">表 6-1 异常清单（按偏差倍数降序）</div><table class=""><thead><tr><th>编号</th><th>对象</th><th>阈值</th><th>实际置信度</th><th class="hc">偏差倍数</th><th>处置</th><th>复核后</th></tr></thead><tbody><tr><td>A-01</td><td>P-07 第 5 行 周工时</td><td>≥0.90</td><td>0.82</td><td class="hc">4.00×</td><td>双模型重识别</td><td>0.97</td></tr><tr><td>A-02</td><td>P-07 第 3 行 周工时</td><td>≥0.90</td><td>0.84</td><td class="hc">3.00×</td><td>人工补录</td><td>1.00</td></tr><tr><td>A-03</td><td>P-06 姓名</td><td>≥0.90</td><td>0.87</td><td class="hc">1.50×</td><td>人工确认</td><td>1.00</td></tr><tr><td>A-04</td><td>P-03 周工时</td><td>≥0.90</td><td>0.88</td><td class="hc">1.00×</td><td>重建网格重识别</td><td>0.96</td></tr><tr><td>A-05</td><td>P-10 部门</td><td>≥0.90</td><td>0.89</td><td class="hc">0.50×</td><td>枚举约束后确认</td><td>1.00</td></tr><tr><td>A-06</td><td>P-02 班次</td><td>≥0.90</td><td>0.89</td><td class="hc">0.50×</td><td>参照签名推断</td><td>1.00</td></tr><tr class='sum'><td>合计</td><td>6 类异常</td><td>—</td><td>最低 0.82</td><td>4.00×</td><td>14 格全部修正</td><td>≥0.96</td></tr></tbody></table><div class="sec dark">低置信格按照片分布</div><div class="bars"><div class="bar"><span>P-02</span><i style="width:20.0%"></i><span class="r mono">1 格</span></div><div class="bar"><span>P-03</span><i style="width:60.0%"></i><span class="r mono">3 格</span></div><div class="bar"><span>P-04</span><i style="width:20.0%"></i><span class="r mono">1 格</span></div><div class="bar"><span>P-06</span><i style="width:40.0%"></i><span class="r mono">2 格</span></div><div class="bar"><span>P-07</span><i style="width:100.0%"></i><span class="r mono">5 格</span></div><div class="bar"><span>P-08</span><i style="width:20.0%"></i><span class="r mono">1 格</span></div><div class="bar"><span>P-10</span><i style="width:20.0%"></i><span class="r mono">1 格</span></div></div><div class="pts"><div class="pt">P-07 的 5 格占全部低置信格的 35.7%，建议直接重拍而非反复修正。</div><div class="pt">复核后全部 14 格置信度 ≥0.96，字段准确率 100%（30 格抽样复检无差异）。</div><div class="pt">规则命中 16 格 = 置信度不足 14 格 + 工时越界 1 格 + 部门越界 1 格，越界 2 格均非 OCR 误差而是原稿笔误。</div></div></div><div class="pf"><span>异常 6 类，最大偏差倍数 4.00×（阈值 0.90 / 实际 0.82）</span><span class="mono">第 6 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="7"><div class="ph"><div><div class="kicker">Validation · 校验与质量</div><h2>6 条校验规则与质量分构成</h2></div><div class="cap mono">综合质量分 99.3（五项等权）<br>阻断级 15 格、警告级 1 格</div></div><div class="body"><div class="sec dark">表 7-1 校验规则清单</div><table class=""><thead><tr><th>规则</th><th>检查内容</th><th>级别</th><th>命中</th><th>处置动作</th></tr></thead><tbody><tr><td>R-01</td><td>单元格置信度 ≥0.90</td><td>阻断</td><td class="hc">14</td><td>进人工复核队列并留痕</td></tr><tr><td>R-02</td><td>周工时 ∈ [0, 168] 整数</td><td>阻断</td><td class="hc">1</td><td>人工补录为 168</td></tr><tr><td>R-03</td><td>部门 ∈ 8 个枚举值</td><td>警告</td><td class="hc">1</td><td>按枚举重新选择</td></tr><tr><td>R-04</td><td>每张照片行数 = 8</td><td>阻断</td><td class="hc">0</td><td>—</td></tr><tr><td>R-05</td><td>页码连续且 1–10 无缺</td><td>警告</td><td class="hc">0</td><td>—</td></tr><tr><td>R-06</td><td>单元格合计 = 280</td><td>阻断</td><td class="hc">0</td><td>—</td></tr><tr class='sum'><td>合计 6 条</td><td>阻断 4 条 / 警告 2 条</td><td>—</td><td>16</td><td>已闭环 16 格，待办 0</td></tr></tbody></table><div class="sec dark">五维质量分（%）</div><div class="bars"><div class="bar"><span>字段准确率</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>结构还原率</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>复核覆盖率</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>原始留痕率</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>时效达成率</span><i style="width:96.4%"></i><span class="r mono">96.4</span></div></div><div class="pts"><div class="pt">时效达成 96.4%：10 张照片中 9 张在 5 秒内完成，P-07 因折痕重识别耗时 11 秒。</div><div class="pt">字段准确率按修正后统计，抽样 30 格与人工录入结果逐格一致，无残留差异。</div><div class="pt">结构还原率 100%：10 张照片的页眉 4 个结构字段全部定位成功，无错行、漏行。</div></div></div><div class="pf"><span>质量分 99.3：字段准确率与结构还原率均为 100%</span><span class="mono">第 7 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="8"><div class="ph"><div><div class="kicker">Actions · 结论与行动</div><h2>结论、耗时结构与五步动作</h2></div><div class="cap mono">验收标准均可自动校验<br>责任到人、期限明确</div></div><div class="body"><div class="sec dark">表 8-1 分阶段处理动作</div><table class=""><thead><tr><th>阶段</th><th>动作</th><th>责任人</th><th>期限</th><th>验收标准</th></tr></thead><tbody><tr><td>立即</td><td>修正 P-07 的 5 个低置信格并二次复检</td><td>蒋雪</td><td>10-06</td><td class="hc">该张置信度 ≥0.96</td></tr><tr><td>本周</td><td>A4 平铺 + 固定曝光重拍 4 张低质照片</td><td>徐海鹏</td><td>10-10</td><td class="hc">重拍后低置信格 ≤2</td></tr><tr><td>本周</td><td>把部门枚举约束写入识别后处理</td><td>高晓鹭</td><td>10-10</td><td class="hc">部门越界命中数为 0</td></tr><tr><td>本月</td><td>手写数字双模型投票设为默认开关</td><td>谭亦文</td><td>10-31</td><td class="hc">手写格平均置信度 ≥0.95</td></tr><tr><td>下季度</td><td>建立照片 → 行 → 单元格三级追溯视图</td><td>周曼</td><td>12-31</td><td class="hc">任一格可回溯原图切图</td></tr></tbody></table><div class="sec dark">端到端耗时分解（合计 42s）</div><div class="bars"><div class="bar"><span>拍摄与上传</span><i style="width:27.3%"></i><span class="r mono">6s</span></div><div class="bar"><span>表格线检测</span><i style="width:13.6%"></i><span class="r mono">3s</span></div><div class="bar"><span>单元格 OCR</span><i style="width:100.0%"></i><span class="r mono">22s</span></div><div class="bar"><span>规则校验</span><i style="width:9.1%"></i><span class="r mono">2s</span></div><div class="bar"><span>复核与导出</span><i style="width:40.9%"></i><span class="r mono">9s</span></div></div><div class="pts"><div class="pt">14 格低置信集中在 4 张照片（P-03 / P-06 / P-07 / P-10），P-07 占 35.7%。</div><div class="pt">手写数字混淆 6 格占 42.9%，双模型投票后置信度恢复至 0.97 以上。</div><div class="pt">80 行台账端到端耗时 42 秒，较人工录入约 12 分钟提速 94.2%，等价月度节省 3.8 人时。</div><div class="pt">签名与班次非空率 91.3% / 97.5%，缺失源于原稿未填写，不属识别缺陷，入库时标记为业务缺失。</div></div></div><div class="pf"><span>五步动作：立即 1 项、本周 2 项、本月 1 项、下季度 1 项</span><span class="mono">第 8 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="9"><div class="ph"><div><div class="kicker">Appendix · 附录</div><h2>数据来源、术语表与修订记录</h2></div><div class="cap mono">原图留痕不可修改<br>修订留痕 3 版</div></div><div class="body"><div class="sec dark">表 9-1 数据来源清单</div><table class="dn"><thead><tr><th>数据源</th><th>提供方</th><th>覆盖周期</th><th>记录数</th><th>口径备注</th></tr></thead><tbody><tr><td>台账照片原图（P-01 ~ P-10）</td><td>生产运营部</td><td>2026-09-28 ~ 09-30</td><td>10</td><td>A4 平铺翻拍，300dpi</td></tr><tr><td>单元格切图与识别日志</td><td>识别引擎 v4.1</td><td>2026-10-03 批量</td><td>280</td><td>含每格置信度与模型版本</td></tr><tr><td>人工复核记录</td><td>数据组</td><td>2026-10-03 ~ 10-05</td><td>16</td><td>含修正前后值与复核人</td></tr><tr><td>部门与人员主数据</td><td>HR 系统</td><td>2026-09-30 快照</td><td>214</td><td>部门 8 枚举唯一来源</td></tr></tbody></table><div class="sec dark">表 9-2 术语表</div><table class="dn"><thead><tr><th>术语</th><th>定义</th></tr></thead><tbody><tr><td>单元格置信度</td><td>该格 OCR 结果的可信度，0–1，取整到 0.01</td></tr><tr><td>复核容差</td><td>0.02，仅用于衡量越界严重度的标尺；低于 0.90 一律进人工队列，不自动放行</td></tr><tr><td>偏差倍数</td><td>（阈值 − 实际值）÷ 复核容差，衡量越界严重度</td></tr><tr><td>结构字段</td><td>页眉的日期 / 班次 / 签名 / 页码，不计入字段准确率</td></tr><tr class='sum'><td>低置信格</td><td>置信度 <0.90 的单元格，本期 14 格，100% 进人工队列</td></tr></tbody></table><div class="sec dark">表 9-3 修订记录</div><table class="dn"><thead><tr><th>版本</th><th>日期</th><th>变更</th><th>责任人</th></tr></thead><tbody><tr><td>v1.0</td><td>2026-10-03</td><td>首版识别结果（置信度阈值 0.85）</td><td>蒋雪</td></tr><tr><td>v1.1</td><td>2026-10-05</td><td>阈值提高到 0.90，补 6 条校验规则</td><td>高晓鹭</td></tr><tr><td>v1.2</td><td>2026-10-06</td><td>修正 P-07 的 5 格并补充三级留痕</td><td>蒋雪</td></tr></tbody></table></div><div class="pf"><span>附录：4 个数据源、5 条术语、3 版修订记录</span><span class="mono">第 9 / 9 页</span></div></section>
+</body></html>

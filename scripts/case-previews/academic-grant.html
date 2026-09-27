@@ -1,65 +1,405 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-grant</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-grant</title><style>
+*{box-sizing:border-box;margin:0}
+body{width:1100px;background:#f2f2ef;padding:30px;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 46px;display:flex;flex-direction:column}
+.mono{font-variant-numeric:tabular-nums}
 .serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:32px;background:#eceae4}
-.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
-.ptitle{font-size:23px;text-align:center;line-height:1.4}
-.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
-th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
-.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.kicker.a{color:var(--accent)}
+h4{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 9px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.05em;font-weight:500}
+tr.total td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+ul{list-style:none;display:grid;gap:5px}
+li{position:relative;padding-left:13px;font-size:12.5px;line-height:1.75;color:#4c5058}
+li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;background:var(--accent)}
+.phead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #e4e4e0;padding-bottom:8px}
+.pn{font-size:11px;color:#8b8f97}
+h2{font-size:23px;letter-spacing:-.02em;font-weight:600;margin-top:8px}
+.body{flex:1;min-height:0;margin-top:11px;display:grid;gap:10px;align-content:start}
+.pfoot{margin-top:auto;padding-top:8px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.kpi{border:1px solid #edede9;background:#faf9f6;padding:9px 11px}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent);font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:4px;font-size:11px;color:#8b8f97}
+.bar{height:8px;background:#f0efeb;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.72}
+.block{border:1px solid #edede9;background:#faf9f6;padding:10px 13px}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:6px 10px}
 .flow i{color:#b8b5ab;font-style:normal}
-.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
-.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
-.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:13px;align-content:start}
-h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-ul{list-style:none;margin-top:8px;display:grid;gap:6px}
-li{position:relative;padding-left:14px;font-size:12px;color:#4c5058;line-height:1.85}
-li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
-.lv2{padding-left:26px}
-.timeline{display:grid;gap:0;margin-top:8px}
-.tl{display:grid;grid-template-columns:78px 1fr;gap:12px;padding:8px 0;border-top:1px solid #eeede7;font-size:12px;color:#4c5058}
+.tl{display:grid;grid-template-columns:118px 1fr 116px;gap:12px;padding:6px 0;border-top:1px solid #eeede7;font-size:12px;color:#4c5058;align-items:center}
 .tl:first-child{border-top:0}
 .tl b{color:var(--accent);font-weight:600}
+.refs{display:grid;gap:4px;font-size:11.5px;color:#4c5058;line-height:1.65}
+.refs div{padding-left:24px;text-indent:-24px}
+.refs em{font-style:normal;color:var(--accent);font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="page" style="--accent:#7C3AED">
-  <div class="ptitle serif">研究计划书要点（开题报告）</div>
-  <div class="authors">拟申报：青年科学基金 · 研究周期 2027 年 1 月至 2029 年 12 月</div>
-  <div class="sections">
-    <div>
-      <h4>立项依据</h4>
-      <p>本地优先部署已从实验场景进入生产环节，但现有研究对"流程改动如何影响落地成效"缺少长期观察。本课题以中型团队为对象，围绕任务边界与审批回溯两个变量，构建可测量的流程框架并做纵向验证。</p>
+
+<section class="page" data-page="1" style="--accent:#7C3AED">
+  <div style="text-align:center;margin-top:4px">
+    <div class="kicker a">RESEARCH PROPOSAL · 研究计划书</div>
+    <h1 class="serif" style="font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.35;margin-top:11px">本地优先智能体协作流程的纵向研究</h1>
+    <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">拟申报：青年科学基金项目　|　研究周期：2027 年 1 月 — 2029 年 12 月　|　申请经费：32 万元　|　2026-09-27</div>
+  </div>
+  <div class="block" style="margin-top:13px">
+    <div class="kicker">摘要 / ABSTRACT</div>
+    <p style="margin-top:7px">本地优先部署已从实验场景进入生产环节，但流程改动如何影响落地成效仍缺少长期证据。本课题以中型团队为对象，围绕任务边界与审批回溯两个变量，构建可测量的流程框架，并做两轮各 12 周的现场实验与 6 个月回访，形成粒度—成本曲线与实施规范，为团队落地提供可复现的方法与工具。</p>
+  </div>
+  <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">关键词：本地优先部署 · 智能体协作 · 审批回溯 · 纵向现场实验 · 粒度成本权衡</div>
+  <div class="grid3" style="margin-top:11px">
+    <div class="kpi"><b>32</b><span>申请经费（万元）</span></div>
+    <div class="kpi"><b>3 年</b><span>研究周期</span></div>
+    <div class="kpi"><b>2 篇</b><span>预期论文</span></div>
+  </div>
+  <div style="margin-top:11px">
+    <h4>研究内容与考核指标</h4>
+    <table style="margin-top:6px">
+      <tr><th style="width:98px">研究内容</th><th>关键科学问题</th><th style="width:210px">考核指标</th></tr>
+      <tr><td>内容一：边界建模</td><td>如何把模糊的协作约定转化为可执行、可核查的任务边界</td><td>边界定义规范 1 套 + 字段模板 1 组</td></tr>
+      <tr><td>内容二：机制与代价</td><td>审批回溯粒度与运行成本之间的平衡点在哪里</td><td>粒度—成本曲线 1 条 + 推荐档位 2 档</td></tr>
+      <tr class="total"><td>内容三：纵向评估</td><td>如何在真实组织中排除学习效应与共同趋势</td><td>两轮 12 周现场实验数据 + 论文 2 篇</td></tr>
+    </table>
+  </div>
+    <div class="grid2" style="margin-top:10px;padding-top:8px;border-top:1px solid #eeede7">
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">口径与来源　</b>申请经费 32 万元 · 周期 2027.01 — 2029.12 · 预实验 168 条任务</p>
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">后续页面导读　</b>P2 依据 · P3 现状 · P4 内容 · P5 路线 · P6 创新 · P7 排期 · P8 成果 · P9 预算 · P10 基础</p>
+  </div>
+  <div class="pfoot"><span>三项研究内容对应 3 类考核指标，年均经费 10.67 万元</span><span>第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">1 立项依据</div><div class="pn">背景、问题与意义</div></div>
+  <h2>立项依据与研究问题</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="block"><h4>背景</h4><p style="margin-top:5px">本地优先部署已在 62% 的采购评审中被列为硬性条件，团队侧的流程适配却主要依赖经验。</p></div>
+      <div class="block"><h4>问题</h4><p style="margin-top:5px">同一类任务的完成时长离散度达 2.7 倍，任务是否完成的判定标准在团队内并不一致。</p></div>
+      <div class="block"><h4>意义</h4><p style="margin-top:5px">把流程改动做成可测量、可复制的干预，为团队提供有成本约束的落地依据。</p></div>
     </div>
-    <div>
-      <h4>研究内容</h4>
-      <ul>
-        <li>内容一：任务边界与角色划分的建模方法</li>
-        <li class="lv2">关键问题：如何把模糊的协作约定转化为可执行的任务边界</li>
-        <li>内容二：审批与回溯机制的设计与代价评估</li>
-        <li class="lv2">关键问题：回溯粒度与运行成本之间的平衡点在哪里</li>
-        <li>内容三：流程改动的纵向成效评估</li>
-        <li class="lv2">关键问题：如何在真实组织中排除短期学习效应</li>
-      </ul>
-    </div>
-    <div>
-      <h4>技术路线</h4>
-      <div class="flow"><span>文献与案例梳理</span><i>→</i><span>框架设计</span><i>→</i><span>原型实现</span><i>→</i><span>现场实验</span><i>→</i><span>结果分析与修正</span></div>
-    </div>
-    <div>
-      <h4>进度安排与预期成果</h4>
-      <div class="timeline">
-        <div class="tl"><b>2027 年</b><span>完成文献综述与框架设计，形成工作论文 1 篇</span></div>
-        <div class="tl"><b>2028 年</b><span>完成原型实现与两轮现场实验，投稿期刊论文 1 篇</span></div>
-        <div class="tl"><b>2029 年</b><span>完成纵向跟踪与结果修正，形成结题报告与工具包</span></div>
+    <table>
+      <tr><th style="width:66px">编号</th><th>拟解决的关键问题</th><th style="width:190px">现有做法的不足</th></tr>
+      <tr><td class="mono">P1</td><td>协作约定如何转化为可自动判定的任务边界字段</td><td>依赖人工经验，缺少字段级规范</td></tr>
+      <tr><td class="mono">P2</td><td>审批回溯的粒度提高到什么程度最经济</td><td>只报告开销上升，未给出推荐档位</td></tr>
+      <tr class="total"><td class="mono">P3</td><td>如何在真实组织中区分学习效应与真实改进</td><td>观察期多短于 8 周，缺少对照组</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>立项的量化依据</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:130px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>完成时长离散度</span><span class="bar"><i style="width:100%"></i></span><span class="mono">2.7 倍</span></div>
+          <div style="display:grid;grid-template-columns:130px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>数据不出域提及率</span><span class="bar"><i style="width:62%"></i></span><span class="mono">62%</span></div>
+          <div style="display:grid;grid-template-columns:130px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>试点转正提升（加审批）</span><span class="bar"><i style="width:18%"></i></span><span class="mono">18 pp</span></div>
+          <div style="display:grid;grid-template-columns:130px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>流程类文献占比</span><span class="bar"><i style="width:22%"></i></span><span class="mono">22.1%</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>预期贡献</h4>
+        <ul style="margin-top:6px">
+          <li>理论上：把边界与回溯纳入同一可测量框架</li>
+          <li>方法上：给出两轮现场实验的纵向证据设计</li>
+          <li>实践上：输出可复用的字段模板与实施规范</li>
+        </ul>
       </div>
     </div>
   </div>
-  <div class="foot"><span>预期成果：论文 2 篇 · 原型系统 1 套</span><span>申请经费：32 万元</span></div>
-</div></body></html>
+  <div class="pfoot"><span>三个关键问题分别对应框架、代价与因果识别三个层面</span><span>第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2 国内外研究现状</div><div class="pn">68 篇文献，检索日 2026-09-20</div></div>
+  <h2>研究现状与不足</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:130px">方向</th><th style="width:150px">代表工作</th><th style="width:210px">已达水平</th><th>不足</th></tr>
+      <tr><td>端侧推理效率</td><td class="mono">Liu 2023 [1]；Tan 2024 [2]</td><td>4bit 量化精度损失控制在 1.2 个百分点以内</td><td>仅在单机实验室条件评测，未涉及团队流程</td></tr>
+      <tr><td>数据主权与合规</td><td class="mono">Zhao 2025 [3]；Xu 2024 [4]</td><td>数据不出域成为采购硬约束，留痕开销可量化</td><td>只报告开销，未回答「做到什么粒度最划算」</td></tr>
+      <tr><td>协作流程与落地</td><td class="mono">Wang 2025 [5]；Qian 2025 [6]</td><td>审批环节使试点转正比例提升 18 个百分点</td><td>观察期 4 — 10 周，未覆盖效果收敛段</td></tr>
+      <tr class="total"><td>纵向评估方法</td><td class="mono">Chen 2024 [7]；Sun 2026 [8]</td><td>任务级评测与成本模型已较成熟</td><td>效率、合规、流程三者未在同一框架内联合测量</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>三个研究缺口</h4>
+        <ul style="margin-top:6px">
+          <li>尚无把边界、回溯、评测纳入同一框架的研究</li>
+          <li>缺少审批粒度的成本—收益量化曲线</li>
+          <li>缺少 8 周以上、含对照组的纵向证据</li>
+        </ul>
+      </div>
+      <div>
+        <h4>本课题的增量</h4>
+        <table style="margin-top:6px">
+          <tr><th>缺口</th><th style="width:150px">本课题做法</th></tr>
+          <tr><td>框架割裂</td><td>6 个指标取自同一日志源</td></tr>
+          <tr><td>代价未量化</td><td>4 档粒度投放测拐点</td></tr>
+          <tr class="total"><td>周期过短</td><td>两轮各 12 周 + 6 个月回访</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="block"><h4>文献基础</h4><p style="margin-top:6px">申请人已完成 68 篇文献的系统梳理，形成 3 条脉络的编码表；初步分析显示，同时满足「观察期不短于 8 周」与「含流程变量」的研究仅 3 篇，为本课题的立项必要性提供了直接依据。</p></div>
+  </div>
+  <div class="pfoot"><span>68 篇中仅 3 篇同时满足长周期与含流程变量，缺口明确</span><span>第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3 研究目标与内容</div><div class="pn">3 项内容、3 个关键问题</div></div>
+  <h2>研究目标与研究内容</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:110px">研究内容</th><th style="width:170px">研究目标</th><th style="width:230px">关键问题</th><th>拟采用方法</th></tr>
+      <tr><td>内容一：边界建模</td><td>形成可执行、可核查的任务边界定义规范</td><td>如何把协作约定转成字段级判定标准</td><td>文献归纳 + 6 人专家评审 + 现场试填</td></tr>
+      <tr><td>内容二：机制设计</td><td>给出回溯粒度的成本曲线与推荐档位</td><td>粒度提高到什么程度最经济</td><td>成本建模 + 4 档分段试点</td></tr>
+      <tr class="total"><td>内容三：纵向评估</td><td>获得流程改动的纵向净效应证据</td><td>如何排除学习效应与共同趋势</td><td>两轮准实验 + 双重差分 + 回访</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="block">
+        <h4>内容一 · 交付物</h4>
+        <ul style="margin-top:5px">
+          <li>字段规范 1 套（3 必填 + 2 选填）</li>
+          <li>判定标准对照表 1 份</li>
+          <li>试填报告 1 份（覆盖 1,842 条任务）</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h4>内容二 · 交付物</h4>
+        <ul style="margin-top:5px">
+          <li>粒度—成本曲线 1 条（4 个档位）</li>
+          <li>推荐档位 2 档（分别对应效率优先与合规优先）</li>
+          <li>成本测算脚本 1 套</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h4>内容三 · 交付物</h4>
+        <ul style="margin-top:5px">
+          <li>两轮实验数据集（约 3,600 条任务）</li>
+          <li>中期与结题报告各 1 份</li>
+          <li>期刊论文 2 篇</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><h4>内容之间的逻辑关系</h4><p style="margin-top:6px">内容一提供可测量的自变量，内容二确定干预强度的合理区间，内容三在前两项基础上开展纵向验证；三项内容共用同一套日志采集口径，避免出现指标口径不一致导致的结论冲突。</p></div>
+  </div>
+  <div class="pfoot"><span>3 项内容互为输入输出，共用 6 个指标的采集口径</span><span>第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4 技术路线与研究方案</div><div class="pn">6 个环节、4 个阶段</div></div>
+  <h2>技术路线与实施方案</h2>
+  <div class="body">
+    <div class="flow"><span>文献与案例梳理</span><i>→</i><span>边界规范设计</span><i>→</i><span>原型实现与预实验</span><i>→</i><span>第一轮现场实验</span><i>→</i><span>粒度调优与第二轮实验</span><i>→</i><span>回访与总结</span></div>
+    <table>
+      <tr><th style="width:96px">阶段</th><th style="width:120px">时间</th><th>主要工作</th><th style="width:150px">阶段产出</th></tr>
+      <tr><td>阶段一</td><td class="mono">2027 年 1 — 6 月</td><td>文献补检、边界规范设计、专家评审、原型开发</td><td>规范初稿 + 原型 v1</td></tr>
+      <tr><td>阶段二</td><td class="mono">2027 年 7 — 12 月</td><td>预实验与量表定型，第一轮 12 周现场实验启动</td><td>预实验报告 + 第一轮中期数据</td></tr>
+      <tr><td>阶段三</td><td class="mono">2028 年 1 — 12 月</td><td>完成第一轮实验，粒度调优后开展第二轮实验</td><td>两轮实验数据集 + 工作论文 1 篇</td></tr>
+      <tr class="total"><td>阶段四</td><td class="mono">2029 年 1 — 12 月</td><td>6 个月回访、结果修正、规范定稿与工具包整理</td><td>论文 2 篇 + 实施规范 + 结题报告</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>两轮实验的设计差异</h4>
+        <table style="margin-top:6px">
+          <tr><th>项目</th><th style="width:110px">第一轮</th><th style="width:110px">第二轮</th></tr>
+          <tr><td>样本</td><td class="mono">2 组 × 20 人</td><td class="mono">3 组 × 20 人</td></tr>
+          <tr><td>回溯覆盖度</td><td class="mono">25% → 100%</td><td class="mono">50% / 75% / 100%</td></tr>
+          <tr class="total"><td>主要目的</td><td>估计净效应</td><td>定位成本拐点</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>关键技术保障</h4>
+        <ul style="margin-top:6px">
+          <li>日志采集经内网部署，数据不出域，满足合规要求</li>
+          <li>指标口径在预实验阶段冻结，正式实验期不得改动</li>
+          <li>双重差分 + 安慰剂检验排除共同趋势</li>
+          <li>访谈与日志三角验证，避免单一数据源偏差</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>4 个阶段覆盖 36 个月，含两轮各 12 周现场实验与 6 个月回访</span><span>第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">5 创新点与可行性</div><div class="pn">3 个创新点、4 维可行性</div></div>
+  <h2>创新点与可行性分析</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="block"><h4>创新点一</h4><p style="margin-top:5px">首次把任务边界与审批回溯纳入同一可测量框架，6 个指标共用同一日志源，消除口径不一致。</p></div>
+      <div class="block"><h4>创新点二</h4><p style="margin-top:5px">用 4 档粒度投放刻画成本曲线并给出拐点，把「留痕开销」从定性描述变为可优化变量。</p></div>
+      <div class="block"><h4>创新点三</h4><p style="margin-top:5px">两轮现场实验 + 6 个月回访构成纵向证据链，可区分学习效应与真实改进。</p></div>
+    </div>
+    <table>
+      <tr><th style="width:104px">可行性维度</th><th>评估依据</th><th style="width:120px">风险等级</th></tr>
+      <tr><td>理论可行</td><td>3 条脉络已有成熟测量方法，可直接组合使用</td><td>低</td></tr>
+      <tr><td>技术可行</td><td>原型已实现任务卡字段校验与审批留痕，预实验跑通 2 周</td><td>低</td></tr>
+      <tr><td>条件可行</td><td>已与 2 家合作团队签署数据使用协议，另 1 家意向确认</td><td>中</td></tr>
+      <tr class="total"><td>团队可行</td><td>4 人课题组分工明确：方法、开发、现场、数据各有专人</td><td>低</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>风险与应对</h4>
+        <table style="margin-top:6px">
+          <tr><th>风险</th><th style="width:150px">应对措施</th></tr>
+          <tr><td>合作团队中途退出</td><td>备选 1 家意向团队 + 缩短单轮周期</td></tr>
+          <tr><td>组织调整干扰</td><td>建立事件台账作为控制变量</td></tr>
+          <tr class="total"><td>指标口径漂移</td><td>预实验后冻结口径并留档</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>与现有工作的区分</h4>
+        <ul style="margin-top:6px">
+          <li>区别于效率类研究[1][2]：本课题的因变量是流程指标而非榜单分数</li>
+          <li>区别于合规类研究[3][4]：本课题给出粒度的成本最优解</li>
+          <li>区别于流程类研究[5][6]：观察期为 12 周且设对照组</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>3 个创新点对应 3 个研究缺口，4 维可行性中 3 项为低风险</span><span>第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">6 进度安排</div><div class="pn">36 个月，按半年度排期</div></div>
+  <h2>进度安排与里程碑</h2>
+  <div class="body">
+    <div style="display:grid;gap:6px">
+      <div class="tl"><b>2027 H1</b><span class="bar"><i style="width:11%;margin-left:0"></i></span><span class="mono">规范设计与原型</span></div>
+      <div class="tl"><b>2027 H2</b><span class="bar"><i style="width:11%;margin-left:11%"></i></span><span class="mono">预实验与第一轮启动</span></div>
+      <div class="tl"><b>2028 H1</b><span class="bar"><i style="width:11%;margin-left:22%"></i></span><span class="mono">第一轮实验完成</span></div>
+      <div class="tl"><b>2028 H2</b><span class="bar"><i style="width:11%;margin-left:33%"></i></span><span class="mono">粒度调优与第二轮实验</span></div>
+      <div class="tl"><b>2029 H1</b><span class="bar"><i style="width:11%;margin-left:44%"></i></span><span class="mono">数据分析与论文撰写</span></div>
+      <div class="tl"><b>2029 H2</b><span class="bar"><i style="width:11%;margin-left:55%"></i></span><span class="mono">回访、定稿与结题</span></div>
+    </div>
+    <table>
+      <tr><th style="width:74px">里程碑</th><th style="width:120px">时间</th><th>交付物</th><th style="width:170px">评定标准</th></tr>
+      <tr><td class="mono">M1</td><td class="mono">2027 年 6 月</td><td>边界定义规范初稿 + 原型 v1</td><td>6 人专家评审通过率不低于 80%</td></tr>
+      <tr><td class="mono">M2</td><td class="mono">2027 年 12 月</td><td>预实验报告 + 量表定型</td><td>量表 α 不低于 0.80，回收率不低于 85%</td></tr>
+      <tr><td class="mono">M3</td><td class="mono">2028 年 6 月</td><td>第一轮实验数据集（约 1,800 条任务）</td><td>两组基线标准化差异小于 0.20</td></tr>
+      <tr><td class="mono">M4</td><td class="mono">2028 年 12 月</td><td>粒度—成本曲线 + 第二轮实验数据</td><td>拐点置信区间宽度不超过 20 个百分点</td></tr>
+      <tr class="total"><td class="mono">M5</td><td class="mono">2029 年 12 月</td><td>论文 2 篇 + 实施规范 + 结题报告</td><td>至少 1 篇发表于 CSSCI 或 SCI 期刊</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>5 个里程碑覆盖 36 个月，每半年一个可核查节点</span><span>第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">7 预期成果</div><div class="pn">成果类型、数量与考核方式</div></div>
+  <h2>预期成果与考核指标</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:130px">成果类型</th><th style="width:60px">数量</th><th>具体内容</th><th style="width:170px">考核方式</th></tr>
+      <tr><td>期刊论文</td><td class="mono">2 篇</td><td>1 篇方法类（框架与粒度权衡）、1 篇实证类（纵向净效应）</td><td>正式发表或录用通知</td></tr>
+      <tr><td>原型系统</td><td class="mono">1 套</td><td>任务卡字段校验 + 审批留痕 + 指标看板三模块</td><td>现场部署并通过验收测试</td></tr>
+      <tr><td>实施规范</td><td class="mono">1 份</td><td>边界定义规范、字段模板、粒度推荐档位与实施步骤</td><td>合作团队试用反馈不低于 80% 认可</td></tr>
+      <tr><td>数据集</td><td class="mono">1 套</td><td>两轮实验脱敏数据，约 3,600 条任务记录</td><td>脱敏后向同行开放申请</td></tr>
+      <tr class="total"><td>结题报告</td><td class="mono">1 份</td><td>含结论、局限、适用边界与后续研究建议</td><td>通过结题验收</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="kpi"><b>2 篇</b><span>论文（含 1 篇 CSSCI/SCI）</span></div>
+      <div class="kpi"><b>3,600</b><span>实验任务记录（条）</span></div>
+      <div class="kpi"><b>80%</b><span>试用认可率门槛</span></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>成果的量化目标</h4>
+        <table style="margin-top:6px">
+          <tr><th>指标</th><th style="width:96px">目标值</th></tr>
+          <tr><td>完成时长中位数降幅</td><td class="mono">不低于 8%</td></tr>
+          <tr><td>返工率降幅</td><td class="mono">不低于 2 pp</td></tr>
+          <tr class="total"><td>粒度拐点区间</td><td class="mono">50% — 70%</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>成果的应用去向</h4>
+        <ul style="margin-top:6px">
+          <li>实施规范供合作团队与其同业团队直接采用</li>
+          <li>原型系统开源核心模块，保留数据接口文档</li>
+          <li>数据集供后续纵向研究复用，避免重复采集</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>5 类成果均有可核查的考核方式，量化目标共 3 项</span><span>第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">8 经费预算</div><div class="pn">合计 32.00 万元，年均 10.67 万元</div></div>
+  <h2>经费预算与说明</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:150px">科目</th><th style="width:96px">金额（万元）</th><th style="width:70px">占比</th><th>主要用途</th></tr>
+      <tr><td>设备费</td><td class="mono">6.08</td><td class="mono">19.0%</td><td>内网推理服务器 2 台与存储设备 1 套</td></tr>
+      <tr><td>材料费</td><td class="mono">2.40</td><td class="mono">7.5%</td><td>测试用账号、云资源与耗材</td></tr>
+      <tr><td>测试化验加工费</td><td class="mono">3.20</td><td class="mono">10.0%</td><td>原型模块开发外包与安全测试</td></tr>
+      <tr><td>差旅与会议费</td><td class="mono">4.64</td><td class="mono">14.5%</td><td>现场实验驻场 4 次、学术会议 3 次</td></tr>
+      <tr><td>出版与文献费</td><td class="mono">3.84</td><td class="mono">12.0%</td><td>论文版面费、文献购置与语言润色</td></tr>
+      <tr><td>劳务费</td><td class="mono">9.60</td><td class="mono">30.0%</td><td>研究生 2 名 × 36 个月、数据标注临时用工</td></tr>
+      <tr class="total"><td>专家咨询费</td><td class="mono">2.24</td><td class="mono">7.0%</td><td>规范评审 6 人次、中期与结题评议</td></tr>
+      <tr class="total"><td>合计</td><td class="mono">32.00</td><td class="mono">100.0%</td><td>年均 10.67 万元</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>年度分布（万元）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:96px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>2027 年</span><span class="bar"><i style="width:34%"></i></span><span class="mono">10.80</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>2028 年</span><span class="bar"><i style="width:37%"></i></span><span class="mono">11.60</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 76px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>2029 年</span><span class="bar"><i style="width:31%"></i></span><span class="mono">9.60</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>预算说明</h4>
+        <ul style="margin-top:6px">
+          <li>设备费集中在第一年支出，占首年预算的 56.3%</li>
+          <li>劳务费按 2 名研究生 36 个月测算，合计 9.60 万元</li>
+          <li>现场实验驻场差旅按 4 次、每次 3 人 5 天测算</li>
+          <li>三年支出 10.80 + 11.60 + 9.60 = 32.00 万元，与总额一致</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>7 个科目合计 32.00 万元，三年支出合计与总额完全一致</span><span>第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">9 研究基础与参考文献</div><div class="pn">前期成果、团队分工与文献</div></div>
+  <h2>研究基础、团队分工与参考文献</h2>
+  <div class="body">
+    <div class="grid2">
+      <div>
+        <h4>前期研究基础</h4>
+        <table style="margin-top:6px">
+          <tr><th>成果</th><th style="width:96px">时间</th></tr>
+          <tr><td>完成 68 篇文献系统梳理与编码</td><td class="mono">2026-09</td></tr>
+          <tr><td>原型 v0 完成 2 周预实验（168 条任务）</td><td class="mono">2026-08</td></tr>
+          <tr class="total"><td>与 2 家团队签署数据使用协议</td><td class="mono">2026-07</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>团队分工</h4>
+        <table style="margin-top:6px">
+          <tr><th>角色</th><th style="width:82px">人数</th><th>职责</th></tr>
+          <tr><td>项目负责人</td><td class="mono">1</td><td>框架设计、论文撰写</td></tr>
+          <tr><td>现场研究</td><td class="mono">1</td><td>实验执行、访谈与编码</td></tr>
+          <tr class="total"><td>数据与开发</td><td class="mono">2</td><td>采集口径、统计与原型维护</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="refs">
+      <div><em>[1]</em> Liu H, Zhang Q. On-device quantization for collaborative agents[J]. Journal of Systems Research, 2023, 14(3): 221-238.</div>
+      <div><em>[2]</em> Tan M, Ito K. Knowledge distillation under strict data residency[J]. Applied Computing Review, 2024, 19(1): 45-61.</div>
+      <div><em>[3]</em> Zhao Y, Sun P. Data sovereignty as a procurement constraint[J]. Information Policy Quarterly, 2025, 7(2): 33-49.</div>
+      <div><em>[4]</em> Xu B, 李静. 审计留痕粒度与运维开销的权衡[J]. 信息安全研究, 2024, 10(5): 402-411.</div>
+      <div><em>[5]</em> Wang J, 李强. 审批环节对智能体落地率的影响：一项流程实验[J]. 管理科学, 2025, 38(4): 112-126.</div>
+      <div><em>[6]</em> Qian M, 吴迪. 任务边界书面化与返工率的关系[J]. 工业工程与管理, 2025, 30(3): 77-85.</div>
+      <div><em>[7]</em> Chen L, Zhou Y. Task-level benchmarks for agent workflows[C]. Proceedings of the 12th Conference on Applied Measurement, 2024: 88-96.</div>
+      <div><em>[8]</em> Sun P, Guo W. Hybrid deployment cost models over three years[J]. Computing Economics, 2026, 9(1): 5-24.</div>
+    </div>
+  </div>
+  <div class="pfoot"><span>前期基础 3 项，团队 4 人分工明确，引用文献 [1] — [8] 与正文一致</span><span>第 10 / 10 页</span></div>
+</section>
+
+</body></html>

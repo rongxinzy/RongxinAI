@@ -5,68 +5,88 @@
       "prompts": {
         "pptx-work-report": {
           "label": "工作汇报",
-          "description": "季度工作总结与下阶段规划汇报",
-          "prompt": "制作一份季度工作汇报 PPT,包含以下内容:\n\n1. 本季度核心工作成果回顾;\n2. 关键项目进展与里程碑达成情况;\n3. 重点数据指标完成度(用图表呈现);\n4. 遇到的问题与解决方案;\n5. 团队协作亮点;\n6. 下季度工作计划与目标;\n7. 需要的资源支持;\n\n风格要求:简洁商务风,逻辑清晰,数据可视化,适合向管理层汇报。"
-        },
-        "pptx-content-research": {
-          "label": "内容调研",
-          "description": "行业趋势与竞品分析调研报告",
-          "prompt": "制作一份行业调研分析报告 PPT,涵盖以下板块:\n\n1. 调研背景与目的说明;\n2. 行业整体发展现状与市场规模;\n3. 主要竞品对比分析(功能、定价、用户口碑);\n4. 目标用户画像与核心需求洞察;\n5. 行业趋势与机会点总结;\n6. 可落地的策略建议;\n\n风格要求:数据驱动,图表丰富,观点有理有据,适合团队内部分享讨论。"
+          "description": "季度指标达成与人效归因",
+          "prompt": "基于我提供的季度数据，输出不少于 9 页的季度工作汇报演示：封面含 3 个关键指标与达成判定表，其后依次是目录、背景与统计口径、现状数据表与月度走势图、归因分析、四维评估框架、重构前后对比、风险与依赖、结论与分阶段行动；同一指标跨页数字必须一致，风险页要给出缓解措施与责任人。"
         },
         "pptx-education": {
-          "label": "教育教学",
-          "description": "课堂教学课件与知识讲解",
-          "prompt": "制作一套关于「太阳系与行星探索」的科普教学课件,适合中学生课堂使用,包含:\n\n1. 太阳系全景概览;\n2. 八大行星的基本特征对比(大小、距离、温度等);\n3. 地球的特殊性——为什么适合生命存在;\n4. 人类探索太空的重要里程碑;\n5. 课堂互动问答环节(设计 3-4 道思考题);\n6. 拓展阅读推荐;\n\n风格要求:生动活泼,配色明快,内容由浅入深,激发学生好奇心与探索欲。"
+          "label": "教学课件",
+          "description": "中学课堂行星科普课件",
+          "prompt": "制作一套不少于 9 页的中学课堂课件，主题为太阳系与行星探索：含课堂流程与时间分配、教学目标与学情分析、八大行星数据表与直径对比图、类地与巨行星的三点差异、轨道结构示意、六颗行星特征对照表、常见误区、课堂小结与作业；每页至少一处可视化，口径统一为 1 AU = 1.5 亿公里。"
         },
         "pptx-ai-intro": {
-          "label": "人工智能入门",
-          "description": "零基础了解 AI 的科普演示",
-          "prompt": "制作一份面向零基础观众的人工智能入门科普 PPT,内容包括:\n\n1. 什么是人工智能——用生活中的例子解释;\n2. AI 的发展简史(从图灵测试到大语言模型);\n3. 常见的 AI 应用场景(语音助手、推荐系统、自动驾驶等);\n4. 机器学习的基本原理(用直观类比说明);\n5. 大模型与 ChatGPT 是怎么工作的;\n6. AI 能做什么、不能做什么;\n7. 普通人如何开始使用 AI 工具提升效率;\n\n风格要求:通俗易懂,多用图示和类比,避免专业术语堆砌,让完全不懂技术的人也能看明白。"
-        },
-        "pptx-product-plan": {
-          "label": "产品方案",
-          "description": "产品方案评审与版本规划汇报",
-          "prompt": "制作一份产品方案评审 PPT,包含以下内容:\n\n1. 需求背景、目标用户与要解决的问题;\n2. 当前问题的具体表现与影响范围;\n3. 产品方案要点与核心流程;\n4. 版本节奏与排期规划;\n5. 资源投入与人力评估;\n6. 预期收益与衡量指标;\n7. 主要风险与应对预案;\n\n风格要求:结构清晰,重点讲清方案取舍的理由,适合向管理层做立项评审。"
+          "label": "AI 入门",
+          "description": "零基础 AI 认知通识课",
+          "prompt": "面向非技术同事制作不少于 9 页的人工智能通识讲稿：三个问题的一句话回答表、内部 6 类场景的使用率与满意度、能力边界与幻觉率分层、数据到推理的四步链条与三类模型、传统软件与 AI 系统的六点差异、风险清单与使用纪律、三条原则与五条上手清单；全程不得出现代码。"
         },
         "pptx-training": {
           "label": "培训课件",
-          "description": "新员工入职与岗位培训课件",
-          "prompt": "制作一套面向新同事的入职培训课件,包含:\n\n1. 培训目标与三天上手路径;\n2. 开发环境搭建的完整步骤;\n3. 常用工具与团队协作规范;\n4. 业务背景与核心链路的介绍;\n5. 第一次独立提交的演练流程;\n6. 上手常见问题与避坑提示;\n\n风格要求:步骤化讲解,多用流程图和检查清单,让新人可以照着一步步做完。"
+          "description": "三天上手路径与考核标准",
+          "prompt": "制作不少于 9 页的新同事入职培训课件：四天课程安排与时间投入、培训对象与前置条件、近三期新人的上手耗时数据与对比图、三类卡点量化分析、能力地图四层自评清单、常见误区与正确做法对照、风险与导师投入测算、考核标准与资源清单；每页都要给出可逐条勾选的具体条目。"
+        },
+        "pptx-product-plan": {
+          "label": "产品方案",
+          "description": "需求、版本与资源评估",
+          "prompt": "制作不少于 9 页的产品方案评审演示：需求背景与问题定义、18 类工单分布与日均量、三条可自动化的收益判断与三段提升路径、四层能力架构与逐层降级策略、三个版本节奏与前后指标对比、风险登记与缓解措施、里程碑与验收标准；要讲清方案取舍的理由、资源投入与不做的边界。"
+        },
+        "pptx-content-research": {
+          "label": "行业调研",
+          "description": "规模、格局与机会点判断",
+          "prompt": "制作不少于 9 页的行业调研汇报：调研问题与统计口径、4 个细分行业的规模增速与渗透率、三条核心结论及支撑数据、部署模式与数据可控性的四象限竞争格局、8 项能力的竞品横向对比、研究局限与样本偏差、结论与三步行动及数据来源清单；同一规模数字跨页必须一致。"
+        },
+        "pptx-annual-review": {
+          "label": "年度经营复盘",
+          "description": "营收、毛利与现金流复盘",
+          "prompt": "制作不少于 9 页的年度经营复盘：合并报表口径与调整说明、三条业务线的收入与毛利结构、收入增量归因与毛利率下滑拆解、增长与毛利四象限及净利率杜邦拆解、年初经营目标的达成对照、经营风险与缓解措施、2027 年目标与三个必赢战役；所有数字须能与总账口径相互验算。"
+        },
+        "pptx-fundraising": {
+          "label": "融资路演",
+          "description": "增长、单位经济与融资条款",
+          "prompt": "制作不少于 9 页的 A 轮融资路演：公司与目标市场、四年 ARR 曲线与经营指标、单位经济模型推导链（ARPU 到 LTV/CAC）、收入结构与交付流程、与 3 家可比公司的对照、客户集中度与敏感性分析、资金用途与 2027 里程碑及本轮条款；所有数字须能相互验算，假设写明。"
         }
       }
     },
     "data-analysis": {
       "label": "数据分析",
       "prompts": {
-        "excel-summary": {
-          "label": "Excel 汇总统计",
-          "description": "对 Excel 数据做分类汇总与统计",
-          "prompt": "请读取我的 Excel 文件,帮我完成以下工作:\n\n1. 按类别对数据进行分类汇总(求和、计数、平均值);\n2. 生成各类别的占比分析;\n3. 标注异常值和关键数据;\n4. 输出一份整理好的汇总统计 Excel 文件,包含图表。"
-        },
         "image-to-excel": {
-          "label": "图片/截图转表格",
-          "description": "识别图片中的表格数据并生成 Excel",
-          "prompt": "请识别我上传的图片中的表格内容,帮我:\n\n1. 提取图片中所有表格数据;\n2. 整理为规范的行列格式;\n3. 修正识别中可能出现的错误;\n4. 生成一份格式清晰的 Excel 文件。"
+          "label": "图片转表格",
+          "description": "拍照台账识别为可编辑表格",
+          "prompt": "把 10 张纸质台账照片识别成结构化表格：自动检测表格线、逐格 OCR 并给出置信度，低于 0.90 的单元格进入人工复核队列。输出不少于 8 页的识别报告，含处理流水线、字段字典、照片级明细、误差归因、校验规则与后续动作，并给出字段准确率与置信度分布。"
         },
-        "word-report": {
-          "label": "数据生成报告",
-          "description": "基于数据文件生成 Word 分析报告",
-          "prompt": "请根据我提供的数据文件,帮我生成一份 Word 分析报告,要求:\n\n1. 包含数据概况说明;\n2. 核心指标统计与趋势分析;\n3. 重点发现与结论总结;\n4. 排版专业、条理清晰,可直接用于汇报。"
+        "excel-summary": {
+          "label": "销售汇总",
+          "description": "季度销售按区域品类汇总",
+          "prompt": "读取销售明细工作簿，按区域、渠道、品类三个维度做季度汇总并计算环比与占比。输出不少于 8 页的表格式分析报告：封面摘要、Sheet 总览、口径与字段字典、区域与品类明细、渠道结构、异常清单、校验规则、结论与动作、附录，所有数字跨页必须一致。"
         },
         "multi-excel-merge": {
-          "label": "多表合并整理",
-          "description": "合并多个 Excel 文件并统一格式",
-          "prompt": "我有多个 Excel 文件需要合并整理,请帮我:\n\n1. 将多个文件的数据合并到一张表中;\n2. 统一列名和数据格式;\n3. 去除重复数据;\n4. 生成一份合并后的 Excel 文件,并添加数据来源标记。"
+          "label": "多表合并",
+          "description": "区域分表合并统一口径总表",
+          "prompt": "把三个区域分表合并成统一口径总表：识别列名差异、统一金额单位与日期格式、按订单号跨文件去重，并处理区域缺失与状态越界。输出不少于 8 页的合并报告，含合并流程、列名映射、去重明细、口径冲突、校验规则与处理动作，保留来源文件与行号便于回溯。"
         },
-        "excel-reconcile": {
-          "label": "对账差异核对",
-          "description": "比对两份数据并定位差异原因",
-          "prompt": "我有两份需要对账的数据文件,请帮我完成对账核对:\n\n1. 按订单号或唯一键比对两边的数据;\n2. 标出金额不一致、单边缺失的记录;\n3. 按差异类型归并,统计各类型的笔数与金额;\n4. 对每类差异给出可能原因的判断;\n5. 输出一份对账结果 Excel,并附上差异明细页。"
+        "word-report": {
+          "label": "数据成报告",
+          "description": "数据自动生成经营分析报告",
+          "prompt": "基于销售与成本数据自动生成月度经营分析报告：计算环比、毛利率、新签占比与履约时长，并按章节成稿。输出不少于 8 页的报告，含章节结构、口径与取数、产品线与成本明细、效率达成、异常清单、校验规则、结论与动作、附录，引用数字须与源表逐一对齐。"
         },
         "excel-budget": {
-          "label": "预算表编制",
-          "description": "编制部门预算并跟踪使用率",
-          "prompt": "请帮我编制一份部门季度预算表:\n\n1. 按科目列出预算金额(人员成本、云与算力、市场推广、办公差旅等);\n2. 记录已占用金额并计算使用率;\n3. 标出使用率明显偏高或偏低的科目;\n4. 对剩余额度给出分配建议;\n5. 输出 Excel 文件,并把使用率做成图表。"
+          "label": "预算与预警",
+          "description": "预算占用分析与超支预测",
+          "prompt": "分析 2026Q4 部门预算执行：按科目与部门两侧统计已占用、使用率与消耗倍数，预测 11—12 月支出并给出超支预警。输出不少于 8 页的预算分析报告，含预算总览、口径字典、执行与预测明细、部门分解、异常清单、校验规则与科目调剂动作。"
+        },
+        "excel-reconcile": {
+          "label": "逐单对账",
+          "description": "系统与渠道逐单勾稽差异",
+          "prompt": "把系统台账与渠道对账文件逐单勾稽：双向匹配订单号、比对金额并按容差自动勾稽，再把超容差差异归因到渠道缺单、退款未同步、手续费口径与四舍五入四类。输出不少于 8 页的对账报告，含差异明细、归因分析、未达账项台账、校验规则与处置动作。"
+        },
+        "excel-pivot": {
+          "label": "多维透视",
+          "description": "渠道品类交叉透视与贡献分解",
+          "prompt": "对销售明细做渠道 × 品类多维透视：生成交叉矩阵并校验行合计、列合计与明细一致，再对品类与渠道做增量贡献分解。输出不少于 8 页的透视分析报告，含透视结构、维度字典、明细与贡献分解、交叉矩阵、异常格、校验规则、结论与处理动作。"
+        },
+        "excel-anomaly": {
+          "label": "异常检测",
+          "description": "报销异常识别与风险分级",
+          "prompt": "对当月 4,286 笔费用报销做异常检测：用阈值、频次与分布三类规则识别异常，并按高、中、低三级分级。输出不少于 8 页的检测报告，含检测流程、字段口径、规则命中明细、部门分布、异常倍数、规则有效性校验与分阶段处置动作。"
         }
       }
     },
@@ -76,32 +96,42 @@
         "edu-english-words": {
           "label": "英语单词学习",
           "description": "高效记忆英语单词",
-          "prompt": "我正在准备英语四级考试,请帮我整理一份高频核心词汇学习清单,要求:\n\n1. 挑选 20 个高频必考单词;\n2. 每个单词给出音标、中文释义和一个简短例句;\n3. 按主题分组(如校园生活、工作职场、科技等);\n4. 在最后给出一组小测验题,帮助我自测记忆效果。"
+          "prompt": "请写一份不少于 10 页的英语词汇讲义,讲 resilient 与 salire 词根家族:含学习目标与路径、构词法脉络、词义演化与 8 个搭配、6 类常见错误、12 道分层练习及逐题解析、自测清单、30 天计划与术语表附录。每条要点都要给具体词例与数字,跨页数据必须自洽。"
         },
         "edu-math-explain": {
           "label": "数学题讲解",
           "description": "数学难题的详细解题过程",
-          "prompt": "请用简单易懂的方式讲解以下数学知识:\n\n题目:一元二次方程 2x² + 3x - 5 = 0 的求解\n\n要求:\n1. 先回顾一元二次方程的一般形式和求根公式;\n2. 一步步展示完整的代入和计算过程;\n3. 用判别式分析根的情况;\n4. 最后验算答案是否正确;\n5. 再出一道类似的练习题让我巩固。"
+          "prompt": "请写一份不少于 10 页的数学讲义,讲解二次函数在闭区间上的最值:含学习目标与路径、知识脉络、配方与对称轴的分类讨论(轴在区间左、内、右三种情形)、常见错误对照表、12 道分层练习及逐题解析、自测清单与下一阶段计划、术语表附录。每道题都要给出具体函数与区间,跨页数值必须一致。"
         },
         "edu-essay-writing": {
           "label": "作文写作辅导",
           "description": "提升写作能力与技巧",
-          "prompt": "请以「我最难忘的一次旅行」为题,帮我进行作文写作辅导:\n\n1. 先给出一个清晰的写作提纲(开头、正文、结尾的结构建议);\n2. 分享 3 个让文章更生动的写作技巧(如细节描写、感官描写、借景抒情);\n3. 写一段示范开头,展示如何吸引读者;\n4. 列出 5 个可以用在这篇作文中的好词好句;\n5. 提醒常见的写作问题和避坑要点。"
+          "prompt": "请写一份不少于 10 页的记叙文写作讲义,以《我的第一次远行》为例讲细节描写:含学习目标与路径、五感细节脉络、8 组原文与改写对照、6 类常见错误、12 道分层练习及逐题解析、自测清单与 12 周写作计划、术语表附录。改写示范要具体到可以照抄的句子,跨页数字自洽。"
         },
         "edu-knowledge-explain": {
           "label": "知识点科普",
           "description": "用通俗语言解释复杂知识",
-          "prompt": "请用通俗易懂的语言给我科普「光合作用」这个知识点:\n\n1. 用一句话概括光合作用是什么;\n2. 用生活中的类比来解释它的原理;\n3. 画出光合作用的简要过程(文字版流程图);\n4. 说明光合作用对地球和人类的重要意义; \n5. 提出 3 个思考题,帮助我加深理解。"
+          "prompt": "请写一份不少于 10 页的科普讲义,讲解光合作用:含学习目标与路径、光反应与暗反应的知识脉络、总反应式与生活类比、6 类常见错误与光合呼吸对照表、12 道理解题及逐题解析、自测清单与 4 周探究计划、术语表附录。要给出具体的物质收支数字,并保证跨页一致。"
         },
         "edu-study-plan": {
           "label": "学习计划制定",
           "description": "把备考目标拆成可执行计划",
-          "prompt": "我需要在三个月内备考英语四级,请帮我制定一份能坚持下来的学习计划:\n\n1. 把备考周期拆成几个阶段,说明每个阶段的目标;\n2. 给出每周的学习安排和每次的时长;\n3. 列出每个阶段要完成的可检查产出;\n4. 说明每天的时间怎么分配;\n5. 给出中途落下进度时的补救办法。"
+          "prompt": "请写一份不少于 10 页的四级备考计划书:含学习目标与路径、分数目标与每周投入口径、12 周三阶段计划表、6 类常见执行失误与计划实际对照、12 道计划诊断题及解析、自测清单与滚动修订方案、术语表附录。所有时长与产出数字要能互相对上,并说明按周如何调整。"
         },
         "edu-mistake-review": {
           "label": "错题复盘",
           "description": "定位错因并给出改进动作",
-          "prompt": "这道题我又做错了,请帮我复盘:\n\n题目:解一元二次方程 2x² + 3x - 5 = 0\n\n要求:\n1. 先指出我可能在哪一步想错了;\n2. 对比错误思路和正确思路的差别;\n3. 归纳这道题暴露的知识漏洞;\n4. 给出这类题的固定解题步骤;\n5. 再出一道同类题让我巩固。"
+          "prompt": "请写一份不少于 10 页的错题复盘讲义,以方程 2x² + 3x − 5 = 0 为例:含学习目标与路径、错因占比图、错误与正确解法对照、判别式 Δ = 49 的完整计算、6 类常见错误、12 道变式练习及逐题解析、自测清单、下一阶段计划与术语表附录,并给出一页错题卡模板。"
+        },
+        "edu-class-activity": {
+          "label": "课堂活动设计",
+          "description": "为教师设计可落地的课堂活动",
+          "prompt": "请为初中物理教师写一份不少于 10 页的课堂活动设计讲义,主题是一节 40 分钟的《浮力》探究课:含设计目标与路径、六环节时间轴与分组器材清单、教师与学生行为对照表、6 类常见失误、12 道教学设计诊断题及解析、自测清单、单元计划与术语表附录。各环节时长合计必须等于 40 分钟。"
+        },
+        "edu-lab-report": {
+          "label": "实验报告",
+          "description": "规范记录数据并分析误差",
+          "prompt": "请写一份不少于 10 页的化学实验报告讲义,主题是用 0.1000 mol/L 标准盐酸滴定氢氧化钠溶液:含报告结构、仪器清单与原理、三次平行滴定的数据表与浓度计算、6 类操作误差及偏大偏小分析、12 道计算题及解析、自测清单、下一阶段计划与术语表附录。各数值与单位必须全篇一致。"
         }
       }
     },
@@ -147,45 +177,142 @@
           "label": "小游戏：2048 合并",
           "description": "单文件 2048,含分值梯度与一步撤销",
           "prompt": "用「板岩梯度」模板做一个可以直接在浏览器里玩的 2048 数字合并游戏。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-game-2048.html 与 templates/web-game-2048.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n玩法与规则:\n- 棋盘固定 4x4,方向键、WASD 与棋盘滑动都能移动,同值方块相撞翻倍;\n- 每次移动后空格里会出现一个 2 或 4,无路可走时本局结束;\n- 保留一步撤销,撤销后按钮变灰;\n- 最高分存在本机 localStorage,换 storageKey 即清空。\n\n内容替换:\n- copy 里的标题、副标题、两个按钮、遮罩文案与 rules 说明换成你自己的;\n- rules 暴露 storageKey、startTiles 与 winValue;\n- tiles 是分值到配色的梯度表,默认从 2 覆盖到 2048,再用 beyond 兜底,不要跳号;\n- 每一档的 bg 与 fg 对比度要过 WCAG AA,改色后逐档检查。\n\n设计目标:\n保留模板的视觉语言:深板岩底、单一钴蓝强调、顶部两个读数、棋盘下方一条分值梯度、只有方块带圆角。可以在同一语言内调整色相,但梯度必须还是同一条色相推明度,不要变回米色棋盘或糖果色方块。"
-        },
-        "web-game-typing": {
-          "label": "小游戏：打字练习",
-          "description": "逐字符反馈的限时英文打字练习",
-          "prompt": "用「冷纸打字」模板做一个可以直接打开的英文打字练习。\n\n模板:frontend-design 技能自带该模板的参考实现。先读该技能的 SKILL.md,再按其中「案例模板」一节读取 templates/web-game-typing.html 与 templates/web-game-typing.info.md,以它为布局骨架、配色角色、字号层级与交互方式的基线。\n\n玩法与规则:\n- 页面显示一段英文,逐字符比对:打对的变深、打错的标红、当前字符只有一条下划线;\n- 顶部实时显示速度、准确率与剩余时间,时间到或打完一段后给出本轮成绩;\n- 保留三档时长与「换一段」,一轮结束后按回车可以直接重开;\n- 成绩只留在本页,刷新即清空。\n\n内容替换:\n- copy 里的标题、说明、读数名称与成绩卡文案换成你自己的;\n- passages 换成 3 段英文,每段 110-170 个字符,只用英文与常用标点,中文会被输入法上屏破坏逐字符比对;\n- notes 保留 2-3 条计分说明;\n- theme 留空即跟随系统深浅色;要固定配色就把九个值一次写全,只写一部分会锁定浅色底。\n\n设计目标:\n保留模板的视觉语言:冷纸底、单一深青强调、等宽正文区、三项读数是直角方条、面板底部一条 2px 进度线。可以在同一语言内调整色相,不要改成黑底绿字终端风,也不要加打字机音效。"
         }
       }
     },
     "deep-research": {
       "label": "深度调研",
       "prompts": {
-        "research-industry": { "label": "行业趋势", "description": "梳理行业现状与发展方向", "prompt": "请对我指定的行业进行深度调研，梳理市场规模、主要参与者、关键趋势、机会与风险，并给出有来源依据的结论。" },
-        "research-competitors": { "label": "竞品分析", "description": "比较竞品能力与市场定位", "prompt": "请完成一份竞品分析，比较主要产品的定位、目标用户、核心功能、价格、优势短板和差异化机会，并用表格总结。" },
-        "research-policy": { "label": "政策分析", "description": "解读政策影响与执行要点", "prompt": "请分析我提供的政策或法规，提炼核心要求、适用范围、时间节点、对业务的影响和落地建议，标注不确定信息。" },
-        "research-literature": { "label": "文献综述", "description": "整理研究脉络与关键观点", "prompt": "请围绕指定主题撰写文献综述框架，归纳主要研究观点、方法、共识、争议与研究空白，并提出后续研究问题。" },
-        "research-user": { "label": "用户调研", "description": "访谈与需求洞察调研报告", "prompt": "请帮我完成一次目标用户调研，并输出一份调研报告。调研对象是一线使用者，围绕他们在真实工作中遇到的问题展开。\n\n报告需要包含：访谈样本构成与调研方法说明、用户当前的工作流程与卡点、需求优先级排序及判断依据、典型用户原话摘录、可直接落地的产品建议。所有结论都要标注来源，不能只给观点。" },
-        "research-market-entry": { "label": "市场进入评估", "description": "新市场进入的可行性分析", "prompt": "请对我指定的市场做一次进入可行性评估，从需求规模、获客成本、合规门槛、交付能力四个维度展开。\n\n报告需要给出：各维度的判断依据与数据来源、分市场的综合评价与优先级排序、建议的进入节奏与阶段目标、主要风险与应对方案。最后要明确指出哪些市场建议进入、哪些建议观望、哪些建议暂缓。" }
+        "research-industry": {
+          "label": "行业趋势研究",
+          "description": "行业规模、驱动因素与趋势判断",
+          "prompt": "围绕「本地优先 AI 工具」做行业趋势研究，输出不少于 10 页报告：界定口径与数据来源，给出行业规模、细分分布与三年变化（含图表），拆解政策、技术、需求、供给四类驱动因素，列出附数字证据的关键洞察，做三种情景推演，写明信息缺口、风险与分阶段动作。数字须标注来源与时间窗。"
+        },
+        "research-competitors": {
+          "label": "竞品分析",
+          "description": "竞品能力矩阵与可切入位置",
+          "prompt": "对 6 家直接竞品做对标分析，输出不少于 10 页报告：定义竞品集合、评估维度与权重，给出功能、成本、数据可控、生态四维评分矩阵与可视化，做定位象限与结构性缺口分析，逐条列洞察并附评分证据，推演竞品降价或补短板后的情景，给出产品、定价与打法建议。价格与评分须注明来源。"
+        },
+        "research-policy": {
+          "label": "政策解读",
+          "description": "监管文本要点与合规影响面",
+          "prompt": "解读新发布的生成式 AI 管理办法及两份配套指引，输出不少于 10 页解读报告：列明文本版本、适用范围与口径，把条款拆成义务清单并标注触发条件与可验证证据，评估数据采集、模型训练、对外服务、内部使用四个环节的影响强度，做三种执法情景推演，给出倒排时间表与责任分工。"
+        },
+        "research-literature": {
+          "label": "文献综述",
+          "description": "研究脉络、观点聚类与证据强度",
+          "prompt": "围绕「本地推理与数据主权」做文献综述，输出不少于 10 页报告：写明检索式、数据库、纳排标准与各阶段筛选数量，给出年份、方法、主题三维分布，拆解每个主题的核心观点并标注支撑文献数与证据强度，单列一页说明研究间冲突与未解问题，写明检索局限与偏倚。每条观点可回溯到文献编号。"
+        },
+        "research-user": {
+          "label": "用户调研",
+          "description": "访谈样本、需求优先级与痛点",
+          "prompt": "针对目标用户做访谈式需求研究，输出不少于 10 页报告：交代样本结构与访谈脚本，给出编码流程各阶段数量，按需求提及率与当前满足度排出优先级，列出痛点频次与带出处的一线原话，做三档投入范围的情景推演，最后写明自报偏差等信息缺口与分阶段落地建议。每个结论须可回溯到样本量与访谈编号。"
+        },
+        "research-market-entry": {
+          "label": "市场进入评估",
+          "description": "区域可行性、节奏与前置条件",
+          "prompt": "评估东南亚六个市场的进入可行性，输出不少于 10 页报告：先给评估框架与四维权重（需求、获客成本、合规门槛、交付），再列六市场数据表与图形对比，逐一给出进入、观望或暂缓的判断与理由，做三种情景推演（含毛利转正月份），写明前置条件、信息缺口与投入节奏。数据须标注口径与时间窗。"
+        },
+        "research-supply-chain": {
+          "label": "供应链风险",
+          "description": "关键物料断供与涨价风险扫描",
+          "prompt": "对 AI 硬件关键物料做风险扫描，输出不少于 10 页报告：先给评分口径（集中度、交期、价格、替代权重），再列出 8 类物料的家数、交期、涨价与单一来源占比并打分，按集中度与替代性分层拆解，列出附证据的洞察，推演断供、涨价与替代成熟三种情景，给出库存与双源策略及信息缺口。"
+        },
+        "research-talent": {
+          "label": "人才市场调研",
+          "description": "岗位供需、薪酬分位与招聘周期",
+          "prompt": "针对六个目标岗位做人才市场调研，输出不少于 10 页报告：交代岗位定义、薪酬口径与数据来源，给出需求、候选人、缺口比、薪酬与周期的数据表与分布图，按缺口比与薪酬水平做二维分层，列出附证据的洞察，推演涨薪、内培与远程用工三种情景，给出分位目标与招聘节奏。"
+        }
       }
     },
     "academic-research": {
       "label": "学术研究",
       "prompts": {
-        "academic-outline": { "label": "论文大纲", "description": "搭建清晰的论文结构", "prompt": "请根据我的研究主题设计一份学术论文大纲，包含研究问题、理论框架、方法、结果与讨论，并说明各部分写作重点。" },
-        "academic-review": { "label": "文献整理", "description": "提炼文献并建立研究脉络", "prompt": "请整理我提供的文献，按主题、方法和结论分类，提炼关键观点并指出相互支持、矛盾和可引用之处。" },
-        "academic-method": { "label": "研究方法", "description": "选择合适的方法与实验方案", "prompt": "请根据研究目标和可用数据，比较可选研究方法，给出推荐方案、变量设计、样本要求、实施步骤和潜在局限。" },
-        "academic-polish": { "label": "学术润色", "description": "提升表达的准确性与连贯性", "prompt": "请将我提供的论文段落润色为规范、清晰、严谨的学术中文，保留原意，并列出关键修改理由。" },
-        "academic-data-analysis": { "label": "数据与统计", "description": "问卷数据的统计方法与结果", "prompt": "请帮我完成论文中数据处理与统计分析的写作，研究对象是问卷调研数据。\n\n需要包含：变量与测量方式的对应表、缺失值处理说明、信效度检验指标的呈现方式、每个研究问题对应的统计方法与输出、结果部分的规范写法。要说明为什么选用该统计方法，不能只罗列公式。" },
-        "academic-grant": { "label": "开题报告", "description": "研究计划书与开题报告要点", "prompt": "请帮我整理一份研究计划书的写作框架，用于开题报告与基金申请。\n\n需要包含：立项依据与研究问题的提出方式、研究内容的分层拆解与关键问题、技术路线与研究方法、进度安排与阶段性成果、预期成果与创新点、经费与可行性说明。每一部分都要说明评委最关注什么。" }
+        "academic-outline": {
+          "label": "论文大纲",
+          "description": "五章十八节提纲与排期",
+          "prompt": "为我正在写的硕士学位论文《面向中型团队的本地优先智能体协作流程研究》输出一份中文论文大纲，不少于 8 页：含标题页与摘要、目录与篇幅分配、逐节提纲（含二三级标题）、研究问题与方法对应矩阵、图表清单、写作排期与里程碑，以及 10 条以上按引用顺序编号的参考文献与术语表。"
+        },
+        "academic-polish": {
+          "label": "学术润色",
+          "description": "逐句润色并标注修改理由",
+          "prompt": "润色我的论文全文语言表达，输出不少于 8 页的润色报告：分章节给出修改前与修改后对照（保留原意、逐处标注理由）、统一术语与搭配、规范数字单位与统计表述、明确各章节时态与人称，并附逐句修改清单、修改前后评分与参考文献格式检查结果。"
+        },
+        "academic-review": {
+          "label": "文献综述",
+          "description": "文献脉络梳理与研究缺口",
+          "prompt": "围绕「端侧推理与团队协作流程」做一篇系统文献综述，输出不少于 8 页：写明数据库、检索式、纳入排除标准与筛选一致性系数，按三条研究脉络逐篇归类并给出结论量级与局限，做方法学质量评价，用证据矩阵指出研究缺口，最后给出 20 条以上按编号引用的参考文献。"
+        },
+        "academic-data-analysis": {
+          "label": "数据统计",
+          "description": "问卷信效度与回归结果呈现",
+          "prompt": "把我收集的 412 份有效问卷做成完整的数据分析章节，不少于 8 页：含样本回收与清洗流程、变量与题项说明、描述统计与相关矩阵、信度效度检验、组间差异检验、多元回归与中介分析、稳健性检验，以及假设检验汇总表，所有图表须编号并与正文数字一致。"
+        },
+        "academic-method": {
+          "label": "研究方法",
+          "description": "准实验设计与变量操作化",
+          "prompt": "把我的研究设计写成可复现的研究方法章节，不少于 8 页：含研究假设与逐条判定标准、变量操作化定义与测量方式、样本分组与功效分析、干预流程与投放节奏、数据采集口径与质量控制、双重差分等分析模型，以及伦理审查与数据保护安排，并附量表条目与日志字段清单。"
+        },
+        "academic-defense": {
+          "label": "答辩提纲",
+          "description": "汇报时序与十二问应答要点",
+          "prompt": "帮我准备硕士学位论文答辩，输出不少于 8 页的答辩材料：含 20 分钟汇报的五个部分与逐页要点、时间分配表、结果与结论页的关键数据（带统计量与置信区间）、12 个高概率提问及应答要点与证据索引、答辩流程与材料清单，并附完整的幻灯片清单。"
+        },
+        "academic-grant": {
+          "label": "研究计划书",
+          "description": "立项依据、路线与经费预算",
+          "prompt": "按青年科学基金申报要求写一份研究计划书，不少于 8 页：含立项依据与关键科学问题、国内外研究现状与不足、研究内容与技术路线、创新点与可行性分析、三年进度与里程碑、预期成果与考核指标、逐科目经费预算（金额与占比须合计一致），以及研究基础与参考文献。"
+        },
+        "academic-ethics": {
+          "label": "伦理审查",
+          "description": "知情同意、风险与数据保护",
+          "prompt": "为一项涉及人的流程干预研究准备伦理审查送审材料，不少于 8 页：含研究概述与科学必要性、受试者招募与纳入排除标准、知情同意流程与告知要素、风险与受益评估及控制措施、数据隐私保护与保存销毁安排、利益冲突与补偿、退出机制，以及审查要点自查清单与法规依据。"
+        }
       }
     },
     "docs": {
       "label": "文档",
       "prompts": {
-        "docs-meeting": { "label": "会议纪要", "description": "整理讨论内容与行动项", "prompt": "请把我提供的会议记录整理成正式会议纪要，包含议题、关键结论、待办事项、负责人和截止时间。" },
-        "docs-report": { "label": "工作报告", "description": "生成结构清晰的正式报告", "prompt": "请根据我提供的材料撰写一份正式工作报告，包含背景、进展、数据、问题、建议和下一步计划。" },
-        "docs-summary": { "label": "文档摘要", "description": "快速提炼长文档重点", "prompt": "请阅读我提供的文档，输出简明摘要、关键事实、重要结论、风险点和需要进一步确认的问题。" },
-        "docs-polish": { "label": "文档润色", "description": "改善语句与整体表达", "prompt": "请润色我提供的文档，改善语法、措辞、结构和正式程度，保留原有事实与意图，并给出修改后的完整版本。" },
-        "docs-prd": { "label": "需求文档", "description": "产品需求说明与验收标准", "prompt": "请帮我写一份产品需求文档(PRD),要求:\n\n1. 说明需求背景、目标用户与要解决的问题;\n2. 列出功能需求清单,标注优先级和验收标准;\n3. 描述核心场景的完整流程;\n4. 明确本版本不做的范围;\n5. 列出依赖条件与主要风险;\n6. 语言简洁,可直接发给研发评审。" },
-        "docs-notice": { "label": "通知公告", "description": "内部通知与公告文书起草", "prompt": "请帮我起草一份公司内部通知,内容是调整月度报表的报送时间与方式,要求:\n\n1. 标题规范,文号、发文单位和日期齐全;\n2. 开头说明调整的原因和依据;\n3. 分条写清调整的具体内容;\n4. 写明执行要求与责任归属;\n5. 注明生效时间;\n6. 结尾给出反馈渠道和落款。" }
+        "docs-meeting": {
+          "label": "会议纪要",
+          "description": "整理讨论内容与行动项",
+          "prompt": "请把我提供的会议记录整理成正式会议纪要，交付不少于 8 页的文档：封面摘要、参会人员与议程、逐议题讨论及数据依据、决议事项、行动项清单（含负责人、时限与验收标准）、风险与未决事项、下次会议安排与附录。条款与编号须跨页连续，每项决议可逐条追溯。"
+        },
+        "docs-report": {
+          "label": "工作报告",
+          "description": "生成结构清晰的正式报告",
+          "prompt": "请根据我提供的材料撰写一份不少于 10 页的正式工作报告：编制说明与数据口径、总体指标对比、分区域与分业务线数据表、重点工作完成度评价、问题归因分析、下阶段计划与资源需求、风险提示与附录。全部数字须标注来源，跨页同一指标必须一致。"
+        },
+        "docs-summary": {
+          "label": "文档摘要",
+          "description": "快速提炼长文档重点",
+          "prompt": "请阅读我提供的长文档，输出不少于 8 页的结构化摘要：原文概况与篇幅构成、研究方法与样本说明、核心发现（逐条附支撑数据）、结论与行动建议、局限与待确认问题、术语表与数据出处索引。引用的每个数字都要标注原文页码。"
+        },
+        "docs-polish": {
+          "label": "文档润色",
+          "description": "改善语句与整体表达",
+          "prompt": "请润色我提供的文档，交付不少于 8 页的润色稿：润色总览与问题类型分布、逐段修改前后对照（含每处修改理由）、数字与术语校核表、可直接使用的定稿全文、逐条修改清单与发布前检查清单。事实、数字、责任主体与结论一律不得改动。"
+        },
+        "docs-prd": {
+          "label": "需求文档",
+          "description": "产品需求说明与验收标准",
+          "prompt": "请帮我写一份产品需求文档（PRD），交付不少于 10 页：背景与目标、用户角色与使用场景、功能需求清单（含优先级与验收标准）、核心流程与异常分支、埋点与指标定义、非功能需求与验收方式、本期不做范围与依赖假设、排期与风险及附录。"
+        },
+        "docs-notice": {
+          "label": "通知公告",
+          "description": "内部通知与公告文书起草",
+          "prompt": "请起草一份公司内部通知，交付不少于 8 页：标题与文号、制定依据与背景数据、调整内容条款、操作步骤、执行要求与自查清单、生效时间与过渡安排、口径问答、监督问责，以及含模板字段与联系方式的附录。条款编号须全文连续。"
+        },
+        "docs-sop": {
+          "label": "作业流程",
+          "description": "标准作业流程与检查清单",
+          "prompt": "请编写一份标准作业流程（SOP），交付不少于 8 页：目的、适用范围与术语、角色与职责矩阵、流程总览与判定点、分步作业要求（含时限）、异常与例外处理、质量检查与考核、培训与生效安排，以及值班检查清单等附录。"
+        },
+        "docs-api": {
+          "label": "接口文档",
+          "description": "开放接口说明与联调清单",
+          "prompt": "请为我们的开放平台编写接口文档，交付不少于 10 页：接入准备与鉴权算法、通用请求与响应规范、接口清单与权限矩阵、各接口的请求响应示例与错误码、回调订阅与重试策略、限流配额、联调检查清单与字段字典。"
+        }
       }
     }
   },
@@ -194,69 +321,89 @@
       "label": "Create Slides",
       "prompts": {
         "pptx-work-report": {
-          "label": "Work Report",
-          "description": "Quarterly summary and next phase planning report",
-          "prompt": "Create a quarterly work report PPT with the following content:\n\n1. Review of core work achievements this quarter\n2. Key project progress and milestone completion\n3. Performance metrics completion (visualized with charts)\n4. Problems encountered and solutions\n5. Team collaboration highlights\n6. Next quarter work plans and objectives\n7. Resource support needed\n\nStyle requirements: Concise business style, clear logic, data visualization, suitable for management reporting."
-        },
-        "pptx-content-research": {
-          "label": "Industry Research",
-          "description": "Industry trends and competitor analysis report",
-          "prompt": "Create an industry research and analysis report PPT covering the following sections:\n\n1. Research background and objectives\n2. Overall industry development status and market size\n3. Main competitor comparison (features, pricing, user reputation)\n4. Target user persona and core needs insights\n5. Industry trends and opportunities summary\n6. Actionable strategy recommendations\n\nStyle requirements: Data-driven, rich in charts, well-reasoned viewpoints, suitable for internal team sharing and discussion."
+          "label": "Quarterly Report",
+          "description": "Metrics, attribution and next-quarter plan",
+          "prompt": "Turn my quarterly data into a slide deck of at least 9 pages: a cover with three key metrics and an attainment table, then agenda, scope and methodology, current-state tables with a monthly trend chart, attribution analysis, a four-dimension evaluation framework, a before/after comparison, risks and dependencies, and conclusions with a phased action plan. Keep every metric consistent across pages and name an owner for each risk mitigation."
         },
         "pptx-education": {
-          "label": "Educational Presentation",
-          "description": "Classroom teaching slides and knowledge explanation",
-          "prompt": "Create a popular science teaching courseware about \"Solar System and Planetary Exploration\" suitable for middle school classroom use, including:\n\n1. Overview of the Solar System\n2. Comparison of basic characteristics of the eight planets (size, distance, temperature, etc.)\n3. Earth's uniqueness - why it is suitable for life\n4. Important milestones in human space exploration\n5. Classroom interactive Q&A session (design 3-4 thinking questions)\n6. Extended reading recommendations\n\nStyle requirements: Vivid and lively, bright colors, content from shallow to deep, stimulating students' curiosity and desire to explore."
+          "label": "Teaching Deck",
+          "description": "Middle-school science deck on the solar system",
+          "prompt": "Build a classroom deck of at least 9 pages on the solar system and planetary exploration: lesson flow and timing, objectives and student analysis, a data table plus a diameter comparison chart for the eight planets, three differences between terrestrial and giant planets, an orbit diagram, a physical-feature comparison of six planets, common misconceptions, and a summary with homework. Every page needs one visualization, using 1 AU = 150 million km."
         },
         "pptx-ai-intro": {
-          "label": "Introduction to AI",
-          "description": "Popular science presentation for understanding AI basics",
-          "prompt": "Create a popular science PPT introducing artificial intelligence for beginners, including:\n\n1. What is artificial intelligence - explain with everyday examples\n2. Brief history of AI development (from Turing Test to large language models)\n3. Common AI application scenarios (voice assistants, recommendation systems, autonomous driving, etc.)\n4. Basic principles of machine learning (explained with intuitive analogies)\n5. How large models and ChatGPT work\n6. What AI can and cannot do\n7. How ordinary people can start using AI tools to improve efficiency\n\nStyle requirements: Easy to understand, use diagrams and analogies, avoid technical jargon, make it understandable even for those with no technical background."
-        },
-        "pptx-product-plan": {
-          "label": "Product Plan",
-          "description": "Product proposal and release plan review",
-          "prompt": "Create a product proposal deck covering:\n\n1. Background, target users and the problem to solve;\n2. How the problem shows up today and who it affects;\n3. The proposed solution and its core flow;\n4. Release phases and schedule;\n5. Resourcing and staffing estimate;\n6. Expected benefits and how they will be measured;\n7. Key risks and mitigations;\n\nStyle: structured and decision-oriented, focused on the reasoning behind each tradeoff. Suitable for a review with management."
+          "label": "AI Literacy Talk",
+          "description": "Plain-language AI basics for non-technical staff",
+          "prompt": "Create an AI literacy deck of at least 9 pages for non-technical colleagues: one-line answers to what it is, how it works and where to use it; internal usage and satisfaction across six scenarios; capability boundaries with hallucination rates; the four-step data-to-inference chain and three model types; six differences between traditional software and AI systems; a risk list with usage discipline; and three principles plus a five-item checklist. No code anywhere."
         },
         "pptx-training": {
-          "label": "Training Deck",
-          "description": "Onboarding and role training courseware",
-          "prompt": "Create an onboarding training deck for new team members covering:\n\n1. Training goals and a three-day ramp-up path;\n2. Step-by-step environment setup;\n3. Common tools and collaboration conventions;\n4. Business background and the core workflow;\n5. A walkthrough of the first independent change;\n6. Common pitfalls and how to avoid them;\n\nStyle: step-by-step, with flow diagrams and checklists so a newcomer can follow along."
+          "label": "Onboarding Deck",
+          "description": "Three-day onboarding path with assessment",
+          "prompt": "Produce an onboarding deck of at least 9 pages: the four-day schedule and time budget, audience and prerequisites, onboarding-time data for the last three cohorts with a comparison chart, quantified blockers, a four-layer capability map with a self-check list, a misconception-versus-practice table, risks and mentor effort, and assessment criteria with a resource list. Every page must offer concrete, checkable items."
+        },
+        "pptx-product-plan": {
+          "label": "Product Proposal",
+          "description": "Requirements, release plan and resource estimate",
+          "prompt": "Build a product proposal deck of at least 9 pages: background and problem definition, ticket distribution across 18 categories with daily volumes, three automation opportunities with a three-stage efficiency path, a four-layer architecture with per-layer degradation, the release plan and before/after metrics, a risk register, and milestones with acceptance criteria. Explain the trade-offs, the resource ask and what is explicitly out of scope."
+        },
+        "pptx-content-research": {
+          "label": "Market Research",
+          "description": "Market size, landscape and opportunity gaps",
+          "prompt": "Create a market research deck of at least 9 pages: research questions and methodology, size, growth and penetration for four sub-industries, three core findings with supporting data, a four-quadrant competitive map by deployment model and data control, an eight-dimension competitor comparison, study limitations and sample bias, and conclusions with a three-step plan and a source list. Market-size figures must match across pages."
+        },
+        "pptx-annual-review": {
+          "label": "Annual Review",
+          "description": "Revenue, margin and cash-flow review",
+          "prompt": "Produce an annual business review deck of at least 9 pages: consolidated reporting scope and adjustments, revenue and gross-margin structure across three business lines, revenue-increment attribution and a gross-margin decline breakdown, a growth-versus-margin quadrant with a net-margin decomposition, actual results against the year's targets, operating risks, and 2027 goals with three must-win battles. All figures must reconcile with the ledger."
+        },
+        "pptx-fundraising": {
+          "label": "Series A Pitch",
+          "description": "Growth, unit economics and Series A terms",
+          "prompt": "Build a Series A pitch deck of at least 9 pages: company and target market, a four-year ARR curve with operating metrics, the unit-economics chain from ARPU to LTV/CAC, revenue mix and delivery process, a benchmark comparison with three comparable companies, customer concentration and sensitivity analysis, and use of proceeds with 2027 milestones and deal terms. Every financial figure must be verifiable and assumptions stated."
         }
       }
     },
     "data-analysis": {
       "label": "Data Analysis",
       "prompts": {
-        "excel-summary": {
-          "label": "Excel Summary",
-          "description": "Categorize and summarize Excel data",
-          "prompt": "Please read my Excel file and help me complete the following tasks:\n\n1. Categorize data by category (sum, count, average)\n2. Generate proportion analysis for each category\n3. Mark outliers and key data points\n4. Output a well-organized summary statistics Excel file with charts."
-        },
         "image-to-excel": {
-          "label": "Image to Table",
-          "description": "Recognize table data in images and generate Excel",
-          "prompt": "Please recognize the table content in the image I uploaded and help me:\n\n1. Extract all table data from the image\n2. Organize into standard row and column format\n3. Correct possible recognition errors\n4. Generate a clearly formatted Excel file."
+          "label": "Photo to Table",
+          "description": "Turn photos of ledgers into tables",
+          "prompt": "Turn 10 photos of paper ledgers into a structured table: detect grid lines, OCR every cell with a confidence score, and route cells below 0.90 to human review. Deliver a report of 8+ pages covering the pipeline, field dictionary, per-photo detail, error causes, validation rules and next actions, plus accuracy and confidence distributions."
         },
-        "word-report": {
-          "label": "Data Report",
-          "description": "Generate Word analysis report based on data files",
-          "prompt": "Please generate a Word analysis report based on the data file I provided, with the following requirements:\n\n1. Include data overview description\n2. Core metrics statistics and trend analysis\n3. Key findings and conclusion summary\n4. Professional layout, clear structure, ready for reporting."
+        "excel-summary": {
+          "label": "Sales Summary",
+          "description": "Quarterly sales by region and category",
+          "prompt": "Summarise the sales workbook by region, channel and category with period-on-period change and shares. Deliver an 8+ page tabular report: summary cover, sheet map, caliber and field dictionary, region and category detail, channel mix, anomaly list, validation rules, conclusions, actions and appendix, with figures consistent across pages."
         },
         "multi-excel-merge": {
-          "label": "Merge Multiple Tables",
-          "description": "Merge multiple Excel files and standardize format",
-          "prompt": "I have multiple Excel files that need to be merged and organized. Please help me:\n\n1. Merge data from multiple files into one table\n2. Standardize column names and data formats\n3. Remove duplicate data\n4. Generate a merged Excel file with data source markers."
+          "label": "Merge Workbooks",
+          "description": "Merge regional sheets into one table",
+          "prompt": "Merge three regional sheets into one standard-caliber table: map differing column names, normalise amount units and date formats, de-duplicate by order id across files, and fix missing regions and out-of-range statuses. Deliver an 8+ page merge report with lineage back to source file and row number."
         },
-        "excel-reconcile": {
-          "label": "Reconciliation",
-          "description": "Compare two datasets and locate differences",
-          "prompt": "I have two datasets that need to be reconciled. Please:\n\n1. Match records on the order number or another unique key;\n2. Flag mismatched amounts and records missing on one side;\n3. Group the differences by type and count each group;\n4. Suggest likely causes for each difference type;\n5. Output an Excel result with a separate detail sheet."
+        "word-report": {
+          "label": "Data to Report",
+          "description": "Auto-draft a business review report",
+          "prompt": "Auto-draft the monthly business review from sales and cost data, computing period-on-period growth, gross margin, new-sign share and fulfilment time. Deliver an 8+ page document with chapter structure, calibers, product and cost detail, efficiency gaps, anomaly list, validation rules, conclusions and actions, every cited figure aligned to the source tables."
         },
         "excel-budget": {
-          "label": "Budget Sheet",
-          "description": "Build a department budget usage tracker",
-          "prompt": "Please build a quarterly department budget sheet:\n\n1. List budget amounts by category (staff, cloud and compute, marketing, travel and office, and so on);\n2. Record the amount already committed and calculate usage;\n3. Flag categories that are overused or underused;\n4. Suggest how to allocate the remaining budget;\n5. Output an Excel file with the usage rates charted."
+          "label": "Budget Watch",
+          "description": "Budget usage with overspend forecast",
+          "prompt": "Analyse Q4 department budget execution: report committed amount, utilisation and burn multiple by account and by department, forecast November-December spend and flag overspend. Deliver an 8+ page budget report with forecast detail, department breakdown, anomaly list, validation rules and reallocation actions."
+        },
+        "excel-reconcile": {
+          "label": "Ledger Recon",
+          "description": "Reconcile ledger against channel bills",
+          "prompt": "Reconcile the ledger against the channel statement order by order: two-way match on order id, compare amounts, auto-match within tolerance, and root-cause every out-of-tolerance difference into missing order, refund lag, fee basis or rounding. Deliver an 8+ page report with a pending-items ledger and actions."
+        },
+        "excel-pivot": {
+          "label": "Pivot Analysis",
+          "description": "Channel and category cross-tab analysis",
+          "prompt": "Build a channel x category pivot from the sales detail, validate that row totals, column totals and the detail table agree, then decompose growth by category and channel. Deliver an 8+ page pivot report with dimension dictionary, contribution analysis, the full matrix, anomaly cells, validation rules and actions."
+        },
+        "excel-anomaly": {
+          "label": "Anomaly Screen",
+          "description": "Detect expense anomalies by risk level",
+          "prompt": "Screen 4,286 expense claims for anomalies using threshold, frequency and distribution rules, then grade every hit as high, medium or low risk. Deliver an 8+ page report covering the detection pipeline, field calibers, rule-hit detail, department distribution, deviation multiples, rule validation and phased actions."
         }
       }
     },
@@ -266,32 +413,42 @@
         "edu-english-words": {
           "label": "English Vocabulary",
           "description": "Efficiently memorize English words",
-          "prompt": "I am preparing for the CET-4 exam. Please help me organize a high-frequency core vocabulary learning list with the following requirements:\n\n1. Select 20 high-frequency must-know words\n2. Provide phonetic symbols, Chinese definitions, and a short example sentence for each word\n3. Group by theme (such as campus life, work, technology, etc.)\n4. Provide a quiz at the end to help me test my memory."
+          "prompt": "Write a vocabulary handout of at least 10 pages for high-school or CET-4 learners, built around the word resilient and the Latin root salire: learning goals and path, word-formation map with a corpus frequency chart, meaning evolution plus 8 real collocations, a table of 6 error types, 12 graded exercises with per-question answers, a self-check list, a 30-day plan and a glossary appendix. Every point needs concrete words and numbers, consistent across pages."
         },
         "edu-math-explain": {
           "label": "Math Problem Explanation",
           "description": "Detailed solution process for math problems",
-          "prompt": "Please explain the following mathematical knowledge in an easy-to-understand way:\n\nProblem: Solve the quadratic equation 2x² + 3x - 5 = 0\n\nRequirements:\n1. First review the general form of quadratic equations and the quadratic formula\n2. Show the complete substitution and calculation process step by step\n3. Analyze the nature of roots using the discriminant\n4. Finally verify if the answer is correct\n5. Provide a similar practice problem for me to consolidate."
+          "prompt": "Write a math handout of at least 10 pages on the maximum and minimum of a quadratic function over a closed interval: learning goals and path, concept map, completing the square and the three axis-position cases (axis left of, inside, right of the interval), a table of common errors, 12 graded exercises with per-question answers, a self-check list, the next-stage plan and a glossary appendix. Every item must use concrete functions and intervals with consistent values."
         },
         "edu-essay-writing": {
           "label": "Essay Writing Guidance",
           "description": "Improve writing skills and techniques",
-          "prompt": "Please provide essay writing guidance on the topic \"My Most Unforgettable Trip\":\n\n1. First provide a clear writing outline (structural suggestions for introduction, body, and conclusion)\n2. Share 3 techniques to make the article more vivid (such as detailed description, sensory description, scene-based emotion)\n3. Write a sample opening paragraph to show how to attract readers\n4. List 5 good words and sentences that can be used in this essay\n5. Remind common writing problems and pitfalls to avoid."
+          "prompt": "Write a narrative-writing handout of at least 10 pages on concrete detail, using My First Long Trip as the worked example: learning goals and path, a five-senses detail map, 8 before-and-after rewrites, 6 common error types, 12 graded exercises with answers, a self-check list, a 12-week writing plan and a glossary appendix. Each rewrite must be a sentence a student can copy, with consistent figures across pages."
         },
         "edu-knowledge-explain": {
           "label": "Knowledge Explanation",
           "description": "Explain complex knowledge in simple language",
-          "prompt": "Please explain the concept of \"photosynthesis\" in easy-to-understand language:\n\n1. Summarize what photosynthesis is in one sentence\n2. Explain the principle with everyday life analogies\n3. Draw a simple process of photosynthesis (text-based flowchart)\n4. Explain the importance of photosynthesis for Earth and humanity\n5. Propose 3 thinking questions to help me deepen my understanding."
+          "prompt": "Write a popular-science handout of at least 10 pages explaining photosynthesis: learning goals and path, a concept map of the light and dark reactions, the overall equation with an everyday analogy, 6 common error types plus a photosynthesis-versus-respiration comparison table, 12 comprehension questions with answers, a self-check list, a 4-week inquiry plan and a glossary appendix. Include concrete matter-balance numbers that stay consistent."
         },
         "edu-study-plan": {
           "label": "Study Plan",
           "description": "Turn a goal into an executable study plan",
-          "prompt": "I need to prepare for an exam in three months. Please build a study plan I can actually keep up with:\n\n1. Split the period into stages and state the goal of each;\n2. Give the weekly schedule and the length of each session;\n3. List the checkable output for every stage;\n4. Explain how to use the time each day;\n5. Offer a fallback for the weeks I fall behind."
+          "prompt": "Write a CET-4 study plan of at least 10 pages: learning goals and path, score target and weekly time budget, a 12-week three-stage plan table, 6 common execution failures with a planned-versus-actual comparison, 12 plan-diagnosis questions with answers, a self-check list, a rolling revision scheme and a glossary appendix. Every duration and output figure must reconcile across pages."
         },
         "edu-mistake-review": {
           "label": "Mistake Review",
           "description": "Find the root cause of a wrong answer",
-          "prompt": "I got this problem wrong again. Please help me review it:\n\nProblem: solve the quadratic equation 2x² + 3x - 5 = 0\n\n1. Point out where my reasoning likely went wrong;\n2. Contrast the wrong approach with the correct one;\n3. Name the knowledge gap this exposes;\n4. Give the fixed steps for this type of problem;\n5. Add a similar problem so I can practice."
+          "prompt": "Write a mistake-review handout of at least 10 pages using the equation 2x² + 3x − 5 = 0: learning goals and path, a chart of error-cause shares, a wrong-versus-correct solution comparison, the full computation with discriminant Δ = 49, 6 common error types, 12 variant exercises with answers, a self-check list, the next-stage plan and a glossary appendix, plus a one-page mistake-card template."
+        },
+        "edu-class-activity": {
+          "label": "Class Activity Design",
+          "description": "Design ready-to-run classroom activities",
+          "prompt": "Write a classroom-activity design handout of at least 10 pages for a middle-school physics teacher, covering one 40-minute inquiry lesson on buoyancy: design goals and path, a timeline of six stages with grouping and equipment lists, a teacher-versus-student behaviour table, 6 common pitfalls, 12 design-diagnosis questions with answers, a self-check list, a unit plan and a glossary appendix. Stage durations must total exactly 40 minutes."
+        },
+        "edu-lab-report": {
+          "label": "Lab Report",
+          "description": "Record data properly and analyze errors",
+          "prompt": "Write a chemistry lab-report handout of at least 10 pages on titrating sodium hydroxide solution with 0.1000 mol/L standard hydrochloric acid: report structure, apparatus list and principle, a data table for three parallel titrations with the concentration calculation, 6 operational error types with high-or-low bias analysis, 12 calculation questions with answers, a self-check list, the next-stage plan and a glossary appendix. Concentrations, volumes and units must be consistent throughout."
         }
       }
     },
@@ -337,45 +494,142 @@
           "label": "Mini-game: 2048",
           "description": "Single-file 2048 with a tile ladder and one-step undo",
           "prompt": "Use the slate ladder template to build a 2048 number-merging game that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-game-2048.html and templates/web-game-2048.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nGameplay and rules:\n- The board is fixed at 4x4, arrow keys, WASD, and swiping on the board all move the tiles, and equal tiles merge into a doubled value;\n- After each move a new 2 or 4 appears in an empty cell, and the run ends when no move is possible;\n- Keep the single-step undo, and the button greys out once it is used;\n- The best score is kept in local storage, and changing storageKey clears it.\n\nContent to replace:\n- Rewrite the title, subtitle, both buttons, the end-screen copy, and the rules lines in copy;\n- rules exposes storageKey, startTiles, and winValue;\n- tiles is the value-to-color ladder, covering 2 through 2048 with a beyond fallback, and the keys must not skip values;\n- Every step's bg and fg pair has to pass WCAG AA, so check each one after changing colors.\n\nDesign goal:\nKeep the visual language of the template: the slate ground, one cobalt accent, the two score readouts at the top, the ladder strip under the board, and rounding only on the tiles. Adjust hue within that language, but the ladder has to stay one hue pushing through lightness, and the board must not fall back to beige with candy-colored tiles."
-        },
-        "web-game-typing": {
-          "label": "Mini-game: Typing Drill",
-          "description": "Timed English typing drill with per-character feedback",
-          "prompt": "Use the cool paper typing template to build an English typing drill that runs by opening a single file.\n\nTemplate: the frontend-design skill ships this template as a reference implementation. Read its SKILL.md first, then read templates/web-game-typing.html and templates/web-game-typing.info.md as described in the case-template section, and treat them as the baseline for layout skeleton, color roles, type hierarchy, and interaction.\n\nGameplay and rules:\n- The page shows an English passage and compares character by character: correct characters darken, mistakes turn red, and the current character carries a single underline;\n- Speed, accuracy, and remaining time update live at the top, and the result card appears when the timer runs out or the passage is finished;\n- Keep the three time steps and the next-passage button, and let Enter restart a round immediately;\n- Results stay on the page only, and a refresh clears them.\n\nContent to replace:\n- Rewrite the title, the line under it, the metric labels, and the result-card copy in copy;\n- Replace passages with three English passages of 110-170 characters each, using only English and common punctuation, because an IME breaks the character-by-character comparison;\n- Keep two or three scoring notes in notes;\n- An empty theme follows the system color scheme, and pinning one means writing all nine values, since a partial set locks the page to light.\n\nDesign goal:\nKeep the visual language of the template: the cool paper ground, one deep teal accent, the monospace passage area, the square metric strip, and the 2px progress line under the panel. Adjust hue within that language, but do not switch to a green-on-black terminal look, and do not add typewriter sound."
         }
       }
     },
     "deep-research": {
       "label": "Deep Research",
       "prompts": {
-        "research-industry": { "label": "Industry Trends", "description": "Map the market and its direction", "prompt": "Conduct deep research on the industry I specify, covering market size, key players, trends, opportunities, risks, and source-backed conclusions." },
-        "research-competitors": { "label": "Competitor Analysis", "description": "Compare positioning and capabilities", "prompt": "Prepare a competitor analysis comparing positioning, users, features, pricing, strengths, weaknesses, and differentiation opportunities in a table." },
-        "research-policy": { "label": "Policy Analysis", "description": "Explain impact and requirements", "prompt": "Analyze the policy or regulation I provide, extracting requirements, scope, dates, business impact, and implementation advice while flagging uncertainty." },
-        "research-literature": { "label": "Literature Review", "description": "Organize the research landscape", "prompt": "Create a literature review framework for the topic, summarizing methods, consensus, disagreements, gaps, and follow-up research questions." },
-        "research-user": { "label": "User Research", "description": "Interview based need insight report", "prompt": "Please run a round of target user research and produce a report. The subjects are frontline users, and the focus is the problems they hit in real work.\n\nThe report should cover the sample composition and method, the current workflow and where it breaks down, a ranked list of needs with the reasoning behind it, representative quotes, and concrete product recommendations. Every conclusion needs a stated source, not just an opinion." },
-        "research-market-entry": { "label": "Market Entry", "description": "Feasibility study for a new market", "prompt": "Please assess the feasibility of entering the market I specify, across four dimensions: demand size, acquisition cost, compliance burden, and delivery capability.\n\nThe report should include the evidence and sources behind each dimension, an overall ranking of the candidate markets, a staged entry plan with goals for each stage, and the main risks with mitigations. Close by stating clearly which markets to enter, which to watch, and which to defer." }
+        "research-industry": {
+          "label": "Industry Trend Study",
+          "description": "Industry size, drivers and trend calls",
+          "prompt": "Run an industry trend study on local-first AI tooling. Deliver a structured report of at least 10 pages: define scope and data sources first, then cover market size, sub-industry distribution and three-year movement with tables and charts, break down policy/technology/demand/supply drivers, list key insights each backed by a number, build three scenarios, and close with information gaps, risks and a phased action plan. Every figure needs a source, time window and definition."
+        },
+        "research-competitors": {
+          "label": "Competitor Analysis",
+          "description": "Capability matrix and open positioning",
+          "prompt": "Benchmark six direct competitors and deliver a report of at least 10 pages: define the competitor set, dimensions and weights; score feature coverage, cost, data control and ecosystem with charts; map positioning quadrants and structural gaps; list insights each with scoring evidence; model scenarios where a rival cuts price or closes a gap; and finish with product, pricing and go-to-market calls plus information gaps. Cite the source and date of every price and score."
+        },
+        "research-policy": {
+          "label": "Policy Brief",
+          "description": "Regulatory duties and compliance impact",
+          "prompt": "Interpret the new generative AI measures plus two companion guidelines in a compliance brief of at least 10 pages: state the text versions, scope and definitions; convert every clause into a duty list with trigger conditions and verifiable evidence; rate impact on data collection, model training, public services and internal use; model three enforcement scenarios; and close with a week-by-week plan before the October effective date, owners per duty, and a standalone page of gaps and uncertainty. Not legal advice."
+        },
+        "research-literature": {
+          "label": "Literature Review",
+          "description": "Research threads and evidence strength",
+          "prompt": "Run a systematic literature review on local inference and data sovereignty. Deliver at least 10 pages: state the query, databases, inclusion and exclusion rules and the screening funnel with counts per stage; chart year, method and theme distributions; break down each theme's core claims with the number of supporting papers and an evidence-strength rating; add a full page on conflicting findings and open questions; and close with search limitations, coverage bias and a tracking plan. Every claim must map back to paper IDs."
+        },
+        "research-user": {
+          "label": "User Research",
+          "description": "Interview sample, needs and pain points",
+          "prompt": "Run an interview-based needs study and deliver at least 10 pages: describe the sample structure and interview script; show the coding funnel with counts at each stage; rank needs on mention rate against current satisfaction; present pain-point frequencies with attributed quotes; model three investment scopes; and close with self-report and social-desirability bias, information gaps and a phased rollout plan. Every conclusion must trace back to a sample size and interview ID."
+        },
+        "research-market-entry": {
+          "label": "Market Entry Study",
+          "description": "Region feasibility, timing, prerequisites",
+          "prompt": "Assess entry feasibility for six Southeast Asian markets in a report of at least 10 pages: define the framework and four weighted dimensions (demand size, acquisition cost, compliance barrier, delivery capability); compare the six markets with tables and charts; give an enter/watch/defer call per market with reasons; model three scenarios including the month gross margin turns positive; and finish with prerequisites, information gaps and a phased investment cadence. Every figure needs a definition, source and time window."
+        },
+        "research-supply-chain": {
+          "label": "Supply Chain Risk",
+          "description": "Shortage and price risk of key parts",
+          "prompt": "Scan supply risk across key AI hardware parts in a report of at least 10 pages: define scope and a four-factor risk score (supplier concentration, lead-time volatility, price movement, substitutability); list eight part groups with vendor counts, lead times, price change and single-source share, each scored; split them by concentration and substitutability; give insights with evidence; model shortage, price-hike and substitution scenarios; and close with safety-stock and dual-source plans, gaps and a phased action list."
+        },
+        "research-talent": {
+          "label": "Talent Market Study",
+          "description": "Role supply, pay percentiles, time to hire",
+          "prompt": "Study the talent market for six target roles in at least 10 pages: define each role, the pay basis and data sources; tabulate open demand, available candidates, gap ratio, median pay and time to hire with three charts; layer roles by gap ratio against pay level; give insights with evidence; model pay-raise, internal-training and remote-hiring scenarios; and close with pay-percentile targets, hiring cadence, information gaps and a phased plan."
+        }
       }
     },
     "academic-research": {
       "label": "Academic Research",
       "prompts": {
-        "academic-outline": { "label": "Paper Outline", "description": "Build a clear paper structure", "prompt": "Design an academic paper outline for my topic with research questions, framework, methods, results, and discussion, including writing guidance for each section." },
-        "academic-review": { "label": "Literature Notes", "description": "Extract and connect key studies", "prompt": "Organize the literature I provide by topic, method, and conclusion; extract key claims and identify support, contradictions, and useful citations." },
-        "academic-method": { "label": "Research Method", "description": "Choose a suitable study design", "prompt": "Compare research methods for my objective and data, then recommend a design with variables, sample needs, steps, and limitations." },
-        "academic-polish": { "label": "Academic Editing", "description": "Improve rigor and clarity", "prompt": "Edit the paper passage I provide into precise, coherent academic English while preserving meaning, and list the key revisions." },
-        "academic-data-analysis": { "label": "Data and Statistics", "description": "Statistical methods and results for survey data", "prompt": "Please help me write the data processing and statistical analysis section of my thesis. The subject is survey data.\n\nInclude a table mapping variables to measurement methods, how missing values were handled, how reliability and validity are reported, the statistical method matched to each research question with its output, and the conventional way to write up results. Explain why each method was chosen rather than listing formulas." },
-        "academic-grant": { "label": "Research Proposal", "description": "Proposal outline for thesis or grant application", "prompt": "Please put together a writing framework for a research proposal, for a thesis opening report or a grant application.\n\nInclude how to frame the rationale and the research question, a layered breakdown of the research content with its key questions, the technical route and methods, the schedule with staged deliverables, expected outcomes and contributions, and the budget and feasibility notes. For each part, note what reviewers look for." }
+        "academic-outline": {
+          "label": "Thesis Outline",
+          "description": "Five-chapter outline with schedule",
+          "prompt": "Draft a deliverable Chinese thesis outline of at least 8 pages for my master's thesis on local-first agent collaboration workflows: title and abstract, contents with length allocation, section-by-section outline to three heading levels, a research-question-to-method matrix, figure and table list, writing schedule and milestones, plus 10+ numbered references and a glossary."
+        },
+        "academic-polish": {
+          "label": "Academic Polish",
+          "description": "Sentence-level polish with rationale",
+          "prompt": "Polish the language of my full thesis and produce a report of at least 8 pages: before-and-after revision pairs per chapter with a stated reason for every change, unified terminology and collocations, standardised numbers, units and statistical phrasing, chapter-by-chapter tense and person rules, a sentence-level change log, before-and-after scores and a reference-format check."
+        },
+        "academic-review": {
+          "label": "Literature Review",
+          "description": "Sixty-eight papers mapped to gaps",
+          "prompt": "Produce a systematic literature review of at least 8 pages on on-device inference and team collaboration workflows: databases, search strings, inclusion and exclusion criteria with inter-rater agreement, three thematic strands with effect sizes and limitations, a methodological quality appraisal, an evidence matrix locating the research gaps, and 20+ numbered references."
+        },
+        "academic-data-analysis": {
+          "label": "Data Analysis",
+          "description": "Reliability, validity and regression reporting",
+          "prompt": "Turn my 412 valid questionnaire responses into a full data-analysis chapter of at least 8 pages: sample recovery and cleaning, variables and item wording, descriptive statistics and correlations, reliability and validity tests, group comparisons, multiple regression with mediation, robustness checks and a hypothesis-summary table, with every figure and table numbered and matching the text."
+        },
+        "academic-method": {
+          "label": "Research Method",
+          "description": "Quasi-experiment design and variable coding",
+          "prompt": "Write my study design as a reproducible methods chapter of at least 8 pages: hypotheses with explicit decision criteria, operational definitions and measurement for every variable, sampling and power analysis, the intervention rollout schedule, data-collection rules and quality control, difference-in-differences and other models, plus ethics and data-protection arrangements and scale items."
+        },
+        "academic-defense": {
+          "label": "Defense Brief",
+          "description": "Timing plan and twelve Q&A briefs",
+          "prompt": "Prepare my master's thesis defence with at least 8 pages of material: the five parts of a 20-minute presentation with per-slide talking points, a timing table, key results with test statistics and confidence intervals, twelve likely committee questions with answer points and evidence references, the defence procedure and material checklist, and a slide list."
+        },
+        "academic-grant": {
+          "label": "Grant Proposal",
+          "description": "Rationale, roadmap and budget breakdown",
+          "prompt": "Write a research proposal of at least 8 pages to the Young Scientists Fund format: rationale and key scientific questions, domestic and international state of the art with gaps, research content and technical roadmap, innovation and feasibility, a three-year schedule with milestones, expected outputs and assessment metrics, a line-item budget whose amounts and shares reconcile, and prior work."
+        },
+        "academic-ethics": {
+          "label": "Ethics Review",
+          "description": "Consent, risk controls and data protection",
+          "prompt": "Prepare ethics review submission materials of at least 8 pages for a human-subjects workflow study: research overview and scientific necessity, participant recruitment with inclusion and exclusion criteria, the informed-consent process and disclosure elements, risk and benefit assessment with mitigation, data privacy plus storage and destruction rules, conflicts of interest, compensation and withdrawal, and a self-check list."
+        }
       }
     },
     "docs": {
       "label": "Documents",
       "prompts": {
-        "docs-meeting": { "label": "Meeting Minutes", "description": "Turn discussion into action items", "prompt": "Turn my meeting notes into formal minutes with agenda, decisions, action items, owners, and due dates." },
-        "docs-report": { "label": "Work Report", "description": "Create a structured formal report", "prompt": "Write a formal work report from my materials covering background, progress, data, issues, recommendations, and next steps." },
-        "docs-summary": { "label": "Document Summary", "description": "Extract the essentials quickly", "prompt": "Read the document I provide and return a concise summary, key facts, conclusions, risks, and questions requiring confirmation." },
-        "docs-polish": { "label": "Document Editing", "description": "Improve language and structure", "prompt": "Edit my document for grammar, wording, structure, and appropriate formality while preserving facts and intent, then provide the complete revised version." },
-        "docs-prd": { "label": "PRD", "description": "Product requirements with acceptance criteria", "prompt": "Please write a product requirements document (PRD) that:\n\n1. Explains the background, target users and the problem to solve;\n2. Lists the functional requirements with priority and acceptance criteria;\n3. Describes the end-to-end flow of the core scenarios;\n4. States clearly what is out of scope for this release;\n5. Lists dependencies and the main risks;\n6. Stays concise and is ready to hand to engineering for review." },
-        "docs-notice": { "label": "Notice", "description": "Internal notice and announcement drafting", "prompt": "Please draft an internal company notice about adjusting the submission time and method for monthly reports. It should:\n\n1. Use a proper title with document number, issuing department and date;\n2. Open with the reason and basis for the change;\n3. List the specific changes item by item;\n4. State the requirements and who owns each;\n5. Note when it takes effect;\n6. Close with a feedback channel and the signature block." }
+        "docs-meeting": {
+          "label": "Meeting Minutes",
+          "description": "Turn discussion into action items",
+          "prompt": "Turn my meeting notes into formal minutes of at least 8 pages: cover summary, attendees and agenda, per-topic discussion with supporting data, resolutions, an action list with owners, deadlines and acceptance criteria, risks and open items, next meeting and annexes. Clause numbers must run continuously across pages."
+        },
+        "docs-report": {
+          "label": "Work Report",
+          "description": "Create a structured formal report",
+          "prompt": "Write a formal work report of at least 10 pages from my materials: scope and metric definitions, headline KPI comparison, regional and business-line tables, key-work completion review, root-cause analysis, next-quarter plan and resource needs, risks and annexes. Every figure needs a source and must stay consistent across pages."
+        },
+        "docs-summary": {
+          "label": "Document Summary",
+          "description": "Extract the essentials quickly",
+          "prompt": "Read the long document I provide and return a structured summary of at least 8 pages: source overview and page composition, method and sample description, key findings each backed by data, conclusions and actions, limitations and open questions, glossary and a page index for every cited figure."
+        },
+        "docs-polish": {
+          "label": "Document Editing",
+          "description": "Improve language and structure",
+          "prompt": "Edit my document and deliver at least 8 pages: an overview with the distribution of issue types, paragraph-by-paragraph before/after comparison with reasons, a numbers and terminology check table, the clean final text, and an itemised change list plus a pre-release checklist. Facts, numbers and conclusions must not change."
+        },
+        "docs-prd": {
+          "label": "PRD",
+          "description": "Product requirements with acceptance criteria",
+          "prompt": "Write a product requirements document of at least 10 pages: background and goals, user roles and scenarios, a requirement list with priorities and acceptance criteria, core flow and exception branches, tracking events and metric definitions, non-functional requirements and acceptance method, out-of-scope items, roadmap, risks and annexes."
+        },
+        "docs-notice": {
+          "label": "Notice",
+          "description": "Internal notice and announcement drafting",
+          "prompt": "Draft an internal company notice of at least 8 pages: title and document number, basis and background data, the clauses being changed, step-by-step instructions, compliance requirements with a self-check list, effective date and transition plan, a Q&A section, supervision and accountability, plus an annex with form fields and contacts."
+        },
+        "docs-sop": {
+          "label": "SOP",
+          "description": "Standard procedure with checklists",
+          "prompt": "Write a standard operating procedure of at least 8 pages: purpose, scope and terms, a role and responsibility matrix, process overview with decision points, step-by-step work requirements with time limits, exception handling, quality checks and assessment, training and effective date, and appendices such as an on-shift checklist."
+        },
+        "docs-api": {
+          "label": "API Reference",
+          "description": "Integration guide with schemas and error codes",
+          "prompt": "Write the API reference for our open platform in at least 10 pages: onboarding and signature authentication, general request and response conventions, an endpoint list with a permission matrix, request/response examples and error codes per endpoint, callback subscriptions and retry policy, rate limits and quotas, plus an integration checklist and field dictionary."
+        }
       }
     }
   }

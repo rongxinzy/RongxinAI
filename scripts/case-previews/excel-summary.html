@@ -1,90 +1,86 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-summary</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-summary</title><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased;display:grid;gap:26px;padding:30px;justify-items:center}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 40px 18px;display:flex;flex-direction:column}
+.ph{display:flex;align-items:flex-start;gap:20px;border-bottom:1px solid #edede9;padding-bottom:12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.18;margin-top:7px}
+h2{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:7px}
+.cap{margin-left:auto;text-align:right;font-size:11px;color:#8b8f97;line-height:1.75;padding-top:2px}
+.meta{display:flex;gap:18px;margin-top:8px;font-size:11.5px;color:#8b8f97;flex-wrap:wrap}
+.meta span{position:relative}
+.meta span+span::before{content:"";position:absolute;left:-10px;top:5px;width:3px;height:3px;background:#c9c9c3}
+.body{flex:1;min-height:0;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.body>*{flex:0 0 auto}
+.stack{flex:none}
+.bars{flex:none}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#8b8f97}
+.pf b{font-weight:500;color:#6f737b}
+.sec{font-size:11px;letter-spacing:.22em;color:#8b8f97;text-transform:uppercase}
+.sec.dark{color:#6f737b;letter-spacing:.16em}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:500;letter-spacing:.06em;color:#6f737b;background:#f6f6f3;text-align:left;padding:5px 10px;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+td{font-size:12.5px;color:#3d4046;padding:5px 10px;border-bottom:1px solid #edede9;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.dn th{padding:3px 9px}
+table.dn td{padding:3px 9px}
+table.dn2 th{padding:2px 8px}
+table.dn2 td{padding:2px 8px}
+.cols.mid{align-items:center}
+.cols.mid>*{min-width:0}
+th.r,td.r{text-align:right}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.hc,th.hc{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+td.mut{color:#8b8f97}
+.lead{font-size:12.5px;color:#4c5058;line-height:1.55}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{border:1px solid #e4e4e0;padding:8px 12px}
+.kpi .k{font-size:11px;color:#8b8f97;letter-spacing:.08em}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.kpi .n{font-size:11px;color:#8b8f97;margin-top:3px;line-height:1.5}
+.cols{display:flex;gap:26px;align-items:flex-start}
+.cols>*{min-width:0}
+.cols.g40{display:grid;grid-template-columns:1fr 300px;gap:26px}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:118px 1fr 64px;align-items:center;gap:11px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.bar .r{text-align:right;color:#3d4046}
+.bar.tight{grid-template-columns:96px 1fr 58px;gap:9px}
+.pts{display:grid;gap:6px}
+.pt{font-size:12.5px;color:#4c5058;line-height:1.55;padding-left:13px;position:relative}
+.pt::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;background:var(--accent)}
+.note{font-size:11px;color:#8b8f97;line-height:1.7}
+.stack{display:flex;height:10px;border:1px solid #e4e4e0}
+.stack i{display:block;height:100%;background:var(--accent)}
+.stack i:nth-child(2){opacity:.74}
+.stack i:nth-child(3){opacity:.56}
+.stack i:nth-child(4){opacity:.4}
+.stack i:nth-child(5){opacity:.27}
+.stack i:nth-child(6){opacity:.18}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:#6f737b}
+.legend b{font-weight:500;color:#3d4046;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:6px 11px;font-size:12.5px;color:#3d4046}
+.chip b{font-weight:600;font-variant-numeric:tabular-nums;color:#16171a}
+.badge{font-size:11px;padding:1px 6px;border:1px solid #e4e4e0;color:#6f737b;font-weight:400}
+.badge.ac{background:color-mix(in srgb,var(--accent) 10%,#fff);border-color:transparent;color:#16171a;font-weight:500}
+.tnote{font-size:11px;color:#8b8f97;line-height:1.5;margin-top:2px}
+.cv{display:grid;gap:3px}
+.cv div{font-size:11px;color:#4c5058;line-height:1.44;padding-left:11px;position:relative}
+.cv div::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;background:var(--accent)}
+.pg{font-size:11px;color:#6f737b;line-height:1.72}
+.pg b{color:#3d4046;font-weight:500;letter-spacing:.04em}
+.wrap{display:flex;flex-direction:column;gap:9px}
 
-body{padding:30px}
-.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
-.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
-.file{font-weight:600;margin-left:6px}
-.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
-.grid{flex:1;min-height:0;overflow:hidden}
-.row{display:grid;border-top:1px solid #edede9}
-.row:first-child{border-top:0}
-.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
-.row:last-child .cell{border-bottom:0}
-.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
-.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
-.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
-.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
-.split{flex:1;display:grid;grid-template-columns:1.15fr 1fr;min-height:0}
-.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
-.pane:last-child{border-right:0}
-.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
-.bars{margin-top:16px;display:grid;gap:11px}
-.bar{display:grid;grid-template-columns:56px 1fr 44px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-.shot{margin-top:14px;border:1px dashed #cfcfc9;background:#fafaf8;height:190px;padding:14px;display:flex;align-items:center;justify-content:center}
-.shot table{border-collapse:collapse;font-size:11px;color:#6f737b;background:#fff}
-.shot td,.shot th{border:1px solid #e4e4e0;padding:5px 9px}
-.arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:#b6bac0}
-.files{display:grid;gap:10px;margin-top:14px}
-.fcard{display:flex;align-items:center;gap:10px;border:1px solid #e4e4e0;background:#fafaf8;padding:10px 12px;font-size:12.5px}
-.fcard b{margin-left:auto;color:#6f737b;font-weight:500}
-.fcard .tag{background:#eceae4;color:#6f737b;font-size:11px;padding:2px 7px}
-.doc{background:#fff;border:1px solid #e4e4e0;height:100%;padding:22px 26px;overflow:hidden}
-.doc h2{font-size:19px}
-.doc .meta{margin-top:8px;font-size:11.5px;color:#9a9ea6}
-.doc p{margin-top:12px;font-size:12.5px;color:#4c5058;line-height:1.85}
-.doc .chart{margin-top:14px;height:96px;border:1px solid #edede9;background:linear-gradient(180deg,#fff,#fafaf8);display:flex;align-items:flex-end;gap:8px;padding:12px}
-.doc .chart i{flex:1;background:var(--accent);opacity:.8}
-.doc ul{margin-top:12px;list-style:none;display:grid;gap:6px}
-.doc li{font-size:12.5px;color:#4c5058;padding-left:14px;position:relative}
-.doc li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
 </style></head><body>
-<div class="win" style="--accent:#8B5CF6">
-  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="file">销售明细_2026Q3.xlsx</span>
-    <span class="menu"><span>开始</span><span>插入</span><span>数据</span><span>公式</span></span>
-  </div>
-  <div class="split">
-    <div class="grid">
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx"></div><div class="cell head">区域</div><div class="cell head">订单数</div><div class="cell head">金额（元）</div><div class="cell head">环比</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx">2</div><div class="cell">华东</div><div class="cell mono">8,642</div><div class="cell mono">3,148,920</div><div class="cell mono">+12.4%</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx">3</div><div class="cell">华南</div><div class="cell mono">6,118</div><div class="cell mono">2,204,310</div><div class="cell mono">+6.8%</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx">4</div><div class="cell">华北</div><div class="cell mono">5,204</div><div class="cell mono">1,876,540</div><div class="cell mono">-2.1%</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx">5</div><div class="cell">西南</div><div class="cell mono">3,271</div><div class="cell mono">1,042,880</div><div class="cell mono">+18.9%</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx">6</div><div class="cell">西北</div><div class="cell mono">1,906</div><div class="cell mono">612,470</div><div class="cell mono">+4.2%</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px">
-        <div class="cell idx">7</div><div class="cell total">合计</div><div class="cell total mono">25,141</div><div class="cell total mono">8,885,120</div><div class="cell total mono">+8.6%</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">8</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">9</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">10</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 1fr 88px 104px 74px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
-    </div>
-    <div class="pane">
-      <h3>按区域汇总</h3>
-      <div class="bars">
-        <div class="bar"><span>华东</span><i style="width:100%"></i><span class="mono">314.9</span></div>
-        <div class="bar"><span>华南</span><i style="width:70%"></i><span class="mono">220.4</span></div>
-        <div class="bar"><span>华北</span><i style="width:60%"></i><span class="mono">187.7</span></div>
-        <div class="bar"><span>西南</span><i style="width:33%"></i><span class="mono">104.3</span></div>
-        <div class="bar"><span>西北</span><i style="width:19%"></i><span class="mono">61.2</span></div>
-      </div>
-      <h3 style="margin-top:24px">一句话结论</h3>
-      <p style="margin-top:10px;font-size:12.5px;color:#4c5058;line-height:1.8">华东与西南环比增速高于整体，华北出现负增长，需要单独复盘渠道结构。</p>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" style="--accent:#8B5CF6" data-page="1"><div class="ph"><div><div class="kicker">Data Analysis · 销售明细汇总</div><h1>销售明细季度汇总与区域结构分析</h1><div class="meta"><span>数据源：订单系统导出 + 渠道对账文件</span><span>时间窗：2026-07-01 ~ 2026-09-30</span><span>口径：已确认收入，含税</span><span>基期：2026Q2 的 824.7 万元</span></div></div><div class="cap mono">销售明细_2026Q3.xlsx<br>口径版本 2026-09-30 冻结</div></div><div class="body"><div class="lead">本季度 25,141 单确认收入 8,885,120 元，环比增长 7.7%，基期为 2026Q2 的 8,247,173 元。增长由华东（+12.4%）与西南（+18.9%）拉动，华北录得唯一负增长（-2.1%）；品类端专业版增速 15.5% 居首，硬件配套 -5.6% 是唯一收缩品类，需与渠道结构变化合并解读。</div><div class="kpis"><div class="kpi"><div class="k">确认收入</div><b class="mono">888.5 万元</b><div class="n">环比 +7.7%，增量 63.8 万元</div></div><div class="kpi"><div class="k">订单数</div><b class="mono">25,141 单</b><div class="n">客单价 353 元，退款率 2.1%</div></div><div class="kpi"><div class="k">区域分化</div><b class="mono">18.9% / -2.1%</b><div class="n">西南最高、华北唯一负增长，极差 21.0 个百分点</div></div></div><div class="sec dark">表 1 区域汇总（金额单位：元）</div><table class="dn"><thead><tr><th>区域</th><th class="r">订单数</th><th class="r hc">确认金额</th><th class="r">客单价</th><th class="r">环比</th><th class="r">退款率</th></tr></thead><tbody><tr><td>华东</td><td class="r">8,642</td><td class="r hc">3,148,920</td><td class="r">364</td><td class="r">+12.4%</td><td class="r">1.8%</td></tr><tr><td>华南</td><td class="r">6,118</td><td class="r hc">2,204,310</td><td class="r">360</td><td class="r">+6.8%</td><td class="r">2.1%</td></tr><tr><td>华北</td><td class="r">5,204</td><td class="r hc">1,876,540</td><td class="r">361</td><td class="r">-2.1%</td><td class="r">3.4%</td></tr><tr class='sum'><td>合计</td><td class="r">25,141</td><td class="r">8,885,120</td><td class="r">353</td><td class="r">+7.7%</td><td class="r">2.1%</td></tr></tbody></table><div class="stack"><i style="width:35.44%"></i><i style="width:24.81%"></i><i style="width:21.12%"></i><i style="width:11.74%"></i><i style="width:6.89%"></i></div><div class="legend"><span>华东 <b>314.9 万</b></span><span>华南 <b>220.4 万</b></span><span>华北 <b>187.7 万</b></span><span>西南 <b>104.3 万</b></span><span>西北 <b>61.2 万</b></span></div><div class="tnote">校验：6 条规则命中 17 行，其中阻断级 8 行已全部处置；最大偏差倍数 3.00×（同日重复订单号）。完整异常清单见第 6 页，质量分 98.9 见第 7 页。</div><div class="cols"><div class="wrap"><div class="sec dark">口径与来源</div><div class="cv"><div>数据口径：确认收入含税；金额 = 数量 × 单价 × (1 − 折扣率)，复算误差 ≤0.01 元</div><div>数据来源：交易中台订单导出（S1）+ 渠道对账文件 + 财务 Q2 基期 + 区域与业务员主数据</div><div>统计窗口：2026-07-01 ~ 2026-09-30，口径版本 2026-09-30 冻结，基期 824.7 万元</div></div></div><div class="wrap"><div class="sec dark">页面导读（共 9 页）</div><div class="pg"><b>P2–P4 数据与口径</b> P2 6 个 Sheet 的分工… · P3 字段字典与四条口径约定 · P4 合计一致）</div><div class="pg"><b>P5–P7 分析与校验</b> P5 渠道结构与增速差异 · P6 最大偏差 3.00× · P7 校验规则与质量分构成</div><div class="pg"><b>P8–P9 结论与附录</b> P8 结论、增量分解与五步动作 · P9 数据来源、术语表与修订记录</div></div></div></div><div class="pf"><span>结论：8,885,120 元确认收入，环比 +7.7%，华东与西南贡献 80.4% 增量</span><span class="mono">第 1 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="2"><div class="ph"><div><div class="kicker">Workbook Map · 工作簿总览</div><h2>6 个 Sheet 的分工、行量与产出</h2></div><div class="cap mono">工作簿：销售明细_2026Q3.xlsx<br>有效数据 25,202 行 · 14 个口径字段</div></div><div class="body"><div class="sec dark">表 2-1 Sheet 清单与行量</div><table class=""><thead><tr><th>Sheet</th><th class="r">行数</th><th class="r">列数</th><th>用途</th><th>状态</th></tr></thead><tbody><tr><td>S1 销售明细</td><td class="r hc">25,141</td><td class="r">14</td><td>订单粒度底表，唯一数据源</td><td>已校验</td></tr><tr><td>S2 区域汇总</td><td class="r hc">5</td><td class="r">8</td><td>区域 × 6 指标（表 1 出处）</td><td>已校验</td></tr><tr><td>S3 渠道透视</td><td class="r hc">24</td><td class="r">7</td><td>渠道 × 品类金额矩阵</td><td>已校验</td></tr><tr><td>S4 环比基期</td><td class="r hc">12</td><td class="r">5</td><td>2026Q2 基线 8,247,173 元</td><td>已校验</td></tr><tr><td>S5 数据字典</td><td class="r hc">14</td><td class="r">5</td><td>字段定义、类型与取值域</td><td>已校验</td></tr><tr><td>S6 异常清单</td><td class="r hc">6</td><td class="r">17</td><td>规则命中明细与处置状态</td><td>待复核 2 条</td></tr><tr class='sum'><td>合计 6 个 Sheet</td><td class="r">25,202</td><td class="r">56</td><td>底表 1 张 + 派生表 5 张</td><td>阻断级已闭环</td></tr></tbody></table><div class="sec dark">处理流水线耗时（合计 6m00s）</div><div class="bars"><div class="bar"><span>导出与解析</span><i style="width:11.7%"></i><span class="r mono">42s</span></div><div class="bar"><span>清洗与去重</span><i style="width:55.0%"></i><span class="r mono">3m18s</span></div><div class="bar"><span>口径映射</span><i style="width:7.2%"></i><span class="r mono">26s</span></div><div class="bar"><span>汇总与透视</span><i style="width:3.3%"></i><span class="r mono">12s</span></div><div class="bar"><span>校验与成稿</span><i style="width:22.8%"></i><span class="r mono">1m22s</span></div></div><div class="pts"><div class="pt">S1 为唯一事实表，S2/S3 全部由 S1 透视生成，不手工录入，任何口径变更只改 S4。</div><div class="pt">S4 基期与财务月报一致（824.7 万元），环比公式为 本季/基期 − 1，保留 1 位小数。</div><div class="pt">S6 由 6 条校验规则自动写入，规则定义与命中数见第 7 页，处置状态需在导出前清零。</div></div></div><div class="pf"><span>工作簿 6 个 Sheet 全部由 S1 派生，无手工录入单元格</span><span class="mono">第 2 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="3"><div class="ph"><div><div class="kicker">Caliber & Dictionary · 口径与字段</div><h2>字段字典与四条口径约定</h2></div><div class="cap mono">口径版本 v3.2 · 2026-09-30<br>字段级非空率按 25,141 行统计</div></div><div class="body"><div class="sec dark">表 3-1 字段字典（14 个字段中的关键 10 个）</div><table class="dn"><thead><tr><th>字段</th><th>类型</th><th>非空率</th><th>口径与取值域</th></tr></thead><tbody><tr><td>订单号</td><td>text</td><td class="hc">100.0%</td><td>主键，SO-/NO-/SN-/WN- 前缀 + 5 位数字</td></tr><tr><td>下单时间</td><td>datetime</td><td class="hc">100.0%</td><td>精确到分钟，UTC+8</td></tr><tr><td>区域</td><td>text</td><td class="hc">100.0%</td><td>枚举 5 值：华东 / 华南 / 华北 / 西南 / 西北</td></tr><tr><td>渠道</td><td>text</td><td class="hc">99.8%</td><td>枚举 3 值：直营 / 分销 / 电商</td></tr><tr><td>品类</td><td>text</td><td class="hc">100.0%</td><td>枚举 5 值：基础版 / 专业版 / 企业版 / 增值服务 / 硬件配套</td></tr><tr><td>数量</td><td>int</td><td class="hc">100.0%</td><td>取值 1–2,400，无 0 与负值</td></tr><tr><td>单价</td><td>decimal(2)</td><td class="hc">100.0%</td><td>单位元，含税</td></tr><tr><td>折扣率</td><td>decimal(3)</td><td class="hc">96.4%</td><td>0–40%，>40% 触发规则 R-03</td></tr><tr><td>金额</td><td>decimal(2)</td><td class="hc">100.0%</td><td>= 数量 × 单价 × (1 − 折扣率)，误差 ≤0.01 元</td></tr><tr><td>发货时间</td><td>datetime</td><td class="hc">94.6%</td><td>空值 1,357 行 = 未发货订单</td></tr><tr class='sum'><td>状态 / 业务员 / 客户 ID / 备注</td><td>text</td><td>100.0% / 98.2% / 99.1% / 61.3%</td><td>枚举 3 值；业务员空值 452 行；客户 ID 空值 226 行；备注 9,733 行非空</td></tr></tbody></table><div class="sec dark">非空率最低的三个字段</div><div class="bars"><div class="bar"><span>发货时间</span><i style="width:94.6%"></i><span class="r mono">94.6%</span></div><div class="bar"><span>折扣率</span><i style="width:96.4%"></i><span class="r mono">96.4%</span></div><div class="bar"><span>业务员</span><i style="width:98.2%"></i><span class="r mono">98.2%</span></div></div><div class="pts"><div class="pt">收入口径：仅统计状态 = 已确认的订单，退款单不冲减金额，改列「退款率」（合计 2.1%）。</div><div class="pt">时间口径：按「下单时间」归属期间，跨期订单一律计入下单月，不按发货或收款时间。</div><div class="pt">金额口径：金额由数量 × 单价 × (1 − 折扣率) 复算，与渠道对账文件净额差 ≤0.01 元。</div><div class="pt">基期口径：2026Q2 = 8,247,173 元（来源 S4），与财务月报差异 0 元。</div></div></div><div class="pf"><span>口径与字段字典：4 条口径约定 + 14 个字段，非空率最低 94.6%</span><span class="mono">第 3 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="4"><div class="ph"><div><div class="kicker">Detail · 明细表</div><h2>区域与品类两张明细表（合计一致）</h2></div><div class="cap mono">两表金额合计均为 8,885,120 元<br>客单价 = 金额 ÷ 订单数，四舍五入取整</div></div><div class="body"><div class="sec dark">表 4-1 区域明细（含基期与增量）</div><table class="dn"><thead><tr><th>区域</th><th class="r">订单数</th><th class="r">确认金额</th><th class="r">基期金额</th><th class="r">增量</th><th class="r">环比</th><th class="r">退款率</th></tr></thead><tbody><tr><td>华东</td><td class="r">8,642</td><td class="r">3,148,920</td><td class="r">2,801,530</td><td class="r hc">347,390</td><td class="r">+12.4%</td><td class="r">1.8%</td></tr><tr><td>华南</td><td class="r">6,118</td><td class="r">2,204,310</td><td class="r">2,063,961</td><td class="r hc">140,349</td><td class="r">+6.8%</td><td class="r">2.1%</td></tr><tr><td>华北</td><td class="r">5,204</td><td class="r">1,876,540</td><td class="r">1,916,793</td><td class="r hc">-40,253</td><td class="r">-2.1%</td><td class="r">3.4%</td></tr><tr><td>西南</td><td class="r">3,271</td><td class="r">1,042,880</td><td class="r">877,106</td><td class="r hc">165,774</td><td class="r">+18.9%</td><td class="r">1.2%</td></tr><tr><td>西北</td><td class="r">1,906</td><td class="r">612,470</td><td class="r">587,783</td><td class="r hc">24,687</td><td class="r">+4.2%</td><td class="r">1.6%</td></tr><tr class='sum'><td>合计</td><td class="r">25,141</td><td class="r">8,885,120</td><td class="r">8,247,173</td><td class="r">637,947</td><td class="r">+7.7%</td><td class="r">2.1%</td></tr></tbody></table><div class="sec dark">表 4-2 品类明细</div><table class="dn"><thead><tr><th>品类</th><th class="r">订单数</th><th class="r">确认金额</th><th class="r">占比</th><th class="r">客单价</th><th class="r">环比</th></tr></thead><tbody><tr><td>基础版</td><td class="r">9,842</td><td class="r">2,485,200</td><td class="r hc">27.97%</td><td class="r">253</td><td class="r">+5.3%</td></tr><tr><td>专业版</td><td class="r">7,316</td><td class="r">2,909,300</td><td class="r hc">32.74%</td><td class="r">398</td><td class="r">+15.5%</td></tr><tr><td>企业版</td><td class="r">4,208</td><td class="r">2,196,900</td><td class="r hc">24.73%</td><td class="r">522</td><td class="r">+3.1%</td></tr><tr><td>增值服务</td><td class="r">2,614</td><td class="r">910,900</td><td class="r hc">10.25%</td><td class="r">348</td><td class="r">+9.4%</td></tr><tr><td>硬件配套</td><td class="r">1,161</td><td class="r">382,820</td><td class="r hc">4.31%</td><td class="r">330</td><td class="r">-5.6%</td></tr><tr class='sum'><td>合计</td><td class="r">25,141</td><td class="r">8,885,120</td><td class="r">100.00%</td><td class="r">8</td></tr></tbody></table><div class="cols mid"><div style="flex:1.35"><div class="sec dark">品类金额占比</div><div class="bars"><div class="bar"><span>基础版</span><i style="width:85.4%"></i><span class="r mono">27.97%</span></div><div class="bar"><span>专业版</span><i style="width:100.0%"></i><span class="r mono">32.74%</span></div><div class="bar"><span>企业版</span><i style="width:75.5%"></i><span class="r mono">24.73%</span></div><div class="bar"><span>增值服务</span><i style="width:31.3%"></i><span class="r mono">10.25%</span></div><div class="bar"><span>硬件配套</span><i style="width:13.2%"></i><span class="r mono">4.31%</span></div></div></div><div style="flex:1"><div class="tnote">表 4-1 与表 4-2 的行集合不同但金额合计相同，任一表出现差异即说明维度归属缺失，需回到 S1 排查。</div></div></div></div><div class="pf"><span>区域与品类两表明细合计一致，均为 8,885,120 元</span><span class="mono">第 4 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="5"><div class="ph"><div><div class="kicker">Channel Cut · 渠道结构</div><h2>渠道结构与增速差异</h2></div><div class="cap mono">渠道为 S1 字段直接分组<br>客单价按渠道独立计算</div></div><div class="body"><div class="sec dark">表 5-1 渠道汇总</div><table class=""><thead><tr><th>渠道</th><th class="r">订单数</th><th class="r">确认金额</th><th class="r">客单价</th><th class="r hc">占比</th><th class="r">环比</th></tr></thead><tbody><tr><td>直营</td><td class="r">9,842</td><td class="r hc">3,966,000</td><td class="r">403</td><td class="r">44.64%</td><td class="r">+7.9%</td></tr><tr><td>分销</td><td class="r">8,606</td><td class="r hc">2,735,900</td><td class="r">318</td><td class="r">30.79%</td><td class="r">+5.4%</td></tr><tr><td>电商</td><td class="r">6,693</td><td class="r hc">2,183,220</td><td class="r">326</td><td class="r">24.57%</td><td class="r">+10.5%</td></tr><tr class='sum'><td>合计</td><td class="r">25,141</td><td class="r">8,885,120</td><td class="r">353</td><td class="r">100.00%</td><td class="r">+7.7%</td></tr></tbody></table><div class="sec dark">渠道金额占比与环比</div><div class="bars"><div class="bar"><span>直营</span><i style="width:100.0%"></i><span class="r mono">+7.9%</span></div><div class="bar"><span>分销</span><i style="width:69.0%"></i><span class="r mono">+5.4%</span></div><div class="bar"><span>电商</span><i style="width:55.0%"></i><span class="r mono">+10.5%</span></div></div><div class="pts"><div class="pt">电商环比 10.5%，高于整体 7.7% 达 2.8 个百分点，占比升至 24.6%。</div><div class="pt">直营客单价 403 元最高，分销 318 元最低，两者相差 85 元，折扣政策需复核。</div><div class="pt">分销 8,606 单贡献 273.6 万元，但增速仅 5.4%，是华北负增长的主要传导路径。</div></div><div class="tnote">渠道口径与区域口径互为交叉：3 个渠道金额合计 8,885,120 元、5 个区域金额合计同为 8,885,120 元，两侧客单价均按本渠道 / 本区域独立计算，不做加权分摊。</div></div><div class="pf"><span>渠道结构：电商占比 24.6%，直营客单价 403 元最高</span><span class="mono">第 5 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="6"><div class="ph"><div><div class="kicker">Anomaly · 差异与异常</div><h2>6 条规则命中 17 行，最大偏差 3.00×</h2></div><div class="cap mono">偏差倍数 = 实际偏离 ÷ 允许偏离<br>阻断级 8 行、警告级 9 行</div></div><div class="body"><div class="sec dark">表 6-1 异常清单（按偏差倍数降序）</div><table class=""><thead><tr><th>编号</th><th class="r">规则</th><th>命中行数</th><th>阈值</th><th>最大实际值</th><th class="hc">偏差倍数</th><th>处置</th></tr></thead><tbody><tr><td>A-01</td><td class="r">R-01 订单号唯一</td><td>3</td><td>0 组重复</td><td>同日重复 3 组</td><td class="hc">3.00×</td><td>合并保留最新一条</td></tr><tr><td>A-02</td><td class="r">R-04 发货 ≥ 下单</td><td>3</td><td>0 小时</td><td>早 36 小时</td><td class="hc">2.40×</td><td>按签收时间修正</td></tr><tr><td>A-03</td><td class="r">R-03 折扣率 ≤ 40%</td><td>5</td><td>40.0%</td><td>52.0%</td><td class="hc">1.30×</td><td>超限单需总监审批</td></tr><tr><td>A-04</td><td class="r">R-02 金额勾稽</td><td>4</td><td>0.01 元</td><td>1,280.00 元</td><td class="hc">1.02×</td><td>按明细重算金额</td></tr><tr><td>A-05</td><td class="r">R-06 金额 ≥ 0</td><td>1</td><td>0.00 元</td><td>−788.00 元</td><td class="hc">—</td><td>红字单冲销</td></tr><tr><td>A-06</td><td class="r">R-05 区域枚举</td><td>1</td><td>5 个枚举值</td><td>“东北” 1 行</td><td class="hc">—</td><td>归并到华北</td></tr><tr class='sum'><td>合计</td><td class="r">6 条规则</td><td>17</td><td>—</td><td>—</td><td>3.00×</td><td>阻断级已闭环 8 行</td></tr></tbody></table><div class="sec dark">异常类型分布（行数）</div><div class="bars"><div class="bar"><span>折扣超限</span><i style="width:100.0%"></i><span class="r mono">5 行</span></div><div class="bar"><span>金额勾稽</span><i style="width:80.0%"></i><span class="r mono">4 行</span></div><div class="bar"><span>重复单号</span><i style="width:60.0%"></i><span class="r mono">3 行</span></div><div class="bar"><span>时序倒挂</span><i style="width:60.0%"></i><span class="r mono">3 行</span></div><div class="bar"><span>枚举越界</span><i style="width:20.0%"></i><span class="r mono">1 行</span></div><div class="bar"><span>负金额</span><i style="width:20.0%"></i><span class="r mono">1 行</span></div></div><div class="pts"><div class="pt">折扣超限 5 行集中在 9 月 21–25 日，均由同一业务员提交，最大折扣 52.0%（阈值 40.0%），已改价 0 元后复核。</div><div class="pt">金额勾稽差异最大 1,280.00 元，出现在退货改单场景：折扣率被改写而数量未同步，复算后已回正。</div><div class="pt">重复订单号 3 组均发生在同日跨渠道补录，按「金额大者保留、金额小者作废」处理，影响金额 0 元。</div></div></div><div class="pf"><span>异常 17 行，阻断级 8 行已闭环，最大偏差倍数 3.00×</span><span class="mono">第 6 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="7"><div class="ph"><div><div class="kicker">Validation · 校验与质量</div><h2>校验规则与质量分构成</h2></div><div class="cap mono">综合质量分 98.9（五项等权）<br>阻断级 8 行 / 警告级 9 行</div></div><div class="body"><div class="sec dark">表 7-1 校验规则清单</div><table class=""><thead><tr><th>规则</th><th>检查内容</th><th>级别</th><th>命中</th><th>处置动作</th></tr></thead><tbody><tr><td>R-01</td><td>订单号全表唯一（跨渠道不重复）</td><td>阻断</td><td class="hc">3</td><td>合并保留最新一条</td></tr><tr><td>R-02</td><td>金额 = 数量 × 单价 × (1 − 折扣率)</td><td>阻断</td><td class="hc">4</td><td>差异 >0.01 元按明细重算</td></tr><tr><td>R-03</td><td>折扣率 ∈ [0, 40%]</td><td>警告</td><td class="hc">5</td><td>超限单需销售总监审批</td></tr><tr><td>R-04</td><td>发货时间 ≥ 下单时间</td><td>警告</td><td class="hc">3</td><td>修正为实际签收时间</td></tr><tr><td>R-05</td><td>区域 ∈ 5 个枚举值</td><td>警告</td><td class="hc">1</td><td>按业务员归属归并</td></tr><tr><td>R-06</td><td>金额 ≥ 0</td><td>阻断</td><td class="hc">1</td><td>红字单冲销</td></tr><tr class='sum'><td>合计 6 条</td><td>阻断 3 条 / 警告 3 条</td><td>—</td><td>17</td><td>已闭环 15 行，待复核 2 行</td></tr></tbody></table><div class="sec dark">五维质量分（%）</div><div class="bars"><div class="bar"><span>完整性</span><i style="width:99.2%"></i><span class="r mono">99.2</span></div><div class="bar"><span>一致性</span><i style="width:98.4%"></i><span class="r mono">98.4</span></div><div class="bar"><span>唯一性</span><i style="width:99.9%"></i><span class="r mono">99.9</span></div><div class="bar"><span>时效性</span><i style="width:97.5%"></i><span class="r mono">97.5</span></div><div class="bar"><span>合规性</span><i style="width:99.6%"></i><span class="r mono">99.6</span></div></div><div class="pts"><div class="pt">完整性扣分来自发货时间 1,357 行空值（未发货属正常业务状态，不阻断发布）。</div><div class="pt">一致性扣分来自 4 行金额勾稽差异，已按 R-02 重算；唯一性仅 3 组重复，扣 0.1 分。</div><div class="pt">时效性 97.5% 是导出延时导致：10 月 1 日 02:14 的导出比约定时间晚 1h14m，未影响口径。</div></div></div><div class="pf"><span>质量分 98.9：完整性 99.2 / 一致性 98.4 / 唯一性 99.9</span><span class="mono">第 7 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="8"><div class="ph"><div><div class="kicker">Conclusion & Actions · 结论与行动</div><h2>结论、增量分解与五步动作</h2></div><div class="cap mono">责任人按 RACI 到岗<br>验收标准均可自动校验</div></div><div class="body"><div class="sec dark">表 8-1 分阶段处理动作</div><table class=""><thead><tr><th>阶段</th><th>动作</th><th>责任人</th><th>期限</th><th>验收标准</th></tr></thead><tbody><tr><td>立即</td><td>冲销 SN-5488 红字单并复核 5 行折扣超限</td><td>徐海鹏</td><td>10-09</td><td class="hc">异常清单阻断级 0 行</td></tr><tr><td>本周</td><td>补充华北分销渠道结构与折扣政策说明</td><td>周曼</td><td>10-11</td><td class="hc">区域复盘页含渠道口径表</td></tr><tr><td>本周</td><td>修正 3 组重复订单号并回写主数据</td><td>高晓鹭</td><td>10-11</td><td class="hc">主数据去重报告通过 R-01</td></tr><tr><td>本月</td><td>把 6 条校验规则固化进导出模板</td><td>谭亦文</td><td>10-25</td><td class="hc">新数据自动触发校验</td></tr><tr><td>下季度</td><td>建立区域 × 渠道 × 品类三维月报</td><td>蒋雪</td><td>12-31</td><td class="hc">三维透视随月报发布</td></tr></tbody></table><div class="sec dark">区域增量分解（万元）</div><div class="bars"><div class="bar"><span>华东</span><i style="width:100.0%"></i><span class="r mono">+34.7 万</span></div><div class="bar"><span>华南</span><i style="width:40.4%"></i><span class="r mono">+14.0 万</span></div><div class="bar"><span>华北</span><i style="width:11.6%"></i><span class="r mono">-4.0 万</span></div><div class="bar"><span>西南</span><i style="width:47.7%"></i><span class="r mono">+16.6 万</span></div><div class="bar"><span>西北</span><i style="width:7.1%"></i><span class="r mono">+2.5 万</span></div></div><div class="pts"><div class="pt">增量 63.8 万元中，华东（+34.7 万）与西南（+16.6 万）合计贡献 80.4%，两区域是唯一超额完成目标的区域（目标增速 10.0%，华南 6.8% 未达线）。</div><div class="pt">华北 -4.0 万元负增长完全来自分销渠道：分销单量 8,606 单中华北占 1,842 单，环比减少 213 单。</div><div class="pt">硬件配套 -5.6% 是唯一收缩品类，因其 92.4% 依赖分销，与华北渠道收缩同源。</div><div class="pt">折扣超限与金额勾稽两类异常合计 9 行，占全部异常 52.9%，建议并入导出模板自动拦截。</div></div></div><div class="pf"><span>五步动作：立即 1 项、本周 2 项、本月 1 项、下季度 1 项</span><span class="mono">第 8 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="9"><div class="ph"><div><div class="kicker">Appendix · 附录</div><h2>数据来源、术语表与修订记录</h2></div><div class="cap mono">来源均可回溯到原始文件<br>修订留痕 3 版</div></div><div class="body"><div class="sec dark">表 9-1 数据来源清单</div><table class="dn"><thead><tr><th>数据源</th><th>提供方</th><th>覆盖周期</th><th>记录数</th><th>口径备注</th></tr></thead><tbody><tr><td>订单系统导出（S1）</td><td>交易中台</td><td>2026-07-01 ~ 09-30</td><td>25,141</td><td>已确认收入，含税</td></tr><tr><td>上一季度基线（S4）</td><td>财务共享中心</td><td>2026-04-01 ~ 06-30</td><td>12</td><td>合计 8,247,173 元，与月报一致</td></tr><tr><td>渠道对账文件</td><td>渠道运营</td><td>2026-09-01 ~ 09-30</td><td>3,231</td><td>仅 9 月，用于金额勾稽</td></tr><tr><td>区域与业务员主数据</td><td>数据治理组</td><td>2026-09-30 快照</td><td>214</td><td>枚举与归属唯一来源</td></tr></tbody></table><div class="sec dark">表 9-2 术语表</div><table class="dn"><thead><tr><th>术语</th><th>定义</th></tr></thead><tbody><tr><td>确认收入</td><td>状态为已确认的订单金额之和，退款单不计入</td></tr><tr><td>客单价</td><td>确认收入 ÷ 订单数，四舍五入取整（元）</td></tr><tr><td>偏差倍数</td><td>实际偏离 ÷ 允许偏离；允许偏离为 0 时以「—」表示</td></tr><tr><td>非空率</td><td>该字段非空行数 ÷ 底表总行数</td></tr><tr class='sum'><td>基期</td><td>2026Q2 的 8,247,173 元，环比 = 本季 ÷ 基期 − 1</td></tr></tbody></table><div class="sec dark">表 9-3 修订记录</div><table class="dn"><thead><tr><th>版本</th><th>日期</th><th>变更</th><th>责任人</th></tr></thead><tbody><tr><td>v1.0</td><td>2026-10-02</td><td>首版区域汇总与结论</td><td>高晓鹭</td></tr><tr><td>v1.1</td><td>2026-10-05</td><td>补充渠道透视与 6 条异常清单</td><td>蒋雪</td></tr><tr><td>v1.2</td><td>2026-10-08</td><td>退款率纳入合计口径，重算客单价</td><td>数据治理组</td></tr></tbody></table></div><div class="pf"><span>附录：4 个数据源、5 条术语、3 版修订记录</span><span class="mono">第 9 / 9 页</span></div></section>
+</body></html>

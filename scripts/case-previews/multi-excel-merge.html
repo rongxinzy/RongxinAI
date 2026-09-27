@@ -1,88 +1,86 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>multi-excel-merge</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>multi-excel-merge</title><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased;display:grid;gap:26px;padding:30px;justify-items:center}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 40px 18px;display:flex;flex-direction:column}
+.ph{display:flex;align-items:flex-start;gap:20px;border-bottom:1px solid #edede9;padding-bottom:12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.18;margin-top:7px}
+h2{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:7px}
+.cap{margin-left:auto;text-align:right;font-size:11px;color:#8b8f97;line-height:1.75;padding-top:2px}
+.meta{display:flex;gap:18px;margin-top:8px;font-size:11.5px;color:#8b8f97;flex-wrap:wrap}
+.meta span{position:relative}
+.meta span+span::before{content:"";position:absolute;left:-10px;top:5px;width:3px;height:3px;background:#c9c9c3}
+.body{flex:1;min-height:0;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.body>*{flex:0 0 auto}
+.stack{flex:none}
+.bars{flex:none}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#8b8f97}
+.pf b{font-weight:500;color:#6f737b}
+.sec{font-size:11px;letter-spacing:.22em;color:#8b8f97;text-transform:uppercase}
+.sec.dark{color:#6f737b;letter-spacing:.16em}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:500;letter-spacing:.06em;color:#6f737b;background:#f6f6f3;text-align:left;padding:5px 10px;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+td{font-size:12.5px;color:#3d4046;padding:5px 10px;border-bottom:1px solid #edede9;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.dn th{padding:3px 9px}
+table.dn td{padding:3px 9px}
+table.dn2 th{padding:2px 8px}
+table.dn2 td{padding:2px 8px}
+.cols.mid{align-items:center}
+.cols.mid>*{min-width:0}
+th.r,td.r{text-align:right}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.hc,th.hc{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+td.mut{color:#8b8f97}
+.lead{font-size:12.5px;color:#4c5058;line-height:1.55}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{border:1px solid #e4e4e0;padding:8px 12px}
+.kpi .k{font-size:11px;color:#8b8f97;letter-spacing:.08em}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.kpi .n{font-size:11px;color:#8b8f97;margin-top:3px;line-height:1.5}
+.cols{display:flex;gap:26px;align-items:flex-start}
+.cols>*{min-width:0}
+.cols.g40{display:grid;grid-template-columns:1fr 300px;gap:26px}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:118px 1fr 64px;align-items:center;gap:11px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.bar .r{text-align:right;color:#3d4046}
+.bar.tight{grid-template-columns:96px 1fr 58px;gap:9px}
+.pts{display:grid;gap:6px}
+.pt{font-size:12.5px;color:#4c5058;line-height:1.55;padding-left:13px;position:relative}
+.pt::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;background:var(--accent)}
+.note{font-size:11px;color:#8b8f97;line-height:1.7}
+.stack{display:flex;height:10px;border:1px solid #e4e4e0}
+.stack i{display:block;height:100%;background:var(--accent)}
+.stack i:nth-child(2){opacity:.74}
+.stack i:nth-child(3){opacity:.56}
+.stack i:nth-child(4){opacity:.4}
+.stack i:nth-child(5){opacity:.27}
+.stack i:nth-child(6){opacity:.18}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:#6f737b}
+.legend b{font-weight:500;color:#3d4046;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:6px 11px;font-size:12.5px;color:#3d4046}
+.chip b{font-weight:600;font-variant-numeric:tabular-nums;color:#16171a}
+.badge{font-size:11px;padding:1px 6px;border:1px solid #e4e4e0;color:#6f737b;font-weight:400}
+.badge.ac{background:color-mix(in srgb,var(--accent) 10%,#fff);border-color:transparent;color:#16171a;font-weight:500}
+.tnote{font-size:11px;color:#8b8f97;line-height:1.5;margin-top:2px}
+.cv{display:grid;gap:3px}
+.cv div{font-size:11px;color:#4c5058;line-height:1.44;padding-left:11px;position:relative}
+.cv div::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;background:var(--accent)}
+.pg{font-size:11px;color:#6f737b;line-height:1.72}
+.pg b{color:#3d4046;font-weight:500;letter-spacing:.04em}
+.wrap{display:flex;flex-direction:column;gap:9px}
 
-body{padding:30px}
-.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
-.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
-.file{font-weight:600;margin-left:6px}
-.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
-.grid{flex:1;min-height:0;overflow:hidden}
-.row{display:grid;border-top:1px solid #edede9}
-.row:first-child{border-top:0}
-.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
-.row:last-child .cell{border-bottom:0}
-.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
-.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
-.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
-.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
-.split{flex:1;display:grid;grid-template-columns:1.15fr 1fr;min-height:0}
-.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
-.pane:last-child{border-right:0}
-.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
-.bars{margin-top:16px;display:grid;gap:11px}
-.bar{display:grid;grid-template-columns:56px 1fr 44px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-.shot{margin-top:14px;border:1px dashed #cfcfc9;background:#fafaf8;height:190px;padding:14px;display:flex;align-items:center;justify-content:center}
-.shot table{border-collapse:collapse;font-size:11px;color:#6f737b;background:#fff}
-.shot td,.shot th{border:1px solid #e4e4e0;padding:5px 9px}
-.arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:#b6bac0}
-.files{display:grid;gap:10px;margin-top:14px}
-.fcard{display:flex;align-items:center;gap:10px;border:1px solid #e4e4e0;background:#fafaf8;padding:10px 12px;font-size:12.5px}
-.fcard b{margin-left:auto;color:#6f737b;font-weight:500}
-.fcard .tag{background:#eceae4;color:#6f737b;font-size:11px;padding:2px 7px}
-.doc{background:#fff;border:1px solid #e4e4e0;height:100%;padding:22px 26px;overflow:hidden}
-.doc h2{font-size:19px}
-.doc .meta{margin-top:8px;font-size:11.5px;color:#9a9ea6}
-.doc p{margin-top:12px;font-size:12.5px;color:#4c5058;line-height:1.85}
-.doc .chart{margin-top:14px;height:96px;border:1px solid #edede9;background:linear-gradient(180deg,#fff,#fafaf8);display:flex;align-items:flex-end;gap:8px;padding:12px}
-.doc .chart i{flex:1;background:var(--accent);opacity:.8}
-.doc ul{margin-top:12px;list-style:none;display:grid;gap:6px}
-.doc li{font-size:12.5px;color:#4c5058;padding-left:14px;position:relative}
-.doc li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
 </style></head><body>
-<div class="win" style="--accent:#8B5CF6">
-  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="file">合并结果_全区域.xlsx</span>
-    <span class="menu"><span>开始</span><span>数据</span><span>查询</span></span>
-  </div>
-  <div class="split" style="grid-template-columns:1fr 44px 1.3fr">
-    <div class="pane">
-      <h3>待合并文件</h3>
-      <div class="files">
-        <div class="fcard">华东区订单.xlsx <span class="tag">1,204 行</span><b>3 列</b></div>
-        <div class="fcard">华北区订单.xlsx <span class="tag">986 行</span><b>3 列</b></div>
-        <div class="fcard">华南区订单.xlsx <span class="tag">1,041 行</span><b>4 列</b></div>
-      </div>
-      <p style="margin-top:14px;font-size:12px;color:#8b8f97;line-height:1.8">列名不一致：<span class="mono">订单号 / 单号 / Order</span> 已统一</p>
-    </div>
-    <div class="arrow">→</div>
-    <div class="grid">
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx"></div><div class="cell head">单号</div><div class="cell head">区域</div><div class="cell head">金额</div><div class="cell head">来源</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx">2</div><div class="cell mono">SO-28417</div><div class="cell">华东</div><div class="cell mono">1,284</div><div class="cell hi">华东区</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx">3</div><div class="cell mono">SO-28409</div><div class="cell">华东</div><div class="cell mono">642</div><div class="cell hi">华东区</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx">4</div><div class="cell mono">NO-11902</div><div class="cell">华北</div><div class="cell mono">910</div><div class="cell hi">华北区</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx">5</div><div class="cell mono">NO-11884</div><div class="cell">华北</div><div class="cell mono">1,470</div><div class="cell hi">华北区</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx">6</div><div class="cell mono">Order-5521</div><div class="cell">华南</div><div class="cell mono">788</div><div class="cell hi">华南区</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px">
-        <div class="cell idx">7</div><div class="cell total">合计</div><div class="cell total">—</div><div class="cell total mono">5,094</div><div class="cell total">3,231 行</div>
-      </div>
-      <div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">8</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">9</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">10</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">14</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">15</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">16</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:30px 1fr 70px 78px 66px"><div class="cell idx">17</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" style="--accent:#8B5CF6" data-page="1"><div class="ph"><div><div class="kicker">Data Analysis · 多表合并</div><h1>区域分表合并为统一口径总表</h1><div class="meta"><span>输入：3 个区域分表（列名与单位不一致）</span><span>输出：3,231 行 × 12 个标准列</span><span>金额合计 2,184,620 元（2026 年 9 月）</span><span>去重键：订单号跨文件唯一</span></div></div><div class="cap mono">合并结果_全区域.xlsx<br>口径版本 2026-10-05 冻结</div></div><div class="body"><div class="lead">3 个区域分表原始 3,258 行，按订单号跨文件去重 27 行后入库 3,231 行，金额合计 2,184,620 元。合并中修复 6 类口径冲突：金额单位混用 3 行（万元误作元，放大 10,000 倍）、列名差异 6 组、区域缺失 12 行、状态值越界 4 行。入库后订单号唯一，且与 9 月渠道对账文件的行数完全一致（均 3,231 单）。</div><div class="kpis"><div class="kpi"><div class="k">入库行数</div><b class="mono">3,231 行</b><div class="n">原始 3,258 行，去重 27 行（0.83%）</div></div><div class="kpi"><div class="k">金额合计</div><b class="mono">218.5 万元</b><div class="n">单均 676 元，三区域加总零误差</div></div><div class="kpi"><div class="k">口径冲突</div><b class="mono">6 类 46 处</b><div class="n">去重 27 行 + 单位 3 行 + 枚举 16 行，最大倍数 10,000×</div></div></div><div class="sec dark">表 1 分表合并结果（金额单位：元）</div><table class="dn"><thead><tr><th>来源文件</th><th class="r">原始行数</th><th class="r">去重删除</th><th class="r">入库行数</th><th class="r hc">金额合计</th><th>列数</th></tr></thead><tbody><tr><td>华东区订单.xlsx</td><td class="r">1,209</td><td class="r">5</td><td class="r">1,204</td><td class="r hc">812,640</td><td>12</td></tr><tr><td>华北区订单.xlsx</td><td class="r">990</td><td class="r">4</td><td class="r">986</td><td class="r hc">668,410</td><td>13</td></tr><tr><td>华南区订单.xlsx</td><td class="r">1,059</td><td class="r">18</td><td class="r">1,041</td><td class="r hc">703,570</td><td>12</td></tr><tr class='sum'><td>合计 3 个分表</td><td class="r">3,258</td><td class="r">27</td><td class="r">3,231</td><td class="r">2,184,620</td><td>12</td></tr></tbody></table><div class="stack"><i style="width:37.26%"></i><i style="width:30.52%"></i><i style="width:32.22%"></i></div><div class="legend"><span>华东 <b>1,204 行</b></span><span>华北 <b>986 行</b></span><span>华南 <b>1,041 行</b></span></div><div class="tnote">校验：6 条规则命中 46 处（去重 27 行 + 金额单位 3 行 + 区域 12 行 + 状态 4 行）；最大偏差倍数 10,000×。清单见第 6 页，质量分 99.93 见第 7 页。</div><div class="cols"><div class="wrap"><div class="sec dark">口径与来源</div><div class="cv"><div>数据口径：金额统一为元，日期统一为 YYYY-MM-DD，区域与状态按枚举归一</div><div>数据来源：华东 / 华北 / 华南三个区域分表 + 区域与客户主数据 + 上期合并结果</div><div>统计窗口：2026-09-01 ~ 2026-09-30，合并口径版本 2026-10-05 冻结</div></div></div><div class="wrap"><div class="sec dark">页面导读（共 9 页）</div><div class="pg"><b>P2–P4 数据与口径</b> P2 五步合并流程与产物清单 · P3 12 个标准列与 6 组列… · P4 合并结果抽样与去重明细</div><div class="pg"><b>P5–P7 分析与校验</b> P5 6 类口径冲突与处理定级 · P6 27 行重复与 4 类口径… · P7 6 条合并校验规则与质量分</div><div class="pg"><b>P8–P9 结论与附录</b> P8 结论、耗时结构与五步动作 · P9 数据来源、术语表与修订记录</div></div></div></div><div class="pf"><span>结论：3,258 行原始数据去重 27 行后入库 3,231 行，金额 2,184,620 元</span><span class="mono">第 1 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="2"><div class="ph"><div><div class="kicker">Merge Map · 合并流程</div><h2>五步合并流程与产物清单</h2></div><div class="cap mono">原始 3,258 行 → 入库 3,231 行<br>全程可回溯来源文件与行号</div></div><div class="body"><div class="sec dark">表 2-1 合并步骤与产物</div><table class=""><thead><tr><th>步骤</th><th>处理对象</th><th>输出</th><th>耗时</th><th>状态</th></tr></thead><tbody><tr><td>M1 列名识别</td><td>3 个分表共 37 列</td><td class="hc">6 组列名映射 + 12 个标准列</td><td>8s</td><td>已完成</td></tr><tr><td>M2 类型与单位归一</td><td>37 列中的 8 个数值列</td><td class="hc">单位统一为元，日期统一为 YYYY-MM-DD</td><td>26s</td><td>已完成</td></tr><tr><td>M3 跨文件去重</td><td>3,258 行</td><td class="hc">删除 27 行，保留 3,231 行</td><td>14s</td><td>已完成</td></tr><tr><td>M4 缺失与越界修补</td><td>区域 12 行 / 状态 4 行</td><td class="hc">按来源文件与枚举归一</td><td>9s</td><td>已完成</td></tr><tr><td>M5 校验与导出</td><td>3,231 行 × 12 列</td><td class="hc">合并结果_全区域.xlsx + 校验报告</td><td>11s</td><td>已交付</td></tr><tr class='sum'><td>合计 5 步</td><td>3 个来源文件</td><td>3,231 行 × 12 列</td><td>68s</td><td>无待办</td></tr></tbody></table><div class="sec dark">合并耗时分解（合计 68s）</div><div class="bars"><div class="bar"><span>列名识别</span><i style="width:30.8%"></i><span class="r mono">8s</span></div><div class="bar"><span>类型与单位归一</span><i style="width:100.0%"></i><span class="r mono">26s</span></div><div class="bar"><span>跨文件去重</span><i style="width:53.8%"></i><span class="r mono">14s</span></div><div class="bar"><span>缺失与越界修补</span><i style="width:34.6%"></i><span class="r mono">9s</span></div><div class="bar"><span>校验与导出</span><i style="width:42.3%"></i><span class="r mono">11s</span></div></div><div class="pts"><div class="pt">列名映射由规则库自动匹配，匹配失败才进入人工确认；本期 6 组映射全部自动命中。</div><div class="pt">去重保留策略：同一订单号保留「金额最大 + 下单时间最早」的一条，并记录被删行的来源行号。</div><div class="pt">标准列固定 12 个，新增来源文件若出现未知列一律进「待映射」清单，不静默丢弃。</div></div></div><div class="pf"><span>五步合并流程总耗时 68 秒，产出 3,231 行 × 12 列总表</span><span class="mono">第 2 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="3"><div class="ph"><div><div class="kicker">Schema · 列名与字典</div><h2>12 个标准列与 6 组列名映射</h2></div><div class="cap mono">标准列 12 个（10 业务 + 2 追溯）<br>非空率按 3,231 行统计</div></div><div class="body"><div class="sec dark">表 3-1 列名映射（3 个分表 → 标准列）</div><table class="dn"><thead><tr><th>标准列</th><th>华东</th><th>华北</th><th>华南</th><th>归一规则</th></tr></thead><tbody><tr><td>订单号</td><td>订单号</td><td>单号</td><td>Order</td><td class="hc">统一「订单号」text，保留原前缀</td></tr><tr><td>金额</td><td>金额</td><td>成交额</td><td>amount</td><td class="hc">统一「金额」decimal(2)，按单位列判定量级</td></tr><tr><td>区域</td><td>区域</td><td>大区</td><td>region</td><td class="hc">映射 3 枚举：华东 / 华北 / 华南</td></tr><tr><td>下单时间</td><td>下单日期</td><td>下单时间</td><td>order_time</td><td class="hc">统一 datetime，兼容 2 种日期格式</td></tr><tr><td>客户</td><td>客户名</td><td>客户</td><td>cust</td><td class="hc">统一「客户名称」text，去重后 1,842 个</td></tr><tr><td>状态</td><td>状态</td><td>订单状态</td><td>status</td><td class="hc">枚举归一为 3 值，越界 4 行已修正</td></tr><tr class='sum'><td>合计 6 组差异</td><td>12 列</td><td>13 列</td><td>12 列</td><td>映射覆盖率 100%</td></tr></tbody></table><div class="sec dark">数值列非空率（%）</div><div class="bars"><div class="bar"><span>折扣率</span><i style="width:96.4%"></i><span class="r mono">96.4%</span></div><div class="bar"><span>渠道</span><i style="width:99.8%"></i><span class="r mono">99.8%</span></div><div class="bar"><span>金额</span><i style="width:100.0%"></i><span class="r mono">100.0%</span></div></div><div class="pts"><div class="pt">新增追溯列 2 个：来源文件（3 个取值）与来源行号（1–1,059），任一入库行可回到原始文件。</div><div class="pt">金额归一先判定单位列与量级：金额 <100 且单位列为「万元」时 ×10,000，本期命中 3 行。</div><div class="pt">日期列兼容 YYYY-MM-DD 与 YYYY/MM/DD 两种格式，解析失败 0 行。</div><div class="pt">标准列类型固定，导入时若类型不符即阻断整文件，避免错误口径的数据混入总表。</div></div></div><div class="pf"><span>12 个标准列 + 6 组列名映射，映射覆盖率 100%</span><span class="mono">第 3 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="4"><div class="ph"><div><div class="kicker">Detail · 明细表</div><h2>合并结果抽样与去重明细</h2></div><div class="cap mono">抽样按金额降序前 8 行<br>全量 3,231 行金额合计 2,184,620 元</div></div><div class="body"><div class="sec dark">表 4-1 合并结果抽样（元）</div><table class="dn"><thead><tr><th>订单号</th><th>区域</th><th>渠道</th><th>金额</th><th>来源文件</th><th>来源行号</th></tr></thead><tbody><tr><td>SO-28417</td><td>华东</td><td>直营</td><td class="hc">1,284.00</td><td>华东区订单.xlsx</td><td>2</td></tr><tr><td>SO-28409</td><td>华东</td><td>电商</td><td class="hc">642.00</td><td>华东区订单.xlsx</td><td>3</td></tr><tr><td>NO-11902</td><td>华北</td><td>分销</td><td class="hc">910.00</td><td>华北区订单.xlsx</td><td>2</td></tr><tr><td>NO-11884</td><td>华北</td><td>直营</td><td class="hc">1,470.00</td><td>华北区订单.xlsx</td><td>3</td></tr><tr><td>SN-5521</td><td>华南</td><td>电商</td><td class="hc">788.00</td><td>华南区订单.xlsx</td><td>2</td></tr><tr><td>SN-5488</td><td>华南</td><td>直营</td><td class="hc">2,046.00</td><td>华南区订单.xlsx</td><td>3</td></tr><tr><td>SO-28103</td><td>华东</td><td>分销</td><td class="hc">536.00</td><td>华东区订单.xlsx</td><td>4</td></tr><tr><td>NO-11802</td><td>华北</td><td>电商</td><td class="hc">1,120.00</td><td>华北区订单.xlsx</td><td>4</td></tr><tr class='sum'><td>抽样小计 8 行</td><td>—</td><td>—</td><td>8,796.00</td><td>全量 3,231 行</td><td>—</td></tr></tbody></table><div class="sec dark">表 4-2 去重明细（按文件）</div><table class="dn"><thead><tr><th>来源文件</th><th>跨文件重复</th><th>文件内重复</th><th>删除合计</th><th>保留行数</th></tr></thead><tbody><tr><td>华东区订单.xlsx</td><td>2</td><td>3</td><td class="hc">5</td><td>1,204</td></tr><tr><td>华北区订单.xlsx</td><td>1</td><td>3</td><td class="hc">4</td><td>986</td></tr><tr><td>华南区订单.xlsx</td><td>3</td><td>15</td><td class="hc">18</td><td>1,041</td></tr><tr class='sum'><td>合计 3 个文件</td><td>6</td><td>21</td><td>27</td><td>3,231</td></tr></tbody></table><div class="cols mid"><div style="flex:1.35"><div class="sec dark">各文件入库行数占比</div><div class="bars"><div class="bar"><span>华东</span><i style="width:115.7%"></i><span class="r mono">1,204 行</span></div><div class="bar"><span>华北</span><i style="width:94.7%"></i><span class="r mono">986 行</span></div><div class="bar"><span>华南</span><i style="width:100.0%"></i><span class="r mono">1,041 行</span></div></div></div><div style="flex:1"><div class="tnote">抽样 8 行金额小计 8,796.00 元，仅用于展示列结构；全量 3,231 行的金额合计 2,184,620 元与 9 月对账文件的「系统金额」完全一致（差异 0 元）。</div></div></div></div><div class="pf"><span>抽样 8 行小计 8,796.00 元，全量金额与对账文件差异 0 元</span><span class="mono">第 4 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="5"><div class="ph"><div><div class="kicker">Caliber Conflict · 口径冲突</div><h2>6 类口径冲突与处理定级</h2></div><div class="cap mono">冲突按「影响范围 × 严重度」定级<br>全部可追溯到来源行号</div></div><div class="body"><div class="sec dark">表 5-1 口径冲突清单</div><table class=""><thead><tr><th>编号</th><th>冲突项</th><th>涉及行数</th><th>严重度</th><th>处理方式</th></tr></thead><tbody><tr><td>C-01</td><td>金额单位：元 / 万元混用</td><td class="hc">3</td><td>高</td><td>按单位列 ×10,000 回正</td></tr><tr><td>C-02</td><td>订单号列名与格式不一致</td><td class="hc">3,231</td><td>高</td><td>统一列名并保留原前缀</td></tr><tr><td>C-03</td><td>区域未填（华北 12 行）</td><td class="hc">12</td><td>中</td><td>按来源文件归属补全</td></tr><tr><td>C-04</td><td>订单状态值越界 4 行</td><td class="hc">4</td><td>中</td><td>枚举归一为已完成</td></tr><tr><td>C-05</td><td>日期格式两种（- 与 /）</td><td class="hc">3,231</td><td>低</td><td>统一解析为 YYYY-MM-DD</td></tr><tr><td>C-06</td><td>客户名称含前后空格</td><td class="hc">41</td><td>低</td><td>去空格并全半角归一</td></tr><tr class='sum'><td>合计 6 类</td><td>高 2 / 中 2 / 低 2</td><td>6,522</td><td>—</td><td>全部闭环</td></tr></tbody></table><div class="sec dark">冲突涉及行数（最高 = 3,231 行，其余按同比例示意）</div><div class="bars"><div class="bar"><span>列名 / 日期</span><i style="width:100.0%"></i><span class="r mono">3,231 行</span></div><div class="bar"><span>客户名空格</span><i style="width:1.3%"></i><span class="r mono">41 行</span></div><div class="bar"><span>区域缺失</span><i style="width:0.4%"></i><span class="r mono">12 行</span></div><div class="bar"><span>状态值越界</span><i style="width:0.1%"></i><span class="r mono">4 行</span></div><div class="bar"><span>金额单位</span><i style="width:0.1%"></i><span class="r mono">3 行</span></div></div><div class="pts"><div class="pt">金额单位混用是最高风险项：3 行若未修正会使合计虚增 1.19 亿元（约 545 倍），已在 M2 阶段拦截。</div><div class="pt">列名与日期格式统一不影响数值，但会影响后续对账文件的关联键，因此定级为高。</div><div class="pt">客户名称去空格后去重客户数从 1,907 降到 1,842，减少 65 个重复客户实体。</div></div></div><div class="pf"><span>6 类口径冲突全部闭环，最大偏差倍数 10,000×</span><span class="mono">第 5 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="6"><div class="ph"><div><div class="kicker">Anomaly · 差异与异常</div><h2>27 行重复与 4 类口径异常</h2></div><div class="cap mono">偏差倍数 = 实际值 ÷ 阈值<br>阈值为 0 时以「—」表示</div></div><div class="body"><div class="sec dark">表 6-1 异常清单（按风险降序）</div><table class=""><thead><tr><th>编号</th><th>对象</th><th>阈值</th><th>实际</th><th class="hc">偏差倍数</th><th>处置</th></tr></thead><tbody><tr><td>A-01</td><td>华南金额（万元误作元）</td><td>金额 <100 视为异常</td><td>3 行命中</td><td class="hc">10,000×</td><td>×10,000 回正并复核</td></tr><tr><td>A-02</td><td>跨文件重复订单号</td><td>0 组</td><td>6 组</td><td class="hc">—</td><td>保留金额大者，记录被删行</td></tr><tr><td>A-03</td><td>文件内重复订单号</td><td>0 组</td><td>21 组</td><td class="hc">—</td><td>同 A-02 策略处理</td></tr><tr><td>A-04</td><td>区域为空的华北行</td><td>0 行</td><td>12 行</td><td class="hc">—</td><td>按来源文件归属补全</td></tr><tr><td>A-05</td><td>状态值越界</td><td>0 行</td><td>4 行</td><td class="hc">—</td><td>枚举归一为已完成</td></tr><tr><td>A-06</td><td>日期解析失败</td><td>0 行</td><td>0 行</td><td class="hc">—</td><td>无需处置</td></tr><tr class='sum'><td>合计 6 类</td><td>—</td><td>—</td><td>27 行 + 19 处</td><td>10,000×</td><td>全部闭环，已复核 100%</td></tr></tbody></table><div class="sec dark">异常行数分布（行）</div><div class="bars"><div class="bar"><span>文件内重复</span><i style="width:100.0%"></i><span class="r mono">21 行</span></div><div class="bar"><span>区域缺失</span><i style="width:57.1%"></i><span class="r mono">12 行</span></div><div class="bar"><span>跨文件重复</span><i style="width:28.6%"></i><span class="r mono">6 行</span></div><div class="bar"><span>状态越界</span><i style="width:19.0%"></i><span class="r mono">4 行</span></div><div class="bar"><span>金额单位</span><i style="width:14.3%"></i><span class="r mono">3 行</span></div></div><div class="pts"><div class="pt">跨文件重复 6 组全部由跨区域补录产生，去重后合计金额减少 0 元（重复行金额完全一致）。</div><div class="pt">文件内重复 21 组中 18 组来自华南分表的批量补录，同一订单被写入两次，按下单时间取最早一条。</div><div class="pt">金额单位 3 行若未拦截将使合并金额从 2,184,620 元虚增到 121,684,620 元，故列为最高风险项。</div></div></div><div class="pf"><span>异常 46 处：去重 27 行 + 单位 3 行 + 区域 12 行 + 状态 4 行</span><span class="mono">第 6 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="7"><div class="ph"><div><div class="kicker">Validation · 校验与质量</div><h2>6 条合并校验规则与质量分</h2></div><div class="cap mono">综合质量分 99.93（五项等权）<br>阻断级 30 处、警告级 16 处</div></div><div class="body"><div class="sec dark">表 7-1 合并校验规则</div><table class=""><thead><tr><th>规则</th><th>检查内容</th><th>级别</th><th>命中</th><th>处置动作</th></tr></thead><tbody><tr><td>R-01</td><td>订单号跨文件唯一</td><td>阻断</td><td class="hc">27</td><td>保留金额最大且时间最早一条</td></tr><tr><td>R-02</td><td>金额单位一致（统一为元）</td><td>阻断</td><td class="hc">3</td><td>按单位列 ×10,000 回正</td></tr><tr><td>R-03</td><td>下单时间可解析</td><td>警告</td><td class="hc">0</td><td>—</td></tr><tr><td>R-04</td><td>区域与状态 ∈ 枚举值</td><td>警告</td><td class="hc">16</td><td>按来源文件与枚举归一</td></tr><tr><td>R-05</td><td>列名映射覆盖率 = 100%</td><td>阻断</td><td class="hc">0</td><td>—</td></tr><tr><td>R-06</td><td>原始行数 − 去重行数 = 入库行数</td><td>阻断</td><td class="hc">0</td><td>勾稽通过（3,258 − 27 = 3,231，差异 0 行）</td></tr><tr class='sum'><td>合计 6 条</td><td>阻断 4 条 / 警告 2 条</td><td>—</td><td>46</td><td>已闭环 46，待办 0</td></tr></tbody></table><div class="sec dark">五维质量分（%）</div><div class="bars"><div class="bar"><span>列映射覆盖</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>行数勾稽</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>单位一致</span><i style="width:99.9%"></i><span class="r mono">99.91</span></div><div class="bar"><span>枚举合规</span><i style="width:99.5%"></i><span class="r mono">99.50</span></div><div class="bar"><span>重复控制</span><i style="width:99.2%"></i><span class="r mono">99.17</span></div></div><div class="pts"><div class="pt">重复控制 99.17% = 1 − 27 ÷ 3,258，去重后订单号全表唯一（0 组残留）。</div><div class="pt">单位一致 99.91% 的 3 行误差已按 ×10,000 回正，回正后与渠道对账金额差异 0 元。</div><div class="pt">行数勾稽 100%：3,258 − 27 = 3,231，与对账文件「本期核对单数」一致，可作为合并正确性的硬证据。</div></div></div><div class="pf"><span>质量分 99.93：行数勾稽与列映射覆盖均 100%</span><span class="mono">第 7 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="8"><div class="ph"><div><div class="kicker">Conclusion & Actions · 结论与动作</div><h2>结论、耗时结构与五步动作</h2></div><div class="cap mono">合并 3,231 行耗时 68 秒<br>验收标准均可自动校验</div></div><div class="body"><div class="sec dark">表 8-1 分阶段处理动作</div><table class=""><thead><tr><th>阶段</th><th>动作</th><th>责任人</th><th>期限</th><th>验收标准</th></tr></thead><tbody><tr><td>立即</td><td>复核华南 3 行金额单位并回正总表</td><td>蒋雪</td><td>10-06</td><td class="hc">单位一致 100%</td></tr><tr><td>本周</td><td>修正华南分表批量补录流程（去重 18 行根因）</td><td>周曼</td><td>10-10</td><td class="hc">该表文件内重复 ≤2 组</td></tr><tr><td>本周</td><td>把 6 组列名映射写入规则库并加测试样例</td><td>高晓鹭</td><td>10-10</td><td class="hc">映射自动命中率 100%</td></tr><tr><td>本月</td><td>为 12 个标准列加类型与枚举约束</td><td>谭亦文</td><td>10-25</td><td class="hc">类型不符即阻断导入</td></tr><tr><td>下季度</td><td>把合并流程接入月度例行任务</td><td>徐海鹏</td><td>12-31</td><td class="hc">每月 1 日自动产出总表</td></tr></tbody></table><div class="sec dark">合并耗时分解（合计 68s）</div><div class="bars"><div class="bar"><span>列名识别</span><i style="width:30.8%"></i><span class="r mono">8s</span></div><div class="bar"><span>类型与单位归一</span><i style="width:100.0%"></i><span class="r mono">26s</span></div><div class="bar"><span>跨文件去重</span><i style="width:53.8%"></i><span class="r mono">14s</span></div><div class="bar"><span>缺失与越界修补</span><i style="width:34.6%"></i><span class="r mono">9s</span></div><div class="bar"><span>校验与导出</span><i style="width:42.3%"></i><span class="r mono">11s</span></div></div><div class="pts"><div class="pt">入库 3,231 行、金额 2,184,620 元，与 9 月对账文件行数一致，可作为合并正确性的终检依据。</div><div class="pt">口径冲突 6 类 43 处全部闭环，其中金额单位 3 行风险最高（潜在放大 10,000 倍）。</div><div class="pt">去重 27 行集中在华南分表（18 行，占 66.7%），提示该分表存在批量补录流程缺陷。</div><div class="pt">列名映射 6 组全部自动命中，规则库覆盖率 100%，新增分表无需人工干预即可合并。</div></div></div><div class="pf"><span>五步动作：立即 1 项、本周 2 项、本月 1 项、下季度 1 项</span><span class="mono">第 8 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="9"><div class="ph"><div><div class="kicker">Appendix · 附录</div><h2>数据来源、术语表与修订记录</h2></div><div class="cap mono">来源文件与行号可回溯<br>修订留痕 3 版</div></div><div class="body"><div class="sec dark">表 9-1 数据来源清单</div><table class="dn"><thead><tr><th>数据源</th><th>提供方</th><th>覆盖周期</th><th>记录数</th><th>口径备注</th></tr></thead><tbody><tr><td>华东区订单.xlsx</td><td>华东运营组</td><td>2026-09-01 ~ 09-30</td><td>1,209</td><td>原始文件，未做任何修改</td></tr><tr><td>华北区订单.xlsx</td><td>华北运营组</td><td>2026-09-01 ~ 09-30</td><td>990</td><td>范围原始文件，未做任何修改</td></tr><tr><td>华南区订单.xlsx</td><td>华南运营组</td><td>2026-09-01 ~ 09-30</td><td>1,059</td><td>原始文件，含 18 行批量补录</td></tr><tr><td>区域与客户主数据</td><td>数据治理组</td><td>2026-09-30 快照</td><td>1,842</td><td>客户名称去空格后去重结果</td></tr></tbody></table><div class="sec dark">表 9-2 术语表</div><table class="dn"><thead><tr><th>术语</th><th>定义</th></tr></thead><tbody><tr><td>标准列</td><td>合并后总表固定使用的 12 个列名与类型</td></tr><tr><td>去重键</td><td>判定同一实体的字段组合，本期为订单号</td></tr><tr><td>偏差倍数</td><td>实际值 ÷ 阈值，衡量越界严重度；阈值为 0 时以「—」表示</td></tr><tr><td>列名映射</td><td>分表列名 → 标准列的对应关系，覆盖率须为 100%</td></tr><tr class='sum'><td>追溯列</td><td>来源文件 + 来源行号，用于任一入库行回到原始文件</td></tr></tbody></table><div class="sec dark">表 9-3 修订记录</div><table class="dn"><thead><tr><th>版本</th><th>日期</th><th>变更</th><th>责任人</th></tr></thead><tbody><tr><td>v1.0</td><td>2026-10-03</td><td>首版合并（未处理单位与枚举冲突）</td><td>高晓鹭</td></tr><tr><td>v1.1</td><td>2026-10-04</td><td>增加金额单位判定与 6 条校验规则</td><td>蒋雪</td></tr><tr><td>v1.2</td><td>2026-10-05</td><td>补追溯列并重算去重后行数 3,231</td><td>数据治理组</td></tr></tbody></table></div><div class="pf"><span>附录：4 个数据源、5 条术语、3 版修订记录</span><span class="mono">第 9 / 9 页</span></div></section>
+</body></html>

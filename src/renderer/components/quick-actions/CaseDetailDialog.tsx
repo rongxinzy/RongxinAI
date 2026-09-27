@@ -35,32 +35,10 @@ export default function CaseDetailDialog({
   const [expanded, setExpanded] = useState(false);
   const applying = useRef(false);
   const t = (key: string) => i18nService.t(key);
-  // The generated walkthrough pages embed copy, so a language switch has to rebuild them.
-  // Subscribed instead of read once: the effect below has to re-run on its own, not because an
-  // ancestor happened to re-render the tree.
-  const [language, setLanguage] = useState(() => i18nService.getLanguage());
-
-  useEffect(() => i18nService.subscribe(() => setLanguage(i18nService.getLanguage())), []);
 
   useEffect(() => {
     let cancelled = false;
-    loadCasePreview(id, {
-      label,
-      description,
-      prompt: taskPrompt,
-      copy: {
-        outlineKicker: i18nService.t('caseOutlineKicker'),
-        deliverableKicker: i18nService.t('caseDeliverableKicker'),
-        outlineFallback: i18nService.t('caseOutlineFallback'),
-        deliverableTitle: i18nService.t('caseDeliverableTitle'),
-        deliverableIntro: i18nService.t('caseDeliverableIntro'),
-        deliverableItems: [
-          i18nService.t('caseDeliverableStructure'),
-          i18nService.t('caseDeliverableFile'),
-          i18nService.t('caseDeliverableEditable'),
-        ],
-      },
-    })
+    loadCasePreview(id)
       .then(content => {
         if (!cancelled) setHtml(content);
       })
@@ -71,7 +49,7 @@ export default function CaseDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [description, id, label, language, taskPrompt]);
+  }, [id]);
 
   return (
     <Dialog

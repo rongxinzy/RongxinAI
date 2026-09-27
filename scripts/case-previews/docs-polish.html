@@ -1,44 +1,94 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-polish</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
-.title{font-size:23px;letter-spacing:-.01em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
-h3{margin-top:16px;font-size:13.5px}
-p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-ul{list-style:none;margin-top:10px;display:grid;gap:7px}
-li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-polish</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--accent:#B45309}
+body{width:1160px;display:grid;gap:26px;padding:30px;background:#f2f2ef;
+ font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+ color:#16171a;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;
+ border:1px solid #e4e4e0;padding:30px 44px 0;display:flex;flex-direction:column}
+.ph{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.ph .kc{color:var(--accent);letter-spacing:.3em}
+.ph .rt{letter-spacing:.06em;color:#9a9ea6}
+.pt{font-size:23px;font-weight:500;letter-spacing:-.02em;margin-top:11px;color:#16171a}
+.pt.lg{font-size:27px;font-weight:600;margin-top:14px;line-height:1.34}
+.rule{height:1px;background:#edede9;margin-top:11px}
+.pbody{flex:1;min-height:0;margin-top:12px;overflow:hidden}
+.pf{margin-top:8px;padding-top:8px;border-top:1px solid #edede9;display:flex;justify-content:space-between;font-size:11px;color:#8b8f97;letter-spacing:.02em}
+.meta{display:flex;flex-wrap:wrap;gap:7px 22px;font-size:12px;color:#8b8f97;padding-bottom:12px;border-bottom:1px solid #edede9}
+h3{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:#16171a;margin-top:12px}
+h3.first{margin-top:0}
+h4{font-size:11px;font-weight:600;letter-spacing:.16em;color:#8b8f97;margin-top:10px}
+h4.first{margin-top:0}
+p{font-size:13px;line-height:1.9;color:#3d4046;margin-top:8px}
+p.first{margin-top:0}
+ul{list-style:none;margin-top:7px;display:grid;gap:5px}
+ul.first{margin-top:0}
+li{position:relative;padding-left:15px;font-size:12.8px;line-height:1.8;color:#4c5058}
 li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
-.split{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
-.pane{min-width:0;overflow:hidden}
-.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.dense{margin-top:10px;font-size:11px;line-height:1.95;color:#6f737b;text-align:justify}
-.card{border:1px solid #edede9;background:#fafaf8;padding:16px 18px;margin-top:10px}
+li b{font-weight:600;color:#16171a}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 10px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.6}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.n,span.n{font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.grid12{display:grid;grid-template-columns:1.28fr 1fr;gap:24px}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #edede9;margin-top:11px}
+.nums>div{padding:10px 13px;border-left:1px solid #edede9}
+.nums>div:first-child{border-left:0}
+.nums .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.nums .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:3px;color:var(--accent)}
+.nums .s{font-size:11.5px;color:#8b8f97;margin-top:2px}
+.card{border:1px solid #edede9;background:#fafaf8;padding:10px 13px;margin-top:8px}
 .card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.card p{margin-top:8px;font-size:12.8px;line-height:1.85;color:#3d4046}
+.card p{margin-top:5px;font-size:12.5px;line-height:1.8}
+.note{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:2px solid var(--accent);
+ padding:8px 12px;margin-top:8px;font-size:12.5px;line-height:1.8;color:#3d4046}
+.toc{margin-top:6px}
+.toc .r{display:grid;grid-template-columns:34px 1fr 208px 40px;gap:10px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.6}
+.toc .r:first-child{border-top:0}
+.toc .r b{color:var(--accent);font-weight:600}
+.toc .r .pg{text-align:right;color:#8b8f97;font-variant-numeric:tabular-nums}
+.bar{margin-top:8px;display:grid;gap:7px}
+.bar .r{display:grid;grid-template-columns:122px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058}
+.bar .tr{height:9px;background:#f1f1ee;position:relative}
+.bar .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);display:block}
+.bar .vv{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.steps{margin-top:6px}
+.steps .s{display:grid;grid-template-columns:58px 1fr;gap:12px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.steps .s:first-child{border-top:0}
+.steps b{color:var(--accent);font-weight:600}
+.def{margin-top:6px}
+.def .d{display:grid;grid-template-columns:158px 1fr;gap:12px;padding:5px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.def .d:first-child{border-top:0}
+.def .d b{font-weight:600;color:#16171a}
+.sig{display:flex;justify-content:flex-end;gap:44px;margin-top:16px;font-size:12.5px;color:#4c5058}
+.cmp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #edede9;margin-top:9px}
+.cmp>div{padding:10px 13px;font-size:12.5px;line-height:1.85;color:#3d4046}
+.cmp>div:first-child{border-right:1px solid #edede9}
+.cmp .h{font-size:11px;letter-spacing:.14em;color:#8b8f97;display:block;margin-bottom:5px}
 del{color:#b3564a;text-decoration:line-through}
-ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.07)}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.08)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border:1px solid #e4e4e0;color:#6f737b}
+.small{font-size:11.5px;color:#8b8f97;line-height:1.75;margin-top:6px}
+.cfoot{display:grid;grid-template-columns:1fr 1fr 1.45fr;border:1px solid #edede9;margin-top:10px}
+.cfoot>div{padding:8px 12px;border-left:1px solid #edede9;font-size:11.5px;line-height:1.7;color:#4c5058}
+.cfoot>div:first-child{border-left:0}
+.cfoot .k{display:block;font-size:11px;letter-spacing:.12em;color:#8b8f97;margin-bottom:3px}
 </style></head><body>
-<div class="doc" style="--accent:#B45309">
-  <div class="title">文档润色：修改对照</div>
-  <div class="meta"><span>原文 1,240 字</span><span>修改 23 处</span><span>结论未变</span></div>
-  <div class="split" style="margin-top:16px">
-    <div class="pane">
-      <h4>修改前</h4>
-      <p class="dense">本季度我们的工作整体上做得还不错，各项指标基本上都完成了。首先我们在商家侧做了一些优化，<del>把原来比较慢的地方改快了一点</del>，人均处理量提升了不少。另外我们也<del>搞了一个</del>指标口径表，把各个业务线的口径统一了起来，这样大家看数的时候就不会打架了。当然也<del>有一些问题</del>，比如华北区域的增长不太好，我们后面会去看看原因。</p>
-    </div>
-    <div class="pane">
-      <h4>修改后</h4>
-      <p class="dense">本季度各项核心指标均达成目标。其中，<ins>商家侧任务分派链路完成重构，人均日处理量由 40 单提升至 128 单</ins>；同时<ins>建立</ins>经营指标口径表，覆盖 6 条业务线，使看板、告警与导出共用同一口径。仍存在待解问题：<ins>华北区域营收环比下降 2.1%，原因尚未完成归因，下季度将专项复盘</ins>。</p>
-      <div class="card"><div class="k">润色原则</div><p>删除程度副词与模糊表述，把"改快了一点"换成本可以核对的数字；"去看看原因"改为有交付物的"专项复盘"。</p></div>
-      <div class="card"><div class="k">未改动的部分</div><p>"各项核心指标均达成目标"保留原判断，仅把口语化的"还不错"收敛为可核对的表述。</p></div>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" data-page="1"><div class="ph"><span class="kc">DOCUMENT EDITING</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">文档润色：修改对照与定稿</h2><div class="pbody"><div class="meta"><span>润色对象：2026 年第三季度运营工作报告</span><span>原文 1,240 字</span><span>修改 23 处</span><span>涉及 6 类问题</span><span>事实与结论：未改动</span><span>完成日期：2026-09-29</span></div><h3 class="first">一、润色总览</h3><p>本次润色只处理表达层，不改动事实、数字与结论：删除程度副词与口语化表述，模糊描述改为可核对数字，统一专业术语。全文修改 23 处，分布见下表。</p><div class="nums"><div><div class="k">修改处数</div><div class="v">23 处</div><div class="s">数字 7 / 删除 5 / 口语 4 / 事实化 3 / 术语 2 / 结构 2</div></div><div><div class="k">字数变化</div><div class="v">1,240 → 1,186 字</div><div class="s">压缩 4.4%，信息量不变</div></div><div><div class="k">涉及段落</div><div class="v">7 段</div><div class="s">对应原文一至四章，共 23 处修改</div></div></div><h3>二、问题类型分布</h3><table><tr><th>类型</th><th>处数</th><th>占比</th><th>典型处理</th><th>示例段落</th></tr><tr><td>模糊描述改具体数字</td><td>7 处</td><td>30.4%</td><td>「提升了不少」改为「由 40 单提升至 128 单」</td><td>第 3、4、5 页</td></tr><tr><td>删除冗余与程度副词</td><td>5 处</td><td>21.7%</td><td>删除「基本上」「一些」「争取」</td><td>第 3、4、5 页</td></tr><tr><td>口语表述改书面语</td><td>4 处</td><td>17.4%</td><td>「搞了一个」改为「建立」</td><td>第 3、4、5 页</td></tr><tr><td>事实与交付物化</td><td>3 处</td><td>13.0%</td><td>「去看看原因」改为「专项复盘并输出调整方案」</td><td>第 3、5 页</td></tr><tr><td>专业术语统一</td><td>2 处</td><td>8.7%</td><td>「口径表」统一为「经营指标口径表」</td><td>第 6 页校核表</td></tr><tr><td>段落结构调整</td><td>2 处</td><td>8.7%</td><td>结论前置，问题与措施逐条配对</td><td>第 4、5 页</td></tr></table><div class="cfoot"><div><span class="k">润色范围</span>仅表达层；事实、数字、责任主体与结论方向均不改动</div><div><span class="k">对照口径</span>原文全文 1,240 字，第 3—5 页对照部分覆盖其中 956 字</div><div><span class="k">阅读顺序</span>P2 原则 · P3—P5 对照 · P6 校核 · P7—P8 定稿 · P9—P10 清单</div></div></div><div class="pf"><span>结论：23 处修改全部为表达层，事实、数字与结论未发生变化</span><span>第 1 / 10 页</span></div></section>
+<section class="page" data-page="2"><div class="ph"><span class="kc">CONTENTS</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">目录与润色原则</h2><div class="pbody"><p class="first">本文件共 10 页：第 3 至 5 页为段落对照，第 6 页为数字与术语校核，第 7 至 8 页为定稿全文，第 9 至 10 页为修改清单与检查清单。</p><div class="toc"><div class="r"><b>一</b><span>润色总览与问题类型分布</span><span style="color:#8b8f97">修改处数、字数变化、6 类问题占比</span><span class="pg">1</span></div><div class="r"><b>二</b><span>润色原则与判定标准</span><span style="color:#8b8f97">5 条原则、判定标准与不可改动清单</span><span class="pg">2</span></div><div class="r"><b>三</b><span>对照一：开头与总体情况</span><span style="color:#8b8f97">段落 1—2 的前后对照与理由</span><span class="pg">3</span></div><div class="r"><b>四</b><span>对照二：主要工作</span><span style="color:#8b8f97">段落 3—5 的前后对照与理由</span><span class="pg">4</span></div><div class="r"><b>五</b><span>对照三：问题与下阶段</span><span style="color:#8b8f97">段落 6—7 的前后对照与理由</span><span class="pg">5</span></div><div class="r"><b>六</b><span>数字与术语校核表</span><span style="color:#8b8f97">4 处数字改写、2 处术语统一的依据</span><span class="pg">6</span></div><div class="r"><b>七</b><span>定稿全文（上）</span><span style="color:#8b8f97">一、总体情况 与 二、主要工作</span><span class="pg">7</span></div><div class="r"><b>八</b><span>定稿全文（下）</span><span style="color:#8b8f97">三、存在问题 与 四、下阶段安排</span><span class="pg">8</span></div><div class="r"><b>九</b><span>修改清单（23 处）</span><span style="color:#8b8f97">逐条编号、定位与修改类型</span><span class="pg">9</span></div><div class="r"><b>十</b><span>附录：定稿前检查清单</span><span style="color:#8b8f97">12 项检查与通过标准</span><span class="pg">10</span></div></div><h4>润色原则（5 条）</h4><ul class="first"><li><b>事实不动</b>：数字、时间、责任主体、结论方向一律不改，只改表达。</li><li><b>可核对</b>：模糊描述一律替换为可核对的数字或明确的交付物。</li><li><b>去程度副词</b>：删除「基本上」「比较」「一些」等不承载信息的词。</li><li><b>书面语统一</b>：口语表述改为公文书面语，句长控制在 40 字以内。</li><li><b>术语一致</b>：同一概念全文只用一个名称，以现行制度文件为准。</li></ul></div><div class="pf"><span>本文件共 10 页，修改处数 23、修改范围限定在表达层</span><span>第 2 / 10 页</span></div></section>
+<section class="page" data-page="3"><div class="ph"><span class="kc">对照一</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">三、对照一：开头与总体情况</h2><div class="pbody"><div class="cmp"><div><span class="h">修改前（原文，共 312 字）</span>本季度我们的工作整体上做得还不错，各项指标<del>基本上</del>都完成了。<del>首先</del>我们在商家侧<del>做了一些</del>优化，把原来比较慢的地方改快了一点，人均处理量提升了不少。另外我们也<del>搞了一个</del>指标口径表，把各个业务线的口径统一了起来，这样大家看数的时候就不会打架了。当然也<del>有一些问题</del>，比如华北区域的增长不太好，我们后面会去看看原因。</div><div><span class="h">修改后（定稿，共 268 字）</span>本季度各项核心指标均达成目标。商家侧任务分派链路完成重构，<ins>人均日处理量由 40 单提升至 128 单</ins>；同时建立<ins>经营指标口径表</ins>，覆盖 6 条业务线，使看板、告警与导出共用同一口径。仍存在待解问题：<ins>华北区域营收环比下降 2.1%，原因尚未完成归因，第四季度将开展专项复盘并输出调整方案</ins>。</div></div><h4>修改理由</h4><table><tr><th>编号</th><th>位置</th><th>修改类型</th><th>理由</th></tr><tr><td>M-01</td><td>「基本上都完成了」</td><td>删除程度副词</td><td>「基本上」削弱判断，且与实际（全部达成）不符</td></tr><tr><td>M-02</td><td>「首先」</td><td>删除语序词</td><td>单段无需序号词，序号由章节标题承担</td></tr><tr><td>M-03</td><td>「做了一些优化」</td><td>模糊改具体</td><td>改为「任务分派链路完成重构」，明确对象</td></tr><tr><td>M-04</td><td>「改快了一点」</td><td>模糊改数字</td><td>替换为「由 40 单提升至 128 单」，可核对</td></tr><tr><td>M-05</td><td>「提升了不少」</td><td>删除冗余</td><td>与 M-04 重复，删除避免同义重复</td></tr><tr><td>M-06</td><td>「口径表 / 指标表」混用</td><td>术语统一</td><td>统一为「经营指标口径表」，依据经营指标管理办法</td></tr><tr><td>M-07</td><td>「不会打架了」</td><td>术语统一</td><td>改为「共用同一口径」，与其他段落用词一致</td></tr><tr><td>M-08</td><td>「增长不太好」</td><td>模糊改数字</td><td>替换为「营收环比下降 2.1%」</td></tr><tr><td>M-09</td><td>「去看看原因」</td><td>模糊改交付物</td><td>改为「专项复盘并输出调整方案」，含交付物</td></tr></table></div><div class="pf"><span>对照一：9 处修改，原文 312 字压缩至 268 字</span><span>第 3 / 10 页</span></div></section>
+<section class="page" data-page="4"><div class="ph"><span class="kc">对照二</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">四、对照二：主要工作</h2><div class="pbody"><div class="cmp"><div><span class="h">修改前（原文，共 296 字）</span><del>我们在几个方面都做了不少事情</del>。一是把指标口径表建起来了，覆盖了几条业务线，看板、告警和导出现在都用这个了。二是分派链路改了一下，效果还可以。三是把异常单排了个序，优先处理影响最大的<del>那么几个</del>单子，这样处理起来更有针对性一些。</div><div><span class="h">修改后（定稿，共 246 字）</span>完成三项重点工作。一是建成<ins>经营指标口径表</ins>，覆盖 <ins>6 条业务线</ins>，看板、告警与导出共用同一份定义；二是完成<ins>任务分派链路重构，人均日处理量提升至 128 单</ins>；三是建立<ins>异常单影响面排序机制，优先处理影响面最大的前 6 单</ins>，处置及时率达 88%。</div></div><h4>修改理由</h4><table><tr><th>编号</th><th>位置</th><th>修改类型</th><th>理由</th></tr><tr><td>M-10</td><td>「我们在几个方面都做了不少事情」</td><td>删除冗余开头</td><td>总起句不承载信息，直接进入分条</td></tr><tr><td>M-11</td><td>「搞了一个」/「建起来了」</td><td>口语改书面</td><td>改为「建立」「建成」，符合公文表述</td></tr><tr><td>M-12</td><td>「几条业务线」</td><td>模糊改数字</td><td>明确为「6 条业务线」，与口径表 v2 一致</td></tr><tr><td>M-13</td><td>「效果还可以」</td><td>模糊改数字</td><td>替换为「提升至 128 单」，补入可核对结果</td></tr><tr><td>M-14</td><td>「那么几个单子」</td><td>模糊改数字</td><td>替换为「前 6 单」，与排序规则定义一致</td></tr><tr><td>M-15</td><td>「更有针对性一些」</td><td>口语改书面</td><td>改为带指标的「处置及时率达 88%」，补充证据</td></tr><tr><td>M-16</td><td>分条序号</td><td>结构调整</td><td>统一为「一是 / 二是 / 三是」，与公文行文一致</td></tr></table><h4>补充对照：段落 4 的句式调整</h4><div class="def"><div class="d"><b>修改前</b><span>「二是分派链路改了一下，效果还可以」</span></div><div class="d"><b>修改后</b><span>「二是完成任务分派链路重构，人均日处理量提升至 128 单」</span></div></div></div><div class="pf"><span>对照二：7 处修改，三条工作全部补入可核对数字</span><span>第 4 / 10 页</span></div></section>
+<section class="page" data-page="5"><div class="ph"><span class="kc">对照三</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">五、对照三：问题与下阶段</h2><div class="pbody"><div class="cmp"><div><span class="h">修改前（原文，共 348 字）</span>问题方面，华北区域这块儿表现不太好，我们觉得可能是渠道那边有变化，但具体是怎么回事还没太弄清楚。<del>另外</del>还有一些小问题，比如导出和看板的数据偶尔对不上。下阶段我们打算把这些问题都解决一下，<del>争取</del>把指标再往上提一提，同时把夜间的人工处理尽量减下来。</div><div><span class="h">修改后（定稿，共 302 字）</span>存在两项待解问题。一是<ins>华北区域营收环比下降 2.1%，渠道结构变化已完成下钻，商家维度样本不足 30 家，归因尚未闭环</ins>；二是<ins>导出模块与看板在 3 条业务线上存在口径差异，最大差异 0.2 个百分点</ins>。下阶段安排：第四季度完成华北区域归因并输出调整方案；<ins>口径表 v2 于 9 月 27 日前完成三处同步</ins>；<ins>夜间人工挑单比例由 18% 降至 10% 以内</ins>。</div></div><h4>修改理由</h4><table><tr><th>编号</th><th>位置</th><th>修改类型</th><th>理由</th></tr><tr><td>M-17</td><td>「这块儿」</td><td>口语改书面</td><td>改为「华北区域」，删除儿化音</td></tr><tr><td>M-18</td><td>「可能是渠道那边有变化」</td><td>模糊改事实</td><td>改为已完成的「渠道结构变化已完成下钻」，区分事实与推测</td></tr><tr><td>M-19</td><td>「没太弄清楚」</td><td>口语改书面</td><td>改为「归因尚未闭环」，并补充样本不足 30 家的证据</td></tr><tr><td>M-20</td><td>「还有一些小问题」</td><td>模糊改数字</td><td>替换为「3 条业务线存在口径差异，最大 0.2 个百分点」</td></tr><tr><td>M-21</td><td>「都解决一下」</td><td>结构调整</td><td>拆为两条带交付物与时限的安排，逐项可考核</td></tr><tr><td>M-22</td><td>「争取」</td><td>删除语气词</td><td>删除后目标成为承诺，且补入具体阈值</td></tr><tr><td>M-23</td><td>「尽量减下来」</td><td>模糊改数字</td><td>替换为「由 18% 降至 10% 以内」</td></tr></table><h4>修改原则落地</h4><div class="def"><div class="d"><b>推测表述处理</b><span>一律改为已完成事实或明确目标，不保留「可能」「大概」「尽量」</span></div></div></div><div class="pf"><span>对照三：7 处修改，把推测性表述全部改为已完成事实或明确目标</span><span>第 5 / 10 页</span></div></section>
+<section class="page" data-page="6"><div class="ph"><span class="kc">数字与术语</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">六、数字与术语校核表</h2><div class="pbody"><h3 class="first">一、关键数字校核（7 处数字类修改中的 4 处新增数字）</h3><table><tr><th>编号</th><th>原表述</th><th>定稿表述</th><th>依据</th><th>校核状态</th></tr><tr><td>M-04</td><td>提升了不少 / 改快了一点</td><td>由 40 单提升至 128 单</td><td>分派链路埋点周报</td><td>已核对</td></tr><tr><td>M-08</td><td>增长不太好</td><td>营收环比下降 2.1%</td><td>运营看板 v2 区域报表</td><td>已核对</td></tr><tr><td>M-12</td><td>几条业务线</td><td>6 条业务线</td><td>经营指标口径表 v2</td><td>已核对</td></tr><tr><td>M-23</td><td>尽量减下来</td><td>由 18% 降至 10% 以内</td><td>夜间分派埋点月报</td><td>已核对</td></tr></table><h3>二、术语统一（2 处）</h3><table><tr><th>编号</th><th>原表述</th><th>统一为</th><th>依据文件</th></tr><tr><td>M-06</td><td>口径表 / 指标表 / 数据口径</td><td>经营指标口径表</td><td>经营指标管理办法（2026 年 3 月版）</td></tr><tr><td>M-07</td><td>单子 / 工单 / 任务</td><td>工单</td><td>客服作业规范（2026 年 6 月版）</td></tr></table><div class="note">格式复核（计入检查项，不计入 23 处修改）：全文百分比统一保留一位小数，日期统一为「YYYY-MM-DD」或「M 月 D 日」，不混用。</div><p class="small">校核规则：凡改写为数字的表述，均须给出可追溯的数据来源；无来源的模糊表述一律删除而不猜测数字。其余 3 处数字类修改（M-13、M-14、M-20）为补入原有数字，逐条见第 4、5 页对照表。</p><h3>三、数字复核记录</h3><div class="def"><div class="d"><b>复核人</b><span>数据分析组 周曼</span></div><div class="d"><b>复核时间</b><span>2026-09-29</span></div><div class="d"><b>复核结论</b><span>4 处新增数字全部可回溯原始报表，无估算值</span></div></div></div><div class="pf"><span>4 处数字、2 处术语全部有据可查，无来源的表述一律删除</span><span>第 6 / 10 页</span></div></section>
+<section class="page" data-page="7"><div class="ph"><span class="kc">定稿上</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">七、定稿全文（上）</h2><div class="pbody"><h3 class="first">2026 年第三季度运营工作报告（定稿）</h3><h4>一、总体情况</h4><p class="first">本季度各项核心指标均达成目标。季度累计处理订单 25,141 单，整体准时率 96.4%，较上季度提升 1.8 个百分点；异常单由季初日均 46 单降至 27 单，降幅 41.3%。商家侧任务分派链路完成重构，人均日处理量由 40 单提升至 128 单；同时建立经营指标口径表，覆盖 6 条业务线，使看板、告警与导出共用同一口径。</p><h4>二、主要工作</h4><p class="first">完成三项重点工作。一是建成经营指标口径表，覆盖 6 条业务线，看板、告警与导出共用同一份定义；二是完成任务分派链路重构，人均日处理量提升至 128 单；三是建立异常单影响面排序机制，优先处理影响面最大的前 6 单，处置及时率达 88%。</p><table><tr><th>重点工作</th><th>目标</th><th>完成情况</th><th>完成度</th></tr><tr><td>经营指标口径表建设</td><td>覆盖 6 条业务线</td><td>已上线并覆盖 6 条业务线</td><td>100%</td></tr><tr><td>任务分派链路重构</td><td>人均日处理量 ≥120 单</td><td>实际达成 128 单</td><td>107%</td></tr><tr><td>异常单影响面排序</td><td>优先处理前 6 单</td><td>处置及时率 88%</td><td>88%</td></tr></table><p class="small">本页为定稿第 1 至 2 章，未做进一步改动；第 8 页为定稿第 3 至 4 章及落款。</p><h4>三、语句层面的统一约定</h4><table><tr><th>约定</th><th>处理方式</th><th>示例</th></tr><tr><td>句长</td><td>单句不超过 40 字，长句拆分为短句</td><td>「看板、告警与导出共用同一口径」</td></tr><tr><td>主语</td><td>段落首句使用明确主语</td><td>「完成三项重点工作」</td></tr><tr><td>单位</td><td>金额用元、时长用分钟、比率保留一位小数</td><td>「由 40 单提升至 128 单」</td></tr><tr><td>序号</td><td>分条统一使用「一是 / 二是 / 三是」</td><td>「一是…二是…三是…」</td></tr></table></div><div class="pf"><span>定稿上篇：一、总体情况 与 二、主要工作，共 3 段 1 表</span><span>第 7 / 10 页</span></div></section>
+<section class="page" data-page="8"><div class="ph"><span class="kc">定稿下</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">八、定稿全文（下）</h2><div class="pbody"><h4 class="first">三、存在问题</h4><p class="first">存在两项待解问题。一是华北区域营收环比下降 2.1%，渠道结构变化已完成下钻，但商家维度样本不足 30 家，归因尚未闭环；二是导出模块与看板在 3 条业务线上存在口径差异，最大差异 0.2 个百分点，涉及生鲜有效单量、服饰超时单占比与食品退货率。</p><h4>四、下阶段安排</h4><p class="first">第四季度完成华北区域归因并输出调整方案；经营指标口径表 v2 于 9 月 27 日前完成看板、告警与导出三处同步；夜间人工挑单比例由 18% 降至 10% 以内，并在 10 月 8 日前完成全量上线。</p><table><tr><th>事项</th><th>责任部门</th><th>完成时间</th><th>衡量方式</th></tr><tr><td>华北区域归因与调整方案</td><td>数据分析组</td><td>2026-11-15</td><td>区域月度营收转正</td></tr><tr><td>口径表 v2 三处同步</td><td>数据分析组</td><td>2026-09-27</td><td>差异回归用例通过</td></tr><tr><td>夜间人工挑单 ≤10%</td><td>客户运营组</td><td>2026-10-08</td><td>夜间分派埋点月报</td></tr></table><div class="sig"><div>编制：数据分析组</div><div>审核：运营管理部</div><div>2026 年 9 月 29 日</div></div><p class="small">定稿共 1,186 字，较长原文压缩 4.4%；原文全部数字与结论未作改动，可回溯至对应期报。</p><h4>五、落款与分发</h4><table><tr><th>项目</th><th>内容</th></tr><tr><td>编制</td><td>数据分析组（周曼）</td></tr><tr><td>审核</td><td>运营管理部（陈立群）</td></tr><tr><td>定稿日期</td><td>2026-09-29</td></tr><tr><td>分发范围</td><td>总经理办公会、6 个区域运营组、6 条业务线负责人</td></tr></table></div><div class="pf"><span>定稿下篇：三、存在问题 与 四、下阶段安排，含落款</span><span>第 8 / 10 页</span></div></section>
+<section class="page" data-page="9"><div class="ph"><span class="kc">修改清单</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">九、修改清单（23 处）</h2><div class="pbody"><h3 class="first">逐条修改清单</h3><table><tr><th>编号</th><th>类型</th><th>修改前 → 修改后</th><th>所在页</th></tr><tr><td>M-01 至 M-09</td><td>数字 2 / 删除 3 / 术语 2 / 事实化 2</td><td>「基本上」删除；「口径表」→「经营指标口径表」；「提升了不少」→「由 40 单提升至 128 单」</td><td>第 3 页</td></tr><tr><td>M-10 至 M-16</td><td>数字 3 / 口语 2 / 删除 1 / 结构 1</td><td>「搞了一个」→「建立」；「效果还可以」→「提升至 128 单」</td><td>第 4 页</td></tr><tr><td>M-17 至 M-23</td><td>数字 2 / 口语 2 / 事实化 1 / 结构 1 / 删除 1</td><td>「没太弄清楚」→「归因尚未闭环」；「尽量减下来」→「由 18% 降至 10% 以内」</td><td>第 5 页</td></tr></table><div class="note">修改类型占比：数字类 30.4%、删除类 21.7%、口语类 17.4%、事实化 13.0%、术语类 8.7%、结构类 8.7%；合计 99.9%，为四舍五入舍入差。</div><h4>二、逐条修改的判定标准</h4><table><tr><th>类型</th><th>判定标准</th><th>典型示例</th></tr><tr><td>模糊改数字</td><td>存在可核对的原始报表</td><td>「提升了不少」→「由 40 单提升至 128 单」</td></tr><tr><td>删除冗余</td><td>删除后语义不变</td><td>「基本上都完成了」→「均达成目标」</td></tr><tr><td>口语改书面</td><td>不出现口头语与儿化音</td><td>「搞了一个」→「建立」</td></tr><tr><td>事实化</td><td>推测改为已完成事实</td><td>「可能是渠道变化」→「渠道结构已完成下钻」</td></tr><tr><td>术语统一</td><td>与现行制度文件一致</td><td>「口径表」→「经营指标口径表」</td></tr><tr><td>结构调整</td><td>结论前置、措施与问题配对</td><td>「下阶段安排」拆为三条带交付物的安排</td></tr></table><p class="small">判定标准用于复核：任一处修改不符合上表标准的，视为无效修改并回退。</p></div><div class="pf"><span>23 处修改分布在第 3—5 页，第 9 页汇总可逐条追溯</span><span>第 9 / 10 页</span></div></section>
+<section class="page" data-page="10"><div class="ph"><span class="kc">附录</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">十、附录：定稿前检查清单</h2><div class="pbody"><div class="grid12"><div><h3 class="first">检查清单（12 项）</h3><table><tr><th>序号</th><th>检查项</th><th>通过标准</th><th>本次结果</th></tr><tr><td>01</td><td>事实与结论是否被改动</td><td>零改动</td><td>通过</td></tr><tr><td>02</td><td>全部数字是否可回溯来源</td><td>每个数字有来源</td><td>通过（4/4）</td></tr><tr><td>03</td><td>是否残留程度副词</td><td>无「基本上」「比较」等</td><td>通过</td></tr><tr><td>04</td><td>是否残留口语表述</td><td>无「搞」「弄」「这块儿」等</td><td>通过</td></tr><tr><td>05</td><td>术语是否全文统一</td><td>同一概念单一名称</td><td>通过（2 处统一）</td></tr><tr><td>06</td><td>段落是否有结论前置</td><td>每段首句为结论</td><td>通过</td></tr><tr><td>07</td><td>是否有未完成的空位</td><td>无空字段、无未填写项</td><td>通过</td></tr><tr><td>08</td><td>百分比格式是否统一</td><td>保留一位小数</td><td>通过</td></tr><tr><td>09</td><td>日期格式是否统一</td><td>YYYY-MM-DD 或 M 月 D 日</td><td>通过</td></tr><tr><td>10</td><td>句长是否超过 40 字</td><td>长句拆分为短句</td><td>通过</td></tr><tr><td>11</td><td>责任主体是否明确</td><td>每项措施有责任部门</td><td>通过</td></tr><tr><td>12</td><td>交付物是否可考核</td><td>每项措施有衡量方式</td><td>通过</td></tr></table></div><div><h4 class="first">不可改动清单</h4><ul class="first"><li>全部经营数字：25,141 单、96.4%、27 单、128 单、2.1%。</li><li>结论方向：「核心指标均达成目标」的判断保留。</li><li>时间与责任主体：完成时间与责任部门一律不改。</li><li>原文判断的语气强度：「存在待解问题」不弱化、不强化。</li></ul><h4>交付说明</h4><div class="steps"><div class="s"><b>对照稿</b><span>第 3—5 页，含修改标记与理由，供审核使用</span></div><div class="s"><b>定稿</b><span>第 7—8 页，无修改标记，可直接使用</span></div><div class="s"><b>清单</b><span>第 9 页，23 处逐条可追溯</span></div><div class="s"><b>本页</b><span>供发布前复核，12 项全部通过方可交付</span></div></div></div></div><h4>交付门禁</h4><div class="def"><div class="d"><b>门禁规则</b><span>12 项检查全部通过方可交付；任一未通过须回退至对应修改环节并重新复核</span></div></div></div><div class="pf"><span>12 项检查全部通过，23 处修改可逐条追溯，事实与结论未改动</span><span>第 10 / 10 页</span></div></section>
+</body></html>

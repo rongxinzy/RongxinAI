@@ -1,61 +1,94 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-prd</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
-.title{font-size:23px;letter-spacing:-.01em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
-h3{margin-top:16px;font-size:13.5px}
-p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-ul{list-style:none;margin-top:10px;display:grid;gap:7px}
-li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-prd</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--accent:#B45309}
+body{width:1160px;display:grid;gap:26px;padding:30px;background:#f2f2ef;
+ font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+ color:#16171a;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;
+ border:1px solid #e4e4e0;padding:30px 44px 0;display:flex;flex-direction:column}
+.ph{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.ph .kc{color:var(--accent);letter-spacing:.3em}
+.ph .rt{letter-spacing:.06em;color:#9a9ea6}
+.pt{font-size:23px;font-weight:500;letter-spacing:-.02em;margin-top:11px;color:#16171a}
+.pt.lg{font-size:27px;font-weight:600;margin-top:14px;line-height:1.34}
+.rule{height:1px;background:#edede9;margin-top:11px}
+.pbody{flex:1;min-height:0;margin-top:12px;overflow:hidden}
+.pf{margin-top:8px;padding-top:8px;border-top:1px solid #edede9;display:flex;justify-content:space-between;font-size:11px;color:#8b8f97;letter-spacing:.02em}
+.meta{display:flex;flex-wrap:wrap;gap:7px 22px;font-size:12px;color:#8b8f97;padding-bottom:12px;border-bottom:1px solid #edede9}
+h3{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:#16171a;margin-top:12px}
+h3.first{margin-top:0}
+h4{font-size:11px;font-weight:600;letter-spacing:.16em;color:#8b8f97;margin-top:10px}
+h4.first{margin-top:0}
+p{font-size:13px;line-height:1.9;color:#3d4046;margin-top:8px}
+p.first{margin-top:0}
+ul{list-style:none;margin-top:7px;display:grid;gap:5px}
+ul.first{margin-top:0}
+li{position:relative;padding-left:15px;font-size:12.8px;line-height:1.8;color:#4c5058}
 li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
-td.mono{font-variant-numeric:tabular-nums}
-.p0{color:var(--accent);font-weight:600}
-.cols2{flex:1;min-height:0;display:grid;grid-template-columns:1.1fr 1fr;gap:26px;margin-top:14px}
-.pane{min-width:0;overflow:hidden}
-.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.flow{margin-top:10px;display:grid;gap:0}
-.fl{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
-.fl:first-child{border-top:0}
-.fl b{color:var(--accent);font-weight:600}
-.card{border:1px solid #edede9;background:#fafaf8;padding:14px 16px;margin-top:10px}
+li b{font-weight:600;color:#16171a}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 10px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.6}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.n,span.n{font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.grid12{display:grid;grid-template-columns:1.28fr 1fr;gap:24px}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #edede9;margin-top:11px}
+.nums>div{padding:10px 13px;border-left:1px solid #edede9}
+.nums>div:first-child{border-left:0}
+.nums .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.nums .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:3px;color:var(--accent)}
+.nums .s{font-size:11.5px;color:#8b8f97;margin-top:2px}
+.card{border:1px solid #edede9;background:#fafaf8;padding:10px 13px;margin-top:8px}
 .card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.card p{margin-top:8px;font-size:12.5px;line-height:1.85;color:#3d4046}
+.card p{margin-top:5px;font-size:12.5px;line-height:1.8}
+.note{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:2px solid var(--accent);
+ padding:8px 12px;margin-top:8px;font-size:12.5px;line-height:1.8;color:#3d4046}
+.toc{margin-top:6px}
+.toc .r{display:grid;grid-template-columns:34px 1fr 208px 40px;gap:10px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.6}
+.toc .r:first-child{border-top:0}
+.toc .r b{color:var(--accent);font-weight:600}
+.toc .r .pg{text-align:right;color:#8b8f97;font-variant-numeric:tabular-nums}
+.bar{margin-top:8px;display:grid;gap:7px}
+.bar .r{display:grid;grid-template-columns:122px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058}
+.bar .tr{height:9px;background:#f1f1ee;position:relative}
+.bar .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);display:block}
+.bar .vv{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.steps{margin-top:6px}
+.steps .s{display:grid;grid-template-columns:58px 1fr;gap:12px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.steps .s:first-child{border-top:0}
+.steps b{color:var(--accent);font-weight:600}
+.def{margin-top:6px}
+.def .d{display:grid;grid-template-columns:158px 1fr;gap:12px;padding:5px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.def .d:first-child{border-top:0}
+.def .d b{font-weight:600;color:#16171a}
+.sig{display:flex;justify-content:flex-end;gap:44px;margin-top:16px;font-size:12.5px;color:#4c5058}
+.cmp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #edede9;margin-top:9px}
+.cmp>div{padding:10px 13px;font-size:12.5px;line-height:1.85;color:#3d4046}
+.cmp>div:first-child{border-right:1px solid #edede9}
+.cmp .h{font-size:11px;letter-spacing:.14em;color:#8b8f97;display:block;margin-bottom:5px}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.08)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border:1px solid #e4e4e0;color:#6f737b}
+.small{font-size:11.5px;color:#8b8f97;line-height:1.75;margin-top:6px}
+.cfoot{display:grid;grid-template-columns:1fr 1fr 1.45fr;border:1px solid #edede9;margin-top:10px}
+.cfoot>div{padding:8px 12px;border-left:1px solid #edede9;font-size:11.5px;line-height:1.7;color:#4c5058}
+.cfoot>div:first-child{border-left:0}
+.cfoot .k{display:block;font-size:11px;letter-spacing:.12em;color:#8b8f97;margin-bottom:3px}
 </style></head><body>
-<div class="doc" style="--accent:#B45309">
-  <div class="title">智能工单助手需求文档</div>
-  <div class="meta"><span>版本：v0.9</span><span>负责人：陈立群</span><span>日期：2026-09-16</span><span>状态：待评审</span></div>
-  <h3>一、背景与目标</h3>
-  <p>商家后台日均产生约 3,200 张工单，其中近七成为重复咨询，分派与回复占用了客服团队一半以上工时。本期目标是把夜间工单的滞留时间压到 30 分钟以内。</p>
-  <h3>二、需求清单</h3>
-  <table>
-    <tr><th>编号</th><th>需求</th><th>优先级</th><th>验收标准</th></tr>
-    <tr><td class="mono">REQ-01</td><td>工单自动分类</td><td class="p0">P0</td><td>18 类常见问题分类准确率不低于 92%</td></tr>
-    <tr><td class="mono">REQ-02</td><td>夜间自动分派</td><td class="p0">P0</td><td>22:00 至 08:00 工单平均分派时延低于 5 分钟</td></tr>
-    <tr><td class="mono">REQ-03</td><td>回复模板建议</td><td>P1</td><td>模板命中率不低于 60%，可一键采用</td></tr>
-    <tr><td class="mono">REQ-04</td><td>处理过程留痕</td><td>P1</td><td>每次分派与回复可追溯到操作人与时间</td></tr>
-  </table>
-  <div class="cols2">
-    <div class="pane">
-      <h4>三、关键流程</h4>
-      <div class="flow">
-        <div class="fl"><b>01</b><span>工单进入队列，先做分类与影响面判断</span></div>
-        <div class="fl"><b>02</b><span>命中夜间规则时直接分派，不再等人工挑单</span></div>
-        <div class="fl"><b>03</b><span>客服工作台给出模板建议，人工确认后发送</span></div>
-        <div class="fl"><b>04</b><span>全流程写入操作记录，供纠纷时回溯</span></div>
-      </div>
-    </div>
-    <div class="pane">
-      <h4>四、本版本不做</h4>
-      <div class="card"><div class="k">明确排除</div><p>不做面向商家的自助入口，不做跨语言回复，不做与外部 CRM 的双向同步。以上三项在下一版本重新评估。</p></div>
-      <p style="margin-top:12px;font-size:11.5px;color:#8b8f97;line-height:1.8">分类准确率依赖历史工单的标注质量。若 92% 的验收线在灰度期无法达到，先放开 P1 需求，把分类能力迭代到 V1.1。</p>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" data-page="1"><div class="ph"><span class="kc">PRODUCT REQUIREMENTS</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">智能工单助手 产品需求文档</h2><div class="pbody"><div class="meta"><span>版本：v0.9（待评审）</span><span>负责人：陈立群</span><span>评审日期：2026-09-18</span><span>目标版本：v1.0</span><span>预计上线：2026-11-15</span><span>文档状态：待评审</span></div><h3 class="first">一、需求摘要</h3><p>商家后台日均产生约 3,200 张工单，其中近七成为重复咨询，分派与回复占用了客服团队一半以上工时。本期目标是把夜间工单的滞留时间压到 30 分钟以内，同时把人工挑单比例从 18% 降到 10% 以下。本版本包含 5 项 P0 需求与 5 项 P1 需求，不做面向商家的自助入口、跨语言回复以及与外部 CRM 的双向同步。</p><div class="nums"><div><div class="k">日均工单量</div><div class="v">3,200 张</div><div class="s">其中 68% 为重复咨询</div></div><div><div class="k">夜间滞留目标</div><div class="v">≤30 分钟</div><div class="s">当前夜间平均滞留 78 分钟</div></div><div><div class="k">需求条目</div><div class="v">10 项</div><div class="s">P0 5 项 / P1 5 项</div></div></div><h3>二、需求优先级分布</h3><table><tr><th>优先级</th><th>条目</th><th>覆盖范围</th><th>验收核心指标</th><th>上线批次</th></tr><tr><td>P0</td><td>REQ-01 至 REQ-05</td><td>分类、分派、时延监控</td><td>分类准确率 ≥92%，分派时延 ≤5 分钟</td><td>v1.0（11-15）</td></tr><tr><td>P1</td><td>REQ-06 至 REQ-10</td><td>模板建议、留痕、导出</td><td>模板命中率 ≥60%，留痕完整率 100%</td><td>v1.1（12-20）</td></tr></table><div class="cfoot"><div><span class="k">需求口径</span>验收标准一律以可核对指标表达；P0 不可裁剪，P1 可顺延一版</div><div><span class="k">数据来源</span>工单库 ops_ticket、分派链路埋点、客服工时统计</div><div><span class="k">阅读顺序</span>P2 修订记录 · P3—P4 背景与角色 · P5—P8 需求、流程与验收 · P9—P10 范围与排期</div></div><h4>版本范围</h4><div class="def"><div class="d"><b>v1.0 范围</b><span>交付 REQ-01 至 REQ-05（全部 P0），不可裁剪</span></div><div class="d"><b>v1.1 范围</b><span>交付 REQ-06 至 REQ-10（全部 P1），可顺延一版但不降低验收标准</span></div></div></div><div class="pf"><span>版本目标：夜间工单滞留 ≤30 分钟，人工挑单比例降至 10% 以下</span><span>第 1 / 10 页</span></div></section>
+<section class="page" data-page="2"><div class="ph"><span class="kc">CONTENTS</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">目录与修订记录</h2><div class="pbody"><p class="first">本文档共 10 页，面向研发、测试与客服运营团队。第 3 至 4 页说明背景与用户场景，第 5 至 8 页为需求、流程、埋点与验收标准，第 9 至 10 页为范围边界、排期与风险。</p><div class="toc"><div class="r"><b>一</b><span>背景与目标</span><span style="color:#8b8f97">业务现状数据、问题定义与本期目标</span><span class="pg">3</span></div><div class="r"><b>二</b><span>用户角色与使用场景</span><span style="color:#8b8f97">4 类角色、3 个核心场景</span><span class="pg">4</span></div><div class="r"><b>三</b><span>功能需求清单</span><span style="color:#8b8f97">REQ-01 至 REQ-10 与验收标准</span><span class="pg">5</span></div><div class="r"><b>四</b><span>核心流程</span><span style="color:#8b8f97">从工单进线到归档的 6 步流程</span><span class="pg">6</span></div><div class="r"><b>五</b><span>数据埋点与指标定义</span><span style="color:#8b8f97">8 个埋点事件与 4 项核心指标</span><span class="pg">7</span></div><div class="r"><b>六</b><span>非功能需求与验收标准</span><span style="color:#8b8f97">性能、可用性、安全与验收方式</span><span class="pg">8</span></div><div class="r"><b>七</b><span>本期不做与依赖假设</span><span style="color:#8b8f97">明确排除项、外部依赖与假设条件</span><span class="pg">9</span></div><div class="r"><b>八</b><span>排期、风险与附录</span><span style="color:#8b8f97">里程碑、风险清单与术语表</span><span class="pg">10</span></div></div><h4>修订记录</h4><table><tr><th>版本</th><th>日期</th><th>修订人</th><th>修订内容</th></tr><tr><td>v0.1</td><td>2026-08-06</td><td>陈立群</td><td>初稿，提出工单自动分类与夜间分派的初步设想</td></tr><tr><td>v0.5</td><td>2026-08-24</td><td>陈立群</td><td>补充分类准确率 92% 的验收线与分类类别清单</td></tr><tr><td>v0.7</td><td>2026-09-08</td><td>周曼</td><td>补充埋点定义与指标口径，统一至口径表 v2</td></tr><tr><td>v0.9</td><td>2026-09-16</td><td>陈立群</td><td>补充本期不做范围、依赖与假设，提交评审</td></tr></table></div><div class="pf"><span>待评审版本 v0.9，评审日期 2026-09-18</span><span>第 2 / 10 页</span></div></section>
+<section class="page" data-page="3"><div class="ph"><span class="kc">背景与目标</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">一、背景与目标</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、业务现状</h3><table><tr><th>指标</th><th>当前值</th><th>问题描述</th><th>目标值</th></tr><tr><td>日均工单量</td><td>3,200 张</td><td>夜间占比 22%，即约 704 张</td><td>维持</td></tr><tr><td>重复咨询占比</td><td>68%</td><td>分类依赖人工，回复模板靠经验检索</td><td>≤45%</td></tr><tr><td>夜间平均滞留</td><td>78 分钟</td><td>人工挑单导致延误，超时单 62% 集中在 23:00—01:00</td><td>≤30 分钟</td></tr><tr><td>分派平均时延</td><td>9 分钟</td><td>分派与判定分离，判定滞后于处置</td><td>≤5 分钟</td></tr><tr><td>人工挑单比例</td><td>18%</td><td>夜间无自动规则，全靠人工排序</td><td>≤10%</td></tr><tr><td>客服工时占用</td><td>53%</td><td>分派与回复占团队一半以上工时</td><td>≤35%</td></tr></table></div><div><h4 class="first">二、本期目标</h4><div class="card"><div class="k">目标一</div><p>夜间工单滞留时间压到 30 分钟以内，超时单占比由 4.6% 降至 2.5% 以下。</p></div><div class="card"><div class="k">目标二</div><p>18 类常见问题的自动分类准确率不低于 92%，分类结果可人工纠正且纠正可回流训练集。</p></div><div class="card"><div class="k">目标三</div><p>夜间自动分派覆盖 22:00—08:00，分派时延低于 5 分钟，人工挑单比例降至 10% 以下。</p></div><h4>三、成功的判断标准</h4><ul class="first"><li>上线后首个完整月，夜间平均滞留 ≤30 分钟且连续两周不反弹。</li><li>分类准确率 ≥92%，人工纠正率 ≤8%。</li><li>客服团队工时占用由 53% 降至 35% 以内。</li></ul></div></div><h4>四、现状数据来源与验证方式</h4><div class="def"><div class="d"><b>现状来源</b><span>工单库 2026 年 1 月 1 日至 8 月 31 日共 243 天、777,600 张工单的统计结果</span></div><div class="d"><b>目标验证</b><span>上线后首个完整月按埋点数据核对，连续两周不反弹方视为达成</span></div></div></div><div class="pf"><span>目标：夜间滞留 ≤30 分钟、分类准确率 ≥92%、人工挑单 ≤10%</span><span>第 3 / 10 页</span></div></section>
+<section class="page" data-page="4"><div class="ph"><span class="kc">用户与场景</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">二、用户角色与使用场景</h2><div class="pbody"><h3 class="first">一、用户角色</h3><table><tr><th>角色</th><th>人数</th><th>核心诉求</th><th>使用频率</th><th>主要痛点</th></tr><tr><td>夜班客服</td><td>24 人</td><td>快速拿到可用的分派结果与回复建议</td><td>每班 8 小时连续使用</td><td>夜间无规则可依，靠人工筛选</td></tr><tr><td>白班客服</td><td>68 人</td><td>减少重复咨询占用，聚焦复杂工单</td><td>日均 6 小时</td><td>重复问题占比 68%，重复劳动多</td></tr><tr><td>值班主管</td><td>6 人</td><td>看清积压与超时，及时调整人力</td><td>每小时查看一次</td><td>缺少实时排序，只能事后统计</td></tr><tr><td>产品运营</td><td>4 人</td><td>了解分类质量与模板命中情况</td><td>每周一次</td><td>缺少准确率与命中率的可核对数据</td></tr></table><div class="grid2" style="margin-top:6px"><div><h4 class="first">二、核心场景</h4><ul class="first"><li><b>S-01</b> 夜间 23:40 进线工单：系统分类为「物流时效」，预测超时概率 0.81，直接进入优先队列并分派给夜班客服。</li><li><b>S-02</b> 客服打开工单：工作台给出 3 条模板建议，命中率最高的排序第一，客服确认后发送。</li><li><b>S-03</b> 分类错误：客服一键纠正分类，纠正记录回流训练集，次日进入抽样复核。</li></ul></div><div><h4 class="first">三、场景日均触发量（条形宽度按 2,176 次/日为 100% 折算）</h4><div class="bar"><div class="r"><span>模板建议</span><span class="tr"><i style="width:100%"></i></span><span class="vv">2,176 次/日</span></div><div class="r"><span>夜间自动分派</span><span class="tr"><i style="width:32%"></i></span><span class="vv">704 张/日</span></div><div class="r"><span>主管实时查看</span><span class="tr"><i style="width:13%"></i></span><span class="vv">144 次/日</span></div><div class="r"><span>人工纠正分类</span><span class="tr"><i style="width:12%"></i></span><span class="vv">256 次/日</span></div></div></div></div><h4>四、角色权限与可见范围</h4><table><tr><th>角色</th><th>可查看</th><th>可操作</th></tr><tr><td>夜班客服</td><td>授权范围内工单</td><td>分派、回复、纠正分类</td></tr><tr><td>白班客服</td><td>授权范围内工单</td><td>回复、纠正分类（不可分派）</td></tr><tr><td>值班主管</td><td>全部夜间工单</td><td>分派、升级、调整人力</td></tr><tr><td>产品运营</td><td>聚合数据，不可见单</td><td>导出质量周报</td></tr></table></div><div class="pf"><span>4 类角色、3 个核心场景，夜间自动分派预计覆盖 704 张/日</span><span>第 4 / 10 页</span></div></section>
+<section class="page" data-page="5"><div class="ph"><span class="kc">需求清单</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">三、功能需求清单（REQ-01 至 REQ-10）</h2><div class="pbody"><h3 class="first">需求清单</h3><table><tr><th>编号</th><th>需求</th><th>优先级</th><th>验收标准</th><th>批次</th></tr><tr><td>REQ-01</td><td>工单自动分类</td><td>P0</td><td>18 类常见问题分类准确率不低于 92%</td><td>v1.0</td></tr><tr><td>REQ-02</td><td>夜间自动分派</td><td>P0</td><td>22:00 至 08:00 平均分派时延 ≤5 分钟</td><td>v1.0</td></tr><tr><td>REQ-03</td><td>超时判定前移</td><td>P0</td><td>命中预测超时概率 ≥0.7 的工单直接进入优先队列</td><td>v1.0</td></tr><tr><td>REQ-04</td><td>夜间时延监控</td><td>P0</td><td>夜间滞留时长看板每 5 分钟刷新一次</td><td>v1.0</td></tr><tr><td>REQ-05</td><td>分类纠正回流</td><td>P0</td><td>纠正记录 100% 入库，次日进入抽样复核</td><td>v1.0</td></tr><tr><td>REQ-06</td><td>回复模板建议</td><td>P1</td><td>模板命中率不低于 60%，可一键采用</td><td>v1.1</td></tr><tr><td>REQ-07</td><td>处理过程留痕</td><td>P1</td><td>每次分派与回复可追溯到操作人与时间</td><td>v1.1</td></tr><tr><td>REQ-08</td><td>影响面排序</td><td>P1</td><td>实时展示影响面前 6 单并支持下钻</td><td>v1.1</td></tr><tr><td>REQ-09</td><td>工单导出</td><td>P1</td><td>导出字段与看板口径一致，差异为 0</td><td>v1.1</td></tr><tr><td>REQ-10</td><td>质量周报</td><td>P1</td><td>每周自动生成准确率与命中率周报</td><td>v1.1</td></tr></table><p class="small">优先级定义：P0 为本版本必须交付且不可裁剪；P1 可顺延一个版本，但不得改变验收标准。</p><h4>交付批次</h4><table><tr><th>批次</th><th>覆盖需求</th><th>上线时间</th></tr><tr><td>v1.0</td><td>REQ-01 至 REQ-05（P0）</td><td>2026-11-15</td></tr><tr><td>v1.1</td><td>REQ-06 至 REQ-10（P1）</td><td>2026-12-20</td></tr></table></div><div class="pf"><span>P0 5 项、P1 5 项，P0 不可裁剪</span><span>第 5 / 10 页</span></div></section>
+<section class="page" data-page="6"><div class="ph"><span class="kc">核心流程</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">四、核心流程</h2><div class="pbody"><h3 class="first">从工单进线到归档的 6 步流程</h3><div class="steps"><div class="s"><b>S1</b><span>工单进入队列：系统读取商家、订单与历史交互信息，生成工单上下文，耗时 ≤2 秒</span></div><div class="s"><b>S2</b><span>自动分类：按 18 类问题标签分类，输出标签与置信度，置信度低于 0.6 时转人工确认</span></div><div class="s"><b>S3</b><span>超时预测：按近 30 日同类型工单平均时长、当前在线人力、跨区域协作单占比三项加权计算超时概率</span></div><div class="s"><b>S4</b><span>分派：概率 ≥0.7 直接进入优先队列并按技能组分派；夜间时段跳过人工挑单环节，分派时延 ≤5 分钟</span></div><div class="s"><b>S5</b><span>处置：客服在工作台查看模板建议，确认或修改后发送；分类有误时可一键纠正，纠正记录入库</span></div><div class="s"><b>S6</b><span>归档与留痕：写入操作人、时间、分类结果与模板使用情况，供导出与质量周报使用</span></div></div><div class="grid2" style="margin-top:6px"><div><ul class="first"><li><b>判定点 P1</b>：置信度 <0.6 转人工确认，不进入自动分派。</li><li><b>判定点 P2</b>：超时概率 <0.7 进入常规队列，按先到先服务处理。</li></ul></div><div><p class="small" style="margin-top:0">失败与降级：分类服务不可用时，工单直接进入人工队列并在看板标记降级状态，不阻断进线；连续 5 分钟不可用触发值班通知。</p></div></div><h4>五、流程异常分支</h4><table><tr><th>分支</th><th>触发条件</th><th>处理方式</th></tr><tr><td>分类失败</td><td>分类服务连续 5 分钟不可用</td><td>降级至人工队列并在看板标记</td></tr><tr><td>置信度低</td><td>置信度低于 0.6</td><td>转人工确认，不进入自动分派</td></tr><tr><td>无技能组</td><td>标签未映射到技能组</td><td>进入通用队列，由值班主管指派</td></tr><tr><td>分派超时</td><td>5 分钟未接单</td><td>改由值班主管指派并记录一次超时</td></tr><tr><td>回复失败</td><td>回复接口返回 5xx</td><td>本地暂存并重试 3 次，失败转人工</td></tr></table></div><div class="pf"><span>6 步流程含 2 个判定点与 1 条降级路径</span><span>第 6 / 10 页</span></div></section>
+<section class="page" data-page="7"><div class="ph"><span class="kc">埋点与指标</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">五、数据埋点与指标定义</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、埋点事件</h3><table><tr><th>事件</th><th>触发时机</th><th>关键字段</th><th>用途</th></tr><tr><td>ticket_created</td><td>工单进入队列</td><td>工单 ID、商家 ID、进线渠道</td><td>计算工单量与渠道结构</td></tr><tr><td>classify_done</td><td>分类完成</td><td>标签、置信度、耗时</td><td>计算分类准确率</td></tr><tr><td>timeout_predicted</td><td>超时预测完成</td><td>概率值、判定结果</td><td>计算误判率与优先队列规模</td></tr><tr><td>ticket_assigned</td><td>完成分派</td><td>分派方式、分派时延、处理人</td><td>计算分派时延与人工挑单比例</td></tr><tr><td>template_suggested</td><td>模板建议下发</td><td>建议条数、排序、命中结果</td><td>计算模板命中率</td></tr><tr><td>classify_corrected</td><td>客服纠正分类</td><td>原标签、新标签、操作人</td><td>构建训练回流集</td></tr><tr><td>ticket_closed</td><td>工单归档</td><td>滞留时长、是否超时</td><td>计算滞留与超时单占比</td></tr><tr><td>export_called</td><td>导出模块调用</td><td>导出字段、记录数、口径版本</td><td>校验导出与看板一致性</td></tr></table></div><div><h4 class="first">二、核心指标定义</h4><div class="def"><div class="d"><b>分类准确率</b><span>分类结果未被人工纠正的工单占已分类工单的比例</span></div><div class="d"><b>分派时延</b><span>工单创建至首次分派完成的时间，按 P50 与 P95 分别统计</span></div><div class="d"><b>人工挑单比例</b><span>夜间时段人工从队列挑选的工单占该时段新建工单的比例</span></div><div class="d"><b>模板命中率</b><span>客服采用首条建议模板的工单占收到建议工单的比例</span></div><div class="d"><b>超时概率误判率</b><span>预测超时但实际未超时的工单占被判超时工单的比例</span></div></div><div class="note">指标口径统一至《经营指标口径表 v2》；看板、导出与质量周报共用同一份定义，差异须为 0。</div></div></div><h4>埋点与指标校验</h4><div class="def"><div class="d"><b>埋点校验</b><span>8 个事件的必填字段完整率须为 100%，缺失即阻断上线</span></div><div class="d"><b>指标口径</b><span>5 项核心指标统一至《经营指标口径表 v2》，与看板差异须为 0</span></div></div></div><div class="pf"><span>8 个埋点事件、5 项核心指标，口径统一至口径表 v2</span><span>第 7 / 10 页</span></div></section>
+<section class="page" data-page="8"><div class="ph"><span class="kc">非功能与验收</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">六、非功能需求与验收标准</h2><div class="pbody"><h3 class="first">一、非功能需求</h3><table><tr><th>类别</th><th>要求</th><th>验收方式</th></tr><tr><td>性能</td><td>分类接口 P95 响应时间 ≤800 毫秒；分派接口 P95 ≤1,500 毫秒</td><td>压测报告，连续 30 分钟 25 QPS</td></tr><tr><td>可用性</td><td>分类与分派服务月度可用率 ≥99.5%；不可用时降级不阻断进线</td><td>月度可用率报告 + 降级演练记录</td></tr><tr><td>并发</td><td>夜间峰值 12 QPS 下无排队超时</td><td>峰值压测，连续 20 分钟</td></tr><tr><td>数据安全</td><td>工单内容按商家隔离，客服仅可见授权范围内工单</td><td>权限用例 24 条全部通过</td></tr><tr><td>留痕要求</td><td>分派、回复、纠正三类操作 100% 写入审计日志</td><td>抽样核对 200 条记录，完整率 100%</td></tr><tr><td>兼容性</td><td>覆盖 Chrome 与 Edge 各 2 个主版本，共 4 个版本</td><td>4 个版本各跑 12 条兼容性用例</td></tr></table><h3>二、验收方式</h3><ul class="first"><li><b>功能验收</b>：REQ-01 至 REQ-10 逐条按验收标准核对，共 10 项，通过率须 100%。</li><li><b>数据验收</b>：埋点 8 个事件字段完整率 100%，指标与看板差异为 0。</li><li><b>灰度验收</b>：灰度一（2 条业务线）观察 7 天，误判率 ≤2%；灰度二（4 条业务线）观察 7 天，人工挑单比例 ≤10%。</li></ul><div class="note">性能与可用性验收未通过时，不允许进入灰度；功能验收未通过项须在 3 个工作日内修复并复验。</div><h4>验收环境与证据</h4><div class="def"><div class="d"><b>验收环境</b><span>测试环境与灰度环境分离，灰度使用与生产同等配置</span></div><div class="d"><b>验收证据</b><span>压测报告、可用率报告、权限用例结果、埋点校验报告</span></div><div class="d"><b>未通过处理</b><span>3 个工作日内修复并复验；复验不通过不得进入灰度</span></div></div></div><div class="pf"><span>6 类非功能要求，功能、数据、灰度三层验收</span><span>第 8 / 10 页</span></div></section>
+<section class="page" data-page="9"><div class="ph"><span class="kc">范围与依赖</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">七、本期不做与依赖假设</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、明确不做</h3><table><tr><th>排除项</th><th>原因</th><th>重新评估时间</th></tr><tr><td>面向商家的自助入口</td><td>商家侧改造范围过大，本期资源不足</td><td>2027 年 Q1</td></tr><tr><td>跨语言回复</td><td>翻译质量与合规均未就绪</td><td>2027 年 Q2</td></tr><tr><td>与外部 CRM 双向同步</td><td>涉及第三方接口授权，周期不可控</td><td>2027 年 Q1</td></tr><tr><td>全量场景本地化部署</td><td>本期为云端推理，本地化不在范围内</td><td>2027 年 Q1</td></tr></table></div><div><h4 class="first">二、外部依赖</h4><ul class="first"><li>分类模型由算法组提供，须在 10 月 20 日前交付 baseline 模型与评测集。</li><li>技能组配置由客服运营组提供，须覆盖 18 类问题的分派映射。</li><li>埋点接入由数据平台组支持，须在 10 月 10 日前完成事件注册。</li></ul><h4>三、假设条件</h4><ul class="first"><li>历史工单的标注质量足以支撑 92% 的准确率目标，否则需先补标约 1,400 单。</li><li>夜间在线人力维持在 3 人以上，低于该值时自动分派仍可运行但时延目标放宽至 8 分钟。</li><li>客服工作台可在本期内完成一次小版本迭代以承载模板建议模块。</li></ul></div></div><h4>四、范围边界说明</h4><table><tr><th>边界项</th><th>本期处理</th><th>说明</th></tr><tr><td>商家自助入口</td><td>不做</td><td>2027 年 Q1 重新评估</td></tr><tr><td>跨语言回复</td><td>不做</td><td>翻译质量与合规均未就绪</td></tr><tr><td>外部 CRM 双向同步</td><td>不做</td><td>第三方接口授权周期不可控</td></tr><tr><td>全量本地化部署</td><td>不做</td><td>本期为云端推理</td></tr><tr><td>分类模型迭代</td><td>做（v1.1）</td><td>准确率未达 92% 时按 R-01 处理</td></tr><tr><td>历史工单补标</td><td>做（依赖）</td><td>1,400 条无标签单，投入 2 人月</td></tr></table></div><div class="pf"><span>4 项排除、3 项外部依赖、3 条假设条件</span><span>第 9 / 10 页</span></div></section>
+<section class="page" data-page="10"><div class="ph"><span class="kc">排期与风险</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">八、排期、风险与附录</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、里程碑</h3><div class="steps"><div class="s"><b>09-18</b><span>PRD 评审通过，输出终稿 v1.0</span></div><div class="s"><b>10-10</b><span>埋点注册完成，接口联调开始</span></div><div class="s"><b>10-20</b><span>分类 baseline 模型交付并完成评测</span></div><div class="s"><b>11-05</b><span>功能与性能验收，冻结发布包</span></div><div class="s"><b>11-08</b><span>灰度一（2 条业务线）启动</span></div><div class="s"><b>11-15</b><span>v1.0 全量上线，观察期 14 天</span></div></div><h4>二、风险</h4><table><tr><th>编号</th><th>风险</th><th>影响</th><th>应对</th></tr><tr><td>R-01</td><td>分类准确率未达 92%</td><td>P0 验收不通过</td><td>先放开 P1 需求，分类能力迭代至 v1.1</td></tr><tr><td>R-02</td><td>标注资源未到位</td><td>基线模型延期</td><td>10 月 10 日前锁定 2 人月标注资源</td></tr><tr><td>R-03</td><td>夜间人力低于 3 人</td><td>分派时延超标</td><td>时延目标按假设条件放宽至 8 分钟</td></tr></table></div><div><h4 class="first">三、术语表</h4><div class="def"><div class="d"><b>优先队列</b><span>超时概率 ≥0.7 的工单进入的队列，优先于常规队列处置</span></div><div class="d"><b>置信度</b><span>分类模型对标签的把握程度，低于 0.6 转人工确认</span></div><div class="d"><b>降级状态</b><span>分类或分派服务不可用时的兜底运行状态，不阻断进线</span></div><div class="d"><b>灰度</b><span>先在部分业务线上线并观察指标，再全量发布</span></div></div><h4>四、评审与签署</h4><table><tr><th>角色</th><th>姓名</th><th>评审结论</th></tr><tr><td>产品负责人</td><td>陈立群</td><td>待评审</td></tr><tr><td>研发负责人</td><td>徐海鹏</td><td>待评审</td></tr><tr><td>测试负责人</td><td>罗静</td><td>待评审</td></tr><tr><td>客服运营</td><td>谭亦文</td><td>待评审</td></tr></table></div></div><h4>评审与观察门禁</h4><div class="def"><div class="d"><b>评审门禁</b><span>PRD 评审通过后方可进入开发，验收标准不得在开发期下调</span></div><div class="d"><b>上线观察</b><span>全量上线后观察 14 天，夜间滞留与误判率每日通报</span></div></div></div><div class="pf"><span>6 个里程碑、3 项风险，v1.0 计划 2026-11-15 上线</span><span>第 10 / 10 页</span></div></section>
+</body></html>
