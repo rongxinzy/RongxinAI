@@ -1,4 +1,5 @@
 import { configService } from './config';
+import { caseDetailTranslations } from './caseDetailTranslations';
 
 // 支持的语言类型
 export type LanguageType = 'zh' | 'en';
@@ -6,6 +7,7 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    ...caseDetailTranslations.zh,
     operationFailed: '操作失败',
     authenticationExpired: '登录状态已过期，请重新登录',
     apiKeyMissing: '缺少 API Key，请先完成配置',
@@ -3393,6 +3395,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     linkSafetyConfirmOpen: '打开链接',
   },
   en: {
+    ...caseDetailTranslations.en,
     operationFailed: 'Operation failed',
     authenticationExpired: 'Authentication expired. Please sign in again',
     apiKeyMissing: 'API key is missing. Check your configuration',

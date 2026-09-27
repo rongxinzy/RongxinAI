@@ -861,7 +861,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               open the cases own the column, so the bar steps aside instead of sitting on
               top of the gallery. The gallery shares the column with the input on purpose:
               that is the box the input's sticky positioning is measured against, so the
-              cases can scroll all the way to the end while the input stays in place. */}
+              cases can scroll all the way to the end while the input stays in place.
+              The column keeps the full width: the bar needs it for its labels, and the case
+              panel narrows itself to the composer width (see PromptPanel). */}
           <div
             className="flex w-full flex-col gap-4 pb-8 animate-fade-in-up"
             style={{ animationDelay: '300ms', animationFillMode: 'both' }}

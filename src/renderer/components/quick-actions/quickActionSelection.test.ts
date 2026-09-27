@@ -91,13 +91,10 @@ test('declares the current PPT and research skill mappings', () => {
   expect(quickActionsConfig.actions.find(action => action.id === 'pptx')?.skillMapping).toBe(
     'presentation-studio',
   );
-  expect(quickActionsConfig.actions.find(action => action.id === 'deep-research')?.skillIds).toEqual([
-    'deep-research',
-    'web-search',
-  ]);
-  expect(quickActionsConfig.actions.find(action => action.id === 'academic-research')?.skillIds).toEqual([
-    'deli-autoresearch',
-    'deep-research',
-    'web-search',
-  ]);
+  expect(
+    quickActionsConfig.actions.find(action => action.id === 'deep-research')?.skillIds,
+  ).toEqual(['deep-research', 'web-search']);
+  expect(
+    quickActionsConfig.actions.find(action => action.id === 'academic-research')?.skillIds,
+  ).toEqual(['deli-autoresearch', 'deep-research', 'web-search']);
 });
