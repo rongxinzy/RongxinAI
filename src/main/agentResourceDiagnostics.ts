@@ -5,6 +5,7 @@ export const AgentResourceDiagnosticTrigger = {
   AcpTurnFinished: 'acp-turn-finished',
   PiTurnStarted: 'pi-turn-started',
   PiTurnFinished: 'pi-turn-finished',
+  PiHistoryRestored: 'pi-history-restored',
   RendererProcessGone: 'renderer-process-gone',
 } as const;
 
@@ -214,6 +215,20 @@ export class AgentResourceDiagnostics {
       peakToolResultBytes: stats.peakToolResultBytes,
     });
     this.piTurns.delete(sessionId);
+  }
+
+  recordPiHistoryRestored(
+    sessionId: string,
+    details: {
+      source: string;
+      messageCount: number;
+      contentBytes: number;
+      metadataBytes: number;
+      promptChars: number;
+      restoreMs: number;
+    },
+  ): void {
+    this.write(AgentResourceDiagnosticTrigger.PiHistoryRestored, { sessionId, ...details });
   }
 
   logRendererProcessGone(reason: string): void {

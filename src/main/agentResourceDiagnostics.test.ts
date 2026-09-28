@@ -63,3 +63,26 @@ test('logs renderer process termination with current process metrics', () => {
   expect(log).toHaveBeenCalledWith(expect.stringContaining('renderer-process-gone'));
   expect(log).toHaveBeenCalledWith(expect.stringContaining('GPU[42] rss=2.0MiB'));
 });
+
+test('records bounded Pi history statistics without logging message contents', () => {
+  const logs: string[] = [];
+  const diagnostics = new AgentResourceDiagnostics({
+    getMemoryUsage: memory,
+    getElectronMetrics: () => [],
+    log: message => logs.push(message),
+  });
+
+  diagnostics.recordPiHistoryRestored('session-1', {
+    source: 'continue',
+    messageCount: 32,
+    contentBytes: 1024,
+    metadataBytes: 2048,
+    promptChars: 4096,
+    restoreMs: 12,
+  });
+
+  expect(logs).toHaveLength(1);
+  expect(logs[0]).toContain('pi-history-restored');
+  expect(logs[0]).toContain('messageCount":32');
+  expect(logs[0]).not.toContain('message contents');
+});

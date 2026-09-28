@@ -17,6 +17,22 @@ const DxfRenderer = React.lazy(() => import('./DxfRenderer'));
 
 const t = (key: string) => i18nService.t(key);
 
+interface PdfDocumentHandle {
+  numPages: number;
+  destroy: () => Promise<void>;
+}
+
+export async function destroyPdfDocument(
+  pdfDoc: Pick<PdfDocumentHandle, 'destroy'> | null,
+): Promise<void> {
+  if (!pdfDoc) return;
+  try {
+    await pdfDoc.destroy();
+  } catch {
+    // Cleanup must not turn a renderer unmount into an application error.
+  }
+}
+
 function getExtension(name: string): string {
   const lastDot = name.lastIndexOf('.');
   return lastDot === -1 ? '' : name.slice(lastDot).toLowerCase();
@@ -497,7 +513,8 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const { data, loading, error: loadError } = useFileContent(artifact);
   const [pageCount, setPageCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PdfDocumentHandle | null>(null);
+  const pdfDocRef = useRef<PdfDocumentHandle | null>(null);
   const [renderWidth, setRenderWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -537,6 +554,7 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     if (!data) return;
 
     let cancelled = false;
+    setPdfDoc(null);
 
     const loadPdf = async () => {
       try {
@@ -547,8 +565,12 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         ).href;
 
         const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(data) }).promise;
-        if (cancelled) return;
+        if (cancelled) {
+          void destroyPdfDocument(pdf);
+          return;
+        }
 
+        pdfDocRef.current = pdf;
         setPdfDoc(pdf);
         setPageCount(pdf.numPages);
       } catch (e) {
@@ -559,6 +581,9 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     loadPdf();
     return () => {
       cancelled = true;
+      const activePdfDoc = pdfDocRef.current;
+      pdfDocRef.current = null;
+      void destroyPdfDocument(activePdfDoc);
     };
   }, [data, loadError]);
 
