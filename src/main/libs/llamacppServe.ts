@@ -5,7 +5,6 @@ import type {
   LlamaCppRuntimeBackend as LlamaCppRuntimeBackendType,
   LlamaCppRuntimeCapabilities,
   LlamaCppRuntimeDevice,
-  LlamaCppRuntimeListDevicesResult,
   LlamaCppModelLaunchInput,
   LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
@@ -13,8 +12,7 @@ import { LlamaCppRuntimeBackend, LlamaCppServiceConfigFieldKey } from '../../sha
 import {
   prependEnvPathEntry,
   resolveExecutableDir,
-  resolveLlamaCppRuntimeMetadata,
-} from './llamacppRuntimePaths';
+} from './llamacppProcessRuntimePaths';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_HOST = '127.0.0.1';
@@ -304,45 +302,6 @@ export function parseLlamaCppHelpFlags(output: string): string[] {
     matches.forEach(flag => flags.add(flag.toLowerCase()));
   }
   return Array.from(flags).sort();
-}
-
-export async function listLlamaCppRuntimeDevices(input: {
-  executablePath: string;
-  platform: NodeJS.Platform;
-  baseEnv?: NodeJS.ProcessEnv;
-  runner?: ExecFileRunner;
-}): Promise<LlamaCppRuntimeListDevicesResult> {
-  const runner = input.runner ?? (execFileAsync as ExecFileRunner);
-  const metadata = resolveLlamaCppRuntimeMetadata(input.executablePath);
-  try {
-    const { stdout, stderr } = await runner(input.executablePath, ['--list-devices'], {
-      env: buildLlamaCppServeEnv(
-        input.baseEnv ?? process.env,
-        input.executablePath,
-        input.platform,
-      ),
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024,
-      timeout: 10_000,
-      windowsHide: true,
-    });
-    const rawOutput = [stdout, stderr].filter(Boolean).join(stderr ? '\n' : '');
-    return {
-      success: true,
-      executablePath: input.executablePath,
-      runtimeTargetId: metadata.runtimeTargetId,
-      rawOutput,
-      devices: parseLlamaCppListDevicesOutput(rawOutput),
-    };
-  } catch (error) {
-    return {
-      success: false,
-      executablePath: input.executablePath,
-      runtimeTargetId: metadata.runtimeTargetId,
-      devices: [],
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
 }
 
 export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeDevice[] {
