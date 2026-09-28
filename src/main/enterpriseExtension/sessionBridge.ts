@@ -14,6 +14,7 @@ import {
 const MAX_ENTERPRISE_ID_LENGTH = 256;
 const MAX_USERNAME_LENGTH = 320;
 const MAX_PASSWORD_LENGTH = 4096;
+const MAX_AEP_BASE_URL_LENGTH = 2048;
 
 type ErrorLogger = (message: string, error: unknown) => void;
 
@@ -89,10 +90,35 @@ export const zhiyuanEnterpriseSessionBridge = new ZhiyuanEnterpriseSessionBridge
 
 function parseLoginInput(value: unknown): EnterprisePasswordLoginInput | null {
   const input = asRecord(value);
+  const aepBaseUrl = normalizedAepBaseUrl(input?.aepBaseUrl);
   const enterpriseId = normalizedIdentifier(input?.enterpriseId, MAX_ENTERPRISE_ID_LENGTH);
   const username = normalizedIdentifier(input?.username, MAX_USERNAME_LENGTH);
   const password = boundedString(input?.password, MAX_PASSWORD_LENGTH);
-  return enterpriseId && username && password ? { enterpriseId, username, password } : null;
+  return aepBaseUrl && enterpriseId && username && password
+    ? { aepBaseUrl, enterpriseId, username, password }
+    : null;
+}
+
+function normalizedAepBaseUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const candidate = value.trim();
+  if (candidate.length === 0 || candidate.length > MAX_AEP_BASE_URL_LENGTH) return null;
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return null;
+  }
+  if (
+    (url.protocol !== 'https:' && url.protocol !== 'http:') ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    return null;
+  }
+  return url.toString().replace(/\/+$/, '');
 }
 
 function parsePasswordChangeInput(value: unknown): EnterprisePasswordChangeInput | null {
