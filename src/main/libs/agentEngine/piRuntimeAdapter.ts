@@ -1880,6 +1880,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
       this.pendingMessageQueue.hasPendingFollowUp(sessionId);
     this.releaseStoppedSession(sessionId);
+    // Stopping flushes the throttled store write, which may carry isStreaming; the
+    // partial answer bubble must not stay in flight after the run is gone.
+    this.closeIdlePlaceholders(sessionId, active);
 
     if (shouldDrainFollowUp) {
       const next = this.pendingMessageQueue.findNextPending(
@@ -2887,6 +2890,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             // the run settles (auto_retry_end / agent_settled).
             active.pendingError = { message: errMsg, classified: classifyCoworkError(errMsg) };
             active.turnFailed = true;
+            // A failed turn leaves its bubble behind too; a retry streams into the
+            // same id and flips the flag back on by itself.
+            this.closeIdlePlaceholders(sessionId, active);
             return;
           }
 
@@ -2933,6 +2939,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               startupLatency,
             );
           }
+
+          // A turn can finish without any text (it answered with a tool call).
+          // Its placeholder bubbles must still be closed: they were created with
+          // isStreaming and would otherwise keep every later view of the session
+          // spinning.
+          this.closeIdlePlaceholders(sessionId, active);
 
           // Turn's segments are done; next turn starts fresh messages.
           active.assistantMessageId = null;
@@ -3350,6 +3362,35 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.emit('messageUpdate', sessionId, messageId, content, metadata);
     if (kind === 'thinking') {
       active.thinkingLifecycle.markMessageFinalized();
+    }
+  }
+
+  /**
+   * Closes placeholder bubbles that never received text, so a finished turn can
+   * no longer look like it is still streaming.
+   */
+  private closeIdlePlaceholders(sessionId: string, active: ActivePiSession): void {
+    const placeholderIds = [active.thinkingMessageId, active.assistantMessageId].filter(
+      (messageId): messageId is string => Boolean(messageId),
+    );
+    for (const messageId of placeholderIds) {
+      this.clearPendingMessageUpdate(messageId);
+      this.clearPendingStoreUpdate(messageId);
+    }
+    if (!this.store || placeholderIds.length === 0) return;
+
+    const messages = this.store.getSession(sessionId)?.messages ?? [];
+    for (const messageId of placeholderIds) {
+      const message = messages.find(candidate => candidate.id === messageId);
+      // A bubble finalizeMessage already closed (the ordinary turn with text) needs
+      // no second write, emit, or session updated_at bump.
+      if (!message || message.metadata?.isStreaming !== true) continue;
+      const metadata = { ...message.metadata, isStreaming: false, isFinal: true };
+      this.store.updateMessage(sessionId, messageId, { metadata });
+      // Republish the row with its own content, so a live view stops spinning
+      // without waiting for the session to be reloaded.
+      this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
+      console.debug('[PiRuntime] closed an idle placeholder message for', sessionId);
     }
   }
 

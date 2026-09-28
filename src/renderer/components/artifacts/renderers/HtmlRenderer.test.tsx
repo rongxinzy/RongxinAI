@@ -6,6 +6,7 @@ import { i18nService } from '@/services/i18n';
 import { ArtifactRole, type Artifact } from '@/types/artifact';
 
 import HtmlRenderer, { ensurePreviewColorScheme, injectPreviewNavigationGuard } from './HtmlRenderer';
+import { MAX_PREVIEW_HTML_CHARS } from './constants';
 
 const makeArtifact = (overrides: Partial<Artifact> = {}): Artifact => ({
   id: 'artifact-1',
@@ -29,7 +30,15 @@ describe('HtmlRenderer', () => {
 
     expect(screen.getByText(i18nService.t('artifactDocumentError'))).toBeTruthy();
   });
+
+  test('skips the preview for an oversized HTML artifact instead of freezing on it', async () => {
+    render(<HtmlRenderer artifact={makeArtifact({ content: 'x'.repeat(MAX_PREVIEW_HTML_CHARS + 1) })} />);
+
+    expect(await screen.findByText(i18nService.t('artifactPreviewTooLarge'))).toBeTruthy();
+    expect(document.querySelector('iframe')).toBeNull();
+  });
 });
+
 describe('ensurePreviewColorScheme', () => {
   test('injects light color-scheme when the document does not declare one', () => {
     const html = '<!DOCTYPE html><html><head><title>简历</title></head><body><h1>关于</h1></body></html>';

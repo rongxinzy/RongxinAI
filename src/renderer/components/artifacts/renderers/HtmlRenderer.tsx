@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
+import { MAX_INLINE_PREVIEW_RESOURCES, MAX_PREVIEW_HTML_CHARS } from './constants';
 
 const t = (key: string) => i18nService.t(key);
 
@@ -87,6 +88,9 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   // A missing or unreadable source must surface as an error: the preview used to
   // stay on "Loading" forever, which reads as a hung panel.
   const [failed, setFailed] = useState(false);
+  // A saved page (or a huge generated document) is not previewable: skip the
+  // decode/inline work instead of freezing the renderer on it.
+  const [oversized, setOversized] = useState(false);
 
   useEffect(() => {
     if (!artifact.content && !artifact.filePath) {
@@ -96,6 +100,7 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
     }
 
     setFailed(false);
+    setOversized(false);
     let cancelled = false;
 
     const process = async () => {
@@ -127,6 +132,14 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
           return;
         }
 
+        if (html.length > MAX_PREVIEW_HTML_CHARS) {
+          if (!cancelled) {
+            setProcessedHtml(null);
+            setOversized(true);
+          }
+          return;
+        }
+
         if (artifact.filePath && !hasRelativeResources(html)) {
           html = await inlineLocalResources(html, artifact.filePath);
         }
@@ -152,6 +165,16 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         {t('artifactDocumentError')}
+      </div>
+    );
+  }
+
+  // Also gate synchronously: the effect reports the size one paint later, and the
+  // iframe branch below would otherwise mount the huge document for that frame.
+  if (oversized || (artifact.content?.length ?? 0) > MAX_PREVIEW_HTML_CHARS) {
+    return (
+      <div className="flex items-center justify-center h-full px-4 text-center text-muted-foreground text-sm">
+        {t('artifactPreviewTooLarge')}
       </div>
     );
   }
@@ -220,11 +243,15 @@ async function inlineLocalResources(html: string, filePath: string): Promise<str
   const dir = filePath.slice(0, lastSlash + 1);
 
   const srcAttrs = /(?:src|data)=["']([^"']+)["']/gi;
-  const matches = [...html.matchAll(srcAttrs)];
+  // Cap the resources actually inlined, not the attributes scanned: a page is
+  // mostly remote URLs, and those must not consume the local-resource budget.
+  const localSources = [...html.matchAll(srcAttrs)]
+    .map(match => match[1])
+    .filter(originalSrc => resolveRelativePath(originalSrc, dir) !== null)
+    .slice(0, MAX_INLINE_PREVIEW_RESOURCES);
   const replacements: Array<[string, string]> = [];
 
-  for (const match of matches) {
-    const originalSrc = match[1];
+  for (const originalSrc of localSources) {
     const absPath = resolveRelativePath(originalSrc, dir);
     if (!absPath) continue;
 
