@@ -22,6 +22,7 @@ import {
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
 import { initializeWorkbenchTaskSchema } from './schema';
+import { setWorkbenchOutputRequirements } from './outputContract';
 import { WorkbenchTaskService } from './taskService';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import type { WorkbenchTaskServiceOptions } from './taskService';
@@ -1105,6 +1106,90 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
     expect(nextCompleted.artifacts).toHaveLength(0);
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
+test('a work run can look around and commit a text contract', async () => {
+  const { db, service } = createService();
+  try {
+    const { run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'sort the downloaded files into folders',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+        outputRequirements: [],
+      },
+    });
+    const authorize = (toolCallId: string, command: string) =>
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: run.id,
+        toolCallId,
+        toolName: 'bash',
+        toolInput: { command },
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
+
+    // Looking around must not require the contract.
+    expect(await authorize('peek', 'ls -lt | head -20')).toEqual({ allow: true });
+
+    // The contract shape a model submits for a written answer is accepted.
+    setWorkbenchOutputRequirements(service.repository, 'session', run.id, [
+      { mode: WorkbenchOutputMode.Text, formats: ['markdown'] },
+    ]);
+    expect(await authorize('work', 'python move_files.py')).toEqual({ allow: true });
+    const committed = service.getDetail(service.getCurrent('session')!.task.id);
+    expect(committed?.task.contract.outputRequirements).toEqual([
+      { mode: WorkbenchOutputMode.Text, formats: [] },
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
+test('the contract gate explains the previous failure and stops a spinning run', async () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'sort the downloaded files into folders',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+        outputRequirements: [],
+      },
+    });
+    const authorize = (toolCallId: string) =>
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: run.id,
+        toolCallId,
+        toolName: 'bash',
+        toolInput: { command: 'python move_files.py' },
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
+
+    const first = await authorize('call-1');
+    expect(first.allow).toBe(false);
+    expect(first.reason).toContain('call set_task_output');
+
+    // A model that already tried to commit learns why the attempt failed.
+    service.recordOutputContractFailure(run.id, 'Text output does not take file formats.');
+    const second = await authorize('call-2');
+    expect(second.reason).toContain('Text output does not take file formats.');
+
+    await authorize('call-3');
+    const fourth = await authorize('call-4');
+    // The breaker must tell the runtime to end the turn, not just flip the run
+    // status in the database.
+    expect(fourth.terminateRun).toBe(true);
+    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Failed);
+    const afterFailure = await authorize('call-5');
+    expect(afterFailure.terminateRun).toBe(true);
+    expect(afterFailure.reason).toContain('does not belong to the active run');
+  } finally {
     db.close();
   }
 });
