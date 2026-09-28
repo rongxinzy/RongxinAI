@@ -153,7 +153,7 @@ ul.tight li b{font-variant-numeric:tabular-nums}
   <div class="sec">B · 六类操作误差对测定结果的影响幅度 <em>条形长度取偏差绝对值，正号=结果偏大，负号=结果偏小</em></div>
   <div class="bars">
     <div class="bar"><span>未润洗滴定管</span><span class="track"><i style="width:67%"></i></span><span class="v">+0.8%</span></div>
-    <div class="bar hl"><span>管尖气泡</span><span class="track"><i style="width:100%;background:color-mix(in srgb,var(--accent) 42%,#fff)"></i></span><span class="v">−1.2%</span></div>
+    <div class="bar hl"><span>管尖气泡</span><span class="track"><i style="width:100%"></i></span><span class="v">+1.2%</span></div>
     <div class="bar"><span>指示剂过量</span><span class="track"><i style="width:8%"></i></span><span class="v">+0.1%</span></div>
     <div class="bar"><span>终点判断偏早</span><span class="track"><i style="width:42%;background:color-mix(in srgb,var(--accent) 42%,#fff)"></i></span><span class="v">−0.5%</span></div>
     <div class="bar"><span>初读数视线偏高</span><span class="track"><i style="width:33%"></i></span><span class="v">+0.4%</span></div>
@@ -161,9 +161,9 @@ ul.tight li b{font-variant-numeric:tabular-nums}
   </div>
   <div class="grid2">
     <div class="box"><div class="k">口径说明</div><p>读数保留 2 位小数（0.01 mL），消耗体积 = 末读数 − 初读数；浓度保留 4 位有效数字。1 滴约 0.04–0.05 mL，即 20.00 mL 的 0.2%–0.25%；限值 0.2% 对应 0.040 mL，约等于 1 滴，所以三次读数之差须控制在一滴以内。</p></div>
-    <div class="box"><div class="k">误差幅度的读法</div><p>气泡（−1.2%）与未润洗（+0.8%）是量级最大、方向相反的两类：一个让读数偏小，一个让读数偏大。指示剂过量只贡献 +0.1%，说明「加 2 滴」这条规矩对结果影响小、但对终点判断影响大。</p></div>
+    <div class="box"><div class="k">误差幅度的读法</div><p>气泡（+1.2%）是量级最大的一类：气泡占掉的管尖容积使读数差大于真正进入锥形瓶的体积，故结果偏大且幅度最大；它与未润洗（+0.8%）方向相同、常被误判为一正一反。指示剂过量只贡献 +0.1%。</p></div>
   </div>
-  <div class="pf"><span>背景结论：<b>误差分两类——让读数偏大的（未润洗、指示剂过量）与让读数偏小的（气泡、终点偏早）</b>。</span><span class="mono">第 3 / 10 页</span></div>
+  <div class="pf"><span>背景结论：<b>误差分两类——让读数偏大的（气泡、未润洗、指示剂过量、初读数视线偏高）与让读数偏小的（终点判断偏早、未做平行）</b>。</span><span class="mono">第 3 / 10 页</span></div>
 </section>
 
 <section class="page" data-page="4">
@@ -203,10 +203,10 @@ ul.tight li b{font-variant-numeric:tabular-nums}
   <div class="sec">A · 6 类常见操作误差 <em>先看「后果」一列，能自己说出方向再往下</em></div>
   <table>
     <tr><th style="width:92px">类型</th><th style="width:206px">典型操作</th><th style="width:206px">正确做法</th><th>后果与偏差幅度</th></tr>
-    <tr><td>未润洗</td><td>滴定管用蒸馏水洗净后直接倒入标准盐酸</td><td>用待装的标准盐酸润洗 2–3 次，每次约 5 mL</td><td>残留水稀释标准液，需更多体积才能中和，结果偏大 <span class="mono">+0.8%</span></td></tr>
-    <tr><td>管尖气泡</td><td>装液后未排气就开始滴定并读数</td><td>快速放液赶走气泡，再调液面到 0.00 mL 附近</td><td>气泡在滴定中消失，放出体积大于读数，结果偏小 <span class="mono">−1.2%</span></td></tr>
+    <tr><td>未润洗</td><td>用蒸馏水洗净后直接倒入标准盐酸</td><td>用标准盐酸润洗 2–3 次</td><td>残留水稀释标准液，需更多体积中和，结果偏大 <span class="mono">+0.8%</span></td></tr>
+    <tr><td>管尖气泡</td><td>装液后未排气就开始滴定并读数</td><td>快速放液排气后调零</td><td>管尖气泡消失，读数差大于实际放出量，结果偏大 <span class="mono">+1.2%</span></td></tr>
     <tr><td>指示剂过量</td><td>一次加入 5–6 滴酚酞</td><td>只加 2 滴，颜色呈浅粉即可</td><td>指示剂自身呈弱酸性会额外耗酸，终点略延后，结果偏大 <span class="mono">+0.1%</span></td></tr>
-    <tr><td>终点偏早</td><td>粉红色一出现就立即停手并读数</td><td>观察 30 s 内不褪色再定终点</td><td>消耗体积偏小，结果偏小 <span class="mono">−0.5%</span></td></tr>
+    <tr><td>终点偏早</td><td>粉红色还没褪净就停手并读数</td><td>滴至红色褪去且 30 s 不复现再读数</td><td>消耗体积偏小，结果偏小 <span class="mono">−0.5%</span></td></tr>
     <tr><td>读数视线不水平</td><td>初读数俯视（视线偏高），末读数平视</td><td>视线始终与凹液面最低点水平相切</td><td>初读数偏小，消耗体积偏大，结果偏大 <span class="mono">+0.4%</span></td></tr>
     <tr class="hl"><td>不做平行</td><td>单次滴定直接报出结果</td><td>平行测定 ≥3 次，相对平均偏差 ≤ 0.2%</td><td>随机误差无法被平均掉，单次偏差常见偏小 <span class="mono">−0.9%</span></td></tr>
   </table>
@@ -214,7 +214,7 @@ ul.tight li b{font-variant-numeric:tabular-nums}
   <table>
     <tr><th style="width:150px">操作</th><th style="width:236px">对消耗体积 V(HCl) 的影响</th><th style="width:246px">对 c(NaOH) 的影响</th><th style="width:82px">偏大 / 偏小</th><th>相对偏差</th></tr>
     <tr><td>未润洗滴定管</td><td>标准液被残留水稀释，需更多体积</td><td>按 0.1000 mol/L 计算，结果虚高</td><td class="num">偏大</td><td class="mono">+0.8%</td></tr>
-    <tr><td>管尖有气泡</td><td>气泡消失使实际放出量大于读数</td><td>V 偏小，结果偏低</td><td class="num">偏小</td><td class="mono">−1.2%</td></tr>
+    <tr><td>管尖有气泡</td><td>气泡消失后补齐管尖容积，读数差偏大</td><td>V 偏大，结果偏高</td><td class="num">偏大</td><td class="mono">+1.2%</td></tr>
     <tr><td>终点判断偏早</td><td>未中和完全就停止，V 偏小</td><td>V 偏小，结果偏低</td><td class="num">偏小</td><td class="mono">−0.5%</td></tr>
     <tr class="hl"><td>初读数视线偏高</td><td>初读数偏小，末读数减初读数变大</td><td>V 偏大，结果偏高</td><td class="num">偏大</td><td class="mono">+0.4%</td></tr>
   </table>
@@ -298,8 +298,8 @@ ul.tight li b{font-variant-numeric:tabular-nums}
     <tr><td class="num">8</td><td>偏大：未润洗 → 残留蒸馏水稀释标准盐酸 → 实际浓度低于 0.1000 mol/L → 中和同一份 NaOH 需更多体积 → 按 0.1000 计算 c(NaOH) 偏大（约 +0.8%）</td><td>链条四步缺一不可；只写「偏大」无推导不得分。</td></tr>
     <tr><td class="num">9</td><td class="mono">ρ = c·M = 0.0800 mol/L × 40.00 g/mol = 3.20 g/L</td><td>单位是 g/L 不是 g/mL；换算成质量分数 0.32%（25.00 mL 中 0.0800 g）同样可得分。</td></tr>
     <tr><td class="num">10</td><td class="mono">取 25.00 mL 蒸馏水替代待测液，加 2 滴酚酞，用同批标准盐酸滴定至褪色；消耗 ≤ 0.02 mL 即合格</td><td>用于检验试剂本底与指示剂耗酸是否可忽略：0.02 mL 只占 20.00 mL 的 0.1%，低于平行性限值 0.2%。不写判定标准不得分。</td></tr>
-    <tr class="hl"><td class="num">11</td><td>仪器误差：滴定管未校准，20 mL 量程内允差 ±0.02 mL（占 20.00 mL 的 0.1%），改进为使用前校准并在同一支管上完成三次滴定。操作误差：装液后管尖留气泡，使读数偏小约 1.2%，改进为放液排气后重新调零。终点判断：粉红色刚现即停，读数偏小约 0.5%，改进为滴至褪色后观察 30 s 不复现。三项改进到位后复测，相对平均偏差为 0.07%（限值 0.2%）。</td><td>三类误差各一处且方向正确；末句须落在复测的 0.07% 上，写成「三者相加 ≤0.2%」即错（三者的量级分别是 0.1%、1.2%、0.5%，不相加）。</td></tr>
-    <tr class="hl"><td class="num">12</td><td class="mono">2MnO₄⁻ + 5H₂C₂O₄ + 6H⁺ → 2Mn²⁺ + 10CO₂↑ + 8H₂O；c(H₂C₂O₄) = (5/2)·c(KMnO₄)·V(KMnO₄)/V(H₂C₂O₄)</td><td>代入 c(KMnO₄)=0.02000 mol/L、V(KMnO₄)=20.00 mL、V(H₂C₂O₄)=25.00 mL 得 0.0400 mol/L。差异两点：① 不需外加指示剂，KMnO₄ 自身紫红色褪去即终点；② 需酸性（H₂SO₄）并加热 70–80 ℃，滴定先慢后快（Mn²⁺ 自催化）。缺一扣分。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>仪器误差：滴定管未校准，20 mL 量程内允差 ±0.02 mL（占 20.00 mL 的 0.1%），改进为使用前校准并在同一支管上完成三次滴定。操作误差：装液后管尖留气泡，读数差比真正进入锥形瓶的体积大约 1.2%，改进为放液排气后重新调零。终点判断：红色尚未褪净就停手，读数偏小约 0.5%，改进为滴至红色恰好褪去后观察 30 s 不复现。三项改进到位后复测，相对平均偏差为 0.07%（限值 0.2%）。</td><td>三类误差各一处且方向正确；末句须落在复测的 0.07% 上，写成「三者相加 ≤0.2%」即错（三者的量级分别是 0.1%、1.2%、0.5%，不相加）。</td></tr>
+    <tr class="hl"><td class="num">12</td><td class="mono">2MnO₄⁻ + 5H₂C₂O₄ + 6H⁺ → 2Mn²⁺ + 10CO₂↑ + 8H₂O；c(H₂C₂O₄) = (5/2)·c(KMnO₄)·V(KMnO₄)/V(H₂C₂O₄)</td><td>代入 c(KMnO₄)=0.02000 mol/L、V(KMnO₄)=20.00 mL、V(H₂C₂O₄)=25.00 mL 得 0.0400 mol/L。差异两点：① 不需外加指示剂（KMnO₄ 自身作指示剂）：滴定中滴入的紫红色随即褪去，终点是溶液出现持久的淡粉（浅紫红）色且 30 s 不退；② 需酸性（H₂SO₄）并加热 70–80 ℃，滴定先慢后快（Mn²⁺ 自催化）。缺一扣分。</td></tr>
   </table>
   <div class="grid3">
     <div class="box"><div class="k">失分点排名（3 次重做统计）</div><p>3 次重做共 7 处错（处数 ≠ 扣分）：第 8 题错 3 次、第 7 题错 2 次、第 12 题错 2 次。</p></div>
@@ -322,7 +322,7 @@ ul.tight li b{font-variant-numeric:tabular-nums}
     <tr><td class="num">3</td><td>算出平均消耗体积</td><td>三次平均为 20.00 mL，保留 2 位小数</td><td class="num">P7</td><td class="gray">□ 达标　□ 未达标</td></tr>
     <tr><td class="num">4</td><td>算出待测液浓度</td><td>0.1000 × 20.00 ÷ 25.00 = 0.0800 mol/L，4 位有效数字</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
     <tr><td class="num">5</td><td>换算质量浓度</td><td>0.0800 × 40.00 = 3.20 g/L，不把单位写成 g/mL</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
-    <tr class="hl"><td class="num">6</td><td>判断误差方向</td><td>未润洗→偏大；气泡、终点偏早→偏小</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>判断误差方向</td><td>未润洗、管尖气泡→偏大；终点判断偏早→偏小</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
   </table>
   <div class="sec">B · 下一阶段：三阶段定量分析计划 <em>每周 3 次实验课，按阶段给产出不给日量</em></div>
   <table>

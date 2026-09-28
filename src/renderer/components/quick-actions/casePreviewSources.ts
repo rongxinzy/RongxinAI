@@ -23,9 +23,10 @@ export async function loadCasePreview(id: string): Promise<string | null> {
   // an example can reach.
   const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">`;
   const fitCover = entry[0].startsWith('/scripts/case-previews/')
-    ? // Scale by the document's own layout width: the pages are 1100px wide plus the body gutter,
-      // and a hardcoded 1100 would clip the right edge behind overflow-x:hidden.
-      `<script>function fit(){const w=document.body.scrollWidth||1100;document.body.style.zoom=Math.min(1,innerWidth/w)}addEventListener('resize',fit);fit();</script>`
+    ? // Scale by the document's own layout width, measured with the zoom cleared: scrollWidth is
+      // reported in the zoomed coordinate space, so feeding it back made the page stop following the
+      // viewport after the first resize (the expanded dialog kept the collapsed scale).
+      `<script>function fit(){const b=document.body;b.style.zoom='';const w=b.scrollWidth||1100;b.style.zoom=Math.min(1,innerWidth/w)}addEventListener('resize',fit);fit();</script>`
     : '';
   // Thumbnail sources hide page overflow; the detail viewport must allow reading below the fold.
   const scrollStyles =
