@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, Folder, Trash2 } from 'lucide-react';
+import { Ellipsis, Folder, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -27,10 +27,6 @@ import {
   AnimatedFolderPlusIcon,
   type AnimatedFolderPlusIconHandle,
 } from '../icons/AnimatedFolderPlusIcon';
-import {
-  SidebarAnimatedMessageCirclePlusIcon,
-  type SidebarAnimatedMessageCirclePlusIconHandle,
-} from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { CodingUiEvent, type CodingCreateSessionEventDetail } from './constants';
 import { CodingWorkspaceDialog } from './CodingWorkspaceDialog';
 
@@ -184,6 +180,7 @@ export const CodingWorkspaceSidebar = ({
       return false;
     }
     applyWorkspaces(result.workspaces);
+    const wasCreate = !editingWorkspace;
     const saved = editingWorkspace
       ? result.workspaces.find(workspace => workspace.id === editingWorkspace.id)
       : result.workspaces.find(workspace => workspace.primaryRoot === input.sourceFolders[0]);
@@ -195,6 +192,10 @@ export const CodingWorkspaceSidebar = ({
         laneId: saved.activeSessionId,
         draft: null,
       });
+      // 等 selection 落稳再开「新建 Session」，避免 selectionKey 变化立刻关掉对话框
+      if (wasCreate) {
+        window.setTimeout(() => openSessionSetup(saved), 0);
+      }
     }
     setEditingWorkspace(null);
     return true;
@@ -378,7 +379,6 @@ const WorkspaceNode = ({
   const [isSessionGroupVisible, setIsSessionGroupVisible] = useState(expanded);
   const [menuOpen, setMenuOpen] = useState(false);
   const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
-  const createSessionIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(expanded);
 
@@ -457,18 +457,10 @@ const WorkspaceNode = ({
             variant="ghost"
             size="icon-xs"
             onClick={() => onCreateSession(workspace)}
-            onMouseEnter={() => {
-              if (!prefersReducedMotion) createSessionIconRef.current?.startAnimation();
-            }}
-            onMouseLeave={() => createSessionIconRef.current?.stopAnimation()}
             className="theme-action-muted"
             aria-label={i18nService.t('codingSessionCreate')}
           >
-            <SidebarAnimatedMessageCirclePlusIcon
-              ref={createSessionIconRef}
-              size={14}
-              className="size-3.5"
-            />
+            <Pencil className="size-3.5" />
           </Button>
           <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger
