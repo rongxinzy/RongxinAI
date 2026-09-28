@@ -12,6 +12,7 @@
 import { z } from 'zod';
 
 import { CoworkExecutionMode, CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
+import { hasCoworkSubmissionContent } from '../cowork/submissionContent';
 import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -259,22 +260,24 @@ const FileAttachmentSchema = z.object({
 });
 
 export const CoworkSessionStartSchema = {
-  input: z.object({
-    prompt: z.string().min(1),
-    cwd: z.string().optional(),
-    systemPrompt: z.string().optional(),
-    title: z.string().optional(),
-    mode: z.enum([CoworkSessionMode.Work, CoworkSessionMode.Chat]).optional(),
-    goalMode: z.boolean().optional(),
-    activeSkillIds: z.array(z.string()).optional(),
-    workspaceId: z.string().optional(),
-    agentId: z.string().optional(),
-    expertIds: z.array(z.string().min(1)).max(1).optional(),
-    modelOverride: z.string().optional(),
-    permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
-    imageAttachments: z.array(ImageAttachmentSchema).optional(),
-    fileAttachments: z.array(FileAttachmentSchema).optional(),
-  }),
+  input: z
+    .object({
+      prompt: z.string(),
+      cwd: z.string().optional(),
+      systemPrompt: z.string().optional(),
+      title: z.string().optional(),
+      mode: z.enum([CoworkSessionMode.Work, CoworkSessionMode.Chat]).optional(),
+      goalMode: z.boolean().optional(),
+      activeSkillIds: z.array(z.string()).optional(),
+      workspaceId: z.string().optional(),
+      agentId: z.string().optional(),
+      expertIds: z.array(z.string().min(1)).max(1).optional(),
+      modelOverride: z.string().optional(),
+      permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
+      imageAttachments: z.array(ImageAttachmentSchema).optional(),
+      fileAttachments: z.array(FileAttachmentSchema).optional(),
+    })
+    .refine(hasCoworkSubmissionContent, { message: 'Prompt is required.', path: ['prompt'] }),
   output: IpcResult({
     session: z
       .object({
@@ -290,17 +293,19 @@ export const CoworkSessionStartSchema = {
 };
 
 export const CoworkSessionContinueSchema = {
-  input: z.object({
-    sessionId: z.string().min(1),
-    prompt: z.string(),
-    systemPrompt: z.string().optional(),
-    activeSkillIds: z.array(z.string()).optional(),
-    goalMode: z.boolean().optional(),
-    expertIds: z.array(z.string().min(1)).max(1).optional(),
-    permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
-    imageAttachments: z.array(ImageAttachmentSchema).optional(),
-    fileAttachments: z.array(FileAttachmentSchema).optional(),
-  }),
+  input: z
+    .object({
+      sessionId: z.string().min(1),
+      prompt: z.string(),
+      systemPrompt: z.string().optional(),
+      activeSkillIds: z.array(z.string()).optional(),
+      goalMode: z.boolean().optional(),
+      expertIds: z.array(z.string().min(1)).max(1).optional(),
+      permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
+      imageAttachments: z.array(ImageAttachmentSchema).optional(),
+      fileAttachments: z.array(FileAttachmentSchema).optional(),
+    })
+    .refine(hasCoworkSubmissionContent, { message: 'Prompt is required.', path: ['prompt'] }),
   output: IpcResult({ engineStatus: z.object({}).passthrough().optional() }),
 };
 
