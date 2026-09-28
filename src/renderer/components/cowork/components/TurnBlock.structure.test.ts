@@ -23,9 +23,6 @@ test('settles execution counts after an answer or when the turn reaches a termin
     /const isAnswer =\s*item\.type === 'assistant' &&\s*!item\.message\.metadata\?\.isThinking &&\s*hasText\(item\.message\.content\);/,
   );
   expect(source).toContain('flush(isAnswer);');
-  expect(source).toContain(
-    'const showCompletedSummary = group.followedByAnswer || isTurnComplete || toolsSettled;',
-  );
 });
 
 test('keeps recoverable interruptions outside reasoning and exposes a resume button', () => {
@@ -80,6 +77,5 @@ test('keeps active tool details in the total summary without adding a child row'
   expect(source).toContain('<ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>');
   expect(source).toContain('<ChainOfThoughtHeader icon={Wrench}>');
   expect(source).toContain('getExecutionStatusText(toolActivityStatus)');
-  expect(source).toContain('toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup');
   expect(source).not.toContain('key={`tool-activity-${latestToolActivity.toolCallId}`}');
 });

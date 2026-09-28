@@ -28,16 +28,28 @@ export const PersistentReasoning: React.FC<PersistentProps<ReasoningProps>> = ({
 };
 
 export const PersistentChainOfThought: React.FC<
-  PersistentProps<ChainOfThoughtProps> & { forceOpen?: boolean }
-> = ({ persistKey, defaultOpen = false, forceOpen = false, ...props }) => {
+  PersistentProps<ChainOfThoughtProps> & {
+    forceOpen?: boolean;
+    /**
+     * Renders the header with the resolved expansion state. The header is the
+     * only place that knows whether the block is open, which decides whether an
+     * inner indicator (streaming reasoning) already owns the running shimmer.
+     */
+    renderHeader?: (isOpen: boolean) => React.ReactNode;
+  }
+> = ({ persistKey, defaultOpen = false, forceOpen = false, renderHeader, children, ...props }) => {
   // 2026/09/16 lixiang  等待工具授权时强制展开思考过程，避免按钮被折叠藏住
   const [open, setOpen] = usePersistentToggle(persistKey, defaultOpen);
+  const isOpen = forceOpen || open;
   return (
     <ChainOfThought
       {...props}
       defaultOpen={defaultOpen}
-      open={forceOpen || open}
+      open={isOpen}
       onOpenChange={setOpen}
-    />
+    >
+      {renderHeader ? renderHeader(isOpen) : null}
+      {children}
+    </ChainOfThought>
   );
 };
