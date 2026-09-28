@@ -66,6 +66,39 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(validatorScript).toContain('Stop-WithCode 2 "hash-mismatch:$($component.Key)"');
   });
 
+  test('measures component trees with long-path-safe enumeration', () => {
+    const validatorScript = fs.readFileSync(offlineComponentValidatorPath, 'utf8');
+
+    // Get-ChildItem is not long-path aware under Windows PowerShell 5.1 and
+    // throws DirectoryNotFoundException on trees deeper than 260 characters,
+    // so the measurement must go through .NET with an extended-length path.
+    expect(validatorScript).not.toContain('Get-ChildItem -LiteralPath $Root -Recurse');
+    expect(validatorScript).toContain('[System.IO.DirectoryInfo]::new((ConvertTo-LongPath $rootFull))');
+    expect(validatorScript).toContain(
+      "EnumerateFiles('*', [System.IO.SearchOption]::AllDirectories)",
+    );
+    expect(validatorScript).toContain("if ($Path.StartsWith('\\\\')) { return '\\\\?\\UNC\\' + $Path.Substring(2) }");
+    expect(validatorScript).toContain("return '\\\\?\\' + $Path");
+    // The completion record must stay excluded from the measurement.
+    expect(validatorScript).toContain("if ($file.FullName -eq $completeFull) { continue }");
+    expect(validatorScript.match(/Measure-ComponentTree \$target/g)).toHaveLength(2);
+    // NSIS relays stdout into a single-line dialog and log field.
+    expect(validatorScript).toContain("Write-Output ($Message -replace '[\\r\\n]+', ' ')");
+  });
+
+  test('reports the failing component when offline component extraction fails', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const failureBlock = installerScript.slice(
+      installerScript.indexOf('ComponentBatchExtractFailed:'),
+      installerScript.indexOf('ComponentBatchVerificationFailed:'),
+    );
+
+    expect(failureBlock).toContain('${StrTrimNewLines} $R8 $1');
+    expect(failureBlock).toContain('离线组件展开失败：$R8。请检查磁盘空间或安全软件后重试。');
+    expect(failureBlock).not.toContain('"离线组件展开失败。请检查磁盘空间或安全软件后重试。"');
+    expect(failureBlock).toContain('Goto OfflineComponentInstallFailed');
+  });
+
   test('uses per-user installation and rolls back pointer changes after normal failures', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
