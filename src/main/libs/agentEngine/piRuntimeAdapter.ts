@@ -72,6 +72,7 @@ import {
 import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
 import type { CoworkMessage } from '../../coworkStore';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
+import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkStore } from '../../coworkStore';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
@@ -184,6 +185,22 @@ import type {
   PiSessionPatch,
   PiStartOptions,
 } from './piRuntimeTypes';
+
+const summarizePiHistory = (messages: readonly CoworkMessage[]) => {
+  let contentBytes = 0;
+  let metadataBytes = 0;
+  for (const message of messages) {
+    contentBytes += Buffer.byteLength(message.content, 'utf8');
+    if (message.metadata) {
+      try {
+        metadataBytes += Buffer.byteLength(JSON.stringify(message.metadata), 'utf8');
+      } catch {
+        // Ignore malformed metadata in diagnostics; the normal session path handles it.
+      }
+    }
+  }
+  return { messageCount: messages.length, contentBytes, metadataBytes };
+};
 
 // ── Types ──
 
@@ -349,6 +366,8 @@ interface ActivePiSession {
   unattended: boolean;
   /** True while Pi is executing the current Work/Chat turn. */
   isRunning: boolean;
+  /** Last time this session was used by a turn; idle sessions may be rebuilt from SQLite. */
+  lastUsedAt: number;
   /** True when the current turn settled with an unrecoverable Pi error. */
   turnFailed: boolean;
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
@@ -593,6 +612,8 @@ if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 let hasAppliedApplicationRuntimeEnv = false;
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
+  private static readonly MAX_RESIDENT_IDLE_SESSIONS = 4;
+  private static readonly IDLE_SESSION_TTL_MS = 30 * 60 * 1000;
   private readonly activeSessions = new Map<string, ActivePiSession>();
   /**
    * Sessions that have been stopped still need to look active to IM routing,
@@ -756,6 +777,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     options: PiStartOptions = {},
   ): Promise<void> {
     assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
+    this.evictIdleSessions();
     const expertIds = normalizeSingleExpertIds(options.expertIds);
 
     if (this.activeSessions.has(sessionId) || this.initializingSessions.has(sessionId)) {
@@ -1332,6 +1354,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
         unattended: resourceState.unattended,
         isRunning: true,
+        lastUsedAt: Date.now(),
         turnFailed: false,
         queueFlushInFlight: false,
         mcpToolManifestGeneration: this.mcpToolManifestGeneration,
@@ -1356,6 +1379,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         return;
       }
       this.activeSessions.set(sessionId, active);
+      agentResourceDiagnostics.startPiTurn(
+        sessionId,
+        this.activeSessions.size,
+        [...this.activeSessions.values()].filter(session => session.isRunning).length,
+      );
       this.initializingSessions.delete(sessionId);
       // A live Pi session replaces the lightweight IM retention marker.
       this.retainedSessionIds.delete(sessionId);
@@ -1430,6 +1458,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     options: PiContinueOptions = {},
   ): Promise<void> {
     assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
+    this.evictIdleSessions();
     const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
     const nextUnattended = options.unattended === true;
     const active = this.activeSessions.get(sessionId);
@@ -1441,6 +1470,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       console.log(
         `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, restoring context via prompt`,
       );
+      const historyLoadStartedAt = Date.now();
       const storedSession = this.store?.getSession(sessionId);
       const history = storedSession?.messages ?? [];
       const chatMode =
@@ -1448,6 +1478,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         storedSession?.mode === CoworkSessionMode.Chat;
       const piPrompt = buildPiConversationPrompt(history, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
+      });
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'continue',
+        ...summarizePiHistory(history),
+        promptChars: piPrompt.length,
+        restoreMs: Date.now() - historyLoadStartedAt,
       });
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1494,10 +1530,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       mcpToolTopologyChanged ||
       unattendedTopologyChanged
     ) {
+      const historyLoadStartedAt = Date.now();
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       if (mcpToolTopologyChanged) {
         console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
       }
+      const piPrompt = buildPiConversationPrompt(history, prompt, {
+        maxChars: this.resolveConversationHistoryCharLimit(
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+          active.resourceState.chatMode,
+        ),
+      });
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'recreate',
+        ...summarizePiHistory(history),
+        promptChars: piPrompt.length,
+        restoreMs: Date.now() - historyLoadStartedAt,
+      });
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1507,13 +1557,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
         unattended: nextUnattended,
-        _piPromptOverride: buildPiConversationPrompt(history, prompt, {
-          maxChars: this.resolveConversationHistoryCharLimit(
-            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-            typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
-            active.resourceState.chatMode,
-          ),
-        }),
+        _piPromptOverride: piPrompt,
       });
     }
 
@@ -1527,7 +1571,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
     const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
     if (skillsChanged) {
+      const historyLoadStartedAt = Date.now();
       const history = this.store?.getSession(sessionId)?.messages ?? [];
+      const piPrompt = buildPiConversationPrompt(history, prompt, {
+        maxChars: this.resolveConversationHistoryCharLimit(
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+          active.resourceState.chatMode,
+        ),
+      });
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'skills-change',
+        ...summarizePiHistory(history),
+        promptChars: piPrompt.length,
+        restoreMs: Date.now() - historyLoadStartedAt,
+      });
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1537,13 +1595,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
         unattended: nextUnattended,
-        _piPromptOverride: buildPiConversationPrompt(history, prompt, {
-          maxChars: this.resolveConversationHistoryCharLimit(
-            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-            typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
-            active.resourceState.chatMode,
-          ),
-        }),
+        _piPromptOverride: piPrompt,
       });
     }
 
@@ -2368,6 +2420,46 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.workbenchTaskService?.deleteSession(sessionId);
   }
 
+  private evictIdleSessions(now = Date.now()): void {
+    const idle = [...this.activeSessions.values()]
+      .filter(session => {
+        if (session.isRunning || session.completionPending) return false;
+        if (this.pendingMessageQueue.hasPendingFollowUp(session.sessionId)) return false;
+        if ((this.queuedControlActions.get(session.sessionId)?.length ?? 0) > 0) return false;
+        return now - session.lastUsedAt >= PiRuntimeAdapter.IDLE_SESSION_TTL_MS;
+      })
+      .sort((left, right) => left.lastUsedAt - right.lastUsedAt);
+    const residentIdle = [...this.activeSessions.values()].filter(
+      session =>
+        !session.isRunning &&
+        !session.completionPending &&
+        !this.pendingMessageQueue.hasPendingFollowUp(session.sessionId),
+    ).length;
+    const excessCount = Math.max(
+      0,
+      residentIdle - PiRuntimeAdapter.MAX_RESIDENT_IDLE_SESSIONS,
+    );
+    const expired = idle.filter(
+      session => now - session.lastUsedAt >= PiRuntimeAdapter.IDLE_SESSION_TTL_MS,
+    );
+    const nonExpired = idle.filter(
+      session => now - session.lastUsedAt < PiRuntimeAdapter.IDLE_SESSION_TTL_MS,
+    );
+    const candidates = [
+      ...expired,
+      ...nonExpired.slice(0, Math.max(0, excessCount - expired.length)),
+    ];
+    for (const session of candidates) {
+      session.unsubscribe();
+      session.piSession.abortBash();
+      void session.piSession.abort();
+      this.activeSessions.delete(session.sessionId);
+      this.retainedSessionIds.add(session.sessionId);
+      this.clearThrottleStateBySession(session.sessionId, true);
+      console.debug(`[PiRuntime] evicted idle session ${session.sessionId} from memory`);
+    }
+  }
+
   private releaseStoppedSession(sessionId: string): void {
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.add(sessionId);
@@ -2806,6 +2898,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     switch (event.type) {
       case 'agent_start':
         active.isRunning = true;
+        active.lastUsedAt = Date.now();
         this.store?.updateSession(sessionId, { status: 'running' });
         if (active.agentStartedAt === null) {
           active.agentStartedAt = Date.now();
@@ -2818,6 +2911,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'turn_start':
         active.isRunning = true;
+        active.lastUsedAt = Date.now();
         active.toolStartedAtByCallId.clear();
         active.preparingToolCallIdByContentIndex.clear();
         {
@@ -3032,6 +3126,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
         const resultText = extractToolResultText(event.result);
         const resultIsError = Boolean(event.isError) || extractToolResultIsError(event.result);
+        agentResourceDiagnostics.recordPiToolResult(sessionId, resultText.length * 2);
         if (active.workbenchRunId) {
           this.workbenchTaskService?.recordToolResult(
             active.workbenchRunId,
@@ -3139,6 +3234,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.markFinalAnswer(sessionId, active);
         this.clearThrottleStateBySession(sessionId, false);
         active.isRunning = false;
+        active.lastUsedAt = Date.now();
+        agentResourceDiagnostics.finishPiTurn(
+          sessionId,
+          this.activeSessions.size,
+          [...this.activeSessions.values()].filter(session => session.isRunning).length,
+        );
         // Pi versions differ in whether they emit agent_settled after agent_end.
         // Drain queued Work follow-ups here so completion never leaves them stuck.
         if (

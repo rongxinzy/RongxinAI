@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 
 import {
   CodingAgentIpc,
+  CodingEventWindowPageSize,
   type AddCodingAgentProfileInput,
   type CodingGitCommitInput,
   type CodingGitCommitAndPushInput,
@@ -27,10 +28,12 @@ import {
 } from '../../shared/codingAgent';
 import type { CodingRoomService } from '../codingAgent/codingRoomService';
 import { GitWorktreeConflictError } from '../codingAgent/gitWorktreeService';
+import { agentResourceDiagnostics } from '../agentResourceDiagnostics';
 
 export function registerCodingAgentIpcHandlers(getService: () => CodingRoomService): void {
   const service = getService();
   service.on('changed', snapshot => {
+    agentResourceDiagnostics.recordRoomSnapshot(snapshot.events.length, snapshot.lanes.length);
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.Changed, snapshot);
     }
@@ -128,11 +131,34 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   });
   ipcMain.handle(CodingAgentIpc.Bootstrap, (_event, workspaceRoot: string) => {
     try {
-      return { success: true, snapshot: service.bootstrap(workspaceRoot) };
+      return {
+        success: true,
+        snapshot: service.bootstrap(workspaceRoot, {
+          eventLimitPerLane: CodingEventWindowPageSize,
+        }),
+      };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  service.on('eventDelta', (delta: import('../../shared/codingAgent').CodingRoomEventDelta) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.EventDelta, delta);
+    }
+  });
+  ipcMain.handle(
+    CodingAgentIpc.LoadEventPage,
+    (_event, input: { workspaceRoot: string; laneId: string; beforeSequence: number | null }) => {
+      try {
+        return {
+          success: true,
+          page: service.loadEventPage(input.workspaceRoot, input.laneId, input.beforeSequence),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
   ipcMain.handle(
     CodingAgentIpc.PrepareLane,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {

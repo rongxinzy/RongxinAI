@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import { CoworkExecutionMode, CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
 import { hasCoworkSubmissionContent } from '../cowork/submissionContent';
+import { ApiRequestPurpose } from './apiRequest';
 import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ export const ApiFetchSchema = {
     headers: z.record(z.string(), z.string()),
     body: z.string().optional(),
     timeoutMs: z.number().int().positive().max(300_000).optional(),
+    purpose: z.literal(ApiRequestPurpose.ConnectivityTest).optional(),
   }),
   output: z.object({ status: z.number(), data: z.unknown() }).passthrough(),
 };

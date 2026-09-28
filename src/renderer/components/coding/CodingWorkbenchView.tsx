@@ -33,6 +33,7 @@ import type {
   CodingAgentAvailableCommand,
   CodingAgentConfigOption,
   CodingPromptAttachment,
+  CodingEventPage,
   CodingRoomSnapshot,
   CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
@@ -66,6 +67,7 @@ import { CodingAuthTerminalDialog } from './CodingAuthTerminalDialog';
 import { CodingComposer } from './CodingComposer';
 import { CodingPermissionOverlay } from './CodingPermissionOverlay';
 import { CodingEventStream } from './CodingEventStream';
+import { mergeCodingRoomEventDelta } from './codingEventDelta';
 import { CodingGitPanel } from './CodingGitPanel';
 import { CodingGitQuickActions } from './CodingGitQuickActions';
 import { CodingInspector } from './CodingInspector';
@@ -159,6 +161,7 @@ export const CodingWorkbenchView = ({
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
+  const loadingOlderEventsRef = useRef(false);
   const workbenchRef = useRef<HTMLDivElement | null>(null);
   const sidePanelFrameRef = useRef<HTMLElement | null>(null);
   const transientSidePanelWidthRef = useRef<number | null>(null);
@@ -196,9 +199,14 @@ export const CodingWorkbenchView = ({
     const unsubscribe = window.electron.codingAgent.onChanged(next => {
       if (next.room.workspaceRoot === workspaceRoot) setSnapshot(next);
     });
+    const unsubscribeDelta = window.electron.codingAgent.onEventDelta(delta => {
+      if (delta.workspaceRoot !== workspaceRoot) return;
+      setSnapshot(current => (current ? mergeCodingRoomEventDelta(current, delta) : current));
+    });
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeDelta();
     };
   }, [workspaceRoot, bootstrapAttempt]);
   useEffect(() => {
@@ -392,6 +400,57 @@ export const CodingWorkbenchView = ({
       activeLane ? (snapshot?.events.filter(event => event.laneId === activeLane.id) ?? []) : [],
     [activeLane, snapshot],
   );
+  const loadOlderEvents = useCallback(async () => {
+    if (!activeLaneId || loadingOlderEventsRef.current) return;
+    const windowInfo = snapshot?.eventWindows?.find(window => window.laneId === activeLaneId);
+    if (!windowInfo?.hasMore || windowInfo.oldestSequence === null) return;
+    loadingOlderEventsRef.current = true;
+    const viewport = eventStreamRef.current?.querySelector<HTMLElement>(
+      '.coding-conversation-scroll',
+    );
+    const distanceFromBottom = viewport
+      ? viewport.scrollHeight - viewport.scrollTop
+      : null;
+    try {
+      const result = await window.electron.codingAgent.loadEventPage({
+        workspaceRoot,
+        laneId: activeLaneId,
+        beforeSequence: windowInfo.oldestSequence,
+      });
+      const page: CodingEventPage | undefined = result.success ? result.page : undefined;
+      if (!page) return;
+      setSnapshot(current => {
+        if (!current) return current;
+        const eventsById = new Map(current.events.map(event => [event.id, event]));
+        for (const event of page.events) eventsById.set(event.id, event);
+        const events = [...eventsById.values()].sort((left, right) =>
+          left.laneId === right.laneId
+            ? left.sequence - right.sequence
+            : left.laneId.localeCompare(right.laneId),
+        );
+        const eventWindows = (current.eventWindows ?? []).map(window =>
+          window.laneId === page.laneId
+            ? {
+                ...window,
+                oldestSequence: page.events[0]?.sequence ?? window.oldestSequence,
+                hasMore: page.hasMore,
+              }
+            : window,
+        );
+        return { ...current, events, eventWindows };
+      });
+      if (distanceFromBottom !== null) {
+        requestAnimationFrame(() => {
+          const nextViewport = eventStreamRef.current?.querySelector<HTMLElement>(
+            '.coding-conversation-scroll',
+          );
+          if (nextViewport) nextViewport.scrollTop = nextViewport.scrollHeight - distanceFromBottom;
+        });
+      }
+    } finally {
+      loadingOlderEventsRef.current = false;
+    }
+  }, [activeLaneId, snapshot?.eventWindows, workspaceRoot]);
   const activeMissionLanes = useMemo(
     () =>
       activeLane
@@ -1148,6 +1207,7 @@ export const CodingWorkbenchView = ({
             onScrollPositionChange={scrollPosition => {
               if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
             }}
+            onLoadOlderEvents={loadOlderEvents}
             onReEditUserMessage={reEditUserMessage}
           />
           {artifactSessionKey && isArtifactPanelOpen && (

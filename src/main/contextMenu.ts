@@ -56,6 +56,7 @@ const executeContextMenuAction = (window: BrowserWindow, action: ContextMenuActi
 };
 
 export function registerContextMenu(window: BrowserWindow): () => void {
+  let isUnregistered = false;
   const listener = (_event: Electron.Event, params: ContextMenuParams) => {
     if (window.isDestroyed() || window.webContents.isDestroyed()) return;
     window.webContents.send(ContextMenuIpc.Open, createContextMenuOpenEvent(params));
@@ -68,7 +69,12 @@ export function registerContextMenu(window: BrowserWindow): () => void {
   window.webContents.on('context-menu', listener);
   ipcMain.on(ContextMenuIpc.Execute, executeListener);
   return () => {
-    window.webContents.removeListener('context-menu', listener);
+    if (isUnregistered) return;
+    isUnregistered = true;
+    if (!window.isDestroyed()) {
+      const contents = window.webContents;
+      if (!contents.isDestroyed()) contents.removeListener('context-menu', listener);
+    }
     ipcMain.removeListener(ContextMenuIpc.Execute, executeListener);
   };
 }
