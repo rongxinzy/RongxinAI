@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-supply-chain</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+</style></head><body>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">Supply Chain Risk</div><h2>AI 硬件关键物料供应风险扫描</h2></div><div class="pn">覆盖 8 类物料 · 3 个供应层级<br>数据截至 2026 年 9 月</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>8 类物料平均风险分 <b>53.8</b>，其中 2 项进入高风险档：HBM 内存 <b>91 分</b>（可用供应商仅 2 家、交期 34 周、单一来源占比 78%）、GPU 加速卡 <b>82 分</b>（交期 26 周、单一来源 62%）。低风险的散热模组与结构件已无瓶颈，风险全部集中在芯片级。建议把 HBM 与加速卡的安全库存从 6 周提到 <b>12 周</b>，并对网络交换模块启动第二供应商认证。</p></div><div class="kpi"><div class="kc"><div class="k">覆盖物料</div><b class="n">8 类</b><i>芯片级 3 · 模组级 3 · 整机级 2</i></div><div class="kc"><div class="k">高风险物料</div><b class="n">2 项</b><i>HBM 91 分、GPU 加速卡 82 分</i></div><div class="kc"><div class="k">最长交期</div><b class="n">34 周</b><i>HBM，较 2025 年延长 11 周</i></div></div><table><thead><tr><th>物料</th><th>层级</th><th class="n">可用供应商</th><th class="n">交期（周）</th><th class="n">12 个月价格</th><th class="n">单一来源占比</th><th class="n">风险分</th></tr></thead><tbody><tr class=""><td>HBM 内存</td><td>芯片级</td><td class="n n">2 家</td><td class="n n">34</td><td class="n n">+41%</td><td class="n n">78%</td><td class="n n hl">91</td></tr><tr class=""><td>GPU 加速卡</td><td>芯片级</td><td class="n n">3 家</td><td class="n n">26</td><td class="n n">+18%</td><td class="n n">62%</td><td class="n n hl">82</td></tr><tr class=""><td>网络交换模块</td><td>芯片级</td><td class="n n">4 家</td><td class="n n">14</td><td class="n n">+9%</td><td class="n n">38%</td><td class="n n">56</td></tr><tr class=""><td>代工产能（整机）</td><td>整机级</td><td class="n n">3 家</td><td class="n n">9</td><td class="n n">+6%</td><td class="n n">45%</td><td class="n n">52</td></tr><tr class=""><td>电源模块</td><td>模组级</td><td class="n n">5 家</td><td class="n n">12</td><td class="n n">+7%</td><td class="n n">31%</td><td class="n n">48</td></tr><tr class=""><td>存储 SSD</td><td>模组级</td><td class="n n">6 家</td><td class="n n">10</td><td class="n n">+12%</td><td class="n n">27%</td><td class="n n">44</td></tr><tr class=""><td>散热模组</td><td>模组级</td><td class="n n">7 家</td><td class="n n">8</td><td class="n n">+3%</td><td class="n n">22%</td><td class="n n">33</td></tr><tr class=""><td>结构件</td><td>整机级</td><td class="n n">11 家</td><td class="n n">6</td><td class="n n">+2%</td><td class="n n">14%</td><td class="n n">24</td></tr></tbody></table><div><h3>风险速览</h3><ul class=""><li>风险集中在芯片级：芯片级三项平均 76.3 分，模组级 41.7 分，整机级 38.0 分</li><li>8 类全部涨价，其中 5 类交期同时延长，仅电源模块交期缩短 1 周</li></ul></div></div>
+  <div class="pf"><span>评分口径：集中度 40% + 交期波动 30% + 价格波动 20% + 替代可得性 10% · 见第 3 页</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 物料编号 P1–P8<br>评分与库存建议见第 3、8 页</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 范围与评分口径</td><td>物料分层、四维权重、数据来源</td><td>8 类物料清单 + 权重表</td><td class="n n">3</td></tr><tr class=""><td>2 风险全景</td><td>风险分、交期与集中度对比</td><td>风险分条形图 + 交期表</td><td class="n n">4</td></tr><tr class=""><td>3 分层拆解</td><td>集中度 × 替代可得性二维</td><td>2×2 矩阵 + 三层对比</td><td class="n n">5</td></tr><tr class=""><td>4 关键洞察与证据</td><td>风险背后的量级与证据</td><td>5 条洞察</td><td class="n n">6</td></tr><tr class=""><td>5 情景推演</td><td>断供、涨价、替代成熟</td><td>3 情景 + 交付影响</td><td class="n n">7</td></tr><tr class=""><td>6 缓释措施与缺口</td><td>安全库存与双源策略</td><td>5 项措施 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 结论与建议动作</td><td>分阶段采购与认证节奏</td><td>3 条结论 · 3 阶段动作</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>来源清单、评分明细、术语</td><td>6 类来源 + 术语表</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>风险分档规则</h3><ul class=""><li><b>高风险</b>：≥ 70 分，必须双源或备库存（本报告 2 项）</li><li><b>中风险</b>：40–69 分，需季度跟踪与备选认证（4 项）</li><li><b>低风险</b>：< 40 分，按常规采购（2 项）</li></ul></div><div><h3>为什么把交期波动放 30%</h3><ul class=""><li>交期延长直接决定整机承诺交付日期是否可信</li><li>价格波动可用调价条款部分转移，交期不能</li><li>替代认证周期通常 6–12 周，晚发现两周即错过交付窗口</li></ul></div></div><div><h3>分层与金额校验</h3><table><thead><tr><th>层级</th><th class="n">物料数</th><th class="n">采购金额占比</th><th>平均风险分</th></tr></thead><tbody><tr class=""><td>芯片级</td><td class="n">3 类</td><td class="n">61%</td><td>76.3</td></tr></tbody></table></div></div>
+  <div class="pf"><span>8 类物料按风险分降序排列；采购金额占比见第 3 页，芯片级三类合计 61%</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Scope & Scoring</div><h2>调研范围、评分口径与数据来源</h2></div><div class="pn">评分 0–100 分，四维加权<br>打分窗口 2026-08-01 – 2026-09-20</div></div>
+  <div class="pc"><div><h3>物料清单与层级划分</h3><table><thead><tr><th>层级</th><th>物料</th><th>采购金额占比</th><th>是否可替代</th></tr></thead><tbody><tr class=""><td>芯片级</td><td>HBM 内存、GPU 加速卡、网络交换模块</td><td>61%</td><td>技术上可替代，认证周期 12–16 周</td></tr><tr class=""><td>模组级</td><td>电源模块、存储 SSD、散热模组</td><td>27%</td><td>多源可替代，认证周期 4–8 周</td></tr><tr class=""><td>整机级</td><td>代工产能、结构件</td><td>12%</td><td>可替代，切换周期 3–6 周</td></tr><tr class="tot"><td>合计</td><td>8 类物料</td><td>100%</td><td>—</td></tr></tbody></table></div><div><h3>评分权重与衡量方式</h3><table><thead><tr><th>维度</th><th>权重</th><th>衡量方式</th><th>数据来源</th></tr></thead><tbody><tr class=""><td>供应集中度</td><td>40%</td><td>单一来源采购金额占比，60% 以上记为满分档</td><td>内部采购台账（12 个月）</td></tr><tr class=""><td>交期波动</td><td>30%</td><td>当前交期相对 2025 年同期的延长幅度</td><td>供应商交期确认函 + 到货记录</td></tr><tr class=""><td>价格波动</td><td>20%</td><td>12 个月采购单价变化幅度</td><td>采购合同与报价单</td></tr><tr class=""><td>替代可得性</td><td>10%</td><td>现有可用替代供应商数量与认证周期</td><td>工程认证记录</td></tr></tbody></table></div><div class="cols2 eq"><div><h3>口径说明</h3><ul class=""><li>交期为确认订单到到货的周数，取最近 3 次采购的中位数</li><li>价格为同规格物料的加权平均单价，未含汇率影响</li><li>单一来源占比按金额而非数量计算</li></ul></div><div><h3>本次不覆盖</h3><ul class=""><li>不评估物流与关税环节，该部分单列在交付成本中</li><li>不评估二级供应商（供应商的上游），信息可得性不足</li><li>不评估地缘与政策风险，仅按可获得数据打分</li></ul></div></div></div>
+  <div class="pf"><span>评分细则与逐项打分记录见第 10 页附录，可完整复算</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Risk Landscape</div><h2>八类物料风险全景</h2></div><div class="pn">风险分越高越需前置动作<br>交期列取最近 3 次采购中位数</div></div>
+  <div class="pc"><div><h3>风险分（0–100）</h3><div class="bars"><div class="bar"><span>HBM 内存</span><span class=""><i class="" style="width:91%"></i></span><span class="v">91</span></div><div class="bar"><span>GPU 加速卡</span><span class=""><i class="" style="width:82%"></i></span><span class="v">82</span></div><div class="bar"><span>网络交换模块</span><span class=""><i class="" style="width:56%"></i></span><span class="v">56</span></div><div class="bar"><span>代工产能</span><span class=""><i class="" style="width:52%"></i></span><span class="v">52</span></div><div class="bar"><span>电源模块</span><span class=""><i class="" style="width:48%"></i></span><span class="v">48</span></div><div class="bar"><span>存储 SSD</span><span class=""><i class="" style="width:44%"></i></span><span class="v">44</span></div><div class="bar"><span>散热模组</span><span class=""><i class="" style="width:33%"></i></span><span class="v">33</span></div><div class="bar"><span>结构件</span><span class=""><i class="" style="width:24%"></i></span><span class="v">24</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></span><span></span></div></div></div><div class="cols2 wide"><div><h3>交期与延长幅度</h3><table><thead><tr><th>物料</th><th class="n">当前交期</th><th class="n">2025 同期</th><th class="n">延长</th><th class="n">库存覆盖（周）</th></tr></thead><tbody><tr class=""><td>HBM 内存</td><td class="n n">34 周</td><td class="n n">23 周</td><td class="n n">+11 周</td><td class="n n">6</td></tr><tr class=""><td>GPU 加速卡</td><td class="n n">26 周</td><td class="n n">17 周</td><td class="n n">+9 周</td><td class="n n">8</td></tr><tr class=""><td>网络交换模块</td><td class="n n">14 周</td><td class="n n">12 周</td><td class="n n">+2 周</td><td class="n n">9</td></tr><tr class=""><td>代工产能</td><td class="n n">9 周</td><td class="n n">8 周</td><td class="n n">+1 周</td><td class="n n">5</td></tr><tr class=""><td>电源模块</td><td class="n n">12 周</td><td class="n n">13 周</td><td class="n n">−1 周</td><td class="n n">10</td></tr><tr class=""><td>存储 SSD</td><td class="n n">10 周</td><td class="n n">9 周</td><td class="n n">+1 周</td><td class="n n">9</td></tr><tr class=""><td>散热模组</td><td class="n n">8 周</td><td class="n n">8 周</td><td class="n n">持平</td><td class="n n">11</td></tr><tr class=""><td>结构件</td><td class="n n">6 周</td><td class="n n">6 周</td><td class="n n">持平</td><td class="n n">12</td></tr></tbody></table></div><div><h3>分层平均风险分</h3><div class="bars"><div class="bar"><span>芯片级（3 类）</span><span class=""><i class="" style="width:76%"></i></span><span class="v">76.3</span></div><div class="bar"><span>模组级（3 类）</span><span class=""><i class="" style="width:42%"></i></span><span class="v">41.7</span></div><div class="bar"><span>整机级（2 类）</span><span class=""><i class="" style="width:38%"></i></span><span class="v">38.0</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></span><span></span></div></div></div></div></div>
+  <div class="pf"><span>库存覆盖周数为当前安全库存水平，高风险两项均低于交期延长幅度</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Segmentation</div><h2>集中度与替代可得性分层</h2></div><div class="pn">行：单一来源占比（阈值 60%）；列：替代可得性（认证 ≤ 8 周为易）<br>风险分口径见第 3 页</div></div>
+  <div class="pc"><div class="mx"><div><div class="t">高集中 · 替代难：HBM、GPU 加速卡</div><p>HBM 单一来源 78% / 认证 16 周；GPU 62% / 需换架构、认证 14 周。</p><ul class=""><li>两项合计占采购金额 44%，风险分 91 与 82</li><li>任何一项断供都会停线</li></ul></div><div><div class="t">高集中 · 替代易：无</div><p>无一项同时满足单一来源 ≥ 60% 与认证 ≤ 8 周。</p><ul class=""><li>代工产能 45% / 认证 6 周，按阈值须划入低集中一侧</li><li>该象限为空，本身说明供应结构脆弱</li></ul></div><div><div class="t">低集中 · 替代难：网络交换模块（38%）</div><p>家数 4 家、单一来源 38%，但兼容性认证周期长达 12 周。</p><ul class=""><li>风险分 56，三类规则的第三类触发项</li><li>库存覆盖 9 周不足以覆盖 12 周认证</li></ul></div><div><div class="t">低集中 · 替代易：代工、电源、SSD、散热、结构件</div><p>单一来源 14%–45%，认证 4–8 周。</p><ul class=""><li>五项平均风险分 40.2</li><li>按常规采购即可，无需统一加码备库</li></ul></div></div><div class="cols2 eq"><div><h3>前置动作的触发条件与叠加规则</h3><ul class=""><li>双源：单一来源占比 ≥ 60% 且替代认证 ≥ 12 周（触发 2 项：HBM 78% / 16 周、GPU 62% / 14 周）</li><li>备库：延长 ≥ 6 周且覆盖 < 延长幅度（HBM 6 < 11 周、GPU 8 < 9 周）</li><li>认证：替代认证 ≥ 10 周但占比 < 60%（网络交换模块 12 周 / 38%）</li><li>规则可叠加：HBM 与 GPU 同时触发双源与备库，两条动作都执行</li></ul></div><div><h3>最容易被忽略的一项</h3><ul class=""><li>网络交换模块风险分 56 不高，但 12 周认证周期与 9 周库存形成 3 周敞口，切换需求会在交付前 3 周才暴露，届时无补救空间</li></ul></div></div><div><h3>库存水位与敞口（口径：净敞口 = 库存覆盖 − 交期延长，负值为缺口）</h3><table><thead><tr><th>物料</th><th class="n">库存覆盖</th><th class="n">交期延长</th><th class="n">净敞口</th><th class="n">建议水位</th></tr></thead><tbody><tr class=""><td>HBM 内存</td><td class="n">6 周</td><td class="n">+11 周</td><td class="n">−5 周</td><td class="n">12 周</td></tr><tr class=""><td>GPU 加速卡</td><td class="n">8 周</td><td class="n">+9 周</td><td class="n">−1 周</td><td class="n">12 周</td></tr><tr class=""><td>网络交换模块</td><td class="n">9 周</td><td class="n">+2 周</td><td class="n">+7 周（交期充足）</td><td class="n">12 周</td></tr></tbody></table></div></div>
+  <div class="pf"><span>统一水位 12 周 = 最长交期延长 11 周 + 1 周余量；净敞口负值即为缺口</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Insights & Evidence</div><h2>关键洞察与证据</h2></div><div class="pn">每条洞察至少一个可核算数据<br>建议动作可回溯到第 8 页措施表</div></div>
+  <div class="pc"><table><thead><tr><th>#</th><th>洞察</th><th>支撑数据</th><th>建议动作</th></tr></thead><tbody><tr class=""><td>1</td><td>风险与采购金额高度重合</td><td>风险 ≥ 70 的两项占采购金额 44%；风险 < 40 的两项仅占 7%</td><td>把风险预算集中在前两类物料</td></tr><tr class=""><td>2</td><td>交期与价格同向恶化</td><td>8 类全部涨价，其中 5 类交期同时延长，仅电源模块交期缩短 1 周</td><td>谈判时以交期优先于价格</td></tr><tr class=""><td>3</td><td>库存水平与风险分倒挂</td><td>HBM 风险 91 分但库存覆盖仅 6 周；结构件风险 24 分却覆盖 12 周</td><td>按风险分重排库存水位</td></tr><tr class=""><td>4</td><td>认证周期是真正的约束</td><td>HBM 16 周、GPU 14 周、网络模块 12 周，均长于库存覆盖</td><td>认证先行，不等出现缺口再启动</td></tr><tr class=""><td>5</td><td>价格可转移、交期不可转移</td><td>12 个月涨价 2%–41% 可通过调价条款转移 60%–70%，交期延误无法转移</td><td>合约定价挂钩 + 交期承诺双条款</td></tr></tbody></table><div class="cols2 eq"><div><h3>洞察的量化含义</h3><ul class=""><li>把 HBM 库存从 6 周提到 12 周，可覆盖其 11 周的交期延长，多占用资金约 1 个季度的采购额</li><li>双源认证按 GPU 14 周 + 产能爬坡 6 周计算，需提前 20 周启动</li><li>网络交换模块的 3 周敞口只需把库存提到 12 周即可闭环，成本远低于重新认证</li></ul></div><div><h3>反例与边界</h3><ul class=""><li>散热与结构件风险低是因为供应商多，若整机设计变更可能重设门槛</li><li>价格数据未含汇率，若结算币种升值 5%，涨价幅度会更难看</li><li>评分未纳入地缘因素，实际风险可能高于分数反映的水平</li></ul></div></div><div><h3>洞察到动作的映射</h3><table><thead><tr><th>洞察</th><th>建议动作</th><th>责任角色</th><th>验证指标</th></tr></thead><tbody><tr class=""><td>1 风险与金额重合</td><td>风险预算集中投向 HBM 与 GPU</td><td>采购 + 计划</td><td>高风险项库存 ≥ 12 周</td></tr><tr class=""><td>2 交期与价格同向</td><td>谈判以交期承诺优先于单价</td><td>采购</td><td>交期延长 ≤ 4 周</td></tr><tr class=""><td>3 库存与风险倒挂</td><td>按风险分重排库存水位</td><td>计划 + 财务</td><td>低风险项库存降至 6 周</td></tr><tr class=""><td>4 认证周期是约束</td><td>认证先行，不等缺口出现</td><td>采购 + 工程</td><td>关键项各有 1 家备选</td></tr><tr class=""><td>5 交期不可转移</td><td>合约定价挂交期双条款</td><td>采购 + 法务</td><td>8 份补充协议签署</td></tr></tbody></table></div></div>
+  <div class="pf"><span>洞察 3 是本轮最需立即修正的一项：库存水位应按风险分而非采购金额排序</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Scenarios</div><h2>三种情景与交付影响</h2></div><div class="pn">情景均以 2026 Q4 为起点<br>概率为采购与交付双线评估的共识值</div></div>
+  <div class="pc"><table><thead><tr><th>情景</th><th>触发条件</th><th>对交付的影响</th><th class="n">需追加投入</th><th>概率</th></tr></thead><tbody><tr class=""><td>断供</td><td>HBM 或 GPU 单一来源连续 6 周无法交货</td><td>整机交付延期 8–14 周，影响 2 个季度排产</td><td class="n">双源认证 + 12 周库存</td><td class="n">20%</td></tr><tr class=""><td>涨价</td><td>关键物料价格再上行 30%</td><td>单机成本上升 9%–13%，毛利压缩 4–6 个百分点</td><td class="n">调价条款 + 提前锁价</td><td class="n">45%</td></tr><tr class=""><td>替代成熟</td><td>第二供应商通过认证并稳定交付</td><td>交期回落 6–8 周，风险分下降 15–25 分</td><td class="n">认证投入（一次性）</td><td class="n">35%</td></tr></tbody></table><div><h3>情景对关键指标的影响</h3><div class="bars"><div class="bar"><span>断供：交付延期</span><span class=""><i class="" style="width:100%"></i></span><span class="v">+11 周</span></div><div class="bar"><span>涨价：单机成本</span><span class=""><i class="" style="width:65%"></i></span><span class="v">+11%</span></div><div class="bar"><span>替代成熟：交付缩短</span><span class=""><i class="" style="width:57%"></i></span><span class="v">−7 周</span></div><div class="bar"><span>基准（无变化）</span><span class=""><i class="" style="width:45%"></i></span><span class="v">不变</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>+4</span><span>+8</span><span>+12</span></span><span></span></div></div></div><div class="cols2 eq"><div><h3>早期信号</h3><ul class=""><li>供应商交期确认函连续两个月上调</li><li>同类物料的公开报价上涨幅度超过 15%</li><li>第二供应商的样品测试进入功能验证阶段</li></ul></div><div><h3>情景无关的必做项</h3><ul class=""><li>网络交换模块库存提到 12 周（成本最低、收益明确）</li><li>按风险分重排库存水位表，本季度调整一次</li></ul></div></div><div><h3>情景触发的复核节奏</h3><table><thead><tr><th>情景</th><th>早期信号</th><th>复核频率</th></tr></thead><tbody><tr class=""><td>断供</td><td>供应商交期确认函连续两月上调</td><td>每两周跟踪一次</td></tr></tbody></table></div></div>
+  <div class="pf"><span>涨价情景概率最高（45%），但断供情景的交付影响是它的 3 倍以上</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Mitigation & Gaps</div><h2>缓释措施、风险与信息缺口</h2></div><div class="pn">措施按投入产出比排序<br>缺口项标注补齐方式</div></div>
+  <div class="pc"><table><thead><tr><th>措施</th><th>针对物料</th><th>投入</th><th>预期效果</th></tr></thead><tbody><tr class=""><td>安全库存从 6 周提到 12 周</td><td>HBM、GPU 加速卡</td><td>多占用约 1 个季度采购额</td><td>覆盖交期延长，断供情景延期从 11 周降到 4 周</td></tr><tr class=""><td>启动第二供应商认证</td><td>HBM、GPU 加速卡、网络交换模块</td><td>认证周期 12–16 周</td><td>风险分预期下降 20–30 分</td></tr><tr class=""><td>合约定价与交期双条款</td><td>8 类全部</td><td>法务工时</td><td>涨价转移 60%–70%，交期承诺可追责</td></tr><tr class=""><td>按风险分重排库存水位</td><td>8 类全部</td><td>计划调整，无现金投入</td><td>结构件等低风险物料释放 6 周库存资金</td></tr><tr class=""><td>替代方案预研（换架构）</td><td>GPU 加速卡</td><td>工程 4 人月</td><td>给出第二技术路线的可行性与代价</td></tr></tbody></table><div class="cols2 eq"><div><h3>风险与不确定性</h3><ul class=""><li>交期为供应商自报，实际到货偏差历史均值 1.5 周</li><li>第二供应商认证可能因兼容性问题失败，需预留一次回退</li><li>库存提升会占用资金，需与财务确认资金成本上限</li><li>价格数据未含汇率，若结算币种波动 5%，涨幅可能被放大</li></ul></div><div><h3>信息缺口</h3><ul class=""><li>缺少二级供应商信息，无法评估上游集中度</li><li>未取得替代供应商的实际产能配额，认证通过不等于可拿量</li><li>地缘与政策风险未纳入评分，实际风险可能被低估</li><li>库存资金成本未量化，措施排序仅按风险收益</li></ul></div></div><div><h3>措施的责任与检查频率</h3><table><thead><tr><th>措施</th><th>责任角色</th><th>检查频率</th></tr></thead><tbody><tr class=""><td>库存水位提到 12 周</td><td>计划 + 财务</td><td>每月盘点一次</td></tr><tr class=""><td>第二供应商认证</td><td>采购 + 工程</td><td>每两周同步进度</td></tr><tr class=""><td>定价与交期双条款</td><td>采购 + 法务</td><td>签约后每季度复核执行率</td></tr></tbody></table></div></div>
+  <div class="pf"><span>四项缓释措施中「按风险分重排库存」零现金投入且当季可完成，建议优先执行</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Recommendations</div><h2>结论与建议动作</h2></div><div class="pn">结论对应第 6 页洞察<br>动作按 0–12 个月三阶段推进</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">结论一</div><b class="n">风险集中在芯片级</b><i>芯片级平均 76.3 分，占采购金额 61%</i></div><div class="kc"><div class="k">结论二</div><b class="n">库存水位排序错误</b><i>HBM 风险 91 分仅覆盖 6 周，结构件 24 分却覆盖 12 周</i></div><div class="kc"><div class="k">结论三</div><b class="n">认证周期才是真约束</b><i>关键物料认证 12–16 周，长于任何现有库存覆盖</i></div></div><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>按风险分重排库存水位：HBM 与 GPU 提到 12 周，结构件与散热下调到 6 周；释放的资金用于芯片级备库，净投入控制在 1 个季度采购额内</span></div><div class="r"><b>3–6 月</b><span>启动 HBM、GPU 与网络交换模块的第二供应商认证（12–16 周周期）；同步输出 GPU 替代技术路线的预研结论</span></div><div class="r"><b>6–12 月</b><span>完成双源切换验证并重算风险分；与全部 8 类供应商签署定价挂交期双条款；季度复核一次风险分排序</span></div></div></div><div class="cols2 eq"><div><h3>责任与交付物</h3><table><thead><tr><th>动作</th><th>负责角色</th><th>交付物</th><th>截止</th></tr></thead><tbody><tr class=""><td>库存水位重排</td><td>计划 + 财务</td><td>库存水位表 v2</td><td>第 3 月</td></tr><tr class=""><td>双源认证</td><td>采购 + 工程</td><td>认证报告 + 首批到货</td><td>第 6 月</td></tr><tr class=""><td>合约条款修订</td><td>采购 + 法务</td><td>8 份补充协议</td><td>第 12 月</td></tr></tbody></table></div><div><h3>衡量指标</h3><ul class=""><li>高风险物料库存覆盖 / 目标 ≥ 12 周</li><li>单一来源占比 / 目标从 78% 降到 55% 以下</li><li>交期延长幅度 / 目标 ≤ 4 周</li><li>风险分季度复核 / 每季 1 次，任一物料上行 > 10 分触发复盘</li></ul></div></div><div><h3>里程碑通过标准</h3><table><thead><tr><th>里程碑</th><th>通过标准</th><th>未通过时的处置</th></tr></thead><tbody><tr class=""><td>库存重排（第 3 月）</td><td>高风险项覆盖 ≥ 12 周</td><td>暂停低风险项采购，腾挪资金补缺口</td></tr></tbody></table></div></div>
+  <div class="pf"><span>三阶段动作与第 7 页涨价情景对应，断供情景下第 2 阶段提前启动</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>参考来源、评分明细与术语</h2></div><div class="pn">评分可完整复算<br>数据窗口 2025-09 – 2026-09</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>来源类型</th><th>数量 / 规模</th><th>时间窗</th><th>用于正文</th></tr></thead><tbody><tr class=""><td>S1</td><td>内部采购台账</td><td>12 个月记录</td><td>2025-09 – 2026-08</td><td>第 3、4 页金额与占比</td></tr><tr class=""><td>S2</td><td>供应商交期确认函</td><td>23 份</td><td>2026-01 – 2026-09</td><td>第 4 页交期与延长幅度</td></tr><tr class=""><td>S3</td><td>采购合同与报价单</td><td>41 份</td><td>2025-09 – 2026-09</td><td>第 4 页价格变化</td></tr><tr class=""><td>S4</td><td>工程认证记录</td><td>16 项</td><td>2024-06 – 2026-09</td><td>第 3、5 页替代可得性</td></tr><tr class=""><td>S5</td><td>库存与到货记录</td><td>8 类物料</td><td>2025-12 – 2026-09</td><td>第 4、8 页库存覆盖</td></tr><tr class=""><td>S6</td><td>供应商公开产能披露</td><td>9 家</td><td>2026-01 – 2026-09</td><td>第 8 页产能配额缺口</td></tr></tbody></table><div class="cols2 eq"><div><h3>评分复算说明</h3><ul class=""><li>风险分 = 集中度分 × 0.4 + 交期波动分 × 0.3 + 价格波动分 × 0.2 + 替代分 × 0.1</li><li>各分项先归一化到 0–100 再加权，避免量纲影响</li><li>以 HBM 为例：集中度 100 × 0.4 + 交期 92 × 0.3 + 价格 82 × 0.2 + 替代 70 × 0.1 = 91</li></ul></div><div><h3>术语表</h3><ul class=""><li><b>单一来源占比</b>：按金额计算的来自唯一供应商的采购比例</li><li><b>交期波动</b>：当前交期相对上年同期的延长幅度</li><li><b>认证周期</b>：替代供应商从送样到可批量交付的周数</li><li><b>库存覆盖</b>：现有安全库存可支撑的正常生产周数</li><li><b>双源</b>：同一物料维持两家以上可切换的合格供应商</li></ul></div></div><div><h3>评分复核计划</h3><table><thead><tr><th>项</th><th>复核方式</th><th>频率</th></tr></thead><tbody><tr class=""><td>风险分</td><td>按四维公式全量重算一次</td><td>每季度</td></tr></tbody></table></div></div>
+  <div class="pf"><span>来源版本 v2026.09 · 风险分每季度复算一次，下次复核 2026-12-18</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

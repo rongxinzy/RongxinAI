@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-fundraising</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
+<body>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Series A · 融资路演</div>
+<h1>A 轮融资路演</h1>
+<p class="lede">面向投资人的一页式摘要：业务规模、增长质量、单位经济模型与本轮条款。核心结论是收入连续三年高增长且单位经济模型已转正。</p>
+<div class="meta"><span>公司：云帆科技（企业智能客服）</span><span>轮次：A 轮</span><span>本轮：融资 8,000 万 · 出让 11.4%</span><span>版本：v2 · 2026-09-26</span></div>
+<div class="kn">
+  <div class="k"><b>5,400<em>万元</em></b><span>ARR（2026 年）</span><p>较 2025 年的 2,010 万元增长 168.7%</p></div>
+  <div class="k"><b>128<em>%</em></b><span>净收入留存 NDR</span><p>存量客户第二年支出平均增长 28%</p></div>
+  <div class="k"><b>3,200<em>家</em></b><span>付费商家</span><p>较 2025 年的 1,150 家增长 178.3%</p></div>
+</div>
+<table class="tb">
+  <caption>核心指标与估值口径（单位：万元 / 家 / 月）</caption>
+  <thead><tr><th>指标</th><th class="r">2025 实际</th><th class="r">2026 现值</th><th class="r">同比</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>ARR 年度经常性收入</td><td class="r mono">2,010</td><td class="r mono">5,400</td><td class="r mono">+168.7%</td><td>不含一次性实施服务收入</td></tr>
+    <tr><td>付费商家数</td><td class="r mono">1,150 家</td><td class="r mono">3,200 家</td><td class="r mono">+178.3%</td><td>含年度付费与季度付费客户</td></tr>
+    <tr><td>客均月收入 ARPU</td><td class="r mono">¥1,457</td><td class="r mono">¥1,406</td><td class="r mono">-3.5%</td><td>客户结构下沉至中小商家所致</td></tr>
+    <tr class="hi"><td>毛利率 / 净收入留存</td><td class="r mono">68% / 119%</td><td class="r mono">71% / 128%</td><td class="r mono">+3 pp / +9 pp</td><td>交付标准化带动毛利率改善</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：ARR 年化现值，不含实施收入｜来源：审计财务口径 · 客户访谈估算</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 增长｜P5–P7 模型｜P8–P9 条款</div>
+</div></div>
+<div class="foot"><span>结论：三年收入复合增长 118%，毛利率与留存同步改善，本轮资金用于规模化交付与研发。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 路演导航</div><h1 class="pt">八页结构与本轮要点</h1></div><div class="calib">路演时长：20 分钟讲解 + 15 分钟问答<br>全文 9 页 · 附条款摘要</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>摘要与核心指标</span><em>ARR、留存、客户数与本轮条款</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>公司与市场</span><em>公司概况、目标市场与竞争位置</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>增长与财务</span><em>四年收入曲线与经营指标</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>单位经济模型</span><em>LTV / CAC、回收期与流失率</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>商业模式</span><em>收入结构、交付流程与增长飞轮</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>同业对比</span><em>与 3 家可比公司的指标对照</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与敏感性</span><em>客户集中度、竞争与假设敏感性</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>资金用途与条款</span><em>资金分配、里程碑与估值</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>投资人关注点</b><p>建议先看 <b>P5 单位经济模型</b> 与 <b>P7 同业对比</b>，这两页回答「为什么现在能规模化」。</p></div>
+  <div class="q"><b>估值口径</b><p>投前估值 <b>6.2 亿元</b>，对应 2026 年 ARR 的 <b>11.5 倍</b>；可比公司区间为 6.8–13.5 倍。</p></div>
+  <div class="q"><b>条款要点</b><p>无对赌、无反稀释例外条款，设 <b>1 年</b> 锁定期；董事会 5 席，投资人占 1 席。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>全文 9 页：P1 摘要 → P4 增长 → P5 模型 → P9 条款。</div>
+  <div class="cell"><u>下一步与责任</u>路演后 48 小时内提供数据包与条款清单。</div>
+</div></div>
+<div class="foot"><span>导航：从市场位置到资金用途，全部结论均以 ARR、留存与单位经济模型三项指标支撑。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 公司与市场</div><h1 class="pt">公司概况、目标市场与竞争位置</h1></div><div class="calib">市场规模口径：企业级智能客服签约金额<br>数据截至 2026 年 9 月</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>公司概况</b>云帆科技成立于 2021 年，主营企业级智能客服，团队 86 人（研发 51 人、交付 19 人、销售 16 人），服务 3,200 家付费商家。</div>
+  <div class="cell"><b>目标市场</b>企业级智能客服 2026 年市场规模 486 亿元，同比增速 24.7%；其中制造业与零售合计 152 亿元，是公司当前的主力客群。</div>
+  <div class="cell"><b>竞争位置</b>在「本地优先 + 数据可追溯」象限仅 2 家厂商，公司为其中之一；差异化集中在离线能力与审计日志的完整度上。</div>
+  <div class="cell"><b>产品形态</b>以坐席订阅收费，标准版 ¥588 / 人 / 月，专业版 ¥980 / 人 / 月，本地化部署按坐席年费计价，实施服务单独报价。</div>
+</div>
+<div class="sl"><i>01</i>竞争位置与客群结构</div>
+<div class="steps">
+  <div class="step"><b>客群 01</b><span>制造业客户 1,420 家，贡献 ARR 2,180 万元，占比 40.4%，平均 5.2 个坐席 / 家，续约率 94%。</span></div>
+  <div class="step"><b>客群 02</b><span>零售客户 1,180 家，贡献 ARR 1,760 万元，占比 32.6%，平均 3.4 个坐席 / 家，续约率 89%。</span></div>
+  <div class="step"><b>客群 03</b><span>金融与医疗客户合计 600 家，贡献 ARR 1,460 万元，占比 27.0%，平均 8.1 个坐席 / 家，续约率 97%。</span></div>
+  <div class="step"><b>不做的事</b><span>不做硬件与通信线路，不做通用大模型训练，不承接纯定制的一次性开发项目，保证收入的可重复性。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>客群：制造业 1,420 家、零售 1,180 家、金融医疗 600 家。</div>
+  <div class="cell"><u>下一步与责任</u>首年主攻金融与医疗，可寻址规模 74 亿元。</div>
+</div></div>
+<div class="foot"><span>位置：在本地优先象限仅 2 家厂商，三类客群合计 3,200 家、ARR 5,400 万元。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 增长与财务</div><h1 class="pt">四年收入曲线与经营指标</h1></div><div class="calib">单位：万元（人民币）<br>数据源：审计后财务口径，2026 为现值</div></div>
+<div class="sl"><i>02</i>ARR 年度经常性收入（万元）</div>
+<div class="vb">
+  <div><em class="mono">520</em><i style="height:19px"></i><span>2023</span></div>
+  <div><em class="mono">1,180</em><i style="height:43px"></i><span>2024</span></div>
+  <div><em class="mono">2,010</em><i style="height:74px"></i><span>2025</span></div>
+  <div><em class="mono">5,400</em><i style="height:120px"></i><span>2026 现值</span></div>
+</div>
+<table class="tb">
+  <caption>表 1 · 四年经营指标对照</caption>
+  <thead><tr><th>年份</th><th class="r">ARR</th><th class="r">同比增速</th><th class="r">付费商家</th><th class="r">毛利率</th><th class="r">净收入留存</th></tr></thead>
+  <tbody>
+    <tr><td>2023</td><td class="r mono">520 万</td><td class="r mono">—</td><td class="r mono">248 家</td><td class="r mono">52%</td><td class="r mono">—</td></tr>
+    <tr><td>2024</td><td class="r mono">1,180 万</td><td class="r mono">+126.9%</td><td class="r mono">596 家</td><td class="r mono">59%</td><td class="r mono">104%</td></tr>
+    <tr><td>2025</td><td class="r mono">2,010 万</td><td class="r mono">+70.3%</td><td class="r mono">1,150 家</td><td class="r mono">68%</td><td class="r mono">119%</td></tr>
+    <tr class="hi"><td>2026 现值</td><td class="r mono">5,400 万</td><td class="r mono">+168.7%</td><td class="r mono">3,200 家</td><td class="r mono">71%</td><td>128%</td></tr>
+  </tbody>
+</table>
+<div class="note">口径说明：2026 年为截至 9 月的年化现值，非全年审计数；毛利率不含实施服务收入，与行业可比口径一致。</div></div>
+<div class="foot"><span>增长：三年 ARR 复合增速 118%，毛利率 52% → 71%，留存持续改善至 128%。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 单位经济模型</div><h1 class="pt">LTV / CAC、回收期与流失率</h1></div><div class="calib">口径：按 2026 年现值计算<br>CAC 含销售人力与市场费用</div></div>
+<div class="kn">
+  <div class="k"><b>4.2<em>倍</em></b><span>LTV / CAC</span><p>客户生命周期价值为获客成本的 4.2 倍，行业健康线为 3 倍</p></div>
+  <div class="k"><b>8.6<em>个月</em></b><span>CAC 回收期</span><p>较 2025 年的 12.4 个月缩短 3.8 个月</p></div>
+  <div class="k"><b>1.6<em>%</em></b><span>月度客户流失率</span><p>对应年度留存约 82.4%，金融客群仅 0.6%</p></div>
+</div>
+<div class="sl"><i>03</i>单位经济模型的推导链（自 ARPU 至 LTV / CAC 共六步）</div>
+<table class="tb">
+  <thead><tr><th>推导步骤</th><th class="r">2025 实际</th><th class="r">2026 现值</th><th>计算依据</th></tr></thead>
+  <tbody>
+    <tr><td>客均月收入 ARPU</td><td class="r mono">¥1,457</td><td class="r mono">¥1,406</td><td>ARR ÷ 12 ÷ 付费商家数</td></tr>
+    <tr><td>毛利率</td><td class="r mono">68%</td><td class="r mono">71%</td><td>扣除云资源与交付人力成本</td></tr>
+    <tr><td>单客月毛利</td><td class="r mono">¥991</td><td class="r mono">¥998</td><td>ARPU × 毛利率</td></tr>
+    <tr><td>获客成本 CAC</td><td class="r mono">¥12,303</td><td class="r mono">¥8,550</td><td>销售与市场费用 ÷ 新增付费商家</td></tr>
+    <tr class="hi"><td>CAC 回收期</td><td class="r mono">12.4 个月</td><td class="r mono">8.6 个月</td><td>CAC ÷ 单客月毛利（月毛利 = ARPU × 毛利率）</td></tr>
+    <tr><td>LTV / CAC</td><td class="r mono">2.9 倍</td><td class="r mono">4.2 倍</td><td>LTV = 月毛利 × 36 个月；2026 年 LTV ¥35,928 ÷ CAC ¥8,550</td></tr>
+  </tbody>
+</table>
+<div class="note">口径说明：按 1.6% 月流失率推算的隐含生命周期为 62.5 个月，估值口径保守取 36 个月为上限；CAC 回收期 = CAC ÷ 单客月毛利，LTV / CAC 同样按 36 个月上限计算，均未做折现。</div><div class="note">敏感度：CAC 每上升 10%（¥8,550 → ¥9,405），回收期从 8.6 个月延长到 9.4 个月，LTV / CAC 从 4.2 倍降到 3.8 倍。</div></div>
+<div class="foot"><span>模型：LTV / CAC 从 2.9 提升到 4.2 倍，CAC 回收期压缩到 8.6 个月，规模化条件已具备。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 商业模式</div><h1 class="pt">收入结构、交付流程与增长飞轮</h1></div><div class="calib">收入构成按 2026 年 ARR 拆分<br>订阅收入占比 88%</div></div>
+<div class="grid3">
+  <div class="q"><b><em>收入 01</em>坐席订阅 62%</b><p>3,348 万元，按坐席数按月或按年计费，标准版 ¥588 / 人 / 月；续约客户次年坐席平均增加 1.6 个。</p></div>
+  <div class="q"><b><em>收入 02</em>增值模块 26%</b><p>1,404 万元，含审计日志、数据导出、私有化运维三类模块，加购率 41%，毛利率高于订阅本身 5 个百分点。</p></div>
+  <div class="q"><b><em>收入 03</em>实施与培训 12%</b><p>648 万元，一次性收入不计入 ARR；标准化交付包上线后，单客户实施人日从 12 天降至 5 天。</p></div>
+</div>
+<div class="sl"><i>04</i>交付流程的四个环节与周期目标</div>
+<div class="flow">
+  <div class="fl"><u>STEP 01 · 3 天</u><b>需求确认</b>输出坐席数、集成清单与验收口径，由客户与交付经理双方签字确认。</div>
+  <div class="fl"><u>STEP 02 · 5 天</u><b>环境部署</b>使用标准化部署包完成内网安装与模型加载，替代原逐台手工部署。</div>
+  <div class="fl"><u>STEP 03 · 6 天</u><b>数据接入</b>完成历史工单导入与知识库初始化，标准连接器覆盖 8 类常见数据源。</div>
+  <div class="fl"><u>STEP 04 · 14 天</u><b>灰度与验收</b>选择 1 条业务线灰度两周，达到 92% 分类准确率后签署验收单。</div>
+</div>
+<div class="note">增长飞轮：标准化交付缩短周期 → 单位交付成本下降 → 可用更低价格获取中小商家 → 客户样本反哺模型准确率提升 → 客户留存与加购继续上升。当前交付周期 28 天，2027 年目标压缩到 21 天。</div><div class="sl"><i>05</i>收入结构的两条风险提示</div>
+<ul class="pts">
+  <li><b>集中度：</b>坐席订阅占 62%，加购率 41% 是增值模块增长的基础；若加购率降至 30%，2026 年 ARR 将减少约 377 万元。</li>
+  <li><b>一次性收入：</b>实施与培训占 12% 且不计入 ARR，估值时已按 ARR 口径剔除，避免高估经常性收入。</li>
+</ul><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>收入结构：订阅 62%、增值模块 26%、实施 12%。</div>
+  <div class="cell"><u>下一步与责任</u>交付周期 28 天，2027 年目标压缩到 21 天。</div>
+</div></div>
+<div class="foot"><span>模式：订阅占 62%、增值模块占 26%，交付周期 28 天并计划压缩至 21 天。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 同业对比</div><h1 class="pt">与 3 家可比公司的指标对照</h1></div><div class="calib">取值：公开披露与行业访谈估算<br>口径统一为 2026 年现值</div></div>
+<table class="tb">
+  <caption>表 2 · 可比公司指标对照（A 为同类上市公司，B / C 为同阶段创业公司）</caption>
+  <thead><tr><th>指标</th><th class="r">可比 A</th><th class="r">可比 B</th><th class="r">可比 C</th><th>云帆科技</th></tr></thead>
+  <tbody>
+    <tr><td>ARR 规模</td><td class="r mono">3.8 亿</td><td class="r mono">7,600 万</td><td class="r mono">4,100 万</td><td class="n">5,400 万</td></tr>
+    <tr><td>同比增速</td><td class="r mono">41.2%</td><td class="r mono">142.0%</td><td class="r mono">96.4%</td><td class="n">168.7%</td></tr>
+    <tr><td>毛利率</td><td class="r mono">73%</td><td class="r mono">64%</td><td class="r mono">66%</td><td class="n">71%</td></tr>
+    <tr><td>净收入留存 NDR</td><td class="r mono">112%</td><td class="r mono">121%</td><td class="r mono">108%</td><td class="n">128%</td></tr>
+    <tr><td>LTV / CAC</td><td class="r mono">3.4 倍</td><td class="r mono">3.1 倍</td><td class="r mono">2.6 倍</td><td class="n">4.2 倍</td></tr>
+    <tr><td>本地化部署能力</td><td class="r">不支持</td><td class="r">部分</td><td class="r">不支持</td><td class="n">完整支持</td></tr>
+    <tr class="hi"><td>估值倍数（ARR）</td><td class="r mono">6.8 倍</td><td class="r mono">13.5 倍</td><td class="r mono">9.2 倍</td><td>11.5 倍（投前）</td></tr>
+  </tbody>
+</table>
+<div class="note">口径说明：可比 A 为上市公司市值口径；B / C 为上轮融资投后估值口径；三家均不具备完整离线部署能力，这是云帆在合规客群中的主要差异点。</div><div class="sl"><i>05</i>估值倍数的选取逻辑</div>
+<ul class="pts">
+  <li><b>可比选取：</b>以 B / C 两家同阶段公司为主（13.5 倍与 9.2 倍），上市公司 A 的 6.8 倍仅作下限参考。</li>
+  <li><b>取值理由：</b>本公司在增速与留存两项上均优于三家可比，取 11.5 倍（区间中位 10.2 倍，区间 6.8–13.5 倍），略高于中位，为投资人保留上行空间。</li>
+</ul><div class="note">验证方式：估值倍数每季度用可比公司披露数据复核一次，偏差超过 20% 须重述并同步投资人。</div></div>
+<div class="foot"><span>对比：增速与留存均为四家最高，估值倍数 11.5 倍处于 6.8–13.5 倍区间的中位。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与敏感性</div><h1 class="pt">客户集中度、竞争与假设敏感性</h1></div><div class="calib">评估时点：2026-09-26<br>敏感性按 ARR ± 20% 测算</div></div>
+<table class="tb">
+  <caption>表 3 · 四类风险与对估值的影响</caption>
+  <thead><tr><th>风险项</th><th>概率</th><th class="r">当前水平</th><th>对 ARR 的影响</th><th>缓解措施</th></tr></thead>
+  <tbody>
+    <tr><td>Top 10 客户集中度偏高</td><td>中</td><td class="r mono">21.4%</td><td class="r">-6.4% 至 -12.8%</td><td>2027 年把集中度压到 15% 以下</td></tr>
+    <tr><td>中小商家流失率上升</td><td>中</td><td class="r mono">1.6% / 月</td><td class="r">-4.2% 至 -8.1%</td><td>季度付费转年度付费，目标转化 35%</td></tr>
+    <tr><td>同业价格战</td><td>高</td><td class="r mono">¥588 起</td><td class="r">-8.0% 至 -15.0%</td><td>以增值模块与交付能力维持价格带</td></tr>
+    <tr><td>交付周期压缩不达预期</td><td>中</td><td class="r mono">28 天</td><td class="r">-3.0% 至 -5.5%</td><td>标准化部署包覆盖 8 类数据源</td></tr>
+    <tr class="hi"><td>合规政策收紧</td><td>低</td><td class="r mono">已具备离线能力</td><td>影响为正向</td><td>本地优先架构无需改造</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>敏感性结论</b><p>在 ARR 下修 20% 的压力情景下，2026 年 ARR 为 4,320 万元，仍高于可比 C 的 4,100 万元，估值倍数升至 14.4 倍。</p></div>
+  <div class="q"><b>关键假设</b><p>本路演数据基于「新增付费商家 2,050 家、月度流失率不超过 2.0%」两项假设，任一未达成将直接影响 2027 年里程碑。</p></div>
+</div><div class="note">压力测试口径：敏感性仅测算 ARR 变动对估值倍数的影响，未考虑倍数本身随市场情绪下修的情形；若倍数同时下修至 9 倍，投前估值将回到 4.86 亿元。</div><div class="sl">压力情景与前置条件</div>
+<ul class="pts"><li>压力情景：ARR 下修 20% 至 4,320 万元时，估值倍数升至 14.4 倍，仍高于可比 C 的 9.2 倍。</li><li>前置条件：新增付费商家 2,050 家与月流失率 ≤2.0% 是 2027 年里程碑的两项假设，需每季度复核。</li></ul></div>
+<div class="foot"><span>风险：Top 10 客户集中度 21.4% 是首要敞口，压力情景下 ARR 下修至 4,320 万元。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 资金用途与条款</div><h1 class="pt">资金分配、里程碑与估值</h1></div><div class="calib">本轮：融资 8,000 万元 · 出让 11.4%<br>投前估值 6.2 亿元 · 投后 7.0 亿元</div></div>
+<div class="grid4">
+  <div class="q"><b>45%</b><p>研发投入 3,600 万元，模型准确率与私有化能力。</p></div>
+  <div class="q"><b>30%</b><p>销售与市场 2,400 万元，重点覆盖金融医疗客群。</p></div>
+  <div class="q"><b>15%</b><p>交付体系 1,200 万元，交付周期压到 21 天。</p></div>
+  <div class="q"><b>10%</b><p>现金储备 800 万元，覆盖 6 个月运营安全垫。</p></div>
+</div>
+<div class="sl"><i>05</i>资金用途与 2027 年里程碑</div>
+<div class="steps">
+  <div class="step"><b>资金 45%</b><span>研发 3,600 万元：用于分类准确率提升至 95%、审计日志增强与私有化部署包迭代 · 责任人：CTO 沈奕。</span></div>
+  <div class="step"><b>资金 30%</b><span>销售与市场 2,400 万元：新增 12 名行业销售，重点覆盖金融与医疗，对应 2027 年 4,800 家新增付费商家目标 · 责任人：销售负责人 何睿。</span></div>
+  <div class="step"><b>资金 25%</b><span>交付与储备 2,000 万元：交付周期从 28 天压到 21 天，同时保留 800 万元现金安全垫 · 责任人：交付负责人 郑宇。</span></div>
+</div>
+<ul class="pts">
+  <li><b>2027 里程碑一：</b>ARR 达到 1.2 亿元，付费商家 8,000 家，净收入留存不低于 125%。</li>
+  <li><b>2027 里程碑二：</b>交付周期压缩至 21 天，单客户实施人日降至 4 天，毛利率维持在 70% 以上。</li>
+  <li><b>本轮条款：</b>投前估值 6.2 亿元对应 11.5 倍 ARR，无对赌、无反稀释例外条款，设 1 年锁定期，董事会 5 席中投资人占 1 席。</li>
+</ul><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>本轮条款：融资 8,000 万元、出让 11.4%、投前估值 6.2 亿元（对应 2026 年 ARR 5,400 万元的 11.5 倍），投后 7.0 亿元；无对赌与反稀释例外条款，锁定期 1 年，董事会 5 席中投资人占 1 席。</div>
+  <div class="cell"><u>下一步与责任</u>资金用途与里程碑：研发 45%（3,600 万）、销售 30%（2,400 万）、交付 15%（1,200 万）、储备 10%（800 万）；2027 年 ARR 目标 1.2 亿元、付费商家 8,000 家，责任人 CEO 与销售负责人何睿。</div>
+</div></div>
+<div class="foot"><span>条款：8,000 万元出让 11.4%，资金 45% 投研发、30% 投销售，2027 年 ARR 目标 1.2 亿元。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

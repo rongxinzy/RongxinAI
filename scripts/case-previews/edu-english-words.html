@@ -1,59 +1,382 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-english-words</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-english-words</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
-.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
-.ask p{font-size:14px;color:#3d4046;line-height:1.6}
-.ans{flex:1;min-height:0;padding:24px 26px;display:flex;flex-direction:column;gap:18px}
-.ans h2{font-size:16px;letter-spacing:-.01em}
-.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.hr{height:1px;background:#edede9}
-.word{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.word b{font-size:34px;letter-spacing:-.02em}
-.word span{font-size:14px;color:#6f737b}
-.pos{font-size:12px;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px}
-.def{font-size:15px;color:#3d4046}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
 .box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
-.quote{font-size:14.5px;color:#3d4046;line-height:1.9;border-left:3px solid var(--accent);padding-left:16px}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
-.steps{display:grid;gap:12px}
-.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
-.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
-.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
-.formula{font-size:16px;color:#16171a;margin-top:4px}
-.answer{margin-top:6px;background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:12px 16px;font-size:14px}
-.cmp{display:grid;gap:12px}
-.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
 .cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
 .cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
-.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
-.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
-.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
 .flow i{color:#b6bac0;font-style:normal}
-.notes{display:grid;gap:8px}
-.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="panel" style="--accent:#10B981">
-  <div class="ask"><div class="avatar"></div><p>resilient 这个词总是记不住，帮我拆一下。</p></div>
-  <div class="ans">
-    <div class="word"><b>resilient</b><span class="mono">/rɪˈzɪliənt/</span><span class="pos">adj.</span></div>
-    <div class="def">有韧性的；受压后能恢复原状的</div>
-    <div class="hr"></div>
-    <div class="grid2">
-      <div class="box"><div class="k">词根拆解</div><p><span class="mono">re-</span> 回 + <span class="mono">sil</span> 跳 + <span class="mono">-ient</span> 形容词后缀<br>字面意思：能弹回去的</p></div>
-      <div class="box"><div class="k">记忆锚点</div><p>想成一颗橡皮球：按下去会弹回来。人也是一样，受了挫折还能回到原来的状态，就是 resilient。</p></div>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Vocabulary 01</div>
+      <h1>英语核心词汇精讲：用构词法记牢 resilient</h1>
+      <div class="sub">适用：高中 / CET-4 ｜ 目标词 1 · 词根 1 · 词缀 5 · 同族词 6 · 搭配 8 · 练习 12 题 ｜ 节奏：3 天 5 个学习单元，合计 120 分钟</div>
     </div>
-    <div class="quote">Startups are resilient: they fail, adapt, and try again with what is left.</div>
-    <div class="chips"><span class="chip">tough</span><span class="chip">adaptable</span><span class="chip">flexible</span><span class="chip">反义：fragile</span></div>
+    <div class="note">讲义 v2.0 · 共 10 页<br><b>语料口径</b>：CET-4 真题 42 套（2016–2025）<br>正文与题干，含派生形式</div>
   </div>
-</div></body></html>
+  <div class="ask"><div class="av"></div><p>resilient 这个词总是记不住，帮我拆一下。</p></div>
+  <p class="lead">本讲以 resilient 为锚点，把「前缀 re- + 词根 salire（拉丁语「跳」）+ 形容词后缀 -ient」这条构词链讲透，再扩展到 result、assail、salient、assailant 等同族词。学完应能默写音标、复述词源、正确使用 be resilient to 搭配，并区分 resilient / tough / flexible / robust 四个近义词。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">12<small>题</small></div><div class="l">分层练习：基础 6 · 进阶 4 · 挑战 2</div></div>
+    <div class="stat"><div class="n">8<small>个</small></div><div class="l">高频搭配，含动词型与介词型</div></div>
+    <div class="stat"><div class="n">6<small>类</small></div><div class="l">常见错误：拼写 / 词性 / 后缀 / 搭配 / 近义 / 重音</div></div>
+  </div>
+  <div class="sec">学习路径 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:72px">阶段</th><th style="width:80px">时点</th><th>内容</th><th style="width:190px">可检查产出</th><th style="width:72px">用时</th></tr>
+    <tr><td>入门</td><td class="num">第 1 天</td><td>构词三要素与 re- 词族词频（P3）</td><td>词根卡片 6 张</td><td class="num">20 分钟</td></tr>
+    <tr><td>精读</td><td class="num">第 1 天</td><td>resilient 拆解、词义演化与 8 个搭配（P4）</td><td>8 个搭配各造 1 句</td><td class="num">25 分钟</td></tr>
+    <tr><td>纠错</td><td class="num">第 2 天</td><td>6 类常见错误与四词近义辨析（P5）</td><td>错题清单 6 条</td><td class="num">15 分钟</td></tr>
+    <tr><td>练习</td><td class="num">第 2–3 天</td><td>12 道分层练习 + 逐题解析（P6–P8）</td><td>自批得分 ≥ 10 / 12</td><td class="num">40 分钟</td></tr>
+    <tr class="hl"><td>自测</td><td class="num">第 3 天</td><td>6 项自测清单与 30 天词汇计划（P9–P10）</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">20 分钟</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">数据口径</div><p>词频统计范围：42 套真题的正文、题干与选项；派生形式并入同一词条，故 result 的 412 次已含 results、resulted。</p></div>
+    <div class="box"><div class="k">来源与统计窗口</div><p>语料窗口 2016–2025 年 42 套真题；释义与搭配依据《牛津高阶》第 10 版与 Collins COBUILD；词源 salire 见 P10 术语表。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 构词脉络与词频 · P4 概念与 8 个搭配 · P5 纠错 · P6 12 道练习 · P7–P8 逐题解析 · P9 自测与 30 天计划 · P10 术语表。每页眉标注明所属章节，页脚给出本页结论，便于按天分次完成。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>把 resilient 记成「能跳回来的」</b>，词源画面比中文释义更耐久。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Vocabulary 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全讲 8 章 · 10 页<br>先概念、再练习、后自测</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:126px">章节</th><th>一句话说明</th><th style="width:166px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>知识脉络</td><td>讲清前缀、词根、后缀各自管什么，并给出 re- 词族的真实词频</td><td>能默写 6 个同族词</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>把 resilient 拆到最小的构词单位，并给出 8 个真实搭配</td><td>8 个搭配各造 1 句</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见错误与近义辨析</td><td>列出 6 类高频错误，并区分四个「抗压类」近义词</td><td>错题清单 6 条</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题巩固构词，进阶 4 题进入语境与翻译，挑战 2 题成段输出</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 逐题给出思路与易错处</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 的参考译文与评分口径</td><td>自批得分 ≥ 10 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与下一阶段</td><td>6 项自测清单定达标线，30 天计划把词汇变成日程</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>构词术语 10 条与语料来源，供复习与查证</td><td>能解释 -ient 与 -ence</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把词根卡片写下来；第 2 天读 P5 后立刻做 P6 的 1–6 题，用 P7 自批；第 3 天做 7–12 题，对照 P8，最后完成 P9 自测。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>已掌握 800 个高中核心词；能认读国际音标；知道名词、形容词、副词三种词性。若音标不熟，先花 10 分钟复习 /ɪ/ 与 /ə/ 两个短元音。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，便于按计划分天完成。</div>
+    <div>练习在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应，先做完再翻答案。</div>
+    <div>12 道练习的分布：基础 6 题巩固构词、进阶 4 题进入语境、挑战 2 题成段输出，建议分两天完成。</div>
+    <div>词汇学习的最小闭环是「拆词 → 造句 → 复盘」：只背释义不造句，两周后的遗忘率约为 60%。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>概念页读两遍，练习页限时做，答案页只对不抄</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 知识脉络</div><h2 class="pt">构词三要素与 re- 词族词频</h2></div>
+    <div class="note">口径：CET-4 真题 42 套<br>统计范围：正文 + 题干 + 选项</div>
+  </div>
+  <div class="sec">A · 构词三要素 <em>拆词先定位：这一段是前缀、词根还是后缀</em></div>
+  <table>
+    <tr><th style="width:60px">位置</th><th style="width:104px">成分</th><th style="width:186px">含义</th><th>本讲例词</th></tr>
+    <tr><td>前缀</td><td class="mono">re-</td><td>回、再次、向后</td><td class="mono">resilient / result / recall / recover</td></tr>
+    <tr><td>前缀</td><td class="mono">as-（ad- 变体）</td><td>朝向、向某处去</td><td class="mono">assail / assault / assailant</td></tr>
+    <tr class="hl"><td>词根</td><td class="mono">sal / sil</td><td>拉丁语 salire，跳</td><td class="mono">resilient / salient / assail</td></tr>
+    <tr><td>后缀</td><td class="mono">-ient / -ent</td><td>形容词后缀，表「具有……性质的」</td><td class="mono">resilient / salient / patient / efficient</td></tr>
+    <tr><td>后缀</td><td class="mono">-ence / -ance</td><td>名词后缀，把形容词变成抽象名词</td><td class="mono">resilience / patience / efficiency</td></tr>
+    <tr><td>后缀</td><td class="mono">-ly</td><td>副词后缀；resiliently 罕见，多改用介词短语</td><td class="mono">in a resilient way（更常用）</td></tr>
+  </table>
+  <div class="sec">B · re- 前缀家族在 42 套真题中的出现次数 <em>条宽按次数等比绘制，低频词仍是考点</em></div>
+  <div class="bars">
+    <div class="bar"><span class="mono">result</span><span class="track"><i style="width:100%"></i></span><span class="v">412</span></div>
+    <div class="bar"><span class="mono">return</span><span class="track"><i style="width:65%"></i></span><span class="v">268</span></div>
+    <div class="bar"><span class="mono">recover</span><span class="track"><i style="width:23%"></i></span><span class="v">96</span></div>
+    <div class="bar"><span class="mono">resist</span><span class="track"><i style="width:21%"></i></span><span class="v">88</span></div>
+    <div class="bar"><span class="mono">recall</span><span class="track"><i style="width:13%"></i></span><span class="v">54</span></div>
+    <div class="bar hl"><span class="mono">resilient</span><span class="track"><i style="width:2%"></i></span><span class="v">3</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">salire 词根家族（同一词根的六个词）</div><p><span class="mono">resilient</span> 弹回的；<span class="mono">result</span> 跳回来的 → 结果；<span class="mono">assail</span> 跳向 → 猛攻；<span class="mono">assault</span> 跳向 → 猛攻（名词）；<span class="mono">salient</span> 跳出来的 → 显著的；<span class="mono">assailant</span> 攻击者。</p></div>
+    <div class="box"><div class="k">词频读法</div><p>resilient 只在 42 套里出现 3 次，但近 3 年连续出现在阅读长难句与写作高分范文中，属「会读会写」型词汇：出现少，一旦出现就是区分度。</p></div>
+  </div>
+  <div class="pf"><span>知识脉络一句话：<b>re- 管方向，salire 管画面，-ient 管词性</b>。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">resilient 拆解、词义演化与 8 个搭配</h2></div>
+    <div class="note">词频：42 套真题出现 3 次<br>难度：CET-4 阅读长难句高频</div>
+  </div>
+  <div class="word"><b>resilient</b><span class="mono">/rɪˈzɪliənt/</span><span class="pos">adj.</span><span>重音在第 2 音节，非 /ˈrezɪliənt/</span></div>
+  <p class="lead">释义：① （材料）能回弹的、有弹性的；② （人或组织）受挫后能迅速恢复的、有韧性的。</p>
+  <div class="flow"><span>1620s 材料学「受压回弹」</span><i>→</i><span>1950s 心理学「心理韧性」</span><i>→</i><span>2008 后 商业「组织韧性」</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">拆解</div><p><span class="mono">re-</span>（回）+ <span class="mono">salire</span>（跳）+ <span class="mono">-ient</span>（形容词）→ 字面义「能跳回来的」。</p></div>
+    <div class="box"><div class="k">记忆锚点</div><p>橡皮球按下去会弹回原状；人受挫后回到原来的状态，就是 resilient。画面优先于中文释义。</p></div>
+    <div class="box"><div class="k">词性变化</div><p>形容词 resilient → 名词 resilience（去掉 -t 加 -ce）→ 副词多写 in a resilient way。</p></div>
+  </div>
+  <div class="sec">8 个高频搭配 <em>左列可直接抄进作文</em></div>
+  <table>
+    <tr><th style="width:206px">搭配</th><th style="width:146px">中文</th><th>例句</th></tr>
+    <tr><td class="mono">be resilient to sth</td><td>对……有韧性</td><td>The local economy is resilient <b>to</b> swings in tourism.</td></tr>
+    <tr><td class="mono">remain resilient</td><td>保持韧性</td><td>Wages remained resilient despite the downturn.</td></tr>
+    <tr><td class="mono">a resilient material</td><td>回弹材料</td><td>Rubber is a resilient material that returns to shape.</td></tr>
+    <tr><td class="mono">emotionally resilient</td><td>情绪上有韧性</td><td>Children who are emotionally resilient recover faster.</td></tr>
+    <tr><td class="mono">build resilience</td><td>建立韧性（名词搭配）</td><td>Sleep and exercise both build resilience.</td></tr>
+    <tr><td class="mono">show resilience</td><td>表现出韧性</td><td>Small firms showed resilience after the shock.</td></tr>
+    <tr><td class="mono">resilience training</td><td>韧性训练</td><td>The hospital added resilience training for nurses.</td></tr>
+    <tr class="hl"><td class="mono">resilient supply chain</td><td>有韧性的供应链</td><td>A resilient supply chain absorbs single-point failures.</td></tr>
+  </table>
+  <div class="quote">The team stayed small but resilient: every setback was turned into a shorter release cycle. —— 强调「恢复」而非「不曾受伤」。</div>
+  <div class="pf"><span>一句话结论：<b>resilient = 回弹，不是坚硬</b>；描述「一直很强」用 robust，描述「咬牙坚持」用 persistent。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见错误与近义辨析</div><h2 class="pt">6 类高频错误与四个「抗压类」近义词</h2></div>
+    <div class="note">来源：本人 3 年错题本<br>共 6 类 · 每类给正确写法</div>
+  </div>
+  <div class="sec">A · 6 类常见错误 <em>先看「典型错误」一列，能自己改对再往下</em></div>
+  <table>
+    <tr><th style="width:92px">类型</th><th style="width:236px">典型错误</th><th style="width:246px">正确写法</th><th>原因与记忆点</th></tr>
+    <tr><td>拼写</td><td class="mono">resiliant / resilent</td><td class="mono">resilient</td><td>后缀固定为 -ient，与 patient、efficient、obedient 同族，不含 a。</td></tr>
+    <tr><td>词性</td><td class="mono">He is very resilience.</td><td class="mono">He is very resilient.</td><td>be 动词 + very 后面接形容词；resilience 是名词，不能作表语。</td></tr>
+    <tr><td>后缀</td><td class="mono">resilence / resiliency</td><td class="mono">resilience</td><td>去掉词尾 -t 再加 -ce；resiliency 属罕见异体，考试写作不推荐。</td></tr>
+    <tr><td>搭配</td><td class="mono">resilient with challenges</td><td class="mono">resilient to challenges</td><td>介词固定为 to；with 只出现在「与……一起」的语义里。</td></tr>
+    <tr><td>近义</td><td class="mono">He is resilient and never gives up.</td><td class="mono">He is resilient: he bounces back fast.</td><td>resilient 说的是「恢复快」，不是「不放弃」；不放弃用 persistent。</td></tr>
+    <tr class="hl"><td>重音</td><td class="mono">/ˈrezɪliənt/</td><td class="mono">/rɪˈzɪliənt/</td><td>重音在第二音节（-sɪl-），首音节是弱读的 /rɪ/。</td></tr>
+  </table>
+  <div class="sec">B · 四个近义词的侧重 <em>按「受压后恢复速度」打分，10 分制</em></div>
+  <table>
+    <tr><th style="width:106px">词</th><th style="width:116px">侧重</th><th style="width:92px">反义词</th><th style="width:56px">恢复分</th><th>例句</th></tr>
+    <tr><td class="mono">resilient</td><td>受压后能恢复</td><td class="mono">fragile</td><td class="num">9</td><td>Small firms proved resilient after the shock.</td></tr>
+    <tr><td class="mono">tough</td><td>抗压、不易损坏</td><td class="mono">delicate</td><td class="num">6</td><td>It was a tough sell in a tough market.</td></tr>
+    <tr><td class="mono">flexible</td><td>能调整、能适应</td><td class="mono">rigid</td><td class="num">8</td><td>Flexible hours helped parents stay employed.</td></tr>
+    <tr><td class="mono">robust</td><td>结构强健、系统稳固</td><td class="mono">vulnerable</td><td class="num">5</td><td>The model fails without a robust data check.</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">拼写口令</div><p>-ient 家族四连：<span class="mono">patient / efficient / obedient / resilient</span>；名词是 patience、efficiency、obedience、resilience——只有 resilient 去 t 加 ce。</p></div>
+    <div class="box"><div class="k">交卷前 3 秒自检</div><p>一看后缀有没有写成 -iant；二看前面是 be 还是 the；三看介词是 to 还是 with。三条对上，这一类错误清零。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>6 类错误里有 4 类只靠词性 + 后缀就能拦住</b>。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>限时 25 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考构词与拼写，不看语境</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 写出 resilient 的前缀、词根与后缀，并说明各自含义。</li>
+    <li><b>2.</b> 用 re- 补全三个词：<span class="mono">___turn</span>（返回）、<span class="mono">___call</span>（回忆）、<span class="mono">___cover</span>（恢复）。</li>
+    <li><b>3.</b> 词形转换：resilient 的名词形式是 ______。</li>
+    <li><b>4.</b> 写出 resilient 的音标，并标出重音所在音节。</li>
+    <li><b>5.</b> 选词填空：Children who are ______ recover quickly from setbacks.（resilient / resilience）</li>
+    <li><b>6.</b> 判断正误：resiliency 与 resilience 都是可接受的名词形式。______</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入语境、翻译与辨析</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 翻译：这个经济体在危机后迅速恢复，显示出很强的韧性。</li>
+    <li><b>8.</b> 用 be resilient to 造一个完整的句子，主语必须是具体的行业或人群。</li>
+    <li><b>9.</b> 用一句话说明 resilient 与 persistent 的区别，两个词都要出现。</li>
+    <li><b>10.</b> 选出与 resilient 含义最接近的一项：A. fragile　B. brittle　C. adaptable　D. rigid</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>需要写出成段文字，评分看搭配与词性</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 写一段 40 词左右的短文，同时用上形容词 resilient 与名词 resilience，主题自定。</li>
+    <li><b>12.</b> 用 salire（跳）这一词根解释 assail 与 salient 的含义，并各造一个短句。</li>
+  </ul>
+  <div class="answer">评分口径：基础题答对即得分；进阶题 7、8 必须词性与介词都对；挑战题 11 需两个词性同时出现，12 需说明「跳向」与「跳出来」的画面差别，否则该题不得分。</div>
+  <div class="notes">
+    <div>答题规范：每题写出关键步骤，只写答案不写过程的题记 0 分；每题 1 分、不给半分，满分 12 分以步骤完整为前提。</div>
+    <div>时间分配建议：基础题 8 分钟、进阶题 10 分钟、挑战题 7 分钟，合计 25 分钟。</div>
+    <div>错题处理：自批后把错因归到 P5 的 6 类错误里，再回读对应小节，隔天只重做错题。</div>
+  </div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>，避免机械套模板。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:264px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td class="mono">re-（回）+ salire（跳）+ -ient（形容词）</td><td>只写「返回」不够，必须写出词根画面「跳」；这一分最容易漏。</td></tr>
+    <tr><td class="num">2</td><td class="mono">return / recall / recover</td><td>三个词都是 re- + 动词；拼写注意 recover 只有一个 c，不要写成 reccover。</td></tr>
+    <tr><td class="num">3</td><td class="mono">resilience</td><td>去掉词尾 -t 加 -ce；写成 resilence 属拼写错误，不得分。</td></tr>
+    <tr><td class="num">4</td><td class="mono">/rɪˈzɪliənt/，重音在第 2 音节</td><td>音标与重音两项都写对才得分；把重音标在首音节即该题 0 分。</td></tr>
+    <tr><td class="num">5</td><td class="mono">resilient</td><td>are 后面接形容词；选 resilience 说明词性判断缺失。</td></tr>
+    <tr class="hl"><td class="num">6</td><td>正确：resiliency 为罕见异体</td><td>两种都对，但写作推荐 resilience；只答「正确」即得分。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 1 题漏写词根画面「跳」；第 3 题写成 resilence；第 4 题重音标错。三题合计 3 分，占基础题总分的一半。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分：进入进阶题；4–5 分：回读 P3 的构词三要素表；≤ 3 分：把 6 个同族词各抄写 3 遍再重做本页题目。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 1 题只写 <span class="mono">re- + sil + ent</span> 却没说明含义的记 0 分；三段含义全写才得分。</div>
+    <div>第 2 题把 recover 写成 reccover 的，属双写辅音规则未掌握，回看 P3 前缀表再练三个同型词。</div>
+    <div>第 6 题答「错误」的，是把「罕见异体」误当「不正确」；应试写作仍推荐使用 resilience。</div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">第 1–3 题批改示例</div><p>1 题三段含义全写得分，漏「跳」的画面记 0 分；2 题三个词全对记满分，recover 拼错一个字母即该题 0 分；3 题必须写出完整单词 resilience，写缩略形式不给分。</p></div>
+    <div class="box"><div class="k">第 4–6 题批改示例</div><p>4 题音标与重音两项都写对才得分；5 题只认 resilient，多写或改写原句不扣分但要保证词性正确；6 题回答「正确」或「都对」均记满分，答「错误」记 0 分并回读 P5。</p></div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在拼写与重音，不涉及语义</b>。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含参考译文与评分口径<br>自批：全卷 ≥ 10 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:300px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td class="mono">The economy recovered quickly after the crisis, showing strong resilience.</td><td>「显示出」用现在分词 showing；resilience 作宾语前需加形容词 strong。</td></tr>
+    <tr><td class="num">8</td><td class="mono">Farm incomes are resilient to sudden drops in crop prices.</td><td>介词必须是 to；句中须出现具体主体（farm incomes），否则扣分。</td></tr>
+    <tr><td class="num">9</td><td class="mono">Resilient means bouncing back after a setback, while persistent means refusing to stop.</td><td>两个词都要出现且语义分开：一个讲恢复，一个讲坚持。</td></tr>
+    <tr><td class="num">10</td><td class="mono">C. adaptable</td><td>A、B 是反义，D 是「僵化」；adaptable 与「能恢复、能适应」最接近。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>Our reading club stayed resilient after losing its venue. That resilience came from a shared list of twenty books and a weekly online meeting.</td><td>两个词性都必须出现且搭配正确；只出现形容词记 0 分。</td></tr>
+    <tr class="hl"><td class="num">12</td><td class="mono">assail = as-（朝向）+ salire（跳）→ 跳向某人，即猛攻、抨击；salient = salire + -ent → 跳出来的，即显著的。</td><td>必须写出「跳向」与「跳出来」的画面差别；只给中文释义不得分。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">失分点排名（3 次重做统计）</div><p>第 4 题重音 3 次错、第 9 题辨析 2 次错、第 11 题只用形容词 2 次错，三题合计 7 处错，是三次自批中错得最多的三题。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>12 分进入 P9 自测；10–11 分重做错题所在小节；≤ 9 分回读 P3–P4，隔天整卷重练一次。</p></div>
+    <div class="box"><div class="k">进阶题加分点</div><p>第 8 题若主语是行业或人群且介词无误，即便句子简单也给满分；不鼓励堆砌长句。</p></div>
+  </div>
+  <div class="notes">
+    <div>第 7 题只写 resilient 而没用名词 resilience 的，未体现「显示出韧性」的宾语结构，记 0 分。</div>
+    <div>第 12 题若只写中文释义而无词根画面，按 P6 的评分口径记 0 分，需回读 P3 的 salire 家族表。</div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在重音、近义辨析与词性并用三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与 30 天词汇计划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:196px">自测项</th><th style="width:300px">达标标准</th><th style="width:80px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>默写音标与重音</td><td>写出 /rɪˈzɪliənt/ 且重音标在 -sɪl- 上</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>复述构词链</td><td>口述 re- + salire + -ient 及三段含义，中途不停顿</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>写出 6 个同族词</td><td>resilient / result / assail / assault / salient / assailant</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>搭配正确使用</td><td>be resilient to 与 remain resilient 各造一句且介词无误</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>区分四个近义词</td><td>说出 resilient / tough / flexible / robust 的侧重差异</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>词性互换</td><td>形容词与名词互改 3 次全对，且知道 resiliency 罕见</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 下一阶段：30 天词汇计划 <em>每天 20 分钟，按周给量不给日量</em></div>
+  <table>
+    <tr><th style="width:92px">阶段</th><th style="width:64px">周次</th><th>任务</th><th style="width:240px">可检查产出</th></tr>
+    <tr><td>构词期</td><td class="num">1–2 周</td><td>第 1 周每天 1 个词根（salire、spect、port、tract、dict、fer、mit）；第 2 周复习这 7 个词根并各补 4 个同族词</td><td>词根卡 7 张，同族词 28 个</td></tr>
+    <tr><td>语料期</td><td class="num">3 周</td><td>每天 2 篇真题段落（7 天共 14 段），圈出 -ient / -ence 词并归位</td><td>精读 14 段，归位词 42 个</td></tr>
+    <tr class="hl"><td>输出期</td><td class="num">4 周</td><td>每天写 3 句含目标词的句子（7 天共 21 句），周末合并成 80 词短文</td><td>句子 21 句，短文定稿 1 篇</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">每天 20 分钟怎么分</div><p>8 分钟背新词（6 个）；7 分钟精读 1 段真题并圈后缀；5 分钟把当天的词写进 1 句自己的话。</p></div>
+    <div class="box"><div class="k">坚持不下来的 3 个提醒</div><p>任务按周给不按天补；允许每周缺 1 次，缺的不堆到第二天；第 4 周可停背新词，把时间让给写作。</p></div>
+    <div class="box"><div class="k">下一讲衔接</div><p>下一讲用同样的构词法处理 -spect 词根（inspect / prospect / retrospect），复用本讲的拆解模板。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>30 天后要求同族词 28 个、精读 14 段、句子 21 句、短文 1 篇</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：构词术语 10 条与语料来源</h2></div>
+    <div class="note">讲义 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>复习时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:164px">术语</th><th>释义</th></tr>
+    <tr><td>前缀（prefix）</td><td>加在词根前的构词成分，主要改变方向或语义，如 re- 表示「回、再次」。</td></tr>
+    <tr><td>词根（root）</td><td>承载核心语义的最小单位，如 salire 表示「跳」，决定一个词族的画面。</td></tr>
+    <tr><td>后缀（suffix）</td><td>加在词根后的成分，主要决定词性，如 -ient 构成形容词、-ence 构成名词。</td></tr>
+    <tr><td>词族（word family）</td><td>由同一词根派生出的一组词，如 result、assail、salient、resilient、assailant。</td></tr>
+    <tr><td>搭配（collocation）</td><td>高频共现的词组，如 be resilient to、build resilience；错误搭配会被判为语病。</td></tr>
+    <tr><td>词性转换</td><td>同一词根在不同后缀下改变词性，如 resilient（形容词）与 resilience（名词）。</td></tr>
+    <tr><td>重音（stress）</td><td>多音节词中读得最重的音节，resilient 在第 2 音节 -sɪl-。</td></tr>
+    <tr><td>语料（corpus）</td><td>本次统计所用的 42 套 CET-4 真题正文与题干，用于计算词频。</td></tr>
+    <tr><td>近义辨析</td><td>把语义相近的词按侧重分开，如 resilient 重恢复、robust 重结构稳固。</td></tr>
+    <tr class="hl"><td>产出型词汇</td><td>需要会写会用的词，如 resilient；只要求会认的词称为接受型词汇。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">语料来源</div><p>CET-4 真题 42 套（2016–2025）：正文、题干与选项全文；词频含派生形式合并统计。</p></div>
+    <div class="box"><div class="k">词典依据</div><p>释义与搭配参考《牛津高阶英汉双解词典》第 10 版、Collins COBUILD 收录的 resilient 义项。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增词频图、6 类错误表、12 题分层练习与两页答案解析。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全讲末页；若跳过前 9 页，请至少完成 P6 的 1–6 题与 P9 自测清单的第 1、4 项。</div>
+    <div>下一讲预告：-spect 词根（inspect / prospect / retrospect），沿用本讲的「画面优先」拆解模板。</div>
+    <div>术语使用提示：写作时优先用 resilient to、build resilience 两个搭配，其余 6 个搭配见 P4 的对照表。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于复习自查，来源清单用于论文与写作引用</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>
