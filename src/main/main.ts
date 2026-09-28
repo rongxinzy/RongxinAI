@@ -130,7 +130,13 @@ import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
 } from './libs/anysearchGatewayCredentials';
-import { APP_DATA_DIR_NAME, APP_NAME, APP_USER_MODEL_ID, DB_FILENAME } from './appConstants';
+import {
+  APP_DATA_DIR_NAME,
+  APP_NAME,
+  APP_USER_MODEL_ID,
+  DB_FILENAME,
+  ENTERPRISE_APP_NAME,
+} from './appConstants';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
@@ -346,9 +352,17 @@ import {
   type WindowRectangle,
 } from './windowState';
 
+// The enterprise packaging overlay injects this directory into resources. The
+// public build has no such directory and keeps the regular Zhiyuan name.
+const runtimeAppName =
+  typeof process.resourcesPath === 'string' &&
+  fs.existsSync(path.join(process.resourcesPath, 'zhiyuan-enterprise'))
+    ? ENTERPRISE_APP_NAME
+    : APP_NAME;
+
 // 设置应用程序名称
-app.name = APP_NAME;
-app.setName(APP_NAME);
+app.name = runtimeAppName;
+app.setName(runtimeAppName);
 // 2026/09/21 lixiang  开发态用独立 AUMID，并配套开始菜单快捷方式（见 ensureWindowsTaskbarBrand），
 // 避免 Windows 继续拿 Electron 默认原子图标的任务栏缓存。打包态仍用产品 AUMID。
 const WINDOWS_TASKBAR_APP_USER_MODEL_ID = app.isPackaged
@@ -2810,7 +2824,7 @@ const ensureWindowsTaskbarBrand = (): void => {
       appUserModelId: WINDOWS_TASKBAR_APP_USER_MODEL_ID,
       icon: iconPath,
       iconIndex: 0,
-      description: APP_NAME,
+      description: runtimeAppName,
     });
     if (!wrote || !fs.existsSync(shortcutPath)) {
       console.warn('[Main] Failed to write Windows taskbar brand shortcut:', shortcutPath);
@@ -7070,7 +7084,7 @@ if (!gotTheLock) {
 
     mainWindow = new BrowserWindow({
       ...initialWindowBounds,
-      title: APP_NAME,
+      title: runtimeAppName,
       icon: getAppIconPath(),
       ...(isMac
         ? {
