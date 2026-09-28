@@ -20,7 +20,8 @@ export const AssistantBubble: React.FC<{
 }> = ({ message, mapDisplayText, resolveLocalFilePath, turnMetadata }) => {
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
-  const isStreaming = Boolean(message.metadata?.isStreaming);
+  // An empty streaming bubble is a leftover placeholder, not an in-flight answer.
+  const isStreaming = Boolean(message.metadata?.isStreaming) && rawContent.trim().length > 0;
   const modelLabel = getMessageModelLabel(turnMetadata);
 
   return (

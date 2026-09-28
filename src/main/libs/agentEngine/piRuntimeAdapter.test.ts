@@ -3061,6 +3061,85 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('closes a whitespace-only placeholder when the turn ends without an answer', async () => {
+      const messages: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
+      const stored: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      const updateMessage = vi.fn(
+        (_sessionId: string, messageId: string, patch: { metadata?: Record<string, unknown> }) => {
+          const target = stored.find(message => message.id === messageId);
+          if (target && patch.metadata) target.metadata = { ...target.metadata, ...patch.metadata };
+        },
+      );
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: Record<string, unknown>) => {
+          const created = { ...message, id: `placeholder-${stored.length + 1}` };
+          stored.push(created as never);
+          return created;
+        },
+        getSession: () => ({ messages: stored }),
+        updateMessage,
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('test', 'Use a tool without writing an answer');
+      listener!({ type: 'turn_start' });
+      // Models routinely emit bare newlines before a tool call: the bubble is
+      // created with isStreaming and must not survive the turn.
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'text_delta', delta: '\n\n' },
+        message: { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+      });
+      const placeholder = messages.find(message => message.type === 'assistant');
+      expect(placeholder?.metadata?.isStreaming).toBe(true);
+
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '\n\n' }],
+          stopReason: 'toolUse',
+        },
+      });
+
+      expect(
+        updates.some(
+          update =>
+            update.messageId === placeholder?.id &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
+      expect(updateMessage).toHaveBeenCalledWith(
+        'test',
+        placeholder?.id,
+        expect.objectContaining({
+          metadata: expect.objectContaining({ isStreaming: false, isFinal: true }),
+        }),
+      );
+      // The persisted row is what any later session load reads.
+      const persisted = stored.find(message => message.id === placeholder?.id);
+      expect(persisted?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
+    });
+
     it('should stream the answer when text starts without a thinking_end event', async () => {
       const messages: Array<{
         id: string;

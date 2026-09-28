@@ -39,3 +39,11 @@ test('forces historical thinking complete inside the final execution summary', (
     durationSeconds: undefined,
   });
 });
+
+test('an empty placeholder bubble is never mid-flight', () => {
+  const metadata = { isThinking: true, isStreaming: true, isFinal: false };
+
+  expect(getThinkingPresentation(metadata, false, true).isStreaming).toBe(true);
+  // A finished turn can leave an empty thinking placeholder behind.
+  expect(getThinkingPresentation(metadata, false, false).isStreaming).toBe(false);
+});
