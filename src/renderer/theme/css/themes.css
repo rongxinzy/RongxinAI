@@ -2865,6 +2865,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -2874,12 +2875,10 @@
   border-radius: var(--zy-style-radius-md);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -5283,11 +5282,6 @@
 }
 }
 @media (hover: hover) {
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -6037,6 +6031,9 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -10495,6 +10492,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -10504,12 +10502,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="classic-dark"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -12916,11 +12912,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="classic-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -13682,6 +13673,9 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="classic-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="classic-dark"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -18140,6 +18134,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -18149,12 +18144,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="daming-light"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -20558,11 +20551,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="daming-light"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -21312,6 +21300,9 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="daming-light"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="daming-light"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -25770,6 +25761,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -25779,12 +25771,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="daming-dark"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -28191,11 +28181,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="daming-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -28957,6 +28942,9 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="daming-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="daming-dark"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -33417,6 +33405,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -33426,12 +33415,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="changan-light"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -35835,11 +35822,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="changan-light"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -36592,6 +36574,9 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="changan-light"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="changan-light"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -41052,6 +41037,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -41061,12 +41047,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="changan-dark"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -43473,11 +43457,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="changan-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -44242,6 +44221,9 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="changan-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="changan-dark"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -48702,6 +48684,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -48711,12 +48694,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="weiyang-light"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -51120,11 +51101,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="weiyang-light"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -51877,6 +51853,9 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="weiyang-light"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;
@@ -56337,6 +56316,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-case-gallery-card) {
   padding: 0;
+  gap: 0.5rem;
   border-style: none;
   background-color: transparent;
   border-radius: var(--zy-style-radius-lg);
@@ -56346,12 +56326,10 @@ to {
   border-radius: var(--zy-style-radius-md);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-case-gallery-body) {
-  padding: 0.75rem;
-  color: var(--zy-component-palette-zinc-950);
+  color: var(--muted-foreground);
   font-size: var(--zy-component-text-sm);
   font-weight: 500;
-  background-image: linear-gradient(to bottom, transparent 0, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 0.5rem, color-mix(in oklab, var(--zy-component-palette-white) 60%, transparent) 2rem, transparent 2.75rem);
-  transition-property: background-color;
+  transition-property: color;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
@@ -58758,11 +58736,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="weiyang-dark"] :where(.theme-page-case-gallery-body):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-overlay-strong) 22%, transparent);
-}
-}
-@media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-installed-skill-grid-card-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--muted);
 }
@@ -59527,6 +59500,9 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
   opacity: 0.3;
+}
+[data-theme="weiyang-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
+  color: var(--foreground);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-agent-task-row-button-variant-1):where(:is(.group:hover *)) {
   opacity: 0.3;

@@ -6,12 +6,12 @@ import { describe, expect, test } from 'vitest';
 
 /**
  * 案例库内容契约：每个快捷技能（public/quick-actions.json 中的一个 action）
- * 都必须提供至少 6 个案例，并且每个案例在中英文下都有完整的
+ * 都必须提供 8 个案例，并且每个案例在中英文下都有完整的
  * label / description / prompt，否则案例卡片会退化成只有 ID 的空壳。
  *
  * 封面缩略图的契约见 casePreviews.test.ts。
  */
-const MIN_CASES_PER_ACTION = 6;
+const CASES_PER_ACTION = 8;
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const publicDir = resolve(projectRoot, 'public');
@@ -61,14 +61,14 @@ const languages = ['zh', 'en'] as const;
 const allCases = catalogue.actions.flatMap(action => action.prompts ?? []);
 
 describe('quick action case library', () => {
-  test('every quick action ships at least six cases', () => {
+  test('every quick action ships exactly eight cases', () => {
     expect(catalogue.actions.length).toBeGreaterThan(0);
 
-    const short = catalogue.actions
-      .filter(action => (action.prompts ?? []).length < MIN_CASES_PER_ACTION)
+    const mismatched = catalogue.actions
+      .filter(action => (action.prompts ?? []).length !== CASES_PER_ACTION)
       .map(action => `${action.id}: ${(action.prompts ?? []).length}`);
 
-    expect(short).toEqual([]);
+    expect(mismatched).toEqual([]);
   });
 
   test('case ids are unique across the whole catalogue', () => {

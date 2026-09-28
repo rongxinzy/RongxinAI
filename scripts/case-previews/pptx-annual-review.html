@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-annual-review</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
+<body>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Annual Review · 经营复盘</div>
+<h1>2026 年度经营复盘</h1>
+<p class="lede">集团层面年度经营复盘：三条业务线的收入与毛利结构、费用率拆解、未达成项归因，以及 2027 年的三个必赢战役与责任分工。</p>
+<div class="meta"><span>复盘主体：云帆科技（集团）</span><span>周期：2026-01-01 至 12-31</span><span>参会：经营管理委员会</span><span>版本：v4 · 定稿 2027-01-15</span></div>
+<div class="kn">
+  <div class="k"><b>2.86<em>亿元</em></b><span>营业收入</span><p>较 2025 年的 2.07 亿元增长 38.2%</p></div>
+  <div class="k"><b>58.2<em>%</em></b><span>综合毛利率</span><p>较 2025 年的 61.2% 下降 3.0 个百分点</p></div>
+  <div class="k"><b>1,940<em>万元</em></b><span>经营性现金流</span><p>连续两年为正，净利率 6.8%</p></div>
+</div>
+<table class="tb">
+  <caption>三条业务线收入结构（合并报表口径，单位：亿元）</caption>
+  <thead><tr><th>业务线</th><th class="r">2025 收入</th><th class="r">2026 收入</th><th class="r">同比</th><th class="r">毛利率</th><th class="r">收入占比</th></tr></thead>
+  <tbody>
+    <tr><td>商家 SaaS</td><td class="r mono">1.08</td><td class="r mono">1.42</td><td class="r mono">+31.5%</td><td class="r mono">67%</td><td class="r mono">49.7%</td></tr>
+    <tr><td>企业智能客服</td><td class="r mono">0.62</td><td class="r mono">0.94</td><td class="r mono">+51.6%</td><td class="r mono">53%</td><td class="r mono">32.9%</td></tr>
+    <tr class="hi"><td>数据服务</td><td class="r mono">0.37</td><td class="r mono">0.50</td><td class="r mono">+35.1%</td><td class="r mono">43%</td><td class="r mono">17.5%</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：合并报表，不含税，经审计调整｜来源：总账 · 人力月报 · 云资源账单</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 结构｜P5–P7 归因｜P8–P9 战役</div>
+</div></div>
+<div class="foot"><span>结论：收入增长 38.2% 但毛利率下降 3.0 pp，2027 年的核心矛盾是「增收」与「增利」的平衡。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 复盘导航</div><h1 class="pt">八页结构与阅读重点</h1></div><div class="calib">口径：合并报表，不含税<br>全文 9 页 · 数据经审计调整</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>结论摘要</span><em>收入、毛利率、现金流与结构</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>范围与口径</span><em>复盘范围、合并口径与调整说明</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>经营数据</span><em>三条业务线的收入与毛利结构</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>增长与利润</span><em>增量归因与毛利率下滑拆解</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>经营框架</span><em>增长 × 毛利四象限与杜邦拆解</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>目标达成</span><em>年初 6 项经营目标的完成情况</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与限制</span><em>应收、毛利、人力与集中度</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>目标与行动</span><em>2027 目标与三个必赢战役</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>重点章节</b><p>建议重点评审 <b>P5 毛利率拆解</b> 与 <b>P9 三个必赢战役</b>，其余章节为支撑数据。</p></div>
+  <div class="q"><b>结论前置</b><p>三项年度目标未达成：毛利率、经营性现金流与研发费用率，具体差距见 <b>P7</b>。</p></div>
+  <div class="q"><b>决策事项</b><p>需在本次会议确认 <b>数据服务线的毛利改善方案</b> 与 2027 年研发预算上限。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>全文 9 页：P1 结构 → P5 归因 → P7 达成 → P9 战役。</div>
+  <div class="cell"><u>下一步与责任</u>会前请确认数据服务线的资源投入规模。</div>
+</div></div>
+<div class="foot"><span>导航：先看收入与毛利结构，再看目标达成与归因，最终落到 2027 年的三个必赢战役。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 范围与口径</div><h1 class="pt">复盘范围、合并口径与调整说明</h1></div><div class="calib">合并报表口径，不含税<br>审计调整已完成，差异 <0.5%</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>复盘范围</b>集团 3 条业务线、5 个区域中心与 2 家控股子公司的全部经营数据，合并抵销内部交易 1,860 万元。</div>
+  <div class="cell"><b>合并口径</b>收入按控制权转移时点确认，服务类收入按服务期分摊；毛利率扣除直接人力、云资源与第三方采购成本。</div>
+  <div class="cell"><b>费用归属</b>销售费用含市场投放与销售人力；研发费用含研发人员薪酬与设备折旧；管理费用含职能人力与办公。三项均按实际发生额归集。</div>
+  <div class="cell"><b>数据来源</b>ERP 总账与辅助核算账、人力成本月报、云资源账单、应收账款账龄表，全部经外部审计确认。</div>
+</div>
+<div class="sl"><i>01</i>口径调整与不可比事项</div>
+<div class="steps">
+  <div class="step"><b>调整 A</b><span>2025 年一笔 420 万元的定制开发收入重分类为一次性收入，本年度不计入经常性收入对比基数。</span></div>
+  <div class="step"><b>调整 B</b><span>研发费用率口径统一为「研发费用 ÷ 营业收入」，2025 年同口径重述后为 19.8%，与 2026 年的 21.3% 可比。</span></div>
+  <div class="step"><b>不可比</b><span>数据服务线于 2025 年 7 月并入，2025 年仅含半年数据，故增速按年化口径折算后再比较。</span></div>
+  <div class="step"><b>未纳入</b><span>未纳入股权激励费用、汇兑损益与资产处置收益，三项合计影响净利率 0.9 个百分点以内。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>口径：合并报表、不含税，经审计调整，差异 < 0.5%。</div>
+  <div class="cell"><u>下一步与责任</u>调整项需经财务负责人确认后方可用于对外披露。</div>
+</div></div>
+<div class="foot"><span>口径：合并报表、不含税、经审计调整，数据服务线按年化口径折算后比较。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 经营数据</div><h1 class="pt">三条业务线的收入与毛利结构</h1></div><div class="calib">单位：亿元 · 毛利率按业务线单独核算<br>占比按四舍五入保留一位小数</div></div>
+<table class="tb">
+  <caption>表 1 · 业务线收入与毛利贡献（2026 年）</caption>
+  <thead><tr><th>业务线</th><th class="r">收入</th><th class="r">收入占比</th><th class="r">毛利率</th><th class="r">毛利额</th><th class="r">毛利占比</th></tr></thead>
+  <tbody>
+    <tr><td>商家 SaaS</td><td class="r mono">1.42</td><td class="r mono">49.7%</td><td class="r mono">67%</td><td class="r mono">0.95</td><td class="r mono">57.2%</td></tr>
+    <tr><td>企业智能客服</td><td class="r mono">0.94</td><td class="r mono">32.9%</td><td class="r mono">53%</td><td class="r mono">0.50</td><td class="r mono">29.9%</td></tr>
+    <tr class="hi"><td>数据服务</td><td class="r mono">0.50</td><td class="r mono">17.5%</td><td class="r mono">43%</td><td class="r mono">0.22</td><td class="r mono">12.9%</td></tr>
+    <tr><td>合计</td><td class="r mono">2.86</td><td class="r mono">100.1%</td><td class="r mono">58.2%</td><td class="r mono">1.67</td><td class="r mono">100.0%</td></tr>
+  </tbody>
+</table>
+<div class="sl"><i>02</i>业务线收入与毛利率对照（收入单位：亿元）</div>
+<div class="bars">
+  <div class="bar"><span>商家 SaaS</span><i style="width:100%"></i><em class="mono">1.42 亿 / 67%</em></div>
+  <div class="bar"><span>智能客服</span><i style="width:66%"></i><em class="mono">0.94 亿 / 53%</em></div>
+  <div class="bar"><span>数据服务</span><i style="width:35%"></i><em class="mono">0.50 亿 / 43%</em></div>
+</div>
+<div class="note">说明：收入占比合计 100.1% 系四舍五入所致；毛利额由收入乘毛利率计算后取两位小数，合计毛利 1.67 亿元，对应综合毛利率 58.2%。</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>结构：SaaS 贡献 57.2% 的毛利额，客服线增速最快 51.6%。</div>
+  <div class="cell"><u>下一步与责任</u>数据服务收入占 17.5% 但毛利仅 12.9%，是调整重点。</div>
+</div></div>
+<div class="foot"><span>结构：商家 SaaS 贡献 57.2% 的毛利额，数据服务收入占 17.5% 但毛利仅占 12.9%。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 增长与利润</div><h1 class="pt">增量归因与毛利率下滑拆解</h1></div><div class="calib">增量口径：2026 收入减 2025 收入<br>毛利率按 pp 拆解</div></div>
+<div class="grid3">
+  <div class="q"><b><em>01</em>客服线贡献 40.5% 增量</b><p>全年收入增量 0.79 亿元中，企业智能客服贡献 0.32 亿元（+51.6%），是增速最快的业务线。</p></div>
+  <div class="q"><b><em>02</em>SaaS 线仍是基本盘</b><p>商家 SaaS 贡献 0.34 亿元增量（+31.5%），增量占比 43.0%，毛利率 67% 为三条线中最高。</p></div>
+  <div class="q"><b><em>03</em>毛利率下滑 3.0 pp</b><p>其中结构性因素贡献 2.1 pp（低毛利业务占比上升），价格与折扣因素贡献 0.9 pp。</p></div>
+</div>
+<div class="sl"><i>03</i>收入增量归因（合计 0.79 亿元）</div>
+<table class="tb">
+  <thead><tr><th>业务线</th><th class="r">2025 收入</th><th class="r">2026 收入</th><th class="r">增量</th><th class="r">增量占比</th><th class="r">毛利率变化</th></tr></thead>
+  <tbody>
+    <tr><td>商家 SaaS</td><td class="r mono">1.08</td><td class="r mono">1.42</td><td class="r mono">+0.34</td><td class="r mono">43.0%</td><td class="r mono">-1.2 pp</td></tr>
+    <tr><td>企业智能客服</td><td class="r mono">0.62</td><td class="r mono">0.94</td><td class="r mono">+0.32</td><td class="r mono">40.5%</td><td class="r mono">-4.6 pp</td></tr>
+    <tr><td>数据服务</td><td class="r mono">0.37</td><td class="r mono">0.50</td><td class="r mono">+0.13</td><td class="r mono">16.5%</td><td class="r mono">-3.8 pp</td></tr>
+    <tr class="hi"><td>合计</td><td class="r mono">2.07</td><td class="r mono">2.86</td><td class="r mono">+0.79</td><td class="r mono">100.0%</td><td class="r mono">-3.0 pp</td></tr>
+  </tbody>
+</table><div class="sl"><i>04</i>毛利率下滑 3.0 pp 的完整拆解</div>
+<ul class="pts">
+  <li><b>结构性因素 2.1 pp：</b>毛利率 53% 的客服线收入占比从 30.0% 升至 32.9%，同时毛利率 67% 的 SaaS 线占比从 52.2% 降至 49.7%。</li>
+  <li><b>价格因素 0.9 pp：</b>中小商家占比上升带动客单价下移，SaaS 线平均合同额同比下降 6.4%。</li>
+</ul><div class="note">归因结论：0.79 亿元增量中 83.5% 来自 SaaS 与客服两条线；毛利率下滑 3.0 pp 中 2.1 pp 为结构性因素、0.9 pp 为价格因素，前者靠结构优化回收，后者靠价格纪律回收。</div></div>
+<div class="foot"><span>归因：0.79 亿元增量中 83.5% 来自 SaaS 与客服两条线，毛利率下滑主要为结构性因素。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 经营框架</div><h1 class="pt">增长 × 毛利四象限与杜邦拆解</h1></div><div class="calib">象限横轴：收入增速；纵轴：毛利率<br>杜邦口径：费用率含销售、研发与管理</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>象限 A · 高增 · 高毛利</u><b>商家 SaaS（+31.5%，67%）</b>现金牛业务，贡献 57.2% 的毛利额；2027 年策略是守住价格带并提升续费率。</div>
+  <div class="cell"><u>象限 B · 高增 · 中毛利</u><b>企业智能客服（+51.6%，53%）</b>战略投入业务，优先做规模；2027 年通过交付标准化把毛利率拉回 56%。</div>
+  <div class="cell"><u>象限 C · 中增 · 低毛利</u><b>数据服务（+35.1%，43%）</b>唯一需要主动调整的业务线；2027 年目标毛利率提升到 48%，否则压缩资源投入。</div>
+  <div class="cell"><u>象限 D · 低增 · 低毛利</u><b>当前无业务落入</b>需警惕客服线在放量过程中掉入该象限，设置 50% 毛利率为红线并月度监控。</div>
+</div>
+<div class="sl"><i>04</i>净利率杜邦拆解（占营业收入比重）</div>
+<div class="flow">
+  <div class="fl"><u>起点</u><b>毛利率 58.2%</b>三条线加权结果，较 2025 年的 61.2% 下降 3.0 pp。</div>
+  <div class="fl"><u>减项 1</u><b>销售费用率 14.6%</b>同比上升 1.3 pp，主要用于金融与医疗客群的行业销售扩张。</div>
+  <div class="fl"><u>减项 2</u><b>研发费用率 21.3%</b>同比上升 1.5 pp，对应研发投入 6,092 万元，为近三年最高。</div>
+  <div class="fl"><u>结果</u><b>净利率 6.8%</b>四项费用率合计 51.4%（销售 14.6 + 研发 21.3 + 管理 12.4 + 其他 3.1），58.2 − 51.4 = 6.8，对应净利 1,945 万元。</div>
+</div><div class="sl">四象限的资源纪律</div>
+<ul class="pts"><li>象限 A 商家 SaaS：守住 67% 毛利率与价格带，2027 年不做折扣换量。</li><li>象限 C 数据服务：毛利率从 43% 提升到 48%，否则压缩投入；客服线设 50% 毛利率红线。</li></ul></div>
+<div class="foot"><span>框架：三条业务线分处三个象限，客服线的毛利率红线设为 50%，2027 年需守住不失守。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 目标达成</div><h1 class="pt">年初 6 项经营目标的完成情况</h1></div><div class="calib">目标来源：2026 年初经营计划<br>判定口径：达成 / 未达成 / 接近</div></div>
+<table class="tb">
+  <caption>表 2 · 年初目标与实际达成对照</caption>
+  <thead><tr><th>经营目标</th><th class="r">2026 年初目标</th><th class="r">2026 实际</th><th class="r">达成率</th><th>判定</th></tr></thead>
+  <tbody>
+    <tr><td>营业收入</td><td class="r mono">2.60 亿</td><td class="r mono">2.86 亿</td><td class="r mono">110.0%</td><td class="n">达成</td></tr>
+    <tr><td>综合毛利率</td><td class="r mono">≥60%</td><td class="r mono">58.2%</td><td class="r mono">97.0%</td><td class="n">未达成 -1.8 pp</td></tr>
+    <tr><td>净利率</td><td class="r mono">≥7.0%</td><td class="r mono">6.8%</td><td class="r mono">97.1%</td><td class="n">接近</td></tr>
+    <tr><td>经营性现金流</td><td class="r mono">≥2,000 万</td><td class="r mono">1,940 万</td><td class="r mono">97.0%</td><td class="n">接近</td></tr>
+    <tr><td>研发费用率</td><td class="r mono">≤20.0%</td><td class="r mono">21.3%</td><td class="r mono">106.5%</td><td>未达成 +1.3 pp</td></tr>
+    <tr class="hi"><td>员工规模</td><td class="r mono">≤260 人</td><td class="r mono">268 人</td><td class="r mono">103.1%</td><td>超编 8 人</td></tr>
+  </tbody>
+</table>
+<div class="note">说明：研发费用率为逆向指标，实际值高于目标即为未达成；员工规模目标为编制上限，超出 8 人主要来自客服线交付岗扩编。</div><div class="sl"><i>05</i>未达成项的共同归因</div>
+<ul class="pts">
+  <li><b>投入前置：</b>研发费用率 21.3% 与编制 268 人两项超出均为主动投入，对应客服线 51.6% 的增速与新客群开拓。</li>
+  <li><b>取舍判断：</b>毛利率与现金流两项未达成属结构性结果，需通过 2027 年的数据服务毛利改善与应收治理回收。</li>
+</ul><div class="note">未达成项归因：营业收入 110.0% 超额完成，毛利率 58.2%（目标 ≥60%）、研发费用率 21.3%（目标 ≤20%）、编制 268 人（上限 260 人）三项超出均来自客服线的主动投入，属前置性投入而非失控；2027 年三项须回到目标区间，否则暂停扩编。</div></div>
+<div class="foot"><span>达成：6 项目标中仅营业收入达成，毛利率、研发费用率与编制三项均超出年初计划。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与限制</div><h1 class="pt">应收、毛利、人力与集中度</h1></div><div class="calib">评估时点：2027-01-15<br>影响按高 / 中 / 低三档</div></div>
+<table class="tb">
+  <caption>表 3 · 五类经营风险与缓解措施</caption>
+  <thead><tr><th>风险项</th><th>影响</th><th class="r">当前水平</th><th class="r">同比变化</th><th>缓解措施</th></tr></thead>
+  <tbody>
+    <tr><td>应收账款周转天数</td><td>高</td><td class="r mono">96 天</td><td class="r mono">+18 天</td><td>2027 年起对账期超 90 天的客户暂停续约</td></tr>
+    <tr><td>综合毛利率下滑</td><td>高</td><td class="r mono">58.2%</td><td class="r mono">-3.0 pp</td><td>数据服务线毛利改善 + 交付标准化</td></tr>
+    <tr><td>人力成本占比上升</td><td>中</td><td class="r mono">42.6%</td><td class="r mono">+1.8 pp</td><td>控制编制，2027 年人均创收目标 132 万</td></tr>
+    <tr><td>客户集中度</td><td>中</td><td class="r mono">Top 10 占 21.4%</td><td class="r mono">-2.1 pp</td><td>继续下沉中小客户，2027 年压到 15% 以下</td></tr>
+    <tr class="hi"><td>海外收入汇兑风险</td><td>低</td><td class="r mono">占比 8.4%</td><td class="r mono">+1.2 pp</td><td>超 60% 的海外合同以人民币结算</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>最需关注的一项</b><p>应收周转从 78 天延长到 96 天，占用资金约 7,520 万元；若 2027 年不改善，经营性现金流目标 3,500 万元难以达成。</p></div>
+  <div class="q"><b>本复盘的假设前提</b><p>假设 2027 年无重大并购与汇率剧烈波动；若发生并购，合并口径将重述，同比数据需重新计算后再比较。</p></div>
+</div><div class="note">资金占用测算：应收周转 96 天对应占用资金约 7,520 万元（2.86 亿元 ÷ 365 × 96），若压回 85 天可释放约 860 万元现金，直接支撑 3,500 万元的现金流目标。</div><div class="sl">应收治理动作</div>
+<ul class="pts"><li>账期纪律：2027 年起对账期超过 90 天的客户暂停续约，目标把周转天数从 96 天压回 85 天。</li><li>现金测算：周转每缩短 1 天约释放 78 万元现金，压回 85 天可释放约 860 万元，支撑 3,500 万元现金流目标。</li></ul></div>
+<div class="foot"><span>风险：应收周转延长 18 天至 96 天，是 2027 年现金流目标的最大不确定性来源。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 目标与行动</div><h1 class="pt">2027 年经营目标与三个必赢战役</h1></div><div class="calib">目标：收入 3.9 亿元 · 毛利率 ≥60%<br>责任人：经营管理委员会</div></div>
+<div class="grid4">
+  <div class="q"><b>3.9 亿</b><p>2027 年收入目标，同比 +36.4%。</p></div>
+  <div class="q"><b>≥60%</b><p>综合毛利率目标，需回升 1.8 pp 以上。</p></div>
+  <div class="q"><b>3,500 万</b><p>经营性现金流目标，较 2026 年增长 80.4%。</p></div>
+  <div class="q"><b>132 万</b><p>人均创收目标，较 2026 年的 106.7 万提升 23.7%。</p></div>
+</div>
+<div class="sl"><i>05</i>三个必赢战役与责任分工</div>
+<div class="steps">
+  <div class="step"><b>战役一</b><span>客服线规模复制：把单客户实施人日从 5 天压到 4 天，实现收入 1.45 亿元、毛利率回到 56% · 责任人：客服事业部 何睿。</span></div>
+  <div class="step"><b>战役二</b><span>数据服务毛利改善：优化第三方数据采购结构，毛利率从 43% 提升到 48%，否则压缩该线资源投入 · 责任人：数据事业部 郑宇。</span></div>
+  <div class="step"><b>战役三</b><span>应收与费用治理：应收周转天数从 96 天压回 85 天，研发费用率控制在 20% 以内 · 责任人：财务负责人 沈奕。</span></div>
+</div>
+<ul class="pts">
+  <li><b>结论一：</b>2026 年收入增长 38.2% 但毛利率下降 3.0 pp，增长质量优于规模，2027 年必须把毛利率拉回 60% 以上。</li>
+  <li><b>结论二：</b>增量高度依赖 SaaS 与客服两条线（合计 83.5%），数据服务线需在一年内证明其毛利改善能力。</li>
+  <li><b>决策请求：</b>请确认 2027 年研发费用率上限 20% 与数据服务线的资源投入规模，两项直接影响 3.9 亿元收入目标的可行性。</li>
+</ul><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>2027 目标：营业收入 3.9 亿元（同比 +36.4%）、综合毛利率 ≥60%、经营性现金流 ≥3,500 万元、人均创收 132 万元；三项与 2026 年实际的差距分别为 +1.04 亿元、+1.8 pp、+1,560 万元、+25.3 万元。</div>
+  <div class="cell"><u>下一步与责任</u>三个必赢战役：客服线规模复制（毛利回到 56%）、数据服务毛利改善（43% → 48%）、应收与费用治理（周转 96 → 85 天），责任人分别为何睿、郑宇、沈奕。</div>
+</div></div>
+<div class="foot"><span>行动：三个必赢战役分别对应规模、毛利与现金，2027 年收入目标 3.9 亿元、毛利率回升至 60%。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

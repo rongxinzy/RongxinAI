@@ -1,50 +1,383 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-study-plan</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-study-plan</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
-.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
-.ask p{font-size:14px;color:#3d4046;line-height:1.6}
-.ans{flex:1;min-height:0;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
-.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.hr{height:1px;background:#edede9}
-.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
 .box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
-.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
-.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
-.flow i{color:#b6bac0;font-style:normal}
-.notes{display:grid;gap:8px}
-.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
 th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-td.mono{font-variant-numeric:tabular-nums}
-.stage{color:var(--accent);font-weight:600}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
+.cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
+.cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="panel" style="--accent:#10B981">
-  <div class="ask"><div class="avatar"></div><p>我三个月后要考英语四级，帮我排一份能坚持下来的学习计划。</p></div>
-  <div class="ans">
-    <div class="box"><div class="k">整体思路</div><p>把 12 周拆成打基础、练题型、模考冲刺三段，每周固定 5 次、每次 40 分钟，任务量按周递增而不是一次排满。</p></div>
-    <div class="flow"><span>第 1 至 4 周：打基础</span><i>→</i><span>第 5 至 9 周：练题型</span><i>→</i><span>第 10 至 12 周：模考冲刺</span></div>
-    <table>
-      <tr><th>阶段</th><th>周次</th><th>每周重点</th><th>可检查的产出</th></tr>
-      <tr><td class="stage">打基础</td><td class="mono">1 至 4</td><td>高频词汇 + 听力精听</td><td>背完 800 词，精听 12 篇短对话</td></tr>
-      <tr><td class="stage">练题型</td><td class="mono">5 至 9</td><td>阅读定位 + 翻译句型</td><td>每类题型各练 20 题，错题本累计 60 条</td></tr>
-      <tr><td class="stage">模考冲刺</td><td class="mono">10 至 12</td><td>整套限时 + 作文模板</td><td>完成 6 套整卷，作文定稿 2 篇</td></tr>
-    </table>
-    <div class="hr"></div>
-    <h3>每天 40 分钟怎么分配</h3>
-    <div class="notes">
-      <div>15 分钟背词：新词 20 个，复习昨天的 20 个，只记读音和核心释义</div>
-      <div>15 分钟主攻项：按当周重点，听力或阅读二选一，不要平均用力</div>
-      <div>10 分钟收尾：把当天错的题写进错题本，只写错因和正确思路</div>
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Study Plan 01</div>
+      <h1>四级 12 周备考计划：每周 5 次，每次 40 分钟</h1>
+      <div class="sub">适用：CET-4 首考 / 二考 ｜ 周期 12 周 · 3 阶段 · 每周 200 分钟 · 常规 2400 分钟 ｜ 分层练习 12 题</div>
     </div>
-    <div class="box"><div class="k">坚持不下来的三个提醒</div><p>任务按周给，不按天补；允许每周缺一次，缺的那次不要堆到第二天；模考那三周可以停掉背词，把时间让给整套练习。</p></div>
+    <div class="note">计划书 v2.0 · 共 10 页<br><b>口径</b>：总分 425 → 目标 550<br>另外加练 1000 分钟：诊断 130 + 整卷 6 × 130 + 修订 90</div>
   </div>
-</div></body></html>
+  <div class="ask"><div class="av"></div><p>我三个月后要考英语四级，帮我排一份能坚持下来的学习计划。</p></div>
+  <p class="lead">本计划从第 0 周的一套整卷诊断出发，把 12 周拆成打基础（1–4 周）、练题型（5–9 周）、模考冲刺（10–12 周）三段，每周固定 5 次、每次 40 分钟，即 200 分钟/周、常规总量 2400 分钟。三段各有一套可检查产出：800 张词汇卡与 12 篇精听笔记、60 条错题与 6 类题型清单、6 套整卷记录与 2 篇作文定稿。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">12<small>周</small></div><div class="l">常规 2400 分钟，含 3 次滚动修订</div></div>
+    <div class="stat"><div class="n">3<small>阶段</small></div><div class="l">打基础 1–4 · 练题型 5–9 · 模考 10–12</div></div>
+    <div class="stat"><div class="n">200<small>分钟</small></div><div class="l">每周 5 次 × 每次 40 分钟</div></div>
+  </div>
+  <div class="sec">学习路径 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:74px">阶段</th><th style="width:88px">周次</th><th>内容</th><th style="width:196px">可检查产出</th><th style="width:104px">用时</th></tr>
+    <tr><td>起步诊断</td><td class="num">第 0 周</td><td>1 套近三年整卷，定位四模块基线（P3）</td><td>诊断报告 1 份、目标 550 分</td><td class="num">加练 130 分钟</td></tr>
+    <tr><td>打基础</td><td class="num">第 1–4 周</td><td>核心词 800 词 + 精听 12 篇，节奏固定（P4）</td><td>词汇卡 800 张、精听笔记 12 篇</td><td class="num">常规 800 分钟</td></tr>
+    <tr><td>练题型</td><td class="num">第 5–9 周</td><td>六类题型各 20 题，错题按类归位（P4–P5）</td><td>错题本 60 条、题型清单 6 类</td><td class="num">常规 1000 分钟</td></tr>
+    <tr class="hl"><td>模考冲刺</td><td class="num">第 10–12 周</td><td>整卷限时 6 套 + 作文定稿 2 篇（P5–P8）</td><td>模考记录 6 份、作文定稿 2 篇</td><td class="num">常规 600 分钟</td></tr>
+    <tr><td>滚动修订</td><td class="num">第 12 周末</td><td>按 4 项指标（完成率 / 正确率 / 模考分 / 产出项）复盘全周期，出下一轮方案（P9）</td><td>修订单 3 份、预警线 2 条</td><td class="num">加练 90 分钟</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">分数口径</div><p>整卷按官方 710 分计：听力 249 + 阅读 249 + 写作 106.5 + 翻译 106.5（四项相加 711，按 710 计入）；现状 425 → 目标 550，125 分分差按 +60 / +45 / +10 / +10 分摊。</p></div>
+    <div class="box"><div class="k">来源与时间窗</div><p>现状分来自第 0 周 1 套近三年（2022–2025）整卷诊断，覆盖听力、阅读、写作、翻译四部分；时间窗为 2026-09 起 12 周，每周 5 次、每次 40 分钟，常规合计 2400 分钟。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 背景与分差 · P4 12 周计划 · P5 风险与失误 · P6 12 题诊断题 · P7–P8 答案解析 · P9 自测与滚动修订 · P10 术语表与口径。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>把「每周 5 次、每次 40 分钟」写死成课次，任务按周给</b>，12 周才不会在第 4 周崩掉。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Study Plan 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全计划 6 章 + 附录 · 共 10 页<br>先对口径、再定节奏、后做诊断题</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:132px">章节</th><th>一句话说明</th><th style="width:184px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>背景与范围</td><td>看清四模块的分值、现状分与目标分差，把 200 分钟排明白</td><td>能复述 425 → 550 的分差来源</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>讲清三阶段设计逻辑，给出 12 周逐周安排与产出</td><td>写出 5 项阶段产出</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见失误</td><td>列出 6 类执行失误，用一周记录做计划与实际的对照</td><td>执行率自评表 1 份</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>12 道计划诊断题：判断合理性、算时长、做补救安排</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 逐题给出数字口径与失分点</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">5</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 的参考安排与评分口径</td><td>自批得分 ≥ 10 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">6</td><td>自测与下一阶段</td><td>6 项自测定达标线，4 周滚动修订把计划变成日程</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td>附</td><td>附录：术语表</td><td>计划术语 10 条与分数口径，供修订时统一口径</td><td>能解释执行率与弹性周</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把 12 周安排抄进日历并标出 60 个课次；第 2 天读 P5 后做 P6 的 1–6 题，用 P7 自批；第 3 天做 7–12 题对照 P8，最后用 P9 清单定达标线。每周日按 P5 的对照表自评完成率，到第 4、8、12 周再按 P9 的三个修订点决定是否调整。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>手里有 1 套近三年真题用于诊断；每天能稳定空出 40 分钟、每周能空出 5 天；词汇量 3200 词左右，能读懂四级阅读题干。若词汇量低于 3000 词，把第 1–2 周的新词量从 40 词降到 30 词，其余安排不动。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，便于按周分配阅读任务。</div>
+    <div>练习在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应，先做完再翻答案。</div>
+    <div>章节 5 的答案解析跨 P7、P8 两页：1–6 题在 P7，7–12 题在 P8，不要跳着批改。</div>
+    <div>第 4 页的 12 周逐周表可整页抄进日历；第 9 页的三次修订点先标在日历上。</div>
+    <div>12 周共 60 个课次：打基础 20 次、练题型 25 次、模考 15 次；缺 1 次就从弹性额度里扣。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>先对口径再做诊断题，先算时长再定任务量</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 知识脉络</div><h2 class="pt">四个模块的分值、现状与目标分差</h2></div>
+    <div class="note">口径：总分 425 → 目标 550<br>12 周共 2400 分钟（200 分钟 × 12 周）</div>
+  </div>
+  <div class="sec">A · 分值与目标 <em>现状分来自第 0 周的 1 套整卷诊断</em></div>
+  <table>
+    <tr><th style="width:104px">模块</th><th style="width:92px">分值</th><th style="width:148px">现状正确率</th><th style="width:148px">目标正确率</th><th>每周投入（练题型阶段）</th></tr>
+    <tr><td>听力</td><td class="num">249 分</td><td class="num">150 分 · 60%</td><td class="num">210 分 · 84%</td><td class="num">50 分钟，2 次课</td></tr>
+    <tr><td>阅读</td><td class="num">249 分</td><td class="num">160 分 · 64%</td><td class="num">205 分 · 82%</td><td class="num">50 分钟，2 次课</td></tr>
+    <tr><td>写作</td><td class="num">106.5 分</td><td class="num">60 分 · 56%</td><td class="num">70 分 · 66%</td><td class="num">25 分钟，1 次课</td></tr>
+    <tr><td>翻译</td><td class="num">106.5 分</td><td class="num">55 分 · 52%</td><td class="num">65 分 · 61%</td><td class="num">20 分钟，收尾</td></tr>
+    <tr><td>词汇基础</td><td>四项共用</td><td class="num">抽测 100 词 62%</td><td class="num">抽测 100 词 88%</td><td class="num">40 分钟，收尾</td></tr>
+    <tr class="hl"><td>模考（整卷）</td><td class="num">710 分</td><td class="num">425 分</td><td class="num">550 分</td><td class="num">15 分钟，复盘</td></tr>
+  </table>
+  <div class="sec">B · 每周 200 分钟的模块分配 <em>以练题型阶段（第 5–9 周）为例，单位：分钟</em></div>
+  <div class="bars">
+    <div class="bar"><span class="mono">听力</span><span class="track"><i style="width:100%"></i></span><span class="v">50</span></div>
+    <div class="bar"><span class="mono">阅读</span><span class="track"><i style="width:100%"></i></span><span class="v">50</span></div>
+    <div class="bar"><span class="mono">词汇</span><span class="track"><i style="width:80%"></i></span><span class="v">40</span></div>
+    <div class="bar"><span class="mono">写作</span><span class="track"><i style="width:50%"></i></span><span class="v">25</span></div>
+    <div class="bar"><span class="mono">翻译</span><span class="track"><i style="width:40%"></i></span><span class="v">20</span></div>
+    <div class="bar hl"><span class="mono">模考复盘</span><span class="track"><i style="width:30%"></i></span><span class="v">15</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">三阶段的分配差异（每周都是 200 分钟）</div><p>打基础：精听 75 + 词汇 75 + 收尾 50；练题型：50 / 50 / 40 / 25 / 20 / 15；模考冲刺：听力 50 + 阅读 50 + 整卷复盘 60 + 错题回炉 25 + 作文定稿 15，词汇新词归零。</p></div>
+    <div class="box"><div class="k">口径与假设</div><p>诊断分按官方计分换算到 710 分制；整卷模考 6 次、每次 130 分钟属加练，不计入常规预算；执行率按 90% 估，即常规实际约 2160 分钟。若执行率落到 70%（实际约 1680 分钟），先按 P9 的第 1 次修订把周任务减到能完成，再按实际总量重排进度，不追加单次时长。</p></div>
+  </div>
+  <div class="notes">
+    <div>听力与阅读合计是底线项：打基础 75 分钟（精听），练题型与模考阶段各 100 分钟，压缩周最多降到 80 分钟（4 次主任务 × 20 分钟）；要减只从词汇与写作里减。</div>
+  </div>
+  <div class="pf"><span>分差结论：<b>425 → 550 的 125 分里，听力与阅读合计要拿 105 分</b>，所以 200 分钟里它们占 100 分钟。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">三阶段设计逻辑与 12 周逐周安排</h2></div>
+    <div class="note">12 周 · 3 阶段 · 60 次课<br>每周 200 分钟，常规共 2400 分钟</div>
+  </div>
+  <div class="word"><b>12 周 × 200 分钟</b><span class="mono">2400 分钟 · 60 次课 · 5 项阶段产出</span><span class="pos">Plan</span></div>
+  <p class="lead">三段各解决一件事：第 1–4 周解决「认得出」，第 5–9 周解决「做得对」，第 10–12 周解决「做得完」——在 130 分钟内做完整卷并保住已得分。</p>
+  <div class="flow"><span>打基础：词汇 + 精听（1–4 周）</span><i>→</i><span>练题型：六类题型各 20 题（5–9 周）</span><i>→</i><span>模考冲刺：整卷限时 6 套（10–12 周）</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">任务按周给，不按天补</div><p>每周只有 5 个课次、200 分钟总量；某天没做，只在本周剩下的课次里均摊，不并成 80 分钟的一次。</p></div>
+    <div class="box"><div class="k">允许每周缺一次</div><p>12 周预留 12 次弹性额度：缺课不跨周补，本周产出按 4 次课的 80% 计，执行率仍算达标。</p></div>
+    <div class="box"><div class="k">模考期停背新词</div><p>第 10–12 周词汇 40 分钟归零，写作与翻译 45 分钟压成作文定稿 15 分钟，腾出的 70 分钟给整卷复盘（15 → 60）与错题回炉（25）。</p></div>
+  </div>
+  <div class="sec">12 周逐周安排 <em>产出列是每行唯一的验收标准，未产出即视为本周未完成</em></div>
+  <table>
+    <tr><th style="width:76px">阶段</th><th style="width:88px">周次</th><th>每周重点</th><th style="width:204px">可检查产出</th><th style="width:78px">每周用时</th></tr>
+    <tr><td>打基础</td><td class="num">第 1 周</td><td>诊断错因归类 + 词表第 1–200 词（每天 40 词）</td><td>词汇卡 200 张、诊断错因 6 条</td><td class="num">200 分钟</td></tr>
+    <tr><td>打基础</td><td class="num">第 2 周</td><td>词表第 201–400 词 + 精听短篇新闻 3 篇</td><td>词汇卡 400 张、精听笔记 3 篇</td><td class="num">200 分钟</td></tr>
+    <tr><td>打基础</td><td class="num">第 3–4 周</td><td>词表第 401–800 词 + 精听累计 12 篇</td><td>词汇卡 800 张、精听笔记 12 篇</td><td class="num">200 分钟</td></tr>
+    <tr><td>练题型</td><td class="num">第 5–6 周</td><td>听力三题型（新闻 / 长对话 / 篇章）各 20 题</td><td>听力题型 3 类、错题 24 条</td><td class="num">200 分钟</td></tr>
+    <tr><td>练题型</td><td class="num">第 7–8 周</td><td>阅读三题型（选词 / 长篇 / 仔细）各 20 题</td><td>题型清单 6 类、错题累计 48 条</td><td class="num">200 分钟</td></tr>
+    <tr><td>练题型</td><td class="num">第 9 周</td><td>写作与翻译专项：各写模板 1 套 + 错题回炉</td><td>错题本 60 条、模板 2 套</td><td class="num">200 分钟</td></tr>
+    <tr><td>模考冲刺</td><td class="num">第 10–11 周</td><td>整卷限时 4 套（周日加练 130 分钟）+ 作文定稿 1 篇</td><td>模考记录 4 份、作文定稿 1 篇</td><td class="num">200 分钟</td></tr>
+    <tr class="hl"><td>模考冲刺</td><td class="num">第 12 周</td><td>整卷限时 2 套 + 作文定稿第 2 篇，停背新词</td><td>模考记录 6 份、作文定稿 2 篇</td><td class="num">200 分钟</td></tr>
+  </table>
+  <div class="quote">计划崩掉很少是因为不努力，而是因为把「每周 5 次」写成了「每天必须」——一次中断就否定了整周。所以本计划只考核每周产出，不考核连续打卡。</div>
+  <div class="pf"><span>设计结论：<b>三段各解决一件事，产出对得上阶段</b>；12 周 60 次课，产出 800 词 / 12 篇 / 60 条 / 6 套 / 2 篇。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见错误</div><h2 class="pt">6 类执行失误与计划 vs 实际对照</h2></div>
+    <div class="note">来源：第 4 周与第 8 周的两周记录<br>共 6 类，每类都给改法与数字</div>
+  </div>
+  <div class="sec">A · 6 类高频执行失误 <em>先看「后果」一列的数字，能不能对上你自己的记录</em></div>
+  <table>
+    <tr><th style="width:112px">类型</th><th style="width:244px">典型表现</th><th style="width:212px">后果（第 4 周实测）</th><th>改法</th></tr>
+    <tr><td>任务按天补</td><td>周一缺课，周二一次做 80 分钟</td><td class="num">缺课累积 4 次，完成率 60%</td><td>缺的课并进本周剩余课次，不跨周补</td></tr>
+    <tr><td>平均用力</td><td>四个模块各 50 分钟，不分阶段</td><td>听力 60%、阅读 64%，四周未变</td><td>按阶段配比：打基础先给词汇 75 分钟</td></tr>
+    <tr><td>只做题不总结</td><td>做 120 题，错题本 0 条</td><td class="num">同类错误重复率 60% 以上</td><td>每题写 1 条错因，12 周凑满 60 条</td></tr>
+    <tr><td>模考不计时</td><td>一套卷做 3 小时，中途查词典</td><td class="num">阅读后两篇空 10 题，丢 35 分</td><td>第 10 周起整卷 130 分钟限时</td></tr>
+    <tr><td>背词与阅读脱节</td><td>词卡背到 800 张，阅读仍错一半</td><td>阅读认词率不足 70%</td><td>每周把 40 个新词回填进真题句子</td></tr>
+    <tr class="hl"><td>疲劳期硬扛</td><td>第 6–7 周每天加练到 90 分钟</td><td class="num">第 8 周执行率从 90% 掉到 50%</td><td>允许每周缺 1 次，第 8 周主动减量</td></tr>
+  </table>
+  <div class="sec">B · 计划安排 vs 实际执行（第 4 周记录，周一起只完成 3 天） <em>完成率 = 实际 ÷ 计划，按课次与用时两个口径各算一次</em></div>
+  <table>
+    <tr><th style="width:132px">项目</th><th style="width:150px">计划安排</th><th style="width:150px">实际执行</th><th style="width:126px">差值</th><th>完成率</th></tr>
+    <tr><td>本周课次</td><td class="num">5 次</td><td class="num">3 次</td><td class="num">−2 次</td><td class="num">60%</td></tr>
+    <tr><td>本周用时</td><td class="num">200 分钟</td><td class="num">120 分钟</td><td class="num">−80 分钟</td><td class="num">60%</td></tr>
+    <tr><td>词汇新词</td><td class="num">40 词</td><td class="num">24 词</td><td class="num">−16 词</td><td class="num">60%</td></tr>
+    <tr class="hl"><td>精听篇数</td><td class="num">3 篇</td><td class="num">1 篇</td><td class="num">−2 篇</td><td class="num">33%</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">完成率 60% 时先做什么</div><p>不补课、不延长单次时长：把剩余课次的主任务从 25 分钟压到 20 分钟，先保住「课次」达标，新词同步从 40 词降到 24 词。</p></div>
+    <div class="box"><div class="k">三条硬规则</div><p>单次不超过 50 分钟；跨周不补课；模考周停背新词。三条都守住，12 周执行率可稳定在 85% 以上。</p></div>
+  </div>
+  <div class="notes">
+    <div>每类失误都配一个可复测的数字：完成率、认词率、重复率，周日自评时逐项打勾。</div>
+    <div>第 8 周是疲劳期高发点：第 7 周末先把第 8 周课次从 5 次调到 4 次，产出按 80% 计。</div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>6 类失误里有 4 类只靠「按周给任务」就能拦住</b>；出现 60% 完成率先减任务量，不加时长。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>限时 30 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考口径与节奏，不看具体分数</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 有人把第 5 周的词汇目标定为「每周 120 个新词」，这个量合理吗？说明理由。</li>
+    <li><b>2.</b> 每天可支配 40 分钟、每周能学 5 天，算出每周投入分钟数与 12 周总量。</li>
+    <li><b>3.</b> 第 2 周安排「整卷限时模考 3 套」，与所处阶段匹配吗？给出你的算法。</li>
+    <li><b>4.</b> 「周一缺的课，周二一次做 80 分钟补回来」会带来什么后果？给出一个具体数字。</li>
+    <li><b>5.</b> 第 12 周应该停掉哪一类任务？为什么停它而不是停听力与阅读？</li>
+    <li><b>6.</b> 为错题本定 12 周总条数目标，并说明第 5–9 周每周各凑多少条。</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入真实记录、时长对账与补救安排</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 某人一周记录：计划 5 次、实际 3 次、用时 120 分钟、新词 24 个。重排下周计划，给出课次、用时与主任务压缩方案。</li>
+    <li><b>8.</b> 算出第 1–4 周、第 5–9 周、第 10–12 周三个阶段各自的常规总时长，并与 2400 分钟对账。</li>
+    <li><b>9.</b> 一个学生连掉两周队，完成率只有 40%。给出 3 周补救安排：砍掉什么、保留什么、用什么指标验收。</li>
+    <li><b>10.</b> 第 10 周的两套整卷分别是 480 分和 462 分（第 2 套比第 1 套低 18 分），要不要改阶段计划？说明判断依据。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>要写成可执行的表格，评分看指标是否可量化</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 写一份 4 周滚动修订方案：触发条件、调整动作、量化指标、可检查产出四项都要有。</li>
+    <li><b>12.</b> 用「完成率」与「正确率」两个指标设计预警线：写出阈值、判定周期与对应动作。</li>
+  </ul>
+  <div class="answer">评分口径：基础题答对即得分；进阶题 7、8 必须给出具体分钟数与课次数；挑战题 11 需四项齐全，12 需给出两个可测量阈值与动作，只写「多练习」不得分。</div>
+  <div class="notes">
+    <div>第 1–6 题只考口径，答错说明 P3 与 P4 没读透；第 9 题的补救安排必须写出 3 周的先后顺序。</div>
+    <div>第 12 题的两条预警线要能被别人复算：阈值、判定周期、动作三样缺一不可。</div>
+    <div>本页限时 30 分钟：1–6 题 10 分钟，7–10 题 12 分钟，11–12 题 8 分钟。</div>
+    <div>凡涉及分钟数、条数、套数的空位都要写出单位，便于按 P7、P8 的口径逐项批改。</div>
+  </div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>；每题都要落到数字，别只写「合理 / 不合理」。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:340px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td>不合理：第 5 周属练题型阶段，词汇新词应为每周 40 个（每天 8 个）</td><td>120 词/周会吃掉阅读精读的 50 分钟，每周 200 分钟预算装不下。</td></tr>
+    <tr><td class="num">2</td><td class="mono">40 × 5 = 200 分钟/周；200 × 12 = 2400 分钟（40 小时）</td><td>只答 200 分钟漏掉总量问项，本问半分。</td></tr>
+    <tr><td class="num">3</td><td>不匹配：模考属第 10–12 周任务；第 2 周应背 200 词 + 精听 3 篇</td><td>3 套整卷约需 390 分钟，接近每周 200 分钟预算的两倍。</td></tr>
+    <tr><td class="num">4</td><td>单次 80 分钟是标准 40 分钟的 2 倍，实测完成率从 100% 掉到 60%</td><td>连续两周后缺课累积 4 次；必须写出至少一个数字。</td></tr>
+    <tr><td class="num">5</td><td>停背新词，把 40 分钟转给错题回炉与作文定稿</td><td>第 12 周比的是整卷手感，不是词汇增量；听力与阅读要保手感，不能停。</td></tr>
+    <tr class="hl"><td class="num">6</td><td>60 条，第 5–9 周每周 12 条：第 5–6 周累计 24 条、第 7–8 周累计 48 条、第 9 周补满 60 条</td><td>每条含题号、错因、正确思路三栏；只写「每天记错题」不得分。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 2 题漏算 2400 分钟总量；第 3 题只答「不匹配」没算时长；第 6 题没给逐周条数。三题合计 3 分，占基础题总分的一半，重做时先做这三题，再按 P3、P4 的口径逐空对照。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分进入进阶题；4–5 分回读 P3 的分配表与 P4 的逐周表；3 分以下把 12 周安排抄写一遍再重做。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 2 题只写 200 分钟/周的记半分，必须同时给出 2400 分钟总量。</div>
+    <div>第 4 题不给数字的记 0 分；能指出「单次不超过 50 分钟」这条规则的给半分。</div>
+    <div>第 6 题条数与周次对不上的扣半分，60 条是全周期硬指标。</div>
+    <div>第 5 题若答「停听力」直接判错：第 12 周整卷的听力占 249 分，手感一停就掉。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在「算不算总量」与「给不给数字」</b>，不涉及判断难度。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含参考安排与评分口径<br>自批：全卷 ≥ 10 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:352px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td>下周回到 5 次课、200 分钟，并把 5 个课次写进固定时段；3 次课的主任务压到 20 分钟，新词两周内从 24 词回到 40 词</td><td>不给课次数与分钟数不得分；跨周补课直接判错。</td></tr>
+    <tr><td class="num">8</td><td class="mono">800 + 1000 + 600 = 2400 分钟（1–4 周 800 · 5–9 周 1000 · 10–12 周 600）</td><td>三段占比 33% / 42% / 25%；对账口径含 800 词 / 12 篇 / 60 条 / 6 套 / 2 篇 五项产出。</td></tr>
+    <tr><td class="num">9</td><td>第 1 周砍掉新词与整卷模考，只做听力精听 50 分钟 + 阅读精读 50 分钟；第 2 周回到 5 次课并加 1 套半卷限时（听力 + 阅读 70 分钟，属加练不占 200 分钟预算）；第 3 周恢复 200 分钟常规，3 周把完成率从 40% 拉回 80%</td><td>验收指标用完成率（达标线 80%）与阅读正确率（阶段线 75%，第 12 周目标 82%），两项都要写；只写「补课」不得分。</td></tr>
+    <tr><td class="num">10</td><td>不改计划：第 2 套比第 1 套低 18 分，落在模考单次波动 ±20 分（约每模块 ±5 分）的正常区间内，看 3 次移动平均再判断</td><td>连续 2 次低于 460 分（预警线）才动计划，且按 P9 的第 3 次修订先改时间分配、不改阶段。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>触发：完成率低于 70%（预警线）或模考连续 2 次低于 460 分；动作：新词 40 → 24 词、主任务 25 → 20 分钟；指标：完成率 ≥ 80%、阅读正确率 ≥ 75%（阶段线，第 12 周目标 82%）；产出：修订单 1 份</td><td>四项缺一扣 0.25 分；只有触发条件、没有产出清单的最多给半分。</td></tr>
+    <tr class="hl"><td class="num">12</td><td>黄线：周完成率低于 70% → 主任务压到 20 分钟；红线：听力与阅读平均正确率低于 65%（按两周判定）→ 停模考 1 周专攻错题本；两线同触则只留听力与阅读 1 周</td><td>阈值、判定周期、动作三样齐全才得分；只写「多练习」不得分。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">失分点排名（3 次重做统计）</div><p>第 8 题三段时长算不全 3 次错、第 11 题漏产出清单 2 次错、第 12 题只给阈值不给动作 2 次错。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>12 分进入 P9 自测；10–11 分重做错题所在页；9 分以下回读 P3–P5，隔天整卷重练一次。</p></div>
+    <div class="box"><div class="k">评分补充</div><p>凡涉及时长与分数的答案，数字带单位才给分；单位缺失或口径不一致（如把 2400 写成 2000）该题半分。第 9 题的三周安排若没有先后顺序，按半分处理。</p></div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在「算不全时长」「漏产出清单」「只给阈值不给动作」三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与 4 周滚动修订</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:148px">自测项</th><th style="width:372px">达标标准</th><th style="width:88px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>复述分数口径</td><td>说出分差：听力 +60、阅读 +45、写作 +10、翻译 +10</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>复述每周分配</td><td>六模块分钟数 50/50/40/25/20/15，合计 200</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>写出阶段产出</td><td>800 词、12 篇精听、60 条错题、6 套整卷、2 篇作文，五项全写出</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>执行率自评</td><td>课次完成率与用时完成率均 ≥ 80%，且能给出近 4 周的数字</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>练习得分</td><td>12 题自批 ≥ 10 / 12，且第 8 题与第 11 题都答全</td><td class="num">P6–P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>预警线落地</td><td>写出完成率 70% 与正确率 65% 两条阈值及对应动作</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 4 周滚动修订 <em>70% 预警线先减量、80% 达标线，70%–80% 记未达标</em></div>
+  <table>
+    <tr><th style="width:112px">修订点</th><th style="width:84px">周次</th><th>触发条件</th><th>调整动作</th><th style="width:200px">可检查产出</th></tr>
+    <tr><td>第 1 次修订</td><td class="num">第 4 周末</td><td>课次完成率低于 70%，或用时完成率低于 70%（预警线）</td><td>新词 40 → 24 词，主任务 25 → 20 分钟</td><td>修订单 1 份、错因清单 6 条</td></tr>
+    <tr><td>第 2 次修订</td><td class="num">第 8 周末</td><td>听力与阅读平均正确率低于 65%（红线），或第 8 周末错题本不足 48 条</td><td>砍写作 1 周（释放 25 分钟），阅读精读 50 → 75 分钟</td><td>修订单 1 份、回炉清单 1 份</td></tr>
+    <tr class="hl"><td>第 3 次修订</td><td class="num">第 12 周初</td><td>连续 2 次模考低于 460 分，或完成率低于 80%（达标线）</td><td>停背新词，只做整卷与错题回炉</td><td>修订单 1 份、复盘记录 1 份</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">每天 40 分钟怎么分</div><p>练题型阶段：主任务 25 分钟（听力 / 阅读 / 写作轮换）+ 背词 8 分钟 + 收尾 7 分钟，合计 40 分钟；打基础阶段改为精听 15 + 背词 15 + 收尾 10，同样合计 40 分钟。两次分配都按 5 次课折算，正好是每周 200 分钟。</p></div>
+    <div class="box"><div class="k">坚持不下来的 3 个提醒</div><p>任务按周给，不按天补；允许每周缺 1 次，12 周共 12 次弹性额度；模考期停背新词，把 40 分钟让给整卷与复盘，缺的课不跨周补。</p></div>
+    <div class="box"><div class="k">下一阶段衔接</div><p>第 13 周起进入 8 周冲刺：仍用每周 5 次节奏，整卷频次提到每周 2 套，词汇只留复习卡片，预警线沿用完成率 70% 与正确率 65% 两条。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>12 周后要求 800 词、12 篇精听、60 条错题、6 套整卷、2 篇定稿作文</b>，五项产出缺一即未达标。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：计划术语 10 条与分数口径</h2></div>
+    <div class="note">计划书 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>修订计划时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:126px">术语</th><th>释义</th></tr>
+    <tr><td>诊断测试</td><td>开始前用 1 套近三年整卷定位四模块基线，本次结果 425 分，用于确定 550 分目标的分差。</td></tr>
+    <tr><td>精听</td><td>对同一段音频逐句听写并对照原文，12 周共 12 篇，每篇留 1 条错因记录。</td></tr>
+    <tr><td>泛听</td><td>不逐句听写，只在通勤时段保持语速适应，每天不超过 10 分钟，不计入 200 分钟预算。</td></tr>
+    <tr><td>错题本</td><td>按题型归位的错题记录，每条含题号、错因、正确思路三栏，全周期目标 60 条。</td></tr>
+    <tr><td>限时模考</td><td>130 分钟内完成整卷并当场填答题卡，第 10–12 周共 6 套，每套 130 分钟。</td></tr>
+    <tr><td>滚动复习</td><td>新词在第 1、3、7 天各复习一次，让 800 词在 12 周内至少过三遍。</td></tr>
+    <tr><td>执行率</td><td>实际完成量 ÷ 计划完成量，按课次与用时两个口径统计，低于 70% 触发预警线。</td></tr>
+    <tr><td>弹性周</td><td>每周允许缺 1 次课的额度，12 周共 12 次；缺课不跨周补，本周产出按 80% 计。</td></tr>
+    <tr><td>复盘</td><td>对模考逐题标注错因并归入题型清单，第 10–12 周每周投 100 分钟。</td></tr>
+    <tr class="hl"><td>边际收益</td><td>同样 40 分钟投给正确率最低的模块收益最大，据此把时间从词汇转向听力与阅读。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">分数口径</div><p>听力 249 + 阅读 249 + 写作 106.5 + 翻译 106.5 = 711 分，官方整卷按 710 分计；425 → 550 的 125 分按 +60 / +45 / +10 / +10 分摊。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增分差表与分配条形图、12 周逐周表、12 题诊断练习与两页答案解析。</p></div>
+    <div class="box"><div class="k">使用提示</div><p>本计划以「每周 5 次、每次 40 分钟」为硬约束；任何调整只改任务量与模块配比，不改课次节奏。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为末页；若跳过前面 9 页，请至少完成 P3 的分差表与 P6 的 1–6 题。</div>
+    <div>术语表按出现顺序排列，10 条覆盖三阶段、模考、执行率与滚动复习的全部口径。</div>
+    <div>下一轮衔接：第 13 周起 8 周冲刺复用本计划的课次节奏与两条预警线。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于修订时统一口径，分数口径用于核对目标是否可达</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>

@@ -1,72 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>research-market-entry</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-market-entry</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-.serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:30px}
-.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.sheet-top{padding:24px 34px 20px;border-bottom:1px solid #edede9}
-.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:11px;font-size:29px;letter-spacing:-.02em}
-.meta{margin-top:9px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
-.body{flex:1;min-height:0;padding:18px 34px;display:grid;gap:12px;align-content:start}
-h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:12px 16px;font-size:12.5px;line-height:1.8;color:#3d4046}
-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
-th,td{border:1px solid #edede9;padding:6px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
-ul{list-style:none;margin-top:9px;display:grid;gap:7px}
-li{position:relative;padding-left:16px;font-size:12.5px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;background:var(--accent)}
-.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
-.verdict{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.vcell{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
-.vcell .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.vcell b{display:block;margin-top:5px;font-size:16px;letter-spacing:-.01em}
-.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0;align-items:start}
-.timeline{display:grid;gap:0;margin-top:9px}
-.tl{display:grid;grid-template-columns:60px 1fr;gap:14px;padding:7px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
-.tl:first-child{border-top:0}
-.tl b{color:var(--accent);font-weight:600}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head><body>
-<div class="sheet" style="--accent:#0F766E">
-  <div class="sheet-top">
-    <div class="kicker">Market Entry</div>
-    <h1>东南亚市场进入可行性评估</h1>
-    <div class="meta"><span>评估维度：需求规模 / 获客成本 / 合规门槛 / 交付能力</span><span>数据截至 2026 年 9 月</span></div>
-  </div>
-  <div class="body">
-    <div><h3>摘要</h3><p class="abstract">按现有交付能力测算，新加坡与马来西亚在 12 个月内可实现正向毛利，前提是先解决本地化部署与数据合规两项前置条件。越南与印尼的获客成本比当前均值高 40% 以上，建议放到第二阶段观望。</p></div>
-    <div class="verdict">
-      <div class="vcell"><div class="k">建议进入</div><b>新加坡 · 马来西亚</b></div>
-      <div class="vcell"><div class="k">建议观望</div><b>越南 · 印尼</b></div>
-      <div class="vcell"><div class="k">建议暂缓</div><b>泰国 · 菲律宾</b></div>
-    </div>
-    <div>
-      <table>
-        <tr><th>市场</th><th>需求规模</th><th>获客成本</th><th>合规门槛</th><th>综合判断</th></tr>
-        <tr><td>新加坡</td><td>中</td><td>低</td><td>中</td><td>优先进入，6 个月验证</td></tr>
-        <tr><td>马来西亚</td><td>中</td><td>低</td><td>低</td><td>优先进入，与新加坡并跑</td></tr>
-        <tr><td>越南</td><td>高</td><td>高</td><td>中</td><td>观察 6 个月后再评估</td></tr>
-        <tr><td>印尼</td><td>高</td><td>高</td><td>高</td><td>需先建本地交付团队</td></tr>
-      </table>
-    </div>
-    <div class="cols2">
-      <div><h3>分阶段动作</h3>
-        <div class="timeline">
-          <div class="tl"><b>0 - 3 月</b><span>完成两地数据合规评估，确定本地部署方案</span></div>
-          <div class="tl"><b>3 - 6 月</b><span>落地 3 家种子客户，验证交付周期与成本</span></div>
-        </div>
-      </div>
-      <div><h3>主要风险</h3>
-        <ul>
-          <li>本地数据留存要求可能推高部署成本，预算需留出余量</li>
-          <li>种子客户集中在单一行业，结论可能被行业特性放大</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="sheet-foot"><span>泰国与菲律宾本阶段不投入，下一轮重新评估</span><span>第 1 / 8 页</span></div>
-</div></body></html>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">Market Entry</div><h2>东南亚市场进入可行性评估</h2></div><div class="pn">评估维度：需求规模 / 获客成本 / 合规门槛 / 交付能力<br>数据截至 2026 年 9 月</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>按现有交付能力测算，新加坡与马来西亚在 <b>12 个月内</b>可实现正向毛利（分别在第 9、11 个月转正），前提是先解决本地化部署与数据合规两项前置条件。越南与印尼的获客成本分别为区域基准的 <b>+41%</b> 与 <b>+50%</b>，且印尼合规门槛为满分 5 分，建议放到第二阶段观望。</p></div><div class="kpi"><div class="kc"><div class="k">建议进入</div><b class="n class="sm"">新加坡 · 马来西亚</b><i>12 个月内毛利转正，合规门槛 ≤ 3 分</i></div><div class="kc"><div class="k">建议观望</div><b class="n">越南 · 印尼</b><i>获客成本高于基准 41%–50%</i></div><div class="kc"><div class="k">建议暂缓</div><b class="n">泰国 · 菲律宾</b><i>需求规模指数仅 61 与 48</i></div></div><table><thead><tr><th>市场</th><th class="n">需求规模</th><th class="n">获客成本</th><th class="n">合规门槛</th><th>综合判断</th></tr></thead><tbody><tr class=""><td>新加坡</td><td class="n">100（基准）</td><td class="n n">3,200 元 −30%</td><td class="n n">3 / 5</td><td>优先进入，9 个月毛利转正</td></tr><tr class=""><td>马来西亚</td><td class="n">84</td><td class="n n">2,900 元 −37%</td><td class="n n">2 / 5</td><td>优先进入，与新加坡并跑</td></tr><tr class=""><td>越南</td><td class="n">76</td><td class="n n">6,500 元 +41%</td><td class="n n">3 / 5</td><td>观察 6 个月后再评估</td></tr><tr class=""><td>印尼</td><td class="n">92</td><td class="n n">6,900 元 +50%</td><td class="n n">5 / 5</td><td>需先建本地交付团队（8 人）</td></tr></tbody></table><div class="cols2 eq"><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>完成新加坡与马来西亚数据合规评估，确定本地部署方案</span></div><div class="r"><b>3–6 月</b><span>落地 6 家种子客户（每地 3 家），验证交付周期与成本</span></div><div class="r"><b>6–12 月</b><span>按验证结果决定是否把印尼提前到第二阶段</span></div></div></div><div><h3>主要风险</h3><ul class=""><li>本地数据留存要求可能推高部署成本，预算需留 15% 余量</li><li>种子客户集中在单一行业，结论可能被行业特性放大</li><li>区域获客成本基准按上半年投放数据测算，下半年可能上移</li></ul></div></div></div>
+  <div class="pf"><span>泰国与菲律宾本阶段不投入，下一轮重新评估（建议 2027 Q2）</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 六市场数据表见第 4 页<br>判断口径见第 3 页</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 评估框架与口径</td><td>四维定义、权重与数据来源</td><td>4 维权重表 + 口径说明</td><td class="n n">3</td></tr><tr class=""><td>2 市场全景</td><td>六市场需求与获客成本对比</td><td>六市场数据表 + 2 组条形图</td><td class="n n">4</td></tr><tr class=""><td>3 维度拆解</td><td>需求 × 合规定位与交付要求</td><td>2×2 矩阵 + 交付能力表</td><td class="n n">5</td></tr><tr class=""><td>4 关键洞察与证据</td><td>判断背后的支撑数据</td><td>5 条洞察</td><td class="n n">6</td></tr><tr class=""><td>5 情景推演</td><td>三种情景下的盈亏路径</td><td>3 情景 + 转正月份对比</td><td class="n n">7</td></tr><tr class=""><td>6 风险与信息缺口</td><td>合规、成本与样本限制</td><td>5 项风险 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 结论与建议动作</td><td>三阶段节奏与里程碑</td><td>3 条结论 · 3 阶段动作</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>来源清单、测算口径、术语</td><td>6 类来源 + 术语表</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>判断规则（三选一）</h3><ul class=""><li><b>进入</b>：合规门槛 ≤ 3 分，且获客成本低于区域基准，且 12 个月内毛利转正</li><li><b>观望</b>：任一项不满足，但需求规模指数 ≥ 70</li><li><b>暂缓</b>：需求规模指数 < 70 且交付需新增 4 人及以上</li><li><b>兜底</b>：以上三档均不满足时按暂缓处理，本阶段不投入</li></ul></div><div><h3>读表须知</h3><ul class=""><li>需求规模指数以新加坡 = 100 为基准，仅用于横向比较</li><li>获客成本为单客户获取成本，含市场投放与人力摊销</li><li>毛利转正月份为按现有交付能力测算的月份数，不含新市场固定投入</li></ul></div></div><div><h3>判断复核记录</h3><table><thead><tr><th>市场</th><th>初判</th><th>复核后</th><th>复核依据</th></tr></thead><tbody><tr class=""><td>印尼</td><td>观望</td><td>观望（不变）</td><td>合规门槛 5 分与 8 人团队需求同时成立</td></tr></tbody></table></div></div>
+  <div class="pf"><span>三档判断规则在第 9 页逐市场复核一次，规则调整会重排优先级</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Framework</div><h2>评估框架、权重与数据口径</h2></div><div class="pn">四维加权，满分 100<br>权重来自 12 位区域负责人的排序</div></div>
+  <div class="pc"><div><h3>四维权重与衡量方式</h3><table><thead><tr><th>维度</th><th>权重</th><th>衡量方式</th><th>数据来源</th></tr></thead><tbody><tr class=""><td>需求规模</td><td>30%</td><td>可服务客户数 × 客单价，折算为指数（新加坡 = 100）</td><td>公开统计 + 12 家渠道商问询</td></tr><tr class=""><td>获客成本</td><td>30%</td><td>单客户获取成本，含投放与人力摊销，与区域基准比较</td><td>2026 上半年投放数据</td></tr><tr class=""><td>合规门槛</td><td>25%</td><td>数据留存、本地化部署、许可要求三项合成，1–5 分</td><td>公开文本 + 本地律所口径摘要</td></tr><tr class=""><td>交付能力</td><td>15%</td><td>达成 12 个月内交付所需本地团队人数与可招聘性</td><td>招聘平台数据 + 内部测算</td></tr></tbody></table></div><div class="cols2 eq"><div><h3>区域基准的定义</h3><ul class=""><li>获客成本区域基准 = 4,600 元/客户，按各市场上半年投放金额加权</li><li>新加坡 3,200 元为基准的 −30%，马来西亚 2,900 元为 −37%</li><li>越南 6,500 元为 +41%，印尼 6,900 元为 +50%</li><li>泰国 5,400 元为 +17%，菲律宾 5,000 元为 +9%</li></ul></div><div><h3>口径说明与时间窗</h3><ul class=""><li>客户定义：50 坐席以上、年客单价 ≥ 15 万元的付费主体</li><li>投放窗口：2026-01-01 – 2026-06-30，未含下半年预算调整</li><li>合规门槛为文本要求合成，未含实际执行宽严差异</li><li>交付能力按现有团队能力外推，未计入新招聘的爬坡期</li></ul></div></div><div><h3>本次不评估</h3><p>不评估汇率与税务结构，不评估并购或合资路径，不评估与本地伙伴的分成比例。以上三项在确定进入后再做专项测算，本报告只回答「进不进、什么顺序进」两个问题。</p></div><div><h3>权重与顺序的敏感性</h3><table><thead><tr><th>变量</th><th>变化</th><th>对排序的影响</th></tr></thead><tbody><tr class=""><td>合规门槛权重 25% → 35%</td><td>其余三维等比下调</td><td>印尼从观望降为暂缓，其余顺序不变</td></tr><tr class=""><td>获客成本基准上移 10%</td><td>相对缺口整体收窄</td><td>马来西亚与越南同时降档，仅新加坡保留</td></tr></tbody></table></div></div>
+  <div class="pf"><span>四维权重合计 100%，若把合规门槛提到 35% 则印尼需降至暂缓档</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Market Landscape</div><h2>六市场全景数据</h2></div><div class="pn">数据截至 2026 年 9 月<br>获客成本基准 4,600 元/客户</div></div>
+  <div class="pc"><table><thead><tr><th>市场</th><th class="n">需求规模指数</th><th class="n">获取成本（元）</th><th class="n">相对基准</th><th class="n">合规门槛</th><th class="n">交付需人数</th><th class="n">毛利转正</th><th>判断</th></tr></thead><tbody><tr class=""><td>新加坡</td><td class="n n hl">100</td><td class="n n">3,200</td><td class="n n">−30%</td><td class="n n">3</td><td class="n n">3</td><td class="n n">第 9 月</td><td>进入</td></tr><tr class=""><td>马来西亚</td><td class="n n">84</td><td class="n n">2,900</td><td class="n n">−37%</td><td class="n n">2</td><td class="n n">4</td><td class="n n">第 11 月</td><td>进入</td></tr><tr class=""><td>越南</td><td class="n n">76</td><td class="n n">6,500</td><td class="n n">+41%</td><td class="n n">3</td><td class="n n">6</td><td class="n n">第 18 月</td><td>观望</td></tr><tr class=""><td>印尼</td><td class="n n">92</td><td class="n n">6,900</td><td class="n n">+50%</td><td class="n n">5</td><td class="n n">8</td><td class="n n">第 21 月</td><td>观望</td></tr><tr class=""><td>泰国</td><td class="n n">61</td><td class="n n">5,400</td><td class="n n">+17%</td><td class="n n">2</td><td class="n n">5</td><td class="n n">第 16 月</td><td>暂缓</td></tr><tr class=""><td>菲律宾</td><td class="n n">48</td><td class="n n">5,000</td><td class="n n">+9%</td><td class="n n">2</td><td class="n n">4</td><td class="n n">第 14 月</td><td>暂缓</td></tr></tbody></table><div class="cols2 eq"><div><h3>需求规模指数（新加坡 = 100）</h3><div class="bars"><div class="bar"><span>新加坡</span><span class=""><i class="" style="width:100%"></i></span><span class="v">100</span></div><div class="bar"><span>印尼</span><span class=""><i class="" style="width:92%"></i></span><span class="v">92</span></div><div class="bar"><span>马来西亚</span><span class=""><i class="" style="width:84%"></i></span><span class="v">84</span></div><div class="bar"><span>越南</span><span class=""><i class="" style="width:76%"></i></span><span class="v">76</span></div><div class="bar"><span>泰国</span><span class=""><i class="" style="width:61%"></i></span><span class="v">61</span></div><div class="bar"><span>菲律宾</span><span class=""><i class="" style="width:48%"></i></span><span class="v">48</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></span><span></span></div></div></div><div><h3>获客成本与区域缺口</h3><div class="bars"><div class="bar"><span>印尼 +50%</span><span class=""><i class="" style="width:100%"></i></span><span class="v">6,900</span></div><div class="bar"><span>越南 +41%</span><span class=""><i class="" style="width:94%"></i></span><span class="v">6,500</span></div><div class="bar"><span>泰国 +17%</span><span class=""><i class="" style="width:78%"></i></span><span class="v">5,400</span></div><div class="bar"><span>菲律宾 +9%</span><span class=""><i class="" style="width:72%"></i></span><span class="v">5,000</span></div><div class="bar"><span>基准</span><span class=""><i class="" style="width:67%"></i></span><span class="v">4,600</span></div><div class="bar"><span>新加坡 −30%</span><span class=""><i class="" style="width:46%"></i></span><span class="v">3,200</span></div><div class="bar"><span>马来西亚 −37%</span><span class=""><i class="" style="width:42%"></i></span><span class="v">2,900</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>1,750</span><span>3,500</span><span>5,250</span><span>7,000</span></span><span></span></div></div></div></div></div>
+  <div class="pf"><span>需求规模高但成本高是印尼的特征，其判断由第 5 页的合规分主导</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Dimensions</div><h2>需求、合规与交付能力拆解</h2></div><div class="pn">行：需求规模指数（阈值 70）；列：合规门槛（阈值 3 分，越低越好）<br>四格按「需求高→低 × 门槛高→低」排布</div></div>
+  <div class="pc"><div class="mx"><div><div class="t">高需求 · 高合规门槛：印尼（92 · 5 分）</div><p>需求规模仅次于新加坡，但合规门槛满分。</p><ul class=""><li>需本地部署 + 数据留存双重满足</li><li>交付需 8 人，招聘周期估 5 个月</li><li>结论：观望，先建团队</li></ul></div><div><div class="t">高需求 · 低合规门槛：新加坡、马来西亚、越南</div><p>三角中新加坡 100 · 3 分，马来西亚 84 · 2 分，越南 76 · 3 分。</p><ul class=""><li>前两者获客成本低于基准 30% 以上</li><li>越南成本 +41%，成本项拖累</li></ul></div><div><div class="t">低需求 · 高合规门槛：无</div><p>六市场中无此组合。</p><ul class=""><li>说明合规门槛与需求规模在本区域正相关</li><li>高门槛市场通常对应更成熟的采购预算</li></ul></div><div><div class="t">低需求 · 低合规门槛：泰国、菲律宾</div><p>泰国 61 · 2 分，菲律宾 48 · 2 分。</p><ul class=""><li>合规不是障碍，需求规模才是</li><li>毛利转正分别需 16 与 14 个月</li></ul></div></div><div class="cols2 wide"><div><h3>交付能力要求与可招聘性</h3><table><thead><tr><th>市场</th><th class="n">交付需人数</th><th class="n">本地可招聘（月）</th><th>语言与时区</th><th>可复用现有团队</th></tr></thead><tbody><tr class=""><td>新加坡</td><td class="n n">3</td><td class="n n">1.5</td><td>英语，与总部同时区</td><td>可复用 1 人</td></tr><tr class=""><td>马来西亚</td><td class="n n">4</td><td class="n n">2.0</td><td>英语 + 马来语</td><td>需新增 3 人</td></tr><tr class=""><td>越南</td><td class="n n">6</td><td class="n n">3.5</td><td>越南语，时区 +1</td><td>需全部新增</td></tr><tr class=""><td>印尼</td><td class="n n">8</td><td class="n n">5.0</td><td>印尼语，时区 +1</td><td>需全部新增</td></tr><tr class=""><td>泰国</td><td class="n n">5</td><td class="n n">3.0</td><td>泰语</td><td>需全部新增</td></tr><tr class=""><td>菲律宾</td><td class="n n">4</td><td class="n n">2.5</td><td>英语</td><td>可复用 1 人</td></tr></tbody></table></div><div><h3>合规门槛的三项构成</h3><ul class=""><li>数据留存要求：新加坡与越南中等（3 分），印尼最严（5 分）</li><li>本地化部署要求：马来西亚最宽（2 分），可接受先远程交付</li><li>许可与备案：印尼为前置审批，泰国与菲律宾为事后备案</li></ul></div></div></div>
+  <div class="pf"><span>合规门槛与交付人数共同决定首批投入：印尼两者均为最高，故排在观望档</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Insights & Evidence</div><h2>关键洞察与证据</h2></div><div class="pn">每条洞察至少一个可核算数据<br>数据来源见第 10 页</div></div>
+  <div class="pc"><table><thead><tr><th>#</th><th>洞察</th><th>支撑数据</th><th>对决策的含义</th></tr></thead><tbody><tr class=""><td>1</td><td>获客成本差异远大于需求规模差异</td><td>需求规模区间 48–100（2.1 倍），获客成本区间 2,900–6,900（2.4 倍）</td><td>成本决定顺序，规模决定上限</td></tr><tr class=""><td>2</td><td>合规门槛与需求规模正相关</td><td>合规 5 分的印尼需求 92；合规 2 分的泰国与菲律宾需求 61 与 48</td><td>高门槛市场往往更值得等待</td></tr><tr class=""><td>3</td><td>12 个月是可否并跑的分水岭</td><td>新加坡第 9 月、马来西亚第 11 月转正，其余市场均 ≥ 14 个月</td><td>并跑只在前两名市场成立</td></tr><tr class=""><td>4</td><td>交付人数与转正月份高度相关</td><td>3–4 人市场转正 9–14 月；6–8 人市场转正 18–21 月</td><td>先建团队再卖，否则会拖长回收期</td></tr><tr class=""><td>5</td><td>种子客户行业集中会放大结论误差</td><td>首批 6 家种子客户中 4 家来自同一行业</td><td>第二轮验证需强制跨行业取样</td></tr></tbody></table><div class="cols2 eq"><div><h3>洞察的量化含义</h3><ul class=""><li>把印尼的 8 人团队拆成两批（先 4 人）可将转正月份从 21 个月压到 17 个月，接近观望上沿</li><li>新加坡与马来西亚合计可覆盖区域需求指数 184，占六市场总量的 40%</li><li>若获客成本整体上移 10%，马来西亚转正月份从 11 个月推后到 13 个月，并跑假设失效</li></ul></div><div><h3>反例与边界</h3><ul class=""><li>菲律宾获客成本仅 +9%，若需求规模在下一轮上升 15 分，可能直接进入档</li><li>泰国合规门槛仅 2 分，本轮暂缓完全由需求规模决定，不涉及合规</li><li>毛利测算未含汇率波动，本地货币贬值 5% 会推后转正 1–2 个月</li></ul></div></div><div><h3>洞察到动作的映射</h3><table><thead><tr><th>洞察</th><th>建议动作</th><th>责任角色</th><th>验证指标</th></tr></thead><tbody><tr class=""><td>1 成本差异大于规模差异</td><td>先按获客成本排序投入顺序</td><td>区域负责人</td><td>实测成本 ≤ 3,400 元</td></tr><tr class=""><td>2 合规与规模正相关</td><td>对高门槛市场先建团队再谈进入</td><td>交付 + 法务</td><td>团队 ≥ 4 人到位</td></tr><tr class=""><td>3 12 个月是并跑分水岭</td><td>只在前两名市场并跑</td><td>区域负责人</td><td>两地均在第 12 月前转正</td></tr><tr class=""><td>4 交付人数决定回收期</td><td>把印尼 8 人拆成 4+4 两批建队</td><td>交付 + HR</td><td>转正月份压缩到 17 月</td></tr><tr class=""><td>5 种子客户需跨行业</td><td>第二轮强制跨 3 行业各 ≥ 2 家</td><td>销售</td><td>跨行业数 ≥ 3</td></tr></tbody></table></div></div>
+  <div class="pf"><span>洞察 3 是「并跑」策略成立的核心依据，第 7 页对其做敏感度检验</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Scenarios</div><h2>情景推演与盈亏路径</h2></div><div class="pn">三种情景均保持现有交付能力<br>转正月份按现金流口径</div></div>
+  <div class="pc"><table><thead><tr><th>情景</th><th>关键变化</th><th class="n">新加坡转正</th><th class="n">马来西亚转正</th><th class="n">印尼转正</th><th>结论变化</th><th>概率</th></tr></thead><tbody><tr class=""><td>基准</td><td>投放成本与合规要求维持现状</td><td class="n">第 9 月</td><td class="n">第 11 月</td><td class="n">第 21 月</td><td>与首屏判断一致</td><td class="n">50%</td></tr><tr class=""><td>竞争加剧</td><td>区域获客成本整体上移 10%</td><td class="n">第 11 月</td><td class="n">第 13 月</td><td class="n">第 24 月</td><td>马来西亚降为观望，改为单点进入</td><td class="n">30%</td></tr><tr class=""><td>合规收紧</td><td>数据留存与本地化要求上调一档</td><td class="n">第 10 月</td><td class="n">第 12 月</td><td class="n">第 26 月以上</td><td>印尼从观望降为暂缓</td><td class="n">20%</td></tr></tbody></table><div><h3>敏感度：单变量变化对转正月份的影响</h3><div class="bars"><div class="bar"><span>获客成本 +10%</span><span class=""><i class="" style="width:100%"></i></span><span class="v">+2 月</span></div><div class="bar"><span>合规要求 +1 档</span><span class=""><i class="" style="width:82%"></i></span><span class="v">+1 月</span></div><div class="bar"><span>交付人数减半</span><span class=""><i class="" style="width:64%"></i></span><span class="v">−4 月</span></div><div class="bar"><span>客单价 +10%</span><span class=""><i class="" style="width:46%"></i></span><span class="v">−2 月</span></div><div class="bar"><span>汇率 −5%</span><span class=""><i class="" style="width:36%"></i></span><span class="v">+1.5 月</span></div><div class="axis"><span></span><span class="t"><span>−4</span><span>0</span><span>+2</span><span>+4 月</span></span><span></span></div></div></div><div class="cols2 eq"><div><h3>推演假设</h3><ul class=""><li>客单价按中型客户年 21 万元测算，不含定制开发收入</li><li>交付人力成本按本地市场中位数薪资，含 30% 管理摊销</li><li>不假设规模效应，单客户交付成本在第 12 个月前保持不变</li></ul></div><div><h3>推翻推演的条件</h3><ul class=""><li>区域获客成本连续两季上行超过 10%</li><li>任一目标市场发布新的数据本地化前置要求</li><li>种子客户交付成本超出测算 25% 以上</li></ul></div></div><div><h3>情景触发的复核节奏</h3><table><thead><tr><th>情景</th><th>早期信号</th><th>复核频率</th></tr></thead><tbody><tr class=""><td>竞争加剧</td><td>区域获客成本连续两季上行 > 10%</td><td>每季度更新投放数据</td></tr></tbody></table></div></div>
+  <div class="pf"><span>竞争加剧情景下马来西亚降档，是唯一会改变首批市场数量的事件</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Risks & Gaps</div><h2>风险、假设与信息缺口</h2></div><div class="pn">风险按「影响 × 概率」排序<br>缺口项标注补齐方式与时间</div></div>
+  <div class="pc"><table><thead><tr><th>风险</th><th>对结论的影响</th><th>概率</th><th>缓释动作</th></tr></thead><tbody><tr class=""><td>本地数据留存要求推高部署成本</td><td>毛利转正月份后移 1–2 个月</td><td>高</td><td>预算留 15% 余量，优先选可复用架构</td></tr><tr class=""><td>种子客户行业集中（6 家中 4 家同行业）</td><td>验证结论不可外推</td><td>高</td><td>第二轮强制跨 3 个行业取样，每行业 ≥ 2 家</td></tr><tr class=""><td>获客成本基准仅取上半年数据</td><td>下半年上移会使马来西亚降档</td><td>中</td><td>每季度更新一次投放数据并复核顺序</td></tr><tr class=""><td>本地招聘周期长于测算</td><td>印尼与越南的观望期被拉长</td><td>中</td><td>先以远程 + 短期派驻覆盖前 6 个月</td></tr><tr class=""><td>合规口径为文本合成，执法宽严未知</td><td>门槛分可能高估或低估一档</td><td>中</td><td>进入前委托本地律所出一份口径摘要</td></tr></tbody></table><div class="cols2 eq"><div><h3>信息缺口</h3><ul class=""><li>缺少六个市场的实际成交价数据，需求规模指数为估算</li><li>未取得任何目标市场的客户访谈，需求判断来自渠道商转述</li><li>交付人力成本未含签证与派驻成本，可能低估 10%–15%</li><li>泰国的合规简化路径细节未核实，暂缓判断可能偏保守</li></ul></div><div><h3>本次成立的假设</h3><ul class=""><li>区域基准 4,600 元/客户在 2026 年内保持同一量级</li><li>客户定义（50 坐席以上）与现有客段一致，产品不需重做</li><li>首批投入不超过 3 个市场，交付团队可复用总部资源</li></ul></div></div><div><h3>风险缓释的责任与频率</h3><table><thead><tr><th>风险</th><th>缓释动作</th><th>责任角色</th><th>检查频率</th></tr></thead><tbody><tr class=""><td>本地留存推高成本</td><td>预算留 15% 余量，优先复用架构</td><td>交付 + 财务</td><td>每项目结项时</td></tr><tr class=""><td>种子客户行业集中</td><td>第二轮强制跨 3 行业取样</td><td>销售</td><td>每轮验证前</td></tr><tr class=""><td>成本基准仅半年数据</td><td>每季度更新投放数据并复核顺序</td><td>市场</td><td>每季度</td></tr></tbody></table></div></div>
+  <div class="pf"><span>风险 1 与风险 2 同时发生的概率约 20%，届时建议只保留新加坡单点进入</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Recommendations</div><h2>结论与建议动作</h2></div><div class="pn">结论对应第 6 页洞察<br>动作按 0–12 个月三阶段推进</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">结论一</div><b class="n class="sm"">先进入新加坡与马来西亚</b><i>合计覆盖区域需求指数 184，12 个月内毛利转正</i></div><div class="kc"><div class="k">结论二</div><b class="n">印尼等待不放弃</b><i>需求 92 分但需 8 人团队，先建队再谈进入</i></div><div class="kc"><div class="k">结论三</div><b class="n class="sm"">泰国与菲律宾下一轮再看</b><i>需求指数 61 与 48，均低于 70 的进入阈值</i></div></div><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>完成新加坡与马来西亚数据合规评估并锁定本地部署方案；启动两地各 1 名交付人员招聘，成本预算留 15% 余量</span></div><div class="r"><b>3–6 月</b><span>落地 6 家种子客户（每地 3 家、跨 3 个行业）；验证交付周期与单客户成本，对照测算的 3,200 与 2,900 元获客成本</span></div><div class="r"><b>6–12 月</b><span>按验证结果决定印尼节奏：若团队到位且合规口径明确，把印尼提前到第二阶段并拆成 4+4 两批建队</span></div></div></div><div class="cols2 eq"><div><h3>里程碑与责任</h3><table><thead><tr><th>里程碑</th><th>时间</th><th>负责角色</th><th>通过标准</th></tr></thead><tbody><tr class=""><td>合规方案锁定</td><td>第 3 月</td><td>法务 + 交付</td><td>两地均出具部署方案</td></tr><tr class=""><td>种子客户 6 家</td><td>第 6 月</td><td>销售 + 交付</td><td>跨 3 行业，各 ≥ 2 家</td></tr><tr class=""><td>转正复核</td><td>第 9 月</td><td>财务 + 区域负责人</td><td>新加坡毛利为正</td></tr><tr class=""><td>印尼决策</td><td>第 12 月</td><td>区域负责人</td><td>团队 ≥ 4 人到位</td></tr></tbody></table></div><div><h3>衡量指标</h3><ul class=""><li>获客成本实测 / 目标 ≤ 3,400 元（新加坡）、≤ 3,100 元（马来西亚）</li><li>交付周期 / 目标 ≤ 6 周，与现有市场持平</li><li>种子客户跨行业数 / 目标 ≥ 3 个</li><li>季度获客成本复核 / 每季 1 次，上移 > 10% 触发顺序重排</li></ul></div></div><div><h3>里程碑通过标准</h3><table><thead><tr><th>里程碑</th><th>通过标准</th><th>未通过时的处置</th></tr></thead><tbody><tr class=""><td>转正复核（第 9 月）</td><td>新加坡毛利为正</td><td>若为负，暂停马来西亚投入并复核成本假设</td></tr></tbody></table></div></div>
+  <div class="pf"><span>三阶段动作合计 12 个月，与第 7 页基准情景一致；竞争加剧情景下只执行新加坡单点</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>参考来源、测算口径与术语</h2></div><div class="pn">来源按类型编号，正文引用编号<br>测算未含汇率与税务结构</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>来源类型</th><th>数量 / 规模</th><th>时间窗</th><th>用于正文</th></tr></thead><tbody><tr class=""><td>M1</td><td>目标市场公开统计（企业数与用工规模）</td><td>6 个市场</td><td>2024 – 2026</td><td>第 4 页需求规模指数</td></tr><tr class=""><td>M2</td><td>区域投放数据（内部与渠道合并）</td><td>12 家渠道商</td><td>2026-01 – 2026-06</td><td>第 3、4 页获客成本</td></tr><tr class=""><td>M3</td><td>公开合规文本与律所口径摘要</td><td>6 份</td><td>2026-03 – 2026-09</td><td>第 5 页合规门槛</td></tr><tr class=""><td>M4</td><td>本地招聘平台数据</td><td>6 个市场</td><td>2026-08</td><td>第 5 页交付能力</td></tr><tr class=""><td>M5</td><td>区域负责人排序问卷</td><td>12 份</td><td>2026-08</td><td>第 3 页权重</td></tr><tr class=""><td>M6</td><td>种子客户交付记录（内部）</td><td>6 个项目</td><td>2026-02 – 2026-09</td><td>第 6、7 页成本校验</td></tr></tbody></table><div class="cols2 eq"><div><h3>测算口径</h3><ul class=""><li>毛利 = 客户年收入 − 获客成本 − 交付人力成本 − 基础设施成本</li><li>获客成本按单客户口径，含投放与销售人力摊销</li><li>转正月份按累计现金流转正的月份计算</li><li>未含汇率波动、税务结构与本地伙伴分成</li></ul></div><div><h3>术语表</h3><ul class=""><li><b>需求规模指数</b>：以新加坡 = 100 的可服务市场规模相对值</li><li><b>合规门槛</b>：数据留存、本地化部署、许可三项合成，1–5 分</li><li><b>并跑</b>：两个市场同期投入同一套交付资源</li><li><b>种子客户</b>：首批验证交付能力与成本的付费客户</li><li><b>转正月份</b>：累计现金流转正的月份序数</li></ul></div></div><div><h3>来源校准计划</h3><table><thead><tr><th>来源</th><th>校准方式</th><th>频率</th></tr></thead><tbody><tr class=""><td>获客成本（M2）</td><td>与渠道商核对实际成交区间</td><td>每季度</td></tr></tbody></table></div></div>
+  <div class="pf"><span>来源版本 v2026.09 · 获客成本数据每季度更新，下次复核 2026-12-20</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

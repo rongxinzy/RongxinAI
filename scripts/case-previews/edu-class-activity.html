@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-class-activity</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
+.box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
+.cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
+.cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
+</style></head><body>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Class Design 01</div>
+      <h1>初中物理《浮力》40 分钟探究课活动设计</h1>
+      <div class="sub">适用：八年级物理（人教版下册第十章）｜ 40 分钟 · 6 个环节 · 5 组 × 8 人 ｜ 器材 5 套 · 练习 12 题</div>
+    </div>
+    <div class="note">讲义 v2.0 · 共 10 页<br><b>对象</b>：八年级物理教师，用于备课与听课<br><b>口径</b>：班额 40 人，分 5 组，每组 8 人</div>
+  </div>
+  <div class="ask"><div class="av"></div><p>帮我设计一节 40 分钟的初中物理《浮力》探究课，要能分组动手、有明确产出。</p></div>
+  <p class="lead">本讲义把一节 40 分钟的《浮力》探究课拆成 6 个环节：情境导入 4 分钟、提出问题 5 分钟、分组猜想 5 分钟、动手测量 12 分钟、数据汇总 8 分钟、结论与作业 6 分钟。动手测量是唯一产生原始数据的环节，占 30%；全班 5 组各出 3 组数据，汇总 15 组，当堂得到「排开液体体积越大、浮力越大」的结论。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">40<small>分钟</small></div><div class="l">6 个环节合计，动手测量占 12 分钟</div></div>
+    <div class="stat"><div class="n">6<small>个</small></div><div class="l">环节：导入 / 提问 / 猜想 / 测量 / 汇总 / 结论</div></div>
+    <div class="stat"><div class="n">8<small>人 / 组</small></div><div class="l">全班 40 人分 5 组，配器材 5 套、记录单 40 张</div></div>
+  </div>
+  <div class="sec">设计路径 <em>本页即封面摘要；课中三段合计 40 分钟，课前与课后为准备与巩固时间</em></div>
+  <table>
+    <tr><th style="width:88px">阶段</th><th style="width:138px">时点</th><th>内容</th><th style="width:246px">可检查产出</th><th style="width:82px">用时</th></tr>
+    <tr><td>备料</td><td class="num">课前 1 天</td><td>按 5 套分装器材，打印记录单 40 张（P3）</td><td>材料包 5 套 + 记录单 40 张</td><td class="num">30 分钟</td></tr>
+    <tr><td>导入与提问</td><td class="num">课中第 1–9 分钟</td><td>演示沉浮现象，把学生原话收敛成问题链 4 问（P4）</td><td>问题链 4 问板书定稿</td><td class="num">9 分钟</td></tr>
+    <tr><td>猜想与测量</td><td class="num">课中第 10–26 分钟</td><td>5 组写可验证猜想，用测力计与量筒测 3 组数据（P4–P5）</td><td>每组 3 组数据，班组 15 组</td><td class="num">17 分钟</td></tr>
+    <tr><td>汇总与结论</td><td class="num">课中第 27–40 分钟</td><td>全班汇总 15 组数据，教师只讲方法不报答案（P5–P8）</td><td>汇总表 15 行 + 结论 1 条</td><td class="num">14 分钟</td></tr>
+    <tr class="hl"><td>自测与规划</td><td class="num">课后 1 天</td><td>6 项自测清单 + 3 课时单元规划（P9–P10）</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">25 分钟</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">学情口径</div><p>八年级 40 人，分 5 组、每组 8 人；已学重力与二力平衡、会用弹簧测力计，未学阿基米德原理公式。</p></div>
+    <div class="box"><div class="k">来源与统计窗口</div><p>样本：本校 2026 年 3–6 月 12 节公开课观察记录；教材：人教版八年级下册第十章；器材：5 套同规格。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 背景与范围 · P4 概念与动作 · P5 失误对照 · P6 诊断题 12 道 · P7–P8 逐题解析 · P9 自测与单元 · P10 术语附录。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>把 12 分钟给动手测量</b>，其余 5 个环节都围绕这 15 组数据服务。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Class Design 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全讲 7 章 + 附录 · 共 10 页<br>先设计、再练习、后自测</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:132px">章节</th><th>一句话说明</th><th style="width:172px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>背景与范围</td><td>给出 6 个环节的时长、组织形式与学生产出，并注明班级与器材口径</td><td>能复述 4 / 5 / 5 / 12 / 8 / 6 分钟</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>讲清探究式课堂三要素：问题链、材料包、记录单</td><td>写出 4 问与 6 个字段</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见失误与对照</td><td>列出 6 个高频失误，并对照讲授式与探究式的处理差异</td><td>错因清单 6 条</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题诊断时间与分工，进阶 4 题改造课堂，挑战 2 题出量表与单元</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>第 1–6 题逐题给出参考答案与失分点</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>第 7–12 题的参考方案、追问话术与观察量表样例</td><td>自批得分 ≥ 9 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与单元规划</td><td>6 项自测清单定达标线，3 课时单元给出可检查产出</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>教学设计术语 10 条与学情口径，供备课本与教研组统一使用</td><td>能解释问题链与脚手架</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把 6 个环节时长抄进备课本；第 2 天读 P5 后做 P6 的 1–6 题，用 P7 自批；第 3 天做 7–12 题，对照 P8，最后完成 P9 自测与单元规划。</p></div>
+    <div class="box"><div class="k">前置准备</div><p>课前备齐 5 套同规格器材（弹簧测力计 0–5 N、溢水杯、量筒 100 mL、铝块 50 g、木块、细线、抹布），打印记录单 40 张；确认实验室有水槽与排水口，量筒刻度可读 1 mL。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，便于按三个半天分次阅读。</div>
+    <div>练习在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应，先做完再翻答案。</div>
+    <div>若用于教研组磨课，建议把 P5 的 6 个失误打印成检查表，一人一张随堂打钩。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>先照着 P3 的时间表排一遍课，再回头改细节</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 背景与范围</div><h2 class="pt">6 个环节的时长、组织形式与学生产出</h2></div>
+    <div class="note">口径：班额 40 人，分 5 组<br>每组 8 人，器材 5 套</div>
+  </div>
+  <div class="sec">A · 环节时间表 <em>合计 40 分钟，任何环节不得挪用动手测量时间</em></div>
+  <table>
+    <tr><th style="width:96px">环节</th><th style="width:66px">时长</th><th style="width:222px">组织形式</th><th>学生产出</th></tr>
+    <tr><td>情境导入</td><td class="num">4 分钟</td><td>全班演示，教师操作铝块 50 g 与木块</td><td>口述 1 个沉 / 浮判断及依据</td></tr>
+    <tr><td>提出问题</td><td class="num">5 分钟</td><td>全班提问，教师板书收敛</td><td>问题链 4 问定稿</td></tr>
+    <tr><td>分组猜想</td><td class="num">5 分钟</td><td>5 组组内讨论并举手表决</td><td>每组 1 条可验证猜想</td></tr>
+    <tr class="hl"><td>动手测量</td><td class="num">12 分钟</td><td>5 组并行，角色每 3 分钟轮换，共 4 轮</td><td>每组 3 组数据，班组 15 组</td></tr>
+    <tr><td>数据汇总</td><td class="num">8 分钟</td><td>抽 3 组上台，全班填汇总表</td><td>汇总表 15 行数据</td></tr>
+    <tr><td>结论与作业</td><td class="num">6 分钟</td><td>全班讲评，教师只讲方法不报答案</td><td>结论 1 条 + 作业 12 题</td></tr>
+  </table>
+  <div class="sec">B · 六个环节的分钟数分布 <em>动手测量占 30%，是两个「5 分钟环节」的两倍多</em></div>
+  <div class="bars">
+    <div class="bar"><span>情境导入</span><span class="track"><i style="width:33%"></i></span><span class="v">4</span></div>
+    <div class="bar"><span>提出问题</span><span class="track"><i style="width:42%"></i></span><span class="v">5</span></div>
+    <div class="bar"><span>分组猜想</span><span class="track"><i style="width:42%"></i></span><span class="v">5</span></div>
+    <div class="bar hl"><span>动手测量</span><span class="track"><i style="width:100%"></i></span><span class="v">12</span></div>
+    <div class="bar"><span>数据汇总</span><span class="track"><i style="width:67%"></i></span><span class="v">8</span></div>
+    <div class="bar"><span>结论与作业</span><span class="track"><i style="width:50%"></i></span><span class="v">6</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">为什么测量给到 12 分钟</div><p>每组 8 人分 4 类角色各 2 人，每 3 分钟轮换 1 次、共 4 轮，每人把 4 类角色各做一遍；4 轮中出 3 组有效数据，第 4 轮复测补齐。</p></div>
+    <div class="box"><div class="k">课时不足时就压缩前三个环节</div><p>若只有 35 分钟：导入 4 → 3、提问 5 → 3、猜想 5 → 3 分钟，测量 12、汇总 8、结论 6 分钟不动，合计 35 分钟。</p></div>
+  </div>
+  <div class="pf"><span>范围一句话：<b>4 + 5 + 5 + 12 + 8 + 6 = 40 分钟</b>，测量环节不缩水。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">探究式课堂三要素与 8 个可观察步骤</h2></div>
+    <div class="note">器材 5 套同规格<br>记录单 40 张 · 字段 6 个</div>
+  </div>
+  <div class="word"><b>探究式课堂</b><span class="mono">F浮 = G − F示</span><span class="pos">40 min</span><span>三要素缺一，探究就会退化成验证</span></div>
+  <p class="lead">探究式课堂三要素：可验证的问题链 4 问、一组一套的材料包 5 套、字段刚好的记录单 6 个（每格带单位），缺一即退化为验证。</p>
+  <div class="flow"><span>问题链 4 问</span><i>→</i><span>材料包 5 套</span><i>→</i><span>记录单 6 字段</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">问题链 4 问</div><p>① 一半浸入时示数少多少？② 全部浸没后还变吗？③ 排开的水几毫升？④ 水越多示数差越大吗？</p></div>
+    <div class="box"><div class="k">每组材料清单（共 5 套）</div><p>弹簧测力计 0–5 N、溢水杯、量筒 100 mL、铝块 50 g、木块、细线、抹布各 1 件。</p></div>
+    <div class="box"><div class="k">记录单 6 个字段</div><p>组号 / 浸入情况 / 排开液体体积 mL / 空气中示数 N / 浸入后示数 N / 示数差 N。不留感想栏。</p></div>
+  </div>
+  <div class="sec">8 个可观察步骤 <em>6 个环节拆成 8 个步骤，听课教师按最右一列打钩</em></div>
+  <table>
+    <tr><th style="width:96px">步骤</th><th style="width:252px">教师行为</th><th style="width:252px">学生行为</th><th>观察点</th></tr>
+    <tr><td>情境导入</td><td>演示铝块与木块入水，只问「看到什么」</td><td>说出沉浮判断并给出依据</td><td>用「重 / 轻」解释的人数</td></tr>
+    <tr><td>提出问题</td><td>把学生原话板书成 4 问，删去不可验证的</td><td>补充自己最想知道的一问</td><td>4 问是否都能用器材回答</td></tr>
+    <tr><td>分组猜想</td><td>发猜想卡，要求写「变量 + 方向」</td><td>组内表决，写 1 条可验证猜想</td><td>是否出现「越……越……」句式</td></tr>
+    <tr><td>测前校零</td><td>示范弹簧测力计 0–5 N 校零与量程确认</td><td>每人校零 1 次，擦干铝块</td><td>校零动作是否人人动手</td></tr>
+    <tr class="hl"><td>动手测量</td><td>巡回 5 组，只追问「你这组数据说明什么」</td><td>用测力计、溢水杯、量筒 100 mL 测 3 组</td><td>每组是否出满 3 组数据</td></tr>
+    <tr><td>记录复核</td><td>提醒带单位、保留 1 位小数</td><td>同桌互查单位与小数位</td><td>记录单有无空格与漏单位</td></tr>
+    <tr><td>数据汇总</td><td>抽 3 组上台，板书全班 15 组数据</td><td>把 15 组数据填进汇总表</td><td>汇总表是否满 15 行</td></tr>
+    <tr><td>结论与作业</td><td>只讲方法不报答案，布置 12 题作业</td><td>写 1 条结论并说明依据</td><td>结论是否提到排开液体体积</td></tr>
+  </table>
+  <div class="quote">同样一句「浮力是多少」，问「你测到多少」只换回一个数字，问「比刚才多了多少」才逼出变量意识——追问指向比较，学生才看得见关系。</div>
+  <div class="pf"><span>一句话结论：<b>问题链管方向、材料包管上手、记录单管证据</b>，三者到位探究才成立。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见失误与对照</div><h2 class="pt">6 个高频失误与讲授 / 探究对照</h2></div>
+    <div class="note">来源：本校 12 节公开课观察记录<br>共 6 类 · 每类给改法</div>
+  </div>
+  <div class="sec">A · 6 个常见失误 <em>先看「典型表现」一列，能自己对号再往下</em></div>
+  <table>
+    <tr><th style="width:124px">失误</th><th style="width:202px">典型表现</th><th style="width:160px">后果</th><th>改法</th></tr>
+    <tr><td>教师直接给结论</td><td>导入后就板书浮力公式</td><td>学生只记公式，不测数据</td><td>导入只问「看到什么」，公式留到第 6 环节</td></tr>
+    <tr><td>小组分工不明</td><td>8 人抢 1 只测力计，4 人旁观</td><td>12 分钟只出 1 组数据</td><td>每组定操作 / 读数 / 记录 / 复核 4 类角色各 2 人，每 3 分钟轮换 1 次</td></tr>
+    <tr><td>器材不足等待超时</td><td>5 组只有 2 套器材，排队等用</td><td>排队耗掉 8 分钟，测量只剩 4 分钟</td><td>课前分装 5 套同规格，一组一套不共用</td></tr>
+    <tr><td>记录单字段太多</td><td>一张单 14 个空、3 个无用栏</td><td>抄表头耗 5 分钟</td><td>字段压到 6 个，只留带单位的量</td></tr>
+    <tr><td>只比结果不讲方法</td><td>汇总时只念谁的数字最大</td><td>说不出「排开液体体积」</td><td>汇总按「体积 — 示数差」成对上台</td></tr>
+    <tr class="hl"><td>总结被压缩</td><td>拖堂后 1 分钟念完结论</td><td>当堂无结论产出</td><td>总结固定 6 分钟，前 5 个环节不得挤占</td></tr>
+  </table>
+  <div class="sec">B · 同一知识点的两种处理 <em>以「浮力与排开液体体积的关系」为例</em></div>
+  <table>
+    <tr><th style="width:100px">维度</th><th style="width:274px">讲授式处理</th><th style="width:274px">探究式处理</th><th>两种处理的差异</th></tr>
+    <tr><td>时间分配</td><td>讲解 12 分钟 + 演示 3 分钟，学生全程不动手</td><td>动手 12 分钟 + 讲评 6 分钟</td><td>学生动手 0 → 12 分钟</td></tr>
+    <tr><td>学生动作</td><td>听讲、抄写公式与 3 道例题</td><td>测 3 组数据、填汇总表 15 行</td><td>每人参与测量 0 → 4 轮</td></tr>
+    <tr><td>当堂产出</td><td>笔记 1 页</td><td>记录单 1 张 + 汇总表 15 行</td><td>可检查产出 1 → 3 项</td></tr>
+    <tr><td>一周后回忆</td><td>能背公式，说不清来由</td><td>能复述体积与浮力的关系</td><td>从「背公式」到「说方法」</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">探究变回验证的 3 个信号</div><p>一是先发结论卡再让学生核对；二是问题只有一个标准答案；三是学生只填数字不写比较。出现任一条，说明问题链已经失效。</p></div>
+    <div class="box"><div class="k">课前 5 分钟检查清单</div><p>5 套器材编号是否齐全；量筒 100 mL 刻度能否读到 1 mL；测力计 0–5 N 指针是否回零；记录单 40 张有无缺页；溢水杯出水口是否对准量筒。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>6 个失误里有 4 个可在课前拦住</b>（备课定问题链、定角色、分装器材、压字段）。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道教学设计诊断题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>限时 30 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>判断时间、分工、字段是否合格</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 某课把 40 分钟里的 6 分钟留给「动手测量」，另外 34 分钟分给其余 5 个环节，判断这份时间表是否合理并说明理由。</li>
+    <li><b>2.</b> 给出 5 组 × 8 人的分组名单，为每组写 4 类角色分工（操作 / 读数 / 记录 / 复核），并说明每人在 12 分钟里至少承担几轮。</li>
+    <li><b>3.</b> 一份记录单只有「浮力大小」1 个字段，判断字段是否够用；若不够，补出至少 3 个必备字段并注明单位。</li>
+    <li><b>4.</b> 指出下列步骤中哪一步会把探究变成验证：（a）先发结论卡，再让学生用数据核对；（b）先测数据，再归纳结论。</li>
+    <li><b>5.</b> 器材清单只有弹簧测力计 0–5 N 与烧杯，要测排开液体的体积，补出至少 2 件器材并说明用途。</li>
+    <li><b>6.</b> 判断提问是否封闭：「浮力是不是等于排开液体所受的重力？」并把它改写成一问开放式提问。</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>时间表改造、差异任务与追问话术</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 为一个 45 人班重排 6 个环节的 40 分钟时间表（分钟合计必须为 40），并说明与 40 人班的两处差异。</li>
+    <li><b>8.</b> 某班 46 人、器材只有 5 套（够 5 组 × 8 人），有 6 名学生落组；为他们设计 1 个差异化任务，要求有可检查产出。</li>
+    <li><b>9.</b> 写一段追问话术（不少于 3 句），把学生「重的物体一定下沉」的前概念推到「排开液体体积」。</li>
+    <li><b>10.</b> 用数据说明「排开液体体积」与浮力的关系：给出 3 组数据并写出关系式。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>需要成体例输出，评分看结构完整度</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 写一份 5 分钟课堂观察量表：含 8 个观察点与「0 / 1 / 2」三档评分标准（量表不计入本卷 12 分）。</li>
+    <li><b>12.</b> 把本课扩成 3 课时单元（浮力概念 / 阿基米德原理 / 应用与作业），写出每课时时长与可检查产出。</li>
+  </ul>
+  <div class="answer">评分口径：每题 1 分；基础题答对即得分，第 3、5 题须同时给出单位或用途，只写名称的记半分（0.5 分）；进阶题第 7 题分钟合计不等于 40 不得分，第 10 题须 3 组数据与关系式齐全；挑战题第 11 题观察点少于 8 个或档位少于 3 档不得分，第 12 题每课时缺产出扣半分（0.5 分）。</div>
+  <div class="notes">
+    <div>限时建议：基础 6 题 12 分钟、进阶 4 题 12 分钟、挑战 2 题 6 分钟，合计 30 分钟。</div>
+    <div>12 题指向：1／7 时间表、2／8 分组、3／5 器材与字段、4／6／9／10 问题链、11／12 量表与单元。</div>
+  </div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>，避免机械套用同一套模板。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:296px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td>不合理：40 分钟里动手测量只剩 6 分钟，5 组无法各出 3 组数据</td><td>测量环节应 ≥ 12 分钟（占 30%）；只答「时间太短」不得分。</td></tr>
+    <tr><td class="num">2</td><td>操作 / 读数 / 记录 / 复核各 2 人；每 3 分钟轮换 1 次共 4 轮，每人做遍 4 类</td><td>四类角色各 2 人且须提到轮换；只写「组长负责」不给分。</td></tr>
+    <tr><td class="num">3</td><td>不够。必备字段：排开液体体积 mL、浸入后示数 N、示数差 N</td><td>字段必须带单位；只补「浮力」属同义重复，不计分。</td></tr>
+    <tr><td class="num">4</td><td>（a）先发结论卡再核对，属于验证；探究应先测数据再归纳</td><td>关键在给出顺序判据：结论出现在数据之前即为验证。</td></tr>
+    <tr><td class="num">5</td><td>补溢水杯（收集排开的水）与量筒 100 mL（读体积）</td><td>两件都要写用途；只写名称不写用途各扣半分。</td></tr>
+    <tr class="hl"><td class="num">6</td><td>封闭。改写为「排开的水越多，弹簧测力计的示数差会怎样变化？」</td><td>改写后须是开放问且指向可测的量，如示数差或体积。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页最容易丢分的三题</div><p>第 3 题漏单位、第 5 题只写器材名不写用途、第 6 题改写后仍是「是不是」句式。三题合计 3 分，占基础题总分的一半。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分：直接进入进阶题；4–5 分：先回读 P3 时间表与 P4 记录单字段，再做进阶题；≤ 3 分：把 6 个环节时长与 6 个字段各默写 3 遍并重做本页。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 2 题只写角色名称没写人数的记半分；角色必须覆盖操作、读数、记录、复核四类。</div>
+    <div>第 4 题选（b）的，是把「先测后归纳」误判成验证；回看 P5 的「探究变回验证的 3 个信号」。</div>
+    <div>第 5 题用烧杯代替溢水杯不给分：烧杯无法在满水状态下收集排开的水。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在单位、用途与提问句式</b>，不涉及教学理念。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含参考方案与量表样例<br>自批：全卷 ≥ 9 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:400px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td>导入 3 + 提问 4 + 猜想 5 + 测量 13 + 汇总 9 + 结论 6 = 40 分钟；分 6 组（3 组 8 人 + 3 组 7 人 = 45 人），器材需 6 套</td><td>分钟合计必须等于 40；差异须落到「组数 5 → 6」与「器材 5 套 → 6 套」，且 6 组人数相加正好 45。</td></tr>
+    <tr><td class="num">8</td><td>落组 6 人任班级汇总组：收集 5 组记录单，把 15 组数据填入汇总表并画 1 条折线</td><td>产出须包括汇总表 15 行与折线 1 条；只写「协助教师」不得分。</td></tr>
+    <tr><td class="num">9</td><td>「你说重的先沉，木块为什么浮着？」「一半浸入，示数比空气中少多少？」「再浸深些、排开的水更多，示数差变大还是变小？」</td><td>三句递进：先反例、再量化、最后指向体积；缺反例扣分。</td></tr>
+    <tr><td class="num">10</td><td>排开 6 mL → 示数差 0.06 N；12 mL → 0.12 N；18.5 mL → 0.19 N；关系式 F浮 = ρ液gV排</td><td>3 组数据须成比例；只写公式不给数据不得分。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>8 个观察点：校零、分工、读数、单位、记录完整、组内讨论、汇总参与、结论表述；每点 0 / 1 / 2 三档</td><td>观察点少于 8 个或档位不是 3 档不得分；该量表是听课工具，满分 16 分，独立于本卷 12 分。</td></tr>
+    <tr class="hl"><td class="num">12</td><td>第 1 课时 概念 → 概念图 1 张；第 2 课时 原理 → 记录单 1 张；第 3 课时 应用 → 报告 1 份</td><td>三课时各 40 分钟共 120 分钟；第 1 课时加判断 5 题，第 3 课时加计算 6 题与报告，第 2 课时出 15 组数据。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">失分点排名（3 次重做统计）</div><p>第 10 题 3 次错、第 11 题 2 次错、第 7 题 2 次错，3 次重做共错 7 次，平均每次错 2.3 题（满分 12 题）。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>12 分为满分；9–11 分达标，但须重做错题所在小节；≤ 8 分回读 P3 时间表与 P4 的 6 个字段，隔天整卷重练一次。</p></div>
+    <div class="box"><div class="k">进阶题加分点</div><p>第 8 题若还写明完成时点（汇总环节 8 分钟内）与交付位置（贴黑板右侧），或把折线画成体积—示数差两列，可直接给满分。</p></div>
+  </div>
+  <div class="notes">
+    <div>第 7 题只要分钟合计不等于 40 就不给分；重排时间表时先锁定测量的 13 分钟，再分配其余 5 个环节。</div>
+    <div>量表档位口径：0 分＝未做到，1 分＝部分做到或教师代劳，2 分＝全组做到且教师未代劳。</div>
+    <div>第 12 题的 3 课时若写成 4 课时或漏掉课时产出，按缺项扣分；单元总时长仍须为 120 分钟。</div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在数据成比例、量表结构与分钟合计三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与单元规划</div><h2 class="pt">6 项自测清单与 3 课时单元规划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:190px">自测项</th><th style="width:300px">达标标准</th><th style="width:82px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>环节时长与合计</td><td>写出 4 / 5 / 5 / 12 / 8 / 6 分钟且合计 40 分钟</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>问题链可验证</td><td>4 个问题都能用本组器材当场回答，不依赖课外资料</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>记录单字段</td><td>恰好 6 个字段且每格带单位，2 分钟能抄完表头</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>分工与轮换</td><td>8 人四类角色（操作 / 读数 / 记录 / 复核）各 2 人，每 3 分钟轮换，每人做遍 4 类</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>数据量与汇总</td><td>每组 3 组数据、全班 15 组，汇总表行数与数据数一致</td><td class="num">P4–P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>器材到位</td><td>5 套同规格器材课前点清，测力计 0–5 N 指针回零</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 单元整体设计：3 课时 <em>每课时 40 分钟，各给可检查产出</em></div>
+  <table>
+    <tr><th style="width:92px">阶段</th><th style="width:80px">课时</th><th>任务</th><th style="width:252px">可检查产出</th></tr>
+    <tr><td>概念</td><td class="num">第 1 课时</td><td>认识浮力：方向、沉浮条件与「示数差」法（40 分钟）</td><td>概念图 1 张 + 判断 5 题</td></tr>
+    <tr><td>原理</td><td class="num">第 2 课时</td><td>阿基米德原理探究：本课 6 环节动手测量与汇总（40 分钟）</td><td>记录单 1 张 + 汇总 15 组数据</td></tr>
+    <tr class="hl"><td>应用</td><td class="num">第 3 课时</td><td>应用与作业：用 F浮 = ρ液gV排 解 3 类题（共 6 题）并写实验报告（40 分钟）</td><td>计算 6 题 + 实验报告 1 份</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">40 分钟怎么分给三课时</div><p>第 1 课时 12 分钟讲概念、28 分钟做判断与讨论；第 2 课时按 6 环节时间表；第 3 课时解题 15 分钟、写报告 15 分钟、讲评 10 分钟。</p></div>
+    <div class="box"><div class="k">执行不下来的 3 个提醒</div><p>器材课前分装不挪到课中；测量的 12 分钟不因拖堂削减；汇总表按组号编号，缺哪组补哪组，不重测全班。</p></div>
+    <div class="box"><div class="k">下一单元衔接</div><p>下一单元《物体的浮沉条件及应用》复用本课记录单与角色分工模板，只替换问题链的第 3、4 问。</p></div>
+  </div>
+  <div class="pf"><span>规划结论：<b>3 课时共 120 分钟，产出记录单 1 张、汇总表 15 行、实验报告 1 份</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：教学设计术语 10 条与学情口径</h2></div>
+    <div class="note">讲义 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>备课时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:164px">术语</th><th>释义</th></tr>
+    <tr><td>探究式学习</td><td>学生以问题为起点、以证据为依据自行归纳结论的学习方式；本课 6 个环节中，动手测量是唯一产生原始数据的环节。</td></tr>
+    <tr><td>问题链</td><td>指向同一目标、前后有依赖的 4 个问题，每一问都要能用本组器材当场回答。</td></tr>
+    <tr><td>脚手架</td><td>帮助学生完成超出其独立水平任务的支持，如猜想卡的「变量 + 方向」句式与记录单表头。</td></tr>
+    <tr><td>小组角色</td><td>组内固定分工，本课为操作、读数、记录、复核四类，每组 8 人各 2 人，每 3 分钟轮换 1 次、共 4 轮。</td></tr>
+    <tr><td>课堂观察量表</td><td>听课用的结构化打分表，含 8 个观察点与 0 / 1 / 2 三档，满分 16 分。</td></tr>
+    <tr><td>形成性评价</td><td>在教学过程中收集证据用于调整教学，本课的证据是每组 3 组数据与汇总表的 15 行数据。</td></tr>
+    <tr><td>差异化任务</td><td>为不同起点学生设计的等效任务，如落组 6 人承担的班级汇总任务。</td></tr>
+    <tr><td>材料包</td><td>按组预分装的同规格器材，本课 5 套，每套含弹簧测力计 0–5 N、溢水杯、量筒 100 mL、铝块 50 g、木块、细线、抹布共 7 件。</td></tr>
+    <tr><td>记录单</td><td>学生当堂填写的原始数据表，本课共 40 张、6 个字段，字段全部带单位。</td></tr>
+    <tr class="hl"><td>课堂节奏</td><td>各环节时长的分配与转换，本课为 4 / 5 / 5 / 12 / 8 / 6 分钟，合计 40 分钟。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">学情口径</div><p>班额 40 人，分 5 组每组 8 人；已学重力与二力平衡，会使用弹簧测力计，未学阿基米德原理公式。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增 6 环节时间表、8 个可观察步骤、12 题诊断练习与两页解析、3 课时单元规划。</p></div>
+    <div class="box"><div class="k">使用提示</div><p>本讲义面向教师备课与听课：P3 时间表可直接抄进教案，P9 清单用于课前自查，P6 练习用于教研组磨课。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全讲义末页；若跳过前 9 页，请至少完成 P6 的 1–6 题与 P9 自测清单的第 1、5、6 项。</div>
+    <div>下一讲预告：《物体的浮沉条件及应用》课时设计，复用本讲的问题链与记录单模板。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于备课自查，学情口径用于教研组统一教学起点</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>
