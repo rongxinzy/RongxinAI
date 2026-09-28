@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
@@ -87,5 +87,32 @@ describe('case previews', () => {
     });
 
     expect(mismatched).toEqual([]);
+  });
+
+  /**
+   * 文档类实例必须是真实的多页文档：scripts/case-previews 下的每个实例都要有 ≥8 页，
+   * 且页脚声明的总页数与实际页数一致——「只有第 1 页却写着第 1 / 8 页」正是本次改造要消灭的形态。
+   * SKILLs/frontend-design/templates 下的实时网页模板不受此约束：它们是可直接运行的单页应用，
+   * 缩略图取首屏。
+   */
+  test('every document example is a real multi-page document', () => {
+    const MIN_PAGES = 8;
+    const coverDir = resolve(projectRoot, 'scripts/case-previews');
+    const failures: string[] = [];
+
+    for (const file of readdirSync(coverDir).filter(name => name.endsWith('.html'))) {
+      const html = readFileSync(join(coverDir, file), 'utf8');
+      const pages = html.match(/data-page="/g)?.length ?? 0;
+      const claimed = Math.max(
+        0,
+        ...[...html.matchAll(/第\s*\d+\s*\/\s*(\d+)\s*页/g)].map(match => Number(match[1])),
+      );
+
+      if (pages < MIN_PAGES) failures.push(`${file}: ${pages} page(s)`);
+      else if (claimed !== pages)
+        failures.push(`${file}: footer says ${claimed}, file has ${pages}`);
+    }
+
+    expect(failures).toEqual([]);
   });
 });

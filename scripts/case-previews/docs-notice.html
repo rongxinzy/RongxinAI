@@ -1,48 +1,94 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-notice</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
-.title{font-size:23px;letter-spacing:-.01em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
-h3{margin-top:16px;font-size:13.5px}
-p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-ul{list-style:none;margin-top:10px;display:grid;gap:7px}
-li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-notice</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--accent:#B45309}
+body{width:1160px;display:grid;gap:26px;padding:30px;background:#f2f2ef;
+ font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+ color:#16171a;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;
+ border:1px solid #e4e4e0;padding:30px 44px 0;display:flex;flex-direction:column}
+.ph{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.ph .kc{color:var(--accent);letter-spacing:.3em}
+.ph .rt{letter-spacing:.06em;color:#9a9ea6}
+.pt{font-size:23px;font-weight:500;letter-spacing:-.02em;margin-top:11px;color:#16171a}
+.pt.lg{font-size:27px;font-weight:600;margin-top:14px;line-height:1.34}
+.rule{height:1px;background:#edede9;margin-top:11px}
+.pbody{flex:1;min-height:0;margin-top:12px;overflow:hidden}
+.pf{margin-top:8px;padding-top:8px;border-top:1px solid #edede9;display:flex;justify-content:space-between;font-size:11px;color:#8b8f97;letter-spacing:.02em}
+.meta{display:flex;flex-wrap:wrap;gap:7px 22px;font-size:12px;color:#8b8f97;padding-bottom:12px;border-bottom:1px solid #edede9}
+h3{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:#16171a;margin-top:12px}
+h3.first{margin-top:0}
+h4{font-size:11px;font-weight:600;letter-spacing:.16em;color:#8b8f97;margin-top:10px}
+h4.first{margin-top:0}
+p{font-size:13px;line-height:1.9;color:#3d4046;margin-top:8px}
+p.first{margin-top:0}
+ul{list-style:none;margin-top:7px;display:grid;gap:5px}
+ul.first{margin-top:0}
+li{position:relative;padding-left:15px;font-size:12.8px;line-height:1.8;color:#4c5058}
 li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
-td.mono{font-variant-numeric:tabular-nums}
-.p0{color:var(--accent);font-weight:600}
-.lead{margin-top:14px;font-size:13px;color:#3d4046;line-height:1.9}
-.sign{margin-top:auto;padding-top:18px;text-align:right;font-size:13px;color:#3d4046;line-height:2}
-.sign .org{font-weight:600}
-.sign .date{color:#6f737b;font-size:12.5px}
-.note{margin-top:16px;border:1px solid #edede9;background:#fafaf8;padding:12px 16px;font-size:12.5px;color:#4c5058;line-height:1.85}
+li b{font-weight:600;color:#16171a}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 10px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.6}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.n,span.n{font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.grid12{display:grid;grid-template-columns:1.28fr 1fr;gap:24px}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #edede9;margin-top:11px}
+.nums>div{padding:10px 13px;border-left:1px solid #edede9}
+.nums>div:first-child{border-left:0}
+.nums .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.nums .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:3px;color:var(--accent)}
+.nums .s{font-size:11.5px;color:#8b8f97;margin-top:2px}
+.card{border:1px solid #edede9;background:#fafaf8;padding:10px 13px;margin-top:8px}
+.card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.card p{margin-top:5px;font-size:12.5px;line-height:1.8}
+.note{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:2px solid var(--accent);
+ padding:8px 12px;margin-top:8px;font-size:12.5px;line-height:1.8;color:#3d4046}
+.toc{margin-top:6px}
+.toc .r{display:grid;grid-template-columns:34px 1fr 208px 40px;gap:10px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.6}
+.toc .r:first-child{border-top:0}
+.toc .r b{color:var(--accent);font-weight:600}
+.toc .r .pg{text-align:right;color:#8b8f97;font-variant-numeric:tabular-nums}
+.bar{margin-top:8px;display:grid;gap:7px}
+.bar .r{display:grid;grid-template-columns:122px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058}
+.bar .tr{height:9px;background:#f1f1ee;position:relative}
+.bar .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);display:block}
+.bar .vv{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.steps{margin-top:6px}
+.steps .s{display:grid;grid-template-columns:58px 1fr;gap:12px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.steps .s:first-child{border-top:0}
+.steps b{color:var(--accent);font-weight:600}
+.def{margin-top:6px}
+.def .d{display:grid;grid-template-columns:158px 1fr;gap:12px;padding:5px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.def .d:first-child{border-top:0}
+.def .d b{font-weight:600;color:#16171a}
+.sig{display:flex;justify-content:flex-end;gap:44px;margin-top:16px;font-size:12.5px;color:#4c5058}
+.cmp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #edede9;margin-top:9px}
+.cmp>div{padding:10px 13px;font-size:12.5px;line-height:1.85;color:#3d4046}
+.cmp>div:first-child{border-right:1px solid #edede9}
+.cmp .h{font-size:11px;letter-spacing:.14em;color:#8b8f97;display:block;margin-bottom:5px}
+del{color:#b3564a;text-decoration:line-through}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.08)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border:1px solid #e4e4e0;color:#6f737b}
+.small{font-size:11.5px;color:#8b8f97;line-height:1.75;margin-top:6px}
+.cfoot{display:grid;grid-template-columns:1fr 1fr 1.45fr;border:1px solid #edede9;margin-top:10px}
+.cfoot>div{padding:8px 12px;border-left:1px solid #edede9;font-size:11.5px;line-height:1.7;color:#4c5058}
+.cfoot>div:first-child{border-left:0}
+.cfoot .k{display:block;font-size:11px;letter-spacing:.12em;color:#8b8f97;margin-bottom:3px}
 </style></head><body>
-<div class="doc" style="--accent:#B45309">
-  <div class="title">关于调整月度报表报送时间的通知</div>
-  <div class="meta"><span>发文单位：运营管理部</span><span>文号：运字〔2026〕14 号</span><span>日期：2026-09-16</span></div>
-  <p class="lead">各业务线、各区域运营组：</p>
-  <p>为保证月度经营数据的口径统一与复核时间，经研究决定，对月度报表的报送时间与报送方式作出调整。现将有关事项通知如下。</p>
-  <h3>一、调整内容</h3>
-  <ul>
-    <li>报送时间由每月 3 日 18:00 前调整为每月 2 日 12:00 前</li>
-    <li>报送方式统一改为在经营看板提交，不再接收邮件与即时消息形式的表格</li>
-    <li>报表模板沿用现行版本，不得自行增删字段或调整字段顺序</li>
-  </ul>
-  <h3>二、执行要求</h3>
-  <ul>
-    <li>各业务线须在报送前完成自查，确保金额、单量与本系统数据一致</li>
-    <li>发现口径差异的，须在报送时以备注形式说明差异原因与金额</li>
-    <li>逾期未报送的，由运营管理部统一记录并纳入季度考核</li>
-  </ul>
-  <h3>三、生效时间</h3>
-  <p>本通知自 2026 年 10 月 1 日起执行。10 月报表为首个适用周期，请各业务线提前调整内部工作安排。</p>
-  <div class="note">如对报送口径有疑问，请于 9 月 25 日前反馈至运营管理部数据分析组，统一答复后不再单独解释。</div>
-  <div class="sign"><div class="org">运营管理部</div><div class="date">2026 年 9 月 16 日</div></div>
-</div></body></html>
+<section class="page" data-page="1"><div class="ph"><span class="kc">OFFICIAL NOTICE</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt lg">关于调整月度报表报送时间与方式的通知</h2><div class="pbody"><div class="meta"><span>发文单位：运营管理部</span><span>文号：运字〔2026〕14 号</span><span>签发日期：2026-09-16</span><span>生效日期：2026-10-01</span><span>公开范围：内部</span></div><h3 class="first">主送</h3><p class="first">各业务线、各区域运营组、财务共享中心：</p><p>为保证月度经营数据的口径统一与复核时间，经 9 月 12 日运营管理例会研究决定，对月度报表的报送时间与报送方式作出调整。本通知共 10 页，其中正文 3 条、执行要求 3 条、自查清单 8 项、过渡安排 5 项及口径问答 6 条，请各业务线组织学习并按要求执行。</p> <h3>一、调整要点速览</h3><table><tr><th>事项</th><th>调整前</th><th>调整后</th><th>首个适用周期</th></tr><tr><td>报送时间</td><td>每月 3 日 18:00 前</td><td>每月 2 日 12:00 前</td><td>2026 年 10 月报表</td></tr><tr><td>报送方式</td><td>邮件、即时消息提交表格</td><td>统一在经营看板提交</td><td>2026 年 10 月报表</td></tr><tr><td>报表模板</td><td>各业务线自行增删字段</td><td>沿用现行模板，不得增删字段</td><td>2026 年 10 月报表</td></tr><tr><td>差异说明</td><td>口头说明</td><td>以备注形式写明原因与金额</td><td>2026 年 10 月报表</td></tr><tr><td>逾期处理</td><td>抽查记录</td><td>统一记录并纳入季度考核</td><td>2026 年 10 月报表</td></tr></table><div class="sig"><div>运营管理部</div><div>2026 年 9 月 16 日</div></div><div class="cfoot"><div><span class="k">依据文件</span>经营指标管理办法、数据质量管理办法与 9 月 12 日例会决议</div><div><span class="k">执行范围</span>6 个区域运营组 + 2 个直属业务线，共 8 个报送单元</div><div><span class="k">阅读顺序</span>P2 目录 · P3 依据 · P4—P6 调整内容与执行要求 · P7—P9 过渡、问答与问责 · P10 附录</div></div></div><div class="pf"><span>自 2026 年 10 月 1 日起执行，10 月报表为首个适用周期</span><span>第 1 / 10 页</span></div></section>
+<section class="page" data-page="2"><div class="ph"><span class="kc">CONTENTS</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">目录与文件信息</h2><div class="pbody"><p class="first">本通知共 10 页：第 3 页说明制定依据，第 4 至 6 页为调整内容、操作步骤与执行要求，第 7 至 9 页为过渡安排、口径问答与监督问责，第 10 页为附录。</p><div class="toc"><div class="r"><b>一</b><span>制定依据与背景</span><span style="color:#8b8f97">报送时效问题的数据与依据文件</span><span class="pg">3</span></div><div class="r"><b>二</b><span>调整内容</span><span style="color:#8b8f97">报送时间、报送方式、报表模板三项调整</span><span class="pg">4</span></div><div class="r"><b>三</b><span>报送方式与操作步骤</span><span style="color:#8b8f97">经营看板提交的 5 步操作</span><span class="pg">5</span></div><div class="r"><b>四</b><span>执行要求与自查清单</span><span style="color:#8b8f97">3 条执行要求与 8 项自查</span><span class="pg">6</span></div><div class="r"><b>五</b><span>生效时间与过渡安排</span><span style="color:#8b8f97">生效日期、过渡期事项与时间表</span><span class="pg">7</span></div><div class="r"><b>六</b><span>口径问答</span><span style="color:#8b8f97">报送口径常见的 6 个问题</span><span class="pg">8</span></div><div class="r"><b>七</b><span>监督与问责</span><span style="color:#8b8f97">记录方式、升级路径与考核口径</span><span class="pg">9</span></div><div class="r"><b>八</b><span>附录</span><span style="color:#8b8f97">报送模板字段、联系方式与抄送单位</span><span class="pg">10</span></div></div><h4>文件信息</h4><table><tr><th>项目</th><th>内容</th></tr><tr><td>文件性质</td><td>内部管理规定，非对外文件</td></tr><tr><td>起草部门</td><td>运营管理部数据分析组</td></tr><tr><td>审核与签发</td><td>审核：运营管理部；签发：分管副总经理</td></tr><tr><td>有效期</td><td>自 2026-10-01 起长期有效，修订须重新发文</td></tr><tr><td>解释权</td><td>运营管理部</td></tr></table></div><div class="pf"><span>本通知 10 页，附录含报送模板字段与联系方式</span><span>第 2 / 10 页</span></div></section>
+<section class="page" data-page="3"><div class="ph"><span class="kc">制定依据</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">一、制定依据与背景</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、制定依据</h3><ul class="first"><li>《经营指标管理办法》（2026 年 3 月版）第十二条：月度报表须在次月第 3 个工作日前完成报送与复核。</li><li>《数据质量管理办法》（2026 年 5 月版）第八条：同一指标在全系统须使用唯一口径。</li><li>9 月 12 日运营管理例会决议：报送时效问题须在 10 月报表周期前完成整改。</li></ul><h4>二、前期运行数据</h4><table><tr><th>月份</th><th>平均报送时间</th><th>逾期业务线</th><th>口径差异条数</th><th>复查工时</th></tr><tr><td>2026 年 5 月</td><td>3 日 20:14</td><td>2 条</td><td>5 条</td><td>18 小时</td></tr><tr><td>2026 年 6 月</td><td>3 日 21:02</td><td>3 条</td><td>7 条</td><td>24 小时</td></tr><tr><td>2026 年 7 月</td><td>4 日 09:36</td><td>4 条</td><td>6 条</td><td>31 小时</td></tr><tr><td>2026 年 8 月</td><td>4 日 11:20</td><td>4 条</td><td>5 条</td><td>27 小时</td></tr></table></div><div><h4 class="first">三、存在的主要问题</h4><ul class="first"><li><b>时效不足</b>：近 4 个月报送时间累计推迟 38 小时（与每月 3 日 18:00 的差值 2.2 + 3.0 + 15.6 + 17.3 相加），8 月已延至 4 日中午。</li><li><b>口径不齐</b>：月均 5 至 7 条口径差异，复查工时在 7 月达到 31 小时。</li><li><b>渠道分散</b>：邮件与即时消息并存，缺少唯一提交入口，漏收与版本混淆各有 2 次。</li><li><b>模板不一</b>：13 个报送单元（6 个区域运营组 + 6 条业务线 + 财务共享中心）中有 5 个自行增删字段，导致合并需人工对齐。</li></ul><div class="note">本次调整只解决时效、渠道与模板三项问题，口径本身的定义修订由《经营指标口径表 v2》另行发布。</div></div></div><h3>三、前期整改情况</h3><table><tr><th>已采取措施</th><th>时间</th><th>效果</th></tr><tr><td>统一报表模板版本号</td><td>2026-06</td><td>自行增删字段的单元由 5 个降至 2 个</td></tr><tr><td>建立口径复查机制</td><td>2026-07</td><td>月末复查工时由 31 小时降至 27 小时</td></tr><tr><td>邮件提醒逾期单元</td><td>2026-08</td><td>逾期单元仍为 4 个，未见改善</td></tr><tr><td>看板报送模块试运行</td><td>2026-09</td><td>3 个单元试点，平均提交时间提前 4 小时</td></tr></table></div><div class="pf"><span>依据 3 份文件与例会决议，4 个月运行数据显示报送平均推迟 15 小时以上</span><span>第 3 / 10 页</span></div></section>
+<section class="page" data-page="4"><div class="ph"><span class="kc">调整内容</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">二、调整内容</h2><div class="pbody"><h3 class="first">第一条 报送时间</h3><p class="first">月度报表报送截止时间由每月 3 日 18:00 前调整为每月 2 日 12:00 前。遇周末或法定节假日，顺延至节后第 1 个工作日 12:00 前。</p><h3>第二条 报送方式</h3><p class="first">报送方式统一改为在经营看板「月度报送」模块提交，不再接收邮件与即时消息形式的表格。看板提交成功后生成报送编号，编号格式为 <span class="n">BB-YYYYMM-业务线代码-序号</span>，作为报送完成的唯一凭据。</p><h3>第三条 报表模板</h3><p class="first">报表模板沿用现行版本，不得自行增删字段或调整字段顺序；确需调整的，由业务线书面向运营管理部申请，经批准后统一版本发布。</p><table><tr><th>条款</th><th>调整前</th><th>调整后</th><th>生效方式</th></tr><tr><td>第一条 报送时间</td><td>每月 3 日 18:00 前</td><td>每月 2 日 12:00 前</td><td>10 月报表起执行</td></tr><tr><td>第一条 顺延规则</td><td>无明确规定</td><td>遇周末或法定节假日顺延至节后第 1 个工作日 12:00</td><td>10 月报表起执行</td></tr><tr><td>第二条 报送方式</td><td>邮件或即时消息表格</td><td>经营看板「月度报送」模块</td><td>10 月报表起执行</td></tr><tr><td>第二条 凭据</td><td>以发送记录为准</td><td>以看板报送编号为准</td><td>10 月报表起执行</td></tr><tr><td>第三条 模板</td><td>可自行增删字段</td><td>沿用现行模板，不得调整</td><td>10 月报表起执行</td></tr></table><div class="note">上述三条为本次调整的全部内容；除此之外的报送要求，仍按《经营指标管理办法》现行条款执行。</div><h4>条款效力</h4><div class="def"><div class="d"><b>生效方式</b><span>第一条至第三条同时生效，缺一不可</span></div><div class="d"><b>与既有文件关系</b><span>与《经营指标管理办法》不一致的，以本通知为准</span></div></div></div><div class="pf"><span>正文 3 条：报送时间、报送方式、报表模板，均自 10 月报表起执行</span><span>第 4 / 10 页</span></div></section>
+<section class="page" data-page="5"><div class="ph"><span class="kc">操作步骤</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">三、报送方式与操作步骤</h2><div class="pbody"><div class="grid12"><div><h3 class="first">经营看板报送 5 步操作</h3><div class="steps"><div class="s"><b>第 1 步</b><span>登录经营看板，进入「月度报送」模块，选择所属业务线与报送月份（如 2026-10）</span></div><div class="s"><b>第 2 步</b><span>下载当前版本模板（系统按月份自动匹配版本号），不得使用历史版本文件</span></div><div class="s"><b>第 3 步</b><span>填写数据并执行系统校验：金额、单量与本系统数据不一致时，校验不通过并高亮差异行</span></div><div class="s"><b>第 4 步</b><span>对强制校验不通过项填写差异说明，说明须包含差异原因、差异金额与责任归属</span></div><div class="s"><b>第 5 步</b><span>提交并获取报送编号，编号需在业务线内部留存；提交后 2 小时内可撤回重报，超时后须联系数据组</span></div></div></div><div><h4 class="first">校验规则</h4><table><tr><th>校验类型</th><th>触发条件</th><th>处理方式</th></tr><tr><td>强制校验</td><td>金额差异超过 100 元或单量差异超过 5 单</td><td>阻断提交，须填写差异说明</td></tr><tr><td>提示校验</td><td>字段为空或格式不符</td><td>允许提交但标记为待补</td></tr><tr><td>口径校验</td><td>报送口径与口径表 v2 不一致</td><td>阻断提交并提示正确口径</td></tr></table><div class="note">报送编号与校验记录自动归档，保存期 5 年，作为考核与复查的原始凭据。</div></div></div><h4>四、常见操作问题</h4><table><tr><th>问题</th><th>处理方式</th></tr><tr><td>模块内看不到所属业务线</td><td>联系数据平台组值班（分机 8300）开通权限</td></tr><tr><td>模板版本号与系统不一致</td><td>重新下载当前版本，历史版本文件不得使用</td></tr><tr><td>校验提示差异但数据无误</td><td>填写差异说明后提交，说明须含差异金额与原因</td></tr><tr><td>提交后需要重报</td><td>2 小时内自行撤回重报，超时联系数据组</td></tr><tr><td>报送编号丢失</td><td>在模块「我的报送」中查询，编号不可修改</td></tr></table></div><div class="pf"><span>5 步操作、3 类校验规则，报送编号为唯一完成凭据</span><span>第 5 / 10 页</span></div></section>
+<section class="page" data-page="6"><div class="ph"><span class="kc">执行要求</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">四、执行要求与自查清单</h2><div class="pbody"><h3 class="first">执行要求（3 条）</h3><ul class="first"><li><b>一、报送前自查</b>：各业务线须在报送前完成自查，确保金额、单量与本系统数据一致，自查记录由业务线留存备查。</li><li><b>二、差异如实说明</b>：发现口径差异的，须在报送时以备注形式写明差异原因、差异金额与责任归属，不得以「数据待核」等表述代替。</li><li><b>三、逾期纳入考核</b>：逾期未报送或提交后数据需更正的，由运营管理部统一记录并纳入季度考核。</li></ul><h3>报送前自查清单（8 项）</h3><table><tr><th>序号</th><th>自查项</th><th>通过标准</th><th>责任岗位</th></tr><tr><td>01</td><td>模板版本</td><td>与系统当前版本号一致</td><td>数据填报岗</td></tr><tr><td>02</td><td>字段完整性</td><td>模板字段无缺失、无新增</td><td>数据填报岗</td></tr><tr><td>03</td><td>金额一致性</td><td>与工单库金额差异 ≤100 元</td><td>数据填报岗</td></tr><tr><td>04</td><td>单量一致性</td><td>与工单库单量差异 ≤5 单</td><td>数据填报岗</td></tr><tr><td>05</td><td>口径一致性</td><td>与经营指标口径表 v2 一致</td><td>业务线数据负责人</td></tr><tr><td>06</td><td>差异说明</td><td>强制校验项全部填写说明</td><td>业务线数据负责人</td></tr><tr><td>07</td><td>时间确认</td><td>在每月 2 日 12:00 前完成提交</td><td>业务线负责人</td></tr><tr><td>08</td><td>编号留存</td><td>报送编号已记录并内部留存</td><td>数据填报岗</td></tr></table><p class="small">自查清单由业务线自行执行并留存；运营管理部在复核阶段抽查不少于 30% 的报送单元。</p><h4>自查留痕</h4><div class="def"><div class="d"><b>留存要求</b><span>自查记录由业务线内部留存，抽查时须能提供，保存期不少于 1 年</span></div></div></div><div class="pf"><span>3 条执行要求、8 项自查，抽查比例不低于 30%</span><span>第 6 / 10 页</span></div></section>
+<section class="page" data-page="7"><div class="ph"><span class="kc">生效与过渡</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">五、生效时间与过渡安排</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、生效时间</h3><p class="first">本通知自 2026 年 10 月 1 日起执行。10 月报表为首个适用周期，报送截止时间为 11 月 2 日（周一）12:00 前；10 月报表的 2 日恰为工作日，不触发顺延规则。</p><h4>二、过渡事项</h4><table><tr><th>事项</th><th>过渡期</th><th>负责方</th><th>完成标志</th></tr><tr><td>看板模块开放</td><td>9-20 至 9-30</td><td>数据平台组</td><td>6 条业务线均可进入模块</td></tr><tr><td>业务线培训</td><td>9-20 至 9-28</td><td>运营管理部</td><td>13 个报送单元（6 区域 + 6 业务线 + 财务共享中心）培训完成</td></tr><tr><td>试报送</td><td>9-25 至 9-28</td><td>各业务线</td><td>使用 9 月数据完成一次全流程试报</td></tr><tr><td>权限配置</td><td>9-20 前</td><td>数据平台组</td><td>填报人与审核人权限确认</td></tr><tr><td>旧渠道关闭</td><td>10-01 起</td><td>运营管理部</td><td>不再接收邮件与即时消息表格</td></tr></table></div><div><h4 class="first">三、过渡期时间表</h4><div class="steps"><div class="s"><b>09-20</b><span>看板模块开放，权限配置完成</span></div><div class="s"><b>09-25</b><span>试报送开始，反馈收集截止日（口径疑问一并反馈）</span></div><div class="s"><b>09-28</b><span>培训与试报送完成，问题清单闭环</span></div><div class="s"><b>09-30</b><span>旧渠道停用公告，通知全部报送单元</span></div><div class="s"><b>10-01</b><span>本通知生效，进入正式执行期</span></div></div><div class="note">试报送期间发现的问题须在 9 月 28 日前反馈至运营管理部数据分析组，统一答复后不再单独解释。</div></div></div><h4>四、阶段与责任方</h4><table><tr><th>阶段</th><th>关键日期</th><th>责任方</th></tr><tr><td>准备期</td><td>9-20 至 9-30</td><td>数据平台组、运营管理部</td></tr><tr><td>正式执行期</td><td>10-01 起</td><td>13 个报送单元（6 区域 + 6 业务线 + 财务共享中心）</td></tr></table></div><div class="pf"><span>10 月报表为首个适用周期，旧报送渠道自 10 月 1 日起停用</span><span>第 7 / 10 页</span></div></section>
+<section class="page" data-page="8"><div class="ph"><span class="kc">口径问答</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">六、口径问答</h2><div class="pbody"><h3 class="first">报送口径常见问题（6 条）</h3><table><tr><th>序号</th><th>问题</th><th>答复</th><th>依据条款</th></tr><tr><td>Q1</td><td>报送时间遇周末或节假日如何处理？</td><td>顺延至节后第 1 个工作日 12:00 前，不提前占用休息日</td><td>第一条</td></tr><tr><td>Q2</td><td>提交后发现问题能否撤回重报？</td><td>提交后 2 小时内可自行撤回重报；超过 2 小时须联系数据组并记录一次更正</td><td>第二条</td></tr><tr><td>Q3</td><td>邮件或即时消息提交是否仍然有效？</td><td>自 10 月 1 日起不再作为有效报送，未走看板视为未报送</td><td>第二条</td></tr><tr><td>Q4</td><td>模板字段确需调整怎么办？</td><td>由业务线书面申请，经运营管理部批准后统一发布新版本，不得自行增删</td><td>第三条</td></tr><tr><td>Q5</td><td>强制校验不通过是否一定不能提交？</td><td>须填写差异原因、金额与责任归属后方可提交，说明不全不得提交</td><td>第三条与执行要求第二条</td></tr><tr><td>Q6</td><td>跨区域协作单归入哪个区域报送？</td><td>按下单商家注册地归属，计入该区域报送单量，不重复计入</td><td>口径表 v2 第四章</td></tr></table><div class="note">问答未能覆盖的情形，请于 9 月 25 日前反馈至运营管理部数据分析组；答复口径以本通知与《经营指标管理办法》为准，口头答复不作为执行依据。</div><h4>三、口径变更与历史数据</h4><table><tr><th>情形</th><th>答复</th></tr><tr><td>8 月及以前报表是否重算</td><td>不重算，保留旧口径快照并标注切换时点</td></tr><tr><td>口径表 v2 新增字段</td><td>报送模板同步更新，由系统按月份自动匹配版本</td></tr><tr><td>跨区域协作单统计</td><td>按下单商家注册地计入，不重复计入两侧</td></tr><tr><td>退款单剔除时点</td><td>统一为分派后 24 小时内剔除</td></tr><tr><td>金额与单量差异阈值</td><td>金额不超过 100 元、单量不超过 5 单，超阈值须填写说明</td></tr></table></div><div class="pf"><span>6 条问答覆盖时间、渠道、模板、校验与归属口径</span><span>第 8 / 10 页</span></div></section>
+<section class="page" data-page="9"><div class="ph"><span class="kc">监督问责</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">七、监督与问责</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、记录与升级</h3><table><tr><th>情形</th><th>记录方式</th><th>升级路径</th><th>处理措施</th></tr><tr><td>逾期未报送</td><td>看板自动记录，标记逾期</td><td>当日通知业务线负责人</td><td>纳入季度考核，扣减管理项 1 分</td></tr><tr><td>逾期超过 1 个工作日</td><td>记录并抄送分管领导</td><td>升级至分管副总经理</td><td>管理项累计扣 2 分并提交书面说明</td></tr><tr><td>提交后更正 1 次</td><td>记录一次更正</td><td>运营管理部备案</td><td>不作扣分，纳入月度通报</td></tr><tr><td>提交后更正 2 次以上</td><td>累计记录</td><td>升级至业务线负责人</td><td>数据质量项累计扣 1 分</td></tr><tr><td>填报数据不实</td><td>按差异条数记录</td><td>升级至运营管理部负责人</td><td>按《数据质量管理办法》第十五条处理</td></tr></table></div><div><h4 class="first">二、复核与通报</h4><ul class="first"><li>运营管理部每月抽查不少于 30% 的报送单元，抽查结果在月后 5 个工作日内通报。</li><li>连续 2 个月未出现逾期与更正的报送单元，在季度考核中给予数据质量加分。</li><li>报送编号、校验记录与差异说明作为唯一考核凭据，口头说明不予采信。</li></ul><h4>三、解释与咨询</h4><div class="def"><div class="d"><b>解释部门</b><span>运营管理部（数据分析组）</span></div><div class="d"><b>咨询窗口</b><span>经营看板「月度报送」模块内的咨询入口</span></div><div class="d"><b>答复时限</b><span>工作日 4 小时内答复，涉及口径变更的 2 个工作日内答复</span></div></div></div></div><h3>三、考核明细与申诉</h3><table><tr><th>扣分项</th><th>扣分</th><th>说明</th></tr><tr><td>逾期未报送</td><td>管理项 1 分</td><td>每逾期 1 次计 1 分</td></tr><tr><td>逾期超过 1 个工作日</td><td>管理项累计 2 分</td><td>含前一项 1 分</td></tr><tr><td>填报数据不实</td><td>按差异条数计</td><td>依据《数据质量管理办法》第十五条</td></tr><tr><td>申诉</td><td>不扣分</td><td>自通报之日起 5 个工作日内书面申诉</td></tr></table></div><div class="pf"><span>抽查比例不低于 30%，逾期与更正均纳入季度考核</span><span>第 9 / 10 页</span></div></section>
+<section class="page" data-page="10"><div class="ph"><span class="kc">附录</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">八、附录：报送模板字段与联系方式</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、报送模板字段（12 项）</h3><table><tr><th>序号</th><th>字段</th><th>类型</th><th>是否必填</th><th>校验方式</th></tr><tr><td>01</td><td>业务线代码</td><td>文本</td><td>必填</td><td>枚举校验</td></tr><tr><td>02</td><td>报送月份</td><td>文本</td><td>必填</td><td>格式 YYYY-MM</td></tr><tr><td>03</td><td>有效单量</td><td>整数</td><td>必填</td><td>与工单库差异 ≤5 单</td></tr><tr><td>04</td><td>成交金额</td><td>金额</td><td>必填</td><td>与工单库差异 ≤100 元</td></tr><tr><td>05</td><td>退款金额</td><td>金额</td><td>必填</td><td>非负数校验</td></tr><tr><td>06</td><td>退货率</td><td>百分比</td><td>必填</td><td>与口径表 v2 一致</td></tr><tr><td>07</td><td>准时率</td><td>百分比</td><td>必填</td><td>0% 至 100% 区间</td></tr><tr><td>08</td><td>异常单数</td><td>整数</td><td>必填</td><td>去重校验</td></tr><tr><td>09</td><td>差异说明</td><td>文本</td><td>条件必填</td><td>强制校验不通过时必填</td></tr><tr><td>10</td><td>填报人</td><td>文本</td><td>必填</td><td>花名册校验</td></tr><tr><td>11</td><td>审核人</td><td>文本</td><td>必填</td><td>权限校验</td></tr><tr><td>12</td><td>报送编号</td><td>文本</td><td>系统生成</td><td>自动生成，不可编辑</td></tr></table></div><div><h4 class="first">二、联系方式</h4><table><tr><th>事项</th><th>对接人</th><th>联系方式</th></tr><tr><td>报送口径咨询</td><td>数据分析组 周曼</td><td>分机 8214</td></tr><tr><td>看板权限与故障</td><td>数据平台组 值班</td><td>分机 8300</td></tr><tr><td>考核与通报</td><td>运营管理部 陈立群</td><td>分机 8102</td></tr></table><h4>三、抄送单位</h4><ul class="first"><li>总经理办公室、财务共享中心、6 个区域运营组、4 条业务线负责人。</li></ul><div class="sig"><div>运营管理部</div><div>2026 年 9 月 16 日</div></div><p class="small">本通知自 2026 年 10 月 1 日起执行；此前发布的相关要求与本通知不一致的，以本通知为准。</p></div></div><h4>归档要求</h4><div class="def"><div class="d"><b>归档规则</b><span>报送编号、校验记录与差异说明由系统自动归档，保存期 5 年</span></div></div></div><div class="pf"><span>附录含 12 项模板字段、3 个联系窗口与抄送单位</span><span>第 10 / 10 页</span></div></section>
+</body></html>

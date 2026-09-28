@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-defense</title><style>
+*{box-sizing:border-box;margin:0}
+body{width:1100px;background:#f2f2ef;padding:30px;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 46px;display:flex;flex-direction:column}
+.mono{font-variant-numeric:tabular-nums}
+.serif{font-family:Georgia,"Songti SC","SimSun",serif}
+.kicker{font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.kicker.a{color:var(--accent)}
+h4{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 9px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.05em;font-weight:500}
+tr.total td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+ul{list-style:none;display:grid;gap:5px}
+li{position:relative;padding-left:13px;font-size:12.5px;line-height:1.75;color:#4c5058}
+li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;background:var(--accent)}
+.phead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #e4e4e0;padding-bottom:8px}
+.pn{font-size:11px;color:#8b8f97}
+h2{font-size:23px;letter-spacing:-.02em;font-weight:600;margin-top:8px}
+.body{flex:1;min-height:0;margin-top:11px;display:grid;gap:10px;align-content:start}
+.pfoot{margin-top:auto;padding-top:8px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.kpi{border:1px solid #edede9;background:#faf9f6;padding:9px 11px}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent);font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:4px;font-size:11px;color:#8b8f97}
+.bar{height:8px;background:#f0efeb;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.72}
+.block{border:1px solid #edede9;background:#faf9f6;padding:10px 13px}
+.tl{display:grid;grid-template-columns:104px 1fr 132px;gap:12px;padding:6px 0;border-top:1px solid #eeede7;font-size:12px;color:#4c5058;align-items:center}
+.tl:first-child{border-top:0}
+.tl b{color:var(--accent);font-weight:600}
+.refs{display:grid;gap:4px;font-size:11.5px;color:#4c5058;line-height:1.65}
+.refs div{padding-left:24px;text-indent:-24px}
+.refs em{font-style:normal;color:var(--accent);font-variant-numeric:tabular-nums}
+</style></head><body>
+
+<section class="page" data-page="1" style="--accent:#7C3AED">
+  <div style="text-align:center;margin-top:4px">
+    <div class="kicker a">THESIS DEFENSE · 答辩提纲</div>
+    <h1 class="serif" style="font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.35;margin-top:11px">硕士学位论文答辩：汇报提纲与问答准备</h1>
+    <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">论文题目：《面向中型团队的本地优先智能体协作流程研究》　|　汇报 20 分钟　|　幻灯 28 页　|　2026-09-27</div>
+  </div>
+  <div class="block" style="margin-top:13px">
+    <div class="kicker">摘要 / ABSTRACT</div>
+    <p style="margin-top:7px">本提纲用于 20 分钟学位论文答辩汇报。全文按 5 个部分组织 28 页幻灯片，重点放在结果与结论部分（占汇报时长 35%）。提纲同时整理 12 个高概率提问及应答要点，并为每一条应答指定可现场调取的证据材料与对应文献，避免临场组织语言导致的回答失焦。</p>
+  </div>
+  <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">关键词：答辩汇报 · 时间分配 · 问答准备 · 证据索引 · 幻灯片结构</div>
+  <div class="grid3" style="margin-top:11px">
+    <div class="kpi"><b>20</b><span>汇报时长（分钟）</span></div>
+    <div class="kpi"><b>5</b><span>汇报部分</span></div>
+    <div class="kpi"><b>12</b><span>备询问题</span></div>
+  </div>
+  <div style="margin-top:11px">
+    <h4>汇报结构与时间分配</h4>
+    <table style="margin-top:6px">
+      <tr><th style="width:130px">部分</th><th style="width:76px">时长</th><th style="width:62px">占比</th><th style="width:70px">正文页数</th><th>核心要讲清的一件事</th></tr>
+      <tr><td>一 选题背景与问题</td><td class="mono">2 分钟</td><td class="mono">10%</td><td class="mono">4</td><td>问题来自真实的流程痛点，而非文献缝隙</td></tr>
+      <tr><td>二 文献与研究缺口</td><td class="mono">3 分钟</td><td class="mono">15%</td><td class="mono">5</td><td>68 篇中仅 3 篇同时满足长周期与含流程变量</td></tr>
+      <tr><td>三 研究设计与数据</td><td class="mono">4 分钟</td><td class="mono">20%</td><td class="mono">6</td><td>变量可自动采集，两组基线可比</td></tr>
+      <tr><td>四 主要结果与结论</td><td class="mono">7 分钟</td><td class="mono">35%</td><td class="mono">8</td><td>净效应量级、拐点位置与稳健性</td></tr>
+      <tr class="total"><td>五 创新点与贡献</td><td class="mono">4 分钟</td><td class="mono">20%</td><td class="mono">3</td><td>三点增量分别对应哪个缺口</td></tr>
+    </table>
+  </div>
+    <div class="grid2" style="margin-top:10px;padding-top:8px;border-top:1px solid #eeede7">
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">口径与来源　</b>论文 12,000 字 · 汇报 20 分钟 · 备询 12 问 · 材料 4 类</p>
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">后续页面导读　</b>P3—7 五个部分 · P8 问答准备 · P9 流程与材料 · P10 文献与幻灯清单</p>
+  </div>
+  <p style="margin-top:8px;font-size:11.5px;line-height:1.7;color:#6f737b">口径说明：时间分配以 20 分钟汇报为基准；问答 15 分钟与评议 10 分钟不计入汇报时长。</p>
+  <div class="pfoot"><span>5 个部分 20 分钟：正文 26 页 + 封面目录 2 页 = 28 页</span><span>第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">1 汇报时序与幻灯结构</div><div class="pn">20 分钟，含 1 分钟弹性</div></div>
+  <h2>汇报时序与幻灯片结构</h2>
+  <div class="body">
+    <div>
+      <h4>时间分配（分钟）</h4>
+      <div style="display:grid;gap:6px;margin-top:7px">
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>一 选题背景</span><span class="bar"><i style="width:10%"></i></span><span class="mono">2 分钟 · 10%</span></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>二 文献缺口</span><span class="bar"><i style="width:15%"></i></span><span class="mono">3 分钟 · 15%</span></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>三 设计与数据</span><span class="bar"><i style="width:20%"></i></span><span class="mono">4 分钟 · 20%</span></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>四 结果与结论</span><span class="bar"><i style="width:35%"></i></span><span class="mono">7 分钟 · 35%</span></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>五 创新与贡献</span><span class="bar"><i style="width:20%"></i></span><span class="mono">4 分钟 · 20%</span></div>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:120px">部分</th><th style="width:88px">幻灯区间</th><th>每页要点</th><th style="width:110px">讲述节奏</th></tr>
+      <tr><td>封面与目录</td><td class="mono">第 1 — 2 页</td><td>题目、导师、一句结论、五段结构图</td><td>不计时</td></tr>
+      <tr><td>一 选题背景</td><td class="mono">第 3 — 6 页</td><td>完成时长离散度 2.7 倍、三个研究问题</td><td>每页 30 秒</td></tr>
+      <tr><td>二 文献缺口</td><td class="mono">第 7 — 11 页</td><td>三条脉络、质量评价、证据矩阵</td><td>每页 36 秒</td></tr>
+      <tr><td>三 设计与数据</td><td class="mono">第 12 — 17 页</td><td>变量操作化、样本 40 人、1,790 条任务</td><td>每页 40 秒</td></tr>
+      <tr><td>四 结果与结论</td><td class="mono">第 18 — 25 页</td><td>DID 系数、拐点、稳健性、结论边界</td><td>每页 52 秒</td></tr>
+      <tr class="total"><td>五 创新与贡献</td><td class="mono">第 26 — 28 页</td><td>三个创新点、局限、致谢</td><td>每页 80 秒</td></tr>
+    </table>
+    <div class="block"><h4>讲述原则</h4><p style="margin-top:6px">每页只讲一个数字加一句话结论；结果页先给量级再给解释；任何一页超时不超过 10 秒，超时则跳到下一页，把解释留给问答环节；全程不念稿，只依据每页左上角的提示句展开。</p></div>
+  </div>
+  <div class="pfoot"><span>28 页幻灯 20 分钟，平均每页 43 秒，结果部分每页 52 秒</span><span>第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2 第一部分 · 选题背景与问题</div><div class="pn">第 3 — 6 页，2 分钟</div></div>
+  <h2>选题背景与研究问题</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="block"><h4>第 3 页 · 现象</h4><p style="margin-top:5px">同一类任务的完成时长离散度达 2.7 倍，任务是否完成在团队内没有统一判定标准。</p></div>
+      <div class="block"><h4>第 4 页 · 背景</h4><p style="margin-top:5px">本地优先部署在 62% 的采购评审中被列为硬性条件，但流程适配仍靠经验。</p></div>
+      <div class="block"><h4>第 5 页 · 问题</h4><p style="margin-top:5px">RQ1 边界清晰度影响时长与返工；RQ2 回溯粒度与成本的权衡；RQ3 效果的稳定期。</p></div>
+    </div>
+    <table>
+      <tr><th style="width:66px">页码</th><th style="width:150px">标题</th><th>口头讲述要点</th><th style="width:110px">支撑材料</th></tr>
+      <tr><td class="mono">第 3 页</td><td>现象：离散度 2.7 倍</td><td>先给一个现场例子：同类任务最快 41 分钟、最慢 111 分钟</td><td>基线日志摘录</td></tr>
+      <tr><td class="mono">第 4 页</td><td>背景：部署已是硬约束</td><td>说明研究对象已完成本地部署，问题不在模型而在流程</td><td>采购评审摘要</td></tr>
+      <tr><td class="mono">第 5 页</td><td>三个研究问题</td><td>逐条念出 RQ1 — RQ3，强调每个问题都对应可观测指标</td><td>指标对照表</td></tr>
+      <tr class="total"><td class="mono">第 6 页</td><td>研究意义与增量</td><td>一句话：把流程改动做成可测量、可复制的干预</td><td>—</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>这一部分的常见失分点</h4>
+        <ul style="margin-top:6px">
+          <li>背景讲太长，压缩了结果部分的时间</li>
+          <li>只讲文献缝隙，讲不出真实痛点</li>
+          <li>研究问题与后文指标对不上号</li>
+        </ul>
+      </div>
+      <div>
+        <h4>规避做法</h4>
+        <ul style="margin-top:6px">
+          <li>背景限时 2 分钟，用计时器在第 1 分 40 秒给出提示</li>
+          <li>开场用一个具体案例代替行业概述</li>
+          <li>第 5 页的问题与指标同页并列呈现</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>第一部分 4 页 2 分钟，每页 30 秒，第 3 页用现场案例开场</span><span>第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3 第二部分 · 文献与研究缺口</div><div class="pn">第 7 — 11 页，3 分钟</div></div>
+  <h2>文献脉络与研究缺口</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:66px">页码</th><th style="width:150px">标题</th><th>口头讲述要点</th><th style="width:120px">现场可调取材料</th></tr>
+      <tr><td class="mono">第 7 页</td><td>检索与筛选</td><td>412 篇初检到 68 篇纳入，κ = 0.81</td><td>筛选流程图</td></tr>
+      <tr><td class="mono">第 8 页</td><td>三条脉络</td><td>效率、合规、流程各自主张与不足，各举 1 篇代表</td><td>脉络对照表</td></tr>
+      <tr><td class="mono">第 9 页</td><td>质量评价</td><td>五项平均分 3.12，观察期达标率仅 22%</td><td>评分明细表</td></tr>
+      <tr><td class="mono">第 10 页</td><td>证据矩阵</td><td>仅 3 篇同时满足长周期与含流程变量</td><td>矩阵图</td></tr>
+      <tr class="total"><td class="mono">第 11 页</td><td>本文定位</td><td>用一句话说清增量：同一框架、同一数据源、两轮纵向</td><td>缺口—章节对照表</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>三条脉络（60 篇；另有评测方法 8 篇）</h4>
+        <table style="margin-top:6px">
+          <tr><th>脉络</th><th style="width:64px">篇数</th><th>一句话</th></tr>
+          <tr><td>端侧推理效率</td><td class="mono">28</td><td>测量精细，但不看流程</td></tr>
+          <tr><td>数据主权合规</td><td class="mono">17</td><td>约束清楚，但不给粒度</td></tr>
+          <tr class="total"><td>协作流程落地</td><td class="mono">15</td><td>现场真实，但周期太短</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>评委可能追问的方向</h4>
+        <ul style="margin-top:6px">
+          <li>为什么只纳入 68 篇，排除标准是否过严</li>
+          <li>κ = 0.81 的两位评价者如何分工</li>
+          <li>质量评价的五项维度依据什么拟定</li>
+          <li>「仅 3 篇」的判定口径是什么</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>第二部分 5 页 3 分钟，核心数字为 68 篇、3.12 分、3 篇</span><span>第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4 第三部分 · 研究设计与数据</div><div class="pn">第 12 — 17 页，4 分钟</div></div>
+  <h2>研究设计与数据来源</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:66px">页码</th><th style="width:150px">标题</th><th>口头讲述要点</th><th style="width:130px">需要主动交代的点</th></tr>
+      <tr><td class="mono">第 12 页</td><td>研究框架</td><td>2 个自变量、6 个因变量，全部来自同一日志源</td><td>为何不用自评作主指标</td></tr>
+      <tr><td class="mono">第 13 页</td><td>变量操作化</td><td>边界清晰度按任务卡字段项数自动判定</td><td>判定的客观性如何保证</td></tr>
+      <tr><td class="mono">第 14 页</td><td>样本与分组</td><td>2 组 × 20 人，最大标准化差异 0.14</td><td>为何不做随机分组</td></tr>
+      <tr><td class="mono">第 15 页</td><td>干预实施</td><td>4 档回溯覆盖度，对应开销 +2.3% 至 +9.2%</td><td>如何确认字段真的填了</td></tr>
+      <tr><td class="mono">第 16 页</td><td>数据采集</td><td>1,790 条任务 + 412 份自评，回收率 85.8%</td><td>剔除标准与效应</td></tr>
+      <tr class="total"><td class="mono">第 17 页</td><td>分析方法</td><td>双重差分 + 中位数回归 + 分段趋势</td><td>标准误为何按个体聚类</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="kpi"><b>40</b><span>受试者（人）</span></div>
+      <div class="kpi"><b>1,790</b><span>分析任务（条）</span></div>
+      <div class="kpi"><b>0.14</b><span>最大标准化差异</span></div>
+    </div>
+    <div class="block"><h4>这一部分最容易被追问的三件事</h4><p style="margin-top:6px">第一，非随机分组下如何保证可比：用基线期 2 周与标准化差异小于 0.20 作为判据；第二，任务级样本的独立性：按个体聚类调整标准误，并在报告中说明；第三，干预强度的伦理边界：不涉及薪酬与考核，仅调整流程字段，已通过伦理审查（批号 MR-2026-118）。</p></div>
+  </div>
+  <div class="pfoot"><span>第三部分 6 页 4 分钟，样本 40 人、任务 1,790 条、差异 0.14</span><span>第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">5 第四部分 · 主要结果与结论</div><div class="pn">第 18 — 25 页，7 分钟（核心）</div></div>
+  <h2>主要结果与结论</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:116px">指标</th><th style="width:82px">基线（B 组）</th><th style="width:82px">干预后 A 组</th><th style="width:74px">净变化</th><th>统计证据</th></tr>
+      <tr><td>完成时长中位数</td><td class="mono">101 分钟</td><td class="mono">89 分钟</td><td class="mono">−11.9%</td><td class="mono">β3 = −0.118, p = 0.006</td></tr>
+      <tr><td>返工率</td><td class="mono">15.1%</td><td class="mono">11.8%</td><td class="mono">−3.3 pp</td><td class="mono">β3 = −0.033, p = 0.018</td></tr>
+      <tr><td>流程依从度</td><td class="mono">60.2%</td><td class="mono">82.4%</td><td class="mono">+22.2 pp</td><td class="mono">β3 = +0.222, p &lt; 0.001</td></tr>
+      <tr><td>人工介入次数</td><td class="mono">0.42 次</td><td class="mono">0.31 次</td><td class="mono">−26.2%</td><td class="mono">拐点 62%, p = 0.009</td></tr>
+      <tr class="total"><td>主观负荷</td><td class="mono">4.4</td><td class="mono">4.2</td><td class="mono">−0.2 分</td><td class="mono">t(38) = 1.42, p = 0.164</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>三条结论</h4>
+        <ul style="margin-top:6px">
+          <li>边界清晰度提高 1 档，完成时长中位数下降 11.9%，H1 成立</li>
+          <li>回溯覆盖度与人工介入呈倒 U 型，拐点位于 62%，H2 成立</li>
+          <li>第 8 周后周度斜率绝对值为 0.3%，效果趋于稳定，H3 成立</li>
+        </ul>
+      </div>
+      <div>
+        <h4>稳健性一句话</h4>
+        <table style="margin-top:6px">
+          <tr><th>检验</th><th style="width:110px">结果</th></tr>
+          <tr><td>安慰剂（干预前移 2 周）</td><td class="mono">p = 0.412，不显著</td></tr>
+          <tr><td>剔除时长首尾 2.5%</td><td class="mono">系数 0.406</td></tr>
+          <tr class="total"><td>完整样本 n = 405</td><td class="mono">方向一致</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="block"><h4>结论边界（必须主动说）</h4><p style="margin-top:6px">适用对象为 15 — 25 人、任务以文档与数据为主、已完成本地部署的知识密集型团队；样本量偏小使可检测效应量为 d = 0.91；观察期 12 周无法覆盖年末高峰；结论不适用于任务高度异质或周新增任务超过 400 条的团队。</p></div>
+  </div>
+  <div class="pfoot"><span>第四部分 8 页 7 分钟，5 个指标中 4 项显著、1 项不显著</span><span>第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">6 第五部分 · 创新点与贡献</div><div class="pn">第 26 — 28 页，4 分钟</div></div>
+  <h2>创新点与研究贡献</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="block"><h4>创新点一</h4><p style="margin-top:5px">把任务边界与审批回溯纳入同一可测量框架，6 个指标共用同一日志源。</p><p style="margin-top:5px;font-size:11.5px;color:#6f737b">对应缺口：框架割裂</p></div>
+      <div class="block"><h4>创新点二</h4><p style="margin-top:5px">用 4 档粒度投放刻画成本曲线，给出拐点 62% 与两个推荐档位。</p><p style="margin-top:5px;font-size:11.5px;color:#6f737b">对应缺口：代价未量化</p></div>
+      <div class="block"><h4>创新点三</h4><p style="margin-top:5px">12 周两组准实验 + 安慰剂检验，区分学习效应与真实改进。</p><p style="margin-top:5px;font-size:11.5px;color:#6f737b">对应缺口：周期过短</p></div>
+    </div>
+    <table>
+      <tr><th style="width:96px">贡献层面</th><th>具体贡献</th><th style="width:170px">与已有工作的差别</th></tr>
+      <tr><td>理论</td><td>给出边界—回溯—成效三者的可测量关系模型</td><td>已有研究多为两两关系的独立验证</td></tr>
+      <tr><td>方法</td><td>12 周两组准实验 + 中位数回归 + 分段趋势</td><td>已有流程类研究观察期中位数仅 6 周</td></tr>
+      <tr class="total"><td>实践</td><td>字段模板、粒度推荐档位与实施清单可直接复用</td><td>已有研究多以「建议加强留痕」收尾</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>局限与后续工作</h4>
+        <ul style="margin-top:6px">
+          <li>样本量偏小，需在更大团队复制以检验效应量</li>
+          <li>单一行业，跨行业外推待验证</li>
+          <li>后续用面板数据替代单期观测</li>
+        </ul>
+      </div>
+      <div>
+        <h4>收尾话术</h4>
+        <div class="block" style="margin-top:6px"><p>三句话收尾：做了什么（把流程改动做成可测量干预）、发现了什么（时长降 11.9%、拐点 62%）、边界在哪（15 — 25 人知识密集型团队、12 周观察期）。</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>第五部分 3 页 4 分钟，3 个创新点逐条对应 3 个研究缺口</span><span>第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">7 预期提问与应答准备</div><div class="pn">12 个问题分 4 类，本页列 8 个</div></div>
+  <h2>高概率提问与应答要点</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:56px">类别</th><th style="width:200px">提问</th><th>应答要点</th><th style="width:120px">可调取证据</th></tr>
+      <tr><td>方法</td><td>为何不做随机分组</td><td>随机重组会破坏既有协作关系，改用基线平衡性检验，最大标准化差异 0.14</td><td>基线对照表</td></tr>
+      <tr><td>方法</td><td>任务级样本是否独立</td><td>不独立，因此标准误按个体聚类，结论以组层面推断为准</td><td>聚类稳健标准误</td></tr>
+      <tr><td>方法</td><td>如何排除学习效应</td><td>B 组同样启用日志采集但不改流程；安慰剂检验 p = 0.412</td><td>安慰剂检验表</td></tr>
+      <tr><td>数据</td><td>剔除 52 条无效记录是否影响结论</td><td>剔除测试重复与跨周挂起共 52 条后重估，系数 0.406 与基准 0.412 基本一致</td><td>稳健性设定表</td></tr>
+      <tr><td>数据</td><td>自评回收率 85.8% 是否偏低</td><td>缺失样本与留存样本的岗位分布无系统差异，且自评仅作辅助</td><td>回收轨迹表</td></tr>
+      <tr><td>结论</td><td>11.9% 的降幅是否来自任务变简单</td><td>按任务类型分层控制后系数仍显著，任务结构占比未变</td><td>分层回归结果</td></tr>
+      <tr><td>结论</td><td>拐点 62% 的置信区间有多宽</td><td>拐点区间为 58% — 66%，落在 50% — 70% 的预期范围内</td><td>拐点估计输出</td></tr>
+      <tr class="total"><td>应用</td><td>结论能否直接用于 50 人以上团队</td><td>不建议直接套用；边界字段维护成本随规模与异质性上升，需重新标定</td><td>边界条件说明</td></tr>
+    </table>
+    <div class="block"><h4>应答三原则</h4><p style="margin-top:6px">第一，先给结论再给证据，不做铺垫；第二，不确定的问题明确说「目前数据不能回答」，并说明需要什么数据才能回答；第三，涉及数值的问题只报已核对的数字，不临场估算，必要时请评委允许调取附录。</p></div>
+  </div>
+  <div class="pfoot"><span>12 个问题分 4 类：方法 4 个、数据 3 个、结论与边界 3 个、应用 2 个</span><span>第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">8 答辩流程与材料清单</div><div class="pn">正式答辩 45 分钟</div></div>
+  <h2>答辩流程、材料清单与时间线</h2>
+  <div class="body">
+    <div>
+      <h4>正式答辩时间构成</h4>
+      <div style="display:grid;gap:6px;margin-top:7px">
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>学生汇报</span><span class="bar"><i style="width:44%"></i></span><span class="mono">20 分钟</span></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>评委问答</span><span class="bar"><i style="width:33%"></i></span><span class="mono">15 分钟</span></div>
+        <div style="display:grid;grid-template-columns:110px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>评议与宣布</span><span class="bar"><i style="width:23%"></i></span><span class="mono">10 分钟</span></div>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:118px">材料</th><th style="width:60px">份数</th><th>要点</th><th style="width:110px">状态</th></tr>
+      <tr><td>论文定稿</td><td class="mono">5</td><td>盲审意见已逐条回应，修改说明单页附后</td><td>已装订</td></tr>
+      <tr><td>汇报幻灯片</td><td class="mono">1</td><td>28 页，兼容 PDF 与演示两版，投影分辨率 1920 × 1080</td><td>已完成</td></tr>
+      <tr><td>数据附录</td><td class="mono">5</td><td>变量操作化表、描述统计、回归与稳健性输出</td><td>已打印</td></tr>
+      <tr class="total"><td>备询应答卡</td><td class="mono">1</td><td>12 个问题与证据页码对应关系，A4 单页</td><td>已完成</td></tr>
+    </table>
+    <div style="display:grid;gap:0">
+      <div class="tl"><b>盲审返回</b><span>逐条回应意见，形成修改说明</span><span class="mono">答辩前 4 周</span></div>
+      <div class="tl"><b>预答辩</b><span>完整走一遍 20 分钟流程，录像复盘节奏</span><span class="mono">答辩前 2 周</span></div>
+      <div class="tl"><b>材料提交</b><span>论文 5 份、附录 5 份、幻灯备份</span><span class="mono">答辩前 3 天</span></div>
+      <div class="tl"><b>设备彩排</b><span>测试投影、翻页笔与备用电源</span><span class="mono">答辩前 1 天</span></div>
+      <div class="tl"><b>正式答辩</b><span>20 分钟汇报 + 15 分钟问答 + 10 分钟评议</span><span class="mono">答辩当日</span></div>
+      <div class="tl"><b>修改归档</b><span>按评委会意见修改并提交终稿</span><span class="mono">答辩后 2 周</span></div>
+    </div>
+  </div>
+  <div class="pfoot"><span>正式答辩 45 分钟 = 20 汇报 + 15 问答 + 10 评议，材料 4 类</span><span>第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">参考文献与幻灯片清单</div><div class="pn">引用 8 条，幻灯 28 页</div></div>
+  <h2>参考文献与幻灯片清单</h2>
+  <div class="body">
+    <div class="refs">
+      <div><em>[1]</em> Wang J, 李强. 审批环节对智能体落地率的影响：一项流程实验[J]. 管理科学, 2025, 38(4): 112-126.</div>
+      <div><em>[2]</em> Qian M, 吴迪. 任务边界书面化与返工率的关系[J]. 工业工程与管理, 2025, 30(3): 77-85.</div>
+      <div><em>[3]</em> Chen L, Zhou Y. Task-level benchmarks for agent workflows[C]. Proceedings of the 12th Conference on Applied Measurement, 2024: 88-96.</div>
+      <div><em>[4]</em> Xu B, 李静. 审计留痕粒度与运维开销的权衡[J]. 信息安全研究, 2024, 10(5): 402-411.</div>
+      <div><em>[5]</em> Angrist J D, Pischke J S. Mostly Harmless Econometrics: An Empiricist's Companion[M]. Princeton: Princeton University Press, 2009: 227-243.</div>
+      <div><em>[6]</em> 国家卫生健康委员会. 涉及人的生命科学和医学研究伦理审查办法[Z]. 2023-02-18.</div>
+    </div>
+    <table>
+      <tr><th style="width:104px">幻灯区间</th><th style="width:130px">内容</th><th style="width:56px">页数</th><th>必须呈现的元素</th></tr>
+      <tr><td class="mono">第 1 — 2 页</td><td>封面与目录</td><td class="mono">2</td><td>题目、导师、五段结构图与时长标注</td></tr>
+      <tr><td class="mono">第 3 — 6 页</td><td>选题背景与问题</td><td class="mono">4</td><td>离散度 2.7 倍、三个研究问题与指标</td></tr>
+      <tr><td class="mono">第 7 — 11 页</td><td>文献与缺口</td><td class="mono">5</td><td>筛选流程、质量评分、证据矩阵</td></tr>
+      <tr><td class="mono">第 12 — 17 页</td><td>设计与数据</td><td class="mono">6</td><td>变量表、样本表、干预档位、DID 模型</td></tr>
+      <tr><td class="mono">第 18 — 25 页</td><td>结果与结论</td><td class="mono">8</td><td>组间差异表、趋势图、拐点图、稳健性</td></tr>
+      <tr class="total"><td class="mono">第 26 — 28 页</td><td>创新、局限与致谢</td><td class="mono">3</td><td>三个创新点、三条局限、致谢</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>幻灯 28 页与第 1 页时间分配表一致；文献 [1] — [6] 为论文主要参考</span><span>第 10 / 10 页</span></div>
+</section>
+
+</body></html>

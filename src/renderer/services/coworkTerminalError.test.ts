@@ -4,6 +4,8 @@ import { CoworkErrorKind, ENGINE_NOT_READY_CODE } from '../../common/coworkError
 import type { CoworkMessage, CoworkSession } from '../types/cowork';
 import {
   createCoworkTerminalErrorMessage,
+  extractUserFacingErrorMessage,
+  getTerminalErrorDisplayText,
   hasMatchingLatestTerminalError,
   isCoworkTerminalErrorMessage,
   resolveCoworkTerminalError,
@@ -77,5 +79,38 @@ describe('cowork terminal errors', () => {
       kind: CoworkErrorKind.EngineNotReady,
       message: 'runtime unavailable',
     });
+  });
+
+  test('extracts nested provider error.message from JSON payloads', () => {
+    const providerMessage = 'provider unavailable';
+    expect(
+      extractUserFacingErrorMessage(JSON.stringify({ error: { message: providerMessage } })),
+    ).toBe(providerMessage);
+  });
+
+  test('extracts error.message when JSON is embedded in a wrapper prefix', () => {
+    const providerMessage = 'provider unavailable';
+    const payload = JSON.stringify({ error: { message: providerMessage } });
+    expect(extractUserFacingErrorMessage(`prefix: ${payload}`)).toBe(providerMessage);
+  });
+
+  test('recognizes legacy chat failure content as a terminal error', () => {
+    const providerMessage = 'provider unavailable';
+    const legacy: CoworkMessage = {
+      id: 'error-1',
+      type: 'system',
+      content: `prefix: ${JSON.stringify({ error: { message: providerMessage } })}`,
+      timestamp: 1,
+    };
+    expect(isCoworkTerminalErrorMessage(legacy)).toBe(true);
+    expect(getTerminalErrorDisplayText(legacy)).toBe(providerMessage);
+  });
+
+  test('extracts message from status-prefixed API error payloads', () => {
+    expect(
+      extractUserFacingErrorMessage(
+        '503: {"message":"No running instances available","code":503,"type":"ServiceUnavailable"}',
+      ),
+    ).toBe('No running instances available');
   });
 });

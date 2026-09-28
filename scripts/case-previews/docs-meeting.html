@@ -1,44 +1,94 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-meeting</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
-.title{font-size:23px;letter-spacing:-.01em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
-h3{margin-top:16px;font-size:13.5px}
-p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-ul{list-style:none;margin-top:10px;display:grid;gap:7px}
-li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-meeting</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--accent:#B45309}
+body{width:1160px;display:grid;gap:26px;padding:30px;background:#f2f2ef;
+ font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+ color:#16171a;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;
+ border:1px solid #e4e4e0;padding:30px 44px 0;display:flex;flex-direction:column}
+.ph{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.ph .kc{color:var(--accent);letter-spacing:.3em}
+.ph .rt{letter-spacing:.06em;color:#9a9ea6}
+.pt{font-size:23px;font-weight:500;letter-spacing:-.02em;margin-top:11px;color:#16171a}
+.pt.lg{font-size:27px;font-weight:600;margin-top:14px;line-height:1.34}
+.rule{height:1px;background:#edede9;margin-top:11px}
+.pbody{flex:1;min-height:0;margin-top:12px;overflow:hidden}
+.pf{margin-top:8px;padding-top:8px;border-top:1px solid #edede9;display:flex;justify-content:space-between;font-size:11px;color:#8b8f97;letter-spacing:.02em}
+.meta{display:flex;flex-wrap:wrap;gap:7px 22px;font-size:12px;color:#8b8f97;padding-bottom:12px;border-bottom:1px solid #edede9}
+h3{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:#16171a;margin-top:12px}
+h3.first{margin-top:0}
+h4{font-size:11px;font-weight:600;letter-spacing:.16em;color:#8b8f97;margin-top:10px}
+h4.first{margin-top:0}
+p{font-size:13px;line-height:1.9;color:#3d4046;margin-top:8px}
+p.first{margin-top:0}
+ul{list-style:none;margin-top:7px;display:grid;gap:5px}
+ul.first{margin-top:0}
+li{position:relative;padding-left:15px;font-size:12.8px;line-height:1.8;color:#4c5058}
 li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
-.split{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
-.pane{min-width:0;overflow:hidden}
-.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.dense{margin-top:10px;font-size:11px;line-height:1.95;color:#6f737b;text-align:justify}
-.card{border:1px solid #edede9;background:#fafaf8;padding:16px 18px;margin-top:10px}
+li b{font-weight:600;color:#16171a}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 10px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.6}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.n,span.n{font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.grid12{display:grid;grid-template-columns:1.28fr 1fr;gap:24px}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #edede9;margin-top:11px}
+.nums>div{padding:10px 13px;border-left:1px solid #edede9}
+.nums>div:first-child{border-left:0}
+.nums .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.nums .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:3px;color:var(--accent)}
+.nums .s{font-size:11.5px;color:#8b8f97;margin-top:2px}
+.card{border:1px solid #edede9;background:#fafaf8;padding:10px 13px;margin-top:8px}
 .card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.card p{margin-top:8px;font-size:12.8px;line-height:1.85;color:#3d4046}
+.card p{margin-top:5px;font-size:12.5px;line-height:1.8}
+.note{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:2px solid var(--accent);
+ padding:8px 12px;margin-top:8px;font-size:12.5px;line-height:1.8;color:#3d4046}
+.toc{margin-top:6px}
+.toc .r{display:grid;grid-template-columns:34px 1fr 208px 40px;gap:10px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.6}
+.toc .r:first-child{border-top:0}
+.toc .r b{color:var(--accent);font-weight:600}
+.toc .r .pg{text-align:right;color:#8b8f97;font-variant-numeric:tabular-nums}
+.bar{margin-top:8px;display:grid;gap:7px}
+.bar .r{display:grid;grid-template-columns:122px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058}
+.bar .tr{height:9px;background:#f1f1ee;position:relative}
+.bar .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);display:block}
+.bar .vv{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.steps{margin-top:6px}
+.steps .s{display:grid;grid-template-columns:58px 1fr;gap:12px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.steps .s:first-child{border-top:0}
+.steps b{color:var(--accent);font-weight:600}
+.def{margin-top:6px}
+.def .d{display:grid;grid-template-columns:158px 1fr;gap:12px;padding:5px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.def .d:first-child{border-top:0}
+.def .d b{font-weight:600;color:#16171a}
+.sig{display:flex;justify-content:flex-end;gap:44px;margin-top:16px;font-size:12.5px;color:#4c5058}
+.cmp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #edede9;margin-top:9px}
+.cmp>div{padding:10px 13px;font-size:12.5px;line-height:1.85;color:#3d4046}
+.cmp>div:first-child{border-right:1px solid #edede9}
+.cmp .h{font-size:11px;letter-spacing:.14em;color:#8b8f97;display:block;margin-bottom:5px}
 del{color:#b3564a;text-decoration:line-through}
-ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.07)}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.08)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border:1px solid #e4e4e0;color:#6f737b}
+.small{font-size:11.5px;color:#8b8f97;line-height:1.75;margin-top:6px}
+.cfoot{display:grid;grid-template-columns:1fr 1fr 1.45fr;border:1px solid #edede9;margin-top:10px}
+.cfoot>div{padding:8px 12px;border-left:1px solid #edede9;font-size:11.5px;line-height:1.7;color:#4c5058}
+.cfoot>div:first-child{border-left:0}
+.cfoot .k{display:block;font-size:11px;letter-spacing:.12em;color:#8b8f97;margin-bottom:3px}
 </style></head><body>
-<div class="doc" style="--accent:#B45309">
-  <div class="title">商家工具组周会纪要</div>
-  <div class="meta"><span>时间：9 月 16 日 10:00 — 11:20</span><span>地点：三楼小会议室</span><span>参会：陈立群、周曼、徐海鹏、谭亦文</span></div>
-  <h3>一、讨论内容</h3>
-  <p>任务分派链路的改版上线两周，人均日处理量从 40 单提升到 128 单，但夜间时段的异常单仍依赖人工挑单。徐海鹏提出把超时判定前移到分派阶段，减少事后补救。</p>
-  <p>指标口径表已覆盖 6 条业务线，周曼反馈导出模块仍有两处口径与看板不一致，需要在下个版本统一。</p>
-  <h3>二、行动项</h3>
-  <table>
-    <tr><th>事项</th><th>负责人</th><th>截止</th><th>状态</th></tr>
-    <tr><td>超时判定前移到分派阶段</td><td>徐海鹏</td><td class="mono">9-23</td><td>进行中</td></tr>
-    <tr><td>导出模块口径对齐</td><td>周曼</td><td class="mono">9-20</td><td>待开始</td></tr>
-    <tr><td>夜间值班排班规则定稿</td><td>陈立群</td><td class="mono">9-25</td><td>待开始</td></tr>
-  </table>
-  <h3>三、下次会议</h3>
-  <p>定于 9 月 23 日 10:00 复看行动项进度，重点确认超时判定前移的灰度范围；如口径对齐未完成，顺延到下一次评审。</p>
-</div></body></html>
+<section class="page" data-page="1"><div class="ph"><span class="kc">MEETING MINUTES</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">商家工具组 2026 年第 19 次双周例会纪要</h2><div class="pbody"><div class="meta"><span>文号：商工纪〔2026〕19 号</span><span>会议时间：2026-09-16 10:00—11:20</span><span>地点：总部三楼小会议室</span><span>主持人：陈立群</span><span>记录人：谭亦文</span><span>参会：6 人</span><span>缺席：2 人</span></div><h3>一、会议摘要</h3><p>本次会议回顾任务分派链路改版上线两周的运行情况，审议夜间异常单处置与经营指标口径统一两项议题。改版后人均日处理量由 40 单提升至 128 单，但夜间时段仍有 18% 的异常单依赖人工挑单，未达 10% 的既定目标。会议形成 5 项决议、7 项行动项，其中 6 项须在 9 月 25 日前闭环、1 项在 9 月 30 日前闭环，超时判定前移的灰度范围由徐海鹏在 9 月 23 日前提交方案。</p><div class="nums"><div><div class="k">人均日处理量</div><div class="v">128 单</div><div class="s">改版前 40 单，提升 2.2 倍</div></div><div><div class="k">夜间人工挑单占比</div><div class="v">18%</div><div class="s">目标 ≤10%，尚有 8 个百分点缺口</div></div><div><div class="k">行动项 / 决议</div><div class="v">7 / 5</div><div class="s">其中 6 项于 9 月 25 日前闭环</div></div></div><h3>二、决议与行动项速览</h3><table><tr><th>编号</th><th>事项</th><th>负责人</th><th>时限</th><th>验收口径</th></tr><tr><td>D-01</td><td>超时判定前移至分派阶段，提交灰度方案</td><td>徐海鹏</td><td>9-23</td><td>灰度覆盖 2 条业务线，误判率 ≤2%</td></tr><tr><td>D-02</td><td>导出模块与看板口径对齐</td><td>周曼</td><td>9-20</td><td>两处已知差异归零，回归用例通过</td></tr><tr><td>D-03</td><td>夜间值班排班规则定稿</td><td>陈立群</td><td>9-25</td><td>常规值守 3 人 + 机动值守 1 人</td></tr><tr><td>D-04</td><td>异常单影响面排序纳入监控</td><td>谭亦文</td><td>9-30</td><td>监控看板含前 6 单实时排序</td></tr></table><div class="cfoot"><div><span class="k">数据口径</span>分派链路埋点与工单库，按工单创建时间归属统计周期</div><div><span class="k">数据来源</span>工单库 ops_ticket、分派链路埋点、客服投诉标签</div><div><span class="k">阅读顺序</span>P2 目录 · P3 会议信息 · P4—P6 三个议题 · P7—P8 决议与行动项 · P9—P10 风险与附录</div></div></div><div class="pf"><span>结论：改版方向确认，优化范围收窄至夜间时段与人工确认环节</span><span>第 1 / 10 页</span></div></section>
+<section class="page" data-page="2"><div class="ph"><span class="kc">CONTENTS</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">目录与阅读指引</h2><div class="pbody"><p class="first">本纪要共 10 页，记录会议基本信息、三个议题的讨论与数据依据、决议与行动项、风险与未决事项，以及下次会议安排。需要跟进任务的读者可直接阅读第 8 页行动项清单；需要了解背景的读者从第 3 页会议信息读起。</p><div class="toc"><div class="r"><b>一</b><span>会议基本信息</span><span style="color:#8b8f97">参会人员、缺席与列席、议程时间分配</span><span class="pg">3</span></div><div class="r"><b>二</b><span>议题一：任务分派链路改版运行回顾</span><span style="color:#8b8f97">两周运行数据、时延分布、异常单结构</span><span class="pg">4</span></div><div class="r"><b>三</b><span>议题二：夜间异常单处置方案</span><span style="color:#8b8f97">超时判定前移、值班规则、人工挑单压缩路径</span><span class="pg">5</span></div><div class="r"><b>四</b><span>议题三：经营指标口径统一</span><span style="color:#8b8f97">6 条业务线口径差异与归零计划</span><span class="pg">6</span></div><div class="r"><b>五</b><span>决议事项</span><span style="color:#8b8f97">D-01 至 D-05 的决议内容与表决结果</span><span class="pg">7</span></div><div class="r"><b>六</b><span>行动项清单</span><span style="color:#8b8f97">7 项行动项的责任人、协作方与验收标准</span><span class="pg">8</span></div><div class="r"><b>七</b><span>风险与未决事项</span><span style="color:#8b8f97">4 项风险、3 项待确认问题</span><span class="pg">9</span></div><div class="r"><b>八</b><span>下次会议安排与附录</span><span style="color:#8b8f97">议题征集、跟踪规则、术语表</span><span class="pg">10</span></div></div><h4>阅读约定</h4><ul class="first"><li>决议编号 <b>D-01</b> 至 <b>D-05</b> 在正文与附录中保持一致，便于跨页检索。</li><li>行动项编号 <b>A-01</b> 至 <b>A-07</b> 为本次会议新增或延续的跟踪项。</li><li>金额单位为人民币元，时延单位为分钟，数据口径见第 10 页术语表。</li></ul></div><div class="pf"><span>本纪要共 10 页，决议与行动项跨页编号连续</span><span>第 2 / 10 页</span></div></section>
+<section class="page" data-page="3"><div class="ph"><span class="kc">会议信息</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">一、会议基本信息与议程</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、参会人员</h3><table><tr><th>姓名</th><th>角色</th><th>所属团队</th><th>出席情况</th><th>关注议题</th></tr><tr><td>陈立群</td><td>产品负责人</td><td>商家工具组</td><td>全程</td><td>议题一、议题三</td></tr><tr><td>周曼</td><td>数据产品经理</td><td>数据分析组</td><td>全程</td><td>议题三</td></tr><tr><td>徐海鹏</td><td>分派链路研发</td><td>商家工具组</td><td>全程</td><td>议题一、议题二</td></tr><tr><td>谭亦文</td><td>运营值班负责人</td><td>客户运营组</td><td>全程</td><td>议题二</td></tr><tr><td>罗静</td><td>测试负责人</td><td>质量保障组</td><td>10:00—10:40</td><td>议题一</td></tr><tr><td>赵鹏</td><td>接口研发</td><td>商家工具组</td><td>10:20—11:20</td><td>议题二</td></tr></table><p class="small">缺席 2 人：林哲（客户运营组，外出培训）、黄薇（数据分析组，年假）。会议结论已于 9 月 16 日 18:00 前以邮件送交本人确认。</p></div><div><h4 class="first">二、议程与时间分配</h4><div class="steps"><div class="s"><b>10:00</b><span>主持人开场，确认上次行动项闭环情况：上期 6 项，闭环 5 项，顺延 1 项</span></div><div class="s"><b>10:10</b><span>议题一：分派链路改版运行回顾，徐海鹏主讲，20 分钟</span></div><div class="s"><b>10:30</b><span>议题二：夜间异常单处置方案，谭亦文主讲，25 分钟</span></div><div class="s"><b>10:55</b><span>议题三：指标口径统一，周曼主讲，15 分钟</span></div><div class="s"><b>11:10</b><span>决议表决与行动项确认，全员，10 分钟</span></div></div><div class="note">议程临时调整：罗静 10:40 离席后，测试相关的两项结论改为会后书面确认，已计入行动项 A-06。</div></div></div><h4>三、会议纪律与确认规则</h4><table><tr><th>事项</th><th>规则</th><th>时限</th></tr><tr><td>迟到与中途离席</td><td>以签到时间为准；离席者涉及结论改为会后书面确认</td><td>当日 18:00 前</td></tr><tr><td>缺席人员确认</td><td>结论以邮件送交本人，逾期未反馈视为无异议</td><td>会后 48 小时</td></tr><tr><td>新增议题提交</td><td>须提交至记录人，未列入议程的仅在末尾口头沟通</td><td>会前 1 个工作日</td></tr><tr><td>纪要分发</td><td>分发至全部参会与缺席人员，归档至共享目录</td><td>会后 1 个工作日</td></tr></table></div><div class="pf"><span>参会 6 人，缺席 2 人，结论已书面送交缺席人确认</span><span>第 3 / 10 页</span></div></section>
+<section class="page" data-page="4"><div class="ph"><span class="kc">议题一</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">二、任务分派链路改版运行回顾</h2><div class="pbody"><h3 class="first">一、运行数据（9 月 1 日—9 月 14 日）</h3><table><tr><th>指标</th><th>改版前（8 月）</th><th>改版后（9 月 1—14 日）</th><th>变化</th><th>口径说明</th></tr><tr><td>人均日处理量</td><td>40 单</td><td>128 单</td><td>+220%</td><td>按在岗客服人数摊薄</td></tr><tr><td>分派平均时延</td><td>42 分钟</td><td>9 分钟</td><td>-33 分钟</td><td>工单创建至首次分派</td></tr><tr><td>超时单占比</td><td>11.2%</td><td>4.6%</td><td>-6.6pp</td><td>超过 SLA 时长未处置</td></tr><tr><td>返工单占比</td><td>7.8%</td><td>6.1%</td><td>-1.7pp</td><td>被二次分派或退回</td></tr><tr><td>夜间人工挑单占比</td><td>31%</td><td>18%</td><td>-13pp</td><td>22:00—08:00 人工介入比例</td></tr></table><h3>二、讨论要点</h3><ul class="first"><li>徐海鹏：时延下降主要来自分派规则合并，<b>9 分钟</b>中仍有 5 分钟消耗在人工确认环节，是下一步优化重点。</li><li>陈立群：超时单占比降到 4.6% 已接近目标，但夜间超时单集中在 23:00—01:00，占夜间超时总量的 <b>62%</b>。</li><li>谭亦文：夜间人工挑单 18% 与 10% 目标的差距，集中在跨区域协作单与历史无标签单两类。</li><li>罗静：回归用例覆盖 148 条，其中 6 条断言依赖人工确认时序，需在灰度前改为可自动判断的判定条件。</li></ul><div class="note">结论：改版方向得到确认，本期不再调整分派规则主干，把优化范围收窄到夜间时段与人工确认环节。</div><h4>三、关键节点耗时拆解（分钟）</h4><table><tr><th>节点</th><th>改版前</th><th>改版后</th><th>变化</th></tr><tr><td>工单创建至首次分派</td><td>42</td><td>9</td><td>-33</td></tr><tr><td>其中：人工确认环节</td><td>18</td><td>5</td><td>-13</td></tr></table></div><div class="pf"><span>数据窗口 9 月 1—14 日，来源为分派链路埋点与工单库</span><span>第 4 / 10 页</span></div></section>
+<section class="page" data-page="5"><div class="ph"><span class="kc">议题二</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">三、夜间异常单处置方案</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、提案：超时判定前移至分派阶段</h3><p>现行机制在处置结束后回算超时，夜间发现超时单时已无法补救。提案把判定条件前移到分派阶段：命中预测超时概率不低于 0.7 的工单直接进入优先队列，不再等待人工挑单。</p><div class="bar"><div class="r"><span>23:00—01:00</span><span class="tr"><i style="width:62%"></i></span><span class="vv">62%</span></div><div class="r"><span>01:00—03:00</span><span class="tr"><i style="width:21%"></i></span><span class="vv">21%</span></div><div class="r"><span>03:00—06:00</span><span class="tr"><i style="width:11%"></i></span><span class="vv">11%</span></div><div class="r"><span>06:00—08:00</span><span class="tr"><i style="width:6%"></i></span><span class="vv">6%</span></div></div><p class="small">上图为夜间超时单的时段分布（9 月 1—14 日共 248 单），23:00—01:00 为集中区间。</p><div class="note">判定依据：近 30 日同类型工单的平均处置时长、当前在线人力、跨区域协作单占比三项加权。</div></div><div><h4 class="first">二、灰度安排</h4><table><tr><th>阶段</th><th>范围</th><th>周期</th><th>观察指标</th></tr><tr><td>灰度一</td><td>2 条业务线（生鲜、家电）</td><td>9-24 至 9-30</td><td>误判率、优先队列积压量</td></tr><tr><td>灰度二</td><td>4 条业务线（含灰度一 2 条）</td><td>10-01 至 10-07</td><td>人工挑单占比、超时单占比</td></tr><tr><td>全量</td><td>6 条业务线</td><td>10-08 起</td><td>夜间平均处置时长</td></tr></table><div class="note">人工挑单占比目标：灰度一期末降至 15%，灰度二期末降至 10% 以内，全量后稳定在 8% 以内；误判率超过 2% 立即回滚至灰度前一档。</div></div></div><h4>三、优先队列判定参数</h4><table><tr><th>参数</th><th>权重</th><th>取值来源</th><th>刷新频率</th></tr><tr><td>近 30 日同类型工单平均处置时长</td><td>45%</td><td>工单库历史统计</td><td>每日 06:00</td></tr><tr><td>当前在线人力</td><td>30%</td><td>客服排班系统</td><td>每 15 分钟</td></tr><tr><td>跨区域协作单占比</td><td>25%</td><td>分派链路埋点</td><td>每小时</td></tr><tr><td>合计</td><td>100%</td><td>—</td><td>—</td></tr></table><div class="note">三项加权得分归一化后得到超时概率；阈值 0.7 由灰度期误判率不超过 2% 反推确定。</div></div><div class="pf"><span>依据：9 月 1—14 日夜间超时单 248 单的时段分布</span><span>第 5 / 10 页</span></div></section>
+<section class="page" data-page="6"><div class="ph"><span class="kc">议题三</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">四、经营指标口径统一</h2><div class="pbody"><h3 class="first">一、口径差异清单</h3><table><tr><th>业务线</th><th>指标</th><th>看板取值</th><th>导出模块取值</th><th>差异原因</th><th>处理方式</th></tr><tr><td>生鲜</td><td>有效单量</td><td>8,384</td><td>8,348</td><td>退款单剔除时机不同</td><td>统一为分派后 24 小时内剔除</td></tr><tr><td>家电</td><td>客单价</td><td>1,268 元</td><td>1,268 元</td><td>无差异</td><td>保持不变</td></tr><tr><td>服饰</td><td>超时单占比</td><td>5.1%</td><td>5.4%</td><td>分母是否含跨区域单</td><td>统一包含跨区域单</td></tr><tr><td>美妆</td><td>履约准时率</td><td>96.4%</td><td>96.4%</td><td>无差异</td><td>保持不变</td></tr><tr><td>食品</td><td>退货率</td><td>2.1%</td><td>2.3%</td><td>退货受理与完成时点选取不同</td><td>统一按受理时点统计</td></tr><tr><td>百货</td><td>有效单量</td><td>942</td><td>942</td><td>无差异</td><td>保持不变</td></tr></table><div class="grid2" style="margin-top:10px"><div><h4 class="first">二、结论</h4><ul class="first"><li>6 条业务线中 3 条存在口径差异，集中在<b>退款剔除时机</b>、<b>跨区域单是否入分母</b>、<b>退货统计时点</b>三项。</li><li>差异幅度最大为服饰超时单占比 0.3 个百分点，其次为食品退货率 0.2 个百分点，对外报送前须先剔除该影响。</li></ul></div><div><h4 class="first">三、归零计划</h4><div class="steps"><div class="s"><b>9-20</b><span>周曼提交口径定义修订稿，含 3 项差异的判定规则</span></div><div class="s"><b>9-23</b><span>口径评审会确认，输出唯一口径表 v2</span></div><div class="s"><b>9-27</b><span>看板、告警、导出三处同步上线并回归验证</span></div></div></div></div><h4>四、口径表 v2 字段定义（节选）</h4><div class="def"><div class="d"><b>有效单量</b><span>分派后 24 小时内未全额退款的订单，含跨区域单</span></div><div class="d"><b>履约准时率</b><span>在约定 SLA 时长内完成处置的订单占有效单量的比例</span></div><div class="d"><b>退货率</b><span>按退货受理时点统计，分母为同期有效单量</span></div></div></div><div class="pf"><span>6 条业务线中 3 条存在口径差异，9 月 27 日前归零</span><span>第 6 / 10 页</span></div></section>
+<section class="page" data-page="7"><div class="ph"><span class="kc">决议事项</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">五、决议事项（D-01 至 D-05）</h2><div class="pbody"><h3 class="first">决议清单</h3><table><tr><th>编号</th><th>决议内容</th><th>提案人</th><th>表决结果</th><th>执行责任</th></tr><tr><td>D-01</td><td>超时判定前移至分派阶段，先按 2 条业务线灰度，误判率超过 2% 立即回滚</td><td>徐海鹏</td><td>5 票同意，0 票反对</td><td>徐海鹏</td></tr><tr><td>D-02</td><td>导出模块与看板统一为唯一口径表，9 月 27 日前完成三处同步</td><td>周曼</td><td>5 票同意，0 票反对</td><td>周曼</td></tr><tr><td>D-03</td><td>夜间值班排班规则定稿：常规值守 3 人 + 机动值守 1 人，覆盖 22:00—08:00</td><td>陈立群</td><td>4 票同意，1 票弃权</td><td>陈立群</td></tr><tr><td>D-04</td><td>异常单影响面排序纳入监控看板，实时展示前 6 单</td><td>谭亦文</td><td>5 票同意，0 票反对</td><td>谭亦文</td></tr><tr><td>D-05</td><td>本季度不再调整分派规则主干，优化范围收窄至夜间时段与人工确认环节</td><td>陈立群</td><td>5 票同意，0 票反对</td><td>全员</td></tr></table><div class="note">弃权说明（赵鹏）：D-03 原表述未覆盖接口故障的应急值守场景。该意见已采纳：机动值守 1 人单独设置、不占用 3 人常规编制，触发条件与到场时限由行动项 A-05 明确。</div><h4>决议生效与变更</h4><ul class="first"><li>本纪要经参会人确认后生效，决议变更须在下一次例会提出并重新表决。</li><li>涉及跨部门资源的 D-02，由周曼在 9 月 18 日前完成与数据分析组的人力确认。</li><li>决议执行证据由记录人归档至商家工具组共享目录，保存期 2 年。</li></ul><h4>三、决议执行检查点</h4><table><tr><th>检查点</th><th>时间</th><th>检查人</th><th>通过标准</th></tr><tr><td>D-01 灰度名单与回滚条件确认</td><td>9-24</td><td>陈立群</td><td>2 条业务线名单与 2% 误判率阈值齐备</td></tr><tr><td>D-02 口径归零验证</td><td>9-27</td><td>周曼</td><td>看板、告警、导出三处取值一致，差异为 0</td></tr><tr><td>D-04 排序看板上线</td><td>9-30</td><td>谭亦文</td><td>可实时查看前 6 单并下钻到单</td></tr></table></div><div class="pf"><span>5 项决议全部表决通过，其中 1 项有 1 票弃权并附说明</span><span>第 7 / 10 页</span></div></section>
+<section class="page" data-page="8"><div class="ph"><span class="kc">行动项</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">六、行动项清单（A-01 至 A-07）</h2><div class="pbody"><h3 class="first">行动项</h3><table><tr><th>编号</th><th>行动项</th><th>负责人</th><th>协作方</th><th>截止</th><th>验收标准</th><th>状态</th></tr><tr><td>A-01</td><td>提交超时判定前移的灰度方案与回滚条件</td><td>徐海鹏</td><td>罗静</td><td>9-23</td><td>方案含 2 条业务线名单与误判率阈值 2%</td><td>进行中</td></tr><tr><td>A-02</td><td>对齐导出模块两处口径差异</td><td>周曼</td><td>赵鹏</td><td>9-24</td><td>看板与导出同日取值一致，差异为 0</td><td>进行中</td></tr><tr><td>A-03</td><td>夜间值班排班规则定稿并发布</td><td>陈立群</td><td>谭亦文</td><td>9-25</td><td>规则覆盖 22:00—08:00，常规值守 3 人 + 机动 1 人</td><td>待开始</td></tr><tr><td>A-04</td><td>监控看板增加影响面排序前 6 单</td><td>谭亦文</td><td>数据分析组</td><td>9-30</td><td>看板可实时查看排序并下钻到单</td><td>待开始</td></tr><tr><td>A-05</td><td>排班规则明确机动值守的触发条件与到场时限</td><td>陈立群</td><td>赵鹏</td><td>9-25</td><td>规则文本含触发条件、到场时限与不占用常规编制</td><td>待开始</td></tr><tr><td>A-06</td><td>6 条依赖人工时序的回归用例改造</td><td>罗静</td><td>徐海鹏</td><td>9-22</td><td>148 条用例可全自动执行</td><td>进行中</td></tr><tr><td>A-07</td><td>口径定义修订稿评审并发布口径表 v2</td><td>周曼</td><td>陈立群</td><td>9-23</td><td>评审纪要归档，口径表 v2 全库生效</td><td>待开始</td></tr></table><p class="small">上期顺延项 1 项（口径表 v2 的评审与发布）已并入 A-07，不再单列跟踪。</p><h4>二、行动项状态分布</h4><table><tr><th>状态</th><th>项数</th><th>占比</th><th>涉及编号</th></tr><tr><td>进行中</td><td>3 项</td><td>42.9%</td><td>A-01、A-02、A-06</td></tr><tr><td>待开始</td><td>4 项</td><td>57.1%</td><td>A-03、A-04、A-05、A-07</td></tr><tr><td>合计</td><td>7 项</td><td>100.0%</td><td>A-01 至 A-07</td></tr></table><ul><li>状态更新规则：每周五 17:00 前由责任人更新，逾截止日未闭环自动升级为主管跟进。</li></ul></div><div class="pf"><span>7 项行动项，其中 6 项于 9 月 25 日前闭环</span><span>第 8 / 10 页</span></div></section>
+<section class="page" data-page="9"><div class="ph"><span class="kc">风险与未决</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">七、风险与未决事项</h2><div class="pbody"><h3 class="first">一、风险清单</h3><table><tr><th>编号</th><th>风险描述</th><th>可能性</th><th>影响</th><th>缓解措施</th><th>责任人</th></tr><tr><td>R-01</td><td>超时判定误判率超过 2%，优先队列积压</td><td>中</td><td>高</td><td>灰度期按日观察误判率，超阈值即回滚</td><td>徐海鹏</td></tr><tr><td>R-02</td><td>口径统一导致历史数据不可比，季度同比失真</td><td>高</td><td>中</td><td>保留旧口径快照，报告注明切换时点</td><td>周曼</td></tr><tr><td>R-03</td><td>夜间值班人力不足，机动值守无法覆盖</td><td>中</td><td>中</td><td>值班表提前 7 天锁定并经主管确认</td><td>陈立群</td></tr><tr><td>R-04</td><td>回归用例改造延期，灰度失去自动化保障</td><td>低</td><td>高</td><td>9 月 22 日未完成则灰度推迟至 9 月 24 日</td><td>罗静</td></tr></table><h3>二、未决事项</h3><ul class="first"><li><b>Q-01</b>：跨区域协作单是否纳入夜间自动分派范围，需在灰度一期末用 2 条业务线的数据决定。</li><li><b>Q-02</b>：历史无标签单约 1,400 单的补标方式，9 月 30 日前由数据分析组给出补标方案。</li><li><b>Q-03</b>：口径表 v2 上线后，8 月及以前的历史报表是否重算，需财务口径确认后再定。</li></ul><div class="note">以上 3 项未决事项在下次例会逐项确认；未决期间相关行动项按原计划推进，不作暂停。</div><h3>三、风险与行动项的对应关系</h3><table><tr><th>风险</th><th>对应行动项</th><th>触发条件</th></tr><tr><td>R-01</td><td>A-01</td><td>灰度期误判率超过 2%</td></tr><tr><td>R-02</td><td>A-02、A-07</td><td>看板与导出取值差异未归零</td></tr><tr><td>R-03</td><td>A-03、A-05</td><td>夜间值守人力低于 3 人</td></tr><tr><td>R-04</td><td>A-06</td><td>9 月 22 日未完成回归用例改造</td></tr></table></div><div class="pf"><span>4 项风险已定缓解措施，3 项未决事项下次会议确认</span><span>第 9 / 10 页</span></div></section>
+<section class="page" data-page="10"><div class="ph"><span class="kc">附录</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">八、下次会议安排与附录</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、下次会议安排</h3><table><tr><th>项目</th><th>内容</th></tr><tr><td>时间</td><td>2026-09-23（周三）10:00—11:00</td></tr><tr><td>地点</td><td>总部三楼小会议室</td></tr><tr><td>主持 / 记录</td><td>陈立群 / 谭亦文</td></tr><tr><td>核心议题</td><td>行动项进度复看；超时判定前移的灰度范围确认</td></tr><tr><td>会前准备</td><td>A-01、A-02、A-06 负责人须于 9 月 22 日 18:00 前提交进展</td></tr></table><h4>二、议题征集</h4><ul class="first"><li>新增议题请于会前 1 个工作日提交至记录人，未列入议程的议题仅在末尾预留 5 分钟口头沟通。</li><li>行动项连续两次未闭环的，责任人须在会上说明原因并给出新的完成时限。</li></ul></div><div><h4 class="first">三、行动项跟踪规则</h4><div class="steps"><div class="s"><b>状态</b><span>待开始 / 进行中 / 已完成 / 已取消，四态择一，不设中间状态</span></div><div class="s"><b>更新</b><span>每周五 17:00 前由责任人更新状态，记录人汇总</span></div><div class="s"><b>超时</b><span>逾截止日未闭环自动升级至主管跟进，并计为下期例会首要议题</span></div><div class="s"><b>闭环</b><span>以验收标准达成且证据归档为闭环条件，口头确认不视为闭环</span></div></div><h4>四、术语表</h4><div class="def"><div class="d"><b>人工挑单占比</b><span>夜间时段由人工从队列中挑选工单的比例，分母为该时段新建工单数</span></div><div class="d"><b>影响面排序</b><span>按受影响商家数、涉及金额与舆情等级加权计算的优先级排序</span></div><div class="d"><b>误判率</b><span>预测超时但实际未超时的工单，占被判超时工单的比例</span></div><div class="d"><b>机动值守</b><span>排班表外保留的应急值守人力，用于接口故障等突发场景</span></div><div class="d"><b>SLA 时长</b><span>工单按业务线约定的最长处置时长，本季度基线为 60 分钟</span></div><div class="d"><b>有效单量</b><span>分派后 24 小时内未全额退款的订单，含跨区域单</span></div></div></div></div></div><div class="pf"><span>会议材料归档于商家工具组共享目录，保存期 2 年</span><span>第 10 / 10 页</span></div></section>
+</body></html>

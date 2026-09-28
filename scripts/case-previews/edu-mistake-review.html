@@ -1,56 +1,368 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-mistake-review</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-mistake-review</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
-.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
-.ask p{font-size:14px;color:#3d4046;line-height:1.6}
-.ans{flex:1;min-height:0;padding:22px 26px;display:flex;flex-direction:column;gap:13px}
-.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.hr{height:1px;background:#edede9}
-.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
 .box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
-.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
-.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
-.flow i{color:#b6bac0;font-style:normal}
-.notes{display:grid;gap:8px}
-.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
-.cmp{display:grid;gap:12px}
-.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
 .cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
 .cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
-.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
-.steps{display:grid;gap:12px}
-.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
-.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
-.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="panel" style="--accent:#10B981">
-  <div class="ask"><div class="avatar"></div><p>这道一元二次方程的题我又错了，帮我看看问题到底出在哪。</p></div>
-  <div class="ans">
-    <div class="cmp">
-      <div class="before"><span class="tag">当时的做法</span>直接把 2x² + 3x - 5 = 0 里的系数当成 1、3、-5 代进求根公式，算出 x = 1 和 x = -2.5。</div>
-      <div class="after"><span class="tag">正确做法</span>二次项系数 a = 2，必须一起代入求根公式。判别式 Δ = 9 + 40 = 49，根为 x = 1 和 x = -2.5，两个根恰好与错误结果相同，所以错因被结果掩盖了。</div>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Mistake Review 01</div>
+      <h1>错题复盘：从 2x² + 3x − 5 = 0 看清四步归因法</h1>
+      <div class="sub">适用：九年级 / 高一 ｜ 原题 1 道 · 错因 6 类 · 变式练习 12 题 ｜ 节奏：2 天，合计 120 分钟（第 1 天 55 · 第 2 天 65）</div>
     </div>
-    <div class="hr"></div>
-    <h3>错因归类</h3>
-    <div class="chips"><span class="chip">公式代入漏系数</span><span class="chip">跳步未写判别式</span><span class="chip">靠结果对错判断</span></div>
-    <div class="hr"></div>
-    <h3>这类题的四步复盘</h3>
-    <div class="steps">
-      <div class="step"><div class="n">1</div><div class="t">先写标准形式，把 a、b、c 单独列一行，不直接代入</div></div>
-      <div class="step"><div class="n">2</div><div class="t">先算判别式 Δ，写出 Δ 的符号再决定用哪种求根方式</div></div>
-      <div class="step"><div class="n">3</div><div class="t">代入后回代验算：把根代回原方程，两边必须相等</div></div>
-      <div class="step"><div class="n">4</div><div class="t">结果正确不等于过程正确，把过程一步步写出来才算掌握</div></div>
-    </div>
-    <div class="box"><div class="k">同类练习</div><p>换一组系数再算一次：3x² - 7x + 2 = 0。做完对照上一步，重点确认 a、b、c 是否一次取对。</p></div>
+    <div class="note">讲义 v2.0 · 共 10 页<br><b>复盘口径</b>：过程分步写，结果单独验算<br>原题 2x² + 3x − 5 = 0，Δ = 49</div>
   </div>
-</div></body></html>
+  <div class="ask"><div class="av"></div><p>这道一元二次方程的题我又错了，帮我看看问题到底出在哪。</p></div>
+  <p class="lead">本讲只处理一道原题：2x² + 3x − 5 = 0。它的错误过程很隐蔽——卷面把 a 记作 1，代入时却按 a = 2 运算，于是两个根仍然算成 x = 1 与 x = −2.5，与正确答案完全一致，结果对错把过程错误掩盖了。学完本讲应能独立完成「还原过程 → 定位错因 → 归类 → 迁移到变式」四步，并一次算对 3x² − 7x + 2 = 0 这类变式。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">1<small>道</small></div><div class="l">原题 2x² + 3x − 5 = 0，Δ = 49</div></div>
+    <div class="stat"><div class="n">6<small>类</small></div><div class="l">错因：漏系数 / 缺 Δ / 结果判 / 符号 / 形式 / 不验算</div></div>
+    <div class="stat"><div class="n">12<small>题</small></div><div class="l">变式练习：基础 6 · 进阶 4 · 挑战 2</div></div>
+  </div>
+  <div class="sec">学习路径 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:72px">阶段</th><th style="width:80px">时点</th><th>内容</th><th style="width:186px">可检查产出</th><th style="width:72px">用时</th></tr>
+    <tr><td>还原</td><td class="num">第 1 天</td><td>把原题的错误解法一步步写回原样，标出每一步依据（P4）</td><td>过程还原稿 1 份</td><td class="num">15 分钟</td></tr>
+    <tr><td>归类</td><td class="num">第 1 天</td><td>看 6 类错因的占比与自己重复犯的那几类（P3）</td><td>错因清单 6 条</td><td class="num">20 分钟</td></tr>
+    <tr><td>纠错</td><td class="num">第 1 天</td><td>6 类错误写法与 4 道变式的 Δ、根对照（P5）</td><td>错题卡 6 张</td><td class="num">20 分钟</td></tr>
+    <tr><td>练习</td><td class="num">第 2 天</td><td>12 道分层练习 + 逐题解析（P6–P8）</td><td>自批得分 ≥ 10 / 12</td><td class="num">45 分钟</td></tr>
+    <tr class="hl"><td>自测</td><td class="num">第 2 天</td><td>6 项自测清单与三阶段防错计划（P9–P10）</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">20 分钟</td></tr>
+  </table>
+  <div class="sec">口径与导读 <em>占比数据、统计窗口与后续页面分工</em></div>
+  <div class="grid3">
+    <div class="box"><div class="k">错因数据口径</div><p>6 类错因占比取自本人错题本 50 道题的首次错误，每题只记最先出现的那一类，四舍五入取整后合计 100%，条形图按同一组数字换算。</p></div>
+    <div class="box"><div class="k">来源与统计窗口</div><p>统计窗口 2023-09 至 2026-09，含初三与高一两个学年的单元测；原题 2x² + 3x − 5 = 0 出自最近一次月考第 18 题。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 错因占比 · P4 概念与 8 行对照 · P5 常见错误 · P6 变式 12 题 · P7–P8 逐题解析 · P9 自测清单 · P10 术语表。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>结果对不等于过程对</b>，本题两根都对，错的是取系数那一步。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Mistake Review 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全讲 8 章 · 10 页<br>先还原、再归类、后练习与自测</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:126px">章节</th><th>一句话说明</th><th style="width:166px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>知识脉络</td><td>6 类错因的占比与干预动作，先弄清自己错在哪一层</td><td>错因清单 6 条</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>把原题的错误过程与正确过程写成 8 行对照</td><td>过程还原稿 1 份</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见错误</td><td>6 类错误写法，加 4 道变式的 Δ 与根对照</td><td>错题卡 6 张</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题、进阶 4 题、挑战 2 题，共 12 题</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 逐题给出过程与失分点</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 的完整过程与评语</td><td>自批得分 ≥ 10 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与下一阶段</td><td>6 项自测清单定达标线，三阶段计划接含参方程</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>判别式、韦达定理等 10 条术语与数据口径</td><td>能解释 Δ = 49 的来历</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把原题的错误过程一步不落地还原；第 2 天读 P5 后立刻做 P6 的 1–6 题，用 P7 自批，再做 7–12 题对照 P8，最后完成 P9 自测。全讲 10 页合计 120 分钟：P3–P5 占 55 分钟、P6–P8 占 45 分钟、P9–P10 占 20 分钟。统计窗口 2023-09 至 2026-09，解析页的 Δ = 49 与根 1、−2.5 与 P3 占比数字全程一致。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>会解一元一次方程；会用求根公式；能算 (−5)² 与 4×2×(−5) 这类含负号乘法。若负号乘法不稳，先练 10 道符号题再读 P4。三项自检：(−5)² = 25、4×2×(−5) = −40、2a = 4，各算 3 遍都对再开始。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，可按两天计划拆开完成。</div>
+    <div>练习在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应，先做完再翻答案。</div>
+    <div>页脚左侧的一句话是本页要记住的结论，10 页连起来就是一份完整的错题复盘模板。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>过程页照着写，练习页限时做，答案页只对不抄</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 知识脉络</div><h2 class="pt">6 类错因的占比与干预动作</h2></div>
+    <div class="note">口径：本人近 3 年错题本 50 道<br>统计单位：每道题的首次错误</div>
+  </div>
+  <div class="sec">A · 6 类错因 <em>占比合计 100%，先找出自己重复的那 2 类</em></div>
+  <table>
+    <tr><th style="width:132px">错因类型</th><th style="width:56px">占比</th><th style="width:284px">典型表现</th><th>干预动作</th></tr>
+    <tr class="hl"><td>公式代入漏系数</td><td class="num">32%</td><td>卷面把 a 记作 1，代入时却按 a = 2 运算</td><td>标准形式后把 a、b、c 单列一行，逐项抄写再代入</td></tr>
+    <tr><td>跳步未写判别式</td><td class="num">24%</td><td>不算 Δ 直接写 x = (−3 ± 7) / 4</td><td>先算 Δ = b² − 4ac 并写出符号，再决定怎么求根</td></tr>
+    <tr><td>靠结果对错判断</td><td class="num">16%</td><td>看到根是 1 与 −2.5 就判定过程没问题</td><td>用回代验算替代「对答案」，两个根都要代</td></tr>
+    <tr><td>符号写错</td><td class="num">12%</td><td>把 c = −5 写成 5，Δ 得 9 − 40 = −31</td><td>代入前把 b、c 连符号抄一遍，重点看负号</td></tr>
+    <tr><td>未写标准形式</td><td class="num">10%</td><td>方程写成 x(2x + 3) = 5 时未移项，把常数项当成 0</td><td>先移项写成 ax² + bx + c = 0，再取系数</td></tr>
+    <tr><td>不验算</td><td class="num">6%</td><td>算出 1 与 −2.5 直接交卷，不回代</td><td>每题留 30 秒把两个根代回原方程</td></tr>
+  </table>
+  <div class="sec">B · 同一组占比的可视化 <em>条形长度按百分比等比换算，最长条为 32%</em></div>
+  <div class="bars">
+    <div class="bar hl"><span>公式代入漏系数</span><span class="track"><i style="width:100%"></i></span><span class="v">32%</span></div>
+    <div class="bar"><span>跳步未写判别式</span><span class="track"><i style="width:75%"></i></span><span class="v">24%</span></div>
+    <div class="bar"><span>靠结果对错判断</span><span class="track"><i style="width:50%"></i></span><span class="v">16%</span></div>
+    <div class="bar"><span>符号写错</span><span class="track"><i style="width:38%"></i></span><span class="v">12%</span></div>
+    <div class="bar"><span>未写标准形式</span><span class="track"><i style="width:31%"></i></span><span class="v">10%</span></div>
+    <div class="bar"><span>不验算</span><span class="track"><i style="width:19%"></i></span><span class="v">6%</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">前两类占 56%</div><p>漏系数 32% 与跳步 24% 合计 56%，且都发生在「动笔后、写根前」的 60 秒内，是本讲优先要堵住的两处。按 50 道错题折算，这两类共 28 道，先改掉它们再处理剩下的 22 道。</p></div>
+    <div class="box"><div class="k">为什么先算 Δ 就能拦住一半</div><p>写 Δ 必须用到 a、b、c 三项，等于强制核对系数；本题 Δ = 49，而误按 a = 1 算得 Δ = 29，一算就会暴露。</p></div>
+  </div>
+  <div class="pf"><span>知识脉络一句话：<b>错因集中在系数核对与判别式两处</b>，占 6 类的 56%。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">原题还原：8 行对照看清错在哪一步</h2></div>
+    <div class="note">原题 2x² + 3x − 5 = 0<br>正确结果 Δ = 49，根为 1 与 −2.5</div>
+  </div>
+  <div class="word"><b>2x² + 3x − 5 = 0</b><span class="mono">a = 2 · b = 3 · c = −5</span><span class="pos">Δ = 49</span></div>
+  <p class="lead">还原一次：卷面把 a 记作 1，代入却按 a = 2 运算，两根仍是 1 与 −2.5；若真按 a = 1 算，Δ = 29，根 ≈ 1.19 与 −4.19，结果对错掩盖了过程错误。</p>
+  <div class="flow"><span>还原过程</span><i>→</i><span>定位错因</span><i>→</i><span>归类</span><i>→</i><span>迁移到变式</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">第一步 标准形式与系数</div><p>写成 2x² + 3x − 5 = 0，把 a = 2、b = 3、c = −5 单列一行，不凭「2x²」的印象取数。</p></div>
+    <div class="box"><div class="k">第二步 判别式 Δ = 49</div><p>Δ = 3² − 4×2×(−5) = 9 + 40 = 49 &gt; 0，两个不等实根；Δ 只判根的情况，本身不是根。</p></div>
+    <div class="box"><div class="k">第三步 回代验算</div><p>x = 1 时 2 + 3 − 5 = 0；x = −2.5 时 12.5 − 7.5 − 5 = 0，两边都等于 0 才算解完。</p></div>
+  </div>
+  <div class="sec">8 行对照 <em>「是否影响最终结果」一列最容易漏，务必逐行看完</em></div>
+  <table>
+    <tr><th style="width:108px">错因</th><th style="width:246px">当时的做法</th><th style="width:246px">正确做法</th><th>是否影响最终结果</th></tr>
+    <tr class="hl"><td>漏二次项系数</td><td>卷面写 a = 1，代入时 Δ 用 4×2×(−5)、分母用 2×2</td><td>a = 2、b = 3、c = −5 逐项抄写后再代入</td><td>本题不影响：算出的根仍是 1 与 −2.5，与正确答案相同</td></tr>
+    <tr><td>判别式未计算</td><td>直接写 x = (−3 ± 7) / 4，跳过 Δ 这一步</td><td>先写 Δ = 9 + 40 = 49 &gt; 0</td><td>不影响本题结果，但问「有几个根」的题必错</td></tr>
+    <tr><td>分母写错</td><td>写成 x = (−3 ± 7) / 2，把 2a 当成 2</td><td>分母是 2a = 2×2 = 4</td><td>影响：根变成 2 与 −5，与 1、−2.5 完全不同</td></tr>
+    <tr><td>符号写错</td><td>把 c 写成 5，Δ 得 9 − 40 = −31</td><td>c = −5 连符号代入，Δ = 9 + 40 = 49</td><td>影响：Δ 由 49 变 −31，会被误判为无实根</td></tr>
+    <tr><td>未化标准形式</td><td>x(2x + 3) = 5 未移项，常数项当成 0</td><td>展开移项成 2x² + 3x − 5 = 0 再取系数</td><td>影响：Δ 由 49 变 9，根变成 0 与 −1.5，两根全错</td></tr>
+    <tr><td>跳步省略中间式</td><td>一行写出 4 / 4 与 −10 / 4 的结果，不写来源</td><td>写 x₁ = 4 / 4 = 1、x₂ = −10 / 4 = −2.5</td><td>不影响本题，但检查时无法定位错在哪一步</td></tr>
+    <tr><td>把 Δ 当根</td><td>算出 49 后直接写「根为 49」</td><td>√49 = 7，再代入 x = (−3 ± 7) / 4</td><td>影响：答案完全错，根是 1 与 −2.5，不是 49</td></tr>
+    <tr><td>不回代验算</td><td>得到 1 与 −2.5 就交卷</td><td>2×1² + 3×1 − 5 = 0 与 2×(−2.5)² + 3×(−2.5) − 5 = 0</td><td>不影响本题，但它是唯一能拦住以上所有错误的动作</td></tr>
+  </table>
+  <div class="pf"><span>一句话结论：<b>先列 a、b、c 再写 Δ</b>，这两步能挡住 8 行里的前 5 类错误。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见错误</div><h2 class="pt">6 类错误写法与 4 道变式的 Δ 对照</h2></div>
+    <div class="note">来源：本人错题本 50 道<br>每类给错法、正解与后果</div>
+  </div>
+  <div class="sec">A · 6 类常见错误写法 <em>本表按错误写法归类，P3 那张表按错因占比归类，两表口径不同、不能相加</em></div>
+  <table>
+    <tr><th style="width:104px">类型</th><th style="width:246px">典型错法</th><th style="width:246px">正确写法</th><th>后果与记忆点</th></tr>
+    <tr><td>漏二次项系数</td><td class="mono">a = 1，b = 3，c = −5</td><td class="mono">a = 2，b = 3，c = −5</td><td>真按 a = 1 算：Δ = 29、根 ≈ 1.19 与 −4.19，无一正确</td></tr>
+    <tr><td>未写判别式</td><td class="mono">x = (−3 ± 7) / 4</td><td class="mono">Δ = 9 + 40 = 49 &gt; 0</td><td>Δ 的符号决定根的情况；不写 Δ 就答不出「有几个根」</td></tr>
+    <tr><td>符号错</td><td class="mono">c = 5，Δ = 9 − 40 = −31</td><td class="mono">c = −5，Δ = 9 + 40 = 49</td><td>负号一丢，Δ 由 49 变 −31，直接误判为无实根</td></tr>
+    <tr><td>把 Δ 当根</td><td class="mono">根为 49</td><td class="mono">√49 = 7，x = (−3 ± 7) / 4</td><td>Δ 是判别式；本题两根是 1 与 −2.5，49 不是根</td></tr>
+    <tr><td>未化简</td><td class="mono">x = 4 / 4 与 −10 / 4 停笔</td><td class="mono">x₁ = 1，x₂ = −2.5</td><td>停在中途会抄成 4 与 −10，两根一起错</td></tr>
+    <tr class="hl"><td>不验算</td><td>算出 1 与 −2.5 直接交卷</td><td class="mono">2×1² + 3×1 − 5 = 0</td><td>回代只要 30 秒，是唯一能拦住以上 5 类后果的动作</td></tr>
+  </table>
+  <div class="sec">B · 4 道变式的判别式与根 <em>先算 Δ 再代入公式，两步都要落在纸上</em></div>
+  <table>
+    <tr><th style="width:206px">变式方程</th><th style="width:112px">a / b / c</th><th style="width:72px">Δ</th><th>根</th></tr>
+    <tr><td class="mono">3x² − 7x + 2 = 0</td><td class="mono">3 / −7 / 2</td><td class="num">25</td><td class="mono">x₁ = 2，x₂ = 1 / 3</td></tr>
+    <tr><td class="mono">x² − 4x + 4 = 0</td><td class="mono">1 / −4 / 4</td><td class="num">0</td><td class="mono">x₁ = x₂ = 2（两个相等实根）</td></tr>
+    <tr><td class="mono">x² − 2x + 3 = 0</td><td class="mono">1 / −2 / 3</td><td class="num">−8</td><td>无实根（Δ &lt; 0）</td></tr>
+    <tr class="hl"><td class="mono">2x² − 5x + 1 = 0</td><td class="mono">2 / −5 / 1</td><td class="num">17</td><td class="mono">x = (5 ± √17) / 4 ≈ 2.28 与 0.22</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">交卷前 3 秒自检</div><p>一看 a 是否就是二次项系数（本题 2）；二看 Δ 是否算过并写了符号；三看两个根是否都化简并回代。三条对上，6 类错因清零。</p></div>
+    <div class="box"><div class="k">这道题为什么特别容易错</div><p>2x² 的系数 2 与分母 2a 的 2 容易混，且 Δ = 49 是完全平方、根又是有理数，结果「好看」会让人以为过程无误。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>漏系数、未写判别式、符号错、把 Δ 当根</b>这 4 类，靠「先列系数、再写 Δ」就能拦住。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>限时 30 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考系数、判别式与公式代入</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 把 2x² + 3x − 5 = 0 写成标准形式，并单独列出 a、b、c 的值（三项都要带符号）。</li>
+    <li><b>2.</b> 计算原题的判别式 Δ，写出计算式与 Δ 的符号，并说明它对应几个实根。</li>
+    <li><b>3.</b> 用求根公式求原题的两个根，要求写全「代入 Δ 与 2a」「拆成两个根」「化简」三步。</li>
+    <li><b>4.</b> 不解方程，判断 x² − 2x + 3 = 0 的根的情况，并写出依据（要给出 Δ 的值）。</li>
+    <li><b>5.</b> 回代验算：把 x = 1 与 x = −2.5 分别代回 2x² + 3x − 5 = 0，写出等式两边的具体数值。</li>
+    <li><b>6.</b> 判断错因：某同学卷面写 a = 1，代入时 Δ 用了 4×2×(−5)、分母用了 2×2，结果得 1 与 −2.5。指出这属于 6 类错因中的哪两类。</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入变式、根的讨论与评语写作</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 完整求解 3x² − 7x + 2 = 0：先列 a、b、c，再算 Δ，再用公式写根，最后回代其中一个根。</li>
+    <li><b>8.</b> 判断 x² − 4x + 4 = 0 的根的情况并求出根，再说明 Δ = 0 与 Δ &gt; 0 在图象上的区别。</li>
+    <li><b>9.</b> 关于 x 的方程 kx² + 2x + 1 = 0 有实根，求 k 的取值范围（分 k = 0 与 k ≠ 0 两种情形讨论）。</li>
+    <li><b>10.</b> 给下面这道学生解法写 60 字以内评语：2x² + 3x − 5 = 0，a = 1，b = 3，c = −5，Δ = 9 + 20 = 29，x = (−3 ± 7) / (2 × 2)，x₁ = 1，x₂ = −2.5。评语要指出错处并写出正确过程的关键一步。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>需要成页或成条输出，按栏位与覆盖度评分</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 设计一页错题卡模板，含原题、错误过程、错因归类、正确过程、防错口令五个栏位，并用 2x² + 3x − 5 = 0 填出完整样例。</li>
+    <li><b>12.</b> 写一份三步防错清单（合计不超过 60 字），每一步标明它对应 6 类错因中的哪几类，并说明用在解题的哪个时刻。</li>
+  </ul>
+  <div class="answer">评分口径（每题 1 分，按下列三档优先给分）：基础题全对 1 分；只有一处缺失（漏写标准形式、漏写 Δ 的符号、只写「成立」不写数值）给 0.5 分；缺两处及以上 0 分。进阶题第 9 题漏掉 k = 0 的情形按 0 分计，不适用 0.5 分档；第 10 题只说「算错了」按 0 分计。挑战题第 11 题五栏缺一扣 0.5 分，第 12 题每步都要标出错因类别。全卷 ≥ 10 / 12 为达标。限时 30 分钟：基础 6 题 6 分钟、进阶 4 题 12 分钟、挑战 2 题 10 分钟，合计 28 分钟，余 2 分钟检查。</div>
+  <div class="notes"><div>第 9 题必须分两种情形：k = 0 时化为 2x + 1 = 0，k ≠ 0 时 Δ = 4 − 4k ≥ 0，漏掉前者就会丢掉 k ≤ 0 的全部解。</div></div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>，避免机械套公式。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:300px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td class="mono">2x² + 3x − 5 = 0；a = 2、b = 3、c = −5</td><td>标准形式要写出等号右边为 0；c 的负号必须写上，写成 5 直接丢分。</td></tr>
+    <tr><td class="num">2</td><td class="mono">Δ = 3² − 4×2×(−5) = 9 + 40 = 49 &gt; 0，两个不等实根</td><td>只写 49 不写符号按 P6 口径扣 0.5 分；「两个不等实根」由 Δ &gt; 0 直接推出。</td></tr>
+    <tr><td class="num">3</td><td class="mono">x = (−3 ± 7) / 4 → x₁ = 4 / 4 = 1，x₂ = −10 / 4 = −2.5</td><td>三步缺一不可；−10 / 4 化简成 −2.5 之外的值即化简错。</td></tr>
+    <tr><td class="num">4</td><td class="mono">a = 1、b = −2、c = 3，Δ = 4 − 12 = −8 &lt; 0，方程无实根</td><td>Δ &lt; 0 不是算错，要敢写「无实根」；把 −8 抄成 8 属符号写错类，会误判为两个不等实根。</td></tr>
+    <tr><td class="num">5</td><td class="mono">x = 1：2 + 3 − 5 = 0；x = −2.5：12.5 − 7.5 − 5 = 0</td><td>必须写出两边具体数值，只写「成立」不得分。</td></tr>
+    <tr class="hl"><td class="num">6</td><td>属「公式代入漏系数」与「跳步未写判别式」两类</td><td>卷面 a = 1 说明系数没真正取对；本题结果对，正好掩盖了这两处。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 1 题漏写 c 的负号、第 3 题不化简到底、第 5 题只写「成立」，按 P6 口径最多扣 2 分（第 3 题 1 分，第 1、5 题各 0.5 分），占基础题 6 分的三分之一。其中负号与不验算两类，正对应 P3 统计里的 12% 与 6%。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>5 分及以上进入进阶题；3–4.5 分回读 P4 的 8 行对照；≤ 2.5 分把原题按 P4 流程重写 3 遍，再重做本页题目。落在 ≤ 2.5 分档时先跳过进阶题，把 8 行对照抄成错题卡再回来。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 1 题只写 a、b、c 而漏写标准形式的，按 P6 口径扣 0.5 分，属未写标准形式类错误。</div>
+    <div>第 2 题把 Δ &gt; 0 写成 Δ ≥ 0 的，回看 P4 第二步：Δ = 0 只有一个根。</div>
+    <div>第 5 题只写「成立」不写数值的，属不验算类错因，回看 P5 第 6 行。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在负号与化简，不在公式本身</b>。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含评语口径与评分细则<br>自批：全卷 ≥ 10 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:300px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td class="mono">a = 3、b = −7、c = 2；Δ = 49 − 24 = 25；x = (7 ± 5) / 6 → x₁ = 12 / 6 = 2，x₂ = 2 / 6 = 1 / 3</td><td>−b = 7，负号必须变号；回代 x = 2 时 12 − 14 + 2 = 0。</td></tr>
+    <tr><td class="num">8</td><td class="mono">a = 1、b = −4、c = 4；Δ = 16 − 16 = 0；x₁ = x₂ = 2</td><td>Δ = 0 时根为 x = −b / (2a) = 2，只有一个值；图象上与 x 轴相切。</td></tr>
+    <tr><td class="num">9</td><td class="mono">k = 0 时化为 2x + 1 = 0，x = −0.5 有实根；k ≠ 0 时 Δ = 4 − 4k ≥ 0 → k ≤ 1；综上 k ≤ 1</td><td>漏讨论 k = 0 会丢掉整个 k ≤ 0 的部分，是本题最大失分点。</td></tr>
+    <tr class="hl"><td class="num">10</td><td>评语：a 应为 2（漏了二次项系数），且 Δ 写 29 却代入 √49 = 7，前后不一致。正确关键一步：Δ = 9 + 40 = 49，x = (−3 ± 7) / 4，x₁ = 1、x₂ = −2.5</td><td>两处错误各占一半；只说「算错了」不给分。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>五栏：原题 / 错误过程 / 错因归类 / 正确过程 / 防错口令。样例：错误过程记 a = 1、Δ 写 29 却代 7；归类为漏系数 32% + 跳步 24%；正确过程 Δ = 49、根 1 与 −2.5</td><td>五栏缺一扣分；错因必须写到类别名，只写「粗心」不得分。</td></tr>
+    <tr><td class="num">12</td><td>三步清单：① 动笔前并排列出标准形式与 a、b、c（拦漏系数 32%、符号错 12%、未写标准形式 10%）② 先写 Δ 并标符号再写根（拦跳步 24%）③ 交卷前回代两个根（拦靠结果判断 16%、不验算 6%）</td><td>每步都要标出对应类别；三句合计超过 60 字扣分。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">本类题失分点</div><p>漏系数 32% 与跳步 24% 合计占 6 类错因的 56%，第 10 题的两处错误正落在这两类上。</p></div>
+    <div class="box"><div class="k">出错处数排名（处数 ≠ 分数）</div><p>第 9 题漏 k = 0 情形 3 处、第 10 题只说「算错」2 处、第 12 题未标错因类别 2 处，累计 7 处。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>≥ 10 分进入 P9 自测；7.5–9.5 分重做错题所在小节；≤ 7 分回读 P4–P5 并隔天重练一次。</p></div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>进阶题失分集中在含参讨论与评语的证据</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与三阶段防错计划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:132px">自测项</th><th style="width:314px">达标标准</th><th style="width:80px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>列出 a、b、c</td><td>不看笔记写出 a = 2、b = 3、c = −5，三项都带符号</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>写出判别式</td><td>算得 Δ = 9 + 40 = 49 并说明 Δ &gt; 0 对应两个不等实根</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>完整解原题</td><td>写出 x = (−3 ± 7) / 4 并化简到 1 与 −2.5，中间步骤不跳</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>复述四步复盘</td><td>口述「还原过程 → 定位错因 → 归类 → 迁移到变式」不停顿</td><td class="num">P1</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>归类自己的错因</td><td>指出自己重复犯的是 6 类中的哪几类，并说出对应占比</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>独立完成变式</td><td>限时 6 分钟解出 3x² − 7x + 2 = 0（Δ = 25，根 2 与 1 / 3）并回代</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 下一阶段：三阶段防错计划 <em>每周 4 天，每次 25 分钟</em></div>
+  <table>
+    <tr><th style="width:132px">阶段</th><th style="width:76px">周次</th><th>任务</th><th style="width:228px">可检查产出</th></tr>
+    <tr><td>含参方程根的分布</td><td class="num">第 1–2 周</td><td>每次 2 题（每周 4 次），分 k = 0 与 k ≠ 0 讨论，画出 Δ 与对称轴的草图</td><td>含参错题卡 16 张</td></tr>
+    <tr><td>韦达定理应用</td><td class="num">第 3 周</td><td>每次 3 题，用 x₁ + x₂ = −b / a、x₁x₂ = c / a 验证结果，本题和 −1.5、积 −2.5</td><td>变式 12 题全对</td></tr>
+    <tr class="hl"><td>恒成立问题</td><td class="num">第 4 周</td><td>每次 2 题，把 ax² + bx + c &gt; 0 恒成立化为 a &gt; 0 且 Δ &lt; 0</td><td>一页判定流程图</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">每次 25 分钟怎么分</div><p>10 分钟重做原题并写全三步；8 分钟做当周题型 2–3 道；7 分钟整理当天 2 张错题卡，五栏都填。</p></div>
+    <div class="box"><div class="k">坚持不下来的 3 个提醒</div><p>任务按周给不按天补；允许每周缺 1 次；第 4 周可停做新题，把时间让给错题卡整理。</p></div>
+    <div class="box"><div class="k">下一讲衔接</div><p>含参方程 kx² + 2x + 1 = 0 的根的分布，复用本讲「先列系数、再写 Δ」的口令。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>4 周后要求含参错题卡 16 张、变式 12 题全对、判定流程图 1 页</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：一元二次方程术语 10 条</h2></div>
+    <div class="note">讲义 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>复习时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:150px">术语</th><th>释义</th></tr>
+    <tr><td>标准形式</td><td>一元二次方程写成 ax² + bx + c = 0（a ≠ 0）；2x² + 3x − 5 = 0 已是标准形式。</td></tr>
+    <tr><td>二次项系数</td><td>标准形式中 x² 前的系数 a，本题 a = 2；漏取或误取成 1 会让 Δ 与根一起错。</td></tr>
+    <tr><td>判别式</td><td>Δ = b² − 4ac，本题 Δ = 3² − 4×2×(−5) = 49；Δ &gt; 0 时两个不等实根。</td></tr>
+    <tr><td>求根公式</td><td>x = (−b ± √Δ) / (2a)；Δ = 49 时 x = (−3 ± 7) / 4，得 1 与 −2.5。</td></tr>
+    <tr><td>韦达定理</td><td>两根之和 x₁ + x₂ = −b / a = −1.5，两根之积 x₁x₂ = c / a = −2.5。</td></tr>
+    <tr><td>因式分解</td><td>把 2x² + 3x − 5 写成 (2x + 5)(x − 1)，两根由 2x + 5 = 0 与 x − 1 = 0 得到。</td></tr>
+    <tr><td>回代验算</td><td>把根代回原方程看两边是否相等；x = 1 时左边 2 + 3 − 5 = 0，两边成立。</td></tr>
+    <tr><td>错因归类</td><td>把一次错误归入 6 类错因并记录占比，本题属「公式代入漏系数」类，占 32%。</td></tr>
+    <tr><td>变式迁移</td><td>换系数、换问法重做同一结构，如把原题换成 3x² − 7x + 2 = 0（Δ = 25）。</td></tr>
+    <tr class="hl"><td>根的分布</td><td>由 Δ 的符号与二次函数图象判断根的个数与范围，含参题靠它讨论 k 的取值。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">数据口径</div><p>错因占比来自本人近 3 年错题本 50 道题的首次错误统计，四舍五入取整，合计 100%。六类占比按 50 道折算为 16 / 12 / 8 / 6 / 5 / 3 道，相加正好 50。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增 6 类错因占比、8 行过程对照、12 题分层练习与两页解析。</p></div>
+    <div class="box"><div class="k">使用提示</div><p>本讲只针对标准解法，不涉及因式分解与公式法的取舍；术语表用于复习自查与课堂引用。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全讲末页；若跳过前 9 页，请至少完成 P6 的 1–3 题与 P9 自测清单的第 1、2 项。</div>
+    <div>下一讲预告：含参方程 kx² + 2x + 1 = 0 的根的分布，复用本讲「先列系数、再写 Δ」的模板。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于复习自查，占比口径用于决定先补哪一类错因</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>

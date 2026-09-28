@@ -1,71 +1,288 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-work-report</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-work-report</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:0;display:block}
-.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
-.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
-.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
-.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
-.rule{margin-top:26px;height:1px;background:#e6e6e2}
-.body{margin-top:30px;display:grid;gap:26px;flex:1}
-.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
-.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
-.cols3{grid-template-columns:repeat(3,1fr)}
-.cols2{grid-template-columns:repeat(2,1fr)}
-.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
-.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
-.blk .num{margin-top:6px;font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
-.blk .num small{font-size:15px;font-weight:500;color:#6f737b;margin-left:8px;letter-spacing:0}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
-.matrix{margin-top:8px;border:1px solid #e6e6e2}
-.matrix .row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-top:1px solid #e6e6e2}
-.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
-.matrix .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2}
-.matrix .row div:first-child{border-left:0}
-.bars{margin-top:14px;display:grid;gap:9px}
-.bar{display:grid;grid-template-columns:74px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
-.diagram{margin-top:6px;height:230px;position:relative;border:1px solid #e6e6e2;background:radial-gradient(120% 120% at 50% 50%,#fdfaf3 0%,#fff 70%)}
-.sun{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--accent)}
-.orbit{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
-.planet{position:absolute;width:16px;height:16px;border-radius:50%;background:#4c5058}
-.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
-.mini{border:1px solid #e6e6e2;padding:16px 18px;background:#fafaf8}
-.mini b{display:block;font-size:34px;color:var(--accent);letter-spacing:-.02em}
-.mini span{display:block;margin-top:8px;font-size:14px;font-weight:600}
-.mini p{margin-top:8px;font-size:13px;color:#6f737b;line-height:1.7}
-</style></head>
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
 <body>
-<div class="slide" style="--accent:#F59E0B">
-  <div class="kicker">Quarterly Review</div>
-  <h1>2026 Q3 工作汇报</h1>
-  <p class="lede">本季度核心成果、关键指标完成度与下阶段重点工作安排</p>
-  <div class="rule"></div>
-  <div class="body" style="grid-template-columns:repeat(3,1fr)">
-    <div class="blk">
-      <h2>01 核心成果</h2>
-      <p>完成 4 个版本迭代，重构商家后台任务分配链路，人均日处理量从 40 单提升到 128 单</p>
-    </div>
-    <div class="blk">
-      <h2>02 关键指标</h2>
-      <div class="num">128%<small>目标完成率</small></div>
-      <div class="num" style="font-size:34px;margin-top:14px">96.4%<small>准时交付率</small></div>
-    </div>
-    <div class="blk">
-      <h2>03 下阶段计划</h2>
-      <ul>
-        <li>经营指标口径表覆盖 6 条业务线</li>
-        <li>异常工单夜间自动分派上线</li>
-        <li>团队值班排班规则统一</li>
-      </ul>
-    </div>
-  </div>
-  <div class="brandline">云帆科技 · 商家工具组</div>
-  <div class="pageno">07 / 18</div>
-</div></body></html>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Quarterly Review · 季度汇报</div>
+<h1>2026 Q3 工作汇报</h1>
+<p class="lede">商家工具组第三季度经营与交付复盘：覆盖 6 条业务线的指标达成、任务链路重构收益、当前风险敞口，以及第四季度的分阶段行动安排与责任人。</p>
+<div class="meta"><span>汇报单位：云帆科技 · 商家工具组</span><span>汇报人：李维（组长）</span><span>周期：2026-07-01 至 09-30</span><span>版本：v3 · 定稿 2026-10-08</span></div>
+<div class="kn">
+  <div class="k"><b>128<em>%</em></b><span>目标完成率</span><p>计划需求 25 个，实际交付 32 个，含 7 个插单</p></div>
+  <div class="k"><b>96.4<em>%</em></b><span>准时交付率</span><p>32 个交付需求中 28 个已完成验收，其中 27 个按期</p></div>
+  <div class="k"><b>4<em>个</em></b><span>版本迭代</span><p>v2.4 至 v2.7，灰度覆盖 6 条业务线</p></div>
+</div>
+<table class="tb">
+  <caption>核心指标一览 · 口径为自然季度，需求计数含插单</caption>
+  <thead><tr><th>指标</th><th class="r">Q2 实际</th><th class="r">Q3 实际</th><th class="r">Q3 目标</th><th>达成判定</th></tr></thead>
+  <tbody>
+    <tr><td>需求交付数</td><td class="r mono">19 个</td><td class="r mono">32 个</td><td class="r mono">25 个</td><td class="n">128%</td></tr>
+    <tr><td>人均日处理量</td><td class="r mono">40 单</td><td class="r mono">128 单</td><td class="r mono">110 单</td><td class="n">116%</td></tr>
+    <tr><td>线上故障 / MTTR</td><td class="r mono">7 起 / 42 分</td><td class="r mono">3 起 / 26 分</td><td class="r mono">≤4 起 / ≤30 分</td><td class="n">达成</td></tr>
+    <tr class="hi"><td>单位处理成本</td><td class="r mono">¥0.42</td><td class="r mono">¥0.31</td><td class="r mono">≤¥0.35</td><td>达成</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：季末快照，未验收 4 个不计入准时率｜来源：需求库 · 监控埋点 · 财务分摊表</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 数据｜P5–P7 分析｜P8–P9 行动</div>
+</div></div>
+<div class="foot"><span>结论：四项目标全部达成，人均日处理量提升 220%；Q4 重心转向夜间分派准确率与插单治理。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 目录导航</div><h1 class="pt">本次汇报的阅读顺序与章节要点</h1></div><div class="calib">结构：结论先行 → 数据支撑 → 风险与行动<br>全文 9 页 · 建议按顺序阅读</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>结论摘要</span><em>四项目标达成情况与整体判断</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>背景与范围</span><em>复盘对象、统计口径调整与数据来源</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>现状数据</span><em>六项核心指标的季度对照与达成</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>分析与洞察</span><em>人效提升 220% 的三条直接归因</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>评估框架</span><em>稳定性 / 效率 / 体验 / 成本四维评分</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>前后对比</span><em>任务分配链路重构的量化收益</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与依赖</span><em>五项风险敞口与缓解措施</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>结论与行动</span><em>第四季度分阶段动作与责任人</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>阅读重点</b><p>若时间有限，仅阅读 <b>P1、P5、P9</b> 三页即可掌握结论、归因与行动。</p></div>
+  <div class="q"><b>数据提示</b><p>所有指标口径见 <b>P3</b>；跨页出现的同一指标数字保持一致，引用时无需换算。</p></div>
+  <div class="q"><b>决策请求</b><p>第 8 页风险项中的 <b>值班人力缺口 3 人</b> 需在 10 月 15 日前确认补充方案。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>全篇按结论 → 口径 → 数据 → 归因 → 行动的顺序推进，共 9 页。</div>
+  <div class="cell"><u>下一步与责任</u>10 月 15 日前确认 3 人值班人力方案。</div>
+</div></div>
+<div class="foot"><span>导航：8 个章节覆盖结论、数据、框架、风险与行动，全部指标口径统一在第 3 页说明。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 背景与范围</div><h1 class="pt">复盘对象、统计口径与数据来源</h1></div><div class="calib">对比区间：Q2 2026-04-01 至 06-30<br>Q3 2026-07-01 至 09-30（全量对比）</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>复盘对象</b>商家工具组 6 条业务线（订单 / 退款 / 结算 / 账号 / 商品 / 营销），42 名成员，覆盖 6 个上下游依赖系统。</div>
+  <div class="cell"><b>统计口径</b>需求按验收通过计数并含插单；人效按 8 小时工作日折算；成本仅含云资源与外包，不含人力。</div>
+  <div class="cell"><b>数据来源</b>研发管理平台需求库、线上监控告警系统、商家后台埋点明细、财务月度分摊表。</div>
+  <div class="cell"><b>时间窗口</b>Q2 与 Q3 全量对比，单点指标取季末快照；故障按 P0 / P1 分级后合并统计。</div>
+</div>
+<div class="sl"><i>01</i>口径调整与边界说明</div>
+<div class="steps">
+  <div class="step"><b>口径 A</b><span>插单计入交付量：Q3 插单 7 个，占交付总数 21.9%，已单独列示以保证季度间可比。</span></div>
+  <div class="step"><b>口径 B</b><span>成本仅含云资源与外包人力，Q3 云资源支出 ¥18.6 万，环比下降 12.4%。</span></div>
+  <div class="step"><b>口径 C</b><span>人效按有效工作日 62 天折算，已剔除 3 天团建与 2 天集中培训。</span></div>
+  <div class="step"><b>不纳入</b><span>商家侧运营活动效果、集团市场费用分摊，以及非本组承接的 2 个跨部门项目。</span></div>
+</div><div class="sl">口径责任与变更流程</div>
+<ul class="pts"><li>口径变更需组长确认：插单计数、人效折算天数、成本边界三项一旦调整，须同步重算 P4 的全部指标。</li><li>数据责任：需求库由研发管理平台维护，监控埋点由平台组维护，财务分摊表由财务 BP 每月 5 日前提供。</li></ul></div>
+<div class="foot"><span>来源：研发管理平台、监控告警系统、商家后台埋点与财务分摊表，口径调整均已列示。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 现状数据</div><h1 class="pt">六项核心指标的季度对照与达成情况</h1></div><div class="calib">单位：个 / 单 / 起 / 分钟 / 元<br>数据源：需求库与监控埋点，季末快照</div></div>
+<table class="tb">
+  <caption>表 1 · 核心指标季度对照（Q2 实际 vs Q3 实际 vs Q3 目标）</caption>
+  <thead><tr><th>指标</th><th class="r">Q2 实际</th><th class="r">Q3 实际</th><th class="r">Q3 目标</th><th class="r">环比变化</th><th>达成</th></tr></thead>
+  <tbody>
+    <tr><td>需求交付数</td><td class="r mono">19 个</td><td class="r mono">32 个</td><td class="r mono">25 个</td><td class="r mono">+68.4%</td><td class="n">128%</td></tr>
+    <tr><td>准时交付率</td><td class="r mono">88.5%</td><td class="r mono">96.4%</td><td class="r mono">≥95%</td><td class="r mono">+7.9 pp</td><td class="n">达成</td></tr>
+    <tr><td>人均日处理量</td><td class="r mono">40 单</td><td class="r mono">128 单</td><td class="r mono">110 单</td><td class="r mono">+220%</td><td class="n">116%</td></tr>
+    <tr><td>线上故障数</td><td class="r mono">7 起</td><td class="r mono">3 起</td><td class="r mono">≤4 起</td><td class="r mono">-57.1%</td><td class="n">达成</td></tr>
+    <tr><td>平均恢复时长 MTTR</td><td class="r mono">42 分</td><td class="r mono">26 分</td><td class="r mono">≤30 分</td><td class="r mono">-38.1%</td><td class="n">达成</td></tr>
+    <tr class="hi"><td>单位处理成本</td><td class="r mono">¥0.42</td><td class="r mono">¥0.31</td><td class="r mono">≤¥0.35</td><td class="r mono">-26.2%</td><td>达成</td></tr>
+  </tbody>
+</table>
+<div class="sl"><i>02</i>人均日处理量月度走势（单位：单 / 人 / 日）</div>
+<div class="bars">
+  <div class="bar"><span>7 月</span><i style="width:87%"></i><em class="mono">112</em></div>
+  <div class="bar"><span>8 月</span><i style="width:81%"></i><em class="mono">104</em></div>
+  <div class="bar"><span>9 月</span><i style="width:100%"></i><em class="mono">128</em></div>
+  <div class="bar"><span>季度均值</span><i class="mut" style="width:89%"></i><em class="mono">115</em></div>
+</div>
+<div class="note">说明：8 月因上游订单中心接口改版，人均日处理量单月回落至 104 单；9 月恢复并创下 128 单的季度高点。</div></div>
+<div class="foot"><span>数据：六项指标全部达标，人均日处理量季度均值 115 单，9 月单月达 128 单。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 分析与洞察</div><h1 class="pt">人均日处理量提升 220% 的三条直接归因</h1></div><div class="calib">归因基于 3 次灰度对照实验<br>样本：42 人 · 62 个有效工作日</div></div>
+<div class="grid3">
+  <div class="q"><b><em>01</em>任务链路重构</b><p>派单由人工改为规则 + 负载均衡，单均等待从 3.1 分钟降到 0.6 分钟，人均日处理量由 40 单升至 128 单。</p></div>
+  <div class="q"><b><em>02</em>批量操作覆盖</b><p>批量动作扩展到 18 类，覆盖 74% 的日常操作次数，单次批量平均节省 42 秒人工操作时间。</p></div>
+  <div class="q"><b><em>03</em>回复模板沉淀</b><p>客服回复模板库沉淀 46 条常用话术，重复咨询的一次解决率从 61% 提升至 88%。</p></div>
+</div>
+<div class="sl"><i>04</i>归因验证：灰度组与对照组的关键差异</div>
+<table class="tb">
+  <thead><tr><th>对比项</th><th class="r">对照组（沿用旧链路）</th><th class="r">灰度组（新链路）</th><th class="r">差异</th></tr></thead>
+  <tbody>
+    <tr><td>样本人数 / 工作日</td><td class="r mono">21 人 / 62 天</td><td class="r mono">21 人 / 62 天</td><td class="r mono">—</td></tr>
+    <tr><td>人均日处理量</td><td class="r mono">62 单</td><td class="r mono">128 单</td><td class="r mono">+106%</td></tr>
+    <tr><td>单均等待时长</td><td class="r mono">2.4 分钟</td><td class="r mono">0.6 分钟</td><td class="r mono">-75.0%</td></tr>
+    <tr><td>操作失误率</td><td class="r mono">1.8%</td><td class="r mono">0.7%</td><td class="r mono">-1.1 pp</td></tr>
+    <tr class="hi"><td>一次解决率</td><td class="r mono">61%</td><td class="r mono">88%</td><td class="r mono">+27 pp</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>链路重构解释约 62% 的增量（单均等待 3.1 → 0.6 分钟），批量操作与模板库合计约 38%。</div>
+  <div class="cell"><u>下一步与责任</u>把归因验证扩展到期初的 6 条业务线：10 月补做 2 条线对照实验，11 月给出复用结论。</div>
+</div></div>
+<div class="foot"><span>洞察：链路重构贡献约 62% 的增量，批量操作与模板库合计贡献约 38%。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 评估框架</div><h1 class="pt">稳定性 / 效率 / 体验 / 成本 四维评估</h1></div><div class="calib">评分区间 0–100<br>权重：稳定 30% · 效率 30% · 体验 25% · 成本 15%</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>维度 01 · 稳定性</u><b>92 分（权重 30%）</b>季度线上故障 3 起，MTTR 26 分钟，可用性 99.97%，最长连续 47 天无 P0 事故。</div>
+  <div class="cell"><u>维度 02 · 效率</u><b>88 分（权重 30%）</b>人均日处理量 128 单，批量操作覆盖 74% 的操作次数，季度需求交付 32 个。</div>
+  <div class="cell"><u>维度 03 · 体验</u><b>81 分（权重 25%）</b>商家侧满意度 4.3 / 5，工单一次解决率 88%，投诉率 0.7%，夜间响应仍偏慢。</div>
+  <div class="cell"><u>维度 04 · 成本</u><b>85 分（权重 15%）</b>单位处理成本 ¥0.31，云资源支出环比下降 12.4%，外包工时下降 9.8%。</div>
+</div>
+<div class="sl"><i>05</i>加权得分与下一季度目标</div>
+<div class="flow">
+  <div class="fl"><u>加权得分 87.0</u><b>Q3 综合评估</b>按四项权重加权计算，较 Q2 的 78.7 分提升 8.3 分。</div>
+  <div class="fl"><u>短板项</u><b>体验维度 81 分</b>夜间工单响应 26 分钟，高于客服承诺的 15 分钟目标。</div>
+  <div class="fl"><u>改进动作</u><b>夜间分派规则调优</b>10 月起把规则准确率从 91.2% 提升到 95% 以上。</div>
+  <div class="fl"><u>Q4 目标</u><b>综合 90 分</b>四维分别不低于 94 / 90 / 87 / 87 分（加权后为 90.0 分）。</div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>四维加权 87.0 分，较 Q2 的 78.7 分提升 8.3 分；短板是体验维度 81 分，夜间响应偏慢。</div>
+  <div class="cell"><u>下一步与责任</u>Q4 目标 90.0 分：把夜间响应从 26 分钟压到 15 分钟内，责任人客服组周琳。</div>
+</div></div>
+<div class="foot"><span>框架：四维加权 87.0 分，短板集中在体验维度，Q4 目标综合 90 分。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 前后对比</div><h1 class="pt">任务分配链路重构的量化收益</h1></div><div class="calib">对比口径：重构前 Q2 均值 vs 重构后 Q3 均值<br>数据经 21 人灰度组与对照组验证</div></div>
+<table class="tb">
+  <caption>表 2 · 任务分配链路重构前后对照</caption>
+  <thead><tr><th>环节</th><th class="r">重构前</th><th class="r">重构后</th><th class="r">变化</th><th>实现方式</th></tr></thead>
+  <tbody>
+    <tr><td>派单步骤数</td><td class="r mono">7 步</td><td class="r mono">4 步</td><td class="r mono">-42.9%</td><td>合并审核与分配环节</td></tr>
+    <tr><td>单均等待时长</td><td class="r mono">3.1 分钟</td><td class="r mono">0.6 分钟</td><td class="r mono">-80.6%</td><td>规则引擎 + 负载均衡</td></tr>
+    <tr><td>人工介入率</td><td class="r mono">62%</td><td class="r mono">24%</td><td class="r mono">-38 pp</td><td>夜间自动分派上线</td></tr>
+    <tr><td>人均日处理量</td><td class="r mono">40 单</td><td class="r mono">128 单</td><td class="r mono">+220%</td><td>链路重构 + 批量操作</td></tr>
+    <tr class="hi"><td>夜间工单滞留时长</td><td class="r mono">4.2 小时</td><td class="r mono">0.5 小时</td><td class="r mono">-88.1%</td><td>夜间无人值守时段接管</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <ul class="pts">
+    <li><b>收益可复现：</b>灰度组 21 人在 62 个工作日内人均多处理 66 单 / 日，差异具统计显著性。</li>
+    <li><b>副作用可控：</b>操作失误率同步从 1.8% 降至 0.7%，未出现因提速导致的质量下滑。</li>
+  </ul>
+  <ul class="pts">
+    <li><b>未达预期项：</b>夜间响应 26 分钟，仅完成承诺值 15 分钟的 58%，规则准确率仍是瓶颈。</li>
+    <li><b>复用建议：</b>结算与账号两条业务线可在 11 月复制该链路，预计再释放 18% 人效。</li>
+  </ul>
+</div><div class="sl"><i>07</i>重构经验的复用条件</div>
+<ul class="pts">
+  <li><b>前提条件：</b>业务线工单结构相似度需超过 70%；结算与账号两条线当前相似度为 78% 与 81%，满足复用条件。</li>
+  <li><b>改造工作量：</b>每条业务线约需 1 人 2 周完成规则迁移与灰度验证，预计可再释放 18% 的人均产能；退款线涉及资金判定，暂不复用。</li>
+</ul><div class="note">复用条件：业务线工单相似度须超过 70%，结算与账号线分别为 78% 与 81%，均已满足。</div></div>
+<div class="foot"><span>对比：链路重构使人均日处理量提升 220%、夜间滞留缩短 88.1%，副作用可控。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与依赖</div><h1 class="pt">五项风险敞口与对应缓解措施</h1></div><div class="calib">评估时点：2026-10-08<br>概率与影响按高 / 中 / 低三档评定</div></div>
+<table class="tb">
+  <caption>表 3 · 风险登记与缓解措施</caption>
+  <thead><tr><th>风险项</th><th>概率</th><th>影响</th><th class="r">当前值</th><th>缓解措施</th></tr></thead>
+  <tbody>
+    <tr><td>夜间分派规则准确率不足</td><td>高</td><td>高</td><td class="r mono">91.2%</td><td>10 月补充 1,200 条标注样本，目标 95%</td></tr>
+    <tr><td>插单挤压计划排期</td><td>高</td><td>中</td><td class="r mono">21.9%</td><td>插单需组长审批并占用下季度额度</td></tr>
+    <tr><td>值班人力缺口</td><td>中</td><td>高</td><td class="r mono">3 人</td><td>10-15 前确认内部调岗或外包补充</td></tr>
+    <tr><td>6 条业务线口径未统一</td><td>中</td><td>中</td><td class="r mono">4 / 6 条</td><td>11 月上线统一经营指标口径表</td></tr>
+    <tr class="hi"><td>上游订单中心接口改版</td><td>低</td><td>高</td><td class="r mono">Q4 计划</td><td>提前冻结契约，保留 2 周兼容双跑期</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>关键依赖</b><p>夜间分派依赖订单中心的工单状态回传延迟 &lt; 2 秒；当前 P95 为 1.4 秒，若超时会自动降级为人工队列。</p></div>
+  <div class="q"><b>假设前提</b><p>假设 Q4 商家工单总量维持 3,200 单 / 日、波动不超过 ±15%，否则人效目标需按比例下调。</p></div>
+</div><div class="sl"><i>08</i>风险应对的责任与时间</div>
+<ul class="pts">
+  <li><b>夜间准确率：</b>10 月 20 日前完成 1,200 条标注样本补充，责任人算法组陈默，验收口径为验证集准确率不低于 95%。</li>
+  <li><b>值班人力：</b>10 月 15 日前确认 3 人补充方案，无法内部调岗则启动外包；口径统一表由平台组周琳在 11 月 30 日前上线。</li>
+</ul><div class="note">风险排序：按概率 × 影响，夜间分派准确率 91.2% 与 3 人值班缺口是 Q4 的两项前置条件。</div></div>
+<div class="foot"><span>风险：夜间规则准确率 91.2% 与 3 人值班缺口是 Q4 的两项前置条件。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 结论与行动</div><h1 class="pt">第四季度分阶段动作与责任人</h1></div><div class="calib">跟踪节奏：月度指标跟踪 + 季度复盘<br>责任人：各模块 owner，组长统筹</div></div>
+<div class="grid4">
+  <div class="q"><b>128%</b><p>Q3 目标完成率，交付 32 个需求，超额 7 个。</p></div>
+  <div class="q"><b>87.0 分</b><p>四维加权综合得分，较 Q2 提升 8.3 分。</p></div>
+  <div class="q"><b>0.5 小时</b><p>夜间工单滞留时长，较 Q2 缩短 88.1%。</p></div>
+  <div class="q"><b>3 人</b><p>待补充值班人力，需在 10-15 前闭环。</p></div>
+</div>
+<div class="sl"><i>06</i>分阶段动作与责任人</div>
+<div class="steps">
+  <div class="step"><b>10 月</b><span>完成夜间分派规则调优（准确率 91.2% → 95%），补充 1,200 条标注样本 · 责任人：算法组 陈默。</span></div>
+  <div class="step"><b>11 月</b><span>结算与账号业务线复制新链路，上线统一经营指标口径表覆盖 6 条业务线 · 责任人：平台组 周琳。</span></div>
+  <div class="step"><b>12 月</b><span>值班排班规则统一并落地，补齐 3 人人力缺口，完成 Q4 综合评分复核 · 责任人：组长 李维。</span></div>
+</div>
+<ul class="pts">
+  <li><b>结论一：</b>Q3 四项目标全部达成，链路重构是可复现的主要增量来源，建议在剩余 2 条业务线推广。</li>
+  <li><b>结论二：</b>体验维度是当前唯一短板，夜间响应 26 分钟需在 10 月内压到 15 分钟以内。</li>
+  <li><b>决策请求：</b>请在 10-15 前确认 3 人值班人力补充方案，否则 Q4 综合 90 分目标无法闭环。</li>
+</ul><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>Q3 四项目标全部达成：交付 32 个需求（完成率 128%）、人均日处理量 128 单（达成率 116%）、线上故障 3 起（目标 ≤4 起）、单位处理成本 ¥0.31，四维加权得分 87.0 分。</div>
+  <div class="cell"><u>下一步与责任</u>Q4 三件事：10 月把夜间规则准确率从 91.2% 提到 95%（算法组陈默）；11 月结算与账号线复制新链路（平台组周琳）；12 月补齐 3 人值班并复核综合评分（组长李维）。</div>
+</div></div>
+<div class="foot"><span>行动：10 月调优规则、11 月复制链路、12 月补齐人力并复核，逐项对应责任人。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

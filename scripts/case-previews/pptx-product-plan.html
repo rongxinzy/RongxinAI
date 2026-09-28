@@ -1,71 +1,280 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-product-plan</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-product-plan</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:0;display:block}
-.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
-.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
-.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
-.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
-.rule{margin-top:26px;height:1px;background:#e6e6e2}
-.body{margin-top:30px;display:grid;gap:26px;flex:1}
-.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
-.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
-.cols2{grid-template-columns:1fr 1fr}
-.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
-.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
-
-.matrix{margin-top:8px;border:1px solid #e6e6e2}
-.matrix .row{display:grid;grid-template-columns:1.5fr 1fr .9fr;border-top:1px solid #e6e6e2}
-.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
-.matrix .row div{padding:10px 14px;font-size:13px;border-left:1px solid #e6e6e2;color:#4c5058}
-.matrix .row div:first-child{border-left:0}
-.phases{margin-top:12px;display:grid;gap:0}
-.phase{display:grid;grid-template-columns:64px 1fr;gap:14px;padding:10px 0;border-top:1px solid #e6e6e2;font-size:13px;color:#4c5058}
-.phase:first-child{border-top:0}
-.phase b{color:var(--accent);font-weight:600}
-</style></head>
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
 <body>
-<div class="slide" style="--accent:#F59E0B">
-  <div class="kicker">Product Proposal</div>
-  <h1>智能工单助手产品方案</h1>
-  <p class="lede">面向商家中台的工单自动化能力设计、版本节奏与资源投入评估</p>
-  <div class="rule"></div>
-  <div class="body" style="grid-template-columns:1.05fr 1fr">
-    <div class="blk">
-      <h2>01 需求与场景</h2>
-      <p>商家后台每天产生约 3,200 张工单，其中 68% 属于重复咨询，人工分派与回复消耗了客服团队近一半的工作时间。</p>
-      <ul>
-        <li>夜间异常单无人分派，平均滞留 4.2 小时</li>
-        <li>同一问题在不同商家间重复出现，缺少模板沉淀</li>
-        <li>处理过程不留痕，纠纷时无法回溯</li>
-      </ul>
-      <h2 style="margin-top:24px">02 方案要点</h2>
-      <div class="matrix">
-        <div class="row"><div>能力</div><div>覆盖场景</div><div>优先级</div></div>
-        <div class="row"><div>智能分类</div><div>18 类常见问题</div><div>P0</div></div>
-        <div class="row"><div>自动分派</div><div>夜间与高峰时段</div><div>P0</div></div>
-        <div class="row"><div>回复建议</div><div>重复咨询模板库</div><div>P1</div></div>
-        <div class="row"><div>过程留痕</div><div>全量操作记录</div><div>P1</div></div>
-      </div>
-    </div>
-    <div class="blk">
-      <h2>03 版本节奏</h2>
-      <div class="phases">
-        <div class="phase"><b>V1.0</b><span>分类与分派上线，灰度 3 家商家，验证准确率</span></div>
-        <div class="phase"><b>V1.1</b><span>接入模板库，回复建议进入客服工作台</span></div>
-        <div class="phase"><b>V1.2</b><span>全量开放并补齐操作留痕与审计导出</span></div>
-      </div>
-      <h2 style="margin-top:24px">04 投入与预期</h2>
-      <p>预计投入 3 人 6 周。目标是把人均日处理量从 40 单提升到 120 单，夜间工单滞留时间压到 30 分钟以内。</p>
-    </div>
-  </div>
-  <div class="brandline">云帆科技 · 商家工具组</div>
-  <div class="pageno">03 / 16</div>
-</div></body></html>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Product Proposal · 产品方案</div>
+<h1>智能工单助手产品方案</h1>
+<p class="lede">面向商家中台的工单自动化能力设计：从问题定义、能力分层到版本节奏与资源投入，目标是把客服团队从重复咨询中释放出来。</p>
+<div class="meta"><span>产品：智能工单助手</span><span>提出方：云帆科技 · 商家工具组</span><span>评估周期：2026 Q4 至 2027 Q1</span><span>版本：v1.2 · 2026-09-26</span></div>
+<div class="kn">
+  <div class="k"><b>3,200<em>单/天</em></b><span>商家后台工单量</span><p>其中 68% 属于重复咨询，可被模板与自动分派覆盖</p></div>
+  <div class="k"><b>68<em>%</em></b><span>重复咨询占比</span><p>集中在退款、发票、上架等 5 类高频问题</p></div>
+  <div class="k"><b>4.2<em>小时</em></b><span>夜间工单滞留</span><p>目标压缩到 30 分钟以内，降幅 88.1%</p></div>
+</div>
+<table class="tb">
+  <caption>能力清单与优先级 · 按业务价值与实现成本排序</caption>
+  <thead><tr><th>能力</th><th>覆盖场景</th><th>优先级</th><th class="r">目标指标</th></tr></thead>
+  <tbody>
+    <tr><td>智能分类</td><td>18 类常见问题自动归集</td><td class="n">P0</td><td class="r mono">准确率 ≥92%</td></tr>
+    <tr><td>自动分派</td><td>夜间与高峰时段无人值守</td><td class="n">P0</td><td class="r mono">滞留 ≤30 分钟</td></tr>
+    <tr><td>回复建议</td><td>重复咨询模板库复用</td><td>P1</td><td class="r mono">一次解决率 88%</td></tr>
+    <tr class="hi"><td>过程留痕</td><td>全量操作记录与审计导出</td><td>P1</td><td>可回溯率 100%</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：Q3 全量工单 29.4 万张｜来源：需求库 · 工作台 · 12 场坐席访谈</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 痛点｜P5–P7 收益｜P8–P9 里程碑</div>
+</div></div>
+<div class="foot"><span>方案结论：用 3 人 6 周把人均日处理量从 40 单提升到 120 单，夜间滞留压到 30 分钟内。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 方案导航</div><h1 class="pt">从问题定义到上线验收的阅读路径</h1></div><div class="calib">评估周期：2026 Q4 至 2027 Q1<br>全文 9 页 · 建议按顺序阅读</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>结论摘要</span><em>工单量、重复率与能力优先级</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>背景与范围</span><em>业务痛点、问题定义与不做的事</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>现状数据</span><em>18 类工单的分布与处理时长</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>分析与洞察</span><em>三条可自动化的收益判断</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>能力分层</span><em>接入 / 理解 / 执行 / 审计四层</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>版本与前后</span><em>V1.0 至 V1.2 节奏与效果对比</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与依赖</span><em>准确率、上游接口与灰度范围</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>结论与行动</span><em>里程碑、资源投入与验收标准</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>评审关注点</b><p>请重点评审 <b>P6 能力分层</b> 是否完整，以及 <b>P9 验收标准</b> 是否可直接写入目标。</p></div>
+  <div class="q"><b>资源请求</b><p>本次申请 <b>3 人 6 周</b>：算法 1 人、后端 1 人、产品兼测试 1 人，不新增服务器预算。</p></div>
+  <div class="q"><b>决策时间</b><p>需在 <b>10 月 10 日前</b> 确认是否启动，否则无法赶在双十一高峰前完成灰度验证。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>资源请求：3 人 6 周，不新增服务器预算。</div>
+  <div class="cell"><u>下一步与责任</u>10 月 10 日前确认是否启动，逾期顺延至 2027 Q1。</div>
+</div></div>
+<div class="foot"><span>导航：问题定义 → 数据支撑 → 能力分层 → 版本节奏 → 验收标准，共 8 个章节。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 背景与范围</div><h1 class="pt">业务痛点、问题定义与不做的事</h1></div><div class="calib">业务口径：自然日工单量<br>样本：商家后台 2026-07 至 09 全量数据</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>业务痛点</b>商家后台日均产生 3,200 张工单，人工分派与回复消耗客服团队近一半工时，人均日处理量长期停留在 40 单。</div>
+  <div class="cell"><b>问题定义</b>不是「客服人手不够」，而是「重复判断占用人力」：68% 的工单属于 5 类高频重复咨询，判断逻辑高度一致。</div>
+  <div class="cell"><b>覆盖范围</b>商家后台 4 条业务线（订单 / 退款 / 结算 / 账号）的工单接入、分类、分派与回复建议，以及全量操作留痕。</div>
+  <div class="cell"><b>数据基础</b>已有 2025 年至今约 128 万条历史工单，其中 46 万条具备人工确认的问题标签，可直接用于分类模型训练。</div>
+</div>
+<div class="sl"><i>01</i>本次明确不做的事</div>
+<div class="steps">
+  <div class="step"><b>不做一</b><span>不做面向商家的自助客服机器人，本方案只服务内部客服工作台，商家侧交互保持不变。</span></div>
+  <div class="step"><b>不做二</b><span>不做自动退款与自动扣款等资金操作，所有涉及资金的结论仍需人工二次确认后执行。</span></div>
+  <div class="step"><b>不做三</b><span>不替换现有工单系统的底层存储与权限体系，仅在上层接入智能能力，降低上线风险。</span></div>
+  <div class="step"><b>不承诺</b><span>不承诺一次性解决长尾 13 类低频问题（合计占 18%），首版仅覆盖 5 类高频问题。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>边界：只服务内部客服工作台，首版覆盖 5 类高频问题。</div>
+  <div class="cell"><u>下一步与责任</u>资金类自动操作一律阻断转人工，不做自动退款与扣款。</div>
+</div></div>
+<div class="foot"><span>范围：只服务内部客服工作台，覆盖 5 类高频问题，不做任何资金类自动操作。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 现状数据</div><h1 class="pt">18 类工单的分布与处理时长</h1></div><div class="calib">口径：2026 Q3 全量工单 29.4 万张<br>单位：张 / 天 · 分钟 / 张</div></div>
+<table class="tb">
+  <caption>表 1 · 工单类型分布与处理时长（前 5 类合计占 82%）</caption>
+  <thead><tr><th>工单类型</th><th class="r">占比</th><th class="r">日均量</th><th class="r">平均处理时长</th><th class="r">可自动化</th></tr></thead>
+  <tbody>
+    <tr><td>退款流程咨询</td><td class="r mono">28%</td><td class="r mono">896 张</td><td class="r mono">7.2 分钟</td><td class="r mono">高</td></tr>
+    <tr><td>发票开具与修改</td><td class="r mono">19%</td><td class="r mono">608 张</td><td class="r mono">5.4 分钟</td><td class="r mono">高</td></tr>
+    <tr><td>商品上架与编辑</td><td class="r mono">14%</td><td class="r mono">448 张</td><td class="r mono">8.1 分钟</td><td class="r mono">中</td></tr>
+    <tr><td>结算对账差异</td><td class="r mono">12%</td><td class="r mono">384 张</td><td class="r mono">6.8 分钟</td><td class="r mono">中</td></tr>
+    <tr><td>账号与权限申请</td><td class="r mono">9%</td><td class="r mono">288 张</td><td class="r mono">4.2 分钟</td><td class="r mono">高</td></tr>
+    <tr class="hi"><td>其余 13 类长尾问题</td><td class="r mono">18%</td><td class="r mono">576 张</td><td class="r mono">9.6 分钟</td><td>低</td></tr>
+  </tbody>
+</table>
+<div class="sl"><i>02</i>前 5 类可自动化工单的日均量（张 / 天）</div>
+<div class="bars">
+  <div class="bar"><span>退款流程</span><i style="width:100%"></i><em class="mono">896</em></div>
+  <div class="bar"><span>发票</span><i style="width:68%"></i><em class="mono">608</em></div>
+  <div class="bar"><span>商品上架</span><i style="width:50%"></i><em class="mono">448</em></div>
+  <div class="bar"><span>结算对账</span><i style="width:43%"></i><em class="mono">384</em></div>
+  <div class="bar"><span>账号权限</span><i style="width:32%"></i><em class="mono">288</em></div>
+</div><div class="note">取舍：优先退款与发票两类（合计 47%、日均 1,504 张），上线门槛最低且模板化程度最高。</div></div>
+<div class="foot"><span>数据：前 5 类高频工单占总量 82%，日均处理时长 4.2–8.1 分钟，是自动化的首要目标。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 分析与洞察</div><h1 class="pt">三条可自动化的收益判断</h1></div><div class="calib">依据：29.4 万张历史工单分布 + 12 场客服坐席访谈<br>收益按上限口径估算</div></div>
+<div class="grid3">
+  <div class="q"><b><em>01</em>分类可自动化</b><p>5 类高频工单占 82%，语义特征清晰；用 46 万条带标签历史工单训练，分类准确率目标 92%，可替代人工首轮归集。</p></div>
+  <div class="q"><b><em>02</em>分派可自动化</b><p>夜间 20:00–08:00 时段仅 3 人值班，工单滞留 4.2 小时；按规则 + 负载均衡自动分派后可压到 30 分钟以内。</p></div>
+  <div class="q"><b><em>03</em>回复可模板化</b><p>46 条模板可覆盖 5 类问题的标准回复；预计单均耗时从 6.4 分钟降到 2.1 分钟，人均日处理量由 40 单升至 120 单。</p></div>
+</div>
+<div class="sl"><i>03</i>收益测算：单人单日处理量的三段提升路径</div>
+<table class="tb">
+  <thead><tr><th>阶段</th><th class="r">人均日处理量</th><th class="r">单均处理时长</th><th class="r">累计耗时下降</th><th>支撑能力</th></tr></thead>
+  <tbody>
+    <tr><td>当前基线</td><td class="r mono">40 单</td><td class="r mono">6.4 分钟</td><td class="r mono">—</td><td>全人工分派与回复</td></tr>
+    <tr><td>V1.0 分类与分派</td><td class="r mono">82 单</td><td class="r mono">4.1 分钟</td><td class="r mono">-35.9%</td><td>智能分类 + 自动分派</td></tr>
+    <tr class="hi"><td>V1.1 回复建议</td><td class="r mono">120 单</td><td class="r mono">2.1 分钟</td><td class="r mono">-67.2%</td><td>叠加模板库与过程留痕</td></tr>
+  </tbody>
+</table><div class="sl"><i>04</i>收益测算的三条前提假设</div>
+<ul class="pts">
+  <li><b>假设一：</b>5 类高频工单占比维持在 78% 以上；若因业务变化降到 70% 以下，人均 120 单的目标需下调约 15%。</li>
+  <li><b>假设二：</b>分类准确率达到 92% 且低置信阈值设为 0.75，则约 8% 的工单仍需人工复核，该部分耗时已计入 2.1 分钟。</li>
+</ul><div class="note">机会成本：若不投入这 3 人 6 周（合计 18 人周），按当前人均 40 单承接日均 3,200 张工单需维持约 80 名客服；V1.1 落地后同等人力可承接约 3 倍工单量，扩容时无需按比例增编。<br>人力口径：客服现有编制约 80 人（3,200 张 ÷ 40 单）；V1.1 后同等人力可承接约 9,600 张 / 日，为当前的 3 倍。</div></div>
+<div class="foot"><span>洞察：分类、分派、模板三段收益叠加，人均日处理量可从 40 单提升到 120 单。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 能力分层</div><h1 class="pt">接入 / 理解 / 执行 / 审计四层架构</h1></div><div class="calib">分层原则：上层可替换、下层可复用<br>每层均有独立的降级策略</div></div>
+<div class="flow">
+  <div class="fl"><u>LAYER 01</u><b>接入层</b>统一接收 4 条业务线的工单事件流，日均 3,200 条，P95 延迟 1.4 秒；支持标准 API 与消息队列双通道接入。</div>
+  <div class="fl"><u>LAYER 02</u><b>理解层</b>在 46 万条带标签样本上训练分类模型，输出 18 类问题标签与置信度；低于 0.75 的样本自动转人工复核。</div>
+  <div class="fl"><u>LAYER 03</u><b>执行层</b>按规则与负载均衡完成分派，命中模板库时生成回复建议；涉及资金的操作一律阻断并转人工确认。</div>
+  <div class="fl"><u>LAYER 04</u><b>审计层</b>记录全量操作轨迹与模型判定依据，支持按工单号、坐席、时间段三类维度导出，保留 24 个月。</div>
+</div>
+<div class="sl"><i>04</i>前三层的降级策略与失效保护（审计层仅记录、不参与决策）</div>
+<div class="cellbox" style="grid-template-columns:repeat(3,1fr)">
+  <div class="cell"><u>降级 01</u><b>接入层超时</b>若上游事件 P95 超过 2 秒，自动切换为每 5 分钟轮询一次状态表，保证不丢单，延迟容忍度放宽到 5 分钟。</div>
+  <div class="cell"><u>降级 02</u><b>理解层低置信</b>两条规则互补：单条置信度低于 0.75 时该工单转人工（日常约 8% 触发）；当整批低置信占比超过 30% 时触发熔断，暂停该批自动分派并全量转人工，同时留样补训。熔断优先于单条规则。</div>
+  <div class="cell"><u>降级 03</u><b>执行层异常</b>回复建议生成失败时不阻塞流程，工作台仅展示原工单内容，坐席按原有方式手工回复。</div>
+</div><div class="sl"><i>05</i>分层架构的三条设计原则</div>
+<ul class="pts">
+  <li><b>上层可替换：</b>接入层与理解层之间通过标准事件格式解耦，更换分类模型不影响上游工单接入。</li>
+  <li><b>下层可复用：</b>审计层同时服务 4 条业务线，无需为每条线单独开发日志与导出能力，节省约 30% 工作量。</li>
+</ul><div class="note">审计边界：审计层只记录与导出，不参与实时决策，因此不设降级分支。</div></div>
+<div class="foot"><span>架构：四层解耦、逐层可降级，任意一层失效都不会阻塞工单在主流程中的流转。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 版本与前后</div><h1 class="pt">V1.0 至 V1.2 节奏与效果对比</h1></div><div class="calib">灰度范围：3 家商家 → 全量<br>每版本间隔 3 周</div></div>
+<table class="tb">
+  <caption>表 2 · 方案上线前后关键指标对照</caption>
+  <thead><tr><th>指标</th><th class="r">当前（人工）</th><th class="r">V1.0 目标</th><th class="r">V1.1 目标</th><th>实现方式</th></tr></thead>
+  <tbody>
+    <tr><td>分类准确率</td><td class="r mono">—</td><td class="r mono">92%</td><td class="r mono">94%</td><td>46 万条样本 + 低置信复核</td></tr>
+    <tr><td>人均日处理量</td><td class="r mono">40 单</td><td class="r mono">82 单</td><td class="r mono">120 单</td><td>分类分派 + 模板库</td></tr>
+    <tr><td>单均处理时长</td><td class="r mono">6.4 分钟</td><td class="r mono">4.1 分钟</td><td class="r mono">2.1 分钟</td><td>回复建议前置生成</td></tr>
+    <tr class="hi"><td>夜间工单滞留</td><td class="r mono">4.2 小时</td><td class="r mono">0.5 小时</td><td class="r mono">0.4 小时</td><td>夜间规则自动分派</td></tr>
+  </tbody>
+</table>
+<div class="sl"><i>05</i>三个版本的交付节奏</div>
+<div class="steps">
+  <div class="step"><b>V1.0</b><span>分类与分派上线，灰度 3 家商家共 1,800 张工单 / 日，验证分类准确率是否达到 92% · 第 6 周末交付。</span></div>
+  <div class="step"><b>V1.1</b><span>接入 46 条模板库，回复建议进入客服工作台，扩展灰度到 12 家商家 · 第 9 周末交付。</span></div>
+  <div class="step"><b>V1.2</b><span>全量开放并补齐操作留痕与审计导出，完成 24 个月数据的合规留存配置 · 第 12 周末交付。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>节奏：V1.0 第 6 周（灰度 3 家）、V1.1 第 9 周（扩到 12 家）、V1.2 第 12 周（全量开放）。</div>
+  <div class="cell"><u>下一步与责任</u>每版验收口径：准确率 ≥92%、人均 ≥120 单、可回溯率 100%，未达标则不放量。</div>
+</div></div>
+<div class="foot"><span>节奏：三个版本各间隔 3 周，先验证准确率再放量，最后补齐审计能力。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与依赖</div><h1 class="pt">准确率、上游接口与灰度范围</h1></div><div class="calib">评估时点：2026-09-26<br>影响按高 / 中 / 低三档</div></div>
+<table class="tb">
+  <caption>表 3 · 风险登记与缓解措施</caption>
+  <thead><tr><th>风险项</th><th>概率</th><th>影响</th><th class="r">当前状态</th><th>缓解措施</th></tr></thead>
+  <tbody>
+    <tr><td>分类准确率不达 92%</td><td>中</td><td>高</td><td class="r mono">离线 89.4%</td><td>补 1.2 万条难例样本，低于 0.75 置信转人工</td></tr>
+    <tr><td>上游工单接口改版</td><td>中</td><td>高</td><td class="r mono">Q4 有排期</td><td>提前冻结契约，预留 2 周兼容双跑期</td></tr>
+    <tr><td>灰度商家样本偏小</td><td>高</td><td>中</td><td class="r mono">3 家 / 1,800 张</td><td>V1.1 扩到 12 家，覆盖 3 类商家规模</td></tr>
+    <tr><td>坐席使用意愿不足</td><td>中</td><td>中</td><td class="r mono">未验证</td><td>上线前 2 场培训，把采纳率纳入试点考核</td></tr>
+    <tr class="hi"><td>长尾 13 类覆盖缺失</td><td>高</td><td>低</td><td class="r mono">占 18%</td><td>首版明确不覆盖，V2 再评估是否纳入</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>关键依赖</b><p>依赖订单中心的工单状态回传延迟低于 2 秒（当前 P95 为 1.4 秒），以及 46 万条历史标签数据的可用性。</p></div>
+  <div class="q"><b>假设前提</b><p>假设工单总量维持 3,200 张 / 日且 5 类高频问题占比不低于 78%，否则人均 120 单的目标需按比例下调。</p></div>
+</div><div class="note">风险排序结论：按「概率 × 影响」计算，分类准确率不达标的综合风险值最高（中 × 高），其次是上游接口改版；两项均需在 V1.0 上线前完成验证。</div><div class="sl">风险前置动作</div>
+<ul class="pts"><li>准确率：V1.0 上线前补 1.2 万条难例样本，离线准确率须从 89.4% 提升到 92% 才允许灰度。</li><li>接口：与订单中心在 10 月 20 日前冻结契约，预留 2 周兼容双跑期，责任人后端周琳。</li></ul></div>
+<div class="foot"><span>风险：离线准确率 89.4% 距 92% 目标尚有差距，需补 1.2 万条难例样本。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 结论与行动</div><h1 class="pt">里程碑、资源投入与验收标准</h1></div><div class="calib">投资人：商家工具组 · 组长 李维<br>决策截止：2026-10-10</div></div>
+<div class="grid4">
+  <div class="q"><b>3 人 6 周</b><p>算法 1 + 后端 1 + 产品兼测试 1，不新增服务器预算。</p></div>
+  <div class="q"><b>68%</b><p>可被覆盖的重复咨询占比，集中在 5 类高频问题。</p></div>
+  <div class="q"><b>120 单</b><p>V1.1 目标人均日处理量，为当前的 3 倍。</p></div>
+  <div class="q"><b>30 分钟</b><p>夜间工单滞留目标，较当前 4.2 小时下降 88.1%。</p></div>
+</div>
+<div class="sl"><i>06</i>分阶段里程碑与验收标准</div>
+<div class="steps">
+  <div class="step"><b>第 6 周</b><span>V1.0 交付并完成 3 家商家灰度；验收标准：分类准确率 ≥92%，夜间滞留 ≤30 分钟 · 责任人：算法 陈默。</span></div>
+  <div class="step"><b>第 9 周</b><span>V1.1 交付并扩展到 12 家商家；验收标准：人均日处理量 ≥120 单，单均时长 ≤2.1 分钟 · 责任人：后端 周琳。</span></div>
+  <div class="step"><b>第 12 周</b><span>V1.2 全量开放并完成审计导出配置；验收标准：可回溯率 100%，操作日志保留 24 个月 · 责任人：组长 李维。</span></div>
+</div>
+<ul class="pts">
+  <li><b>结论一：</b>重复判断而非人手不足是核心问题，5 类高频工单占 82%，具备明确的自动化边界与训练数据基础。</li>
+  <li><b>结论二：</b>收益路径分三段释放，V1.0 只解决分派与分类，真正的效率跃升发生在本方案 V1.1 的模板库上线之后。</li>
+  <li><b>决策请求：</b>请在 10-10 前确认启动，以赶上双十一高峰前的灰度窗口；逾期将顺延至 2027 Q1。</li>
+</ul><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>收益三段释放：V1.0 把人均日处理量从 40 单提到 82 单（单均 4.1 分钟），V1.1 叠加 46 条模板后达到 120 单（单均 2.1 分钟），夜间滞留从 4.2 小时压到 0.5 小时。</div>
+  <div class="cell"><u>下一步与责任</u>资源与验收：3 人 6 周（算法 1 + 后端 1 + 产品兼测试 1），第 6 / 9 / 12 周分别验收准确率 92%、人均 120 单、可回溯率 100%，责任人组长李维。</div>
+</div></div>
+<div class="foot"><span>行动：第 6 / 9 / 12 周三个里程碑，分别验收准确率、处理量与可回溯率三项指标。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>
