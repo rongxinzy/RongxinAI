@@ -47,7 +47,7 @@ describe('collectCodingFileArtifacts', () => {
     expect(artifacts[0].needsFileLoad).toBe(false);
   });
 
-  test('collects write-tool inputs from builtin tool calls', () => {
+  test('skips pending write-tool calls until they complete', () => {
     const artifacts = collectCodingFileArtifacts(
       [
         event(CodingEventKind.ToolCall, {
@@ -55,6 +55,21 @@ describe('collectCodingFileArtifacts', () => {
           toolName: 'write',
           toolInput: { file_path: '/work/page.html', content: '<html></html>' },
           status: 'pending',
+        }),
+      ],
+      'lane-1',
+    );
+    expect(artifacts).toHaveLength(0);
+  });
+
+  test('collects completed write-tool inputs from builtin tool calls', () => {
+    const artifacts = collectCodingFileArtifacts(
+      [
+        event(CodingEventKind.ToolCall, {
+          toolCallId: 'call-1',
+          toolName: 'write',
+          toolInput: { file_path: '/work/page.html', content: '<html></html>' },
+          status: 'completed',
         }),
       ],
       'lane-1',
@@ -69,6 +84,7 @@ describe('collectCodingFileArtifacts', () => {
       [
         event(CodingEventKind.ToolCall, {
           toolCallId: 'call-2',
+          status: 'completed',
           rawInput: { path: '/work/diagram.mmd', content: 'graph TD' },
         }),
       ],

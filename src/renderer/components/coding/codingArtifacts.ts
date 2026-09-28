@@ -1,4 +1,4 @@
-import { CodingEventKind, type CodingEvent } from '../../../shared/codingAgent';
+import { CodingEventKind, CodingToolCallStatus, type CodingEvent } from '../../../shared/codingAgent';
 import {
   extractFilePath,
   getArtifactTypeFromExtension,
@@ -121,6 +121,9 @@ const artifactFromToolCall = (
   baseDir: string | null | undefined,
 ): CodingFileArtifact | null => {
   const payload = event.payload;
+  // Pending/failed writes must not surface preview cards — the file is not on
+  // disk yet and the side panel would open empty.
+  if (readString(payload.status) !== CodingToolCallStatus.Completed) return null;
   const toolName = readString(payload.toolName) ?? readString(payload.title);
   const input = asRecord(payload.toolInput) ?? asRecord(payload.rawInput);
   if (!input) return null;

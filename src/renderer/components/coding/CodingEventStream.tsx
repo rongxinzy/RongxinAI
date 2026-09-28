@@ -152,14 +152,19 @@ export const CodingEventStream = ({
     [events, artifactSessionKey, artifactBaseDir],
   );
   useEffect(() => {
-    if (!artifactSessionKey || isStreaming) return;
-    for (const { artifact } of detectArtifactsFromMessages(
-      detectableMessages,
-      artifactSessionKey,
-    )) {
-      // The coding page keeps revealing its own stream artifacts; the cowork
-      // panel only opens for live declared deliverables.
-      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));
+    if (!artifactSessionKey) return;
+    // Markdown/message artifacts wait for a settled transcript; file artifacts
+    // from completed writes / FileChange can sync while the turn still streams
+    // so preview cards and the side panel stay consistent.
+    if (!isStreaming) {
+      for (const { artifact } of detectArtifactsFromMessages(
+        detectableMessages,
+        artifactSessionKey,
+      )) {
+        // The coding page keeps revealing its own stream artifacts; the cowork
+        // panel only opens for live declared deliverables.
+        dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));
+      }
     }
     for (const { artifact, needsFileLoad, version } of fileArtifacts) {
       // The coding page keeps revealing its own stream artifacts; the cowork
