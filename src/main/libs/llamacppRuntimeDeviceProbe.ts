@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import { promisify } from 'util';
 
 import type { LlamaCppRuntimeListDevicesResult } from '../../shared/llamacpp';
 import { resolveLlamaCppRuntimeMetadata } from './llamacppRuntimePaths';
@@ -16,13 +17,17 @@ type ExecFileRunner = (
   },
 ) => Promise<{ stdout: string; stderr: string }>;
 
+const execFileAsync = promisify(execFile);
+const defaultExecFileRunner: ExecFileRunner = (file, args, options) =>
+  execFileAsync(file, args, options);
+
 export async function listLlamaCppRuntimeDevices(input: {
   executablePath: string;
   platform: NodeJS.Platform;
   baseEnv?: NodeJS.ProcessEnv;
   runner?: ExecFileRunner;
 }): Promise<LlamaCppRuntimeListDevicesResult> {
-  const runner = input.runner ?? (execFile as ExecFileRunner);
+  const runner = input.runner ?? defaultExecFileRunner;
   const metadata = resolveLlamaCppRuntimeMetadata(input.executablePath);
   try {
     const { stdout, stderr } = await runner(input.executablePath, ['--list-devices'], {
