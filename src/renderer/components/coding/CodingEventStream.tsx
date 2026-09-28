@@ -37,6 +37,7 @@ interface CodingEventStreamProps {
   isStreaming: boolean;
   scrollAreaRef: RefObject<HTMLDivElement | null>;
   onScrollPositionChange: (scrollPosition: number) => void;
+  onLoadOlderEvents?: () => void;
   onReEditUserMessage: (content: string) => void;
   emptyDescription?: string;
   headerActions?: ReactNode;
@@ -107,6 +108,7 @@ export const CodingEventStream = ({
   isStreaming,
   scrollAreaRef,
   onScrollPositionChange,
+  onLoadOlderEvents,
   onReEditUserMessage,
   emptyDescription,
   headerActions,
@@ -207,6 +209,7 @@ export const CodingEventStream = ({
           target.classList.contains('coding-conversation-scroll')
         ) {
           onScrollPositionChange(target.scrollTop);
+          if (target.scrollTop <= 24) onLoadOlderEvents?.();
         }
       }}
     >

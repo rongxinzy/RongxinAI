@@ -16,6 +16,8 @@ import {
   type CodingPromptAttachment,
 } from '../../../shared/codingAgent';
 import { AcpConnectionSupervisor } from '../acp/connectionSupervisor';
+import { AcpEventQueue } from '../acp/acpEventQueue';
+import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import {
   ACP_CLIENT_CAPABILITIES,
   ACP_MINIMUM_PROTOCOL_VERSION,
@@ -47,13 +49,37 @@ type AcpInitializeResult = {
 };
 type AcpSessionResult = { sessionId?: string; configOptions?: unknown };
 type EventStream = {
-  events: DriverEvent[];
+  events: AcpEventQueue<DriverEvent>;
   waiters: Array<{
     resolve: (result: IteratorResult<DriverEvent>) => void;
     reject: (error: Error) => void;
   }>;
   done: boolean;
   error: Error | null;
+};
+
+const mergeAdjacentDriverEvents = (previous: DriverEvent, next: DriverEvent): DriverEvent | null => {
+  if (previous.kind === CodingEventKind.MessageDelta && next.kind === CodingEventKind.MessageDelta) {
+    const previousMessageId = previous.payload.messageId;
+    if (previousMessageId !== next.payload.messageId || typeof previousMessageId !== 'string') {
+      return null;
+    }
+    if (next.payload.streamUpdateMode === CodingStreamUpdateMode.Replace) return next;
+    return {
+      ...next,
+      payload: {
+        ...previous.payload,
+        ...next.payload,
+        content: `${typeof previous.payload.content === 'string' ? previous.payload.content : ''}${typeof next.payload.content === 'string' ? next.payload.content : ''}`,
+      },
+    };
+  }
+  if (previous.kind === CodingEventKind.ToolCall && next.kind === CodingEventKind.ToolCall) {
+    return previous.payload.toolCallId === next.payload.toolCallId
+      ? { ...next, payload: { ...previous.payload, ...next.payload } }
+      : null;
+  }
+  return null;
 };
 type PendingPermission = {
   streamSessionId: string;
@@ -433,8 +459,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     await this.ensureConnected(input.workspaceRoot);
     this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'assistant'));
     this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'user'));
-    const stream: EventStream = { events: [], waiters: [], done: false, error: null };
+    const stream: EventStream = {
+      events: new AcpEventQueue(mergeAdjacentDriverEvents),
+      waiters: [],
+      done: false,
+      error: null,
+    };
     this.streams.set(input.sessionId, stream);
+    agentResourceDiagnostics.startAcpTurn(input.sessionId, this.supervisor.processId);
     console.debug(`[AcpCodingDriver] started session prompt for ${input.sessionId}`);
     void this.supervisor
       .request(
@@ -478,11 +510,12 @@ export class AcpCodingDriver implements CodingAgentDriver {
       });
     try {
       while (true) {
-        const next = await this.nextEvent(stream);
+        const next = await this.nextEvent(input.sessionId, stream);
         if (next.done) return;
         yield next.value;
       }
     } finally {
+      agentResourceDiagnostics.finishAcpTurn(input.sessionId, Boolean(stream.error));
       this.streams.delete(input.sessionId);
     }
   }
@@ -1043,7 +1076,18 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (!stream || stream.done) return false;
     const waiter = stream.waiters.shift();
     if (waiter) waiter.resolve({ done: false, value: event });
-    else stream.events.push(event);
+    else {
+      const queued = stream.events.enqueue(event);
+      if (!queued.accepted) {
+        this.finishStream(sessionId, new Error('ACP event queue exceeded its memory limits.'));
+        return false;
+      }
+      if (queued.replaced) {
+        agentResourceDiagnostics.recordAcpReplaced(sessionId, queued.replaced, queued.event);
+      } else {
+        agentResourceDiagnostics.recordAcpEnqueued(sessionId, queued.event);
+      }
+    }
     return true;
   }
 
@@ -1070,8 +1114,15 @@ export class AcpCodingDriver implements CodingAgentDriver {
     }
   }
 
-  private async nextEvent(stream: EventStream): Promise<IteratorResult<DriverEvent>> {
-    if (stream.events.length > 0) return { done: false, value: stream.events.shift()! };
+  private async nextEvent(
+    sessionId: string,
+    stream: EventStream,
+  ): Promise<IteratorResult<DriverEvent>> {
+    if (stream.events.length > 0) {
+      const event = stream.events.dequeue()!;
+      agentResourceDiagnostics.recordAcpDequeued(sessionId, event);
+      return { done: false, value: event };
+    }
     if (stream.done) {
       if (stream.error) throw stream.error;
       return { done: true, value: undefined };
