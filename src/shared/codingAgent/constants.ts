@@ -219,5 +219,9 @@ export const CodingAgentIpc = {
   Changed: 'codingAgent:changed',
   AuthTerminalData: 'codingAgent:authTerminalData',
   AuthTerminalExit: 'codingAgent:authTerminalExit',
+  LoadEventPage: 'codingAgent:loadEventPage',
+  EventDelta: 'codingAgent:eventDelta',
 } as const;
 export type CodingAgentIpc = (typeof CodingAgentIpc)[keyof typeof CodingAgentIpc];
+
+export const CodingEventWindowPageSize = 240;

@@ -10,6 +10,7 @@ const BUILTIN_MODULES = new Set([
   ...builtinModules.map(moduleName => `node:${moduleName}`),
   'electron',
 ]);
+const DAEMON_FORBIDDEN_EXTERNALS = ['electron', 'extract-zip', 'tar'];
 
 function packageRoot(specifier) {
   if (specifier.startsWith('@')) return specifier.split('/').slice(0, 2).join('/');
@@ -49,6 +50,17 @@ function findFiles(directory, predicate) {
   return matches;
 }
 
+function assertDaemonIsNodeSafe(source) {
+  const forbidden = DAEMON_FORBIDDEN_EXTERNALS.filter(specifier =>
+    new RegExp(`\\brequire\\s*\\(\\s*(['"])${specifier}\\1\\s*\\)`).test(source),
+  );
+  if (forbidden.length > 0) {
+    throw new Error(
+      `Llama.cpp daemon bundle references Electron-only dependencies: ${forbidden.join(', ')}`,
+    );
+  }
+}
+
 export function checkElectronRuntimeDependencies(projectRoot) {
   const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const declared = Object.keys(packageJson.dependencies ?? {}).sort();
@@ -64,6 +76,12 @@ export function checkElectronRuntimeDependencies(projectRoot) {
   if (!fs.existsSync(mainPath)) {
     throw new Error(`Electron main bundle is missing: ${mainPath}`);
   }
+
+  const daemonPath = path.join(outputDirectory, 'llamacppModelDaemonEntry.js');
+  if (!fs.existsSync(daemonPath)) {
+    throw new Error(`Llama.cpp daemon bundle is missing: ${daemonPath}`);
+  }
+  assertDaemonIsNodeSafe(fs.readFileSync(daemonPath, 'utf8'));
 
   const externalRoots = collectLiteralExternalRoots(fs.readFileSync(mainPath, 'utf8'));
   const undeclared = externalRoots.filter(root => !declared.includes(root));

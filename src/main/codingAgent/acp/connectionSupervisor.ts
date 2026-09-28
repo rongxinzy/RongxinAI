@@ -111,6 +111,10 @@ export class AcpConnectionSupervisor {
     return this.connectionGeneration;
   }
 
+  get processId(): number | undefined {
+    return this.child?.pid;
+  }
+
   onNotification(handler: (method: string, params: Record<string, unknown>) => void): void {
     this.notificationHandler = handler;
   }

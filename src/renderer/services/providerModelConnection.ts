@@ -5,6 +5,7 @@ import {
   resolveCodingPlanBaseUrl,
   type ProviderConfig,
 } from '../../shared/providers';
+import { ApiRequestPurpose } from '../../shared/ipc/apiRequest';
 import { i18nService } from './i18n';
 
 export interface ProviderModelConnectionTarget {
@@ -190,6 +191,7 @@ export async function testProviderModelConnection(
           generationConfig: { maxOutputTokens: CONNECTIVITY_TEST_TOKEN_BUDGET },
         }),
         timeoutMs: CONNECTION_TEST_TIMEOUT_MS,
+        purpose: ApiRequestPurpose.ConnectivityTest,
       });
       return getProviderModelConnectionTestResult(response);
     }
@@ -209,6 +211,7 @@ export async function testProviderModelConnection(
           messages: [{ role: 'user', content: 'Hi' }],
         }),
         timeoutMs: CONNECTION_TEST_TIMEOUT_MS,
+        purpose: ApiRequestPurpose.ConnectivityTest,
       });
       return getProviderModelConnectionTestResult(response);
     }
@@ -250,6 +253,7 @@ export async function testProviderModelConnection(
       headers,
       body: JSON.stringify(body),
       timeoutMs: CONNECTION_TEST_TIMEOUT_MS,
+      purpose: ApiRequestPurpose.ConnectivityTest,
     });
     return getProviderModelConnectionTestResult(response);
   } catch (error) {

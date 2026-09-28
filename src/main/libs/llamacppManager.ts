@@ -81,11 +81,11 @@ import {
   buildLlamaServerArgs,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
   isGpuLikeRuntimeDevice,
-  listLlamaCppRuntimeDevices,
   listLlamaCppRuntimeHelpFlags,
   resolveLlamaCppDeviceSelection,
   shouldEnableLlamaCppModelsAutoload,
 } from './llamacppServe';
+import { listLlamaCppRuntimeDevices } from './llamacppRuntimeDeviceProbe';
 import { MarketplaceService } from './marketplaceService';
 import { getNvidiaSmiSnapshot } from './nvidiaSmi';
 
@@ -1647,13 +1647,13 @@ export {
   buildLlamaServerModelArgs,
   buildLlamaServerArgs,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
-  listLlamaCppRuntimeDevices,
   listLlamaCppRuntimeHelpFlags,
   parseLlamaCppHelpFlags,
   parseLlamaCppListDevicesOutput,
   resolveLlamaCppDeviceSelection,
   shouldEnableLlamaCppModelsAutoload,
 } from './llamacppServe';
+export { listLlamaCppRuntimeDevices } from './llamacppRuntimeDeviceProbe';
 
 export function modelLaunchOptionsToPreset(
   options: NonNullable<LlamaCppModelLaunchInput['options']>,

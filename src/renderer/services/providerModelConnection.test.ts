@@ -3,6 +3,7 @@ import {
   ProviderModelConnectionFailureKind,
   type ProviderConfig,
 } from '../../shared/providers';
+import { ApiRequestPurpose } from '../../shared/ipc/apiRequest';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { i18nService } from './i18n';
@@ -20,6 +21,7 @@ type ConnectionFetchRequest = {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
+  purpose?: string;
 };
 
 type PendingConnectionRequest = {
@@ -72,6 +74,9 @@ test('tests models with bounded concurrency and preserves result order', async (
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
   expect(activeRequests).toBe(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY);
   expect(maxActiveRequests).toBe(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY);
+  expect(fetchMock.mock.calls.every(([request]) =>
+    request.purpose === ApiRequestPurpose.ConnectivityTest,
+  )).toBe(true);
 
   const resolvePendingRequests = (count: number) => {
     const requests = pendingRequests.slice(0, count);
