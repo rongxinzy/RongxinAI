@@ -37,6 +37,7 @@ import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
 import { invalidateArtifactFile, loadArtifactFile } from '@/services/artifactFileLoader';
+import { MAX_PREVIEW_HTML_CHARS } from './renderers/constants';
 
 // Same code-split as ArtifactRenderer — avoid static import pulling Prism into the main chunk.
 const CodeRenderer = React.lazy(() => import('./renderers/CodeRenderer'));
@@ -175,6 +176,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
           }),
         );
+        // An oversized page has no usable preview: show its source instead of a
+        // blank notice, so a saved web page can never take over the app.
+        if (selectedArtifact.type === 'html' && loaded.content.length > MAX_PREVIEW_HTML_CHARS) {
+          dispatch(setActiveTab('code'));
+        }
       })
       .catch(() => {
         if (!cancelled) setArtifactLoadError(artifactId);
@@ -353,6 +359,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
           }),
         );
+        // An oversized page has no usable preview: show its source instead of a
+        // blank notice, so a saved web page can never take over the app.
+        if (selectedArtifact.type === 'html' && loaded.content.length > MAX_PREVIEW_HTML_CHARS) {
+          dispatch(setActiveTab('code'));
+        }
       }
     } catch {
       // File unreadable or missing

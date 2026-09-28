@@ -248,6 +248,7 @@ const TurnBlockComponent: React.FC<{
       const { durationSeconds, isComplete, isStreaming } = getThinkingPresentation(
         meta,
         forceComplete,
+        hasText(item.message.content),
       );
       const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
