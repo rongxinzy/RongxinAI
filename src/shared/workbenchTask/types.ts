@@ -33,6 +33,17 @@ export interface WorkbenchOutputRequirement {
   formats: string[];
 }
 
+/**
+ * Raw requirement as a model submits it: `formats` may be omitted, and a text
+ * requirement may carry formats. Both are normalized away instead of rejected,
+ * because a rejected requirement leaves the task without an output contract and
+ * every later tool call is blocked with no way for the model to recover.
+ */
+export interface WorkbenchOutputRequirementInput {
+  mode: WorkbenchOutputMode;
+  formats?: string[];
+}
+
 export interface WorkbenchVerificationCheck {
   name: string;
   status: WorkbenchVerificationCheckStatus;
