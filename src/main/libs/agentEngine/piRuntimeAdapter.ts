@@ -182,6 +182,22 @@ import type {
   PiStartOptions,
 } from './piRuntimeTypes';
 
+const summarizePiHistory = (messages: readonly CoworkMessage[]) => {
+  let contentBytes = 0;
+  let metadataBytes = 0;
+  for (const message of messages) {
+    contentBytes += Buffer.byteLength(message.content, 'utf8');
+    if (message.metadata) {
+      try {
+        metadataBytes += Buffer.byteLength(JSON.stringify(message.metadata), 'utf8');
+      } catch {
+        // Ignore malformed metadata in diagnostics; the normal session path handles it.
+      }
+    }
+  }
+  return { messageCount: messages.length, contentBytes, metadataBytes };
+};
+
 // ── Types ──
 
 const PiChatRuntimeLimit = {
@@ -1453,6 +1469,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       console.log(
         `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, restoring context via prompt`,
       );
+      const historyLoadStartedAt = Date.now();
       const storedSession = this.store?.getSession(sessionId);
       const history = storedSession?.messages ?? [];
       const chatMode =
@@ -1460,6 +1477,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         storedSession?.mode === CoworkSessionMode.Chat;
       const piPrompt = buildPiConversationPrompt(history, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
+      });
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'continue',
+        ...summarizePiHistory(history),
+        promptChars: piPrompt.length,
+        restoreMs: Date.now() - historyLoadStartedAt,
       });
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1506,10 +1529,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       mcpToolTopologyChanged ||
       unattendedTopologyChanged
     ) {
+      const historyLoadStartedAt = Date.now();
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       if (mcpToolTopologyChanged) {
         console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
       }
+      const piPrompt = buildPiConversationPrompt(history, prompt, {
+        maxChars: this.resolveConversationHistoryCharLimit(
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+          active.resourceState.chatMode,
+        ),
+      });
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'recreate',
+        ...summarizePiHistory(history),
+        promptChars: piPrompt.length,
+        restoreMs: Date.now() - historyLoadStartedAt,
+      });
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1519,13 +1556,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
         unattended: nextUnattended,
-        _piPromptOverride: buildPiConversationPrompt(history, prompt, {
-          maxChars: this.resolveConversationHistoryCharLimit(
-            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-            typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
-            active.resourceState.chatMode,
-          ),
-        }),
+        _piPromptOverride: piPrompt,
       });
     }
 
@@ -1539,7 +1570,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
     const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
     if (skillsChanged) {
+      const historyLoadStartedAt = Date.now();
       const history = this.store?.getSession(sessionId)?.messages ?? [];
+      const piPrompt = buildPiConversationPrompt(history, prompt, {
+        maxChars: this.resolveConversationHistoryCharLimit(
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+          active.resourceState.chatMode,
+        ),
+      });
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'skills-change',
+        ...summarizePiHistory(history),
+        promptChars: piPrompt.length,
+        restoreMs: Date.now() - historyLoadStartedAt,
+      });
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1549,13 +1594,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
         unattended: nextUnattended,
-        _piPromptOverride: buildPiConversationPrompt(history, prompt, {
-          maxChars: this.resolveConversationHistoryCharLimit(
-            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-            typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
-            active.resourceState.chatMode,
-          ),
-        }),
+        _piPromptOverride: piPrompt,
       });
     }
 
