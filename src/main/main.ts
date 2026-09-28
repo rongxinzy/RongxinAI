@@ -2821,6 +2821,26 @@ const ensureWindowsTaskbarBrand = (): void => {
 // 保存对主窗口的引用
 let mainWindow: BrowserWindow | null = null;
 
+let pendingMainWindowFocus = false;
+
+/**
+ * Bring the running window to the front. A request that arrives before the
+ * window exists is remembered and replayed once the window is shown, so a
+ * second launch never disappears without a trace.
+ */
+const focusMainWindow = (): void => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    pendingMainWindowFocus = true;
+    return;
+  }
+  pendingMainWindowFocus = false;
+  const target = mainWindow;
+  if (target.isMinimized()) target.restore();
+  if (!target.isVisible()) target.show();
+  target.moveTop();
+  target.focus();
+};
+
 let isQuitting = false;
 
 let lastReloadAt = 0;
@@ -3126,6 +3146,23 @@ if (!gotTheLock) {
       return;
     }
     console.warn('[Main] Another ZhiYuanAgent instance is already running; exiting.');
+    // A silent exit is indistinguishable from a launch that did nothing (e.g. the
+    // installer's "run after finish" losing the lock to a running instance), so
+    // tell the user why this process is going away.
+    try {
+      await app.whenReady();
+      await dialog.showMessageBox({
+        type: 'info',
+        buttons: [t('appInstanceRunningConfirm')],
+        defaultId: 0,
+        noLink: true,
+        title: t('appInstanceRunningTitle'),
+        message: t('appInstanceRunningMessage'),
+        detail: t('appInstanceRunningDetail'),
+      });
+    } catch {
+      // No display available (headless CI) or the dialog failed: exit quietly.
+    }
     app.exit(0);
   })();
 } else {
@@ -3196,11 +3233,7 @@ if (!gotTheLock) {
     }
 
     // Focus main window
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!mainWindow.isVisible()) mainWindow.show();
-      if (!mainWindow.isFocused()) mainWindow.focus();
-    }
+    focusMainWindow();
   });
 
   // IPC 处理程序
@@ -7299,6 +7332,8 @@ if (!gotTheLock) {
           applyWindowsWindowIcon(mainWindow);
         }
       }
+      // A second launch that arrived before the window existed still has to land.
+      if (pendingMainWindowFocus) focusMainWindow();
       // Initialize main-process i18n from stored language before creating UI elements.
       const initLang = getStore().get<{ language?: string }>('app_config')?.language;
       setLanguage(initLang === 'en' ? 'en' : 'zh');

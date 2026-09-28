@@ -35,6 +35,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     trayNewTask: '新建任务',
     traySettings: '设置',
     trayQuit: '退出',
+    appInstanceRunningTitle: '知远已在运行',
+    appInstanceRunningMessage: '已有知远实例在运行，本次启动已退出。',
+    appInstanceRunningDetail:
+      '如果屏幕上没有出现知远窗口，请先退出正在运行的知远。开发态实例（bun run electron:dev）与安装版共用同一份用户数据，也会占用它；可在任务管理器中结束残留的知远/electron 进程后重新启动。',
+    appInstanceRunningConfirm: '知道了',
 
     // Session titles (created by ChannelSessionSync)
     coworkDefaultSessionTitle: '新对话',
@@ -416,6 +421,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     trayNewTask: 'New Task',
     traySettings: 'Settings',
     trayQuit: 'Quit',
+    appInstanceRunningTitle: '知远 is already running',
+    appInstanceRunningMessage: 'Another 知远 instance is running, so this launch exited.',
+    appInstanceRunningDetail:
+      'If no 知远 window appeared, quit the running instance first. A development build (bun run electron:dev) shares the same user data and holds the lock too; end leftover 知远/electron processes in Task Manager, then start again.',
+    appInstanceRunningConfirm: 'OK',
 
     // Session titles
     coworkDefaultSessionTitle: 'New Chat',
