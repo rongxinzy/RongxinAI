@@ -12,10 +12,6 @@
           "preview": "./case-previews/pptx-work-report.webp"
         },
         {
-          "id": "pptx-content-research",
-          "preview": "./case-previews/pptx-content-research.webp"
-        },
-        {
           "id": "pptx-education",
           "preview": "./case-previews/pptx-education.webp"
         },
@@ -24,12 +20,24 @@
           "preview": "./case-previews/pptx-ai-intro.webp"
         },
         {
+          "id": "pptx-training",
+          "preview": "./case-previews/pptx-training.webp"
+        },
+        {
           "id": "pptx-product-plan",
           "preview": "./case-previews/pptx-product-plan.webp"
         },
         {
-          "id": "pptx-training",
-          "preview": "./case-previews/pptx-training.webp"
+          "id": "pptx-content-research",
+          "preview": "./case-previews/pptx-content-research.webp"
+        },
+        {
+          "id": "pptx-annual-review",
+          "preview": "./case-previews/pptx-annual-review.webp"
+        },
+        {
+          "id": "pptx-fundraising",
+          "preview": "./case-previews/pptx-fundraising.webp"
         }
       ]
     },
@@ -40,28 +48,36 @@
       "skillMapping": "xlsx",
       "prompts": [
         {
-          "id": "excel-summary",
-          "preview": "./case-previews/excel-summary.webp"
-        },
-        {
           "id": "image-to-excel",
           "preview": "./case-previews/image-to-excel.webp"
         },
         {
-          "id": "word-report",
-          "preview": "./case-previews/word-report.webp"
+          "id": "excel-summary",
+          "preview": "./case-previews/excel-summary.webp"
         },
         {
           "id": "multi-excel-merge",
           "preview": "./case-previews/multi-excel-merge.webp"
         },
         {
-          "id": "excel-reconcile",
-          "preview": "./case-previews/excel-reconcile.webp"
+          "id": "word-report",
+          "preview": "./case-previews/word-report.webp"
         },
         {
           "id": "excel-budget",
           "preview": "./case-previews/excel-budget.webp"
+        },
+        {
+          "id": "excel-reconcile",
+          "preview": "./case-previews/excel-reconcile.webp"
+        },
+        {
+          "id": "excel-pivot",
+          "preview": "./case-previews/excel-pivot.webp"
+        },
+        {
+          "id": "excel-anomaly",
+          "preview": "./case-previews/excel-anomaly.webp"
         }
       ]
     },
@@ -94,6 +110,14 @@
         {
           "id": "edu-mistake-review",
           "preview": "./case-previews/edu-mistake-review.webp"
+        },
+        {
+          "id": "edu-class-activity",
+          "preview": "./case-previews/edu-class-activity.webp"
+        },
+        {
+          "id": "edu-lab-report",
+          "preview": "./case-previews/edu-lab-report.webp"
         }
       ]
     },
@@ -134,10 +158,6 @@
         {
           "id": "web-game-2048",
           "preview": "./case-previews/web-game-2048.webp"
-        },
-        {
-          "id": "web-game-typing",
-          "preview": "./case-previews/web-game-typing.webp"
         }
       ]
     },
@@ -171,6 +191,14 @@
         {
           "id": "research-market-entry",
           "preview": "./case-previews/research-market-entry.webp"
+        },
+        {
+          "id": "research-supply-chain",
+          "preview": "./case-previews/research-supply-chain.webp"
+        },
+        {
+          "id": "research-talent",
+          "preview": "./case-previews/research-talent.webp"
         }
       ]
     },
@@ -186,24 +214,32 @@
           "preview": "./case-previews/academic-outline.webp"
         },
         {
-          "id": "academic-review",
-          "preview": "./case-previews/academic-review.webp"
-        },
-        {
-          "id": "academic-method",
-          "preview": "./case-previews/academic-method.webp"
-        },
-        {
           "id": "academic-polish",
           "preview": "./case-previews/academic-polish.webp"
+        },
+        {
+          "id": "academic-review",
+          "preview": "./case-previews/academic-review.webp"
         },
         {
           "id": "academic-data-analysis",
           "preview": "./case-previews/academic-data-analysis.webp"
         },
         {
+          "id": "academic-method",
+          "preview": "./case-previews/academic-method.webp"
+        },
+        {
+          "id": "academic-defense",
+          "preview": "./case-previews/academic-defense.webp"
+        },
+        {
           "id": "academic-grant",
           "preview": "./case-previews/academic-grant.webp"
+        },
+        {
+          "id": "academic-ethics",
+          "preview": "./case-previews/academic-ethics.webp"
         }
       ]
     },
@@ -236,6 +272,14 @@
         {
           "id": "docs-notice",
           "preview": "./case-previews/docs-notice.webp"
+        },
+        {
+          "id": "docs-sop",
+          "preview": "./case-previews/docs-sop.webp"
+        },
+        {
+          "id": "docs-api",
+          "preview": "./case-previews/docs-api.webp"
         }
       ]
     }

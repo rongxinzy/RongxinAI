@@ -32,7 +32,17 @@ const OUTPUT_WIDTH = 800;
 const OUTPUT_HEIGHT = 500;
 const WEBP_QUALITY = 0.8;
 
-const WINDOWS_BROWSER_PATHS = [
+const LOCAL_BROWSER_PATHS = [
+  // macOS
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  // Linux
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/usr/bin/microsoft-edge',
+  // Windows
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
@@ -40,7 +50,7 @@ const WINDOWS_BROWSER_PATHS = [
 ];
 
 async function launchBrowser() {
-  const attempts = [{}, ...WINDOWS_BROWSER_PATHS.map(executablePath => ({ executablePath }))];
+  const attempts = [{}, ...LOCAL_BROWSER_PATHS.map(executablePath => ({ executablePath }))];
   let lastError = null;
 
   for (const options of attempts) {
@@ -154,7 +164,13 @@ async function main() {
       // finish, otherwise the card captures half-animated numbers.
       await page.waitForTimeout(1500);
 
-      const png = await page.screenshot();
+      // Document cases stack one 1100x688 page per section, and the card shows the first page: clip
+      // to it instead of to whatever the viewport happens to cover. Web cases ship a live template
+      // with no page sections and keep the viewport capture.
+      const firstPage = page.locator('[data-page="1"]');
+      const png = (await firstPage.count())
+        ? await firstPage.first().screenshot()
+        : await page.screenshot();
       const webp = await encodeWebp(encoderContext, png);
       const buffer = Buffer.from(webp, 'base64');
 

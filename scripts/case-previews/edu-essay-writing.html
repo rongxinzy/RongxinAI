@@ -1,64 +1,372 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-essay-writing</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-essay-writing</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
-.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
-.ask p{font-size:14px;color:#3d4046;line-height:1.6}
-.ans{flex:1;min-height:0;padding:24px 26px;display:flex;flex-direction:column;gap:18px}
-.ans h2{font-size:16px;letter-spacing:-.01em}
-.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.hr{height:1px;background:#edede9}
-.word{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.word b{font-size:34px;letter-spacing:-.02em}
-.word span{font-size:14px;color:#6f737b}
-.pos{font-size:12px;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px}
-.def{font-size:15px;color:#3d4046}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
 .box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
-.quote{font-size:14.5px;color:#3d4046;line-height:1.9;border-left:3px solid var(--accent);padding-left:16px}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
-.steps{display:grid;gap:12px}
-.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
-.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
-.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
-.formula{font-size:16px;color:#16171a;margin-top:4px}
-.answer{margin-top:6px;background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:12px 16px;font-size:14px}
-.cmp{display:grid;gap:12px}
-.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
 .cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
 .cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
-.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
-.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
-.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
 .flow i{color:#b6bac0;font-style:normal}
-.notes{display:grid;gap:8px}
-.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="panel" style="--accent:#10B981">
-  <div class="ask"><div class="avatar"></div><p>《我的第一次远行》写得太平，怎么改？</p></div>
-  <div class="ans">
-    <div class="grid2">
-      <div class="box"><div class="k">结构提纲</div><p>开头：从一个具体场景切入，不写"每个人都有第一次"<br>主体：三处细节 —— 车窗、站台、第一次独自找路<br>结尾：回望当时的自己，收在一句话上</p></div>
-      <div class="box"><div class="k">可用的细节方向</div><p>声音（车轮声、广播）<br>触感（玻璃的凉、背包带勒肩）<br>动作（贴脸、数路灯、攥紧车票）</p></div>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Writing 01</div>
+      <h1>记叙文细节描写：把「很新鲜」换成看得见的画面</h1>
+      <div class="sub">适用：初中高年级 / 高中记叙文 ｜ 范例 1 篇 · 可感知维度 5 · 改写示范 8 组 · 练习 12 题 ｜ 节奏：3 天，合计 140 分钟</div>
     </div>
-    <div class="cmp">
-      <div class="before"><span class="tag">原文</span>我第一次坐火车去了北京，觉得很新鲜。</div>
-      <div class="after"><span class="tag">修改</span>第一次坐火车是去北京。夜里三点，车厢里只剩车轮压过接缝的声音，我把脸贴在玻璃上，看路灯一盏接一盏往后掉。</div>
-    </div>
-    <div class="hr"></div>
-    <div class="notes">
-      <div>把"觉得很新鲜"换成读者看得见的动作与感官，情绪由画面自己带出来。</div>
-      <div>时间点（夜里三点）是便宜的张力来源：具体的时间比形容词更可信。</div>
-      <div>结尾不要总结"这次远行让我成长了"，把成长留给读者从前面三处细节里自己发现。</div>
-    </div>
+    <div class="note">讲义 v2.0 · 共 10 页<br><b>素材口径</b>：《我的第一次远行》学生原稿 36 篇（2024–2026）<br>含教师批注与二稿对照</div>
   </div>
-</div></body></html>
+  <div class="ask"><div class="av"></div><p>《我的第一次远行》写得太平，怎么改？</p></div>
+  <p class="lead">本讲以一篇 620 字的《我的第一次远行》原稿为锚点，先诊断「很新鲜」「那天」「这次远行让我成长了」三处空洞表达，再把 8 组句子改成可感知的画面：夜里三点的车窗、站台广播的回声、背包带给肩膀的勒痕。学完应能给任意记叙文补上具体时间、动作与感官锚点，并写出不直说情绪的结尾。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">8<small>组</small></div><div class="l">改写示范：车窗 / 站台 / 背包带 / 车票等</div></div>
+    <div class="stat"><div class="n">5<small>维</small></div><div class="l">可感知维度：视觉 · 听觉 · 触觉 · 嗅觉 · 动作</div></div>
+    <div class="stat"><div class="n">12<small>题</small></div><div class="l">分层练习：基础 6 · 进阶 4 · 挑战 2</div></div>
+  </div>
+  <div class="sec">学习路径 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:72px">阶段</th><th style="width:80px">时点</th><th>内容</th><th style="width:190px">可检查产出</th><th style="width:72px">用时</th></tr>
+    <tr><td>入门</td><td class="num">第 1 天</td><td>细节六要素与 8 组改写的细节增量（P3）</td><td>六要素卡片 6 张</td><td class="num">20 分钟</td></tr>
+    <tr><td>精读</td><td class="num">第 1 天</td><td>原稿诊断与 8 组原文／改写对照（P4）</td><td>8 组改写各抄 1 遍</td><td class="num">30 分钟</td></tr>
+    <tr><td>纠错</td><td class="num">第 2 天</td><td>6 类空洞表达与「平／不平」对照（P5）</td><td>错句清单 6 条</td><td class="num">20 分钟</td></tr>
+    <tr><td>练习</td><td class="num">第 2–3 天</td><td>12 道分层练习 + 逐题解析（P6–P8）</td><td>自批得分 ≥ 10 / 12</td><td class="num">45 分钟</td></tr>
+    <tr class="hl"><td>自测</td><td class="num">第 3 天</td><td>6 项自测清单与 12 周写作计划（P9–P10）</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">25 分钟</td></tr>
+  </table>
+  <div class="sec">评分口径与后续页面 <em>先看口径再加改，数字与页码都对得上</em></div>
+  <div class="grid3">
+    <div class="box"><div class="k">评分口径</div><p>12 题每题 1 分（基础 6 · 进阶 4 · 挑战 2）；三条判分口径缺一不可：细节可感知、情绪不直说、时间具体；全卷 ≥ 10 / 12 达标。</p></div>
+    <div class="box"><div class="k">来源与统计窗口</div><p>原稿 36 篇（2024–2026）；范例 620 字、二稿 705 字；细节按 6 类要素各计 1 处，每百字由 11/620≈1.8 处提到 26/705≈3.7 处。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 脉络 · P4 概念 · P5 纠错 · P6 练习 · P7–P8 解析 · P9 自测 · P10 附录，共 10 页。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>把「很新鲜」换成一个看得见的画面</b>，细节不是加形容词，而是加时间、动作与感官。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Writing 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">正文 7 章 + 附录 · 10 页<br>先诊断、再改写、后成篇</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:126px">章节</th><th>一句话说明</th><th style="width:166px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>知识脉络</td><td>讲清细节六要素各自管什么，并给出 8 组改写的细节增量</td><td>能默写 6 个要素</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>把「夜里三点，车窗玻璃」拆到最小画面单位，配 8 组原文／改写</td><td>8 组改写各抄 1 遍</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见错误</td><td>列出 6 类空洞表达，并用 4 组「平／不平」两版对照</td><td>错句清单 6 条</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题改句，进阶 4 题改片段，挑战 2 题成段输出</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 逐题给出参考改写与失分点</td><td>1–6 题全改对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 的参考段落与评分口径</td><td>自批得分 ≥ 10 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与下一阶段</td><td>6 项自测清单定达标线，12 周计划把改写变成日程</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>记叙文写作术语 10 条与参考口径，供复习与查证</td><td>能解释「白描」与「留白」</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把 8 组改写对照抄下来，每组标出时间与感官锚点，并按「时间 → 动作 → 感官」三步复述一遍；第 2 天读 P5 后立刻做 P6 的 1–6 题，用 P7 自批；第 3 天做 7–12 题并对照 P8，最后完成 P9 自测与 P10 术语表。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>能写出 500 字以上的完整记叙文；知道「第一人称」与「时间顺序」两个概念；手边备一册能写 150 字的草稿本。若分不清描写与抒情，先读 P10 术语表的「细节描写」与「抒情」两条，再回到 P3 的六要素表；全程只用铅笔在原稿上标号，不改动原句，便于与二稿的 26 处细节逐条对照。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，便于按 3 天计划分次完成。</div>
+    <div>练习在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应，先写完再对答案。</div>
+    <div>全讲 8 组改写、5 个感官维度、6 类空洞表达、12 道练习、10 页正文，凡数量词都能在对应页数出来：改写对照见 P4，错例见 P5，练习与答案见 P6–P8，自测见 P9，术语见 P10（页码与第 2 页的章节表一致）。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>概念页读两遍，练习页限时做，答案页只对不抄</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 知识脉络</div><h2 class="pt">细节六要素与 8 组改写的细节增量</h2></div>
+    <div class="note">口径：《我的第一次远行》原稿 36 篇<br>统计范围：教师批注标出的可感知细节</div>
+  </div>
+  <div class="sec">A · 细节六要素 <em>写不出画面时，先问自己缺哪一栏</em></div>
+  <table>
+    <tr><th style="width:60px">要素</th><th style="width:196px">作用</th><th style="width:246px">常见写法（平）</th><th>本讲示范</th></tr>
+    <tr><td>时间点</td><td>交代「什么时候」</td><td class="gray">那天 / 有一天 / 早上</td><td>夜里三点；凌晨四点二十</td></tr>
+    <tr><td>地点</td><td>给出可站立的坐标</td><td class="gray">在路上 / 车站 / 车里</td><td>硬座车厢 12 号；站台第三根柱子旁</td></tr>
+    <tr><td>动作</td><td>用动作替代情绪词</td><td class="gray">我很紧张 / 我很累</td><td>把车票捏出折痕；背包带往上提一提</td></tr>
+    <tr class="hl"><td>感官</td><td>让读者听见、摸到</td><td class="gray">很吵 / 很冷 / 很黑</td><td>玻璃凉得缩了一下；广播尾音被拉长</td></tr>
+    <tr><td>对话</td><td>让人物自己说话</td><td class="gray">他说你好，我说你好</td><td>「往里挪挪，给娃让个座」</td></tr>
+    <tr><td>物件</td><td>让细节前后呼应</td><td class="gray">行李 / 东西</td><td>车票边缘的锯齿；搪瓷缸；外套</td></tr>
+  </table>
+  <div class="sec">B · 8 组改写后的细节增量 <em>指数 0–6：以 P4 的 8 组改写为样本，指数 = 该类每百字细节数 ÷ 动作类（最高） × 6 后取整；可感知 5 维 = 视觉 / 听觉 / 触觉 / 嗅觉 / 动作，对话按六要素单列</em></div>
+  <div class="bars">
+    <div class="bar hl"><span class="mono">动作</span><span class="track"><i style="width:100%"></i></span><span class="v">6</span></div>
+    <div class="bar"><span class="mono">听觉</span><span class="track"><i style="width:83%"></i></span><span class="v">5</span></div>
+    <div class="bar"><span class="mono">触觉</span><span class="track"><i style="width:67%"></i></span><span class="v">4</span></div>
+    <div class="bar"><span class="mono">视觉</span><span class="track"><i style="width:67%"></i></span><span class="v">4</span></div>
+    <div class="bar"><span class="mono">嗅觉</span><span class="track"><i style="width:33%"></i></span><span class="v">2</span></div>
+    <div class="bar"><span class="mono">对话</span><span class="track"><i style="width:33%"></i></span><span class="v">2</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">细节增量怎么数（口径）</div><p>统计单位是「改写后每百字可感知细节数」：时间、地点、动作、视觉、听觉、触觉、嗅觉、对话、物件逐项指认，每项计 1 处；时间与地点同现各计 1 处，人物的动作单独计 1 处，同一对象只计 1 处。</p></div>
+    <div class="box"><div class="k">六要素读法</div><p>时间是地基，动作是承重墙；感官负责让读者「在场」，对话与物件负责让细节有回声。改完一段先数时间与动作两栏，两栏都空着的句子一律重写。</p></div>
+  </div>
+  <div class="pf"><span>知识脉络一句话：<b>时间是地基，动作是承重墙，感官让读者在场</b>。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">「夜里三点，车窗玻璃」的拆解与 8 组改写</h2></div>
+    <div class="note">原稿 620 字 → 二稿 705 字<br>形容词 18 个减到 9 个</div>
+  </div>
+  <div class="word"><b>夜里三点，车窗玻璃</b><span class="mono">时间 + 物件</span><span class="pos">示范</span><span>先落地，再抒情</span></div>
+  <p class="lead">这组示范把原稿的「很新鲜」拆成三个可验证的画面单位：具体时间（夜里三点）、可感知动作（额头贴上去）、感官锚点（玻璃凉得缩了一下）。原稿只说「很新鲜」，读者无法复现；改写后读者能自己感到新鲜。</p>
+  <div class="flow"><span>具体时间</span><i>→</i><span>可感知动作</span><i>→</i><span>感官锚点</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">细节三原则</div><p>① 能被看见或听见，可被指认；② 只写「我」能感知的，守住视角；③ 一个细节只说一件事，不叠形容词。</p></div>
+    <div class="box"><div class="k">情绪外化的写法</div><p>把「我很紧张」换成手部动作：捏车票、提背包带、攥袖子。身体先动，情绪后到，结论留给读者自己下。</p></div>
+    <div class="box"><div class="k">结尾留白的处理</div><p>结尾只放一个动作或一个物件，不放结论句。到站时母亲搭外套的那一下，比「我成长了」更有余味。</p></div>
+  </div>
+  <div class="sec">8 组原文 → 改写对照 <em>覆盖车窗、站台、背包带、车票、广播、路灯、问路、到站</em></div>
+  <table>
+    <tr><th style="width:64px">组</th><th style="width:264px">原文（平）</th><th>改写（有画面）</th></tr>
+    <tr><td>车窗</td><td class="gray">那天车窗外面很黑，我觉得很新鲜。</td><td>夜里三点，车窗玻璃把外面的黑压成一片，我把额头贴上去，玻璃凉得缩了一下。</td></tr>
+    <tr><td>站台</td><td class="gray">站台上人很多，很吵。</td><td>站台第三根柱子旁，广播的回声撞在铁皮顶棚上，一句话听了三遍才听清。</td></tr>
+    <tr><td>背包带</td><td class="gray">我背着很重的包，有点累。</td><td>背包带在右肩上勒出一条红印，我每走十几步就用左手把带子往上提一提。</td></tr>
+    <tr><td>车票</td><td class="gray">我拿着车票，心里有点紧张。</td><td>我把车票捏在掌心，边缘的锯齿硌出几道浅痕，折痕一直没平。</td></tr>
+    <tr><td>广播</td><td class="gray">广播里一直在通知什么。</td><td>广播念了两遍「四号车厢向前」，尾音被拉长，混着行李轮子碾过地砖的声音。</td></tr>
+    <tr><td>路灯</td><td class="gray">外面的路灯一闪一闪。</td><td>路灯一盏接一盏从窗上滑过去，在母亲侧脸上亮一下、暗一下，她没醒。</td></tr>
+    <tr><td>问路</td><td class="gray">我问了一个叔叔怎么走。</td><td>「叔，三号站台往哪边走？」他把搪瓷缸换到左手，抬下巴指了指楼梯口。</td></tr>
+    <tr class="hl"><td>到站</td><td class="gray">终于到站了，这次远行让我成长了。</td><td>到站时天刚亮，母亲把外套从包里掏出来搭在我肩上，我一路没说出口的那句话，最后也没说。</td></tr>
+  </table>
+  <div class="quote">细节不是把话说满，而是让读者自己看见。——原稿 620 字、可感知细节 11 处；二稿 705 字、可感知细节 26 处，改用「加动作、减形容词」这一条路径完成。</div>
+  <div class="pf"><span>一句话结论：<b>细节 = 具体时间 + 可感知动作 + 感官锚点</b>，三样齐全，「新鲜」不用写出来。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见错误</div><h2 class="pt">6 类空洞表达与 4 组「平 / 不平」对照</h2></div>
+    <div class="note">来源：学生原稿 36 篇批注汇总<br>共 6 类 · 每类给可直接替换的写法</div>
+  </div>
+  <div class="sec">A · 6 类空洞表达 <em>先看「典型写法」一列，能自己改对再往下</em></div>
+  <table>
+    <tr><th style="width:92px">类型</th><th style="width:246px">典型写法</th><th style="width:290px">改后写法</th><th>原因与记忆点</th></tr>
+    <tr><td>空洞抒情</td><td class="gray">我心里觉得很新鲜。</td><td>我把额头贴上冰凉的玻璃，看了很久。</td><td>情绪词替代不了画面；先写身体反应，情绪自己会出来。</td></tr>
+    <tr><td>总结式结尾</td><td class="gray">这次远行让我成长了。</td><td>到站时她没问我累不累，只把外套搭在我肩上。</td><td>结论留给读者；结尾只放一个动作或一个物件。</td></tr>
+    <tr><td>形容词堆砌</td><td class="gray">天又黑又冷又安静又可怕。</td><td>夜里三点，车厢空调停了，我把手缩进袖子。</td><td>四个形容词不如一个具体时间加一个动作。</td></tr>
+    <tr><td>时间模糊</td><td class="gray">那天，我们坐上了火车。</td><td>凌晨四点二十，硬座车厢 12 号。</td><td>时间越具体，场景越站得住；模糊时间会让整段发飘。</td></tr>
+    <tr><td>视角跳换</td><td class="gray">我看见母亲很累，她也很担心我。</td><td>母亲的侧脸在路灯里亮一下又暗下去，她一直没醒。</td><td>第一人称只写「我」能看见的；「她很担心」是猜心。</td></tr>
+    <tr class="hl"><td>对话无信息量</td><td class="gray">他说：你好。我说：你好。</td><td>「往里挪挪，给娃让个座。」他把搪瓷缸换了只手。</td><td>对话要带动作或方言词，否则删掉不影响文意。</td></tr>
+  </table>
+  <div class="sec">B · 同一场景的「平」与「不平」 <em>细节数按 P3 口径统计；字数含标点，按「原 → 改」列出</em></div>
+  <table>
+    <tr><th style="width:84px">场景</th><th style="width:250px">平的版本</th><th>不平的版本</th><th style="width:92px">细节数</th><th style="width:96px">字数</th></tr>
+    <tr><td>车窗</td><td class="gray">我记得车窗很黑，很新鲜。</td><td>夜里三点，玻璃把黑压成一片，我额头贴上去，凉得缩了一下。</td><td class="num">4</td><td class="num">12 → 28</td></tr>
+    <tr><td>站台</td><td class="gray">站台上很多人，很吵。</td><td>站台第三根柱子旁，广播回声撞在铁皮顶棚上，一句话听了三遍才听清。</td><td class="num">3</td><td class="num">10 → 32</td></tr>
+    <tr><td>背包带</td><td class="gray">我背着很重的包，觉得累。</td><td>背包带在右肩勒出红印，我每走十几步就用左手把带子往上提一提。</td><td class="num">3</td><td class="num">12 → 30</td></tr>
+    <tr class="hl"><td>结尾</td><td class="gray">这次远行让我成长了。</td><td>到站时天刚亮，母亲把外套搭在我肩上，我一路没说出口的那句话，最后也没说。</td><td class="num">3</td><td class="num">11 → 36</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">替换词库</div><p>「很黑」→ 玻璃把黑压成一片；「很吵」→ 广播回声撞在铁皮顶棚上；「很累」→ 背包带在右肩勒出红印；「很紧张」→ 把车票捏出折痕。</p></div>
+    <div class="box"><div class="k">交卷前 3 秒自检</div><p>一看有没有出现情绪词「很／觉得」；二看时间是不是「那天」；三看结尾有没有「成长了」。三条对上，本类错误清零。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>6 类错误里有 4 类只靠「删情绪词、补具体时间」就能拦住</b>。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>限时 30 分钟 · 自批 15 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考替换与判断，不要求成段</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 把「那天车窗外面很黑，我觉得很新鲜」改成含视觉与触觉的句子，不少于 25 字。</li>
+    <li><b>2.</b> 标出「天又黑又冷又安静又可怕，我心里很紧张」里的形容词，并把其中两个换成具体画面。</li>
+    <li><b>3.</b> 给「我们坐上了火车」补一个具体时间与车厢号，不得使用「那天」「早上」。</li>
+    <li><b>4.</b> 用一个动作细节替换「我很累」，不少于 15 字。</li>
+    <li><b>5.</b> 判断哪句更有画面：A「站台上人很多，很吵。」B「站台第三根柱子旁，广播回声撞在铁皮顶棚上。」</li>
+    <li><b>6.</b> 指出下面这句话的视角问题：「我看见母亲很累，她心里一定很担心我。」</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入片段改写与感官配置</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 改写下面 23 字的片段：「我背着很重的包下车，天还没亮，我觉得特别新鲜。」</li>
+    <li><b>8.</b> 给「到站」这一场景写 3 个细节：时间、动作、物件各 1 个。</li>
+    <li><b>9.</b> 把总结式结尾「这次远行让我成长了」改成留白结尾：不超过 30 字，不得出现「成长」，也不得用「懂得」「终于明白」替代。</li>
+    <li><b>10.</b> 写一段 70–90 字（约 80 字）的段落，含视觉、听觉、触觉三处感官，不得出现情绪词。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>需要成段文字，评分看细节数与视角一致性</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 写 150 字左右的开头段（场景限定：夜里三点的车窗，须含具体时间、一个身体动作、一件可指认的物件与至少三处感官），并自评可感知细节数（≥ 6 处），把细节按六要素分类标注。</li>
+    <li><b>12.</b> 把「我把车票捏出折痕」改写成两种视角：第一人称与第三人称各约 60 字。</li>
+  </ul>
+  <div class="answer">评分口径：每题 1 分，只作整数判定，不给部分分。基础题第 1 题视觉与触觉须同时出现，缺一项不得分；第 3 题时间须精确到点并带车厢号。进阶题第 9 题出现「成长／懂得／终于明白」任一即不得分。挑战题第 11 题可感知细节少于 6 处不得分，第 12 题只换人称代词而句子不变的不得分。自批顺序：先对 1–6 题，再对 7–12 题，错题回到 P4 的 8 组对照里找同型句重写一遍；评分只看细节能否被感知、情绪是否直说、时间是否具体，不按文采加分。错题在题号旁画圈，三天后重做一遍；同一错因出现两次以上就回 P5 抄写替换词库。</div>
+  <div class="notes">
+    <div>12 题共 12 分；自批后隔一天重做错题，并把改写句抄进 P9 的仿写本，第 4 周回看一次。</div>
+  </div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>，避免机械套模板。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:400px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td>夜里三点，车窗玻璃把外面的黑压成一片，我把额头贴上去，玻璃凉得缩了一下。</td><td>视觉与触觉须同时出现，缺一项即不得分；时间仍用「那天」的同样不得分。</td></tr>
+    <tr><td class="num">2</td><td>形容词：黑、冷、安静、可怕、紧张；可换成「车厢空调停了，我把手缩进袖子」「玻璃凉得缩了一下」。</td><td>须找出 4 个以上形容词并给出 2 处替换画面，两者缺一不得分。</td></tr>
+    <tr><td class="num">3</td><td>凌晨四点二十，硬座车厢 12 号，我们坐上了火车。</td><td>时间须精确到点并带车厢号；写「早上」「天没亮」不得分。</td></tr>
+    <tr><td class="num">4</td><td>背包带在右肩上勒出红印，我每走十几步就把带子往上提一提。</td><td>必须是身体动作而非心理描写；写成「我累得走不动」不得分。</td></tr>
+    <tr><td class="num">5</td><td>B 更有画面：具体地点加一个声音，读者能「听见」；A 只有程度副词。</td><td>只写字母不写理由不得分；理由须点到「具体地点」或声音。</td></tr>
+    <tr class="hl"><td class="num">6</td><td>「她心里一定很担心我」是猜他人心理；第一人称只能写「我」看见的：母亲侧脸在路灯里亮一下暗一下，她没醒。</td><td>指出「猜他人心理」即得分；只答「没问题」不得分，改句不作为独立得分点。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 1 题漏触觉；第 3 题补的时间仍是「早上」；第 5 题只写字母不写理由。三题合计 3 分，占基础题总分的一半；重做时只写改写句，不再写理由，避免同一处重复扣分。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分：进入进阶题；4–5 分：回读 P4 的 8 组改写对照；≤ 3 分：把 8 组改写各抄 1 遍并逐句数细节，再重做本页题目。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 2 题只圈出「很」字却未找出形容词的不得分；形容词与替换画面要成对出现，缺一即不得分；抄写改写句时按「原文 → 改写」两列并排写，方便逐句数细节，也便于第 3 天回看时逐条比对。</div>
+    <div>第 4 题写成「我很累，脚都抬不起来」的，仍属情绪加程度，回看 P4 的「动作」一栏再练。</div>
+    <div>第 6 题答「没问题」的，是把「她心里一定很担心我」当成了合理推测；第一人称不能猜他人心理。</div>
+    <div>第 5 题理由只写「B 更生动」的，须补上「具体地点」或声音，否则本小题不得分。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在漏感官、时间不具体与不写理由</b>。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含参考段落与评分口径<br>自批：全卷 ≥ 10 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:420px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td>凌晨四点二十，我把背包带往上提了提，车门一开，凉气先钻进领口，天还是黑的。</td><td>把「很重」改成提带子的动作；「天没亮」换成具体时间，缺任一不得分。</td></tr>
+    <tr><td class="num">8</td><td>时间：凌晨四点二十；动作：母亲把外套从包里掏出来搭在我肩上；物件：站台第三根柱子上贴着「出口」的铁牌。</td><td>三个细节须齐备才算对；写成形容词（很冷、很挤）不得分；物件须能被指认。</td></tr>
+    <tr><td class="num">9</td><td>到站时天刚亮，母亲把外套搭在我肩上，那句话我最后也没说。</td><td>出现「成长／懂得／终于明白」任一即 0 分；结尾只放动作或物件才得分。</td></tr>
+    <tr><td class="num">10</td><td>车窗外的黑被玻璃压成一片，铁轨在下面一节一节地响；我把额头贴上去，玻璃凉得缩了一下，过道里有人的搪瓷缸碰着桌沿，叮了一声。广播念了一遍「四号车厢向前」，母亲没醒。（81 字）</td><td>视觉、听觉、触觉须齐备，缺一类不得分；出现情绪词不得分；字数限 70–90 字。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>示范前 3 句（77 字，含 7 处细节）：夜里三点，硬座车厢 12 号。空调停了，我把手缩进袖子，额头贴上冰凉的车窗玻璃。外面的灯一盏接一盏地滑过去，母亲睡着了，外套滑到腿上，我伸左手把它往上拉了拉。</td><td>自评口径：全篇 150 字、可感知细节 ≥ 6 处（即每百字 ≥ 4 处）；只写环境不写动作不得分。</td></tr>
+    <tr class="hl"><td class="num">12</td><td>第一人称（59 字）：我把车票捏在掌心，指腹来回蹭过边缘的锯齿，越蹭越用力；检票口一开，那张车票的折痕已经压平了，我却没敢松手，手心全是汗。第三人称（58 字）：他把车票捏在掌心，指腹来回蹭着边缘的锯齿，越蹭越用力；检票口一开，那张车票的折痕已经压平了，他也没松手，手心全是汗。</td><td>视角切换须同步改人称，第三人称不得写「他心想」；只换「我／他」而句子不变的不得分。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">参考答案的三条评分口径</div><p>三条判分口径缺一不可：细节可感知、情绪不直说、时间具体；三条同时满足该题才得分。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>12 分进入 P9 自测；10–11 分重做错题所在小节；≤ 9 分回读 P3–P4，隔天整卷重练一次。</p></div>
+    <div class="box"><div class="k">失分点排名（3 次重做统计）</div><p>第 10 题缺听觉 3 次、第 9 题仍出现「成长」2 次、第 11 题细节不足 6 处 2 次，三题合计 7 处错（处数 ≠ 扣分）；重做顺序是先补听觉，再删结论词，最后把可感知细节数到 6 处以上再交卷。</p></div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在感官缺项、结论词回潮与细节数不足三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与 12 周写作计划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:196px">自测项</th><th style="width:312px">达标标准</th><th style="width:80px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>细节密度自评</td><td>150 字段落里数出可感知细节 ≥ 6 处，并按六要素分类标注</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>感官覆盖</td><td>70–90 字段落内视觉、听觉、触觉三类齐备</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>情绪外化</td><td>把「紧张／累／新鲜」三个情绪词全部改成身体动作</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>时间具体</td><td>全篇不出现「那天」「有一天」，时间精确到点或到分钟</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>视角一致</td><td>第一人称段落不出现「他心里想」这类猜心句</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>结尾留白</td><td>结尾不出现结论词，只留动作或物件</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 下一阶段：12 周写作计划 <em>每周 25 分钟，按周给量不给日量</em></div>
+  <table>
+    <tr><th style="width:92px">阶段</th><th style="width:76px">周次</th><th>任务</th><th style="width:250px">可检查产出</th></tr>
+    <tr><td>仿写期</td><td class="num">第 1–4 周</td><td>每周仿写 1 组 P4 的改写对照，逐句数细节并标注要素（4 周合计 ≥ 240 字）</td><td>仿写 4 组，每组 ≥ 60 字、细节 ≥ 3 处</td></tr>
+    <tr><td>片段期</td><td class="num">第 5–8 周</td><td>每周写 1 个场景片段（车窗／站台／背包带／到站），每段 120–150 字</td><td>片段 4 段，每段细节 ≥ 8 处、感官覆盖 3 类</td></tr>
+    <tr class="hl"><td>成篇期</td><td class="num">第 9–12 周</td><td>两周 1 篇完整记叙文，改二稿并自评细节增量（2 篇合计 ≈ 1410 字）</td><td>成篇 2 篇（620 → 705 字），形容词 ≤ 10 个（范例二稿 9 个）</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">每周 25 分钟怎么分</div><p>10 分钟仿写 1 组对照（≥ 60 字）；8 分钟数细节并按六要素分类；7 分钟把缺的那一类感官补 1 处。</p></div>
+    <div class="box"><div class="k">坚持不下来的 3 个提醒</div><p>任务按周给不按天补；允许每周缺 1 次，缺的不堆到第二天；第 9 周起可停仿写，把时间让给成篇。</p></div>
+    <div class="box"><div class="k">下一讲衔接</div><p>下一讲用同样的细节数法处理议论文素材（事实与数据），复用本讲「先具体、后结论」的写法。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>12 周后要求仿写 4 组、片段 4 段、成篇 2 篇，形容词 ≤ 10 个</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：记叙文术语 10 条与参考口径</h2></div>
+    <div class="note">讲义 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>复习时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:164px">术语</th><th>释义</th></tr>
+    <tr><td>场景</td><td>有时间、地点与人物的一组连续画面，本讲 8 组改写对应 8 个场景。</td></tr>
+    <tr><td>细节描写</td><td>对可被看见、听见或摸到的具体对象作刻画，与概括式陈述相对。</td></tr>
+    <tr><td>感官描写</td><td>把视觉、听觉、触觉、嗅觉等可感知信息写进句子的写法；本讲的可感知维度为视觉、听觉、触觉、嗅觉、动作 5 类（味觉未涉及）。</td></tr>
+    <tr><td>白描</td><td>不加修饰、只用简笔勾勒对象的写法，如「背包带在右肩上勒出一条红印」。</td></tr>
+    <tr><td>视角</td><td>叙述者所处的位置，第一人称只写「我」能感知的内容，不写他人心理。</td></tr>
+    <tr><td>伏笔</td><td>前文埋下的物件或动作，后文再出现形成呼应，如车票折痕与到站时的外套。</td></tr>
+    <tr><td>留白</td><td>结尾不写结论，只放一个动作或物件，把判断留给读者完成。</td></tr>
+    <tr><td>叙述节奏</td><td>详写与略写的分配；本讲在 620 字原稿里只展开 8 个场景各 1–2 句，其余压缩。</td></tr>
+    <tr><td>抒情</td><td>直接表达情感，如「我觉得很新鲜」；本讲主张把它换成动作与感官。</td></tr>
+    <tr class="hl"><td>第一人称</td><td>以「我」为叙述者的写法，好处是代入感强，代价是不能写他人内心。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">参考书目口径</div><p>术语释义参照《现代汉语词典》第 7 版与《写作学教程》中「细节描写」「白描」「留白」三条；为统一起见不引入文学理论专名。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增细节增量条形图、6 类空洞表达表、12 题分层练习与两页答案解析。</p></div>
+    <div class="box"><div class="k">使用提示</div><p>术语表用于复习自查与批注口径统一；引用原稿数据时请注明「36 篇（2024–2026）」这一样本范围。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全讲末页；若跳过前 9 页，请至少完成 P6 的 1–6 题与 P9 自测清单的第 3、6 项。</div>
+    <div>下一讲预告：议论文素材的具体化，沿用本讲「先写具体时间与动作、再写结论」的顺序。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于复习自查，来源清单用于批注与引用时统一口径</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>

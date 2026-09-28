@@ -1,58 +1,391 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-method</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-method</title><style>
+*{box-sizing:border-box;margin:0}
+body{width:1100px;background:#f2f2ef;padding:30px;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 46px;display:flex;flex-direction:column}
+.mono{font-variant-numeric:tabular-nums}
 .serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:32px;background:#eceae4}
-.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
-.ptitle{font-size:23px;text-align:center;line-height:1.4}
-.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
-.abstract{margin-top:18px;border:1px solid #eeede7;background:#faf9f6;padding:14px 18px}
-.abstract h4{font-size:11px;letter-spacing:.2em;color:#8b8f97}
-.abstract p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-.keywords{margin-top:10px;font-size:11.5px;color:#8b8f97}
-.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:12px}
-.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
-.sec b{font-weight:600}
-.lv2{padding-left:22px}
-.lv3{padding-left:44px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
-th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
-.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.kicker.a{color:var(--accent)}
+h4{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 9px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.05em;font-weight:500}
+tr.total td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+ul{list-style:none;display:grid;gap:5px}
+li{position:relative;padding-left:13px;font-size:12.5px;line-height:1.75;color:#4c5058}
+li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;background:var(--accent)}
+.phead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #e4e4e0;padding-bottom:8px}
+.pn{font-size:11px;color:#8b8f97}
+h2{font-size:23px;letter-spacing:-.02em;font-weight:600;margin-top:8px}
+.body{flex:1;min-height:0;margin-top:11px;display:grid;gap:10px;align-content:start}
+.pfoot{margin-top:auto;padding-top:8px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.kpi{border:1px solid #edede9;background:#faf9f6;padding:9px 11px}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent);font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:4px;font-size:11px;color:#8b8f97}
+.bar{height:8px;background:#f0efeb;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.72}
+.block{border:1px solid #edede9;background:#faf9f6;padding:10px 13px}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#3d4046}
+.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:6px 10px}
 .flow i{color:#b8b5ab;font-style:normal}
-.redline{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.redline .col h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.redline .col p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-del{color:#b3564a;text-decoration:line-through}
-ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px}
-.reasons{margin-top:12px;display:grid;gap:7px}
-.reasons div{font-size:12px;color:#4c5058;padding-left:14px;position:relative}
-.reasons div::before{content:"·";position:absolute;left:2px;color:#b8b5ab}
-.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.formula{border:1px solid #edede9;background:#faf9f6;padding:10px 13px;font-size:12.5px;color:#16171a;line-height:1.9}
+.refs{display:grid;gap:4px;font-size:11.5px;color:#4c5058;line-height:1.65}
+.refs div{padding-left:24px;text-indent:-24px}
+.refs em{font-style:normal;color:var(--accent);font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="page" style="--accent:#7C3AED">
-  <div class="ptitle serif">研究方法与实验方案</div>
-  <div class="authors">准实验设计 · 两组对照 · 周期 12 周</div>
-  <div class="sections">
-    <div class="flow"><span>研究对象</span><i>→</i><span>分组</span><i>→</i><span>流程干预</span><i>→</i><span>指标采集</span><i>→</i><span>结果分析</span></div>
-    <table>
-      <tr><th>变量</th><th>类型</th><th>测量方式</th><th>预期方向</th></tr>
-      <tr><td>任务完成时长</td><td>连续</td><td>系统日志中位数</td><td>下降</td></tr>
-      <tr><td>返工率</td><td>连续</td><td>被驳回任务占比</td><td>下降</td></tr>
-      <tr><td>流程依从度</td><td>类别</td><td>审批节点覆盖率</td><td>上升</td></tr>
-      <tr><td>主观负荷</td><td>量表</td><td>每周自评（1-7）</td><td>持平或下降</td></tr>
-      <tr><td>异常处理占比</td><td>连续</td><td>人工介入次数 / 任务数</td><td>下降</td></tr>
-      <tr><td>采用意愿</td><td>量表</td><td>期末问卷（1-7）</td><td>上升</td></tr>
-    </table>
-    <div class="redline">
-      <div class="col"><h4>样本设计</h4><p>选取 2 个规模相近的 20 人团队，A 组启用流程干预，B 组保持原有方式，周期 12 周，每两周采集一次。</p></div>
-      <div class="col"><h4>分析方法</h4><p>组间比较用双重差分，控制团队既往任务量差异；对主观量表做信度检验后取组内均值。</p></div>
-    </div>
-    <div class="reasons"><div>局限：样本量偏小，结论只适用于流程高度相似的团队。</div></div>
+
+<section class="page" data-page="1" style="--accent:#7C3AED">
+  <div style="text-align:center;margin-top:4px">
+    <div class="kicker a">METHOD · 研究方法与实验方案</div>
+    <h1 class="serif" style="font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.35;margin-top:11px">流程干预对落地成效的影响：一项 12 周准实验研究方案</h1>
+    <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">设计类型：两组前后测准实验　|　对象：2 组 × 20 人　|　周期：12 周　|　预注册编号 MR-2026-118</div>
   </div>
-  <div class="foot"><span>伦理审查：已通过</span><span>预注册编号 MR-2026-118</span></div>
-</div></body></html>
+  <div class="block" style="margin-top:13px">
+    <div class="kicker">摘要 / ABSTRACT</div>
+    <p style="margin-top:7px">本方案设计一项 12 周两组准实验，检验任务边界清晰度与审批回溯覆盖度对任务完成时长、返工率与流程依从度的影响。A 组按周递增回溯覆盖度（25% 至 100%），B 组维持基线方式，两组各 20 人。主分析采用双重差分，辅以中位数回归与分段趋势检验，并设置安慰剂检验排除共同趋势。</p>
+  </div>
+  <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">关键词：准实验设计 · 双重差分 · 操作化定义 · 功效分析 · 数据保护</div>
+  <div class="grid3" style="margin-top:11px">
+    <div class="kpi"><b>40</b><span>受试者（2 × 20 人）</span></div>
+    <div class="kpi"><b>12</b><span>干预周期（周）</span></div>
+    <div class="kpi"><b>6</b><span>观测指标（个）</span></div>
+  </div>
+  <div style="margin-top:11px">
+    <h4>假设与检验方法</h4>
+    <table style="margin-top:6px">
+      <tr><th style="width:56px">编号</th><th>假设内容</th><th style="width:176px">检验方法</th><th style="width:198px">判定标准</th></tr>
+      <tr><td class="mono">H1</td><td>边界清晰度每提高 1 档，完成时长中位数下降 8% 以上</td><td>双重差分 + 中位数回归</td><td>系数 &lt; 0、p &lt; 0.05 且中位数降幅 ≥ 8%</td></tr>
+      <tr><td class="mono">H2</td><td>回溯覆盖度与人工介入次数呈倒 U 型，拐点约在 60%</td><td>二次项回归 + 拐点估计</td><td>二次项系数小于 0 且拐点落在 50% — 70%</td></tr>
+      <tr><td class="mono">H3</td><td>干预效果在第 8 周后趋于稳定，周度斜率绝对值小于 0.5%</td><td>分段趋势回归</td><td>后段斜率 90% 置信区间完全落在 ±0.5% 内</td></tr>
+      <tr class="total"><td class="mono">E1</td><td>探索性：边界与回溯对返工率存在交互效应</td><td>交互项回归</td><td>报告点估计与 95% 区间，不作确认性推断</td></tr>
+    </table>
+  </div>
+  <div class="grid2" style="margin-top:10px;padding-top:8px;border-top:1px solid #eeede7">
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">六项观测指标　</b>完成时长 · 返工率 · 流程依从度 · 人工介入次数 · 主观负荷 · 采用意愿</p>
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">后续页面导读　</b>P2 设计 · P3 变量 · P4 样本 · P5 干预 · P6 采集 · P7 分析 · P8 伦理 · P9 预期 · P10 文献</p>
+  </div>
+  <div class="pfoot"><span>1 个主假设链（H1 — H3）+ 1 条探索性假设，全部指标出自同一日志源</span><span>第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.1 研究设计要素</div><div class="pn">准实验：非随机分组，含基线期</div></div>
+  <h2>设计类型、分组逻辑与效度保障</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:104px">设计要素</th><th>本方案设置</th><th style="width:190px">理由</th></tr>
+      <tr><td>设计类型</td><td>两组前后测准实验（A 干预组 / B 对照组）</td><td>真实团队无法随机重组，随机化会破坏既有协作关系</td></tr>
+      <tr><td>基线期</td><td>干预前 2 周，采集 168 条任务记录</td><td>建立组间可比基线，供平衡性检验使用</td></tr>
+      <tr><td>干预期</td><td>12 周，A 组按周递增回溯覆盖度，B 组不变</td><td>覆盖学习效应与效果收敛两个阶段</td></tr>
+      <tr><td>分析单位</td><td>任务（1,674 条）；个体层面指标取周均值</td><td>任务级样本量更大，周均值可避免伪重复</td></tr>
+      <tr class="total"><td>分配方式</td><td>按团队整体分配，不可在组内切换</td><td>避免同一团队内的干预污染</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="block"><h4>内部效度</h4><p style="margin-top:5px">基线期 2 周 + 平衡性检验（标准化差异小于 0.2）；用 B 组吸收共同趋势。</p></div>
+      <div class="block"><h4>外部效度</h4><p style="margin-top:5px">对象为两家同城中型团队，结论限于同类知识密集型团队。</p></div>
+      <div class="block"><h4>构念效度</h4><p style="margin-top:5px">每个变量至少对应 1 个客观日志指标 + 1 个主观自评指标。</p></div>
+    </div>
+    <table>
+      <tr><th style="width:150px">威胁类型</th><th>具体表现</th><th style="width:250px">控制措施</th></tr>
+      <tr><td>选择偏差</td><td>两团队原有流程成熟度不同</td><td>基线平衡性检验；不达标则改用倾向得分匹配</td></tr>
+      <tr><td>历史效应</td><td>同期组织调整影响任务量</td><td>记录组织事件台账，作为控制变量纳入</td></tr>
+      <tr><td>霍桑效应</td><td>被观察导致短期效率提升</td><td>B 组同样启用日志采集，且不做告知差异</td></tr>
+      <tr class="total"><td>测量偏移</td><td>自评受绩效应答倾向影响</td><td>主指标取日志，自评仅作辅助，交叉验证</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>设计覆盖 4 类效度威胁，每类均给出可执行的控制措施</span><span>第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.2 变量与操作化</div><div class="pn">2 个自变量、6 个因变量、3 个控制变量</div></div>
+  <h2>变量操作化定义（表 3-1）</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:118px">变量</th><th style="width:74px">角色</th><th style="width:64px">类型</th><th>测量方式与取值</th><th style="width:112px">采集频率</th></tr>
+      <tr><td>任务边界清晰度</td><td>自变量</td><td>有序</td><td>任务卡含责任人、输入输出、完成判定三项中的项数，取 0 — 3</td><td>每任务</td></tr>
+      <tr><td>审批回溯覆盖度</td><td>自变量</td><td>连续</td><td>关键节点中带审批记录的比例，按 25% / 50% / 75% / 100% 四档投放</td><td>每周</td></tr>
+      <tr><td>任务完成时长</td><td>因变量</td><td>连续</td><td>从任务创建到验收通过的分钟数，取组内中位数</td><td>每任务</td></tr>
+      <tr><td>返工率</td><td>因变量</td><td>连续</td><td>被驳回后需重做的任务数 / 任务总数</td><td>每周</td></tr>
+      <tr><td>流程依从度</td><td>因变量</td><td>连续</td><td>实际执行路径符合既定流程的任务占比</td><td>每周</td></tr>
+      <tr><td>人工介入次数</td><td>因变量</td><td>计数</td><td>单任务人工干预次数之和，取周均值</td><td>每周</td></tr>
+      <tr><td>主观负荷</td><td>因变量</td><td>量表</td><td>每周自评 1 — 7 分，4 个题项取均值</td><td>每周</td></tr>
+      <tr class="total"><td>采用意愿</td><td>因变量</td><td>量表</td><td>期末问卷 1 — 7 分，3 个题项取均值</td><td>期末一次</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>控制变量</h4>
+        <ul style="margin-top:6px">
+          <li>任务类型：文档 / 数据 / 代码三分组</li>
+          <li>任务规模：预估工时，取对数后入模</li>
+          <li>人员经验：司龄（年），组内中心化处理</li>
+        </ul>
+      </div>
+      <div>
+        <h4>操作化注意事项</h4>
+        <ul style="margin-top:6px">
+          <li>边界清晰度由任务卡字段自动判定，不由人工打分</li>
+          <li>完成时长剔除跨周挂起任务（占 3.1%）</li>
+          <li>回溯覆盖度按节点计数而非按记录条数，避免重复计数</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><h4>变量缺省与插补</h4><p style="margin-top:6px">日志类变量无缺失；量表类变量缺失 7 例（占有效自评 412 份的 1.7%），采用同题组均值插补，并在稳健性检验中报告不插补样本（405 份）的结果作为对照。</p></div>
+  </div>
+  <div class="pfoot"><span>操作化覆盖 2 自变量 + 6 因变量 + 3 控制变量，全部可自动采集</span><span>第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.3 样本与分组</div><div class="pn">基线期 168 条任务，干预期 1,674 条</div></div>
+  <h2>样本描述与基线平衡性检验（表 4-1）</h2>
+  <div class="body">
+    <table>
+      <tr><th>基线特征</th><th style="width:104px">A 组（n = 20）</th><th style="width:104px">B 组（n = 20）</th><th style="width:96px">标准化差异</th><th style="width:96px">判定</th></tr>
+      <tr><td>平均司龄（年）</td><td class="mono">2.8</td><td class="mono">2.9</td><td class="mono">0.06</td><td>平衡</td></tr>
+      <tr><td>周均任务量（条）</td><td class="mono">42.3</td><td class="mono">41.6</td><td class="mono">0.09</td><td>平衡</td></tr>
+      <tr><td>完成时长中位数（分钟）</td><td class="mono">96</td><td class="mono">101</td><td class="mono">0.14</td><td>平衡</td></tr>
+      <tr><td>返工率</td><td class="mono">14.2%</td><td class="mono">15.1%</td><td class="mono">0.11</td><td>平衡</td></tr>
+      <tr><td>流程依从度</td><td class="mono">61.4%</td><td class="mono">60.2%</td><td class="mono">0.10</td><td>平衡</td></tr>
+      <tr class="total"><td>主观负荷（1 — 7）</td><td class="mono">4.3</td><td class="mono">4.4</td><td class="mono">0.08</td><td>平衡</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="kpi"><b>0.14</b><span>最大标准化差异</span></div>
+      <div class="kpi"><b>0.20</b><span>平衡阈值</span></div>
+      <div class="kpi"><b>1,842</b><span>任务记录（含基线）</span></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>样本量与功效分析</h4>
+        <table style="margin-top:6px">
+          <tr><th>参数</th><th style="width:96px">取值</th></tr>
+          <tr><td>显著性水平 α</td><td class="mono">0.05（双侧）</td></tr>
+          <tr><td>统计功效 1 − β</td><td class="mono">0.80</td></tr>
+          <tr><td>每组样本量</td><td class="mono">20 人</td></tr>
+          <tr class="total"><td>可检测最小效应量</td><td class="mono">d = 0.91</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>分组与任务量核对</h4>
+        <ul style="margin-top:6px">
+          <li>基线期 2 周：40 人共产出 168 条任务记录</li>
+          <li>干预期 12 周：1,674 条，其中 A 组 848 条、B 组 826 条</li>
+          <li>A 组与 B 组任务量相差 22 条（2.6%），在容差范围内</li>
+          <li>剔除测试、重复与跨周挂起记录 52 条后，纳入分析 1,790 条</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><p><b style="font-weight:600">样本局限　</b>每组 20 人使可检测效应量偏大（d = 0.91）；补以任务级样本 1,790 条，标准误按个体聚类调整。</p></div>
+  </div>
+  <div class="pfoot"><span>全部基线特征标准化差异均小于 0.20，组间可比性成立</span><span>第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.4 干预实施</div><div class="pn">A 组 4 档递增，B 组维持基线</div></div>
+  <h2>干预流程与投放节奏</h2>
+  <div class="body">
+    <div class="flow"><span>任务卡改造</span><i>→</i><span>边界字段补全</span><i>→</i><span>审批节点布点</span><i>→</i><span>逐周提高回溯覆盖度</span><i>→</i><span>周度指标核对</span><i>→</i><span>期末复盘</span></div>
+    <table>
+      <tr><th style="width:96px">周次</th><th>回溯覆盖度（A 组）</th><th>边界字段要求</th><th style="width:150px">本周核对项</th></tr>
+      <tr><td class="mono">第 1 — 3 周</td><td class="mono">25%</td><td>责任人 + 输入输出</td><td>字段填写完整率是否达 90%</td></tr>
+      <tr><td class="mono">第 4 — 6 周</td><td class="mono">50%</td><td>增加完成判定标准</td><td>驳回任务是否均带审批记录</td></tr>
+      <tr><td class="mono">第 7 — 9 周</td><td class="mono">75%</td><td>三项字段全部必填</td><td>人工介入次数是否出现拐点</td></tr>
+      <tr class="total"><td class="mono">第 10 — 12 周</td><td class="mono">100%</td><td>字段校验 + 抽检</td><td>时长与返工率是否收敛</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>实施清单</h4>
+        <ul style="margin-top:6px">
+          <li>任务卡模板统一为 3 个必填字段，旧模板第 1 周内替换完毕</li>
+          <li>审批节点由流程引擎自动布点，不依赖人工自觉</li>
+          <li>每周一由流程管理员核对上周指标，异常任务当日标注</li>
+          <li>B 组保持原有模板与审批方式，仅启用同源日志采集</li>
+        </ul>
+      </div>
+      <div>
+        <h4>投放强度的理由</h4>
+        <table style="margin-top:6px">
+          <tr><th>档位</th><th style="width:88px">预期运维开销</th></tr>
+          <tr><td class="mono">25%</td><td class="mono">+2.3%</td></tr>
+          <tr><td class="mono">50%</td><td class="mono">+4.6%</td></tr>
+          <tr><td class="mono">75%</td><td class="mono">+6.9%</td></tr>
+          <tr class="total"><td class="mono">100%</td><td class="mono">+9.2%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="block"><h4>违背与退出处理</h4><p style="margin-top:6px">若某周字段完整率低于 80%，该周标记为违背周，纳入敏感性分析；受试者中途退出按意向性分析（ITT）保留其全部已采集数据，不剔除已完成任务。</p></div>
+  </div>
+  <div class="pfoot"><span>四档覆盖率对应运维开销 +2.3% 至 +9.2%，用于估计拐点位置</span><span>第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.5 数据采集与质量控制</div><div class="pn">单一日志源 + 双通道校验</div></div>
+  <h2>采集口径与质量控制（表 4-2）</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:104px">指标</th><th style="width:150px">数据来源</th><th style="width:88px">采集频率</th><th style="width:120px">质量控制措施</th><th>异常判定</th></tr>
+      <tr><td>任务完成时长</td><td>流程引擎日志</td><td>每任务</td><td>剔除无效记录（52 条）</td><td>超过 8 小时标记复核</td></tr>
+      <tr><td>返工率</td><td>审批记录表</td><td>每周</td><td>驳回口径统一为「需重做」</td><td>周环比超过 5 pp 触发核查</td></tr>
+      <tr><td>流程依从度</td><td>日志路径比对</td><td>每周</td><td>路径模板冻结于干预前</td><td>低于 40% 标记为违背周</td></tr>
+      <tr><td>人工介入次数</td><td>人工操作埋点</td><td>每周</td><td>排除系统重试产生的记录</td><td>单任务超过 5 次标记复核</td></tr>
+      <tr><td>主观负荷</td><td>每周自评表单</td><td>每周</td><td>同题组内部一致性检验</td><td>α 低于 0.7 则重测</td></tr>
+      <tr class="total"><td>采用意愿</td><td>期末问卷</td><td>第 12 周末</td><td>匿名提交，不关联绩效</td><td>回收率低于 80% 则补采</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="kpi"><b>1,790</b><span>纳入分析任务（条）</span></div>
+      <div class="kpi"><b>412</b><span>自评有效份数</span></div>
+      <div class="kpi"><b>85.8%</b><span>自评回收率</span></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>自评回收轨迹（每周应采 40 份）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 1 — 4 周</span><span class="bar"><i style="width:88%"></i></span><span class="mono">141 份</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 5 — 8 周</span><span class="bar"><i style="width:86%"></i></span><span class="mono">138 份</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 9 — 12 周</span><span class="bar"><i style="width:83%"></i></span><span class="mono">133 份</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>数据清理规则</h4>
+        <ul style="margin-top:6px">
+          <li>剔除测试任务与重复提交记录 34 条</li>
+          <li>剔除跨周挂起任务 18 条；与上项合计剔除 52 条</li>
+          <li>时长超过 8 小时的 11 条任务按缺失处理，不参与中位数计算</li>
+          <li>同日同一任务的多条日志按首条计；反向题先重编码再取均值</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>1,790 条任务 + 412 份自评构成分析样本，回收率 85.8%</span><span>第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.6 分析方法</div><div class="pn">主分析 + 三项稳健性检验</div></div>
+  <h2>分析模型与稳健性设计</h2>
+  <div class="body">
+    <div class="formula">
+      <div class="kicker" style="letter-spacing:.16em">双重差分模型</div>
+      <div class="mono" style="margin-top:7px">Y<sub>it</sub> = α + β<sub>1</sub>·Treat<sub>i</sub> + β<sub>2</sub>·Post<sub>t</sub> + β<sub>3</sub>·(Treat<sub>i</sub> × Post<sub>t</sub>) + γ·X<sub>it</sub> + u<sub>i</sub> + λ<sub>t</sub> + ε<sub>it</sub></div>
+      <div style="font-size:11.5px;color:#6f737b;margin-top:6px">Y 为因变量；Treat 为分组虚拟变量；Post 为干预前后虚拟变量；X 为控制变量；u、λ 分别为个体与周固定效应；交互项系数 β<sub>3</sub> 即净效应。标准误按个体聚类。</div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>三项稳健性检验</h4>
+        <table style="margin-top:6px">
+          <tr><th>检验</th><th style="width:120px">做法</th></tr>
+          <tr><td>安慰剂检验</td><td>把干预前移 2 周，预期交互项不显著</td></tr>
+          <tr><td>异常值敏感</td><td>剔除时长首尾各 2.5% 后重估</td></tr>
+          <tr class="total"><td>完整样本</td><td>不插补量表缺失，n = 405 重估</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>辅助分析</h4>
+        <ul style="margin-top:6px">
+          <li>H1：以中位数回归替代均值回归，降低长尾影响</li>
+          <li>H2：加入覆盖度平方项，用导数求拐点并给出置信区间</li>
+          <li>H3：从第 8 周起做分段趋势回归，检验斜率是否为零</li>
+          <li>探索分析：按任务类型做亚组，结果仅作描述</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:96px">输出项</th><th>呈现内容</th><th style="width:150px">对应结论</th></tr>
+      <tr><td>主效应表</td><td>交互项系数、聚类标准误、95% 区间与 p 值</td><td>H1 是否成立</td></tr>
+      <tr><td>拐点估计</td><td>覆盖度平方项系数 + 拐点位置及其区间</td><td>H2 是否成立</td></tr>
+      <tr class="total"><td>趋势图</td><td>周度完成时长中位数与返工率两条序列</td><td>H3 是否成立</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>主分析 β<sub>3</sub> 的净效应估计 + 3 项稳健性检验，标准误按个体聚类</span><span>第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.7 伦理与数据保护</div><div class="pn">审查批号 MR-2026-118，已获批准</div></div>
+  <h2>伦理审查、知情同意与数据保护</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:118px">伦理事项</th><th>本方案安排</th><th style="width:170px">依据 / 记录</th></tr>
+      <tr><td>审查类别</td><td>涉及人的研究，采用会议审查（非加快审查）</td><td>批件编号 MR-2026-118</td></tr>
+      <tr><td>风险等级</td><td>不大于最小风险：不改动薪酬与考核，仅调整流程字段</td><td>风险自评表第 3 项</td></tr>
+      <tr><td>知情同意</td><td>干预前集中说明并逐一签署，签署率 40 / 40</td><td>同意书 40 份存档</td></tr>
+      <tr><td>自愿退出</td><td>可在任一周退出且不影响绩效评价</td><td>方案第 9 条</td></tr>
+      <tr class="total"><td>弱势群体</td><td>不涉及学生、实习生等从属关系人群</td><td>纳入标准第 4 项</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>数据保护措施</h4>
+        <ul style="margin-top:6px">
+          <li>姓名替换为代号 T1 — T40，映射表由第三方保管</li>
+          <li>日志中的任务正文经关键词过滤后留存，不导出原文</li>
+          <li>数据仅存于内网服务器，禁止上传公网存储</li>
+          <li>分析数据集去除工号、IP 与设备标识字段</li>
+          <li>论文与报告中不出现可识别个人身份的引语</li>
+        </ul>
+      </div>
+      <div>
+        <h4>数据生命周期</h4>
+        <table style="margin-top:6px">
+          <tr><th>阶段</th><th style="width:110px">安排</th></tr>
+          <tr><td>采集</td><td>仅采集 6 个指标相关字段</td></tr>
+          <tr><td>存储</td><td>内网加密存储，访问需双人授权</td></tr>
+          <tr><td>使用</td><td>仅限本课题组 4 名成员</td></tr>
+          <tr class="total"><td>销毁</td><td>研究结束后 5 年内销毁原始数据</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="block"><h4>利益冲突声明</h4><p style="margin-top:6px">课题组与两家受试团队无资金往来；研究工具由课题组自行开发，不含商业授权条款；流程管理员由受试团队指定，非课题组成员，避免研究者与执行者角色重叠。</p></div>
+  </div>
+  <div class="pfoot"><span>知情同意签署 40 / 40，原始数据在研究结束后 5 年内销毁</span><span>第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.8 预期结果与局限</div><div class="pn">替代解释及其排除方式</div></div>
+  <h2>预期结果、替代解释与研究局限</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:126px">指标</th><th style="width:88px">基线（B 组）</th><th style="width:104px">预期 A 组（第 12 周）</th><th style="width:78px">预期净变化</th><th>替代解释</th></tr>
+      <tr><td>完成时长中位数</td><td class="mono">101 分钟</td><td class="mono">89 分钟</td><td class="mono">−11.9%</td><td>任务池变简单；用任务类型分层控制</td></tr>
+      <tr><td>返工率</td><td class="mono">15.1%</td><td class="mono">11.8%</td><td class="mono">−3.3 pp</td><td>驳回口径放宽；口径冻结于干预前</td></tr>
+      <tr><td>流程依从度</td><td class="mono">60.2%</td><td class="mono">82.4%</td><td class="mono">+22.2 pp</td><td>仅为填表而遵从；用抽检验证执行质量</td></tr>
+      <tr><td>人工介入次数</td><td class="mono">0.42 次 / 任务</td><td class="mono">0.31 次 / 任务</td><td class="mono">−26.2%</td><td>审批前置使介入被隐藏；统计全部节点操作</td></tr>
+      <tr><td>主观负荷</td><td class="mono">4.4</td><td class="mono">4.2</td><td class="mono">−0.2 分</td><td>短期新鲜感；观察第 8 周后是否回升</td></tr>
+      <tr class="total"><td>采用意愿</td><td class="mono">4.6</td><td class="mono">5.5</td><td class="mono">+0.9 分</td><td>社会赞许偏差；匿名提交且不关联绩效</td></tr>
+    </table>
+    <div class="grid3">
+      <div class="block"><h4>局限一：样本</h4><p style="margin-top:5px">每组仅 20 人，可检测效应量偏大；两家团队同城同行业，外推需谨慎。</p></div>
+      <div class="block"><h4>局限二：周期</h4><p style="margin-top:5px">12 周可覆盖收敛段，但无法观察跨季度或年末高峰下的表现。</p></div>
+      <div class="block"><h4>局限三：测量</h4><p style="margin-top:5px">依从度依赖日志路径比对，无法捕捉流程外的口头协调。</p></div>
+    </div>
+    <div class="block"><h4>结论的适用边界</h4><p style="margin-top:6px">本方案的结论适用于 15 — 25 人、任务类型以文档与数据处理为主、已完成本地部署的知识密集型团队；对任务高度异质或每周新增任务超过 400 条的团队，边界字段的维护成本会显著上升，净效应方向可能反转。</p></div>
+  </div>
+  <div class="pfoot"><span>6 个指标均预期正向变化，净变化量级在 3.3 pp 至 22.2 pp 之间</span><span>第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">参考文献与附录</div><div class="pn">方法学引用 10 条 + 量表条目</div></div>
+  <h2>参考文献与方法附录</h2>
+  <div class="body">
+    <div class="refs">
+      <div><em>[1]</em> Wang J, 李强. 审批环节对智能体落地率的影响：一项流程实验[J]. 管理科学, 2025, 38(4): 112-126.</div>
+      <div><em>[2]</em> Qian M, 吴迪. 任务边界书面化与返工率的关系[J]. 工业工程与管理, 2025, 30(3): 77-85.</div>
+      <div><em>[3]</em> Chen L, Zhou Y. Task-level benchmarks for agent workflows[C]. Proceedings of the 12th Conference on Applied Measurement, 2024: 88-96.</div>
+      <div><em>[4]</em> Xu B, 李静. 审计留痕粒度与运维开销的权衡[J]. 信息安全研究, 2024, 10(5): 402-411.</div>
+      <div><em>[5]</em> Angrist J D, Pischke J S. Mostly Harmless Econometrics: An Empiricist's Companion[M]. Princeton: Princeton University Press, 2009: 227-243.</div>
+      <div><em>[6]</em> 国家卫生健康委员会. 涉及人的生命科学和医学研究伦理审查办法[Z]. 2023-02-18.</div>
+      <div><em>[7]</em> Sun P, Guo W. Hybrid deployment cost models over three years[J]. Computing Economics, 2026, 9(1): 5-24.</div>
+      <div><em>[8]</em> Cohen J. Statistical Power Analysis for the Behavioral Sciences[M]. 2nd ed. Hillsdale: Lawrence Erlbaum, 1988: 24-40.</div>
+    </div>
+    <table>
+      <tr><th style="width:130px">量表</th><th>题项数</th><th style="width:96px">计分方式</th><th>示例题项</th></tr>
+      <tr><td>主观负荷</td><td class="mono">4</td><td>1 — 7 分，均值</td><td>本周的任务量让我感到吃力（含 1 道反向题）</td></tr>
+      <tr><td>采用意愿</td><td class="mono">3</td><td>1 — 7 分，均值</td><td>我愿意在后续项目中继续使用该流程</td></tr>
+      <tr><td>边界清晰度自评</td><td class="mono">4</td><td>1 — 5 分，均值</td><td>我清楚每项任务的完成判定标准</td></tr>
+      <tr class="total"><td>流程依从度自评</td><td class="mono">3</td><td>1 — 5 分，均值</td><td>我按既定路径完成了本任务的各个节点</td></tr>
+    </table>
+    <div class="block"><h4>附录清单</h4><p style="margin-top:6px">附录 A：知情同意书（1 页）；附录 B：任务卡字段模板（3 字段 + 2 选填）；附录 C：系统日志字段说明（23 个字段，含 6 个分析字段）；附录 D：伦理审查批件编号与批准日期。</p></div>
+  </div>
+  <div class="pfoot"><span>量表共 14 个题项（4 + 3 + 4 + 3）；方法学参考 [1] — [8] 如上</span><span>第 10 / 10 页</span></div>
+</section>
+
+</body></html>

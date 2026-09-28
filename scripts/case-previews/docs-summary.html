@@ -1,45 +1,94 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-summary</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.doc{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;padding:28px 38px;display:flex;flex-direction:column;overflow:hidden}
-.title{font-size:23px;letter-spacing:-.01em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:20px;padding-bottom:14px;border-bottom:1px solid #edede9}
-h3{margin-top:16px;font-size:13.5px}
-p{margin-top:8px;font-size:13px;color:#3d4046;line-height:1.9}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-ul{list-style:none;margin-top:10px;display:grid;gap:7px}
-li{position:relative;padding-left:15px;font-size:12.8px;color:#4c5058;line-height:1.8}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>docs-summary</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--accent:#B45309}
+body{width:1160px;display:grid;gap:26px;padding:30px;background:#f2f2ef;
+ font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+ color:#16171a;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;
+ border:1px solid #e4e4e0;padding:30px 44px 0;display:flex;flex-direction:column}
+.ph{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.ph .kc{color:var(--accent);letter-spacing:.3em}
+.ph .rt{letter-spacing:.06em;color:#9a9ea6}
+.pt{font-size:23px;font-weight:500;letter-spacing:-.02em;margin-top:11px;color:#16171a}
+.pt.lg{font-size:27px;font-weight:600;margin-top:14px;line-height:1.34}
+.rule{height:1px;background:#edede9;margin-top:11px}
+.pbody{flex:1;min-height:0;margin-top:12px;overflow:hidden}
+.pf{margin-top:8px;padding-top:8px;border-top:1px solid #edede9;display:flex;justify-content:space-between;font-size:11px;color:#8b8f97;letter-spacing:.02em}
+.meta{display:flex;flex-wrap:wrap;gap:7px 22px;font-size:12px;color:#8b8f97;padding-bottom:12px;border-bottom:1px solid #edede9}
+h3{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:#16171a;margin-top:12px}
+h3.first{margin-top:0}
+h4{font-size:11px;font-weight:600;letter-spacing:.16em;color:#8b8f97;margin-top:10px}
+h4.first{margin-top:0}
+p{font-size:13px;line-height:1.9;color:#3d4046;margin-top:8px}
+p.first{margin-top:0}
+ul{list-style:none;margin-top:7px;display:grid;gap:5px}
+ul.first{margin-top:0}
+li{position:relative;padding-left:15px;font-size:12.8px;line-height:1.8;color:#4c5058}
 li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;background:var(--accent)}
-.split{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:26px}
-.pane{min-width:0;overflow:hidden}
-.pane h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.dense{margin-top:10px;font-size:11px;line-height:1.95;color:#6f737b;text-align:justify}
-.card{border:1px solid #edede9;background:#fafaf8;padding:16px 18px;margin-top:10px}
+li b{font-weight:600;color:#16171a}
+table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 10px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.6}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.n,span.n{font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.grid12{display:grid;grid-template-columns:1.28fr 1fr;gap:24px}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #edede9;margin-top:11px}
+.nums>div{padding:10px 13px;border-left:1px solid #edede9}
+.nums>div:first-child{border-left:0}
+.nums .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.nums .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:3px;color:var(--accent)}
+.nums .s{font-size:11.5px;color:#8b8f97;margin-top:2px}
+.card{border:1px solid #edede9;background:#fafaf8;padding:10px 13px;margin-top:8px}
 .card .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.card p{margin-top:8px;font-size:12.8px;line-height:1.85;color:#3d4046}
+.card p{margin-top:5px;font-size:12.5px;line-height:1.8}
+.note{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:2px solid var(--accent);
+ padding:8px 12px;margin-top:8px;font-size:12.5px;line-height:1.8;color:#3d4046}
+.toc{margin-top:6px}
+.toc .r{display:grid;grid-template-columns:34px 1fr 208px 40px;gap:10px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.6}
+.toc .r:first-child{border-top:0}
+.toc .r b{color:var(--accent);font-weight:600}
+.toc .r .pg{text-align:right;color:#8b8f97;font-variant-numeric:tabular-nums}
+.bar{margin-top:8px;display:grid;gap:7px}
+.bar .r{display:grid;grid-template-columns:122px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058}
+.bar .tr{height:9px;background:#f1f1ee;position:relative}
+.bar .tr i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);display:block}
+.bar .vv{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.steps{margin-top:6px}
+.steps .s{display:grid;grid-template-columns:58px 1fr;gap:12px;padding:6px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.steps .s:first-child{border-top:0}
+.steps b{color:var(--accent);font-weight:600}
+.def{margin-top:6px}
+.def .d{display:grid;grid-template-columns:158px 1fr;gap:12px;padding:5px 0;
+ border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.7}
+.def .d:first-child{border-top:0}
+.def .d b{font-weight:600;color:#16171a}
+.sig{display:flex;justify-content:flex-end;gap:44px;margin-top:16px;font-size:12.5px;color:#4c5058}
+.cmp{display:grid;grid-template-columns:1fr 1fr;border:1px solid #edede9;margin-top:9px}
+.cmp>div{padding:10px 13px;font-size:12.5px;line-height:1.85;color:#3d4046}
+.cmp>div:first-child{border-right:1px solid #edede9}
+.cmp .h{font-size:11px;letter-spacing:.14em;color:#8b8f97;display:block;margin-bottom:5px}
 del{color:#b3564a;text-decoration:line-through}
-ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.07)}
+ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px;background:rgba(47,111,94,.08)}
+.tag{display:inline-block;font-size:11px;padding:0 6px;border:1px solid #e4e4e0;color:#6f737b}
+.small{font-size:11.5px;color:#8b8f97;line-height:1.75;margin-top:6px}
+.cfoot{display:grid;grid-template-columns:1fr 1fr 1.45fr;border:1px solid #edede9;margin-top:10px}
+.cfoot>div{padding:8px 12px;border-left:1px solid #edede9;font-size:11.5px;line-height:1.7;color:#4c5058}
+.cfoot>div:first-child{border-left:0}
+.cfoot .k{display:block;font-size:11px;letter-spacing:.12em;color:#8b8f97;margin-bottom:3px}
 </style></head><body>
-<div class="doc" style="--accent:#B45309">
-  <div class="title">长文档摘要：行业研究报告（42 页）</div>
-  <div class="meta"><span>原文：2026 本地优先 AI 工具行业研究</span><span>摘要生成时间：2026-09-16</span></div>
-  <div class="split" style="margin-top:16px">
-    <div class="pane">
-      <h4>原文节选</h4>
-      <p class="dense">从采购决策看，2026 年前三个季度支持本地部署的产品在制造业与金融行业的占比由 21% 提升至 38%，交付周期与数据出境合规连续两个季度位列决策因素前两位。中型团队通常在完成一次小范围试点后，才会把本地部署纳入正式预算，试点周期中位数为 6 周。与此同时，模型能力差异在收敛，采购方更关注数据接入方式、能否导出以及审计记录是否完整。报告同时指出，跨工具的数据流转仍需人工搬运，缺少统一出口，这是当前落地过程里最耗时的一环。</p>
-    </div>
-    <div class="pane">
-      <h4>摘要要点</h4>
-      <div class="card"><div class="k">一句话结论</div><p>行业竞争重心已从模型能力转向数据可控性与交付确定性。</p></div>
-      <div class="card"><div class="k">关键数字</div><p>本地部署占比 21% → 38%；试点周期中位数 6 周；决策因素前两位为交付周期与出境合规。</p></div>
-      <div class="card"><div class="k">行动建议</div><p>把合规说明前置到售前阶段；优先解决跨工具数据出口问题。</p></div>
-      <div class="card"><div class="k">风险提示</div><p>报告样本以制造业与金融为主，零售与教育两个行业的结论可信度有限。</p></div>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" data-page="1"><div class="ph"><span class="kc">DOCUMENT SUMMARY</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">长文档摘要：《2026 本地优先 AI 工具行业研究》</h2><div class="pbody"><div class="meta"><span>原文：2026 本地优先 AI 工具行业研究</span><span>原文篇幅：42 页 / 8 章 / 26 图 / 18 表</span><span>摘要生成：2026-09-16</span><span>摘要篇幅：10 页</span><span>压缩比：4.2 : 1</span></div><h3 class="first">一、一句话结论</h3><p>行业竞争重心已从模型能力转向数据可控性与交付确定性：支持本地部署的产品在制造业与金融行业的占比由 21% 提升至 38%，交付周期与数据出境合规连续两个季度位列采购决策因素前两位，而模型能力的重要性评分下降 0.5 分。落地过程中最耗时的一环是跨工具的数据流转，68% 的受访团队仍需人工搬运，人均每周消耗 6.5 小时。</p><div class="nums"><div><div class="k">本地部署占比</div><div class="v">38%</div><div class="s">两个季度前为 21%，提升 17 个百分点</div></div><div><div class="k">试点周期中位数</div><div class="v">6 周</div><div class="s">中型团队完成首轮试点所需时间</div></div><div><div class="k">人工搬运数据团队</div><div class="v">68%</div><div class="s">人均每周消耗 6.5 小时</div></div></div><h3>二、摘要要点</h3><table><tr><th>维度</th><th>原文结论</th><th>支撑数据</th><th>可信度</th></tr><tr><td>采购决策</td><td>交付周期与合规优先级高于模型能力</td><td>412 份问卷，两项评分 4.4 与 4.3</td><td>高</td></tr><tr><td>部署形态</td><td>本地部署从中型团队向上渗透</td><td>占比 21% → 38%</td><td>高</td></tr><tr><td>落地瓶颈</td><td>跨工具数据流转缺少统一出口</td><td>68% 团队依赖人工搬运</td><td>高</td></tr><tr><td>预算节奏</td><td>试点通过后才进入正式预算</td><td>试点周期中位数 6 周</td><td>中</td></tr></table><h3>三、引用与使用说明</h3><div class="def"><div class="d"><b>引用方式</b><span>数字须注明「原文页码 + 摘要页码」；评分类数据仅用于定性判断</span></div><div class="d"><b>时效说明</b><span>原文数据截至 2026-09-10，结论适用于 2026 年内</span></div></div></div><div class="pf"><span>摘要结论：竞争重心由模型能力转向数据可控性与交付确定性</span><span>第 1 / 10 页</span></div></section>
+<section class="page" data-page="2"><div class="ph"><span class="kc">CONTENTS</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">目录与阅读指引</h2><div class="pbody"><p class="first">原报告 42 页，章节多且含大量图表。本摘要按「结论优先」重组为 10 页：第 3 至 4 页交代原文结构与研究方法，第 5 至 7 页逐条给出三项核心发现及支撑数据，第 8 至 10 页给出行动建议、局限说明与附录。</p><div class="toc"><div class="r"><b>一</b><span>原文概况与阅读范围</span><span style="color:#8b8f97">原文 8 章结构、页数分布与本次摘要覆盖范围</span><span class="pg">3</span></div><div class="r"><b>二</b><span>研究方法与样本说明</span><span style="color:#8b8f97">问卷 412 份、访谈 32 人、行业分布</span><span class="pg">4</span></div><div class="r"><b>三</b><span>核心发现一：采购决策因素变化</span><span style="color:#8b8f97">决策因素评分与排序变化</span><span class="pg">5</span></div><div class="r"><b>四</b><span>核心发现二：部署形态与合规要求</span><span style="color:#8b8f97">本地部署渗透路径与合规门槛</span><span class="pg">6</span></div><div class="r"><b>五</b><span>核心发现三：跨工具数据流转</span><span style="color:#8b8f97">人工搬运成本与统一出口需求</span><span class="pg">7</span></div><div class="r"><b>六</b><span>结论与行动建议</span><span style="color:#8b8f97">5 条建议、对应责任角色与验证方式</span><span class="pg">8</span></div><div class="r"><b>七</b><span>局限、争议与待确认问题</span><span style="color:#8b8f97">样本偏差、结论冲突与 4 项待确认</span><span class="pg">9</span></div><div class="r"><b>八</b><span>附录：术语表与数据出处</span><span style="color:#8b8f97">术语定义与原文页码索引</span><span class="pg">10</span></div></div><h4>阅读建议</h4><ul class="first"><li>需要做采购决策的读者：直接阅读第 5 页决策因素与第 6 页合规门槛。</li><li>需要做产品规划的读者：阅读第 7 页数据流转瓶颈与第 8 页行动建议。</li><li>需要引用数据的读者：先看第 9 页局限说明，再按第 10 页页码索引回查原文。</li></ul><h4>摘要生成规则</h4><div class="def"><div class="d"><b>生成规则</b><span>结论优先、数字原样引用、页码可回溯；同类章节合并，不作二次加工</span></div></div></div><div class="pf"><span>本摘要共 10 页，压缩比 4.2 : 1，所有数据均可回溯原文页码</span><span>第 2 / 10 页</span></div></section>
+<section class="page" data-page="3"><div class="ph"><span class="kc">原文概况</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">一、原文概况与阅读范围</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、原文结构</h3><table><tr><th>章节</th><th>页数</th><th>主题</th><th>本次摘要处理</th></tr><tr><td>第一章</td><td>3 页</td><td>研究背景与问题定义</td><td>并入第 3 页</td></tr><tr><td>第二章</td><td>5 页</td><td>研究方法与样本说明</td><td>独立为第 4 页</td></tr><tr><td>第三章</td><td>6 页</td><td>采购决策因素排序</td><td>独立为第 5 页</td></tr><tr><td>第四章</td><td>5 页</td><td>部署形态与合规门槛</td><td>独立为第 6 页</td></tr><tr><td>第五章</td><td>4 页</td><td>数据接入与流转成本</td><td>独立为第 7 页</td></tr><tr><td>第六章</td><td>3 页</td><td>供应商格局与定价</td><td>压缩进第 8 页建议</td></tr><tr><td>第七章</td><td>3 页</td><td>案例与落地路径</td><td>并入第 7 页案例区</td></tr><tr><td>第八章</td><td>2 页</td><td>结论与展望</td><td>独立为第 8 页</td></tr><tr><td>附录</td><td>11 页</td><td>合规条款逐条解读</td><td>仅保留结论，见第 9 页</td></tr><tr class="sum"><td>合计</td><td>42 页</td><td>正文 31 页 + 附录 11 页</td><td>本摘要 10 页</td></tr></table></div><div><h4 class="first">二、摘要覆盖范围</h4><div class="def"><div class="d"><b>已覆盖</b><span>8 章全部结论性内容，26 图压缩为 3 处可视化</span></div><div class="d"><b>已合并</b><span>第六章供应商格局与第七章案例合并进建议页</span></div><div class="d"><b>未覆盖</b><span>原文附录的合规条款逐条解读（11 页），仅保留结论</span></div><div class="d"><b>保留原文</b><span>全部数字与评分原样引用，未做二次加工或换算</span></div></div><div class="note">原文附录中的合规条款逐条解读未纳入本摘要；如涉及对外合规承诺，须回查原文第 32 至 42 页。</div></div></div><h4>三、原文图表分布</h4><table><tr><th>类型</th><th>数量</th><th>摘要处理</th></tr><tr><td>图（趋势与分布）</td><td>26 个</td><td>压缩为 3 处 CSS 可视化</td></tr><tr><td>表（数据与对照）</td><td>18 张</td><td>保留 9 张，其余转为正文数据</td></tr></table></div><div class="pf"><span>8 章 42 页全部覆盖，原文附录合规条款仅保留结论</span><span>第 3 / 10 页</span></div></section>
+<section class="page" data-page="4"><div class="ph"><span class="kc">研究方法</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">二、研究方法与样本说明</h2><div class="pbody"><h3 class="first">一、样本构成</h3><table><tr><th>行业</th><th>样本数</th><th>占比</th><th>本地部署占比</th><th>试点周期中位数</th></tr><tr><td>制造业</td><td>148 家</td><td>35.9%</td><td>48%</td><td>7 周</td></tr><tr><td>金融</td><td>96 家</td><td>23.3%</td><td>43%</td><td>8 周</td></tr><tr><td>信息技术</td><td>62 家</td><td>15.0%</td><td>34%</td><td>5 周</td></tr><tr><td>零售</td><td>46 家</td><td>11.2%</td><td>22%</td><td>4 周</td></tr><tr><td>教育</td><td>34 家</td><td>8.3%</td><td>18%</td><td>5 周</td></tr><tr><td>医疗</td><td>26 家</td><td>6.3%</td><td>27%</td><td>6 周</td></tr></table><div class="grid2" style="margin-top:6px"><div><ul class="first"><li>制造业与金融合计占样本 59.2%，两项结论的可信度最高。</li><li>零售与教育样本合计 80 家，结论可信度有限。</li></ul></div><div><div class="steps"><div class="s"><b>问卷</b><span>回收有效问卷 412 份，有效率 78.6%，剔除答案前后矛盾样本 112 份</span></div><div class="s"><b>访谈</b><span>深度访谈 32 人，含采购负责人 18 人、技术负责人 14 人</span></div><div class="s"><b>口径</b><span>本地部署指模型与数据均在企业自有环境运行，不含专有云托管</span></div></div></div></div><h4>四、样本分层与权重</h4><table><tr><th>分层</th><th>样本数</th><th>权重与使用限制</th></tr><tr><td>制造业 + 金融</td><td>244 家</td><td>权重 59.2%，结论可直接引用</td></tr><tr><td>信息技术 + 医疗</td><td>88 家</td><td>权重 21.4%，结论需标注样本量</td></tr><tr><td>零售 + 教育</td><td>80 家</td><td>权重 19.4%，可信度有限，引用须标注</td></tr></table></div><div class="pf"><span>样本 412 家，制造业与金融合计占 59.2%，零售与教育可信度有限</span><span>第 4 / 10 页</span></div></section>
+<section class="page" data-page="5"><div class="ph"><span class="kc">核心发现一</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">三、核心发现一：采购决策因素变化</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、决策因素评分（5 分制）</h3><div class="bar"><div class="r"><span>交付周期</span><span class="tr"><i style="width:88%"></i></span><span class="vv">4.4</span></div><div class="r"><span>出境合规</span><span class="tr"><i style="width:86%"></i></span><span class="vv">4.3</span></div><div class="r"><span>数据接入方式</span><span class="tr"><i style="width:82%"></i></span><span class="vv">4.1</span></div><div class="r"><span>能否导出</span><span class="tr"><i style="width:76%"></i></span><span class="vv">3.8</span></div><div class="r"><span>价格</span><span class="tr"><i style="width:74%"></i></span><span class="vv">3.7</span></div><div class="r"><span>模型能力</span><span class="tr"><i style="width:72%"></i></span><span class="vv">3.6</span></div></div><p class="small">位次按评分高低排序；模型能力评分由一季度 4.1 降至 3.6（下降 0.5 分、位次下降 5 位），是唯一明显下降项。</p></div><div><h4 class="first">二、前两位因素的变化</h4><table><tr><th>因素</th><th>两个季度前</th><th>本期</th><th>位次变化</th></tr><tr><td>交付周期</td><td>第 2 位（4.0）</td><td>第 1 位（4.4）</td><td>上升 1 位</td></tr><tr><td>数据出境合规</td><td>第 4 位（3.7）</td><td>第 2 位（4.3）</td><td>上升 2 位</td></tr><tr><td>模型能力</td><td>第 1 位（4.1）</td><td>第 6 位（3.6）</td><td>下降 5 位</td></tr><tr><td>价格</td><td>第 3 位（3.8）</td><td>第 5 位（3.7）</td><td>下降 2 位</td></tr></table><div class="note">采购方口径：交付周期指从签约到首个可用场景上线的时间，含数据接入与权限配置。</div></div></div><h4>四、评分变化的原因（原文未给出定论）</h4><table><tr><th>因素</th><th>位次变化</th><th>原文给出的可能原因</th></tr><tr><td>交付周期</td><td>第 2 → 第 1</td><td>试点周期压缩，上线确定性优先</td></tr><tr><td>出境合规</td><td>第 4 → 第 2</td><td>数据出境审查趋严</td></tr><tr><td>数据接入方式</td><td>第 5 → 第 3</td><td>接入成本成为落地前置条件</td></tr><tr><td>能否导出</td><td>第 6 → 第 4</td><td>数据可迁移性要求提高</td></tr><tr><td>价格</td><td>第 3 → 第 5</td><td>预算转向合规与交付</td></tr><tr><td>模型能力</td><td>第 1 → 第 6</td><td>主流模型能力差距收敛</td></tr></table></div><div class="pf"><span>交付周期 4.4 分与出境合规 4.3 分连续两个季度位列前两位</span><span>第 5 / 10 页</span></div></section>
+<section class="page" data-page="6"><div class="ph"><span class="kc">核心发现二</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">四、核心发现二：部署形态与合规要求</h2><div class="pbody"><h3 class="first">一、本地部署渗透路径</h3><table><tr><th>行业</th><th>两个季度前</th><th>本期</th><th>变化</th><th>主要驱动</th><th>典型预算区间</th></tr><tr><td>制造业</td><td>31%</td><td>48%</td><td>+17pp</td><td>图纸与工艺数据不得出境</td><td>35 万至 80 万元</td></tr><tr><td>金融</td><td>27%</td><td>43%</td><td>+16pp</td><td>客户信息本地留存要求</td><td>60 万至 140 万元</td></tr><tr><td>信息技术</td><td>22%</td><td>34%</td><td>+12pp</td><td>客户数据隔离条款</td><td>25 万至 60 万元</td></tr><tr><td>医疗</td><td>16%</td><td>27%</td><td>+11pp</td><td>病历数据合规要求</td><td>30 万至 70 万元</td></tr><tr><td>零售</td><td>14%</td><td>22%</td><td>+8pp</td><td>多门店数据聚合需求</td><td>15 万至 40 万元</td></tr><tr><td>教育</td><td>11%</td><td>18%</td><td>+7pp</td><td>学籍数据留存要求</td><td>12 万至 30 万元</td></tr></table><div class="grid2" style="margin-top:6px"><div><ul class="first"><li>渗透顺序稳定：<b>制造业 → 金融 → 信息技术 → 医疗 → 零售 → 教育</b>，两个季度未发生位次变化。</li><li>预算区间与行业数据敏感度正相关，金融为最高档 60 万至 140 万元。</li></ul></div><div><p class="small" style="margin-top:0">调研口径提示：本地部署占比按「至少一个生产场景在自有环境运行」统计，与「全量场景本地化」不同；全量本地化的团队占比仅 9%。</p></div></div><h4>四、合规门槛清单（原文第四章第 3 节）</h4><table><tr><th>门槛</th><th>适用行业</th><th>要求</th></tr><tr><td>数据本地留存</td><td>金融、医疗</td><td>客户信息与病历数据不得出境</td></tr><tr><td>图纸与工艺数据不出境</td><td>制造业</td><td>生产数据仅在企业内网流转</td></tr><tr><td>审计记录完整</td><td>金融、医疗、制造业</td><td>保留操作人、时间与内容，留存不少于 3 年</td></tr><tr><td>客户数据隔离</td><td>信息技术</td><td>多租户数据物理或逻辑隔离</td></tr></table></div><div class="pf"><span>整体本地部署占比由 21% 升至 38%，全量本地化仅 9%</span><span>第 6 / 10 页</span></div></section>
+<section class="page" data-page="7"><div class="ph"><span class="kc">核心发现三</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">五、核心发现三：跨工具数据流转</h2><div class="pbody"><h3 class="first">一、数据流转现状</h3><table><tr><th>环节</th><th>完全自动化</th><th>半自动（脚本）</th><th>人工搬运</th><th>人均每周耗时</th></tr><tr><td>上游业务系统 → 模型输入</td><td>19%</td><td>27%</td><td>54%</td><td>3.2 小时</td></tr><tr><td>模型输出 → 下游系统</td><td>12%</td><td>20%</td><td>68%</td><td>6.5 小时</td></tr><tr><td>跨工具结果汇总</td><td>8%</td><td>15%</td><td>77%</td><td>4.8 小时</td></tr><tr><td>审计与留痕</td><td>23%</td><td>31%</td><td>46%</td><td>1.6 小时</td></tr></table><div class="grid2" style="margin-top:6px"><div><h4 class="first">二、结论</h4><ul class="first"><li>输出侧的人工搬运比例 68% 高于输入侧的 54%，是落地过程中最耗时的一环。</li><li>人均每周合计 16.1 小时；40 人团队月度工时约 2,788 小时（约合 15.8 人月）。</li><li>审计留痕的自动化程度反而最高（23%），说明合规驱动优先于效率驱动。</li></ul></div><div><h4 class="first">三、原文案例</h4><div class="card"><div class="k">制造业案例</div><p>某汽车零部件企业接入 3 个工具后，输出侧仍需 2 名员工专职搬运，月度工时约 320 小时。</p></div><div class="card"><div class="k">金融案例</div><p>某城商行以自建脚本打通输出侧，人均每周耗时由 6.8 小时降至 1.4 小时。</p></div></div></div><h4>四、成本折算（耗时最高的两个环节）</h4><table><tr><th>环节</th><th>人均每周耗时</th><th>40 人团队月度工时</th></tr><tr><td>模型输出 → 下游系统</td><td>6.5 小时</td><td>1,126 小时</td></tr><tr><td>跨工具结果汇总</td><td>4.8 小时</td><td>831 小时</td></tr></table><p class="small">其余两个环节的上游成本见本页主表：上游系统 → 模型输入 3.2 小时、审计与留痕 1.6 小时。</p></div><div class="pf"><span>输出侧人工搬运占 68%，人均每周 6.5 小时，为最耗时环节</span><span>第 7 / 10 页</span></div></section>
+<section class="page" data-page="8"><div class="ph"><span class="kc">结论与建议</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">六、结论与行动建议</h2><div class="pbody"><h3 class="first">一、结论</h3><ul class="first"><li>竞争重心已从模型能力转向数据可控性与交付确定性，模型能力评分下降 0.5 分为直接信号。</li><li>本地部署从中型团队向上渗透，整体占比 21% → 38%，预算区间 25 万至 60 万元为主流。</li><li>落地瓶颈位于输出侧数据流转，68% 的团队仍依赖人工搬运，是效率损耗最大的环节。</li></ul><h3>二、行动建议</h3><table><tr><th>编号</th><th>建议</th><th>责任角色</th><th>验证方式</th><th>建议时限</th></tr><tr><td>A-01</td><td>把合规说明与数据流向图前置到售前阶段</td><td>解决方案架构师</td><td>售前材料含合规专章</td><td>30 天</td></tr><tr><td>A-02</td><td>优先建设输出侧的标准化出口，替代人工搬运</td><td>产品负责人</td><td>输出侧人工占比降至 30% 以内</td><td>90 天</td></tr><tr><td>A-03</td><td>以 6 周试点周期设计交付方案，明确试点验收口径</td><td>交付经理</td><td>试点周期中位数 ≤6 周</td><td>60 天</td></tr><tr><td>A-04</td><td>对零售与教育行业补充样本后再做投放判断</td><td>市场研究</td><td>补充样本 ≥60 家</td><td>120 天</td></tr><tr><td>A-05</td><td>把审计留痕能力做成标准模块，复用至 6 个行业</td><td>研发负责人</td><td>6 个行业均可开启留痕</td><td>90 天</td></tr></table><div class="note">建议优先级：A-01 与 A-02 为高优先级，直接对应采购决策前两位因素与最大效率损耗点。</div><h3>三、建议的验证方式</h3><table><tr><th>建议</th><th>验证指标</th><th>观察周期</th></tr><tr><td>A-01 合规前置</td><td>售前材料合规专章覆盖率 100%</td><td>上线后 30 天</td></tr><tr><td>A-02 输出侧统一出口</td><td>输出侧人工搬运占比由 68% 降至 30% 以内</td><td>90 天</td></tr><tr><td>A-03 试点周期设计</td><td>试点周期中位数不超过 6 周</td><td>60 天</td></tr></table></div><div class="pf"><span>5 条行动建议中 A-01、A-02 为高优先级，分别对应决策因素与效率瓶颈</span><span>第 8 / 10 页</span></div></section>
+<section class="page" data-page="9"><div class="ph"><span class="kc">局限与争议</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">七、局限、争议与待确认问题</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、局限说明</h3><table><tr><th>编号</th><th>局限</th><th>影响</th><th>建议处理</th></tr><tr><td>L-01</td><td>样本以制造业与金融为主，占 59.2%</td><td>零售与教育结论可信度有限</td><td>补充样本后再引用</td></tr><tr><td>L-02</td><td>本地部署按场景口径统计，非全量本地化</td><td>易高估本地部署成熟度</td><td>引用时注明统计口径</td></tr><tr><td>L-03</td><td>访谈 32 人集中在采购与技术负责人</td><td>缺少一线使用者的效率数据</td><td>结合工时台账交叉验证</td></tr><tr><td>L-04</td><td>时间窗覆盖 2025-10 至 2026-09</td><td>政策变化后的结论可能滞后</td><td>每季度更新一次</td></tr></table></div><div><h4 class="first">二、原文中的结论冲突</h4><ul class="first"><li>原文第四章称价格因素权重上升，第六章又给出「价格敏感度下降」的结论，两处口径不一致。</li><li>原文第二章样本自报的试点周期（均值 7.4 周）与第四章引用值（中位数 6 周）统计量不同，非冲突。</li></ul><h4>三、待确认问题</h4><ul class="first"><li><b>Q-01</b>：输出侧统一出口的行业标准尚未形成，是否需要自建规范。</li><li><b>Q-02</b>：全量本地化的 9% 团队集中在哪些行业，原文未披露。</li><li><b>Q-03</b>：价格敏感度两项结论以哪一处为准。</li><li><b>Q-04</b>：原文附录合规条款是否适用于境外主体。</li></ul></div></div><h3>四、引用注意事项</h3><table><tr><th>注意事项</th><th>说明</th></tr><tr><td>样本偏差</td><td>制造业与金融占 59.2%，零售与教育结论可信度有限</td></tr><tr><td>口径标注</td><td>本地部署按「至少一个生产场景」统计，全量本地化仅 9%</td></tr><tr><td>结论冲突</td><td>价格敏感度两处结论不一致，引用前须回查原文第六章</td></tr><tr><td>时间窗</td><td>覆盖 2025-10 至 2026-09，政策变化后结论可能滞后</td></tr><tr><td>待确认问题</td><td>Q-01 至 Q-04 原文未给出答案，不得代为推断</td></tr></table></div><div class="pf"><span>4 项局限、1 处结论冲突与 4 项待确认问题，引用前须核对口径</span><span>第 9 / 10 页</span></div></section>
+<section class="page" data-page="10"><div class="ph"><span class="kc">附录</span><span class="rt"></span></div><div class="rule"></div><h2 class="pt">八、附录：术语表与数据出处</h2><div class="pbody"><div class="grid12"><div><h3 class="first">一、术语表</h3><div class="def"><div class="d"><b>本地部署</b><span>模型与数据均在企业自有环境运行，不含专有云托管形态</span></div><div class="d"><b>试点周期</b><span>从签约到首个可用场景上线的时长，含数据接入与权限配置</span></div><div class="d"><b>人工搬运</b><span>由人员手工完成数据导出、转换与导入的全过程</span></div><div class="d"><b>统一出口</b><span>跨工具数据可标准化导出并被下游直接消费的接口层</span></div><div class="d"><b>全量本地化</b><span>全部生产场景均在自有环境运行，占比仅 9%</span></div></div></div><div><h4 class="first">二、关键数据出处索引</h4><table><tr><th>数据</th><th>原文位置</th><th>原文页码</th></tr><tr><td>本地部署占比 21% → 38%</td><td>第四章第 2 节</td><td>第 16 页</td></tr><tr><td>决策因素评分表</td><td>第三章第 3 节</td><td>第 12 页</td></tr><tr><td>试点周期中位数 6 周</td><td>第二章第 4 节</td><td>第 8 页</td></tr><tr><td>输出侧人工搬运 68%</td><td>第五章第 1 节</td><td>第 20 页</td></tr><tr><td>行业预算区间</td><td>第六章第 3 节</td><td>第 26 页</td></tr><tr><td>行业案例（2 例）</td><td>第七章第 2 节</td><td>第 28 页</td></tr></table><p class="small">摘要生成：文档摘要流程 v1，输入原文 42 页，输出 10 页；所有数字未做四舍五入以外的加工。</p></div></div><h4>三、引用格式示例</h4><table><tr><th>场景</th><th>引用写法</th></tr><tr><td>正文引用</td><td>「本地部署占比由 21% 提升至 38%（原文第 16 页 / 摘要第 6 页）」</td></tr><tr><td>图表引用</td><td>「决策因素评分见摘要第 5 页，原始数据见原文第 12 页」</td></tr><tr><td>结论包容</td><td>「样本以制造业与金融为主（59.2%），结论不适用于零售与教育」</td></tr><tr><td>数据未披露</td><td>「全量本地化团队占比 9%（原文未披露行业分布）」</td></tr></table><p class="small">引用格式由文档摘要流程 v1 统一定义，修改须同步更新本页。</p></div><div class="pf"><span>术语 5 条，关键数据出处 6 处，均可回溯原文页码</span><span>第 10 / 10 页</span></div></section>
+</body></html>

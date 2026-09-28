@@ -1,68 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>research-policy</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-policy</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-.serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:30px}
-.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
-.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
-.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:18px}
-h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
-.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0}
-.bars{display:grid;gap:10px;margin-top:12px}
-.bar{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
-td.mono{font-variant-numeric:tabular-nums}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
-li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
-.timeline{display:grid;gap:0;margin-top:12px}
-.tl{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
-.tl:first-child{border-top:0}
-.tl b{color:var(--accent);font-weight:600}
-.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head><body>
-<div class="sheet" style="--accent:#0F766E">
-  <div class="sheet-top">
-    <div class="kicker">Policy Brief</div>
-    <h1>生成式 AI 管理办法要点解读</h1>
-    <div class="meta"><span>解读对象：最新管理办法与两份配套指引</span><span>生效时间：2026 年 10 月 1 日</span></div>
-  </div>
-  <div class="body">
-    <div><h3>核心要点</h3>
-      <ul>
-        <li>面向公众提供生成能力，须对生成内容做标识并保留可追溯记录</li>
-        <li>使用个人信息训练模型前，须完成告知与单独同意</li>
-        <li>企业内部使用不对外提供服务时，适用简化备案流程</li>
-      </ul>
-    </div>
-    <div class="cols2">
-      <div><h3>影响面</h3>
-        <table style="margin-top:10px">
-          <tr><th>环节</th><th>影响</th></tr>
-          <tr><td>数据采集</td><td class="mono">中</td></tr>
-          <tr><td>模型训练</td><td class="mono">中</td></tr>
-          <tr><td>对外服务</td><td class="mono">高</td></tr>
-          <tr><td>内部使用</td><td class="mono">低</td></tr>
-        </table>
-      </div>
-      <div><h3>执行要点</h3>
-        <ul>
-          <li>10 月前完成日志留存与标识能力的自检</li>
-          <li>梳理训练数据来源清单，补全授权链路</li>
-          <li>面向客户侧更新隐私条款与数据处理说明</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="sheet-foot"><span>本解读不构成法律意见</span><span>第 5 / 12 页</span></div>
-</div></body></html>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">Policy Brief</div><h2>生成式 AI 管理办法要点解读</h2></div><div class="pn">解读对象：管理办法 5 章 38 条 + 2 份配套指引<br>生效时间：2026 年 10 月 1 日</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>管理办法与两份配套指引合计 <b>58 条</b>，其中实质性义务 <b>21 条</b>。对业务影响最大的不是备案，而是「内容标识 + 调用日志留存」这两个可被现场验证的能力：对外服务环节影响强度 <b>5 分</b>（满分 5 分），内部使用仅 2 分。存量服务有 3 个月过渡期（至 2027 年 1 月 1 日），但 9 项高优先级自检须在生效日前完成，按 3 人投入测算需要 <b>6 周</b>。</p></div><div class="kpi"><div class="kc"><div class="k">文本合计</div><b class="n">58 条</b><i>管理办法 38 条 + 指引 11 条 + 9 条</i></div><div class="kc"><div class="k">实质义务</div><b class="n">21 条</b><i>占总条文的 55%</i></div><div class="kc"><div class="k">高优先级自检</div><b class="n">9 项</b><i>需在 2026-10-01 前完成</i></div></div><div class="cols2 eq"><div><h3>核心要点</h3><ul class=""><li>面向公众提供生成能力，须对生成内容做标识并保留可追溯记录，留存期不少于 6 个月</li><li>使用个人信息训练模型前，须完成告知与单独同意，并留存授权链路凭证</li><li>企业内部使用且不对外提供服务时，适用简化备案流程，但标识与留存义务不豁免</li></ul></div><div><h3>影响面（强度 1–5 分）</h3><table><thead><tr><th>环节</th><th class="n">强度</th><th>主要义务</th><th>责任角色</th></tr></thead><tbody><tr class=""><td>对外服务</td><td class="n n hl">5</td><td>内容标识、日志留存、投诉处置</td><td>产品 + 安全</td></tr><tr class=""><td>数据采集</td><td class="n n">3</td><td>告知与单独同意、来源清单</td><td>数据 + 法务</td></tr><tr class=""><td>模型训练</td><td class="n n">3</td><td>训练数据来源与授权凭证</td><td>算法团队</td></tr><tr class=""><td>内部使用</td><td class="n n">2</td><td>简化备案、标识能力不豁免</td><td>IT + 安全</td></tr></tbody></table></div></div><div class="cols2 eq"><div><h3>执行要点</h3><ul class=""><li>10 月前完成日志留存与内容标识两项能力的自检，覆盖 27 个检查项</li><li>梳理训练数据来源清单，补全授权链路凭证，缺口项在过渡期内闭环</li><li>面向客户侧更新隐私条款与数据处理说明，明确标识方式与留存期限</li></ul></div><div><h3>关键时点</h3><div class="tl"><div class="r"><b>2026-10-01</b><span>生效日，9 项高优先级自检须已完成</span></div><div class="r"><b>2026-12-31</b><span>存量服务整改与补备案的准备期结束</span></div><div class="r"><b>2027-01-01</b><span>过渡期届满，全量适用完整义务</span></div></div></div></div></div>
+  <div class="pf"><span>本解读不构成法律意见 · 文本版本与来源见第 10 页</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 义务清单见第 4、6 页<br>时间表见第 9 页</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 解读范围与口径</td><td>文本版本、适用范围、解读边界</td><td>文本构成表 + 边界声明</td><td class="n n">3</td></tr><tr class=""><td>2 义务全景</td><td>58 条中的义务分布</td><td>主题分布表 + 条形图</td><td class="n n">4</td></tr><tr class=""><td>3 影响面拆解</td><td>四个业务环节 × 影响强度</td><td>2×2 矩阵 + 责任分工表</td><td class="n n">5</td></tr><tr class=""><td>4 关键义务解读</td><td>逐条要求、触发条件、证据</td><td>9 项高优先级义务表</td><td class="n n">6</td></tr><tr class=""><td>5 情景推演</td><td>三种执法强度的上线影响</td><td>3 情景 + 触发信号</td><td class="n n">7</td></tr><tr class=""><td>6 风险与信息缺口</td><td>细则未出与口径差异</td><td>5 项风险 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 行动建议与时间表</td><td>生效前倒排 6 周</td><td>4 段倒排 + 责任分工</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>文本清单、术语、免责</td><td>文本版本表 + 术语表</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>两种读法</h3><ul class=""><li>合规负责人：直接读第 4 页义务全景 + 第 6 页逐条解读 + 第 9 页时间表</li><li>业务负责人：读第 5 页影响面判断自己的环节强度，再确认第 6 页对应义务项</li></ul></div><div><h3>术语先行</h3><ul class=""><li><b>标识</b>：对生成内容添加可识别的显式或隐式标记</li><li><b>留存</b>：调用记录保存不少于 6 个月并可按请求调取</li><li><b>简化备案</b>：内部使用场景的材料与流程精简路径</li></ul></div></div><div><h3>自检清单构成：三类共 27 项，其中 9 项高优先级</h3><table><thead><tr><th>分类</th><th class="n">项数</th><th class="n">高优先级</th><th>完成时点</th></tr></thead><tbody><tr class=""><td>标识能力</td><td class="n">8 项</td><td class="n">4 项</td><td>10-01 前</td></tr><tr class=""><td>留存与追溯</td><td class="n">7 项</td><td class="n">3 项</td><td>10-01 前</td></tr><tr class=""><td>数据与授权</td><td class="n">12 项</td><td class="n">2 项</td><td>过渡期内</td></tr></tbody></table></div></div>
+  <div class="pf"><span>页码与正文一致，义务编号 P1–P9 贯穿全文</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Scope & Baseline</div><h2>解读范围、文本版本与边界</h2></div><div class="pn">解读基于 2026-09 可获得的三份文本<br>细则缺位项在第 8 页单独列出</div></div>
+  <div class="pc"><div><h3>解读文本构成</h3><table><thead><tr><th>文本</th><th>结构</th><th class="n">条数</th><th class="n">与本业务相关条款</th></tr></thead><tbody><tr class=""><td>管理办法（正式发布版）</td><td>5 章</td><td class="n n">38</td><td class="n n">21</td></tr><tr class=""><td>配套指引一：内容标识</td><td>3 章</td><td class="n n">11</td><td class="n n">6</td></tr><tr class=""><td>配套指引二：数据来源与授权</td><td>3 章</td><td class="n n">9</td><td class="n n">5</td></tr><tr class="tot"><td>合计</td><td>11 章</td><td class="n">58</td><td class="n">32</td></tr></tbody></table></div><div class="cols2 eq"><div><h3>适用范围判定</h3><ul class=""><li>对外提供服务：向不特定用户开放生成能力，无论是否收费，适用全部 21 条实质义务</li><li>内部使用：仅为本单位业务使用且不对外提供，适用简化备案，但标识与留存义务不豁免</li><li>模型微调：使用第三方基座模型做微调后对外提供，视同自研提供方</li></ul></div><div><h3>解读边界</h3><ul class=""><li>本解读以文本字面为准，不推测执法裁量空间</li><li>地方实施细则尚未发布，区域口径差异在第 8 页说明</li><li>不覆盖跨境数据传输，该事项由另两份文本规范</li><li>不构成法律意见，重大决策前须取得执业律师意见</li></ul></div></div><div><h3>口径声明</h3><p>"影响强度"为本报告自定指标，取值 1–5 分：1 分=仅需制度更新，3 分=需能力改造，5 分=需在生效日前完成能力上线并留痕；评分依据为义务条款数量、可验证方式以及与公开报道的历史检查重点三项加权。</p></div><div><h3>文本版本核对记录</h3><table><thead><tr><th>文本</th><th>版本日期</th><th>与解读的差异</th><th>处理方式</th></tr></thead><tbody><tr class=""><td>管理办法</td><td>2026-08-20 发布版</td><td>无</td><td>按发布版解读</td></tr><tr class=""><td>标识指引 / 数据指引</td><td>2026-08-20 同步发布</td><td>数据指引未明确留存格式</td><td>按最严口径推定</td></tr></tbody></table></div></div>
+  <div class="pf"><span>文本版本 v2026.09；如管理办法在生效前修订，本解读需整体重做</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Obligation Map</div><h2>义务全景：58 条落在哪里</h2></div><div class="pn">21 条实质义务按主题归类<br>剩余 37 条为定义、程序与附则类</div></div>
+  <div class="pc"><div class="cols2 wide"><div><h3>义务主题分布</h3><table><thead><tr><th>主题</th><th class="n">条数</th><th class="n">占比</th><th>是否需能力改造</th></tr></thead><tbody><tr class=""><td>内容标识</td><td class="n n">6</td><td class="n">29%</td><td>是</td></tr><tr class=""><td>数据来源与授权</td><td class="n n">5</td><td class="n">24%</td><td>是</td></tr><tr class=""><td>日志留存与追溯</td><td class="n n">4</td><td class="n">19%</td><td>是</td></tr><tr class=""><td>未成年人保护</td><td class="n n">2</td><td class="n">9%</td><td>部分</td></tr><tr class=""><td>投诉与处置</td><td class="n n">2</td><td class="n">10%</td><td>部分</td></tr><tr class=""><td>备案与变更</td><td class="n n">2</td><td class="n">9%</td><td>否</td></tr><tr class="tot"><td>合计</td><td class="n">21</td><td class="n">100%</td><td>4 项需能力改造</td></tr></tbody></table></div><div><h3>义务条数（按主题）</h3><div class="bars"><div class="bar"><span>内容标识</span><span class=""><i class="" style="width:100%"></i></span><span class="v">6 条</span></div><div class="bar"><span>数据来源授权</span><span class=""><i class="" style="width:83%"></i></span><span class="v">5 条</span></div><div class="bar"><span>日志留存</span><span class=""><i class="" style="width:67%"></i></span><span class="v">4 条</span></div><div class="bar"><span>未成年人保护</span><span class=""><i class="" style="width:33%"></i></span><span class="v">2 条</span></div><div class="bar"><span>投诉与处置</span><span class=""><i class="" style="width:33%"></i></span><span class="v">2 条</span></div><div class="bar"><span>备案与变更</span><span class=""><i class="" style="width:33%"></i></span><span class="v">2 条</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>2</span><span>4</span><span>6</span></span><span></span></div></div></div></div><div><h3>能力改造项与工作量估算</h3><table><thead><tr><th>能力项</th><th class="n">对应义务条数</th><th>改造内容</th><th class="n">预估工时</th><th>能否复用现有</th></tr></thead><tbody><tr class=""><td>内容标识</td><td class="n">6 条</td><td>输出侧显式标记 + 元数据隐式标记</td><td class="n">120 人时</td><td>部分（现有水印模块可复用 40%）</td></tr><tr class=""><td>调用日志留存</td><td class="n">4 条</td><td>记录留存 ≥ 6 个月、按请求可调取</td><td class="n">96 人时</td><td>否，需新增归档存储</td></tr><tr class=""><td>授权链路凭证</td><td class="n">5 条</td><td>数据来源清单 + 同意凭证关联</td><td class="n">72 人时</td><td>部分（现有同意管理系统可扩展）</td></tr><tr class=""><td>投诉处置通道</td><td class="n">2 条</td><td>带留痕的工单流</td><td class="n">40 人时</td><td>是，复用现有客服工单</td></tr><tr class="tot"><td>合计</td><td class="n">17 条</td><td>4 项能力</td><td class="n">328 人时（约 6 周 / 3 人）</td></tr></tbody></table></div></div>
+  <div class="pf"><span>328 人时按每周 20 人时/人测算，得 5.5 周，向上取整为 6 周</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Impact Breakdown</div><h2>四个业务环节的影响强度拆解</h2></div><div class="pn">强度 1–5 分，评分口径见第 3 页<br>越靠右上越需优先投入</div></div>
+  <div class="pc"><div class="mx"><div><div class="t">对外服务 · 强度 5</div><p>需要能力上线 + 留痕。4 项需改造能力中的 4 项全部命中。</p><ul class=""><li>义务条数 17 / 21 条</li><li>必须在 2026-10-01 前完成</li></ul></div><div><div class="t">数据采集 · 强度 3</div><p>以制度与凭证为主，涉及 5 条义务。</p><ul class=""><li>需补全授权链路，历史数据存在缺口</li><li>涉及个人信息时触发单独同意</li></ul></div><div><div class="t">模型训练 · 强度 3</div><p>关注训练数据来源清单与授权凭证。</p><ul class=""><li>需建立来源台账，按批次留档</li><li>第三方数据采购合同需补充授权条款</li></ul></div><div><div class="t">内部使用 · 强度 2</div><p>简化备案，但标识与留存不豁免。</p><ul class=""><li>只需制度更新 + 简化备案材料</li><li>仍须保证调用记录留存 6 个月</li></ul></div></div><div class="cols2 eq"><div><h3>责任分工</h3><table><thead><tr><th>环节</th><th>主责</th><th>配合</th><th>交付物</th></tr></thead><tbody><tr class=""><td>对外服务</td><td>产品 + 安全</td><td>法务</td><td>标识能力上线 + 留存看板</td></tr><tr class=""><td>数据采集</td><td>数据 + 法务</td><td>业务线</td><td>数据来源清单 + 同意凭证</td></tr><tr class=""><td>模型训练</td><td>算法团队</td><td>法务</td><td>来源台账 + 采购合同补条款</td></tr><tr class=""><td>内部使用</td><td>IT + 安全</td><td>法务</td><td>简化备案材料 + 制度更新</td></tr></tbody></table></div><div><h3>强度评分拆解</h3><ul class=""><li>对外服务 5 分 = 义务覆盖 2 分 + 需能力上线 2 分 + 可现场验证 1 分</li><li>数据采集与模型训练 3 分 = 义务覆盖 2 分 + 制度与凭证 1 分</li><li>内部使用 2 分 = 义务覆盖 1 分 + 简化程序 1 分</li></ul></div></div><div><h3>强度评分与工作量的对应关系</h3><p>强度 5 分的对外服务环节覆盖 21 条实质义务中的 17 条，并驱动全部 4 项能力改造；强度 3 分的数据采集与模型训练以制度与凭证为主（P5、P6 合计 72 人时，占 328 人时的 22%）；强度 2 分的内部使用仅需材料准备与简化备案。</p></div></div>
+  <div class="pf"><span>若将对外服务拆分为「面向消费者」与「面向企业客户」两条线，后者强度可降至 4 分</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Key Duties</div><h2>关键义务逐条解读（P1–P9）</h2></div><div class="pn">P1–P9 为 27 项自检清单中的高优先级项<br>证据列为可现场出示的形式</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>义务要求</th><th>触发条件</th><th>可验证证据</th><th>环节</th></tr></thead><tbody><tr class=""><td>P1</td><td>生成内容添加显式标识</td><td>对外提供生成能力</td><td>抽样 20 条输出可见标识</td><td>对外服务</td></tr><tr class=""><td>P2</td><td>元数据中写入隐式标记</td><td>对外提供生成能力</td><td>文件元数据字段截图</td><td>对外服务</td></tr><tr class=""><td>P3</td><td>调用日志留存 ≥ 6 个月</td><td>任何对外调用</td><td>归档策略 + 随机调取 10 条记录</td><td>对外服务</td></tr><tr class=""><td>P4</td><td>记录可按请求调取</td><td>监管或用户提出</td><td>调取流程演练记录 1 次</td><td>对外服务</td></tr><tr class=""><td>P5</td><td>个人信息训练前单独同意</td><td>训练使用个人信息</td><td>同意凭证与数据批次关联表</td><td>数据采集</td></tr><tr class=""><td>P6</td><td>建立训练数据来源清单</td><td>使用第三方数据</td><td>来源台账 + 采购合同条款页</td><td>模型训练</td></tr><tr class=""><td>P7</td><td>未成年人使用限制</td><td>面向公众开放注册</td><td>年龄验证与限制策略说明</td><td>对外服务</td></tr><tr class=""><td>P8</td><td>投诉入口与处置留痕</td><td>对外提供服务</td><td>工单系统截图 + 30 天处置记录</td><td>对外服务</td></tr><tr class=""><td>P9</td><td>备案信息变更及时更新</td><td>主体或服务范围变更</td><td>变更登记回执</td><td>内部使用</td></tr></tbody></table><p><span class="sm">说明：P1–P9 合计覆盖 17 条实质义务中的 15 条；剩余 2 条（投诉与处置、备案与变更的下级细则）归入普通优先级，可在过渡期内完成。</span></p><div><h3>高优先级义务的责任分工（P1–P6）</h3><table><thead><tr><th>义务</th><th>主责角色</th><th>证据保管方</th><th>最晚完成</th></tr></thead><tbody><tr class=""><td>P1 / P2 内容标识</td><td>产品 + 工程</td><td>安全</td><td>2026-09-20</td></tr><tr class=""><td>P3 / P4 日志留存与调取</td><td>工程 + 运维</td><td>运维</td><td>2026-09-25</td></tr><tr class=""><td>P5 / P6 授权凭证</td><td>数据 + 法务</td><td>法务</td><td>过渡期内</td></tr></tbody></table></div></div>
+  <div class="pf"><span>9 项高优先级义务需在 2026-10-01 前完成，其余 18 项可在过渡期（至 2027-01-01）内闭环</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Scenarios</div><h2>执法情景推演与上线节奏</h2></div><div class="pn">概率为合规与业务双线评估的共识值<br>情景只影响节奏，不改变义务本身</div></div>
+  <div class="pc"><table><thead><tr><th>情景</th><th>特征</th><th>对我方上线节奏的影响</th><th>应对要点</th><th class="n">概率</th></tr></thead><tbody><tr class=""><td>严格执法</td><td>生效后即开展专项检查，重点查标识与留存</td><td>对外服务须在 10-01 前具备 P1–P4 并可留痕；上线时间推迟 2 周</td><td>把 6 周整改压缩到 5 周，标识与留存先行</td><td class="n n">30%</td></tr><tr class=""><td>常规过渡</td><td>生效后以自查报告与整改指导为主</td><td>可按 6 周计划推进，10-01 前完成 P1–P9，其余在过渡期收尾</td><td>维持既定节奏，季度复核细则</td><td class="n n">55%</td></tr><tr class=""><td>细则延迟</td><td>地方实施细则晚于生效日发布，口径暂不明朗</td><td>先做与细则无关的 P1–P4；P5–P7 待细则明确后启动</td><td>预留 2 周弹性，不做超前投入</td><td class="n n">15%</td></tr></tbody></table><div><h3>情景对交付时间的影响</h3><div class="bars"><div class="bar"><span>严格执法</span><span class=""><i class="" style="width:100%"></i></span><span class="v">+2 周</span></div><div class="bar"><span>常规过渡</span><span class=""><i class="" style="width:70%"></i></span><span class="v">基准</span></div><div class="bar"><span>细则延迟</span><span class=""><i class="" style="width:55%"></i></span><span class="v">P5–P7 延后</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>2</span><span>4</span><span>6 周</span></span><span></span></div></div></div><div class="cols2 eq"><div><h3>早期信号</h3><ul class=""><li>生效前 2 周内是否发布配套解读或问答口径</li><li>同行企业是否集中发布内容标识改造公告</li><li>属地监管是否组织预沟通会或自查填报</li></ul></div><div><h3>情景无关的必做项</h3><ul class=""><li>P3 日志留存归档策略（三情景均需在生效日前具备）</li><li>P6 训练数据来源清单（制度成本低，越早越省事）</li></ul></div></div><div><h3>情景对内部资源的占用差异</h3><table><thead><tr><th>情景</th><th class="n">专职人数</th><th class="n">占用周数</th><th>对其它项目的影响</th></tr></thead><tbody><tr class=""><td>严格执法</td><td class="n">3 人</td><td class="n">5 周</td><td>同期其他项目暂停 2 周</td></tr><tr class=""><td>常规过渡</td><td class="n">3 人</td><td class="n">6 周</td><td>无</td></tr><tr class=""><td>细则延迟</td><td class="n">2 人</td><td class="n">4 周（分两段）</td><td>P5–P7 延后至过渡期</td></tr></tbody></table></div></div>
+  <div class="pf"><span>三种情景下 P1–P4 均须在 2026-10-01 前完成，这是唯一不随情景变化的时间点</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Risks & Gaps</div><h2>风险、不确定性与信息缺口</h2></div><div class="pn">不确定性主要来自细则缺位<br>缺口项标注补齐方式</div></div>
+  <div class="pc"><table><thead><tr><th>风险 / 不确定性</th><th>对解读的影响</th><th>概率</th><th>缓释动作</th></tr></thead><tbody><tr class=""><td>地方实施细则未发布</td><td>区域口径差异可能导致重复改造</td><td>高</td><td>生效前每两周跟踪一次属地发布渠道</td></tr><tr class=""><td>「显式标识」的呈现标准未细化</td><td>标识方案可能需二次调整</td><td>高</td><td>按最严口径实现（可见文字 + 元数据双写）</td></tr><tr class=""><td>历史训练数据的授权凭证不完整</td><td>P5、P6 可能无法在生效日前完全闭环</td><td>中</td><td>先出缺口清单，按影响面排序分批补</td></tr><tr class=""><td>简化备案的适用范围存在解释空间</td><td>内部使用场景可能被要求走完整流程</td><td>中</td><td>保留完整备案材料，随时可切换</td></tr><tr class=""><td>归档存储成本高于预期</td><td>留存 6 个月的存储开支需重新预算</td><td>低</td><td>先按冷存储测算，按季度复核用量</td></tr></tbody></table><div class="cols2 eq"><div><h3>信息缺口</h3><ul class=""><li>缺少配套细则中关于标识技术标准的说明，实现方式靠最严推定</li><li>未取得同类企业的合规成本数据，328 人时仅为内部估算</li><li>跨境场景不在这三份文本内，需要另做一次解读</li><li>投诉处置的时限要求未见明确数字，暂按 7 个工作日设计</li></ul></div><div><h3>本次成立的假设</h3><ul class=""><li>文本在生效日前不做实质性修订</li><li>简化备案可覆盖纯内部使用场景</li><li>留存要求为 6 个月，不含特定行业的更长要求</li></ul></div></div><div><h3>风险检查频率与责任</h3><table><thead><tr><th>风险</th><th>检查频率</th><th>责任角色</th><th>触发升级条件</th></tr></thead><tbody><tr class=""><td>地方细则未发布</td><td>每两周跟踪一次</td><td>法务</td><td>发布内容与推定口径冲突</td></tr><tr class=""><td>标识标准未细化</td><td>每月复核一次行业实践</td><td>产品 + 安全</td><td>同行公开方案与现方案差一档</td></tr><tr class=""><td>历史数据凭证缺口</td><td>过渡期内每月盘点</td><td>数据 + 法务</td><td>缺口条数两周内未下降</td></tr></tbody></table></div></div>
+  <div class="pf"><span>高概率风险与非高概率风险的应对策略不同：前者靠最严实现，后者靠材料可切换</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Recommendations</div><h2>行动建议与生效前倒排</h2></div><div class="pn">以 2026-10-01 为终点倒排 6 周<br>3 人专职投入，合计 328 人时</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">必须完成</div><b class="n">P1–P4</b><i>标识与留存 4 项，是 17 条对外服务义务中最先被现场检查的部分</i></div><div class="kc"><div class="k">投入估算</div><b class="n">328 人时</b><i>约 6 周 / 3 人，含复用现有模块</i></div><div class="kc"><div class="k">硬约束</div><b class="n class="sm"">2026-10-01</b><i>无论何种情景，此日期不变</i></div></div><div><h3>倒排 6 周</h3><div class="tl"><div class="r"><b>W1–W2</b><span>标识能力：输出侧显式标记 + 元数据隐式标记；复用现有水印模块（覆盖率 40%），补齐剩余 60%</span></div><div class="r"><b>W3–W4</b><span>留存能力：调用日志归档策略上线，留存期设为 6 个月，完成随机调取 10 条记录的演练</span></div><div class="r"><b>W5</b><span>数据侧：输出训练数据来源清单与授权凭证缺口表，P5、P6 缺口项按影响面分批排队</span></div><div class="r"><b>W6</b><span>客户侧：更新隐私条款与数据处理说明；完成 27 项自检并出具自查报告；确认简化备案材料齐备</span></div></div></div><div class="cols2 eq"><div><h3>责任与交付物</h3><table><thead><tr><th>动作</th><th>负责角色</th><th>交付物</th><th>截止</th></tr></thead><tbody><tr class=""><td>标识能力上线</td><td>产品 + 工程</td><td>标识能力 + 抽样记录</td><td>W2 末</td></tr><tr class=""><td>日志留存上线</td><td>工程 + 运维</td><td>归档策略 + 调取演练记录</td><td>W4 末</td></tr><tr class=""><td>数据来源清单</td><td>数据 + 法务</td><td>来源台账 + 缺口表</td><td>W5 末</td></tr><tr class=""><td>自检与自查报告</td><td>安全 + 法务</td><td>27 项自检报告</td><td>W6 末</td></tr></tbody></table></div><div><h3>过渡期（至 2027-01-01）内的收尾项</h3><ul class=""><li>剩余的 18 项普通优先级自检逐项闭环</li><li>未成年人保护与投诉处置策略按最终细则微调</li><li>存量服务完成补充登记与口径对齐</li><li>每两周跟踪一次属地细则发布情况</li></ul></div></div></div>
+  <div class="pf"><span>若出现严格执法情景，W1–W4 压缩到 5 周执行，W5–W6 顺延至过渡期</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>参考来源、术语与免责</h2></div><div class="pn">三份文本均以 2026-09 可获得版本为准<br>本解读不构成法律意见</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>来源</th><th>版本 / 规模</th><th>时间</th><th>引用位置</th></tr></thead><tbody><tr class=""><td>T1</td><td>管理办法正式发布版</td><td>5 章 38 条</td><td>2026-08</td><td>第 1、3、4、6 页</td></tr><tr class=""><td>T2</td><td>配套指引一（内容标识）</td><td>3 章 11 条</td><td>2026-08</td><td>第 1、4、6 页</td></tr><tr class=""><td>T3</td><td>配套指引二（数据来源与授权）</td><td>3 章 9 条</td><td>2026-08</td><td>第 4、6 页</td></tr><tr class=""><td>T4</td><td>属地监管公开问答</td><td>2 场</td><td>2026-07 – 2026-09</td><td>第 7、8 页</td></tr><tr class=""><td>T5</td><td>内部系统现状盘点</td><td>4 个系统</td><td>2026-09</td><td>第 4 页工时估算</td></tr><tr class=""><td>T6</td><td>行业合规成本对照（公开报道）</td><td>6 篇</td><td>2026-05 – 2026-09</td><td>第 8 页成本校验</td></tr></tbody></table><div class="cols2 eq"><div><h3>术语表</h3><ul class=""><li><b>显式标识</b>：用户可见的生成内容标记</li><li><b>隐式标记</b>：写入文件元数据的标识字段</li><li><b>留存期</b>：调用记录的最短保存时长，本解读按 6 个月</li><li><b>简化备案</b>：内部使用场景的精简程序</li><li><b>高优先级项</b>：P1–P9，须在生效日前完成</li></ul></div><div><h3>免责与更新</h3><ul class=""><li>本解读仅为内部分析材料，不构成法律意见</li><li>文本若在生效日前修订，须整体重做第 4、6 页</li><li>解读版本 v2026.09，下次复核时间 2026-10-15</li><li>所有工时与成本估算为内部测算，非外部基准</li></ul></div></div><div><h3>来源可得性与复核计划</h3><table><thead><tr><th>来源</th><th>可得性</th><th>复核频率</th><th>责任</th></tr></thead><tbody><tr class=""><td>三份文本（T1–T3）</td><td>公开可得</td><td>文本修订即复核</td><td>法务</td></tr><tr class=""><td>属地问答与内部盘点（T4、T5）</td><td>内部整理</td><td>每两周 / 每月</td><td>安全 + 法务</td></tr></tbody></table></div></div>
+  <div class="pf"><span>解读版本 v2026.09 · 下次复核 2026-10-15（生效后两周）</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

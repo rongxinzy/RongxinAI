@@ -1,75 +1,290 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-content-research</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-content-research</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:0;display:block}
-.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
-.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
-.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
-.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
-.rule{margin-top:26px;height:1px;background:#e6e6e2}
-.body{margin-top:30px;display:grid;gap:26px;flex:1}
-.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
-.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
-.cols3{grid-template-columns:repeat(3,1fr)}
-.cols2{grid-template-columns:repeat(2,1fr)}
-.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
-.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
-.blk .num{margin-top:6px;font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
-.blk .num small{font-size:15px;font-weight:500;color:#6f737b;margin-left:8px;letter-spacing:0}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
-.matrix{margin-top:8px;border:1px solid #e6e6e2}
-.matrix .row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-top:1px solid #e6e6e2}
-.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
-.matrix .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2}
-.matrix .row div:first-child{border-left:0}
-.bars{margin-top:14px;display:grid;gap:9px}
-.bar{display:grid;grid-template-columns:74px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
-.diagram{margin-top:6px;height:230px;position:relative;border:1px solid #e6e6e2;background:radial-gradient(120% 120% at 50% 50%,#fdfaf3 0%,#fff 70%)}
-.sun{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--accent)}
-.orbit{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
-.planet{position:absolute;width:16px;height:16px;border-radius:50%;background:#4c5058}
-.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
-.mini{border:1px solid #e6e6e2;padding:16px 18px;background:#fafaf8}
-.mini b{display:block;font-size:34px;color:var(--accent);letter-spacing:-.02em}
-.mini span{display:block;margin-top:8px;font-size:14px;font-weight:600}
-.mini p{margin-top:8px;font-size:13px;color:#6f737b;line-height:1.7}
-</style></head>
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
 <body>
-<div class="slide" style="--accent:#F59E0B">
-  <div class="kicker">Market Research</div>
-  <h1>行业趋势与竞品调研</h1>
-  <p class="lede">市场规模、竞争格局与机会点判断</p>
-  <div class="rule"></div>
-  <div class="body cols2">
-    <div>
-      <div class="matrix">
-        <div class="row"><div>对比项</div><div>竞品 A</div><div>竞品 B</div><div>本方案</div></div>
-        <div class="row"><div>部署方式</div><div>纯云端</div><div>私有化</div><div>本地优先</div></div>
-        <div class="row"><div>数据口径</div><div>黑盒</div><div>可导出</div><div>可追溯</div></div>
-        <div class="row"><div>离线可用</div><div>不支持</div><div>部分</div><div>完整支持</div></div>
-        <div class="row"><div>起订价格</div><div>¥299/人</div><div>按项目</div><div>按坐席</div></div>
-      </div>
-    </div>
-    <div>
-      <div class="blk"><h2>细分市场规模</h2></div>
-      <div class="bars">
-        <div class="bar"><span>制造业</span><i style="width:88%"></i><span class="mono">88</span></div>
-        <div class="bar"><span>零售</span><i style="width:64%"></i><span class="mono">64</span></div>
-        <div class="bar"><span>金融</span><i style="width:46%"></i><span class="mono">46</span></div>
-        <div class="bar"><span>医疗</span><i style="width:28%"></i><span class="mono">28</span></div>
-      </div>
-      <ul style="margin-top:18px">
-        <li>机会点：本地化部署与数据可追溯</li>
-        <li>风险：交付周期普遍长于 6 周</li>
-      </ul>
-    </div>
-  </div>
-  <div class="pageno">12 / 24</div>
-</div></body></html>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Market Research · 行业调研</div>
+<h1>行业趋势与竞品调研</h1>
+<p class="lede">企业级智能客服赛道的规模、竞争格局与机会点判断：覆盖 4 个细分行业、12 家主要厂商，并给出本地化部署与数据可追溯的产品定位依据。</p>
+<div class="meta"><span>研究对象：企业级智能客服</span><span>样本：4 个细分行业 · 12 家厂商 · 24 位客户访谈</span><span>口径：签约金额，不含硬件</span><span>数据截至 2026-09-20</span></div>
+<div class="kn">
+  <div class="k"><b>486<em>亿元</em></b><span>2026 年市场规模</span><p>同比增速 24.7%，4 个细分行业合计 226 亿</p></div>
+  <div class="k"><b>12<em>家</em></b><span>重点厂商</span><p>按部署模式分为 4 类，其中本地优先仅 2 家</p></div>
+  <div class="k"><b>8<em>周</em></b><span>本地化交付周期</span><p>行业均值 8 周，云端仅 3.5 周，交付周期是主要门槛</p></div>
+</div>
+<table class="tb">
+  <caption>竞品概览 · 4 个关键维度的快速对照</caption>
+  <thead><tr><th>对比项</th><th>竞品 A</th><th>竞品 B</th><th>本方案</th></tr></thead>
+  <tbody>
+    <tr><td>部署方式</td><td>纯云端</td><td>混合部署</td><td class="n">本地优先</td></tr>
+    <tr><td>数据口径</td><td>黑盒</td><td>可导出</td><td class="n">可追溯</td></tr>
+    <tr><td>离线可用</td><td>不支持</td><td>部分</td><td class="n">完整支持</td></tr>
+    <tr class="hi"><td>起订价格</td><td>¥299 / 人 / 月</td><td>按项目报价</td><td>按坐席计价</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：签约金额，不含硬件｜来源：公开财报 · 招投标公告 · 24 位客户访谈</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 规模｜P5–P7 格局｜P8–P9 建议</div>
+</div></div>
+<div class="foot"><span>结论：本地化部署与数据可追溯是 226 亿细分市场的空缺位，交付周期是可攻破的门槛。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 目录导航</div><h1 class="pt">调研结构与阅读路径</h1></div><div class="calib">口径：签约金额（不含硬件）<br>数据截至 2026-09-20 · 全文 9 页</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>结论摘要</span><em>市场规模、厂商结构与机会点判断</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>背景与范围</span><em>研究问题、统计口径与样本构成</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>现状数据</span><em>4 个细分行业的规模、增速与渗透率</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>分析与洞察</span><em>合规、交付周期与价格带三条结论</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>竞争格局</span><em>部署模式 × 数据可控性四象限</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>竞品对比</span><em>8 项能力的横向对照表</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与限制</span><em>样本偏差、数据滞后与口径差异</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>结论与行动</span><em>定位建议、三步动作与来源清单</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>研究方法</b><p>公开财报与招投标公告为主，辅以 <b>24 位客户访谈</b> 交叉验证，避免单一来源偏差。</p></div>
+  <div class="q"><b>数据提示</b><p>市场规模为签约金额口径，与「开通量」口径相比存在 <b>12%–18%</b> 差异，跨页引用需注意。</p></div>
+  <div class="q"><b>决策用途</b><p>本报告用于确定产品定位与首年目标行业，重点关注 <b>P5 与 P6</b> 的结论页。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>全文 9 页：P1 结论 → P3 口径 → P4 规模 → P6 格局 → P9 建议。</div>
+  <div class="cell"><u>下一步与责任</u>10 月 10 日前确认首年主攻行业与定价档。</div>
+</div></div>
+<div class="foot"><span>导航：从规模数据到竞争格局，最终收敛为定位建议与三步行动。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 背景与范围</div><h1 class="pt">研究问题、统计口径与样本构成</h1></div><div class="calib">时间窗：2024 Q1 至 2026 Q3<br>样本：12 家厂商 · 24 位客户</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>研究问题</b>企业级智能客服的市场规模与增速如何分布？本地化部署是否存在可持续的产品空位？进入该赛道的交付门槛多高？</div>
+  <div class="cell"><b>统计口径</b>规模按签约金额统计，不含硬件与实施服务；渗透率按「已上线坐席数 / 目标企业坐席数」计算。</div>
+  <div class="cell"><b>样本构成</b>12 家厂商（4 类部署模式）+ 24 位客户（制造业 9 / 零售 7 / 金融 5 / 医疗 3），访谈时长 45–70 分钟。</div>
+  <div class="cell"><b>数据窗口</b>财务数据截至 2026 Q2 财报，招投标与产品文档截至 2026-09-20，价格按公开挂牌价取中位数。</div>
+</div>
+<div class="sl"><i>01</i>口径边界与不作为结论的事项</div>
+<div class="steps">
+  <div class="step"><b>纳入</b><span>企业级智能客服软件订阅、私有化授权与年度运维服务收入，含渠道分成前金额。</span></div>
+  <div class="step"><b>不纳入</b><span>呼叫中心硬件、通信线路费、通用大模型 API 转售收入，以及政企定制项目的一次性开发费。</span></div>
+  <div class="step"><b>不作为结论</b><span>厂商未公开的续约率与毛利结构不做推断；12 家厂商中 7 家未披露价格，均价仅代表可观测样本。</span></div>
+  <div class="step"><b>汇率与税</b><span>海外厂商收入按 2026-09 中间价折算，统一采用不含税口径，避免票面差异。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>样本：12 家厂商、24 位客户访谈、4 个细分行业。</div>
+  <div class="cell"><u>下一步与责任</u>结论外推前须复核样本偏差，由市场研究组秦朗负责。</div>
+</div></div>
+<div class="foot"><span>范围：4 个细分行业、12 家厂商、24 位客户访谈，口径与边界已明确列出。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 现状数据</div><h1 class="pt">4 个细分行业的规模、增速与渗透率</h1></div><div class="calib">单位：亿元人民币 / 平均客单价：万元<br>口径：签约金额，不含硬件与实施</div></div>
+<div class="grid2">
+  <table class="tb">
+    <caption>表 1 · 内圈：制造业与零售</caption>
+    <thead><tr><th>行业</th><th class="r">规模</th><th class="r">增速</th><th class="r">渗透率</th><th class="r">客单价</th></tr></thead>
+    <tbody>
+      <tr><td>制造业</td><td class="r mono">88 亿</td><td class="r mono">+18.2%</td><td class="r mono">12%</td><td class="r mono">¥38 万</td></tr>
+      <tr><td>零售</td><td class="r mono">64 亿</td><td class="r mono">+27.4%</td><td class="r mono">21%</td><td class="r mono">¥22 万</td></tr>
+      <tr class="hi"><td>两行业合计</td><td class="r mono">152 亿</td><td class="r mono">+21.9%</td><td class="r mono">加权 16%</td><td class="r mono">—</td></tr>
+    </tbody>
+  </table>
+  <table class="tb">
+    <caption>表 2 · 外圈：金融与医疗</caption>
+    <thead><tr><th>行业</th><th class="r">规模</th><th class="r">增速</th><th class="r">渗透率</th><th class="r">客单价</th></tr></thead>
+    <tbody>
+      <tr><td>金融</td><td class="r mono">46 亿</td><td class="r mono">+31.6%</td><td class="r mono">34%</td><td class="r mono">¥96 万</td></tr>
+      <tr><td>医疗</td><td class="r mono">28 亿</td><td class="r mono">+34.8%</td><td class="r mono">9%</td><td class="r mono">¥41 万</td></tr>
+      <tr class="hi"><td>两行业合计</td><td class="r mono">74 亿</td><td class="r mono">+32.8%</td><td class="r mono">加权 25%</td><td class="r mono">—</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="sl"><i>02</i>细分市场规模对比（亿元，2026 年）</div>
+<div class="bars">
+  <div class="bar"><span>制造业</span><i style="width:100%"></i><em class="mono">88</em></div>
+  <div class="bar"><span>零售</span><i style="width:73%"></i><em class="mono">64</em></div>
+  <div class="bar"><span>金融</span><i style="width:52%"></i><em class="mono">46</em></div>
+  <div class="bar"><span>医疗</span><i style="width:32%"></i><em class="mono">28</em></div>
+</div>
+<div class="note">口径说明：4 个细分行业合计 226 亿元，占整体市场 486 亿元的 46.5%，其余规模分散在政务、教育、物流等长尾行业；合计行的增速与渗透率为按规模加权的加权值，不是简单相加。</div><div class="sl"><i>03</i>四个细分行业的取舍判断</div>
+<ul class="pts">
+  <li><b>优先制造业：</b>规模 88 亿元最大、客单价 ¥38 万居中、渗透率仅 12%，是规模与空白度兼顾的首选市场。</li>
+  <li><b>储备医疗：</b>规模 28 亿元最小但增速 34.8% 最快、渗透率 9% 最低；零售 64 亿元已有 3 家厂商竞争，价格战风险最高，暂缓进入。</li>
+</ul><div class="note">取舍判断：优先制造业（88 亿、渗透率 12%），储备医疗（增速 34.8%），零售价格战风险最高。</div></div>
+<div class="foot"><span>数据：制造业 88 亿居首，金融与医疗增速最快，合计 226 亿占整体 46.5%。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 分析与洞察</div><h1 class="pt">合规、交付周期与价格带三条核心结论</h1></div><div class="calib">支撑：24 位客户访谈 + 12 家厂商产品文档<br>交叉验证，结论置信度已标注</div></div>
+<div class="grid3">
+  <div class="q"><b><em>01</em>合规驱动本地化</b><p>金融与医疗合计 74 亿、占细分市场 32.7%，渗透率却只有 34% 与 9%，本地部署是唯一可选项。置信度：高。</p></div>
+  <div class="q"><b><em>02</em>交付周期是护城河</b><p>本地化平均交付 8 周，云端仅 3.5 周；访谈中 21 位客户表示交付周期缩短 2 周可提升中标概率约 21 pp。</p></div>
+  <div class="q"><b><em>03</em>价格带存在断层</b><p>¥299 / 人 / 月与 ¥1,180 / 坐席 / 年之间缺少中间档，¥600–800 / 人 / 月区间无厂商覆盖。</p></div>
+</div>
+<div class="sl"><i>03</i>三条结论的关键支撑数据</div>
+<table class="tb">
+  <thead><tr><th>结论</th><th class="r">关键数据</th><th class="r">样本量</th><th>置信度</th></tr></thead>
+  <tbody>
+    <tr><td>合规驱动本地化</td><td class="r mono">74 亿 / 渗透率 34% 与 9%</td><td class="r mono">8 位金融医疗客户</td><td class="n">高</td></tr>
+    <tr><td>交付周期是护城河</td><td class="r mono">8 周 vs 3.5 周 / 中标率 +21 pp</td><td class="r mono">24 位客户</td><td class="n">中高</td></tr>
+    <tr class="hi"><td>价格带存在断层</td><td class="r mono">¥600–800 区间 0 家覆盖</td><td class="r mono">5 家公开价厂商</td><td>中</td></tr>
+  </tbody>
+</table><div class="sl"><i>04</i>三条结论对产品定位的直接含义</div>
+<ul class="pts">
+  <li><b>能力取舍：</b>离线能力与审计日志是合规客群的准入项，须作为首版必备能力，不能延后到二期实现。</li>
+  <li><b>交付目标：</b>把本地化交付周期从 8 周压到 5 周，对应访谈中 21 位客户提到的中标率提升 21 pp 的关键门槛。</li>
+  <li><b>定价策略：</b>¥720 / 人 / 月落在无人覆盖的 ¥600–800 区间，可同时避开 ¥299 的低价战与 ¥1,180 的高门槛。</li>
+</ul><div class="note">三条结论的验证方式：合规结论用 8 位金融医疗客户复核，交付周期结论用 3 个试点项目验证，价格带结论每季度用公开挂牌价更新一次；置信度为「中高」与「中」的两项不得直接用于对外材料。</div></div>
+<div class="foot"><span>洞察：合规是本地化的刚需来源，交付周期决定中标概率，价格带存在可切入的中间档。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 竞争格局</div><h1 class="pt">部署模式 × 数据可控性四象限</h1></div><div class="calib">横轴：部署模式（云端 → 本地）<br>纵轴：数据可控性（黑盒 → 可追溯）</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>象限 A · 云端黑盒</u><b>6 家厂商 · 均价 ¥299 / 人 / 月</b>标准化程度最高，交付周期 3–4 周，但数据不出站点的合规要求无法满足，金融与医疗客户基本被排除。</div>
+  <div class="cell"><u>象限 B · 云端可导出</u><b>3 家厂商 · 均价 ¥460 / 人 / 月</b>支持数据导出与操作审计日志，交付周期 5–6 周，是当前零售行业的主流选择。</div>
+  <div class="cell"><u>象限 C · 本地优先</u><b>2 家厂商 · 均价 ¥1,180 / 坐席 / 年</b>具备完整离线能力，需客户自备算力，交付周期 8 周以上，制造业客户接受度最高。</div>
+  <div class="cell"><u>象限 D · 混合部署</u><b>1 家厂商 · 按项目报价</b>核心数据本地、推理走云端，架构复杂、运维成本高，目前仅有 1 个可验证的落地案例。</div>
+</div>
+<div class="note">口径：厂商归属按 2026 年 9 月公开产品文档与实际交付案例判定；6 + 3 + 2 + 1 = 12 家，与样本总数一致；均价取可观测样本中位数。</div><div class="sl"><i>04</i>象限归属的判定依据与易混淆点</div>
+<ul class="pts">
+  <li><b>判定依据：</b>「本地优先」要求支持完整离线推理；仅提供私有化部署但推理仍走云端的厂商归入象限 D。</li>
+  <li><b>易混淆点：</b>「数据可导出」不等于「可追溯」，前者指导出文件，后者要求操作轨迹与模型判定依据可查；本方案按后者设计。</li>
+  <li><b>空位结论：</b>象限 A 与 B 合计 9 家厂商同质化竞争，象限 C 仅 2 家且客单价最高，是差异化定价的立足点。</li>
+  <li><b>与竞品表的对应：</b>竞品 A 属象限 A（纯云端 ¥299）、竞品 C 属象限 B（云端可导出 ¥460）、竞品 B 属象限 D（混合部署、按项目报价、离线仅部分支持）；象限 C 的 2 家厂商未纳入本报告的三家对比样本。</li>
+</ul></div>
+<div class="foot"><span>格局：12 家厂商集中在云端象限，本地优先仅 2 家，中间档位无人占据。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 竞品对比</div><h1 class="pt">8 项关键能力的横向对照</h1></div><div class="calib">取值来源：厂商公开文档与交付案例<br>价格口径：不含税挂牌中位数</div></div>
+<table class="tb">
+  <caption>表 3 · 竞品能力对照（A / B / C 为观测样本量最大的三家）</caption>
+  <thead><tr><th>对比项</th><th class="r">竞品 A</th><th class="r">竞品 B</th><th class="r">竞品 C</th><th>本方案</th></tr></thead>
+  <tbody>
+    <tr><td>部署方式</td><td class="r">纯云端</td><td class="r">混合部署</td><td class="r">云端 + 导出</td><td class="n">本地优先</td></tr>
+    <tr><td>数据口径</td><td class="r">黑盒</td><td class="r">可导出</td><td class="r">可导出</td><td class="n">可追溯</td></tr>
+    <tr><td>离线可用</td><td class="r">不支持</td><td class="r">部分</td><td class="r">不支持</td><td class="n">完整支持</td></tr>
+    <tr><td>集成与部署周期</td><td class="r mono">3.5 周</td><td class="r mono">8 周</td><td class="r mono">5 周</td><td class="n">目标 5 周</td></tr>
+    <tr><td>意图分类准确率</td><td class="r mono">89.4%</td><td class="r mono">92.1%</td><td class="r mono">90.7%</td><td class="n">目标 92%</td></tr>
+    <tr><td>操作审计日志</td><td class="r">基础</td><td class="r">完整</td><td class="r">完整</td><td class="n">完整 + 导出</td></tr>
+    <tr class="hi"><td>起订价格</td><td class="r mono">¥299 / 人 / 月</td><td class="r mono">按项目报价</td><td class="r mono">¥460 / 人 / 月</td><td>目标 ¥720 / 人 / 月</td></tr>
+    <tr><td>不可替代性风险</td><td class="r">高（同质化）</td><td class="r">低（交付重）</td><td class="r">中</td><td class="n">中低</td></tr>
+  </tbody>
+</table><div class="sl"><i>05</i>本方案的目标取值与验证方式</div>
+<ul class="pts">
+  <li><b>准确率目标：</b>92% 取行业中位偏上水平（竞品 B 为 92.1%、竞品 C 为 90.7%），可通过 46 万条历史工单样本达成。</li>
+  <li><b>价格目标：</b>¥720 / 人 / 月较竞品 B 年费折算价低 39%，同时保留 12 个百分点的毛利空间。</li>
+</ul><div class="note">本方案目标：分类准确率 92%、交付周期 5 周、定价 ¥720 / 人 / 月。</div></div>
+<div class="foot"><span>对比：本方案在离线能力与数据可追溯上占优，目标价格 ¥720 恰好填补中间档断层。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与限制</div><h1 class="pt">样本偏差、数据滞后与口径差异</h1></div><div class="calib">评估时点：2026-09-26<br>影响程度按高 / 中 / 低三档</div></div>
+<table class="tb">
+  <caption>表 4 · 研究局限与影响评估</caption>
+  <thead><tr><th>局限项</th><th>影响</th><th class="r">可观测范围</th><th>应对方式</th></tr></thead>
+  <tbody>
+    <tr><td>价格样本不足</td><td>中</td><td class="r mono">5 / 12 家</td><td>仅给出中位数区间，不做单点定价结论</td></tr>
+    <tr><td>财务数据滞后</td><td>中</td><td class="r mono">截至 2026 Q2</td><td>2026 全年规模按上半年增速外推并标注</td></tr>
+    <tr><td>口径差异</td><td>高</td><td class="r mono">12%–18%</td><td>统一按签约金额口径，同时在附录列出换算系数</td></tr>
+    <tr><td>访谈意愿偏差</td><td>中</td><td class="r mono">24 / 24 位</td><td>其中 9 位拒绝披露成本结构，相关结论降级为中置信度</td></tr>
+    <tr class="hi"><td>厂商聚类主观性</td><td>低</td><td class="r mono">12 家</td><td>象限归属采用双人独立判定，分歧项由第三人裁决</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>尚不能回答的问题</b><p>厂商真实续约率、单客户实施成本、渠道分成比例三项数据均未公开，本报告不对此做任何推断。</p></div>
+  <div class="q"><b>使用建议</b><p>本报告适合用于定位与目标行业选择；若用于定价决策，需另行补充 20 家以上客户的实测价格样本。</p></div>
+</div><div class="sl"><i>05</i>结论可信度的分级说明</div>
+<ul class="pts">
+  <li><b>可直接引用：</b>市场规模、增速与渗透率三项来自第三方行业数据库，可用于对外材料。</li>
+  <li><b>需谨慎引用：</b>均价与成交折扣来自 5 家公开价厂商与访谈估算，仅适合内部决策参考。</li>
+</ul><div class="note">引用纪律：规模与增速可直接对外；均价与折扣仅限内部决策使用。</div></div>
+<div class="foot"><span>局限：价格样本仅 5 / 12 家可观测，口径差异 12%–18%，定价类结论需补充样本。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 结论与行动</div><h1 class="pt">定位建议、三步动作与来源清单</h1></div><div class="calib">复核节奏：季度更新一次规模与价格<br>责任人：市场研究组 秦朗</div></div>
+<div class="grid4">
+  <div class="q"><b>226 亿</b><p>4 个细分行业合计规模，占整体 46.5%。</p></div>
+  <div class="q"><b>32.7%</b><p>金融与医疗规模占比，渗透率仅 34% / 9%。</p></div>
+  <div class="q"><b>¥720</b><p>建议切入价格档，填补 ¥600–800 空位。</p></div>
+  <div class="q"><b>5 周</b><p>本地化交付周期目标，较行业均值缩短 3 周。</p></div>
+</div>
+<div class="sl"><i>04</i>三步行动</div>
+<div class="steps">
+  <div class="step"><b>第一步</b><span>锁定金融与医疗两个高合规行业为首年主攻方向，合计可寻址规模 74 亿元 · 10 月完成目标客户名单 60 家。</span></div>
+  <div class="step"><b>第二步</b><span>把本地化交付周期从 8 周压到 5 周，通过标准化部署包与预设连接器实现 · 11 月完成 3 个试点交付。</span></div>
+  <div class="step"><b>第三步</b><span>定价定在 ¥720 / 人 / 月，配套审计日志与数据导出能力 · 12 月完成首版报价单与竞品话术。</span></div>
+</div>
+<div class="sl"><i>05</i>数据来源清单</div>
+<div class="refs">
+  <div class="ref"><u>01</u><span>12 家厂商公开财报、招投标公告与产品文档</span><em>2026-09-20</em></div>
+  <div class="ref"><u>02</u><span>24 位客户深度访谈记录（制造业 9 / 零售 7 / 金融 5 / 医疗 3）</span><em>2026-08 至 09</em></div>
+  <div class="ref"><u>03</u><span>第三方行业数据库：企业级 SaaS 细分市场规模与渗透率</span><em>2026 Q2</em></div>
+</div><div class="note">落地资源：首年需 12 名行业销售与 2 名交付顾问，预算按 74 亿元可寻址规模的 3% 投入；三步行动的季度验收口径见本页，责任人市场研究组秦朗，10 月 10 日前完成目标客户名单 60 家。</div></div>
+<div class="foot"><span>行动：锁定金融医疗、交付压缩至 5 周、定价 ¥720 切入中间档，来源清单见本页。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

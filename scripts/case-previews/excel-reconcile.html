@@ -1,89 +1,86 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-reconcile</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>excel-reconcile</title><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased;display:grid;gap:26px;padding:30px;justify-items:center}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 40px 18px;display:flex;flex-direction:column}
+.ph{display:flex;align-items:flex-start;gap:20px;border-bottom:1px solid #edede9;padding-bottom:12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.18;margin-top:7px}
+h2{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:7px}
+.cap{margin-left:auto;text-align:right;font-size:11px;color:#8b8f97;line-height:1.75;padding-top:2px}
+.meta{display:flex;gap:18px;margin-top:8px;font-size:11.5px;color:#8b8f97;flex-wrap:wrap}
+.meta span{position:relative}
+.meta span+span::before{content:"";position:absolute;left:-10px;top:5px;width:3px;height:3px;background:#c9c9c3}
+.body{flex:1;min-height:0;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.body>*{flex:0 0 auto}
+.stack{flex:none}
+.bars{flex:none}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#8b8f97}
+.pf b{font-weight:500;color:#6f737b}
+.sec{font-size:11px;letter-spacing:.22em;color:#8b8f97;text-transform:uppercase}
+.sec.dark{color:#6f737b;letter-spacing:.16em}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:500;letter-spacing:.06em;color:#6f737b;background:#f6f6f3;text-align:left;padding:5px 10px;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+td{font-size:12.5px;color:#3d4046;padding:5px 10px;border-bottom:1px solid #edede9;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.dn th{padding:3px 9px}
+table.dn td{padding:3px 9px}
+table.dn2 th{padding:2px 8px}
+table.dn2 td{padding:2px 8px}
+.cols.mid{align-items:center}
+.cols.mid>*{min-width:0}
+th.r,td.r{text-align:right}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.hc,th.hc{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+td.mut{color:#8b8f97}
+.lead{font-size:12.5px;color:#4c5058;line-height:1.55}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{border:1px solid #e4e4e0;padding:8px 12px}
+.kpi .k{font-size:11px;color:#8b8f97;letter-spacing:.08em}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.kpi .n{font-size:11px;color:#8b8f97;margin-top:3px;line-height:1.5}
+.cols{display:flex;gap:26px;align-items:flex-start}
+.cols>*{min-width:0}
+.cols.g40{display:grid;grid-template-columns:1fr 300px;gap:26px}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:118px 1fr 64px;align-items:center;gap:11px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.bar .r{text-align:right;color:#3d4046}
+.bar.tight{grid-template-columns:96px 1fr 58px;gap:9px}
+.pts{display:grid;gap:6px}
+.pt{font-size:12.5px;color:#4c5058;line-height:1.55;padding-left:13px;position:relative}
+.pt::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;background:var(--accent)}
+.note{font-size:11px;color:#8b8f97;line-height:1.7}
+.stack{display:flex;height:10px;border:1px solid #e4e4e0}
+.stack i{display:block;height:100%;background:var(--accent)}
+.stack i:nth-child(2){opacity:.74}
+.stack i:nth-child(3){opacity:.56}
+.stack i:nth-child(4){opacity:.4}
+.stack i:nth-child(5){opacity:.27}
+.stack i:nth-child(6){opacity:.18}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:0;font-size:11px;color:#6f737b}
+.legend b{font-weight:500;color:#3d4046;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:6px 11px;font-size:12.5px;color:#3d4046}
+.chip b{font-weight:600;font-variant-numeric:tabular-nums;color:#16171a}
+.badge{font-size:11px;padding:1px 6px;border:1px solid #e4e4e0;color:#6f737b;font-weight:400}
+.badge.ac{background:color-mix(in srgb,var(--accent) 10%,#fff);border-color:transparent;color:#16171a;font-weight:500}
+.tnote{font-size:11px;color:#8b8f97;line-height:1.5;margin-top:0}
+.cv{display:grid;gap:3px}
+.cv div{font-size:11px;color:#4c5058;line-height:1.4;padding-left:11px;position:relative}
+.cv div::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;background:var(--accent)}
+.pg{font-size:11px;color:#6f737b;line-height:1.5}
+.pg b{color:#3d4046;font-weight:500;letter-spacing:.04em}
+.wrap{display:flex;flex-direction:column;gap:9px}
 
-body{padding:30px}
-.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
-.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
-.file{font-weight:600;margin-left:6px}
-.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
-.grid{flex:1;min-height:0;overflow:hidden}
-.row{display:grid;border-top:1px solid #edede9}
-.row:first-child{border-top:0}
-.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
-.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
-.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
-.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
-.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
-.warn{color:#b3564a}
-.split{flex:1;display:grid;grid-template-columns:1.25fr 1fr;min-height:0}
-.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
-.pane:last-child{border-right:0}
-.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
-.bars{margin-top:16px;display:grid;gap:11px}
-.bar{display:grid;grid-template-columns:62px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-.notes{margin-top:14px;display:grid;gap:8px}
-.notes div{font-size:12.5px;color:#4c5058;line-height:1.7;padding-left:15px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
 </style></head><body>
-<div class="win" style="--accent:#8B5CF6">
-  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="file">对账差异_2026年9月.xlsx</span>
-    <span class="menu"><span>开始</span><span>数据</span><span>公式</span><span>审阅</span></span>
-  </div>
-  <div class="split">
-    <div class="grid">
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx"></div><div class="cell head">订单号</div><div class="cell head">系统金额</div><div class="cell head">渠道金额</div><div class="cell head">差异</div><div class="cell head">状态</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">2</div><div class="cell mono">SO-28417</div><div class="cell mono">1,284.00</div><div class="cell mono">1,284.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">3</div><div class="cell mono">SO-28409</div><div class="cell mono">642.00</div><div class="cell mono">642.50</div><div class="cell mono warn">-0.50</div><div class="cell hi">待核对</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">4</div><div class="cell mono">NO-11902</div><div class="cell mono">910.00</div><div class="cell mono">910.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">5</div><div class="cell mono">NO-11884</div><div class="cell mono">1,470.00</div><div class="cell mono">1,452.00</div><div class="cell mono warn">+18.00</div><div class="cell hi">待核对</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">6</div><div class="cell mono">SN-5521</div><div class="cell mono">788.00</div><div class="cell mono">788.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">7</div><div class="cell mono">SN-5488</div><div class="cell mono">2,046.00</div><div class="cell mono">0.00</div><div class="cell mono warn">+2,046.00</div><div class="cell hi">缺单</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">8</div><div class="cell mono">WN-3370</div><div class="cell mono">536.00</div><div class="cell mono">536.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx">9</div><div class="cell mono">WN-3358</div><div class="cell mono">1,120.00</div><div class="cell mono">1,120.00</div><div class="cell mono">0.00</div><div class="cell">一致</div>
-      </div>
-      <div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px">
-        <div class="cell idx"></div><div class="cell total">合计</div><div class="cell total mono">2,184,620</div><div class="cell total mono">2,182,111</div><div class="cell total mono">2,509</div><div class="cell total">17 待核对</div>
-      </div>
-<div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">11</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">12</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">13</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">14</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">15</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">16</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div><div class="row" style="grid-template-columns:34px 108px 96px 96px 74px 84px"><div class="cell idx">17</div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div>
-    </div>
-    <div class="pane">
-      <h3>差异类型分布</h3>
-      <p style="margin-top:10px;font-size:12px;color:#8b8f97;line-height:1.7">本期共核对 3,231 单,其中 17 单存在差异</p>
-      <div class="bars">
-        <div class="bar"><span>四舍五入</span><i style="width:100%"></i><span class="mono">9</span></div>
-        <div class="bar"><span>渠道缺单</span><i style="width:55%"></i><span class="mono">5</span></div>
-        <div class="bar"><span>退款未同步</span><i style="width:33%"></i><span class="mono">3</span></div>
-        <div class="bar"><span>手续费口径</span><i style="width:22%"></i><span class="mono">2</span></div>
-      </div>
-      <h3 style="margin-top:24px">处理建议</h3>
-      <div class="notes">
-        <div>9 笔为分位取整差异，金额均小于 1 元，可按容差自动勾稽</div>
-        <div>5 笔渠道缺单集中在 9 月 3 日，需向渠道方索要当日的原始流水</div>
-        <div>退款未同步的 3 笔建议按 T+1 重新拉取一次渠道对账文件</div>
-      </div>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" style="--accent:#8B5CF6" data-page="1"><div class="ph"><div><div class="kicker">Data Analysis · 对账</div><h1>系统台账与渠道流水逐单对账</h1><div class="meta"><span>范围：3,231 单 · 系统 2,184,620.00 元 · 渠道 2,182,111.00 元</span><span>容差：单笔差异 ≤1.00 元自动勾稽</span><span>净差异 +2,509.00 元，占交易额 0.115%</span><span>差异：19 条记录 / 17 单（2 单跨两类）</span></div></div><div class="cap mono">对账差异_2026年9月.xlsx<br>对账时点 2026-10-02 09:00</div></div><div class="body"><div class="lead">本期核对 3,231 单，系统金额 2,184,620.00 元、渠道金额 2,182,111.00 元，净差异 +2,509.00 元（占交易额 0.115%），差异集中在 17 单上，其中 9 笔为分位取整（均 <1.00 元）可自动勾稽，5 笔渠道缺单合计 +3,738.00 元是主要敞口。最大单笔差异 +2,046.00 元（SN-5488），为单笔容差（1.00 元）的 2,046 倍，已挂未达账项并索要渠道原始流水。</div><div class="kpis"><div class="kpi"><div class="k">核对单数</div><b class="mono">3,231 单</b><div class="n">一致 3,214 单，一致率 99.47%</div></div><div class="kpi"><div class="k">净差异</div><b class="mono">+2,509.00 元</b><div class="n">占交易额 0.115%，方向为系统大于渠道</div></div><div class="kpi"><div class="k">差异单数</div><b class="mono">17 单 / 19 条</b><div class="n">最大单笔 +2,046.00 元 = 容差的 2,046 倍</div></div></div><div class="sec dark">表 1 差异类型汇总（金额单位：元）</div><table class="dn"><thead><tr><th>差异类型</th><th>记录数</th><th>涉及单数</th><th class="r hc">差异金额</th><th>金额占比</th><th>处理方式</th></tr></thead><tbody><tr><td>渠道缺单</td><td>5</td><td>5</td><td class="r hc">3,738.00</td><td>74.0%</td><td>索要渠道当日原始流水后补录</td></tr><tr><td>退款未同步</td><td>3</td><td>3</td><td class="r hc">-1,266.50</td><td>25.1%</td><td>T+1 重新拉取渠道对账文件</td></tr><tr><td>手续费口径</td><td>2</td><td>2</td><td class="r hc">42.00</td><td>0.8%</td><td>渠道账单加回手续费列后重算</td></tr><tr class='sum'><td>合计 4 类</td><td>19</td><td>17</td><td class="r">2,509.00</td><td>100.0%</td><td>净差异 +2,509.00 元</td></tr></tbody></table><div class="stack"><i style="width:74.01%"></i><i style="width:25.07%"></i><i style="width:0.83%"></i><i style="width:0.09%"></i></div><div class="legend"><span>渠道缺单 <b>3,738.00 元</b></span><span>退款未同步 <b>1,266.50 元</b></span><span>手续费口径 <b>42.00 元</b></span><span>四舍五入 <b>4.50 元</b></span></div><div class="tnote">校验：6 条规则命中 17 单 / 19 条记录，其中阻断级 8 条（缺单 5 + 退款 3）需挂未达账项；最大偏差倍数 3,738×（缺单金额 ÷ 1.00 元容差）。清单见第 6 页，质量分 99.84 见第 7 页。</div><div class="cols"><div class="wrap"><div class="sec dark">口径与来源</div><div class="cv"><div>数据口径：差异 = 系统金额 − 渠道金额；单笔 |差异| ≤1.00 元视为容差内自动勾稽</div><div>数据来源：交易中台台账 + 渠道月结账单 + 费控退款流水 + 期初余额表</div><div>统计窗口：2026-09-01 ~ 2026-09-30，对账时点 2026-10-02 09:00</div></div></div><div class="wrap"><div class="sec dark">页面导读（共 9 页）</div><div class="pg"><b>P2–P4 数据与口径</b> P2 五步对账流程与产物清… · P3 六个对账字段与四条口… · P4 按差异金额降序的 8…</div><div class="pg"><b>P5–P7 分析与校验</b> P5 四类差异的根因与责任… · P6 738× 偏差 · P7 6 条对账校验规则与…</div><div class="pg"><b>P8–P9 结论与附录</b> P8 结论、耗时结构与五步… · P9 数据来源、术语表与修…</div></div></div></div><div class="pf"><span>结论：3,231 单核对，净差异 +2,509.00 元，占交易额 0.115%</span><span class="mono">第 1 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="2"><div class="ph"><div><div class="kicker">Recon Map · 对账流程</div><h2>五步对账流程与产物清单</h2></div><div class="cap mono">双向匹配 3,231 单<br>差异全部挂账，不静默抹平</div></div><div class="body"><div class="sec dark">表 2-1 对账步骤与产物</div><table class=""><thead><tr><th>步骤</th><th>处理对象</th><th>输出</th><th>耗时</th><th>状态</th></tr></thead><tbody><tr><td>D1 数据拉取</td><td>系统台账 + 渠道对账文件</td><td class="hc">系统 3,231 单 / 渠道 3,229 单</td><td>3m12s</td><td>已完成</td></tr><tr><td>D2 单号双向匹配</td><td>3,231 单</td><td class="hc">匹配 3,226 单（渠道侧同为 3,226 单，缺 5 单）</td><td>42s</td><td>已完成</td></tr><tr><td>D3 金额比对</td><td>3,226 对</td><td class="hc">一致 3,214 单 / 差异单 12 单（14 条记录）</td><td>18s</td><td>已完成</td></tr><tr><td>D4 差异归因</td><td>19 条差异记录</td><td class="hc">4 类归因 + 未达账项 8 条</td><td>18m</td><td>已完成</td></tr><tr><td>D5 台账与报告</td><td>差异明细 + 归因</td><td class="hc">对账差异_2026年9月.xlsx + 结论页</td><td>1m30s</td><td>已交付</td></tr><tr class='sum'><td>合计 5 步</td><td>3,231 单</td><td>19 条差异记录</td><td>23m42s</td><td>无待办</td></tr></tbody></table><div class="sec dark">对账耗时分解（合计 23m42s）</div><div class="bars"><div class="bar"><span>数据拉取</span><i style="width:17.8%"></i><span class="r mono">3m12s</span></div><div class="bar"><span>单号匹配</span><i style="width:3.9%"></i><span class="r mono">42s</span></div><div class="bar"><span>金额比对</span><i style="width:1.7%"></i><span class="r mono">18s</span></div><div class="bar"><span>差异归因</span><i style="width:100.0%"></i><span class="r mono">18m</span></div><div class="bar"><span>台账与报告</span><i style="width:8.3%"></i><span class="r mono">1m30s</span></div></div><div class="pts"><div class="pt">单号匹配为双向匹配：系统有渠道无计「缺单」，渠道有系统无计「多单」（本期 0 单）。</div><div class="pt">容差规则：单笔 |差异| ≤1.00 元直接勾稽并标注「容差内」，不进未达账项台账。</div><div class="pt">差异归因必须落到四类之一，无法归因的记录一律保持「待核对」状态，不允许强行归因。</div></div></div><div class="pf"><span>五步对账流程耗时 23m42s，差异归因占 18 分钟</span><span class="mono">第 2 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="3"><div class="ph"><div><div class="kicker">Caliber · 对账口径</div><h2>六个对账字段与四条口径约定</h2></div><div class="cap mono">口径版本 v2.1，2026-10-02<br>非空率按 3,231 单统计</div></div><div class="body"><div class="sec dark">表 3-1 对账字段字典</div><table class="dn"><thead><tr><th>字段</th><th>类型</th><th>非空率</th><th>口径与取值域</th></tr></thead><tbody><tr><td>订单号</td><td>text</td><td class="hc">100.0%</td><td>双向匹配键，系统与渠道格式已统一</td></tr><tr><td>系统金额</td><td>decimal(2)</td><td class="hc">100.0%</td><td>台账口径，合计 2,184,620.00 元</td></tr><tr><td>渠道金额</td><td>decimal(2)</td><td class="hc">100.0%</td><td>渠道账单口径，合计 2,182,111.00 元</td></tr><tr><td>差异</td><td>decimal(2)</td><td class="hc">100.0%</td><td>系统金额 − 渠道金额，正数表示系统多记</td></tr><tr><td>差异类型</td><td>text</td><td class="hc">100.0%</td><td>4 类：渠道缺单 / 退款未同步 / 手续费口径 / 四舍五入</td></tr><tr><td>状态</td><td>text</td><td class="hc">100.0%</td><td>3 值：一致 / 容差内 / 待核对</td></tr><tr><td>对账时点</td><td>datetime</td><td class="hc">100.0%</td><td>2026-10-02 09:00，之后入账归入 10 月</td></tr><tr><td>渠道流水号</td><td>text</td><td class="hc">99.8%</td><td>缺单 5 单为空，即差异来源</td></tr><tr class='sum'><td>合计 8 个字段</td><td>4 文本 / 3 数值 / 1 时间</td><td>99.98% 平均</td><td>3,231 单双向匹配，缺单 5 单</td></tr></tbody></table><div class="sec dark">非空率最低的三个字段</div><div class="bars"><div class="bar"><span>渠道流水号</span><i style="width:99.8%"></i><span class="r mono">99.8%</span></div><div class="bar"><span>渠道金额</span><i style="width:100.0%"></i><span class="r mono">100.0%</span></div><div class="bar"><span>系统金额</span><i style="width:100.0%"></i><span class="r mono">100.0%</span></div></div><div class="pts"><div class="pt">金额口径：系统金额取台账「已确认收入」，渠道金额取渠道月结账单净额，两者均含税。</div><div class="pt">差异方向：正数表示系统多记（渠道缺单 / 渠道扣手续费），负数表示渠道多记（退款未同步）。</div><div class="pt">容差口径：单笔 |差异| ≤1.00 元视为分位取整，自动勾稽并在状态列标注「容差内」。</div><div class="pt">时点口径：以 10-02 09:00 的快照为准，之后入账或退款的流水归入 10 月对账，不追溯调整本期。</div></div></div><div class="pf"><span>8 个对账字段，渠道流水号非空率 99.8%（缺单 5 单）</span><span class="mono">第 3 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="4"><div class="ph"><div><div class="kicker">Detail · 差异明细</div><h2>按差异金额降序的 8 条明细与全量勾稽</h2></div><div class="cap mono">8 条明细小计 +3,755.00 元<br>全量 19 条净差异 +2,509.00 元</div></div><div class="body"><div class="sec dark">表 4-1 差异明细（按 |差异| 降序前 6 条，元）</div><table class="dn"><thead><tr><th>订单号</th><th class="r">系统金额</th><th class="r">渠道金额</th><th class="r">差异</th><th>差异类型</th><th>状态</th></tr></thead><tbody><tr><td>SN-5488</td><td class="r">2,046.00</td><td class="r">0.00</td><td class="r hc">2,046.00</td><td>渠道缺单</td><td>待核对</td></tr><tr><td>SO-31102</td><td class="r">518.00</td><td class="r">0.00</td><td class="r hc">518.00</td><td>渠道缺单</td><td>待核对</td></tr><tr><td>SN-28518</td><td class="r">486.00</td><td class="r">0.00</td><td class="r hc">486.00</td><td>渠道缺单</td><td>待核对</td></tr><tr><td>NO-12655</td><td class="r">316.00</td><td class="r">0.00</td><td class="r hc">316.00</td><td>渠道缺单</td><td>待核对</td></tr><tr><td>NO-11884</td><td class="r">1,470.00</td><td class="r">1,452.00</td><td class="r hc">18.00</td><td>手续费口径</td><td>待核对</td></tr><tr><td>SO-28409</td><td class="r">642.00</td><td class="r">642.50</td><td class="r hc">-0.50</td><td>四舍五入</td><td>待核对</td></tr><tr class='sum'><td>8 条小计</td><td class="r">5,478.00</td><td class="r">2,094.50</td><td class="r">3,383.50</td><td>全量 19 条</td><td>净差异 +2,509.00</td></tr></tbody></table><div class="sec dark">表 4-2 一致性与容差分布</div><table class="dn"><thead><tr><th>分类</th><th>单数</th><th>占比</th><th>差异金额（元）</th><th>处理</th></tr></thead><tbody><tr><td>完全一致</td><td>3,214</td><td>99.47%</td><td class="hc">0.00</td><td>无需处理</td></tr><tr><td>容差内（≤1.00 元）</td><td>9</td><td>0.28%</td><td class="hc">-4.50</td><td>自动勾稽并标注</td></tr><tr><td>渠道缺单</td><td>5</td><td>0.15%</td><td class="hc">3,738.00</td><td>挂未达账项并索要流水</td></tr><tr><td>退款未同步</td><td>3</td><td>0.09%</td><td class="hc">-1,266.50</td><td>T+1 重拉账单核对</td></tr><tr><td>手续费口径（2 条记录，单已计上方）</td><td>0</td><td>0.00%</td><td class="hc">42.00</td><td>只计差额，不重复计单</td></tr><tr class='sum'><td>合计</td><td>3,231</td><td>100.00%</td><td>2,509.00</td><td>净差异 +2,509.00 元（含手续费 +42.00）</td></tr></tbody></table><div class="cols mid"><div style="flex:1.35"><div class="sec dark">单数分布（占比）</div><div class="bars"><div class="bar"><span>完全一致</span><i style="width:99.5%"></i><span class="r mono">3,214 单</span></div><div class="bar"><span>容差内</span><i style="width:0.3%"></i><span class="r mono">9 单</span></div><div class="bar"><span>渠道缺单</span><i style="width:0.2%"></i><span class="r mono">5 单</span></div><div class="bar"><span>退款未同步</span><i style="width:0.1%"></i><span class="r mono">3 单</span></div></div></div><div style="flex:1"><div class="tnote">表 4-1 为差异金额最大的 6 条抽样，小计 3,383.50 元；全量 19 条净差异 +2,509.00 元，与两侧总额之差勾稽闭合。</div></div></div></div><div class="pf"><span>差异明细：8 条抽样小计 3,383.50 元，全量 19 条勾稽闭合</span><span class="mono">第 4 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="5"><div class="ph"><div><div class="kicker">Root Cause · 归因分析</div><h2>四类差异的根因与责任方</h2></div><div class="cap mono">归因必须落到四类之一<br>8 条已挂未达账项台账</div></div><div class="body"><div class="sec dark">表 5-1 差异归因与责任</div><table class=""><thead><tr><th>差异类型</th><th>记录数</th><th class="r">差异金额（元）</th><th>根因</th><th>责任方</th></tr></thead><tbody><tr><td>渠道缺单</td><td>5</td><td class="r hc">3,738.00</td><td>9 月 3 日渠道侧批量掉单，账单未落 5 笔</td><td>渠道运营</td></tr><tr><td>退款未同步</td><td>3</td><td class="r hc">-1,266.50</td><td>退款已在系统冲销，渠道账单仍按原额入账</td><td>财务共享中心</td></tr><tr><td>手续费口径</td><td>2</td><td class="r hc">42.00</td><td>渠道账单扣手续费，系统按净额记录</td><td>财务共享中心</td></tr><tr><td>四舍五入</td><td>9</td><td class="r hc">-4.50</td><td>渠道账单分位进位，系统保留两位小数</td><td>系统（容差处理）</td></tr><tr class='sum'><td>合计 4 类</td><td>19</td><td class="r">2,509.00</td><td>8 条挂未达账项，其余 11 条容差内</td><td>—</td></tr></tbody></table><div class="sec dark">差异金额绝对额占比</div><div class="bars"><div class="bar"><span>渠道缺单</span><i style="width:74.0%"></i><span class="r mono">3,738.00 元</span></div><div class="bar"><span>退款未同步</span><i style="width:25.1%"></i><span class="r mono">1,266.50 元</span></div><div class="bar"><span>手续费口径</span><i style="width:0.8%"></i><span class="r mono">42.00 元</span></div><div class="bar"><span>四舍五入</span><i style="width:0.1%"></i><span class="r mono">4.50 元</span></div></div><div class="pts"><div class="pt">渠道缺单 5 笔全部由 9 月 3 日渠道侧批量掉单造成，合计 +3,738.00 元，占差异绝对额的 74.0%。</div><div class="pt">退款未同步 3 笔（−1,266.50 元）方向与缺单相反，T+1 重拉账单后预计可自动消除。</div><div class="pt">手续费口径 2 笔仅 42.00 元，但属长期口径差异，建议在渠道账单侧增加「手续费」列一次性解决。</div></div><div class="tnote">涉及单数列按单去重：5 + 3 + 2 + 9 = 19 条记录中有 2 单同时命中两类，去重后为 17 单。</div></div><div class="pf"><span>四类归因：缺单 74.0% / 退款 25.1% / 手续费 0.8% / 四舍五入 0.1%</span><span class="mono">第 5 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="6"><div class="ph"><div><div class="kicker">Anomaly · 差异与异常</div><h2>19 条差异记录、8 条未达账项与最大 3,738× 偏差</h2></div><div class="cap mono">偏差倍数 = |实际差异| ÷ 单笔容差 1.00 元<br>未达账项 8 条已全部挂账</div></div><div class="body"><div class="sec dark">表 6-1 异常清单（按偏差倍数降序）</div><table class=""><thead><tr><th>编号</th><th>对象</th><th>阈值</th><th>实际</th><th class="hc">偏差倍数</th><th>处置</th></tr></thead><tbody><tr><td>A-01</td><td>渠道缺单金额合计</td><td>容差 1.00 元</td><td>+3,738.00 元</td><td class="hc">3,738×</td><td>5 单逐一索取原始流水</td></tr><tr><td>A-02</td><td>单笔最大差异（SN-5488）</td><td>容差 1.00 元</td><td>+2,046.00 元</td><td class="hc">2,046×</td><td>挂未达账项并专项核对</td></tr><tr><td>A-03</td><td>单笔四舍五入差异</td><td>容差 1.00 元</td><td>−0.50 元</td><td class="hc">0.50×</td><td>纳入容差自动勾稽</td></tr><tr><td>A-04</td><td>退款未同步金额</td><td>0.00 元</td><td>−1,266.50 元</td><td class="hc">—</td><td>T+1 重拉渠道账单</td></tr><tr><td>A-05</td><td>未达账项单数（缺单 + 退款）</td><td>0 单</td><td>8 单</td><td class="hc">—</td><td>建立未达账项台账并每周闭环</td></tr><tr><td>A-06</td><td>手续费口径笔数</td><td>账单应含手续费列</td><td>2 笔</td><td class="hc">—</td><td>渠道账单加回手续费列</td></tr><tr class='sum'><td>合计 6 类</td><td>—</td><td>—</td><td>19 条 / 17 单</td><td>3,738×</td><td>未达账项 8 条已挂账</td></tr></tbody></table><div class="sec dark">差异记录数分布（条）</div><div class="bars"><div class="bar"><span>四舍五入</span><i style="width:100.0%"></i><span class="r mono">9 条</span></div><div class="bar"><span>渠道缺单</span><i style="width:55.6%"></i><span class="r mono">5 条</span></div><div class="bar"><span>退款未同步</span><i style="width:33.3%"></i><span class="r mono">3 条</span></div><div class="bar"><span>手续费口径</span><i style="width:22.2%"></i><span class="r mono">2 条</span></div></div><div class="pts"><div class="pt">净差异 +2,509.00 元只占系统金额的 0.115%，但敞口集中在 8 条未达账项上。</div><div class="pt">SN-5488 单笔 +2,046.00 元占全部差异绝对额的 40.5%，是本期优先核对对象。</div><div class="pt">9 条四舍五入差异合计仅 −4.50 元，全部在 1.00 元容差内，不应占用人工核对资源。</div></div></div><div class="pf"><span>异常 19 条 / 17 单，最大偏差倍数 3,738×</span><span class="mono">第 6 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="7"><div class="ph"><div><div class="kicker">Validation · 校验与质量</div><h2>6 条对账校验规则与质量分</h2></div><div class="cap mono">综合质量分 99.84（五项等权）<br>期末余额勾稽闭合</div></div><div class="body"><div class="sec dark">表 7-1 对账校验规则</div><table class=""><thead><tr><th>规则</th><th>检查内容</th><th>级别</th><th>命中</th><th>处置动作</th></tr></thead><tbody><tr><td>R-01</td><td>单号双向匹配（系统 ↔ 渠道）</td><td>阻断</td><td class="hc">5</td><td>缺单挂未达账项台账</td></tr><tr><td>R-02</td><td>单笔 |差异| ≤1.00 元自动勾稽</td><td>警告</td><td class="hc">9</td><td>标注「容差内」并放行</td></tr><tr><td>R-03</td><td>超容差差异必须归因到 4 类之一</td><td>阻断</td><td class="hc">3</td><td>归因并注明责任方</td></tr><tr><td>R-04</td><td>退款单在两侧状态一致</td><td>阻断</td><td class="hc">3</td><td>重拉渠道账单核对</td></tr><tr><td>R-05</td><td>手续费口径两侧一致</td><td>警告</td><td class="hc">2</td><td>渠道账单加回手续费列</td></tr><tr><td>R-06</td><td>期初 + 本期 − 退款 = 期末</td><td>阻断</td><td class="hc">0</td><td>勾稽通过，差异 0.00 元</td></tr><tr class='sum'><td>合计 6 条</td><td>阻断 4 条 / 警告 2 条</td><td>—</td><td>22</td><td>已闭环 22，待办 0</td></tr></tbody></table><div class="sec dark">五维质量分（%）</div><div class="bars"><div class="bar"><span>匹配率</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>金额一致率</span><i style="width:99.5%"></i><span class="r mono">99.47</span></div><div class="bar"><span>容差内勾稽率</span><i style="width:99.8%"></i><span class="r mono">99.75</span></div><div class="bar"><span>未达账项挂账</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>期末勾稽</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div></div><div class="pts"><div class="pt">金额一致率 99.47% = 1 − 17/3,231，差异全部有归因，无未归因记录。</div><div class="pt">容差内勾稽率 99.75%：9 条分位取整差异自动放行，人工只需处理 8 单。</div><div class="pt">期末勾稽通过：期初余额 + 本期 2,184,620.00 − 退款 = 期末余额，差异 0.00 元。</div></div></div><div class="pf"><span>质量分 99.84：匹配率与期末勾稽均 100%</span><span class="mono">第 7 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="8"><div class="ph"><div><div class="kicker">Conclusion & Actions · 结论与动作</div><h2>结论、耗时结构与五步动作</h2></div><div class="cap mono">对账耗时 23m42s，归因占 18m<br>全部差异已确认处理责任人</div></div><div class="body"><div class="sec dark">表 8-1 分阶段处理动作</div><table class=""><thead><tr><th>阶段</th><th>动作</th><th>责任人</th><th>期限</th><th>验收标准</th></tr></thead><tbody><tr><td>立即</td><td>向渠道索要 9 月 3 日原始流水并核对 5 笔缺单</td><td>周曼</td><td>10-04</td><td class="hc">5 笔缺单全部落账</td></tr><tr><td>本周</td><td>建立未达账项台账（8 条）并每周闭环</td><td>高晓鹭</td><td>10-09</td><td class="hc">台账未达账项 ≤2 条</td></tr><tr><td>本周</td><td>T+1 重拉渠道账单，核销 3 笔退款差异</td><td>蒋雪</td><td>10-09</td><td class="hc">退款差异归零</td></tr><tr><td>本月</td><td>容差规则（≤1.00 元）上线自动勾稽</td><td>谭亦文</td><td>10-25</td><td class="hc">人工处理量降至 ≤8 单</td></tr><tr><td>下季度</td><td>把对账流程改为日终自动执行</td><td>徐海鹏</td><td>12-31</td><td class="hc">每日 07:00 自动出差异表</td></tr></tbody></table><div class="sec dark">对账耗时分解（合计 23m42s）</div><div class="bars"><div class="bar"><span>数据拉取</span><i style="width:17.8%"></i><span class="r mono">3m12s</span></div><div class="bar"><span>单号匹配</span><i style="width:3.9%"></i><span class="r mono">42s</span></div><div class="bar"><span>金额比对</span><i style="width:1.7%"></i><span class="r mono">18s</span></div><div class="bar"><span>差异归因</span><i style="width:100.0%"></i><span class="r mono">18m</span></div><div class="bar"><span>台账与报告</span><i style="width:8.3%"></i><span class="r mono">1m30s</span></div></div><div class="pts"><div class="pt">净差异 +2,509.00 元（占交易额 0.115%），其中 74.0% 来自渠道缺单，责任方为渠道运营。</div><div class="pt">9 条四舍五入差异（合计 −4.50 元）全部在容差内，建议直接自动勾稽，不再占用人工核对工时。</div><div class="pt">退款未同步 3 笔预计在 T+1 重拉账单后自动消除，若仍未消除需在渠道侧发起工单。</div><div class="pt">SN-5488 的 +2,046.00 元单笔敞口占差异绝对额 40.5%，是本期唯一需要专项核对的记录。</div></div></div><div class="pf"><span>五步动作：立即 1 项、本周 2 项、本月 1 项、下季度 1 项</span><span class="mono">第 8 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="9"><div class="ph"><div><div class="kicker">Appendix · 附录</div><h2>数据来源、术语表与修订记录</h2></div><div class="cap mono">流水与快照均可回溯<br>修订留痕 3 版</div></div><div class="body"><div class="sec dark">表 9-1 数据来源清单</div><table class="dn"><thead><tr><th>数据源</th><th>提供方</th><th>覆盖周期</th><th>记录数</th><th>口径备注</th></tr></thead><tbody><tr><td>系统台账导出</td><td>交易中台</td><td>2026-09-01 ~ 09-30</td><td>3,231</td><td>已确认收入口径，含税</td></tr><tr><td>渠道月结账单</td><td>渠道运营</td><td>2026-09-01 ~ 09-30</td><td>3,226</td><td>净额口径，缺 5 单</td></tr><tr><td>退款流水</td><td>财务共享中心</td><td>2026-09-01 ~ 09-30</td><td>3</td><td>系统侧冲销时间 09-28 ~ 09-30</td></tr><tr><td>期初余额表</td><td>财务共享中心</td><td>2026-08-31 快照</td><td>1</td><td>用于期末勾稽（差异 0.00 元）</td></tr></tbody></table><div class="sec dark">表 9-2 术语表</div><table class="dn"><thead><tr><th>术语</th><th>定义</th></tr></thead><tbody><tr><td>未达账项</td><td>一侧已入账、另一侧尚未入账，需挂账跟踪的差异</td></tr><tr><td>容差</td><td>单笔差异可自动勾稽的上限，本期为 1.00 元</td></tr><tr><td>净差异</td><td>系统金额 − 渠道金额，含正负方向的合计差异</td></tr><tr><td>偏差倍数</td><td>|实际差异| ÷ 单笔容差，衡量单笔差异严重度</td></tr><tr class='sum'><td>双向匹配</td><td>系统与渠道互为基准各匹配一次，缺单与多单分别计数</td></tr></tbody></table><div class="sec dark">表 9-3 修订记录</div><table class="dn"><thead><tr><th>版本</th><th>日期</th><th>变更</th><th>责任人</th></tr></thead><tbody><tr><td>v1.0</td><td>2026-10-02</td><td>首版对账（容差 0.10 元，差异 17 单）</td><td>蒋雪</td></tr><tr><td>v1.1</td><td>2026-10-03</td><td>容差放宽到 1.00 元，四舍五入 9 条自动勾稽</td><td>高晓鹭</td></tr><tr><td>v2.1</td><td>2026-10-05</td><td>补未达账项台账与期末勾稽表</td><td>财务共享中心</td></tr></tbody></table></div><div class="pf"><span>附录：4 个数据源、5 条术语、3 版修订记录</span><span class="mono">第 9 / 9 页</span></div></section>
+</body></html>

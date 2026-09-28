@@ -1,69 +1,408 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-data-analysis</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-data-analysis</title><style>
+*{box-sizing:border-box;margin:0}
+body{width:1100px;background:#f2f2ef;padding:30px;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 46px;display:flex;flex-direction:column}
+.mono{font-variant-numeric:tabular-nums}
 .serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:32px;background:#eceae4}
-.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
-.ptitle{font-size:23px;text-align:center;line-height:1.4}
-.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
-th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
-.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
-.flow i{color:#b8b5ab;font-style:normal}
-.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
-.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
-.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:11px;align-content:start}
-h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-ul{list-style:none;margin-top:8px;display:grid;gap:7px}
-li{position:relative;padding-left:14px;font-size:12px;color:#4c5058;line-height:1.85}
-li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.metric{border:1px solid #eeede7;background:#faf9f6;padding:8px 11px}
-.metric b{display:block;font-size:20px;letter-spacing:-.02em;color:var(--accent)}
-.metric span{display:block;margin-top:5px;font-size:11px;color:#8b8f97}
+.kicker{font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.kicker.a{color:var(--accent)}
+h4{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 9px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.05em;font-weight:500}
+tr.total td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+ul{list-style:none;display:grid;gap:5px}
+li{position:relative;padding-left:13px;font-size:12.5px;line-height:1.75;color:#4c5058}
+li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;background:var(--accent)}
+.phead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #e4e4e0;padding-bottom:8px}
+.pn{font-size:11px;color:#8b8f97}
+h2{font-size:23px;letter-spacing:-.02em;font-weight:600;margin-top:8px}
+.body{flex:1;min-height:0;margin-top:11px;display:grid;gap:10px;align-content:start}
+.pfoot{margin-top:auto;padding-top:8px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.kpi{border:1px solid #edede9;background:#faf9f6;padding:9px 11px}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent);font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:4px;font-size:11px;color:#8b8f97}
+.bar{height:8px;background:#f0efeb;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.72}
+.block{border:1px solid #edede9;background:#faf9f6;padding:10px 13px}
+.refs{display:grid;gap:4px;font-size:11.5px;color:#4c5058;line-height:1.65}
+.refs div{padding-left:24px;text-indent:-24px}
+.refs em{font-style:normal;color:var(--accent);font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="page" style="--accent:#7C3AED">
-  <div class="ptitle serif">问卷数据的统计方法与结果呈现</div>
-  <div class="authors">有效样本 412 份 · 回收率 91.6% · 数据处理与统计部分</div>
-  <div class="sections">
-    <div>
-      <h4>变量与测量</h4>
-      <table>
-        <tr><th>变量</th><th>测量方式</th><th>题项</th><th>缺失值处理</th></tr>
-        <tr><td>任务边界清晰度</td><td>李克特五点量表</td><td class="mono">4</td><td>均值填补（缺失 6 例）</td></tr>
-        <tr><td>审批与回溯需求</td><td>李克特五点量表</td><td class="mono">5</td><td>整卷剔除（缺失 3 例）</td></tr>
-        <tr><td>使用频率</td><td>单选分级</td><td class="mono">1</td><td>无缺失</td></tr>
-        <tr><td>落地成效自评</td><td>李克特七点量表</td><td class="mono">3</td><td>均值填补（缺失 2 例）</td></tr>
-      </table>
+
+<section class="page" data-page="1" style="--accent:#7C3AED">
+  <div style="text-align:center;margin-top:4px">
+    <div class="kicker a">DATA ANALYSIS · 数据统计与结果呈现</div>
+    <h1 class="serif" style="font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.35;margin-top:11px">团队协作需求问卷的统计分析与结果呈现</h1>
+    <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">有效样本 412 份　|　回收率 91.6%　|　13 个题项 / 4 个变量　|　分析工具 Python statsmodels + pandas</div>
+  </div>
+  <div class="block" style="margin-top:13px">
+    <div class="kicker">摘要 / ABSTRACT</div>
+    <p style="margin-top:7px">本文报告一项覆盖 2 个城市、450 份问卷的协作需求调查的统计分析过程。有效样本 412 份，量表 Cronbach α 为 0.87，KMO 值 0.81，探索性因子分析提取 4 个因子、累计方差解释率 68.4%。回归结果显示，任务边界清晰度对落地成效的标准化系数为 0.309，是四个变量中作用最强的一项。</p>
+  </div>
+  <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">关键词：问卷分析 · 信效度检验 · 方差分析 · 多元回归 · 结果呈现</div>
+  <div class="grid3" style="margin-top:11px">
+    <div class="kpi"><b>412</b><span>有效样本（份）</span></div>
+    <div class="kpi"><b>91.6%</b><span>回收率</span></div>
+    <div class="kpi"><b>0.87</b><span>Cronbach α</span></div>
+  </div>
+  <div style="margin-top:11px">
+    <h4>变量与测量</h4>
+    <table style="margin-top:6px">
+      <tr><th>变量</th><th style="width:140px">测量方式</th><th style="width:52px">题项</th><th style="width:62px">取值</th><th style="width:150px">缺失值处理</th></tr>
+      <tr><td>任务边界清晰度</td><td>李克特五点量表</td><td class="mono">4</td><td class="mono">1 — 5</td><td>均值填补（缺失 4 例）</td></tr>
+      <tr><td>审批与回溯需求</td><td>李克特五点量表</td><td class="mono">5</td><td class="mono">1 — 5</td><td>均值填补（缺失 3 例）</td></tr>
+      <tr><td>使用频率</td><td>单选分级</td><td class="mono">1</td><td class="mono">1 — 5</td><td>无缺失</td></tr>
+      <tr><td>落地成效自评</td><td>李克特七点量表</td><td class="mono">3</td><td class="mono">1 — 7</td><td>均值填补（缺失 1 例）</td></tr>
+      <tr class="total"><td>合计</td><td>4 个变量</td><td class="mono">13</td><td>—</td><td>题项缺失 8 例（1.9%）</td></tr>
+    </table>
+  </div>
+    <div class="grid2" style="margin-top:10px;padding-top:8px;border-top:1px solid #eeede7">
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">口径与来源　</b>线上问卷发放 450 份 · 有效 412 份 · 工具 Python statsmodels</p>
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">后续页面导读　</b>P2 清洗 · P3 描述 · P4 信效度 · P5 差异 · P6 回归 · P7 稳健 · P8 呈现 · P9 局限 · P10 附录</p>
+  </div>
+  <div class="pfoot"><span>412 份有效样本覆盖 4 个变量 13 个题项，题项缺失率 1.9%</span><span>第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.1 数据来源与清洗</div><div class="pn">比例以发放 450 份为基数，四舍五入至一位小数</div></div>
+  <h2>样本回收与数据清洗流程</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:118px">环节</th><th style="width:74px">数量</th><th style="width:78px">比例</th><th>处理说明</th></tr>
+      <tr><td>发放问卷</td><td class="mono">450</td><td class="mono">100.0%</td><td>覆盖 2 个城市 11 家企业的 45 个团队</td></tr>
+      <tr><td>实际回收</td><td class="mono">415</td><td class="mono">92.2%</td><td>线上表单提交，系统自动记录提交时间</td></tr>
+      <tr><td>剔除无效卷</td><td class="mono">3</td><td class="mono">0.7%</td><td>作答时长不足 60 秒或全部同选项</td></tr>
+      <tr class="total"><td>有效样本</td><td class="mono">412</td><td class="mono">91.6%</td><td>纳入全部统计分析</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>清洗规则</h4>
+        <ul style="margin-top:6px">
+          <li>反向题先重编码，再参与信度与因子分析</li>
+          <li>作答时长低于 60 秒的样本整卷剔除</li>
+          <li>连续 10 题以上同选项视为直线作答，剔除</li>
+          <li>题项级缺失 8 例（1.9%）采用同题组均值填补</li>
+          <li>清洗脚本与原始数据一并归档，保证可复现</li>
+        </ul>
+      </div>
+      <div>
+        <h4>样本构成</h4>
+        <table style="margin-top:6px">
+          <tr><th>维度</th><th>分组</th><th style="width:56px">n</th></tr>
+          <tr><td>团队规模</td><td>10 人及以下</td><td class="mono">138</td></tr>
+          <tr><td></td><td>11 — 30 人</td><td class="mono">176</td></tr>
+          <tr><td></td><td>31 人及以上</td><td class="mono">98</td></tr>
+          <tr class="total"><td>行业</td><td>软件与信息服务</td><td class="mono">412</td></tr>
+        </table>
+      </div>
     </div>
-    <div class="metrics">
-      <div class="metric"><b>0.87</b><span>Cronbach α</span></div>
-      <div class="metric"><b>0.81</b><span>KMO 值</span></div>
-      <div class="metric"><b>4</b><span>提取因子数</span></div>
-      <div class="metric"><b>68.4%</b><span>累计方差解释率</span></div>
-    </div>
-    <div>
-      <h4>研究问题与对应方法</h4>
-      <table>
-        <tr><th>研究问题</th><th>适用方法</th><th>输出</th></tr>
-        <tr><td>不同规模团队的流程需求是否存在差异</td><td>单因素方差分析</td><td>组间差异表 + 事后检验</td></tr>
-        <tr><td>任务边界清晰度能否预测落地成效</td><td>多元回归</td><td>回归系数表 + 调整后 R²</td></tr>
-        <tr><td>需求结构包含哪些维度</td><td>探索性因子分析</td><td>因子载荷矩阵</td></tr>
-      </table>
-    </div>
-    <div>
-      <h4>结果呈现的写法</h4>
-      <ul>
-        <li>先报描述统计，再报推断统计，表格与正文不重复叙述同一组数字</li>
-        <li>回归结果需同时给出系数、标准误与显著性水平，避免只写"显著影响"</li>
-      </ul>
+    <div class="block"><h4>共同方法偏差的初步检查</h4><p style="margin-top:6px">采用 Harman 单因子检验，未旋转的第一个因子解释方差 28.6%，低于 40% 的判定阈值，提示共同方法偏差不构成主要威胁；后续在回归中仍加入团队规模与企业固定效应作为控制。</p></div>
+  </div>
+  <div class="pfoot"><span>发放 450 份，有效 412 份，回收率 91.6%，无整卷异常</span><span>第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4.1 描述统计</div><div class="pn">均值、离散度与分布形态</div></div>
+  <h2>变量描述统计（表 2-1）</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:150px">变量</th><th style="width:70px">均值</th><th style="width:80px">标准差</th><th style="width:70px">偏度</th><th style="width:80px">取值范围</th><th>解读</th></tr>
+      <tr><td>任务边界清晰度</td><td class="mono">3.42</td><td class="mono">0.78</td><td class="mono">−0.21</td><td class="mono">1 — 5</td><td>低于量表中点，边界定义普遍不足</td></tr>
+      <tr><td>审批与回溯需求</td><td class="mono">4.06</td><td class="mono">0.63</td><td class="mono">−0.44</td><td class="mono">1 — 5</td><td>需求强烈，分布左偏</td></tr>
+      <tr><td>使用频率</td><td class="mono">3.18</td><td class="mono">1.02</td><td class="mono">0.08</td><td class="mono">1 — 5</td><td>接近正态，集中在每周数次</td></tr>
+      <tr class="total"><td>落地成效自评</td><td class="mono">4.71</td><td class="mono">1.04</td><td class="mono">−0.36</td><td class="mono">1 — 7</td><td>高于量表中点，评价偏正向</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>使用频率分布（n = 412）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:96px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>每天使用</span><span class="bar"><i style="width:18.4%"></i></span><span class="mono">76 份 · 18.4%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>每周数次</span><span class="bar"><i style="width:34.2%"></i></span><span class="mono">141 份 · 34.2%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>每周一次</span><span class="bar"><i style="width:22.6%"></i></span><span class="mono">93 份 · 22.6%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>每月数次</span><span class="bar"><i style="width:16.8%"></i></span><span class="mono">69 份 · 16.8%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>几乎不用</span><span class="bar"><i style="width:8%"></i></span><span class="mono">33 份 · 8.0%</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>变量相关矩阵（皮尔逊 r）</h4>
+        <table style="margin-top:6px">
+          <tr><th></th><th style="width:56px">1</th><th style="width:56px">2</th><th style="width:56px">3</th></tr>
+          <tr><td>1 边界清晰度</td><td class="mono">1</td><td class="mono">0.38</td><td class="mono">0.44</td></tr>
+          <tr><td>2 回溯需求</td><td class="mono">0.38</td><td class="mono">1</td><td class="mono">0.29</td></tr>
+          <tr class="total"><td>3 使用频率</td><td class="mono">0.44</td><td class="mono">0.29</td><td class="mono">1</td></tr>
+        </table>
+        <p style="margin-top:6px;font-size:11.5px;color:#6f737b">三组相关系数均在 0.29 — 0.44 之间，低于 0.70 的多重共线性警戒线。</p>
+      </div>
     </div>
   </div>
-  <div class="foot"><span>分析工具：Python statsmodels + pandas</span><span>更新于 2026-09</span></div>
-</div></body></html>
+  <div class="pfoot"><span>边界清晰度均值 3.42 低于中点，回溯需求均值 4.06 高于中点</span><span>第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4.2 信度与效度</div><div class="pn">α、KMO、因子载荷三项证据</div></div>
+  <h2>信度与效度检验</h2>
+  <div class="body">
+    <div class="grid4">
+      <div class="kpi"><b>0.87</b><span>总量表 Cronbach α</span></div>
+      <div class="kpi"><b>0.81</b><span>KMO 值</span></div>
+      <div class="kpi"><b>4</b><span>提取因子数</span></div>
+      <div class="kpi"><b>68.4%</b><span>累计方差解释率</span></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>各分量表信度</h4>
+        <table style="margin-top:6px">
+          <tr><th>分量表</th><th style="width:56px">题项</th><th style="width:66px">α</th><th style="width:78px">判定</th></tr>
+          <tr><td>任务边界清晰度</td><td class="mono">4</td><td class="mono">0.84</td><td>良好</td></tr>
+          <tr><td>审批与回溯需求</td><td class="mono">5</td><td class="mono">0.82</td><td>良好</td></tr>
+          <tr class="total"><td>落地成效自评</td><td class="mono">3</td><td class="mono">0.79</td><td>可接受</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>KMO 与巴特利特检验</h4>
+        <table style="margin-top:6px">
+          <tr><th>指标</th><th style="width:120px">取值</th></tr>
+          <tr><td>KMO 取样适切性量数</td><td class="mono">0.81</td></tr>
+          <tr><td>巴特利特球形检验 χ²</td><td class="mono">1,842.6</td></tr>
+          <tr><td>自由度 df</td><td class="mono">78</td></tr>
+          <tr class="total"><td>显著性 p</td><td class="mono">&lt; 0.001</td></tr>
+        </table>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:110px">因子</th><th>对应题项</th><th style="width:110px">载荷范围</th><th style="width:96px">解释方差</th><th style="width:82px">累计</th></tr>
+      <tr><td>因子 1</td><td>边界清晰度 4 题</td><td class="mono">0.68 — 0.81</td><td class="mono">21.3%</td><td class="mono">21.3%</td></tr>
+      <tr><td>因子 2</td><td>回溯需求 5 题</td><td class="mono">0.64 — 0.77</td><td class="mono">18.6%</td><td class="mono">39.9%</td></tr>
+      <tr><td>因子 3</td><td>成效自评 3 题</td><td class="mono">0.71 — 0.79</td><td class="mono">15.2%</td><td class="mono">55.1%</td></tr>
+      <tr class="total"><td>因子 4</td><td>使用频率 1 题 + 1 道反向题</td><td class="mono">0.62 — 0.70</td><td class="mono">13.3%</td><td class="mono">68.4%</td></tr>
+    </table>
+    <div class="block"><h4>效度判定</h4><p style="margin-top:6px">4 个因子与理论构念一一对应，无跨因子载荷超过 0.40 的题项，聚合效度与区分效度均成立；累计方差解释率 68.4% 高于 60% 的经验阈值，说明提取的 4 个因子能代表原始题项的主要信息。</p></div>
+  </div>
+  <div class="pfoot"><span>α = 0.87、KMO = 0.81、累计方差 68.4%，四项指标均达标</span><span>第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4.3 组间差异</div><div class="pn">单因素方差分析 + 事后检验</div></div>
+  <h2>不同团队规模的差异检验（表 3-1）</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:126px">变量</th><th style="width:104px">小组 n = 138</th><th style="width:110px">中组 n = 176</th><th style="width:110px">大组 n = 98</th><th style="width:62px">F</th><th style="width:66px">p</th><th>η²</th></tr>
+      <tr><td>任务边界清晰度</td><td class="mono">3.21 (0.81)</td><td class="mono">3.48 (0.74)</td><td class="mono">3.62 (0.76)</td><td class="mono">6.42</td><td class="mono">0.002</td><td class="mono">0.031</td></tr>
+      <tr><td>审批与回溯需求</td><td class="mono">3.94 (0.68)</td><td class="mono">4.09 (0.61)</td><td class="mono">4.18 (0.58)</td><td class="mono">4.11</td><td class="mono">0.017</td><td class="mono">0.020</td></tr>
+      <tr class="total"><td>落地成效自评</td><td class="mono">4.42 (1.11)</td><td class="mono">4.76 (1.02)</td><td class="mono">4.98 (0.96)</td><td class="mono">7.03</td><td class="mono">0.001</td><td class="mono">0.034</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>事后检验（因变量：落地成效自评）</h4>
+        <table style="margin-top:6px">
+          <tr><th>对比</th><th style="width:110px">均值差</th><th style="width:66px">p</th></tr>
+          <tr><td>大组 vs 小组</td><td class="mono">+0.56</td><td class="mono">0.001</td></tr>
+          <tr><td>大组 vs 中组</td><td class="mono">+0.22</td><td class="mono">0.042</td></tr>
+          <tr class="total"><td>中组 vs 小组</td><td class="mono">+0.34</td><td class="mono">0.084</td></tr>
+        </table>
+        <p style="margin-top:6px;font-size:11.5px">仅「中组 vs 小组」未达显著，其余两组对比均显著。</p>
+      </div>
+      <div>
+        <h4>成效自评均值对比（1 — 7 分）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>小组</span><span class="bar"><i style="width:63%"></i></span><span class="mono">4.42 (n=138)</span></div>
+          <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>中组</span><span class="bar"><i style="width:68%"></i></span><span class="mono">4.76 (n=176)</span></div>
+          <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>大组</span><span class="bar"><i style="width:71%"></i></span><span class="mono">4.98 (n=98)</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="block"><h4>组间差异的解读</h4><p style="margin-top:6px">团队规模越大，边界清晰度与成效自评均值越高，与「规模扩大迫使团队把协作约定书面化」的判断一致；但效应量 η² 均小于 0.06，属小效应，实际差异幅度有限，不宜作为决策主依据。</p></div>
+  </div>
+  <div class="pfoot"><span>三组样本 138 / 176 / 98，合计 412，与有效样本数一致</span><span>第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4.4 回归分析</div><div class="pn">因变量：落地成效自评（1 — 7）</div></div>
+  <h2>多元回归结果（表 3-2）</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:150px">自变量</th><th style="width:70px">B</th><th style="width:70px">SE</th><th style="width:70px">β</th><th style="width:66px">t</th><th style="width:88px">p</th></tr>
+      <tr><td>常数项</td><td class="mono">1.842</td><td class="mono">0.412</td><td class="mono">—</td><td class="mono">4.47</td><td class="mono">&lt; 0.001</td></tr>
+      <tr><td>任务边界清晰度</td><td class="mono">0.412</td><td class="mono">0.061</td><td class="mono">0.309</td><td class="mono">6.75</td><td class="mono">&lt; 0.001</td></tr>
+      <tr><td>审批与回溯需求</td><td class="mono">0.238</td><td class="mono">0.074</td><td class="mono">0.144</td><td class="mono">3.22</td><td class="mono">0.001</td></tr>
+      <tr><td>使用频率</td><td class="mono">0.196</td><td class="mono">0.045</td><td class="mono">0.191</td><td class="mono">4.36</td><td class="mono">&lt; 0.001</td></tr>
+      <tr><td>团队规模（控制）</td><td class="mono">0.087</td><td class="mono">0.038</td><td class="mono">0.102</td><td class="mono">2.29</td><td class="mono">0.023</td></tr>
+      <tr class="total"><td>司龄（控制）</td><td class="mono">0.014</td><td class="mono">0.019</td><td class="mono">0.032</td><td class="mono">0.74</td><td class="mono">0.461</td></tr>
+    </table>
+    <div class="grid4">
+      <div class="kpi"><b>0.412</b><span>R²</span></div>
+      <div class="kpi"><b>0.405</b><span>调整后 R²</span></div>
+      <div class="kpi"><b>56.9</b><span>F(5, 406)</span></div>
+      <div class="kpi"><b>&lt; 0.001</b><span>模型 p 值</span></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>标准化系数对比</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:110px 1fr 60px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>边界清晰度</span><span class="bar"><i style="width:100%"></i></span><span class="mono">0.309</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 60px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>使用频率</span><span class="bar"><i style="width:62%"></i></span><span class="mono">0.191</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 60px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>回溯需求</span><span class="bar"><i style="width:47%"></i></span><span class="mono">0.144</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 60px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>团队规模</span><span class="bar"><i style="width:33%"></i></span><span class="mono">0.102</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 60px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>司龄</span><span class="bar"><i style="width:10%"></i></span><span class="mono">0.032</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>回归诊断</h4>
+        <ul style="margin-top:6px">
+          <li>方差膨胀因子最大值为 1.42，无多重共线性</li>
+          <li>残差正态性检验 p = 0.18，未拒绝正态假设</li>
+          <li>Breusch-Pagan 检验 p = 0.24，方差齐性成立</li>
+          <li>司龄系数不显著，保留为控制变量不作解释</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>模型解释 41.2% 的成效自评方差，边界清晰度贡献最大的标准化系数 0.309</span><span>第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4.5 稳健性与假设检验</div><div class="pn">三项稳健性 + 假设汇总</div></div>
+  <h2>稳健性检验与假设检验汇总</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:170px">稳健性设定</th><th style="width:150px">关键系数（边界清晰度）</th><th style="width:96px">标准误</th><th>结论</th></tr>
+      <tr><td>基准模型（n = 412）</td><td class="mono">0.412</td><td class="mono">0.061</td><td>基准结果</td></tr>
+      <tr><td>剔除「几乎不用」组（n = 379）</td><td class="mono">0.398</td><td class="mono">0.064</td><td>方向与量级基本一致</td></tr>
+      <tr><td>随机分半（n = 206 / 206）</td><td class="mono">0.405 / 0.421</td><td class="mono">0.088 / 0.084</td><td>两个子样本区间重叠</td></tr>
+      <tr class="total"><td>因变量替换为采用意愿</td><td class="mono">0.336</td><td class="mono">0.072</td><td>方向一致，量级略低</td></tr>
+    </table>
+    <table>
+      <tr><th style="width:56px">编号</th><th>假设</th><th style="width:170px">证据</th><th style="width:82px">结论</th></tr>
+      <tr><td class="mono">H1</td><td>边界清晰度正向预测落地成效</td><td class="mono">β = 0.309, p &lt; 0.001</td><td>支持</td></tr>
+      <tr><td class="mono">H2</td><td>审批与回溯需求正向预测落地成效</td><td class="mono">β = 0.144, p = 0.001</td><td>支持</td></tr>
+      <tr><td class="mono">H3</td><td>使用频率在边界与成效之间起中介作用</td><td class="mono">间接效应 0.061, 95% CI [0.021, 0.108]</td><td>支持</td></tr>
+      <tr class="total"><td class="mono">H4</td><td>团队规模调节边界与成效的关系</td><td class="mono">交互项 β = 0.048, p = 0.218</td><td>不支持</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>中介效应分解</h4>
+        <table style="margin-top:6px">
+          <tr><th>效应</th><th style="width:76px">估计值</th><th style="width:110px">95% CI</th></tr>
+          <tr><td>总效应</td><td class="mono">0.412</td><td class="mono">[0.292, 0.532]</td></tr>
+          <tr class="total"><td>间接效应</td><td class="mono">0.061</td><td class="mono">[0.021, 0.108]</td></tr>
+        </table>
+        <p style="margin-top:6px;font-size:11.5px">Bootstrap 5,000 次抽样，间接效应区间不含 0。</p>
+      </div>
+      <div>
+        <h4>结果解读的三条边界</h4>
+        <ul style="margin-top:6px">
+          <li>横断面数据只能说明关联，不能确立因果方向</li>
+          <li>H4 不显著不代表调节不存在，可能是规模分组过粗</li>
+          <li>效应量 η² 与 β 均属中小水平，实务改进需结合流程成本</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>4 项假设中 3 项支持、1 项不支持，稳健性检验方向一致</span><span>第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">4.6 结果呈现规范</div><div class="pn">表图清单与写作口径</div></div>
+  <h2>结果章节的呈现规范</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:74px">编号</th><th>名称</th><th style="width:82px">呈现形式</th><th style="width:96px">对应小节</th><th>正文需说明的内容</th></tr>
+      <tr><td class="mono">表 2-1</td><td>变量描述统计</td><td>均值 ± 标准差</td><td class="mono">4.1</td><td>量表取值范围与偏度判断</td></tr>
+      <tr><td class="mono">表 3-1</td><td>团队规模差异检验</td><td>F 检验 + η²</td><td class="mono">4.3</td><td>事后检验的显著对比</td></tr>
+      <tr><td class="mono">表 3-2</td><td>多元回归结果</td><td>B / SE / β / t / p</td><td class="mono">4.4</td><td>模型拟合与共线性诊断</td></tr>
+      <tr><td class="mono">图 2-1</td><td>使用频率分布</td><td>条形图</td><td class="mono">4.1</td><td>分布形态与峰值所在组</td></tr>
+      <tr class="total"><td class="mono">图 3-1</td><td>标准化系数对比</td><td>横条图</td><td class="mono">4.4</td><td>各变量相对贡献排序</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>写作口径</h4>
+        <ul style="margin-top:6px">
+          <li>先报描述统计，再报推断统计，不交叉叙述</li>
+          <li>表格已列的数字，正文只解释方向与量级，不逐格复述</li>
+          <li>所有统计量保留两位小数，p 值小于 0.001 时写作「&lt; 0.001」</li>
+          <li>报告效应量（η²、β、R²）与显著性并重，不只报 p 值</li>
+          <li>不支持假设的结果同样完整报告，不作淡化处理</li>
+        </ul>
+      </div>
+      <div>
+        <h4>常见呈现错误</h4>
+        <table style="margin-top:6px">
+          <tr><th>错误</th><th style="width:130px">后果</th></tr>
+          <tr><td>只写「显著影响」</td><td>无法判断实际幅度</td></tr>
+          <tr><td>正文与表格数值不一致</td><td>结论可信度受损</td></tr>
+          <tr><td>用「证明」描述相关结果</td><td>因果推断越界</td></tr>
+          <tr class="total"><td>省略不显著结果</td><td>选择性报告</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="block"><h4>一致性自检</h4><p style="margin-top:6px">表 3-2 中的标准化系数与图 3-1 的横条长度按同一数据生成；表 3-1 的三组样本量 138 / 176 / 98 与第 5 页正文一致，合计 412 与有效样本数一致；全文出现的均值与标准差均可在描述统计表中回溯。</p></div>
+  </div>
+  <div class="pfoot"><span>3 张表 2 张图，编号与正文引用逐一对应</span><span>第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">5 讨论与局限</div><div class="pn">结果解释与不确定性说明</div></div>
+  <h2>讨论、替代解释与研究局限</h2>
+  <div class="body">
+    <div class="grid2">
+      <div>
+        <h4>三条主要发现</h4>
+        <ul style="margin-top:6px">
+          <li>边界清晰度是四个变量中作用最强的预测项（β = 0.309）</li>
+          <li>回溯需求与使用频率均为正向预测项，但量级明显偏小</li>
+          <li>团队规模的作用为小效应，且不调节主效应（p = 0.218）</li>
+        </ul>
+      </div>
+      <div>
+        <h4>替代解释与排除</h4>
+        <table style="margin-top:6px">
+          <tr><th>替代解释</th><th style="width:140px">处理方式</th></tr>
+          <tr><td>共同方法偏差</td><td>Harman 单因子 28.6% &lt; 40%</td></tr>
+          <tr><td>反向因果</td><td>无法排除，明确列为局限</td></tr>
+          <tr class="total"><td>团队差异</td><td>加入团队规模控制变量</td></tr>
+        </table>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:118px">局限</th><th>具体表现</th><th style="width:210px">对结论的影响</th></tr>
+      <tr><td>横断面设计</td><td>同一时点采集自变量与因变量，无法确认时序</td><td>只能表述为关联，不写「导致」</td></tr>
+      <tr><td>自评量表</td><td>成效自评为主观评分，可能与实际绩效脱节</td><td>需与日志类客观指标交叉验证</td></tr>
+      <tr><td>样本范围</td><td>集中在 2 个城市 11 家企业的 45 个团队</td><td>外推到其他行业需谨慎</td></tr>
+      <tr class="total"><td>规模分组</td><td>三档划分较粗，大组内跨 31 至 120 人</td><td>调节效应可能被稀释</td></tr>
+    </table>
+    <div class="block"><h4>后续改进方向</h4><p style="margin-top:6px">把问卷与系统日志配对采集，用完成时长与返工率作为客观因变量；在 6 个月后做一次回访，形成两期面板数据以支撑时序推断；把团队规模按人数连续化处理，避免分组造成的效应稀释。</p></div>
+  </div>
+  <div class="pfoot"><span>4 项局限已逐条说明对结论的影响，因果表述全部回避</span><span>第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">参考文献与附录</div><div class="pn">统计方法引用 8 条 + 变量编码表</div></div>
+  <h2>参考文献与变量编码附录</h2>
+  <div class="body">
+    <div class="refs">
+      <div><em>[1]</em> 吴明隆. 问卷统计分析实务：SPSS 操作与应用[M]. 3 版. 重庆: 重庆大学出版社, 2020: 237-262.</div>
+      <div><em>[2]</em> Hair J F, Black W C, Babin B J, et al. Multivariate Data Analysis[M]. 8th ed. Andover: Cengage Learning, 2019: 675-698.</div>
+      <div><em>[3]</em> Hayes A F. Introduction to Mediation, Moderation, and Conditional Process Analysis[M]. 3rd ed. New York: Guilford Press, 2022: 79-112.</div>
+      <div><em>[4]</em> Podsakoff P M, MacKenzie S B, Lee J Y, et al. Common method biases in behavioral research[J]. Journal of Applied Psychology, 2003, 88(5): 879-903.</div>
+      <div><em>[5]</em> Kaiser H F. An index of factorial simplicity[J]. Psychometrika, 1974, 39(1): 31-36.</div>
+      <div><em>[6]</em> 温忠麟, 叶宝娟. 中介效应分析：方法和模型发展[J]. 心理科学进展, 2014, 22(5): 731-745.</div>
+    </div>
+    <table>
+      <tr><th style="width:150px">变量</th><th style="width:78px">编码</th><th style="width:96px">题项数</th><th>题项示例</th></tr>
+      <tr><td>任务边界清晰度</td><td class="mono">BC1 — BC4</td><td class="mono">4</td><td>我清楚每项任务的责任人与完成判定标准</td></tr>
+      <tr><td>审批与回溯需求</td><td class="mono">AR1 — AR5</td><td class="mono">5</td><td>关键节点需要留下可回查的审批记录</td></tr>
+      <tr><td>使用频率</td><td class="mono">UF1</td><td class="mono">1</td><td>过去一个月使用智能体协作的频率（五级）</td></tr>
+      <tr class="total"><td>落地成效自评</td><td class="mono">OE1 — OE3</td><td class="mono">3</td><td>采用新流程后，任务的完成质量有所提升</td></tr>
+    </table>
+    <div class="block"><h4>分析环境与可复现性</h4><p style="margin-top:6px">分析使用 Python 3.12，statsmodels 0.14 与 pandas 2.2；因子分析采用主轴因式分解与方差最大化旋转；回归标准误为普通最小二乘，中介效应采用 Bootstrap 5,000 次重抽样；清洗脚本、编码表与描述统计输出一并归档。</p></div>
+  </div>
+  <div class="pfoot"><span>方法学参考 [1] — [6] 如上；变量编码 13 项 = 4 + 5 + 1 + 3，与题项数一致</span><span>第 10 / 10 页</span></div>
+</section>
+
+</body></html>
