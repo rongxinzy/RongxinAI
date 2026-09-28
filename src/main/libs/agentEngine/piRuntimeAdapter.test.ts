@@ -1599,6 +1599,69 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
+    it('ends the turn with a visible error when the workbench run can no longer execute tools', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const message =
+        'Stopped the run: the output contract was never committed, so no tool call could execute.';
+      const authorizeToolCall = vi
+        .fn()
+        .mockResolvedValue({ allow: false, reason: message, terminateRun: true });
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'terminated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      expect(result).toMatchObject({ block: true });
+      // The model must not be asked again, and the user must see why.
+      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
+      expect(onError).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ message: expect.stringContaining('output contract') }),
+      );
+    });
+
     it('starts the Goal loop only when Work explicitly enables goal mode', async () => {
       await adapter.startSession('goal-work', 'Finish the requested task', {
         sessionMode: 'work',
