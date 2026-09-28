@@ -65,6 +65,26 @@ describe('CaseGallery', () => {
     expect(image).toHaveAttribute('loading', 'lazy');
   });
 
+  /**
+   * 卡片是「图片在上、标题在下」：标题必须是图片之后、且不绝对定位的元素，
+   * 否则又回到把文字压在图上的旧样式。
+   */
+  test('renders the caption after the artwork so it sits below the image', () => {
+    const { container } = render(<CaseGallery prompts={prompts} onPromptSelect={vi.fn()} />);
+    const media = container.querySelector('.theme-page-case-gallery-media');
+    const card = media?.closest('.theme-page-case-gallery-card');
+    const caption = card?.querySelector('.theme-page-case-gallery-body');
+
+    expect(media).not.toBeNull();
+    expect(caption).not.toBeNull();
+    expect(caption?.className).not.toContain('absolute');
+    expect(
+      media && caption
+        ? media.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING
+        : 0,
+    ).toBeTruthy();
+  });
+
   test('keeps the gallery aligned with the four-column prompt width', () => {
     const { container } = render(<CaseGallery prompts={prompts} onPromptSelect={vi.fn()} />);
     const grid = container.querySelector('.grid');
