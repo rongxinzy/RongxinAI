@@ -242,6 +242,10 @@ jobs:
         working-directory: aaas
         env:
           ZHIYUAN_ELECTRON_PACKAGE_DIR: ${{ github.workspace }}\zhiyuan-core\release\win-unpacked
+          # verify-electron-package.mjs compares the packaged config.json against
+          # this file; without it the check falls back to the example config and
+          # reports a hash mismatch.
+          ZHIYUAN_ENTERPRISE_CONFIG_FILE: build/.enterprise-config.generated.json
         run: npm run verify:electron-package
       - name: Verify packaged runtimes with a clean PATH
         shell: powershell
