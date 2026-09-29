@@ -289,7 +289,10 @@ FunctionEnd
     StrCpy $R9 "离线组件归档包含不安全路径或链接元数据。"
     Goto OfflineComponentInstallFailed
   ComponentBatchExtractFailed:
-    StrCpy $R9 "离线组件展开失败。请检查磁盘空间或安全软件后重试。"
+    ; Keep the failing component key and the 7za exit code or exception detail
+    ; from the validator in the dialog and the install timing log. The validator
+    ; already folds newlines, so $1 is a single line.
+    StrCpy $R9 "离线组件展开失败：$1。请检查磁盘空间或安全软件后重试。"
     Goto OfflineComponentInstallFailed
   ComponentBatchVerificationFailed:
     StrCpy $R9 "离线组件健康检查失败，哨兵文件缺失或校验不匹配。"
