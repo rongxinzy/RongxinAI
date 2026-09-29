@@ -1,3 +1,5 @@
+import { EventEmitter } from 'node:events';
+
 import { expect, test, vi } from 'vitest';
 
 import {
@@ -9,11 +11,56 @@ import {
 } from '../../shared/workbenchTask';
 import { registerWorkbenchTaskIpcHandlers } from './ipc';
 import type { WorkbenchTaskService } from './taskService';
+import { observePreparedRun } from './preparedRunFailure';
 
 const electronMocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   showSaveDialog: vi.fn(),
 }));
+
+test('retry returns promptly but a later initialization rejection updates the task and reports the error', async () => {
+  const task = { id: 'task-1', sessionId: 'session-1', activeRunId: 'run-2' } as WorkbenchTask;
+  const run = { id: 'run-2', taskId: task.id, trigger: WorkbenchRunTrigger.Retry } as WorkbenchRun;
+  const service = {
+    on: vi.fn(),
+    repository: { getActiveTaskForSession: () => task },
+    prepareRun: () => ({ task, run }),
+    getDetail: () => ({ task }),
+    pauseRun: vi.fn(),
+    failRun: vi.fn(),
+  } as unknown as WorkbenchTaskService;
+  const runtime = new EventEmitter();
+  const onError = vi.fn();
+  runtime.on('error', onError);
+  let reject!: (error: Error) => void;
+  const pending = new Promise<void>((_resolve, fail) => {
+    reject = fail;
+  });
+  registerWorkbenchTaskIpcHandlers({
+    getService: () => service,
+    startPreparedRun: async (preparedTask, preparedRun) => {
+      observePreparedRun(() => pending, preparedTask, preparedRun, { service, runtime });
+    },
+  });
+  const handler = electronMocks.handlers.get(WorkbenchTaskIpc.Retry);
+  await expect(handler?.(undefined, task.id)).resolves.toMatchObject({ success: true });
+  expect(service.failRun).not.toHaveBeenCalled();
+  const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  try {
+    reject(new Error('Runtime initialization failed'));
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(service.failRun).toHaveBeenCalledWith(task.sessionId, {
+      message: 'Runtime initialization failed',
+    });
+    expect(onError).toHaveBeenCalledWith(
+      task.sessionId,
+      expect.objectContaining({ message: 'Runtime initialization failed' }),
+    );
+    expect(runtime.listenerCount('error')).toBe(1);
+  } finally {
+    log.mockRestore();
+  }
+});
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [], fromWebContents: () => null },
