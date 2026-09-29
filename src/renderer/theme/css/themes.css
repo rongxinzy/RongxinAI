@@ -3097,6 +3097,10 @@
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
 }
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
   background-color: var(--card);
@@ -7112,6 +7116,7 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-settings-input-variant-2),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-settings-input-variant-3),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-settings-button-variant-7),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-settings-navigation-icon),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-settings-button-variant-8),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-settings-button-variant-9),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-agent-task-row-button-variant-1),
@@ -10723,6 +10728,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="classic-dark"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="classic-dark"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -14754,6 +14763,7 @@ to {
 [data-theme="classic-dark"] :where(.theme-page-settings-input-variant-2),
 [data-theme="classic-dark"] :where(.theme-page-settings-input-variant-3),
 [data-theme="classic-dark"] :where(.theme-page-settings-button-variant-7),
+[data-theme="classic-dark"] :where(.theme-settings-navigation-icon),
 [data-theme="classic-dark"] :where(.theme-page-settings-button-variant-8),
 [data-theme="classic-dark"] :where(.theme-page-settings-button-variant-9),
 [data-theme="classic-dark"] :where(.theme-page-agent-task-row-button-variant-1),
@@ -18365,6 +18375,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="daming-light"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="daming-light"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -22381,6 +22395,7 @@ to {
 [data-theme="daming-light"] :where(.theme-page-settings-input-variant-2),
 [data-theme="daming-light"] :where(.theme-page-settings-input-variant-3),
 [data-theme="daming-light"] :where(.theme-page-settings-button-variant-7),
+[data-theme="daming-light"] :where(.theme-settings-navigation-icon),
 [data-theme="daming-light"] :where(.theme-page-settings-button-variant-8),
 [data-theme="daming-light"] :where(.theme-page-settings-button-variant-9),
 [data-theme="daming-light"] :where(.theme-page-agent-task-row-button-variant-1),
@@ -25992,6 +26007,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="daming-dark"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="daming-dark"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -30023,6 +30042,7 @@ to {
 [data-theme="daming-dark"] :where(.theme-page-settings-input-variant-2),
 [data-theme="daming-dark"] :where(.theme-page-settings-input-variant-3),
 [data-theme="daming-dark"] :where(.theme-page-settings-button-variant-7),
+[data-theme="daming-dark"] :where(.theme-settings-navigation-icon),
 [data-theme="daming-dark"] :where(.theme-page-settings-button-variant-8),
 [data-theme="daming-dark"] :where(.theme-page-settings-button-variant-9),
 [data-theme="daming-dark"] :where(.theme-page-agent-task-row-button-variant-1),
@@ -33636,6 +33656,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="changan-light"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="changan-light"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -37655,6 +37679,7 @@ to {
 [data-theme="changan-light"] :where(.theme-page-settings-input-variant-2),
 [data-theme="changan-light"] :where(.theme-page-settings-input-variant-3),
 [data-theme="changan-light"] :where(.theme-page-settings-button-variant-7),
+[data-theme="changan-light"] :where(.theme-settings-navigation-icon),
 [data-theme="changan-light"] :where(.theme-page-settings-button-variant-8),
 [data-theme="changan-light"] :where(.theme-page-settings-button-variant-9),
 [data-theme="changan-light"] :where(.theme-page-agent-task-row-button-variant-1),
@@ -41268,6 +41293,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="changan-dark"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="changan-dark"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -45302,6 +45331,7 @@ to {
 [data-theme="changan-dark"] :where(.theme-page-settings-input-variant-2),
 [data-theme="changan-dark"] :where(.theme-page-settings-input-variant-3),
 [data-theme="changan-dark"] :where(.theme-page-settings-button-variant-7),
+[data-theme="changan-dark"] :where(.theme-settings-navigation-icon),
 [data-theme="changan-dark"] :where(.theme-page-settings-button-variant-8),
 [data-theme="changan-dark"] :where(.theme-page-settings-button-variant-9),
 [data-theme="changan-dark"] :where(.theme-page-agent-task-row-button-variant-1),
@@ -48915,6 +48945,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="weiyang-light"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="weiyang-light"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -52934,6 +52968,7 @@ to {
 [data-theme="weiyang-light"] :where(.theme-page-settings-input-variant-2),
 [data-theme="weiyang-light"] :where(.theme-page-settings-input-variant-3),
 [data-theme="weiyang-light"] :where(.theme-page-settings-button-variant-7),
+[data-theme="weiyang-light"] :where(.theme-settings-navigation-icon),
 [data-theme="weiyang-light"] :where(.theme-page-settings-button-variant-8),
 [data-theme="weiyang-light"] :where(.theme-page-settings-button-variant-9),
 [data-theme="weiyang-light"] :where(.theme-page-agent-task-row-button-variant-1),
@@ -56547,6 +56582,10 @@ to {
   transition-duration: 200ms;
   transition-timing-function: ease-out;
   line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="weiyang-dark"] :where(.theme-settings-navigation-icon) {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 [data-theme="weiyang-dark"] :where(.theme-page-settings-button-variant-8) {
   border-color: var(--zy-border);
@@ -60581,6 +60620,7 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-page-settings-input-variant-2),
 [data-theme="weiyang-dark"] :where(.theme-page-settings-input-variant-3),
 [data-theme="weiyang-dark"] :where(.theme-page-settings-button-variant-7),
+[data-theme="weiyang-dark"] :where(.theme-settings-navigation-icon),
 [data-theme="weiyang-dark"] :where(.theme-page-settings-button-variant-8),
 [data-theme="weiyang-dark"] :where(.theme-page-settings-button-variant-9),
 [data-theme="weiyang-dark"] :where(.theme-page-agent-task-row-button-variant-1),
