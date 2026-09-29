@@ -1,3 +1,4 @@
+import { resolveArtifactPath } from '../../shared/cowork/artifactPath';
 import { isBinaryArtifactFile } from '../../shared/cowork/artifactPreview';
 import type { Artifact } from '../types/artifact';
 
@@ -23,21 +24,6 @@ let cachedBytes = 0;
 let usageCounter = 0;
 let cacheEpoch = 0;
 
-function normalizeFilePath(rawPath: string): string {
-  let filePath = rawPath;
-  if (filePath.startsWith('file:///')) filePath = filePath.slice(7);
-  else if (filePath.startsWith('file://')) filePath = filePath.slice(7);
-  else if (filePath.startsWith('file:/')) filePath = filePath.slice(5);
-  if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1);
-  return filePath.replace(/\\/g, '/');
-}
-
-export function resolveFilePath(rawPath: string, cwd?: string | null): string {
-  const filePath = normalizeFilePath(rawPath);
-  if (filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath)) return filePath;
-  return `${cwd ?? ''}/${filePath}`.replace(/\\/g, '/');
-}
-
 function decodeTextDataUrl(dataUrl: string): string {
   const base64 = dataUrl.split(',')[1] || '';
   const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
@@ -59,7 +45,7 @@ function evictDataUrlCache(): void {
 
 /** Loads a path-backed artifact as a data URL through the shared preview broker. */
 export function loadArtifactDataUrl(rawPath: string, cwd?: string | null): Promise<string> {
-  const filePath = resolveFilePath(rawPath, cwd);
+  const filePath = resolveArtifactPath(rawPath, cwd);
   const cached = dataUrlCache.get(filePath);
   if (cached) {
     cached.lastUsed = ++usageCounter;
@@ -116,7 +102,7 @@ export function loadArtifactFile(
     return Promise.resolve(null);
   }
 
-  const filePath = resolveFilePath(artifact.filePath, cwd);
+  const filePath = resolveArtifactPath(artifact.filePath, cwd);
   const cached = pendingLoads.get(filePath);
   if (cached) return cached;
 
@@ -140,7 +126,7 @@ export function loadArtifactFile(
 }
 
 export function invalidateArtifactFile(filePath: string): void {
-  const normalizedPath = resolveFilePath(filePath);
+  const normalizedPath = resolveArtifactPath(filePath);
   pathGenerations.set(normalizedPath, (pathGenerations.get(normalizedPath) ?? 0) + 1);
   pendingLoads.delete(normalizedPath);
   pendingDataUrlLoads.delete(normalizedPath);

@@ -1,11 +1,14 @@
 import { Button } from '@shared/components/ui/button';
+import { resolveArtifactPath } from '@shared/cowork/artifactPath';
 import { ExternalLink, LoaderCircle } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'sonner';
 
-import { isArtifactFileAvailable } from '@/services/artifactAvailability';
-import { resolveFilePath } from '@/services/artifactFileLoader';
+import {
+  ArtifactFileAvailability,
+  probeArtifactFileAvailability,
+} from '@/services/artifactAvailability';
 import { i18nService } from '@/services/i18n';
 import { selectCurrentSession } from '@/store/selectors/coworkSelectors';
 import {
@@ -188,6 +191,20 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
   const [checking, setChecking] = useState(false);
   const busy = checking;
 
+  // An availability answer belongs to one card identity inside one session. Any
+  // change to that identity — or unmounting the card — invalidates the pending
+  // probe, so a late answer cannot select an artifact the user has already left.
+  const probeGenerationRef = useRef(0);
+  useEffect(() => {
+    probeGenerationRef.current += 1;
+  }, [artifact.id, artifact.filePath, artifact.sessionId, currentSession?.id]);
+  useEffect(
+    () => () => {
+      probeGenerationRef.current += 1;
+    },
+    [],
+  );
+
   // 2026/09/20 lixiang  右侧预览面板 toggle：同文件已打开则关闭，否则打开/切换（issue #805）
   const handleOpenPreview = async () => {
     if (busy) return;
@@ -195,9 +212,13 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
       dispatch(closePanel());
       return;
     }
+    probeGenerationRef.current += 1;
+    const probeGeneration = probeGenerationRef.current;
     setChecking(true);
     try {
-      if (!(await isArtifactFileAvailable(artifact, cwd))) {
+      const state = await probeArtifactFileAvailability(artifact, cwd);
+      if (probeGeneration !== probeGenerationRef.current) return;
+      if (state === ArtifactFileAvailability.Missing) {
         toast.error(t('fileNotFound'));
         return;
       }
@@ -213,12 +234,16 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
     if (!path) return;
     event.preventDefault();
     event.stopPropagation();
+    probeGenerationRef.current += 1;
+    const probeGeneration = probeGenerationRef.current;
     try {
-      if (!(await isArtifactFileAvailable(artifact, cwd))) {
+      const state = await probeArtifactFileAvailability(artifact, cwd);
+      if (probeGeneration !== probeGenerationRef.current) return;
+      if (state === ArtifactFileAvailability.Missing) {
         toast.error(t('fileNotFound'));
         return;
       }
-      const result = await window.electron.shell.showItemInFolder(resolveFilePath(path, cwd));
+      const result = await window.electron.shell.showItemInFolder(resolveArtifactPath(path, cwd));
       if (!result?.success) {
         console.error('[Artifact] Failed to show item in folder:', path, result?.error);
       }

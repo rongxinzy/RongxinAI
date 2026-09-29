@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { resolveArtifactPath } from '../../../shared/cowork/artifactPath';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
@@ -506,6 +507,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- message count and updatedAt cover message additions and content updates
   }, [sessionId, messagesLength, currentSession?.updatedAt, isStreaming]);
 
+  // The session the registered document listeners belong to. A link probe that
+  // settles after a session switch (or after unmount) must not change the
+  // selection of a session the user has already left.
+  const artifactListenerSessionIdRef = useRef<string | null>(sessionId ?? null);
+  useEffect(() => {
+    artifactListenerSessionIdRef.current = sessionId ?? null;
+    return () => {
+      artifactListenerSessionIdRef.current = null;
+    };
+  }, [sessionId]);
+
   // Intercept clicks on artifact-compatible file links → open in panel
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -518,16 +530,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const href = anchor.getAttribute('href') || '';
       if (!href.startsWith('file://')) return;
 
-      let filePath: string;
-      try {
-        filePath = decodeURIComponent(href.replace(/^file:\/\//, ''));
-      } catch {
-        filePath = href.replace(/^file:\/\//, '');
-      }
-      // Strip leading / before Windows drive letter
-      if (/^\/[A-Za-z]:/.test(filePath)) {
-        filePath = filePath.slice(1);
-      }
+      const filePath = resolveArtifactPath(href);
 
       const lastDot = filePath.lastIndexOf('.');
       if (lastDot === -1) return;
@@ -542,10 +545,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick,
       );
       if (existing) {
+        // The probe may settle after the user switched sessions; only a verdict for
+        // the session that registered this listener may change the selection.
         void openAvailableArtifact(
           existing,
           () => dispatch(selectArtifact(existing.id)),
           currentSession?.cwd,
+          { isCurrent: () => artifactListenerSessionIdRef.current === sessionId },
         );
       }
       // No fallback creation — artifacts are now declared via declare_artifact tool,
