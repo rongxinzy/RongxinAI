@@ -1,5 +1,5 @@
 import { AgentId } from '@shared/agent';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSelector } from 'react-redux';
 
 import { coworkService } from '../../services/cowork';
@@ -19,6 +19,8 @@ import { TaskSearchDialog } from './TaskSearchDialog';
 
 const SEARCH_SESSION_LIMIT = 100;
 const SearchError = { Load: 'searchLoadError', Open: 'searchOpenError' } as const;
+const subscribeLanguage = (listener: () => void) => i18nService.subscribe(listener);
+const getLanguage = () => i18nService.getLanguage();
 interface CoworkSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,6 +43,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
   const agents = useSelector((state: RootState) => state.agent.agents);
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const streamingSessionIds = useSelector(selectStreamingSessionIds);
+  const language = useSyncExternalStore(subscribeLanguage, getLanguage, getLanguage);
   const [query, setQuery] = useState('');
   const [searchSessions, setSearchSessions] = useState(sessions);
   const [loading, setLoading] = useState(false);
@@ -110,7 +113,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
         const agentName = getAgentDisplayNameById(agentId, agents) ?? agentId;
         const context = names.get(session.workspaceId ?? '') ?? (isChat ? undefined : agentName);
         // The dialog must show and match the same title as the sidebar.
-        const title = resolveSessionDisplayTitle(session, i18nService.getLanguage());
+        const title = resolveSessionDisplayTitle(session, language);
         if (
           normalizedQuery &&
           ![title, agentName, context ?? ''].some(value =>
@@ -130,7 +133,16 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
         ];
       });
     return { items, sessionById };
-  }, [searchSessions, agents, workspaces, query, isChat, currentSessionId, streamingSessionIds]);
+  }, [
+    searchSessions,
+    agents,
+    workspaces,
+    query,
+    isChat,
+    currentSessionId,
+    streamingSessionIds,
+    language,
+  ]);
 
   const handleSelect = async (id: string) => {
     const session = sessionById.get(id);

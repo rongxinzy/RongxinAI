@@ -8,56 +8,68 @@
  * the fix command when the native module is built for the wrong ABI.
  */
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 export const NATIVE_MODULE = 'better-sqlite3';
+export const NativeAbiStatus = {
+  Compatible: 'electron-abi',
+  Incompatible: 'incompatible-abi',
+  Unavailable: 'unavailable',
+};
+export const NativeAbiProbeExitCode = { Compatible: 0, Unavailable: 1, Incompatible: 2 };
+export const NATIVE_ABI_PROBE_TIMEOUT_MS = 10_000;
+const probePath = fileURLToPath(new URL('./electron-native-abi-probe.cjs', import.meta.url));
 
-/** @returns {'electron-abi' | 'node-abi' | 'unavailable'} */
-export const classifyNativeAbi = (error) => {
+/** Classify errors from the target Electron process, never from the host Node. */
+export const classifyNativeAbi = error => {
   if (!error) {
-    // Node loaded it, so it was compiled against Node's ABI.
-    return 'node-abi';
+    return NativeAbiStatus.Compatible;
   }
   const message = String(error?.message ?? error);
-  // Both ABIs produce this message; the mismatch itself is what Electron's
-  // build looks like from plain Node.
-  return /NODE_MODULE_VERSION/.test(message) ? 'electron-abi' : 'unavailable';
+  return /NODE_MODULE_VERSION/.test(message)
+    ? NativeAbiStatus.Incompatible
+    : NativeAbiStatus.Unavailable;
 };
 
-export const inspectNativeAbi = (projectRoot) => {
-  const requireFromProject = createRequire(path.join(projectRoot, 'package.json'));
-  let database = null;
+export const inspectNativeAbi = projectRoot => {
   try {
-    const Database = requireFromProject(NATIVE_MODULE);
-    // better-sqlite3 loads its addon lazily, so the probe must open a database;
-    // an in-memory one touches no user data.
-    database = new Database(':memory:');
-    return classifyNativeAbi(null);
-  } catch (error) {
-    return classifyNativeAbi(error);
-  } finally {
-    try {
-      database?.close();
-    } catch {
-      // The probe database is disposable.
-    }
+    const requireFromProject = createRequire(path.join(projectRoot, 'package.json'));
+    const electronBinary = requireFromProject('electron');
+    // A mismatch under host Node does not prove compatibility with Electron.
+    // Load the addon in the actual installed Electron, without booting the app.
+    const { NODE_OPTIONS: _nodeOptions, NODE_PATH: _nodePath, ...env } = process.env;
+    const result = spawnSync(electronBinary, [probePath, path.resolve(projectRoot)], {
+      cwd: projectRoot,
+      env: { ...env, ELECTRON_RUN_AS_NODE: '1' },
+      encoding: 'utf8',
+      timeout: NATIVE_ABI_PROBE_TIMEOUT_MS,
+      maxBuffer: 64 * 1024,
+      windowsHide: true,
+    });
+    if (result.error || result.signal) return NativeAbiStatus.Unavailable;
+    if (result.status === NativeAbiProbeExitCode.Compatible) return NativeAbiStatus.Compatible;
+    if (result.status === NativeAbiProbeExitCode.Incompatible) return NativeAbiStatus.Incompatible;
+    return NativeAbiStatus.Unavailable;
+  } catch {
+    return NativeAbiStatus.Unavailable;
   }
 };
 
 const FIX_COMMAND = 'npm run rebuild:electron-native';
 
-export const describeNativeAbi = (status) => {
-  if (status === 'node-abi') {
+export const describeNativeAbi = status => {
+  if (status === NativeAbiStatus.Incompatible) {
     return [
-      `[native-abi] ${NATIVE_MODULE} is built for Node's ABI, but Electron needs its own.`,
+      `[native-abi] ${NATIVE_MODULE} does not match the installed Electron's ABI.`,
       `[native-abi] The app would crash in initStore with ERR_DLOPEN_FAILED.`,
       `[native-abi] Run: ${FIX_COMMAND}`,
     ].join('\n');
   }
-  if (status === 'unavailable') {
+  if (status === NativeAbiStatus.Unavailable) {
     return [
-      `[native-abi] ${NATIVE_MODULE} could not be loaded at all.`,
+      `[native-abi] Electron could not verify ${NATIVE_MODULE}.`,
       `[native-abi] Run: bun install  (then ${FIX_COMMAND} if the app still fails)`,
     ].join('\n');
   }
@@ -69,5 +81,5 @@ if (scriptPath === fileURLToPath(import.meta.url)) {
   const projectRoot = path.resolve(process.argv[2] ?? path.join(path.dirname(scriptPath), '..'));
   const status = inspectNativeAbi(projectRoot);
   console.log(describeNativeAbi(status));
-  process.exit(status === 'electron-abi' ? 0 : 1);
+  process.exit(status === NativeAbiStatus.Compatible ? 0 : 1);
 }
