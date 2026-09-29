@@ -69,6 +69,7 @@ import {
   type WorkbenchTaskChangedEvent,
 } from '../shared/workbenchTask';
 import { CodingAgentIpc } from '../shared/codingAgent';
+import { RuntimeNoticeIpc } from '../shared/ipc/channels';
 
 // Helper: typed main→renderer push listener with automatic cleanup
 const onPush = <T>(channel: string, callback: (data: T) => void): (() => void) => {
@@ -862,6 +863,11 @@ contextBridge.exposeInMainWorld('electron', {
     exportZip: () => ipcRenderer.invoke(LogIpc.ExportZip),
     fromRenderer: (level: string, tag: string, message: string) =>
       ipcRenderer.send(LogIpc.FromRenderer, level, tag, message),
+  },
+
+  runtimeNotices: {
+    onNotice: (callback: (notice: import('../common/runtimeNotice').RuntimeRetryNotice) => void) =>
+      onPush(RuntimeNoticeIpc.Notice, callback),
   },
 
   im: {

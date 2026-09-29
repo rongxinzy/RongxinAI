@@ -24,6 +24,7 @@ const isModelLaunchLogWindow =
 
 const root = ReactDOM.createRoot(rootElement);
 let activityUnsubscribe: (() => void) | null = null;
+let runtimeNoticeUnsubscribe: (() => void) | null = null;
 let devNetworkUnsubscribe: (() => void) | null = null;
 
 async function renderRoot(): Promise<void> {
@@ -49,6 +50,10 @@ async function renderRoot(): Promise<void> {
 
   const [{ default: App }, { store }] = await Promise.all([import('./App'), import('./store')]);
 
+  const { startRuntimeNoticeListener } = await import('./services/runtimeNotice');
+  runtimeNoticeUnsubscribe?.();
+  runtimeNoticeUnsubscribe = startRuntimeNoticeListener();
+
   const { hydrateRuns, upsertRun } = await import('./store/slices/activitySlice');
   activityUnsubscribe?.();
   activityUnsubscribe = window.electron.activity.onUpdated(run => store.dispatch(upsertRun(run)));
@@ -71,6 +76,8 @@ if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     activityUnsubscribe?.();
     activityUnsubscribe = null;
+    runtimeNoticeUnsubscribe?.();
+    runtimeNoticeUnsubscribe = null;
     devNetworkUnsubscribe?.();
     devNetworkUnsubscribe = null;
   });

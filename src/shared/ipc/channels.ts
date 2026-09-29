@@ -357,6 +357,13 @@ export const NetworkIpc = {
 } as const;
 export type NetworkIpc = (typeof NetworkIpc)[keyof typeof NetworkIpc];
 
+// ─── Agent runtime notices ──────────────────────────────────────────────────
+/** Transient runtime status the renderer shows once and never persists. */
+export const RuntimeNoticeIpc = {
+  Notice: 'runtime:notice',
+} as const;
+export type RuntimeNoticeIpc = (typeof RuntimeNoticeIpc)[keyof typeof RuntimeNoticeIpc];
+
 // 2026/09/17 lixiang  开发态主进程 HTTP → 渲染进程 Network beacon
 export const DevNetworkIpc = {
   Entry: 'dev-network:entry',

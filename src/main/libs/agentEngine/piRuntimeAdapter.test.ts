@@ -3524,6 +3524,93 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
+    it('ends a non-retryable turn immediately instead of waiting out the retry cycle', async () => {
+      const notices: Array<{ kind: string; attempt: number }> = [];
+      adapter.on('retryNotice', (_sid, notice) =>
+        notices.push({ kind: notice.kind, attempt: notice.attempt }),
+      );
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('401 Unauthorized: invalid api key');
+
+      // Reported at the failure itself — no auto_retry_end / agent_settled needed.
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(completes).toHaveLength(0);
+      // Pi owns its retry timer and cannot be stopped here; the session must
+      // stay usable for the next message instead of being torn down.
+      expect(mockSession.abort).not.toHaveBeenCalled();
+
+      // Pi keeps emitting retry bookkeeping after the runtime ended the turn;
+      // none of it may report the same failure twice or promise a retry.
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      listener!({
+        type: 'auto_retry_end',
+        success: false,
+        attempt: 1,
+        finalError: '401 Unauthorized: invalid api key',
+      });
+      listener!({ type: 'agent_settled' });
+
+      expect(notices).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(completes).toHaveLength(0);
+    });
+
+    it('announces a retryable failure once while Pi keeps retrying', async () => {
+      const notices: Array<{ kind: string; attempt: number }> = [];
+      adapter.on('retryNotice', (_sid, notice) =>
+        notices.push({ kind: notice.kind, attempt: notice.attempt }),
+      );
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('429 Too Many Requests: overloaded');
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      listener!({ type: 'auto_retry_start', attempt: 2 });
+
+      expect(notices).toEqual([{ kind: CoworkErrorKind.RateLimited, attempt: 1 }]);
+      // A retryable failure keeps retrying: the runtime must not end the turn.
+      expect(errors).toHaveLength(0);
+      expect(mockSession.abort).not.toHaveBeenCalled();
+    });
+
+    it('completes the turn when Pi recovers after the runtime reported the failure', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('401 Unauthorized: invalid api key');
+      expect(errors).toHaveLength(1);
+      expect(completes).toEqual([]);
+
+      // Pi kept retrying on its own and this time got an answer: the turn must
+      // still finalize and complete instead of staying reported as failed.
+      successfulTurn('Recovered after the failure');
+      listener!({ type: 'agent_settled' });
+
+      expect(completes).toEqual(['test']);
+      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'idle' });
+    });
+
+    it('runs the next turn in the same session after a non-retryable failure', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('401 Unauthorized: invalid api key');
+      expect(errors).toHaveLength(1);
+
+      // The user sends another message: this turn must run and complete.
+      listener!({ type: 'turn_start' });
+      successfulTurn('Second answer');
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(1);
+      expect(completes).toEqual(['test']);
+    });
+
     it('finalizes a partial answer before surfacing the terminal error', async () => {
       const updates: Array<{
         messageId: string;

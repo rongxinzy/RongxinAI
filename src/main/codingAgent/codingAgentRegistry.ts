@@ -7,12 +7,13 @@ import {
   CodingAgentEnvironmentKey,
   CodingAgentProfileId,
   CodingAgentProfileStatus,
+  CodingErrorMessage,
   type CodingAgentCapabilities,
   type CodingAgentProfile,
 } from '../../shared/codingAgent';
 import { AcpDiscoveryService, type AcpDiscoveryOptions } from './acp/discoveryService';
 import { BUNDLED_ACP_ADAPTERS, bundledAdapterDefinition } from './acp/bundledAdapters';
-import { AcpProbeService } from './acp/probeService';
+import { AcpProbeNoAnswerError, AcpProbeService } from './acp/probeService';
 import { AcpProtocolIncompatibleError } from './acp/protocol';
 import type { CodingAgentProfileRepository } from './codingAgentProfileRepository';
 
@@ -62,7 +63,7 @@ export class CodingAgentRegistry extends EventEmitter {
   }
   refreshBuiltinReadiness(): CodingAgentProfile {
     const profile = this.profiles.get(CodingAgentProfileId.Builtin);
-    if (!profile) throw new Error('The built-in coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileBuiltinNotFound);
     const status = this.isBuiltinReady()
       ? CodingAgentProfileStatus.Ready
       : CodingAgentProfileStatus.NeedsConfiguration;
@@ -98,10 +99,10 @@ export class CodingAgentRegistry extends EventEmitter {
   }): CodingAgentProfile {
     const command = input.command.trim();
     if (!path.isAbsolute(command))
-      throw new Error('Custom coding agent commands must use an absolute path.');
-    if (!input.name.trim()) throw new Error('Coding agent name is required.');
+      throw new Error(CodingErrorMessage.ProfileCommandAbsolute);
+    if (!input.name.trim()) throw new Error(CodingErrorMessage.ProfileNameRequired);
     if (command.includes('\0') || input.args.some(arg => !arg || arg.includes('\0'))) {
-      throw new Error('Custom coding agent command arguments are invalid.');
+      throw new Error(CodingErrorMessage.ProfileArgumentsInvalid);
     }
     return this.registerExternal({
       name: input.name.trim(),
@@ -129,7 +130,7 @@ export class CodingAgentRegistry extends EventEmitter {
   trust(profileId: string): CodingAgentProfile {
     const profile = this.profiles.get(profileId);
     if (!profile || profile.isBuiltin)
-      throw new Error('The coding agent profile cannot be trusted.');
+      throw new Error(CodingErrorMessage.ProfileNotTrustable);
     const updated = { ...profile, status: CodingAgentProfileStatus.Detected };
     this.profiles.set(updated.id, updated);
     this.repository?.save(updated);
@@ -140,7 +141,7 @@ export class CodingAgentRegistry extends EventEmitter {
   markNeedsAuth(profileId: string): CodingAgentProfile {
     const profile = this.profiles.get(profileId);
     if (!profile || profile.isBuiltin)
-      throw new Error('The coding agent profile cannot require external authentication.');
+      throw new Error(CodingErrorMessage.ProfileNotAuthenticatable);
     const updated = { ...profile, status: CodingAgentProfileStatus.NeedsAuth };
     this.profiles.set(updated.id, updated);
     this.repository?.save(updated);
@@ -150,7 +151,7 @@ export class CodingAgentRegistry extends EventEmitter {
 
   markReady(profileId: string): CodingAgentProfile {
     const profile = this.profiles.get(profileId);
-    if (!profile) throw new Error('The coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
     const updated = { ...profile, status: CodingAgentProfileStatus.Ready };
     this.profiles.set(updated.id, updated);
     this.repository?.save(updated);
@@ -171,7 +172,7 @@ export class CodingAgentRegistry extends EventEmitter {
         profile.status !== CodingAgentProfileStatus.Unavailable &&
         profile.status !== CodingAgentProfileStatus.NeedsAuth)
     ) {
-      throw new Error('The coding agent profile cannot be probed.');
+      throw new Error(CodingErrorMessage.ProfileNotProbeable);
     }
     try {
       const result = await new AcpProbeService().probe({
@@ -191,12 +192,21 @@ export class CodingAgentRegistry extends EventEmitter {
       this.emit('changed');
       return updated;
     } catch (error) {
+      // The connection check renders a verdict for the configure-time flow: an
+      // agent that answers nothing but offers a sign-in method is "needs
+      // sign-in", everything else stays "unavailable".
+      const needsAuth =
+        error instanceof AcpProbeNoAnswerError &&
+        error.authMethods.some(method => method.type === 'terminal' || !method.type);
       const updated = {
         ...profile,
+        ...(error instanceof AcpProbeNoAnswerError ? { authMethods: error.authMethods } : {}),
         status:
           error instanceof AcpProtocolIncompatibleError
             ? CodingAgentProfileStatus.Incompatible
-            : CodingAgentProfileStatus.Unavailable,
+            : needsAuth
+              ? CodingAgentProfileStatus.NeedsAuth
+              : CodingAgentProfileStatus.Unavailable,
       };
       this.profiles.set(updated.id, updated);
       this.repository?.save(updated);
