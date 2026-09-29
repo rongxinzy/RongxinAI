@@ -5,13 +5,20 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 /**
- * 案例库内容契约：每个快捷技能（public/quick-actions.json 中的一个 action）
- * 都必须提供 8 个案例，并且每个案例在中英文下都有完整的
+ * 案例库内容契约：UI 的六个快捷技能各提供**十二**个场景不同的高质量示例；教育专题归入网站入口。
+ * 每个案例在中英文下都有完整的
  * label / description / prompt，否则案例卡片会退化成只有 ID 的空壳。
  *
  * 封面缩略图的契约见 casePreviews.test.ts。
  */
-const CASES_PER_ACTION = 8;
+const CASE_COUNTS: Record<string, number> = {
+  pptx: 12,
+  'data-analysis': 12,
+  website: 12,
+  'deep-research': 12,
+  'academic-research': 12,
+  docs: 12,
+};
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const publicDir = resolve(projectRoot, 'public');
@@ -61,14 +68,17 @@ const languages = ['zh', 'en'] as const;
 const allCases = catalogue.actions.flatMap(action => action.prompts ?? []);
 
 describe('quick action case library', () => {
-  test('every quick action ships exactly eight cases', () => {
-    expect(catalogue.actions.length).toBeGreaterThan(0);
+  test('keeps six quick skills with twelve examples each and assigns education to website', () => {
+    expect(catalogue.actions.map(action => action.id)).toEqual(Object.keys(CASE_COUNTS));
 
     const mismatched = catalogue.actions
-      .filter(action => (action.prompts ?? []).length !== CASES_PER_ACTION)
+      .filter(action => (action.prompts ?? []).length !== CASE_COUNTS[action.id])
       .map(action => `${action.id}: ${(action.prompts ?? []).length}`);
 
     expect(mismatched).toEqual([]);
+    expect(catalogue.actions.find(action => action.id === 'website')?.prompts?.[0]?.id).toBe(
+      'web-learning-lab',
+    );
   });
 
   test('case ids are unique across the whole catalogue', () => {

@@ -11,10 +11,10 @@ import {
 } from './quickActionSelection';
 
 const action = {
-  id: 'education',
-  label: 'Education & Learning',
-  icon: 'GraduationCap',
-  color: '#10B981',
+  id: 'website',
+  label: 'Create Website',
+  icon: 'GlobeAltIcon',
+  color: '#3B82F6',
   skillMapping: 'frontend-design',
   prompts: [],
 };
@@ -97,4 +97,10 @@ test('declares the current PPT and research skill mappings', () => {
   expect(
     quickActionsConfig.actions.find(action => action.id === 'academic-research')?.skillIds,
   ).toEqual(['deli-autoresearch', 'deep-research', 'web-search']);
+});
+
+test('keeps website examples on the existing frontend-design shortcut', () => {
+  const websiteAction = quickActionsConfig.actions.find(action => action.id === 'website');
+
+  expect(websiteAction?.skillMapping).toBe('frontend-design');
 });

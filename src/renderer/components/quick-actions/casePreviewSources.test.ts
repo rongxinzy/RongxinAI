@@ -18,16 +18,18 @@ describe('bundled case detail previews', () => {
   });
 
   /**
-   * 文档类预览按 1100px 设计宽度注入自适应缩放。缩放必须用「未缩放的」内容宽度计算：
-   * scrollWidth 在 zoom 生效后返回的是缩放坐标系下的值，把它喂回去会让对话框放大后
-   * 仍停在收起时的缩放比例（展开预览不跟随视口）。
+   * 案例预览现在是自包含的响应式独立页（viewport meta + 内联样式/脚本），
+   * 详情弹窗直接按原文展示，不再注入任何缩放脚本：
+   * 一旦有人把「按固定 1100px 注入 fit() 缩放」的老实现加回来，这条负向断言会失败。
    */
-  test('rescales the preview from an unzoomed measurement', async () => {
+  test('serves redesigned research briefs as responsive standalone pages', async () => {
     const html = await loadCasePreview('research-supply-chain');
 
     expect(html).not.toBeNull();
-    expect(html).toContain("b.style.zoom=''");
-    expect(html).toContain('addEventListener');
+    expect(html).toContain('name="viewport"');
+    expect(html).toContain('EVIDENCE MAP');
+    expect(html).not.toContain('style.zoom');
+    expect(html).not.toContain('innerWidth/1100');
   });
 
   /**
