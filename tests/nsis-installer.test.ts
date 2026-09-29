@@ -93,8 +93,8 @@ describe('NSIS offline resource and local inference flow', () => {
       installerScript.indexOf('ComponentBatchVerificationFailed:'),
     );
 
-    expect(failureBlock).toContain('${StrTrimNewLines} $R8 $1');
-    expect(failureBlock).toContain('离线组件展开失败：$R8。请检查磁盘空间或安全软件后重试。');
+    expect(failureBlock).not.toContain('StrTrimNewLines');
+    expect(failureBlock).toContain('离线组件展开失败：$1。请检查磁盘空间或安全软件后重试。');
     expect(failureBlock).not.toContain('"离线组件展开失败。请检查磁盘空间或安全软件后重试。"');
     expect(failureBlock).toContain('Goto OfflineComponentInstallFailed');
   });
