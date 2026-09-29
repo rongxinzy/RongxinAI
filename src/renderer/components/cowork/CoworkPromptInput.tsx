@@ -22,6 +22,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 
 import { DEFAULT_COWORK_PERMISSION_MODE, CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import {
+  hasCoworkSubmissionContent,
+  hasVisiblePromptContent,
+} from '../../../shared/cowork/submissionContent';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -63,6 +67,7 @@ import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
 import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
+import { usePromptSubmissionLock } from './usePromptSubmissionLock';
 import { resolveInitialSelectedExpertIds } from './resolveInitialSelectedExpertIds';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
@@ -512,7 +517,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
     }, [value, draftPrompt, dispatch, draftKey]);
 
-    const handleSubmit = useCallback(async () => {
+    const submitPrompt = useCallback(async () => {
       if (showFolderSelector && !workingDirectory?.trim()) {
         setShowFolderRequiredWarning(true);
         if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
@@ -523,7 +528,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         return;
       }
 
-      const trimmedValue = value.trim();
+      const trimmedValue = hasVisiblePromptContent(value) ? value.trim() : '';
       if (
         (!trimmedValue && attachments.length === 0 && !resumeTaskActive) ||
         (isStreaming && !canQueueWhileStreaming) ||
@@ -637,7 +642,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       // would trigger native image-path detection, which rejects paths outside allowed
       // directories and can drop the base64 image during sanitization (macOS-only bug).
       const attachmentLines = attachments
-        .filter(a => !a.path.startsWith('inline:') && !(a.isImage && a.dataUrl))
+        .filter(
+          a =>
+            hasVisiblePromptContent(a.path) &&
+            !a.path.startsWith('inline:') &&
+            !(a.isImage && a.dataUrl),
+        )
         .map(attachment => `${i18nService.t('inputFileLabel')}: ${attachment.path}`)
         .join('\n');
       const finalPrompt = trimmedValue
@@ -645,6 +655,25 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           ? `${attachmentLines}\n\n${trimmedValue}`
           : trimmedValue
         : attachmentLines;
+
+      if (
+        !resumeTaskActive &&
+        !hasCoworkSubmissionContent({ prompt: finalPrompt, imageAttachments: imageAtts })
+      ) {
+        // 2026/09/28 之前这里是静默 return：按钮看起来可用，点下去却什么都不发生。
+        const unusableImage = attachments.some(a => a.isImage || isImagePath(a.path));
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: {
+              message: i18nService.t(
+                unusableImage ? 'imageReadError' : 'coworkSubmitEmptyContent',
+              ),
+              isError: true,
+            },
+          }),
+        );
+        return;
+      }
 
       if (imageAtts.length > 0) {
         console.log('[CoworkPromptInput] handleSubmit: passing imageAtts to onSubmit', {
@@ -712,6 +741,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       canQueueWhileStreaming,
       resumeTaskActive,
     ]);
+
+    const handleSubmit = usePromptSubmissionLock(submitPrompt);
 
     const handleManageSkills = useCallback(() => {
       if (onManageSkills) {
@@ -1113,7 +1144,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const isPlusToolbar = !remoteManaged;
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     // 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip
-    const isSubmitEmpty = !value.trim() && attachments.length === 0 && !resumeTaskActive;
+    const isSubmitEmpty =
+      !hasVisiblePromptContent(value) && attachments.length === 0 && !resumeTaskActive;
     const showEmptySubmitHint = isSubmitEmpty && !isStreaming;
     return (
       <div ref={promptRootRef} className="relative">
