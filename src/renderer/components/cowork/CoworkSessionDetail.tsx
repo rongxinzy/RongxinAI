@@ -14,7 +14,10 @@ import type { CoworkSessionInterruption } from '../../../shared/cowork/interrupt
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import type { DetectedArtifact } from '../../services/artifactParser';
-import { loadArtifactDataUrl } from '../../services/artifactFileLoader';
+import {
+  openAvailableArtifact,
+  prepareAvailableArtifacts,
+} from '../../services/artifactAvailability';
 import {
   detectArtifactsFromMessages,
   getArtifactTypeFromExtension,
@@ -42,7 +45,6 @@ import {
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
-  shouldRevealLiveArtifact,
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
@@ -313,31 +315,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const targetSessionId = sessionId;
       if (!targetSessionId) return;
 
-      const shouldReveal = await Promise.all(
-        detected.map(async ({ artifact, needsFileLoad }) => {
-          const isLiveDeliverable = shouldRevealLiveArtifact(artifact, {
-            isLiveSession: liveRunRef.current,
-            previewable: true,
-          });
-          if (!isLiveDeliverable || !needsFileLoad || !artifact.filePath) return isLiveDeliverable;
-          try {
-            // Same call the HTML renderer will make, so a path it cannot show is
-            // never revealed automatically.
-            await loadArtifactDataUrl(artifact.filePath);
-            return true;
-          } catch {
-            return false;
-          }
-        }),
+      const available = await prepareAvailableArtifacts(
+        detected,
+        liveRunRef.current,
+        currentSession?.cwd,
       );
 
-      detected.forEach(({ artifact }, index) => {
-        dispatch(
-          addArtifact({ sessionId: targetSessionId, artifact, reveal: shouldReveal[index] }),
-        );
+      available.forEach(({ artifact, reveal }) => {
+        dispatch(addArtifact({ sessionId: targetSessionId, artifact, reveal }));
       });
     },
-    [dispatch, sessionId],
+    [dispatch, sessionId, currentSession?.cwd],
   );
 
   // Initialize/replace artifact detection service when session changes
@@ -467,22 +455,24 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     if (!persisted || persisted.length === 0) return;
 
     const existingIds = new Set((previewArtifacts || []).map(a => a.id));
-    for (const artifact of persisted) {
-      // Only add if not already present. Path-level deduplication in the
-      // artifact slice reconciles persisted declarations with loaded files.
-      if (!existingIds.has(artifact.id)) {
-        dispatch(
-          addArtifact({
-            sessionId,
-            artifact: {
-              ...artifact,
-              sessionId,
-            },
-          }),
-        );
-      }
-    }
-  }, [sessionId, currentSession?.artifacts]); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    void prepareAvailableArtifacts(
+      persisted
+        .filter(artifact => !existingIds.has(artifact.id))
+        .map(artifact => ({
+          artifact: { ...artifact, sessionId },
+          needsFileLoad: Boolean(artifact.filePath),
+        })),
+      false,
+      currentSession?.cwd,
+    ).then(available => {
+      if (cancelled) return;
+      available.forEach(({ artifact }) => dispatch(addArtifact({ sessionId, artifact })));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, currentSession?.artifacts, currentSession?.cwd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Synchronous artifact detection on session mount so artifact cards
   // appear in the first-paint frame instead of popping in after the async
@@ -494,6 +484,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const detected = detectArtifactsFromMessages(currentSession.messages, sessionId);
     if (detected.length > 0) {
       for (const { artifact } of detected) {
+        // Inline content is immediately available; file candidates use the validated worker batch.
+        if (artifact.filePath) continue;
         dispatch(addArtifact({ sessionId, artifact }));
       }
       // The async useEffect pass below will also call processMessages.
@@ -550,7 +542,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick,
       );
       if (existing) {
-        dispatch(selectArtifact(existing.id));
+        void openAvailableArtifact(
+          existing,
+          () => dispatch(selectArtifact(existing.id)),
+          currentSession?.cwd,
+        );
       }
       // No fallback creation — artifacts are now declared via declare_artifact tool,
       // not created from ad-hoc link clicks or regex parsing.
@@ -558,7 +554,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     container.addEventListener('click', handleLinkClick, true);
     return () => container.removeEventListener('click', handleLinkClick, true);
-  }, [sessionId, sessionArtifacts, dispatch]);
+  }, [sessionId, sessionArtifacts, dispatch, currentSession?.cwd]);
   // ─── End artifact detection ─────────────────────────────────────────
 
   // Cleanup nav timers on unmount

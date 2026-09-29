@@ -32,7 +32,7 @@ function normalizeFilePath(rawPath: string): string {
   return filePath.replace(/\\/g, '/');
 }
 
-function resolveFilePath(rawPath: string, cwd?: string | null): string {
+export function resolveFilePath(rawPath: string, cwd?: string | null): string {
   const filePath = normalizeFilePath(rawPath);
   if (filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath)) return filePath;
   return `${cwd ?? ''}/${filePath}`.replace(/\\/g, '/');
