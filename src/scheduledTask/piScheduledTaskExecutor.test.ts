@@ -108,7 +108,7 @@ test('runs a canonical task in its workspace and waits for complete', async () =
     new PiScheduledTaskExecutor(runtime as never, store as never).execute(task, run),
   ).resolves.toEqual({ sessionId: session.id, output: 'done' });
   expect(store.createSession).toHaveBeenCalledWith(
-    'Scheduled: task',
+    '[定时]task',
     session.cwd,
     'Default prompt',
     'local',
@@ -194,7 +194,7 @@ test('reuses one stable dedicated session for every run of a task-bound task', a
 
   await new PiScheduledTaskExecutor(runtime as never, store as never).execute(taskBoundTask, run);
   expect(store.createSession).toHaveBeenCalledWith(
-    'Scheduled: task',
+    '[定时]task',
     session.cwd,
     'Default prompt',
     'local',

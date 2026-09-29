@@ -15,6 +15,7 @@ import {
 } from '../shared/agent';
 import { CoworkScheduledSessionTitlePrefix, CoworkSessionSource } from '../shared/cowork/constants';
 import { DB_FILENAME } from './appConstants';
+import { migrateScheduledSessionTitles } from './scheduledSessionTitles/migration';
 import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import {
   openSqliteDatabaseWithRecovery,
@@ -574,6 +575,7 @@ export class SqliteStore {
     }
 
     this.migrateLegacyMemoryFileToUserMemories();
+    migrateScheduledSessionTitles(this.db);
     this.migrateFromElectronStore(basePath);
   }
 

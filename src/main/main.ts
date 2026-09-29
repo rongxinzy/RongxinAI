@@ -58,7 +58,8 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
   CoworkSessionMode,
-  type CoworkSessionSource,
+  CoworkSessionSource,
+  normalizeRenamedSessionTitle,
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
@@ -4990,17 +4991,25 @@ if (!gotTheLock) {
     'cowork:session:rename',
     async (_event, options: { sessionId: string; title: string }) => {
       try {
-        const title = options.title.trim();
+        const coworkStoreInstance = getCoworkStore();
+        // Scheduled rows are identified by their `source`; the stored title keeps
+        // the canonical prefix so it cannot drift from migrated/renamed rows.
+        const existing = coworkStoreInstance.getSession(options.sessionId, 0);
+        const title = normalizeRenamedSessionTitle(
+          options.title,
+          existing?.source === CoworkSessionSource.Scheduled,
+        ).trim();
         if (!title) {
           return { success: false, error: 'Title is required' };
         }
-        const coworkStoreInstance = getCoworkStore();
         coworkStoreInstance.updateSession(
           options.sessionId,
           { title },
           { userInitiatedTitleChange: true },
         );
-        return { success: true };
+        // Report the stored (normalized) title: the renderer echoes this value
+        // into redux, and a scheduled rename adds the canonical prefix.
+        return { success: true, title };
       } catch (error) {
         return {
           success: false,

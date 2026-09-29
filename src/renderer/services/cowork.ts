@@ -567,21 +567,24 @@ class CoworkService {
     return { success: false, pinOrder: null };
   }
 
-  async renameSession(sessionId: string, title: string): Promise<boolean> {
+  async renameSession(sessionId: string, title: string): Promise<string | null> {
     const cowork = window.electron?.cowork;
-    if (!cowork?.renameSession) return false;
+    if (!cowork?.renameSession) return null;
 
     const normalizedTitle = title.trim();
-    if (!normalizedTitle) return false;
+    if (!normalizedTitle) return null;
 
     const result = await cowork.renameSession({ sessionId, title: normalizedTitle });
     if (result.success) {
-      store.dispatch(updateSessionTitle({ sessionId, title: normalizedTitle }));
-      return true;
+      // The main process owns the stored form — a scheduled rename re-adds the
+      // canonical prefix — so echo its value instead of the typed one.
+      const storedTitle = result.title?.trim() || normalizedTitle;
+      store.dispatch(updateSessionTitle({ sessionId, title: storedTitle }));
+      return storedTitle;
     }
 
     console.error('Failed to rename session:', result.error);
-    return false;
+    return null;
   }
 
   async exportSessionResultImage(options: {

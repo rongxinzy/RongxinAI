@@ -108,6 +108,10 @@ jobs:
       - run: bun run apply:patches
       - name: Compile Electron sources used by integration tests
         run: bun run compile:electron
+      - name: Install Electron for native ABI integration tests
+        # Dependency lifecycle scripts are disabled above; the ABI probe needs
+        # the actual target runtime, rather than a host Node approximation.
+        run: node node_modules/electron/install.js
       - name: Run tests
         run: bun run test
       - name: Verify Presentation Studio compiler and validator

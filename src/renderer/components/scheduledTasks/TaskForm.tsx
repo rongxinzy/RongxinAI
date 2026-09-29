@@ -66,6 +66,8 @@ interface TaskFormProps {
   mode: 'create' | 'edit';
   task?: ScheduledTask;
   prefill?: TaskTemplateValues;
+  /** Folder the new task belongs to; falls back to the current folder. */
+  initialWorkspaceId?: string;
   onCancel: () => void;
   onSaved: (newTaskId?: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
@@ -83,6 +85,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
   mode,
   task,
   prefill,
+  initialWorkspaceId,
   onCancel,
   onSaved,
   onDirtyChange,
@@ -135,11 +138,12 @@ const TaskForm: React.FC<TaskFormProps> = ({
 
   useEffect(() => {
     if (form.workspaceId) return;
-    const workspaceId = currentWorkspaceId ?? workspaces.find(item => !item.isHidden)?.id ?? '';
+    const workspaceId =
+      initialWorkspaceId || currentWorkspaceId || workspaces.find(item => !item.isHidden)?.id || '';
     if (!workspaceId) return;
     setForm(current => (current.workspaceId ? current : { ...current, workspaceId }));
     setInitialForm(current => (current.workspaceId ? current : { ...current, workspaceId }));
-  }, [form.workspaceId, currentWorkspaceId, workspaces]);
+  }, [form.workspaceId, initialWorkspaceId, currentWorkspaceId, workspaces]);
 
   useEffect(() => {
     let cancelled = false;

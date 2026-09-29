@@ -233,14 +233,14 @@ test('backfills legacy scheduled sessions only when adding the source column', a
   const store = await SqliteStore.create(userDataPath);
   const migratedRows = store
     .getDatabase()
-    .prepare('SELECT id, source FROM cowork_sessions ORDER BY id')
-    .all() as Array<{ id: string; source: string }>;
+    .prepare('SELECT id, source, title FROM cowork_sessions ORDER BY id')
+    .all() as Array<{ id: string; source: string; title: string }>;
 
   expect(migratedRows).toEqual([
-    { id: 'manual', source: CoworkSessionSource.Manual },
-    { id: 'scheduled-cn', source: CoworkSessionSource.Scheduled },
-    { id: 'scheduled-en', source: CoworkSessionSource.Scheduled },
-    { id: 'scheduled-executor', source: CoworkSessionSource.Scheduled },
+    { id: 'manual', source: CoworkSessionSource.Manual, title: 'ordinary conversation' },
+    { id: 'scheduled-cn', source: CoworkSessionSource.Scheduled, title: ' [定时]日报' },
+    { id: 'scheduled-en', source: CoworkSessionSource.Scheduled, title: '[Cron] report' },
+    { id: 'scheduled-executor', source: CoworkSessionSource.Scheduled, title: '[定时]report' },
   ]);
 
   store
@@ -256,9 +256,15 @@ test('backfills legacy scheduled sessions only when adding the source column', a
   const reopenedStore = await SqliteStore.create(userDataPath);
   const reopenedRow = reopenedStore
     .getDatabase()
-    .prepare('SELECT source FROM cowork_sessions WHERE id = ?')
-    .get('manual-prefixed') as { source: string };
+    .prepare('SELECT source, title FROM cowork_sessions WHERE id = ?')
+    .get('manual-prefixed') as { source: string; title: string };
   expect(reopenedRow.source).toBe(CoworkSessionSource.Manual);
+  // The title migration must not run twice: a re-prefixed title would double up.
+  const migratedTitle = reopenedStore
+    .getDatabase()
+    .prepare('SELECT title FROM cowork_sessions WHERE id = ?')
+    .get('scheduled-executor') as { title: string };
+  expect(migratedTitle.title).toBe('[定时]report');
   reopenedStore.close();
 });
 

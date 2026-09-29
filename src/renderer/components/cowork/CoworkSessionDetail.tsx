@@ -30,6 +30,7 @@ import {
   selectIsStreaming,
   selectRemoteManaged,
 } from '../../store/selectors/coworkSelectors';
+import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import {
   addArtifact,
   activateSessionArtifactView,
@@ -1178,7 +1179,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   return (
     <CoworkSessionLayout
-      title={currentSession.title || i18nService.t('coworkNewSession')}
+      title={resolveSessionDisplayTitle(currentSession, i18nService.getLanguage()) || i18nService.t('coworkNewSession')}
       sessionId={sessionId}
       isSessionSwitching={isSessionSwitching}
       isSidebarCollapsed={isSidebarCollapsed}

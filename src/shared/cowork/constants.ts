@@ -51,6 +51,31 @@ export const CoworkScheduledSessionTitlePrefix = {
 } as const;
 
 /**
+ * Canonical stored form of a scheduled session title. Storage is language
+ * independent (`[定时]`) so creation, rename and migration cannot disagree; the
+ * renderer re-prefixes it per UI language for display.
+ */
+export const buildScheduledSessionTitle = (name: string): string =>
+  `${CoworkScheduledSessionTitlePrefix.Chinese}${name}`;
+
+/** Drops a known scheduled prefix (and the spacing after it) from a title. */
+export const stripScheduledSessionTitlePrefix = (title: string): string => {
+  const trimmed = title.trim();
+  const prefix = Object.values(CoworkScheduledSessionTitlePrefix).find(candidate =>
+    trimmed.startsWith(candidate),
+  );
+  return prefix ? trimmed.slice(prefix.length).trimStart() : trimmed;
+};
+
+/**
+ * Session titles are stored with the canonical prefix so search, backfill and
+ * rename agree on one form; a rename that drops the prefix would also drop the
+ * row's scheduled marker.
+ */
+export const normalizeRenamedSessionTitle = (title: string, isScheduled: boolean): string =>
+  isScheduled ? buildScheduledSessionTitle(stripScheduledSessionTitlePrefix(title)) : title;
+
+/**
  * Desktop permission mode for cowork sessions.
  * Ask: the agent requests authorization before acting.
  * AllowAll: tools execute without asking for authorization.

@@ -3,7 +3,10 @@ import type { CoworkError } from '../common/coworkError';
 import type { PiContinueOptions, PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
 import { getDefaultConversationWorkspacePath } from '../main/defaultConversationWorkspace';
 import { parseManagedSessionKey } from '../main/libs/channelSessionKey';
-import { CoworkSessionSource } from '../shared/cowork/constants';
+import {
+  buildScheduledSessionTitle,
+  CoworkSessionSource,
+} from '../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../shared/workbenchTask';
 
 import { PayloadKind, SessionTarget } from './constants';
@@ -93,7 +96,7 @@ export class PiScheduledTaskExecutor {
     const config = this.coworkStore.getConfig();
     const workspace = task.workspaceId ? this.coworkStore.getWorkspace(task.workspaceId) : null;
     return this.coworkStore.createSession(
-      `Scheduled: ${task.name}`,
+      buildScheduledSessionTitle(task.name),
       workspace?.path || getDefaultConversationWorkspacePath(),
       config.systemPrompt,
       config.executionMode,
