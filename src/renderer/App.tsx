@@ -332,6 +332,9 @@ const App: React.FC = () => {
         .then(() => notifyLlamaCppRunningModelsChanged())
         .catch(() => undefined);
     };
+    const handleManagedProvidersChanged = () => {
+      void refreshAvailableModels().catch(() => undefined);
+    };
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
@@ -341,6 +344,9 @@ const App: React.FC = () => {
     window.addEventListener(ZhiyuanModelPoolEvent.AuthChanged, handleLlamaCppRunningModelsChanged);
     const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
       handleLlamaCppModelBindingsChanged,
+    );
+    const unsubscribeManagedProviders = window.electron.managedProviders.onChanged(
+      handleManagedProvidersChanged,
     );
     return () => {
       window.removeEventListener('config-updated', handleConfigUpdated);
@@ -353,6 +359,7 @@ const App: React.FC = () => {
         handleLlamaCppRunningModelsChanged,
       );
       unsubscribeModelBindings();
+      unsubscribeManagedProviders();
     };
   }, [dispatch, isInitialized]);
 
@@ -444,7 +451,9 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isInitialized || !defaultSelectedModel?.id) return;
+    // In exclusive managed mode the host bridge owns model.defaultModel in app_config;
+    // writing the renderer selection back would race its refresh loop.
+    if (!isInitialized || managedModelsOnly || !defaultSelectedModel?.id) return;
     const config = configService.getConfig();
     if (
       config.model.defaultModel === defaultSelectedModel.id &&
@@ -459,7 +468,7 @@ const App: React.FC = () => {
         defaultModelProvider: defaultSelectedModel.providerKey,
       },
     });
-  }, [isInitialized, defaultSelectedModel?.id, defaultSelectedModel?.providerKey]);
+  }, [isInitialized, managedModelsOnly, defaultSelectedModel?.id, defaultSelectedModel?.providerKey]);
 
   const handleShowSettings = useCallback((options?: SettingsOpenOptions) => {
     setSettingsOptions({
