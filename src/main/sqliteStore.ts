@@ -33,6 +33,7 @@ type ChangePayload<T = unknown> = {
 
 const USER_MEMORIES_MIGRATION_KEY = 'userMemories.migration.v1.completed';
 const AGENT_WORKING_DIRECTORY_BACKFILL_KEY = 'agents.workingDirectoryBackfill.v1.completed';
+const SCHEDULED_SESSION_TITLE_MIGRATION_KEY = 'cowork.scheduledSessionTitle.v1.completed';
 
 export class SqliteStore {
   private db: Database.Database;
@@ -574,6 +575,7 @@ export class SqliteStore {
     }
 
     this.migrateLegacyMemoryFileToUserMemories();
+    this.migrateScheduledSessionTitles();
     this.migrateFromElectronStore(basePath);
   }
 
@@ -733,6 +735,39 @@ export class SqliteStore {
       .replace(/\s+/g, ' ')
       .trim();
     return crypto.createHash('sha1').update(normalized).digest('hex');
+  }
+
+  /**
+   * Sessions created before the localized prefix landed carry the English
+   * `Scheduled: ` marker. Rewrite them to the canonical stored form so search,
+   * rename and the sidebar agree on one title; the renderer re-prefixes it per
+   * UI language for display, and localization of `[Cron]` rows stays display-only.
+   */
+  private migrateScheduledSessionTitles(): void {
+    if (this.get<string>(SCHEDULED_SESSION_TITLE_MIGRATION_KEY) === '1') {
+      return;
+    }
+
+    const legacyPrefix = CoworkScheduledSessionTitlePrefix.Legacy;
+    const canonicalPrefix = CoworkScheduledSessionTitlePrefix.Chinese;
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `
+            UPDATE cowork_sessions
+            SET title = ? || LTRIM(SUBSTR(TRIM(title), ?))
+            WHERE source = ? AND TRIM(title) LIKE ?
+          `,
+        )
+        .run(
+          canonicalPrefix,
+          legacyPrefix.length + 1,
+          CoworkSessionSource.Scheduled,
+          `${legacyPrefix}%`,
+        );
+    })();
+
+    this.set(SCHEDULED_SESSION_TITLE_MIGRATION_KEY, '1');
   }
 
   private migrateLegacyMemoryFileToUserMemories(): void {

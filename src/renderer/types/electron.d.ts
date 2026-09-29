@@ -833,7 +833,7 @@ interface IElectronAPI {
     renameSession: (options: {
       sessionId: string;
       title: string;
-    }) => Promise<{ success: boolean; error?: string }>;
+    }) => Promise<{ success: boolean; title?: string; error?: string }>;
     updateSessionModel: (options: {
       sessionId: string;
       modelOverride: string;

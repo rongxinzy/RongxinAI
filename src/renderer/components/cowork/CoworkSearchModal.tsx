@@ -14,6 +14,7 @@ import { WorkMode } from '../../store/workMode/constants';
 import type { CoworkSessionSummary } from '../../types/cowork';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
 import { getWorkspaceDisplayName } from '../../utils/path';
+import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import { TaskSearchDialog } from './TaskSearchDialog';
 
 const SEARCH_SESSION_LIMIT = 100;
@@ -108,9 +109,11 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
         const agentId = session.agentId?.trim() || AgentId.Main;
         const agentName = getAgentDisplayNameById(agentId, agents) ?? agentId;
         const context = names.get(session.workspaceId ?? '') ?? (isChat ? undefined : agentName);
+        // The dialog must show and match the same title as the sidebar.
+        const title = resolveSessionDisplayTitle(session, i18nService.getLanguage());
         if (
           normalizedQuery &&
-          ![session.title, agentName, context ?? ''].some(value =>
+          ![title, agentName, context ?? ''].some(value =>
             value.toLocaleLowerCase().includes(normalizedQuery),
           )
         )
@@ -119,7 +122,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
         return [
           {
             id: session.id,
-            title: session.title,
+            title,
             context,
             current: session.id === currentSessionId,
             running: streamingSessionIds.includes(session.id),
