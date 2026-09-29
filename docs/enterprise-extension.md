@@ -35,3 +35,11 @@ The preload bridge permits only `snapshot`, `login`, `changePassword`, and `logo
 An extension may register multiple settings pages with stable IDs. Zhiyuan renders each page as an independent settings-sidebar entry; account and model management therefore remain separate destinations even when they share one renderer bundle.
 
 `capabilities.managedProvider` accepts one managed configuration source. The source must use the existing `custom_` provider namespace and return the public application's standard `ProviderConfig`. The host synchronizes that configuration into `app_config.providers`, so model selection, OpenAI-compatible transport, capability checks, reasoning compatibility, and Pi runtime all use the same code path as a user-created custom provider. An exclusive source hides editable provider and local-inference entry points without introducing a second model runtime.
+
+## Central Windows package signing
+
+Unsigned enterprise installers are built by the `Build Windows enterprise package` workflow in the private repository. The `Sign Zhiyuan Enterprise Windows package` workflow in this repository turns one successful unsigned run into a signed package: dispatch it from main with the unsigned run ID, an optional matching `release_version`, and the AEP base URL to bake into `resources/zhiyuan-enterprise/config.json`. The prepare job verifies the source repository, workflow, run conclusion, required build steps, and the unexpired unsigned artifact before resolving the source commit and package version.
+
+The sign job rebuilds from the exact source commit. It checks out the private repository at the source commit and this repository at the `zhiyuanCore.commit` pinned by `build/build-manifest.json`, rebuilds and re-verifies the extension, renders the AEP configuration, then packages with `build/electron-builder.overlay-signed.cjs` so the application executables and the NSIS installer are Authenticode-signed in a single pass. The packaged version, certificate thumbprint, injected enterprise resources, and clean-PATH runtimes are verified before the signed installer and `SHA256SUMS.txt` are uploaded as an Actions artifact with 14-day retention.
+
+Signing reuses the existing Certum credentials of this repository's `release` environment; the private repository and workflow callers configure no secrets.
