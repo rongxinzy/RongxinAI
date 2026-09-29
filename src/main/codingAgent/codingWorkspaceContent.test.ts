@@ -15,7 +15,7 @@ const workerFixture = vi.hoisted(() => ({ dispose: undefined as (() => void) | u
 vi.mock('../workbenchTask/artifactWorkerPool', async importOriginal => {
   const actual = await importOriginal<typeof import('../workbenchTask/artifactWorkerPool')>();
   const pool = new actual.WorkbenchArtifactWorkerPool(
-    path.resolve('dist-electron/artifactWorker.js'),
+    path.resolve('dist-electron/main/workbenchTask/artifactWorker.js'),
   );
   workerFixture.dispose = () => pool.dispose();
   return {
