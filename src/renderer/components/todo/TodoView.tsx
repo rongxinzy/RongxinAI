@@ -58,7 +58,6 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [todos, setTodos] = useState<Todo[]>([]);
   const [allTodos, setAllTodos] = useState<Todo[]>([]);
   const [completedTodos, setCompletedTodos] = useState<Todo[]>([]);
-  const [completedCount, setCompletedCount] = useState(0);
   const [suggestionTodos, setSuggestionTodos] = useState<Todo[]>([]);
   const [lists, setLists] = useState<TodoList[]>([]);
   const [query, setQuery] = useState('');
@@ -92,8 +91,8 @@ const TodoView: React.FC<TodoViewProps> = ({
   );
 
   const activeCounts = useMemo<Record<TodoViewFilter, number>>(() => {
-    return countTodosByView(allTodos, completedCount, todayDateKey());
-  }, [allTodos, completedCount]);
+    return countTodosByView(allTodos, completedTodos, todayDateKey());
+  }, [allTodos, completedTodos]);
 
   const listCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -145,7 +144,6 @@ const TodoView: React.FC<TodoViewProps> = ({
     setAllTodos(allTodoItems);
     const completedTodoItems = completedResult.todos ?? [];
     setCompletedTodos(completedTodoItems);
-    setCompletedCount(completedTodoItems.length);
     setSuggestionTodos(
       allTodoItems
         .filter(todo => todo.myDayDate !== todayDateKey())
