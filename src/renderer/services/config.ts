@@ -4,6 +4,11 @@ import {
   ProviderName,
   ProviderRegistry,
 } from '@shared/providers';
+import {
+  ManagedProviderAccessMode,
+  OPEN_MANAGED_PROVIDER_ACCESS_POLICY,
+  type ManagedProviderAccessPolicy,
+} from '@shared/managedProviders';
 
 import { AppConfig, CONFIG_KEYS, defaultConfig, isCustomProvider } from '../config';
 import { localStore } from './store';
@@ -97,7 +102,10 @@ const normalizeProviderModels = (
     };
   });
 
-const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig['providers'] => {
+const normalizeProvidersConfig = (
+  providers: AppConfig['providers'],
+  managedProviderExclusive = false,
+): AppConfig['providers'] => {
   if (!providers) {
     return providers;
   }
@@ -107,13 +115,17 @@ const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig[
       providerKey,
       {
         ...providerConfig,
-        // Managed access never requires a user API key or an enable toggle.
-        ...(providerKey === ProviderName.Zhiyuan ? { enabled: true } : {}),
+        // Managed access never requires a user API key or an enable toggle. An exclusive
+        // managed provider replaces the managed free model, which must stay disabled and
+        // unseeded so host model resolution cannot fall back to it.
+        ...(providerKey === ProviderName.Zhiyuan ? { enabled: !managedProviderExclusive } : {}),
         baseUrl: normalizeProviderBaseUrl(providerKey, providerConfig.baseUrl),
         apiFormat: normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
         models: normalizeProviderModels(
           providerKey,
-          providerKey === ProviderName.Zhiyuan && !providerConfig.models?.length
+          providerKey === ProviderName.Zhiyuan &&
+            !providerConfig.models?.length &&
+            !managedProviderExclusive
             ? defaultConfig.providers![ProviderName.Zhiyuan].models
             : providerConfig.models,
           normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
@@ -300,6 +312,22 @@ const MODEL_POOL_PROVIDER_MIGRATION_VERSION = 1;
 export class ConfigService {
   private config: AppConfig = defaultConfig;
   private operationQueue: Promise<void> = Promise.resolve();
+  private managedProviderPolicy: ManagedProviderAccessPolicy = OPEN_MANAGED_PROVIDER_ACCESS_POLICY;
+
+  private isManagedProviderExclusive(): boolean {
+    return this.managedProviderPolicy.mode === ManagedProviderAccessMode.Exclusive;
+  }
+
+  private async refreshManagedProviderPolicy(): Promise<void> {
+    try {
+      const policy = await window.electron?.managedProviders?.policy?.();
+      if (policy) {
+        this.managedProviderPolicy = policy;
+      }
+    } catch {
+      // Keep the last known policy; a transient IPC failure must not re-seed managed access.
+    }
+  }
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.operationQueue.then(operation);
@@ -311,6 +339,8 @@ export class ConfigService {
   }
 
   private async loadFromStorage() {
+    await this.refreshManagedProviderPolicy();
+    const managedProviderExclusive = this.isManagedProviderExclusive();
     const storedConfig = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
     if (!storedConfig) {
       console.warn('[ConfigService] init: no stored config found, using defaults');
@@ -420,7 +450,10 @@ export class ConfigService {
           ...defaultConfig.shortcuts!,
           ...(storedConfig.shortcuts ?? {}),
         } as AppConfig['shortcuts'],
-        providers: normalizeProvidersConfig(mergedProviders as AppConfig['providers']),
+        providers: normalizeProvidersConfig(
+          mergedProviders as AppConfig['providers'],
+          managedProviderExclusive,
+        ),
         migrations: {
           ...defaultConfig.migrations,
           ...storedConfig.migrations,
@@ -437,13 +470,17 @@ export class ConfigService {
         settings:
           shortcuts.settings === 'Ctrl+,' ? defaultConfig.shortcuts!.settings : shortcuts.settings,
       };
+      const storedZhiyuanProvider = storedConfig.providers?.[ProviderName.Zhiyuan];
       const shouldRepairManagedAccess =
-        storedConfig.providers?.[ProviderName.Zhiyuan]?.enabled !== true ||
-        !storedConfig.providers?.[ProviderName.Zhiyuan]?.models?.length;
+        !managedProviderExclusive &&
+        (storedZhiyuanProvider?.enabled !== true || !storedZhiyuanProvider?.models?.length);
+      const shouldSuppressManagedAccess =
+        managedProviderExclusive && storedZhiyuanProvider?.enabled === true;
       if (
         shouldMigrateProviderModels ||
         shouldMigrateModelPoolProvider ||
-        shouldRepairManagedAccess
+        shouldRepairManagedAccess ||
+        shouldSuppressManagedAccess
       ) {
         await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
       }
@@ -475,8 +512,10 @@ export class ConfigService {
 
   async updateConfig(newConfig: Partial<AppConfig>) {
     await this.enqueue(async () => {
+      await this.refreshManagedProviderPolicy();
       const normalizedProviders = normalizeProvidersConfig(
         newConfig.providers as AppConfig['providers'] | undefined,
+        this.isManagedProviderExclusive(),
       );
 
       // Read only after earlier operations finish so concurrent partial updates

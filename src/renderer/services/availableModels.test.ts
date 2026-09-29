@@ -128,7 +128,7 @@ test('does not expose the managed free model when the account has no entitlement
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(false);
 });
 
-test('exclusive managed policy exposes only the synchronized custom provider', async () => {
+test('exclusive managed policy exposes the managed provider without a connection test', async () => {
   const config = createConfig();
   config.providers = {
     ...config.providers,
@@ -141,7 +141,6 @@ test('exclusive managed policy exposes only the synchronized custom provider', a
       models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
     },
   };
-  await markProviderModelTestSuccess(config, 'custom_enterprise', 'enterprise-chat');
   const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
   vi.stubGlobal('window', {
     electron: {
@@ -159,6 +158,50 @@ test('exclusive managed policy exposes only the synchronized custom provider', a
     expect.objectContaining({ id: 'enterprise-chat', providerKey: 'custom_enterprise' }),
   ]);
   expect(listRunningModels).not.toHaveBeenCalled();
+});
+
+test('keeps unmanaged custom providers behind the connection test gate', async () => {
+  const config = createConfig();
+  config.providers = {
+    ...config.providers,
+    custom_personal: {
+      enabled: true,
+      apiKey: 'user-key',
+      baseUrl: 'https://example.test/v1',
+      apiFormat: 'openai',
+      models: [{ id: 'personal-model', name: 'Personal Model' }],
+    },
+  };
+  vi.stubGlobal('window', {
+    electron: {
+      managedProviders: {
+        policy: vi.fn(async () => ({
+          mode: ManagedProviderAccessMode.Exclusive,
+          providerKeys: ['custom_enterprise'],
+        })),
+      },
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const exclusiveModels = await collectAvailableModels(config);
+  expect(exclusiveModels.some(model => model.providerKey === 'custom_personal')).toBe(false);
+
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+  const openModels = await collectAvailableModels(config);
+  expect(openModels.some(model => model.providerKey === 'custom_personal')).toBe(false);
+
+  await markProviderModelTestSuccess(config, 'custom_personal', 'personal-model');
+  const testedModels = await collectAvailableModels(config);
+  expect(
+    testedModels.some(
+      model => model.providerKey === 'custom_personal' && model.id === 'personal-model',
+    ),
+  ).toBe(true);
 });
 
 test('does not expose the legacy default model when no provider is configured', async () => {
