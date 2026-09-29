@@ -16,14 +16,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/t
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
 import {
-  Building2,
   ExternalLink,
   Eye,
   EyeOff,
   Key,
   PlusCircle,
   RefreshCw,
-  ServerCog,
   ShieldCheck,
   X,
   XCircle,
@@ -145,6 +143,7 @@ import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
 import { EnterpriseSettingsPage } from './enterprise/EnterpriseSettingsPage';
+import { useEnterpriseSettingsNavigationIcons } from './enterprise/useEnterpriseSettingsNavigationIcons';
 import {
   filterManagedModelSettingsTabs,
   resolveManagedModelSettingsTab,
@@ -719,6 +718,7 @@ const Settings: React.FC<SettingsProps> = ({
   const imIconRef = useRef<SettingsAnimatedMessageCircleMoreIconHandle>(null);
   const appearanceIconRef = useRef<SettingsAnimatedSunMediumIconHandle>(null);
   const modelIconRef = useRef<SettingsAnimatedBoxIconHandle>(null);
+  const enterpriseNavigationIcons = useEnterpriseSettingsNavigationIcons(toEnterpriseTab);
   const prefersReducedMotion = useReducedMotion();
   const settingsIconRefs: Partial<Record<SettingsTabType, { current: AnimatedIconHandle | null }>> =
     {
@@ -730,6 +730,7 @@ const Settings: React.FC<SettingsProps> = ({
       coworkMemory: memoryIconRef,
       shortcuts: shortcutsIconRef,
       about: aboutIconRef,
+      ...enterpriseNavigationIcons.refs,
     };
 
   useEffect(() => {
@@ -3239,12 +3240,7 @@ const Settings: React.FC<SettingsProps> = ({
         ...enterpriseSettingsPages.map(page => ({
           key: toEnterpriseTab(page.id),
           label: page.labels[language],
-          icon:
-            page.id === 'models' ? (
-              <ServerCog aria-hidden="true" />
-            ) : (
-              <Building2 aria-hidden="true" />
-            ),
+          icon: enterpriseNavigationIcons.iconForPage(page.id),
         })),
       );
     }
@@ -5354,7 +5350,12 @@ const Settings: React.FC<SettingsProps> = ({
                     : 'theme-page-settings-button-variant-9',
                 )}
               >
-                {tab.icon}
+                <span
+                  className="theme-settings-navigation-icon inline-flex shrink-0 items-start justify-start"
+                  aria-hidden="true"
+                >
+                  {tab.icon}
+                </span>
                 <span className="min-w-0 truncate">{tab.label}</span>
               </Button>
             ))}

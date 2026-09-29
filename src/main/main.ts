@@ -60,7 +60,8 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
   CoworkSessionMode,
-  type CoworkSessionSource,
+  CoworkSessionSource,
+  normalizeRenamedSessionTitle,
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
@@ -138,6 +139,7 @@ import {
   APP_USER_MODEL_ID,
   DB_FILENAME,
   ENTERPRISE_APP_NAME,
+  resolveAppDataDirName,
 } from './appConstants';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
@@ -251,6 +253,7 @@ import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterp
 import {
   disposeZhiyuanEnterpriseExtension,
   initializeZhiyuanEnterpriseExtension,
+  isEnterpriseBuild,
 } from './enterpriseExtension/host';
 import {
   ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
@@ -354,13 +357,16 @@ import {
   type WindowRectangle,
 } from './windowState';
 
-// The enterprise packaging overlay injects this directory into resources. The
-// public build has no such directory and keeps the regular Zhiyuan name.
-const runtimeAppName =
-  typeof process.resourcesPath === 'string' &&
-  fs.existsSync(path.join(process.resourcesPath, 'zhiyuan-enterprise'))
-    ? ENTERPRISE_APP_NAME
-    : APP_NAME;
+// The enterprise packaging overlay injects the extension module into resources;
+// the public build has no such module and keeps the regular Zhiyuan name. The
+// same detection also selects the enterprise application data root, so product
+// naming and storage isolation can never disagree.
+const isEnterprise = isEnterpriseBuild({
+  isPackaged: app.isPackaged,
+  resourcesPath: process.resourcesPath,
+  developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
+});
+const runtimeAppName = isEnterprise ? ENTERPRISE_APP_NAME : APP_NAME;
 
 // 设置应用程序名称
 app.name = runtimeAppName;
@@ -816,7 +822,7 @@ const configureUserDataPath = (): void => {
   }
 
   const appDataPath = app.getPath('appData');
-  const targetUserDataPath = path.join(appDataPath, APP_DATA_DIR_NAME);
+  const targetUserDataPath = path.join(appDataPath, resolveAppDataDirName(isEnterprise));
   const currentUserDataPath = app.getPath('userData');
 
   if (currentUserDataPath !== targetUserDataPath) {
@@ -4987,17 +4993,25 @@ if (!gotTheLock) {
     'cowork:session:rename',
     async (_event, options: { sessionId: string; title: string }) => {
       try {
-        const title = options.title.trim();
+        const coworkStoreInstance = getCoworkStore();
+        // Scheduled rows are identified by their `source`; the stored title keeps
+        // the canonical prefix so it cannot drift from migrated/renamed rows.
+        const existing = coworkStoreInstance.getSession(options.sessionId, 0);
+        const title = normalizeRenamedSessionTitle(
+          options.title,
+          existing?.source === CoworkSessionSource.Scheduled,
+        ).trim();
         if (!title) {
           return { success: false, error: 'Title is required' };
         }
-        const coworkStoreInstance = getCoworkStore();
         coworkStoreInstance.updateSession(
           options.sessionId,
           { title },
           { userInitiatedTitleChange: true },
         );
-        return { success: true };
+        // Report the stored (normalized) title: the renderer echoes this value
+        // into redux, and a scheduled rename adds the canonical prefix.
+        return { success: true, title };
       } catch (error) {
         return {
           success: false,

@@ -528,6 +528,7 @@ export const COMPONENT_SELECTORS = {
   'page-settings-input-variant-2': '.theme-page-settings-input-variant-2',
   'page-settings-input-variant-3': '.theme-page-settings-input-variant-3',
   'page-settings-button-variant-7': '.theme-page-settings-button-variant-7',
+  'settings-navigation-icon': '.theme-settings-navigation-icon',
   'page-settings-button-variant-8': '.theme-page-settings-button-variant-8',
   'page-settings-button-variant-9': '.theme-page-settings-button-variant-9',
   'page-agent-task-row-button-variant-1': '.theme-page-agent-task-row-button-variant-1',
