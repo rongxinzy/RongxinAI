@@ -11,7 +11,11 @@ import {
   ZhiyuanEnterpriseExtensionStatus,
   type ZhiyuanEnterpriseHostContext,
 } from './contract';
-import { ZhiyuanEnterpriseExtensionHost, type ZhiyuanEnterpriseExtensionHostOptions } from './host';
+import {
+  isEnterpriseBuild,
+  ZhiyuanEnterpriseExtensionHost,
+  type ZhiyuanEnterpriseExtensionHostOptions,
+} from './host';
 
 const temporaryDirectories: string[] = [];
 
@@ -291,6 +295,59 @@ describe('Zhiyuan enterprise extension host', () => {
       status: ZhiyuanEnterpriseExtensionStatus.Disposed,
       extensionId: null,
     });
+  });
+});
+
+describe('isEnterpriseBuild', () => {
+  test('detects a packaged build carrying the fixed extension module', () => {
+    const root = createTemporaryDirectory();
+    const resourcesPath = path.join(root, 'resources');
+    const modulePath = path.join(resourcesPath, 'zhiyuan-enterprise', 'extension.cjs');
+    fs.mkdirSync(path.dirname(modulePath), { recursive: true });
+    fs.writeFileSync(modulePath, 'module placeholder');
+
+    expect(isEnterpriseBuild({ isPackaged: true, resourcesPath })).toBe(true);
+  });
+
+  test('treats a packaged build without the extension module as community', () => {
+    const root = createTemporaryDirectory();
+
+    expect(
+      isEnterpriseBuild({ isPackaged: true, resourcesPath: path.join(root, 'resources') }),
+    ).toBe(false);
+  });
+
+  test('treats an unpackaged build with a development extension path set as enterprise', () => {
+    const root = createTemporaryDirectory();
+
+    expect(
+      isEnterpriseBuild({
+        isPackaged: false,
+        resourcesPath: path.join(root, 'resources'),
+        developmentExtensionPath: path.join(root, 'private-extension.cjs'),
+      }),
+    ).toBe(true);
+  });
+
+  test('ignores the development extension path in packaged builds', () => {
+    const root = createTemporaryDirectory();
+
+    expect(
+      isEnterpriseBuild({
+        isPackaged: true,
+        resourcesPath: path.join(root, 'resources'),
+        developmentExtensionPath: path.join(root, 'private-extension.cjs'),
+      }),
+    ).toBe(false);
+  });
+
+  test('treats an unpackaged build without a development extension path as community', () => {
+    const root = createTemporaryDirectory();
+
+    expect(
+      isEnterpriseBuild({ isPackaged: false, resourcesPath: path.join(root, 'resources') }),
+    ).toBe(false);
+    expect(isEnterpriseBuild({ isPackaged: true })).toBe(false);
   });
 });
 
