@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { statSync } from 'fs';
 import { readFile, readdir, rename, stat, unlink, writeFile } from 'fs/promises';
@@ -82,6 +82,7 @@ import {
 } from './builtinCodingMcpReport';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
+import { inspectWorkspaceContentAsync } from '../workbenchTask/artifactWorkerPool';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import {
   CoworkQueueDelivery,
@@ -1338,33 +1339,35 @@ export class CodingRoomService extends EventEmitter {
     if (file.size > 512 * 1024) throw new Error(CodingErrorMessage.FilePreviewTooLarge);
 
     const content = await readFile(filePath);
-    if (content.includes(0)) throw new Error(CodingErrorMessage.FilePreviewBinary);
+    const inspected = await inspectWorkspaceContentAsync(content);
+    if (inspected.binary) throw new Error(CodingErrorMessage.FilePreviewBinary);
     return {
       path: path.relative(sourceRoot, filePath),
-      content: content.toString('utf8'),
-      sha256: createHash('sha256').update(content).digest('hex'),
+      content: inspected.text,
+      sha256: inspected.sha256,
     };
   }
 
   async writeWorkspaceFile(input: CodingWorkspaceFileWriteInput): Promise<CodingWorkspaceFileContent> {
-    if (typeof input.content !== 'string') throw new Error('Workspace file content must be text.');
+    if (typeof input.content !== 'string') throw new Error(CodingErrorMessage.FileEditTextRequired);
     const content = Buffer.from(input.content, 'utf8');
-    if (content.length > 512 * 1024) throw new Error('Files larger than 512 KB cannot be edited.');
+    if (content.length > 512 * 1024) throw new Error(CodingErrorMessage.FileEditTooLarge);
     const { sourceRoot, broker, roomId } = this.resolveWorkspaceBrowser(input);
     const relativePath = this.requireWorkspaceRelativePath(input.path);
-    if (!relativePath) throw new Error('Select a workspace file to edit.');
+    if (!relativePath) throw new Error(CodingErrorMessage.FileEditNotSelected);
     if (this.repository.getWriterLease(roomId, sourceRoot)) {
-      throw new Error('Wait for the active workspace writer before saving this file.');
+      throw new Error(CodingErrorMessage.FileEditWriterBusy);
     }
     const filePath = await broker.resolveTarget(relativePath);
     const fileStat = await stat(filePath);
     if (!fileStat.isFile()) throw new Error(CodingErrorMessage.WorkspacePathNotFile);
     const current = await readFile(filePath);
-    const currentSha256 = createHash('sha256').update(current).digest('hex');
-    if (currentSha256 !== input.expectedSha256) {
-      throw new Error('The file changed outside the editor. Reload it before saving.');
+    const currentInspection = await inspectWorkspaceContentAsync(current);
+    if (currentInspection.sha256 !== input.expectedSha256) {
+      throw new Error(CodingErrorMessage.FileEditChanged);
     }
-    if (current.includes(0)) throw new Error('Binary files cannot be edited.');
+    if (currentInspection.binary) throw new Error(CodingErrorMessage.FileEditBinary);
+    const nextInspection = await inspectWorkspaceContentAsync(content);
     const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
     try {
       await writeFile(temporaryPath, content, { mode: fileStat.mode });
@@ -1375,7 +1378,7 @@ export class CodingRoomService extends EventEmitter {
     return {
       path: path.relative(sourceRoot, filePath),
       content: input.content,
-      sha256: createHash('sha256').update(content).digest('hex'),
+      sha256: nextInspection.sha256,
     };
   }
 
