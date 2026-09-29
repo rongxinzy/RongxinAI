@@ -238,6 +238,7 @@ export const AppIpc = {
   SetPreventSleep: 'app:setPreventSleep',
   GetVersion: 'app:getVersion',
   IsDev: 'app:isDev',
+  IsEnterprise: 'app:isEnterprise',
   GetSystemLocale: 'app:getSystemLocale',
   ConsumePendingLocalInferenceInstall: 'app:consumePendingLocalInferenceInstall',
   Relaunch: 'app:relaunch',

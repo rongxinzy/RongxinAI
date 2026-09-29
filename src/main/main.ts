@@ -1986,7 +1986,9 @@ const getOllamaManager = (): OllamaManager => {
 
 const getAppUpdateCoordinator = (): AppUpdateCoordinator => {
   if (!appUpdateCoordinator) {
-    appUpdateCoordinator = new AppUpdateCoordinator(getStore());
+    appUpdateCoordinator = new AppUpdateCoordinator(getStore(), undefined, undefined, {
+      enterpriseBuild: isEnterprise,
+    });
   }
   return appUpdateCoordinator;
 };
@@ -2003,7 +2005,9 @@ const checkForAppUpdate = (): void => {
 };
 
 const startAppUpdatePolling = (): void => {
-  if (appUpdatePollTimer) return;
+  // Enterprise builds receive updates through the enterprise distribution
+  // channel; the client never runs startup or periodic update checks.
+  if (isEnterprise || appUpdatePollTimer) return;
   const startupDelay =
     APP_UPDATE_STARTUP_DELAY_MIN_MS +
     Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
@@ -3466,6 +3470,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(AppIpc.GetVersion, () => app.getVersion());
   ipcMain.handle(AppIpc.IsDev, () => canUseDevTools()); // 开发环境打开调试面板
+  ipcMain.handle(AppIpc.IsEnterprise, () => isEnterprise);
   ipcMain.handle(AppIpc.GetSystemLocale, () => app.getLocale());
   ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
     consumePendingLocalInferenceInstall(app.getPath('userData')),

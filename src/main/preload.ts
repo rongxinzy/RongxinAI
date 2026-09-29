@@ -835,6 +835,7 @@ contextBridge.exposeInMainWorld('electron', {
   appInfo: {
     getVersion: () => ipcRenderer.invoke(AppIpc.GetVersion),
     isDev: () => ipcRenderer.invoke(AppIpc.IsDev),
+    isEnterprise: () => ipcRenderer.invoke(AppIpc.IsEnterprise),
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
     consumePendingLocalInferenceInstall: () =>
       ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
