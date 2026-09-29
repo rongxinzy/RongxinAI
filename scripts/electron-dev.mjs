@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import concurrently from 'concurrently';
 
 import { resolveDevPort } from './find-dev-port.mjs';
+import { describeNativeAbi, inspectNativeAbi } from './electron-native-abi.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -48,6 +49,15 @@ function patchWindowsElectronIcon() {
 async function main() {
   if (!fs.existsSync(localBinDirectory)) {
     throw new Error(`Missing ${localBinDirectory}; run npm/bun install first.`);
+  }
+
+  // `npm test` rebuilds better-sqlite3 for Node's ABI and restores Electron's
+  // afterwards; starting inside that window would die later with an opaque
+  // ERR_DLOPEN_FAILED inside initStore, so fail fast with the fix command.
+  const nativeAbi = inspectNativeAbi(projectRoot);
+  if (nativeAbi !== 'electron-abi') {
+    console.error(describeNativeAbi(nativeAbi));
+    process.exit(1);
   }
 
   // Windows: embed the app icon into development electron.exe so the taskbar
