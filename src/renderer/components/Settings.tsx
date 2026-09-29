@@ -5354,7 +5354,12 @@ const Settings: React.FC<SettingsProps> = ({
                     : 'theme-page-settings-button-variant-9',
                 )}
               >
-                {tab.icon}
+                <span
+                  className="theme-settings-navigation-icon inline-flex shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  {tab.icon}
+                </span>
                 <span className="min-w-0 truncate">{tab.label}</span>
               </Button>
             ))}
