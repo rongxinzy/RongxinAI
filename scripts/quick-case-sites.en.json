@@ -1,0 +1,1730 @@
+{
+  "pptx-work-report": {
+    "description": "Reframe the Q3 business review around slow first-value delivery and the renewal risk it creates",
+    "lead": "Growth is still there, but the first payoff arrives too late; organize the review around renewal risk",
+    "insight": "Revenue growth must not hide how late delivery value shows up",
+    "steps": [
+      "Align what sales promised with what was actually configured",
+      "Compress the first effective workflow into 7 days",
+      "Use the first-value rate to decide whether to expand"
+    ],
+    "metrics": [
+      [
+        "¥84.2M",
+        "Quarterly net revenue"
+      ],
+      [
+        "112%",
+        "Target attainment"
+      ],
+      [
+        "76.4%",
+        "Renewal rate"
+      ]
+    ]
+  },
+  "pptx-education": {
+    "description": "A middle-school science inquiry that reads thermal images of the schoolyard and proposes a cooling fix",
+    "lead": "A 45-minute inquiry lesson for middle-school science, moving from thermal imaging to a community cooling plan",
+    "insight": "Start from the surface materials students can touch, so their explanations can be tested",
+    "steps": [
+      "Measure surface temperature at two spots",
+      "Explain the readings with materials and shade",
+      "Design a small cooling retrofit for the campus"
+    ],
+    "metrics": [
+      [
+        "45 min",
+        "Lesson length"
+      ],
+      [
+        "3 groups",
+        "Observation sites"
+      ],
+      [
+        "1",
+        "Action map"
+      ]
+    ]
+  },
+  "pptx-ai-intro": {
+    "description": "An investor pitch that shows how traceable citations turn a support workflow into a fundable product",
+    "lead": "A product pitch for seed investors, covering customer pain, workflow, business path, and the validation plan",
+    "insight": "Start from traceable knowledge citations to build a credible AI story rather than a generic one",
+    "steps": [
+      "Knowledge sits scattered across several workspaces",
+      "Citations and permissions stay traceable",
+      "Enter through high-frequency support scenarios"
+    ],
+    "metrics": [
+      [
+        "3",
+        "Target team types"
+      ],
+      [
+        "4 weeks",
+        "Pilot length"
+      ],
+      [
+        "2",
+        "Validation metrics"
+      ]
+    ]
+  },
+  "pptx-training": {
+    "description": "Train chain-store supervisors to work through listening, confirming, remedying, and reviewing on the sales floor",
+    "lead": "A half-day training course for chain-store service supervisors, built around four on-floor actions: listen, confirm, remedy, review",
+    "insight": "The script should help staff judge the next step, not recite a standard answer",
+    "steps": [
+      "Read the emotion and the real request",
+      "Restate the problem and confirm the boundary",
+      "Offer remedies the store can actually keep"
+    ],
+    "metrics": [
+      [
+        "4 h",
+        "Training length"
+      ],
+      [
+        "6",
+        "Role-play stations"
+      ],
+      [
+        "1",
+        "Supervisor checklist"
+      ]
+    ]
+  },
+  "pptx-product-plan": {
+    "description": "Plan a 90-day camera launch around sample photos, in-store demos, and lens bundles",
+    "lead": "A launch plan for a new full-frame mirrorless camera, focused on a light body, travel creators, and a 90-day channel rhythm",
+    "insight": "A launch is not a spike in exposure; it is finding people who will carry the camera out the door",
+    "steps": [
+      "Warm-up: real travel sample photos",
+      "Launch: in-store experience week",
+      "Repeat purchase: lens and course bundles"
+    ],
+    "metrics": [
+      [
+        "90 days",
+        "Launch window"
+      ],
+      [
+        "3 cities",
+        "Launch demos"
+      ],
+      [
+        "2",
+        "Core audience segments"
+      ]
+    ]
+  },
+  "pptx-content-research": {
+    "description": "Redraw the team-collaboration competitive map around governance, then test the gap with two experiments",
+    "lead": "A competitor review for product leads, framing the next position through capability limits, deployment responsibility, and migration cost",
+    "insight": "Do not compare feature lists; compare whether a team can control its data and workflows",
+    "steps": [
+      "Define the enterprise buyer's decision task",
+      "Redraw the competitive map by governance capability",
+      "Turn the gap into two validation experiments"
+    ],
+    "metrics": [
+      [
+        "6",
+        "Candidate products"
+      ],
+      [
+        "4",
+        "Evaluation dimensions"
+      ],
+      [
+        "2",
+        "Hypotheses to test"
+      ]
+    ]
+  },
+  "pptx-annual-review": {
+    "description": "Show a wetland charity's year of shoreline repair, patrol logs, and monitoring, and what the next budget must cover",
+    "lead": "An annual report for a conservation group, covering habitat restoration, public participation, monitoring methods, and next year's resource needs",
+    "insight": "Separate direct observation, model estimates, and long-term assumptions when reporting ecological results",
+    "steps": [
+      "Restore three shoreline plots",
+      "Set up a public patrol record",
+      "Extend long-term monitoring and open days"
+    ],
+    "metrics": [
+      [
+        "3",
+        "Restoration plots"
+      ],
+      [
+        "28",
+        "Public patrols"
+      ],
+      [
+        "2 years",
+        "Monitoring period"
+      ]
+    ]
+  },
+  "pptx-fundraising": {
+    "description": "Pitch tidal-flat restoration with staged goals, public spend disclosure, and no unsupported carbon claims",
+    "lead": "A coastal-wetland restoration pitch for foundations and corporate partners, showing use of funds, the monitoring framework, and risk boundaries",
+    "insight": "Build trust with transparent stage goals and avoid promising carbon gains that cannot be attributed",
+    "steps": [
+      "Baseline and community agreement before restoration",
+      "Small pilot with quarterly inspection",
+      "Publish fund flows and ecological indicators"
+    ],
+    "metrics": [
+      [
+        "12 months",
+        "Pilot period"
+      ],
+      [
+        "3",
+        "Published indicators"
+      ],
+      [
+        "1",
+        "Annual audit"
+      ]
+    ]
+  },
+  "excel-budget": {
+    "description": "Show where committed spend and burn rate will push Q4 past the line before the quarter closes",
+    "lead": "Put approved budget, committed spend, quarter-end forecast, and burn rate into one auditable decision view",
+    "insight": "The total sits near the budget line, but high-burn categories need structural rebalancing first",
+    "steps": [
+      "Align budgets on the account and department sides",
+      "Separate one-off purchases from recurring spend",
+      "Trigger alerts by burn-rate multiple"
+    ],
+    "metrics": [
+      [
+        "¥10.92M",
+        "Approved budget"
+      ],
+      [
+        "68.3%",
+        "Committed"
+      ],
+      [
+        "99.1%",
+        "Quarter-end forecast"
+      ]
+    ]
+  },
+  "image-to-excel": {
+    "description": "Turn 120 scanned invoices into a payables list whose low-confidence fields can be checked against the scan",
+    "lead": "Pull supplier, amount, tax, and order number from scanned invoices, and keep a review path for low-confidence fields",
+    "insight": "Automated extraction is not automated posting; every exception must be traceable back to the scan",
+    "steps": [
+      "Read invoices in batches and flag confidence",
+      "Match purchase orders and goods receipts",
+      "Export the list of differences awaiting review"
+    ],
+    "metrics": [
+      [
+        "120",
+        "Input invoices"
+      ],
+      [
+        "8",
+        "Core fields"
+      ],
+      [
+        "17",
+        "Items for manual review"
+      ]
+    ]
+  },
+  "excel-summary": {
+    "description": "Show how discounted drink bundles drain margin even while store traffic and revenue climb",
+    "lead": "Break down four cities and 28 stores by traffic, average ticket, discount depth, and category margin",
+    "insight": "Growth comes from recovering footfall, while margin pressure sits in heavily discounted drink bundles",
+    "steps": [
+      "Slice by city and store type",
+      "Identify discount depth and margin shifts",
+      "Produce next week's store action list"
+    ],
+    "metrics": [
+      [
+        "28",
+        "Stores sampled"
+      ],
+      [
+        "+12.4%",
+        "Revenue change"
+      ],
+      [
+        "−2.1 pt",
+        "Gross margin change"
+      ]
+    ]
+  },
+  "multi-excel-merge": {
+    "description": "Reconcile twelve stores' SKUs, units, and dates into one table plus a conflict log",
+    "lead": "Unify store SKUs, units, dates, and out-of-stock status across twelve files, keeping source files and original row numbers",
+    "insight": "Standardize definitions before merging; inconsistent units must never be summed silently",
+    "steps": [
+      "Map each store's column names and units",
+      "Detect duplicate SKUs and dates",
+      "Output the merged table plus a conflict log"
+    ],
+    "metrics": [
+      [
+        "12",
+        "Source files"
+      ],
+      [
+        "846",
+        "SKU records"
+      ],
+      [
+        "23",
+        "Definition conflicts"
+      ]
+    ]
+  },
+  "excel-reconcile": {
+    "description": "Trace every payment from charge to refund and keep the 31 unmatched items visible for review",
+    "lead": "Match payment-platform, order-system, and refund records, and surface mismatches in amount, time window, and status",
+    "insight": "Keep unmatched records; do not force differences away with fuzzy matching",
+    "steps": [
+      "Match exactly on transaction ID first",
+      "Run time-boxed assisted matching for missing IDs",
+      "Output difference categories and an owner queue"
+    ],
+    "metrics": [
+      [
+        "3",
+        "Streams reconciled"
+      ],
+      [
+        "2,460",
+        "Transactions sampled"
+      ],
+      [
+        "31",
+        "Items to confirm"
+      ]
+    ]
+  },
+  "excel-pivot": {
+    "description": "Find which of six paid channels keeps users past day 30, not just which brings the most leads",
+    "lead": "Compare six acquisition channels from first visit and signup through activation to 30-day retention",
+    "insight": "Search channels bring more activations, while content partnerships retain users more steadily",
+    "steps": [
+      "Build cohorts by acquisition week",
+      "Align attribution windows and dedupe rules",
+      "Compare retention rather than clicks alone"
+    ],
+    "metrics": [
+      [
+        "6",
+        "Acquisition channels"
+      ],
+      [
+        "4",
+        "Funnel stages"
+      ],
+      [
+        "30 days",
+        "Retention window"
+      ]
+    ]
+  },
+  "excel-anomaly": {
+    "description": "Explain why night cooling load stays high on weekends across 18 campus buildings",
+    "lead": "Detect energy anomalies by building, time of day, weather, and equipment condition, separating real risk from scheduled maintenance",
+    "insight": "The weekend baseline did not fall with occupancy, so check control strategy and sensors first",
+    "steps": [
+      "Normalize by building floor area",
+      "Filter out maintenance days and extreme weather",
+      "Create inspection tasks for anomalous hours"
+    ],
+    "metrics": [
+      [
+        "18",
+        "Buildings analyzed"
+      ],
+      [
+        "7 nights",
+        "Anomalous periods"
+      ],
+      [
+        "4",
+        "Units for priority inspection"
+      ]
+    ]
+  },
+  "excel-forecast": {
+    "description": "Cut strawberry spoilage by staging weekend reorders against a 14-day demand range",
+    "lead": "Forecast 14 days of store demand from sales, promotions, weather, and delivery lead time, showing a range instead of one number",
+    "insight": "Weekend forecasts carry the largest error, so reorder in small batches and watch for two weeks",
+    "steps": [
+      "Split trend, weekly seasonality, and promotions",
+      "Compare the baseline forecast with actual sales",
+      "Output a safety-stock range"
+    ],
+    "metrics": [
+      [
+        "14 days",
+        "Forecast window"
+      ],
+      [
+        "42 SKU",
+        "Items tested"
+      ],
+      [
+        "±12%",
+        "Error range"
+      ]
+    ]
+  },
+  "web-learning-lab": {
+    "description": "Drag the Moon closer and farther to see why one coastline gets two high tides a day",
+    "lead": "A hands-on earth-science lesson that starts from tide-gauge records and explains the rise and fall with an Earth–Moon model",
+    "insight": "Drag the Earth–Moon distance and watch how the relative tidal force changes",
+    "steps": [
+      "Compare tide levels with moon phases",
+      "Adjust the distance model",
+      "Finish the classroom reasoning quiz"
+    ],
+    "metrics": [
+      [
+        "01",
+        "Earth and Moon"
+      ],
+      [
+        "03",
+        "Inquiry tasks"
+      ],
+      [
+        "40 min",
+        "Lesson path"
+      ]
+    ]
+  },
+  "web-resume": {
+    "description": "Book one night by date, guests, and room type, then preview the coastal walk",
+    "lead": "A small guesthouse on the coastline, explaining the stay through room types, tidal paths, and slow-travel routes",
+    "insight": "Keep the booking path to three decisions: date, guests, and room type",
+    "steps": [
+      "Pick a date and number of guests",
+      "View room types and coastal walks",
+      "Submit a cancellable booking request"
+    ],
+    "metrics": [
+      [
+        "6",
+        "Guest rooms"
+      ],
+      [
+        "2",
+        "Coastal routes"
+      ],
+      [
+        "14:00",
+        "Check-in time"
+      ]
+    ]
+  },
+  "web-store": {
+    "description": "Filter three Yunnan lots by flavour, then choose grind and dose before adding to the bag",
+    "lead": "A single-origin store for an independent roaster: origin, process, roast level, and brewing advice on one screen",
+    "insight": "Use origin stories and flavour filters to help people find the beans that suit them",
+    "steps": [
+      "Filter lots by flavour",
+      "Choose grind and dose",
+      "Add to bag and open the brew card"
+    ],
+    "metrics": [
+      [
+        "3",
+        "Origin lots"
+      ],
+      [
+        "12 days",
+        "Recommended rest"
+      ],
+      [
+        "2",
+        "Roast levels"
+      ]
+    ]
+  },
+  "web-event": {
+    "description": "Plan one evening of music and night markets, from metro exit to the last set at 21:30",
+    "lead": "A weekend festival of independent music and night markets, with routes, time slots, stalls, and accessibility clearly reachable",
+    "insight": "The event page is at once a route map, a schedule, and entry instructions",
+    "steps": [
+      "Choose a session and ticket type",
+      "View the performance timeline",
+      "Save the route from metro exit to gate"
+    ],
+    "metrics": [
+      [
+        "2 nights",
+        "Festival length"
+      ],
+      [
+        "4",
+        "Stage locations"
+      ],
+      [
+        "21:30",
+        "Last set ends"
+      ]
+    ]
+  },
+  "web-product-launch": {
+    "description": "Browse travel shots, switch focal lengths, and book a demo for a 429 g full-frame body",
+    "lead": "A lightweight full-frame camera for travel creators, introduced through sample photos, body details, and lens combinations",
+    "insight": "Show the results first, then the specs; do not turn the hero into a wall of numbers",
+    "steps": [
+      "Browse scene sample photos",
+      "Switch between lens focal lengths",
+      "Book an in-store demo"
+    ],
+    "metrics": [
+      [
+        "24 MP",
+        "Effective pixels"
+      ],
+      [
+        "429 g",
+        "Body weight"
+      ],
+      [
+        "July 18",
+        "Launch demo day"
+      ]
+    ]
+  },
+  "web-ops-console": {
+    "description": "Turn rooftop-solar alarms into assigned inspections that operators can track to closure",
+    "lead": "A community solar monitoring page for energy operators: generation, storage, load, and alarms on one timeline",
+    "insight": "An anomaly is not a red dot; it is field work that must be assigned and tracked",
+    "steps": [
+      "Filter by site and device",
+      "Check inverter alarms",
+      "Assign an inspection and record the result"
+    ],
+    "metrics": [
+      [
+        "18",
+        "Sites online"
+      ],
+      [
+        "94.2%",
+        "Device availability"
+      ],
+      [
+        "3",
+        "Alarms awaiting inspection"
+      ]
+    ]
+  },
+  "web-survey": {
+    "description": "Ask residents which street corner should change first, then publish the anonymous tally",
+    "lead": "An accessible community feedback page inviting residents to choose among walking, safety, shade, and public seating priorities",
+    "insight": "Collect only what a decision needs, and publish the aggregate rather than individual answers",
+    "steps": [
+      "Pick the spot you most want improved",
+      "Vote and add one reason",
+      "See the current spread of opinions"
+    ],
+    "metrics": [
+      [
+        "4",
+        "Proposal topics"
+      ],
+      [
+        "3 min",
+        "Completion time"
+      ],
+      [
+        "Anonymous",
+        "Default submission"
+      ]
+    ]
+  },
+  "web-game-2048": {
+    "description": "Merge root tiles on a 4 × 4 board to unlock example sentences and review new words",
+    "lead": "A small word-building game: drag root tiles, combine them into words, then read example sentences and memory hints",
+    "insight": "The play loop brings people back for one more round; the explanation is what makes a new word stick",
+    "steps": [
+      "Slide to merge matching roots",
+      "Complete a word to unlock its example",
+      "Log the words learned this round"
+    ],
+    "metrics": [
+      [
+        "4 × 4",
+        "Game board"
+      ],
+      [
+        "12",
+        "Root combinations"
+      ],
+      [
+        "Offline",
+        "No-account practice"
+      ]
+    ]
+  },
+  "research-industry": {
+    "description": "Map where power and cooling constrain AI data-center growth across four industry links",
+    "lead": "Assess industry constraints across four links: power demand, thermal management, grid connection, and equipment supply",
+    "insight": "Demand growth is publicly documented, but project economics still hinge on regional power prices and climate",
+    "steps": [
+      "Separate global forecasts from single-site parameters",
+      "Compare where air cooling and liquid cooling fit",
+      "Flag grid-connection and equipment lead-time uncertainty"
+    ],
+    "metrics": [
+      [
+        "4 links",
+        "Industry chain"
+      ],
+      [
+        "3 layers",
+        "Constraint framework"
+      ],
+      [
+        "2025",
+        "Data baseline"
+      ]
+    ]
+  },
+  "research-competitors": {
+    "description": "Shortlist knowledge-base tools for an 80-person product and delivery team",
+    "lead": "Build a vendor shortlist for an 80-person product and delivery team, starting with deployment and permission boundaries",
+    "insight": "Verify where data lives, who maintains it, and how permissions inherit before comparing features",
+    "steps": [
+      "Confirm hosted versus self-hosted responsibility",
+      "Accept candidates by testing permission revocation in search",
+      "Compare the shortlist on three-year total cost"
+    ],
+    "metrics": [
+      [
+        "6 options",
+        "Candidates"
+      ],
+      [
+        "4 axes",
+        "Decision framework"
+      ],
+      [
+        "0 pts",
+        "Unverified scores"
+      ]
+    ]
+  },
+  "research-policy": {
+    "description": "Screen obligations before an enterprise customer-service AI goes live under the EU AI Act",
+    "lead": "Chart a screening path for an enterprise customer-service system through use case, deployment role, transparency, and human oversight",
+    "insight": "Obligations depend on the specific use case and role; this is a compliance research framework, not legal advice",
+    "steps": [
+      "Define provider versus deployer roles",
+      "Check each applicable article and its start date",
+      "Map evidence requirements to launch controls"
+    ],
+    "metrics": [
+      [
+        "1 text",
+        "Regulation"
+      ],
+      [
+        "4 categories",
+        "Checklist items"
+      ],
+      [
+        "1",
+        "Legal review"
+      ]
+    ]
+  },
+  "research-literature": {
+    "description": "Map battery-recycling evidence across collection, pretreatment, material recovery, and certification",
+    "lead": "Map battery-recycling research evidence across collection, pretreatment, material recovery, and recycled-content certification",
+    "insight": "Capacity, actual recycling rate, and displaced virgin material are three different measures",
+    "steps": [
+      "Tag studies by chemistry and geography",
+      "Extract method, data year, and system boundary",
+      "Separate lab results from commercial-scale results"
+    ],
+    "metrics": [
+      [
+        "4 stages",
+        "Recycling chain"
+      ],
+      [
+        "3 tiers",
+        "Evidence strength"
+      ],
+      [
+        "2026",
+        "Source snapshot"
+      ]
+    ]
+  },
+  "research-user": {
+    "description": "Design multi-source user research on bike-share demand across commute, transfer, and weekend trips",
+    "lead": "Design a multi-source user study for a city mobility team that separates commuting, transfer, and weekend leisure demand",
+    "insight": "Samples cannot come from active users alone; lapsed riders and walkers who replaced trips matter too",
+    "steps": [
+      "Re-check the anonymized trip-data definitions",
+      "Organize interviews around transfer scenarios",
+      "Map demand onto testable service hypotheses"
+    ],
+    "metrics": [
+      [
+        "3 types",
+        "Trip contexts"
+      ],
+      [
+        "4 sources",
+        "Evidence set"
+      ],
+      [
+        "2 rounds",
+        "Interview design"
+      ]
+    ]
+  },
+  "research-market-entry": {
+    "description": "Compare two-wheelers, cars, and charging for a Vietnam e-mobility entry decision",
+    "lead": "Compare policy targets, channel structure, and localization needs for two-wheelers, passenger cars, and charging services",
+    "insight": "Policy targets are not the same as serviceable market size; segment by vehicle type and purchasing power",
+    "steps": [
+      "Check national targets against the effective documents",
+      "Size the serviceable segment by vehicle type",
+      "Put channel-partner assumptions into the validation plan"
+    ],
+    "metrics": [
+      [
+        "3 segments",
+        "Market split"
+      ],
+      [
+        "4 groups",
+        "Entry variables"
+      ],
+      [
+        "1",
+        "Policy check sheet"
+      ]
+    ]
+  },
+  "research-supply-chain": {
+    "description": "Turn battery-material concentration into ranked supply risks from mine to cell",
+    "lead": "Track regional concentration and substitution paths for critical materials, precursors, electrode materials, and recycled feedstock",
+    "insight": "Raw-material origin, refining capacity, and cell manufacturing capacity must be assessed separately",
+    "steps": [
+      "Draw the layered chain from mine to cell",
+      "Flag single-source nodes and policy chokepoints",
+      "Propose dual sourcing, inventory, and recycling actions"
+    ],
+    "metrics": [
+      [
+        "5 layers",
+        "Supply-chain structure"
+      ],
+      [
+        "3 drivers",
+        "Risk types"
+      ],
+      [
+        "4 actions",
+        "Mitigations"
+      ]
+    ]
+  },
+  "research-talent": {
+    "description": "Separate education, migration, and demand when measuring the AI talent gap",
+    "lead": "Separate education supply, cross-industry migration, research talent, and job demand, so job postings are not read as the talent gap",
+    "insight": "The same talent measure shifts sharply with degree, region, and career-trajectory definitions",
+    "steps": [
+      "Fix the talent definition and time range",
+      "Compare education, employment, and migration data",
+      "Flag coverage gaps and representativeness limits"
+    ],
+    "metrics": [
+      [
+        "3 dimensions",
+        "Talent definition"
+      ],
+      [
+        "2010–25",
+        "Observation window"
+      ],
+      [
+        "4 types",
+        "Data limits"
+      ]
+    ]
+  },
+  "academic-outline": {
+    "description": "Draft a falsifiable longitudinal study on how work-boundary clarity affects team rework",
+    "lead": "Design an executable, falsifiable longitudinal study for mid-sized teams, with clear questions, measurement, and ethics boundaries",
+    "insight": "This is a research plan, not an empirical study that has collected data or reached conclusions",
+    "steps": [
+      "Define rework and boundary clarity",
+      "Pilot test, then estimate sample size",
+      "Introduce in phases and preregister the analysis"
+    ],
+    "metrics": [
+      [
+        "3",
+        "Research questions"
+      ],
+      [
+        "16 weeks",
+        "Planned duration"
+      ],
+      [
+        "0",
+        "Fabricated results"
+      ]
+    ]
+  },
+  "academic-polish": {
+    "description": "Edit a management paper's argument chain before touching its sentences",
+    "lead": "Design a traceable structure-revision and language-editing process for an empirical management paper",
+    "insight": "Editorial comments should separate logic gaps, insufficient evidence, and purely language issues",
+    "steps": [
+      "Check that the research question and conclusion close the loop",
+      "Annotate each paragraph's claim-to-evidence relationship",
+      "Keep the original meaning and log the reason for each rewrite"
+    ],
+    "metrics": [
+      [
+        "4 layers",
+        "Argument check"
+      ],
+      [
+        "2 rounds",
+        "Structure and language"
+      ],
+      [
+        "Per item",
+        "Edit trail"
+      ]
+    ]
+  },
+  "academic-review": {
+    "description": "Review when AI advice helps judgment and when it breeds over-reliance",
+    "lead": "Use a thematic matrix to review research on automation bias, advice taking, calibration, and responsibility allocation",
+    "insight": "Classify by study design, task, and participant experience rather than pooling different experiments",
+    "steps": [
+      "Set search terms and inclusion criteria",
+      "Extract task, sample, and effect measures",
+      "Chart thematic gaps and evidence strength"
+    ],
+    "metrics": [
+      [
+        "4 clusters",
+        "Themes"
+      ],
+      [
+        "3 levels",
+        "Evidence quality"
+      ],
+      [
+        "1 set",
+        "Inclusion rules"
+      ]
+    ]
+  },
+  "academic-data-analysis": {
+    "description": "Define variables and robustness checks for a quasi-experimental panel dataset",
+    "lead": "Define variables, missing-data handling, baseline comparison, and robustness analysis for a sample panel dataset",
+    "insight": "The sample values demonstrate the workflow and must not be read as real research results",
+    "steps": [
+      "Lock the sample and variable dictionary",
+      "Estimate segmented trends with uncertainty intervals",
+      "Report missingness and sensitivity results"
+    ],
+    "metrics": [
+      [
+        "26 weeks",
+        "Simulation window"
+      ],
+      [
+        "4 groups",
+        "Sample cohorts"
+      ],
+      [
+        "3 checks",
+        "Robustness tests"
+      ]
+    ]
+  },
+  "academic-method": {
+    "description": "Choose between stepped-wedge and interrupted time series for a clustered intervention",
+    "lead": "Compare stepped-wedge and interrupted time series on randomization, time points, rollout, and analysis assumptions",
+    "insight": "Method choice follows implementation conditions; do not pick a design just for its complexity",
+    "steps": [
+      "Match the research question to the intervention mechanism",
+      "Check cluster and time-point resources",
+      "Write the choice rationale and its failure conditions"
+    ],
+    "metrics": [
+      [
+        "2 designs",
+        "Method options"
+      ],
+      [
+        "5 items",
+        "Decision criteria"
+      ],
+      [
+        "1",
+        "Choice tree"
+      ]
+    ]
+  },
+  "academic-defense": {
+    "description": "Compress a thesis into a 12-minute defense built on question, method, evidence, and limits",
+    "lead": "Compress a thesis into a 12-minute defense covering question, method, evidence, boundaries, and contribution",
+    "insight": "Stating uncertainty clearly persuades better than inflating the conclusion",
+    "steps": [
+      "Open with why the question matters",
+      "Show how the method supports the answer",
+      "State the boundaries where the conclusion holds"
+    ],
+    "metrics": [
+      [
+        "12 min",
+        "Talk length"
+      ],
+      [
+        "4",
+        "Narrative sections"
+      ],
+      [
+        "3 questions",
+        "Prepared defenses"
+      ]
+    ]
+  },
+  "academic-grant": {
+    "description": "Frame a small interdisciplinary grant on shade, heat exposure, and vulnerable residents",
+    "lead": "For a small interdisciplinary grant, propose research on community shade, heat exposure, and access for vulnerable groups",
+    "insight": "Public health data must follow minimal collection and informed community participation",
+    "steps": [
+      "Define the community and study population",
+      "Design heat-exposure measurement and interviews",
+      "Set out shared results and protection mechanisms"
+    ],
+    "metrics": [
+      [
+        "3 aims",
+        "Research objectives"
+      ],
+      [
+        "2 seasons",
+        "Collection period"
+      ],
+      [
+        "1",
+        "Ethics review"
+      ]
+    ]
+  },
+  "academic-ethics": {
+    "description": "Design consent, storage, and withdrawal rules for interviews on workplace AI",
+    "lead": "Design informed consent, data retention, and withdrawal for an interview study on AI at work",
+    "insight": "Employment relationships affect voluntariness; recruiters and direct managers should stay at arm's length",
+    "steps": [
+      "Explain risks, use, and the right to withdraw",
+      "Minimize identifying data and separate the keys",
+      "Set access, retention, and destruction timelines"
+    ],
+    "metrics": [
+      [
+        "3 tiers",
+        "Data classes"
+      ],
+      [
+        "2 layers",
+        "Identity separation"
+      ],
+      [
+        "Withdrawable",
+        "Consent to participate"
+      ]
+    ]
+  },
+  "docs-meeting": {
+    "description": "Turn a vendor-onboarding review into decisions, owners, dates, and open questions",
+    "lead": "Write up the vendor-onboarding review with decisions, open questions, owners, due dates, and risk dependencies",
+    "insight": "An action item without an owner and a date is not traceable",
+    "steps": [
+      "Keep the decisions reached and their rationale",
+      "Flag open questions and their blockers",
+      "Confirm owner and timing for each item"
+    ],
+    "metrics": [
+      [
+        "5",
+        "Decisions"
+      ],
+      [
+        "3",
+        "Actions"
+      ],
+      [
+        "2",
+        "Open questions"
+      ]
+    ]
+  },
+  "docs-report": {
+    "description": "Write a payment-callback outage review without blaming operator error",
+    "lead": "Record the timeline, impact, detection path, systemic factors, and fixes for a payment-callback delay",
+    "insight": "The goal is to reduce recurrence, not to find one person to blame",
+    "steps": [
+      "Pin down the timeline and impact definition first",
+      "Separate triggers from systemic conditions",
+      "Bind each fix to a verification signal"
+    ],
+    "metrics": [
+      [
+        "42 min",
+        "Impact duration"
+      ],
+      [
+        "3 stages",
+        "Incident timeline"
+      ],
+      [
+        "5",
+        "Follow-up actions"
+      ]
+    ]
+  },
+  "docs-summary": {
+    "description": "Condense six pages of operating material into three decisions for leadership",
+    "lead": "Prepare growth, risk, and resource requests for leadership, leading with conclusions and then definitions and evidence",
+    "insight": "A one-page summary should cut decision switching, not shrink the font to fit everything",
+    "steps": [
+      "Lead with conclusions and mark changes",
+      "Separate risks from controllable factors",
+      "State what needs leadership sign-off"
+    ],
+    "metrics": [
+      [
+        "3",
+        "Key conclusions"
+      ],
+      [
+        "2",
+        "Main risks"
+      ],
+      [
+        "1",
+        "Decision request"
+      ]
+    ]
+  },
+  "docs-notice": {
+    "description": "Announce a data-import maintenance window with impact, timing, and rollback",
+    "lead": "Publish a maintenance notice for a data-import service covering time, affected scope, user actions, and support channels",
+    "insight": "Avoid vague promises like 'brief impact' that users cannot verify",
+    "steps": [
+      "Publish the window with its time zone",
+      "State which features are affected",
+      "Give the rollback and contact path if it fails"
+    ],
+    "metrics": [
+      [
+        "30 min",
+        "Planned window"
+      ],
+      [
+        "2",
+        "Affected features"
+      ],
+      [
+        "All day",
+        "Support hours"
+      ]
+    ]
+  },
+  "docs-api": {
+    "description": "Help a first-time integrator receive their first webhook event",
+    "lead": "Document signature verification, retry semantics, idempotency, event structure, error codes, and local debugging steps",
+    "insight": "Sample requests and responses must be copy-and-run, not just a field table",
+    "steps": [
+      "Create a subscription and verify the signature",
+      "Handle retries and idempotency keys safely",
+      "Diagnose integration issues by error code"
+    ],
+    "metrics": [
+      [
+        "3 steps",
+        "Onboarding path"
+      ],
+      [
+        "4 types",
+        "Error responses"
+      ],
+      [
+        "1",
+        "Runnable example"
+      ]
+    ]
+  },
+  "docs-polish": {
+    "description": "Rewrite a copy style guide so errors, empty states, and permissions sound consistent",
+    "lead": "Rewrite a product copy style guide so errors, empty states, permission requests, and dangerous actions share one voice",
+    "insight": "Solve what the user needs right now before explaining what happened inside the system",
+    "steps": [
+      "Map high-frequency states and audiences",
+      "Set reusable writing rules",
+      "Check them against before-and-after copy"
+    ],
+    "metrics": [
+      [
+        "4 types",
+        "Copy states"
+      ],
+      [
+        "6",
+        "Language principles"
+      ],
+      [
+        "2 rounds",
+        "Review process"
+      ]
+    ]
+  },
+  "docs-sop": {
+    "description": "Write a closing checklist for a four-person coffee shop with dual sign-off points",
+    "lead": "Design cash, equipment, cleaning, refrigeration, and handover tasks for a four-person shift store, marking dual-check points",
+    "insight": "Safety checks and equipment power-down must name an owner and a completion test",
+    "steps": [
+      "Hand over cash and the day's orders",
+      "Clean equipment and log any faults",
+      "Verify doors, windows, temperature, and keys"
+    ],
+    "metrics": [
+      [
+        "18",
+        "Closing steps"
+      ],
+      [
+        "2 people",
+        "Double checks"
+      ],
+      [
+        "22:30",
+        "Target finish"
+      ]
+    ]
+  },
+  "docs-prd": {
+    "description": "Define a support-ticket assistant that drafts sourced replies but never auto-sends",
+    "lead": "Define knowledge retrieval, paragraph citations, human confirmation, permission inheritance, and audit boundaries",
+    "insight": "The assistant only drafts sourced suggestions; it never auto-replies to customers or writes to accounts",
+    "steps": [
+      "Retrieve only knowledge the user may access",
+      "Show the suggestion, citations, and update time",
+      "Let a human review before deciding to send"
+    ],
+    "metrics": [
+      [
+        "4 items",
+        "P0 requirements"
+      ],
+      [
+        "3 steps",
+        "Core flow"
+      ],
+      [
+        "Human",
+        "Send confirmation"
+      ]
+    ]
+  },
+  "pptx-climate": {
+    "description": "Show a city panel how sponge blocks shorten flood recovery and where pilot spending should start",
+    "lead": "A sponge-city retrofit proposal for a municipal review panel, covering flooding paths, priority blocks, and phased investment",
+    "insight": "Measure resilience by recovery time and exposure at flood-prone spots, not by counting new facilities",
+    "steps": [
+      "Overlay rainfall and flooding-complaint maps",
+      "Compare three retrofit combinations",
+      "Propose district pilots and review indicators"
+    ],
+    "metrics": [
+      [
+        "11",
+        "High-risk road sections"
+      ],
+      [
+        "3 years",
+        "Implementation period"
+      ],
+      [
+        "4 h",
+        "Target recovery time"
+      ]
+    ]
+  },
+  "pptx-hiring": {
+    "description": "Define the design work first, then choose interview rounds and 30-day onboarding for a growing team",
+    "lead": "A hiring plan for a rapidly growing product design team, covering the role profile, interview stages, and 30-day onboarding support",
+    "insight": "A structured work sample supports fairer judgment than a vague culture fit",
+    "steps": [
+      "Break down the current capability gaps",
+      "Design a job-related work sample",
+      "Agree scoring anchors and arrange onboarding coaching"
+    ],
+    "metrics": [
+      [
+        "4",
+        "Capability dimensions"
+      ],
+      [
+        "3",
+        "Interview rounds"
+      ],
+      [
+        "30 days",
+        "Onboarding period"
+      ]
+    ]
+  },
+  "pptx-exhibit": {
+    "description": "Follow one harbor artifact through a five-stop night route that mixes sound, light, and street memory",
+    "lead": "A night-exhibition proposal for a city museum, linking port-trade artifacts through sound, route, and local memory",
+    "insight": "Let the narrative follow how visitors walk, rather than starting from the collection list",
+    "steps": [
+      "Set one city timeline",
+      "Organize five stops with sound and light",
+      "Design a street route for after the exit"
+    ],
+    "metrics": [
+      [
+        "5",
+        "Night-route stops"
+      ],
+      [
+        "70 min",
+        "Visit length"
+      ],
+      [
+        "3",
+        "Sound archives"
+      ]
+    ]
+  },
+  "pptx-cyber": {
+    "description": "Rehearse the first hour after a ransomware hit with four decision roles and two recovery paths",
+    "lead": "A security tabletop exercise for executives and technical leads, rehearsing isolation, forensics, communication, and recovery decisions",
+    "insight": "Protect evidence and critical services first, then decide the recovery order; the drill should expose gaps in ownership",
+    "steps": [
+      "Inject abnormal encryption and a ransom note",
+      "Set the isolation and business-continuity boundary",
+      "Review decision delays and the notification chain"
+    ],
+    "metrics": [
+      [
+        "60 min",
+        "Exercise window"
+      ],
+      [
+        "4",
+        "Decision roles"
+      ],
+      [
+        "2",
+        "Recovery paths"
+      ]
+    ]
+  },
+  "excel-carbon": {
+    "description": "Find the real emissions hotspots in the purchasing list and rank them by factor quality",
+    "lead": "Build a traceable Scope 3 estimation workbook by category, supplier, and emission factor",
+    "insight": "Every estimate must keep its factor source, year, and data-quality grade",
+    "steps": [
+      "Clean procurement amounts and material categories",
+      "Match factors and record the source version",
+      "Prioritize high-emission, low-confidence categories"
+    ],
+    "metrics": [
+      [
+        "8",
+        "Procurement categories"
+      ],
+      [
+        "72",
+        "Suppliers"
+      ],
+      [
+        "B–D",
+        "Data quality"
+      ]
+    ]
+  },
+  "excel-staffing": {
+    "description": "Spread night shifts fairly across 32 nurses while still covering every required slot",
+    "lead": "Generate a reviewable four-week roster from qualifications, availability, rest rules, and preferences",
+    "insight": "Check coverage and fairness together; filling every gap is not enough",
+    "steps": [
+      "Import qualifications and unavailable slots",
+      "Check consecutive shifts against legal rest",
+      "Compare night-shift distribution and collect confirmation"
+    ],
+    "metrics": [
+      [
+        "32",
+        "Nursing staff"
+      ],
+      [
+        "4 weeks",
+        "Roster cycle"
+      ],
+      [
+        "11 h",
+        "Minimum rest"
+      ]
+    ]
+  },
+  "excel-energy": {
+    "description": "Tell a household whether higher bills come from more usage or a costlier peak window",
+    "lead": "Split time-of-use rates, weather, air-conditioning runtime, and billing periods to locate what changed in household power use",
+    "insight": "Align billing days and tariff versions before comparing month-over-month usage",
+    "steps": [
+      "Correct billing periods and tiered rates",
+      "Break usage and cost down by time band",
+      "Model the cost range after shifting peak load"
+    ],
+    "metrics": [
+      [
+        "12 months",
+        "Billing period"
+      ],
+      [
+        "3",
+        "Time-of-use bands"
+      ],
+      [
+        "18%",
+        "Shiftable load"
+      ]
+    ]
+  },
+  "excel-clinic": {
+    "description": "Look past the average wait to find the departments and slots where patients actually leave",
+    "lead": "Analyze arrival, waiting, and no-show patterns by department, appointment slot, and check-in process",
+    "insight": "The median hides the long tail; look at percentiles and congestion by time band",
+    "steps": [
+      "Align appointment and call-number timestamps",
+      "Plot waiting distributions by department",
+      "Link peak periods to no-show rates"
+    ],
+    "metrics": [
+      [
+        "6",
+        "Departments"
+      ],
+      [
+        "P50 / P90",
+        "Percentile metrics"
+      ],
+      [
+        "15 min",
+        "Target wait"
+      ]
+    ]
+  },
+  "web-museum": {
+    "description": "Choose a 30- or 70-minute night walk and listen to the harbor story at each stop",
+    "lead": "An online exhibition guide made for night walks, linking artifact stories, sound clips, and a city map",
+    "insight": "The guide unfolds by location, and visitors can choose route length or an accessible alternative",
+    "steps": [
+      "Choose the 30- or 70-minute route",
+      "Preview the sound archive at each stop",
+      "Save the offline map and opening hours"
+    ],
+    "metrics": [
+      [
+        "5",
+        "Exhibition stops"
+      ],
+      [
+        "2",
+        "Walking routes"
+      ],
+      [
+        "21:00",
+        "Last entry"
+      ]
+    ]
+  },
+  "web-restaurant": {
+    "description": "Check tonight's harvest dishes and allergens, then reserve one of 24 seats",
+    "lead": "A seasonal menu page for a small mountain restaurant, showing ingredient origins, seating times, and allergy notes",
+    "insight": "Let guests see the menu and allergens before booking, so they know whether the meal suits them",
+    "steps": [
+      "Browse the seasonal menu and origins",
+      "Choose party size and dining slot",
+      "Note dietary limits and confirm the booking"
+    ],
+    "metrics": [
+      [
+        "18",
+        "Seasonal dishes"
+      ],
+      [
+        "24 seats",
+        "Daily capacity"
+      ],
+      [
+        "48 h",
+        "Cancellation deadline"
+      ]
+    ]
+  },
+  "web-climate-map": {
+    "description": "Find the nearest shade, water, or cooling space within a five-minute walk of any street",
+    "lead": "A civic map for residents showing street shade, drinking-water points, cooling spaces, and walkable routes",
+    "insight": "Show the data refresh date and accessible entrances, so an expired point is not mistaken for a working service",
+    "steps": [
+      "Locate nearby cooling spaces",
+      "Filter by opening hours and accessibility",
+      "Report a closed or missing point"
+    ],
+    "metrics": [
+      [
+        "26",
+        "Locations included"
+      ],
+      [
+        "5 min",
+        "Walk radius"
+      ],
+      [
+        "Weekly",
+        "Update frequency"
+      ]
+    ]
+  },
+  "web-language": {
+    "description": "Listen to 42 licensed town recordings and read bilingual notes on how place names travel",
+    "lead": "A digital sound archive of fishing-village oral history, dialect entries, and place-name stories, explorable by map and theme",
+    "insight": "Each recording states the speaker's consent scope, capture date, and whether it can be downloaded",
+    "steps": [
+      "Pick a recording point on the map",
+      "Listen and read the term notes",
+      "Submit your own place-name memory"
+    ],
+    "metrics": [
+      [
+        "42",
+        "Licensed recordings"
+      ],
+      [
+        "3 generations",
+        "Speaker age bands"
+      ],
+      [
+        "Bilingual",
+        "Term notes"
+      ]
+    ]
+  },
+  "research-water": {
+    "description": "Test whether tap-level water-quality evidence supports claims about aging pipe networks",
+    "lead": "Gather public monitoring standards, local water-quality reports, and studies on aging networks to define the evidence boundary at the user end",
+    "insight": "Compliant water leaving the plant does not prove conditions at each building's tap; sampling point and timing must match",
+    "steps": [
+      "Confirm the standard version and its scope",
+      "Compare plant-gate and tap monitoring designs",
+      "List data gaps and a sampling plan"
+    ],
+    "metrics": [
+      [
+        "3 layers",
+        "Monitoring points"
+      ],
+      [
+        "4 items",
+        "Core indicators"
+      ],
+      [
+        "2026",
+        "Data cutoff"
+      ]
+    ]
+  },
+  "research-heat": {
+    "description": "Assess which outdoor workers can least afford to stop during heatwaves",
+    "lead": "Assess the evidence and enforcement gap between heat warnings, labor protection, worker exposure, and income constraints",
+    "insight": "A policy existing does not mean workers can safely stop; pay arrangements and enforcement coverage matter just as much",
+    "steps": [
+      "Build an exposure and vulnerability matrix by occupation",
+      "Check local stop-work thresholds and wage rules",
+      "Compare enforcement evidence with complaint channels"
+    ],
+    "metrics": [
+      [
+        "5 types",
+        "Outdoor occupations"
+      ],
+      [
+        "3 layers",
+        "Protection mechanisms"
+      ],
+      [
+        "4",
+        "Evidence gaps"
+      ]
+    ]
+  },
+  "research-reuse": {
+    "description": "Study how demolished building materials can re-enter the market at scale",
+    "lead": "Study sorting, certification, storage, and resale mechanisms for urban demolition waste to find what blocks scale",
+    "insight": "Tonnage recycled does not equal high-value reuse; quality certification and supply-demand timing matter more",
+    "steps": [
+      "Separate reuse, remanufacturing, and downcycling",
+      "Check demolition and waste policy",
+      "Map buyer acceptance and logistics costs"
+    ],
+    "metrics": [
+      [
+        "4 types",
+        "Material flows"
+      ],
+      [
+        "3 steps",
+        "Market stages"
+      ],
+      [
+        "2 cities",
+        "Comparison scope"
+      ]
+    ]
+  },
+  "research-childcare": {
+    "description": "Measure childcare access by distance, cost, hours, vacancy info, and care quality",
+    "lead": "Assess urban childcare access across distance, cost, opening hours, vacancy information, and care quality",
+    "insight": "Geographic coverage is only the start; price and time slots can form much stronger real barriers",
+    "steps": [
+      "Define household demand and service supply terms",
+      "Estimate realistic reachable time over the road network",
+      "Interview families that did not use the service"
+    ],
+    "metrics": [
+      [
+        "5 dimensions",
+        "Access framework"
+      ],
+      [
+        "15 min",
+        "Travel band"
+      ],
+      [
+        "3 types",
+        "Family samples"
+      ]
+    ]
+  },
+  "academic-replication": {
+    "description": "Write a replication preregistration that locks exclusions and outcomes before opening results",
+    "lead": "Build a replication analysis plan for a behavioral experiment that locks exclusion rules, primary outcomes, and deviation logs",
+    "insight": "A failed replication still carries information; transparently reporting method differences beats chasing significance",
+    "steps": [
+      "Freeze data cleaning and exclusion rules",
+      "Reproduce the original analysis and log software versions",
+      "Predefine robustness checks and deviation notes"
+    ],
+    "metrics": [
+      [
+        "1",
+        "Original study"
+      ],
+      [
+        "3 levels",
+        "Replication aims"
+      ],
+      [
+        "0",
+        "Result peeks"
+      ]
+    ]
+  },
+  "academic-interview": {
+    "description": "Build a coding manual that explains why two researchers code the same interview differently",
+    "lead": "Build a qualitative coding process from initial codes and definitions to inclusion rules and disagreement resolution",
+    "insight": "Agreement metrics cannot replace discussion of codebook boundaries and interpretive disagreement",
+    "steps": [
+      "Code the same small sample in pairs",
+      "Log boundary cases and revise definitions",
+      "Keep an audit trail and counterexamples"
+    ],
+    "metrics": [
+      [
+        "2 rounds",
+        "Trial coding"
+      ],
+      [
+        "12",
+        "Initial codes"
+      ],
+      [
+        "1",
+        "Versioned codebook"
+      ]
+    ]
+  },
+  "academic-survey": {
+    "description": "Plan translation, cognitive interviews, and measurement equivalence for a cross-cultural scale",
+    "lead": "Plan translation, cognitive interviewing, pretesting, and measurement equivalence for a cross-cultural survey scale",
+    "insight": "Word-level equivalence does not guarantee construct equivalence; record conceptual shifts in cultural context",
+    "steps": [
+      "Translate both ways and convene expert review",
+      "Run cognitive interviews with the target population",
+      "Test structure and equivalence given sample conditions"
+    ],
+    "metrics": [
+      [
+        "2 teams",
+        "Translation groups"
+      ],
+      [
+        "3 stages",
+        "Pretest process"
+      ],
+      [
+        "4 checks",
+        "Measurement tests"
+      ]
+    ]
+  },
+  "academic-open-data": {
+    "description": "Open interview data without exposing participants through tiered access and de-identification",
+    "lead": "Design tiered access, de-identification, metadata, and retention limits for a project with sensitive interview data",
+    "insight": "Open science does not mean publishing raw personal data; controlled access can still support review",
+    "steps": [
+      "Sort fields into public, controlled, and non-shareable",
+      "Assess re-identification risk and consent scope",
+      "Set application review, retention, and destruction rules"
+    ],
+    "metrics": [
+      [
+        "3 tiers",
+        "Access classes"
+      ],
+      [
+        "2 layers",
+        "Identity separation"
+      ],
+      [
+        "5 years",
+        "Retention cap"
+      ]
+    ]
+  },
+  "docs-board": {
+    "description": "Put the cost of a new-market entry ahead of the recommendation in a board memo",
+    "lead": "Compress market opportunity, entry mode, capital needs, failure conditions, and approvals into a board decision memo",
+    "insight": "A recommendation must also state what you will not do, when to stop, and which assumptions remain untested",
+    "steps": [
+      "Give a clear recommendation with alternatives",
+      "Quantify the capital and organizational commitment",
+      "List stage gates and exit thresholds"
+    ],
+    "metrics": [
+      [
+        "2 paths",
+        "Entry routes"
+      ],
+      [
+        "3",
+        "Stage gates"
+      ],
+      [
+        "1",
+        "Board resolution"
+      ]
+    ]
+  },
+  "docs-grant": {
+    "description": "Turn a one-off community event into an evaluable case for funding",
+    "lead": "Write a community-fund proposal linking the problem baseline, activity outputs, short-term outcomes, and evaluation method",
+    "insight": "Participant counts are outputs, not community outcomes; indicators should map to the change mechanism",
+    "steps": [
+      "Describe the community problem and existing evidence",
+      "Build the logic chain from activity to outcome",
+      "Detail the budget, risks, and evaluation plan"
+    ],
+    "metrics": [
+      [
+        "12 months",
+        "Project duration"
+      ],
+      [
+        "4",
+        "Outcome indicators"
+      ],
+      [
+        "¥360K",
+        "Requested budget"
+      ]
+    ]
+  },
+  "docs-research-protocol": {
+    "description": "Keep six research sites executing one protocol with less variation",
+    "lead": "Write recruitment, consent, data entry, deviation reporting, and site-startup procedures for a multi-site observational study",
+    "insight": "Only decidability and a written trail let you spot differences in how sites implement a protocol",
+    "steps": [
+      "Define screening and consent decisions",
+      "Standardize variable entry and question escalation paths",
+      "Track deviations and training status by site"
+    ],
+    "metrics": [
+      [
+        "6",
+        "Research sites"
+      ],
+      [
+        "5",
+        "Execution forms"
+      ],
+      [
+        "48 h",
+        "Deviation reporting"
+      ]
+    ]
+  },
+  "docs-incident-comms": {
+    "description": "Draft the first notification for a data incident: confirmed facts and user actions",
+    "lead": "Draft the communication framework for internal escalation, affected-user notices, regulatory assessment, and support answers",
+    "insight": "Lead with confirmed facts and what users can do; never speculate on scope or play down impact",
+    "steps": [
+      "Mark what is known, unknown, and its update time",
+      "Prepare notices and Q&A by audience",
+      "Arrange joint legal, security, and support review"
+    ],
+    "metrics": [
+      [
+        "4 types",
+        "Audience materials"
+      ],
+      [
+        "2 h",
+        "First update"
+      ],
+      [
+        "1",
+        "Fact source"
+      ]
+    ]
+  }
+}
