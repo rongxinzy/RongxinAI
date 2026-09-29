@@ -57,7 +57,10 @@ vi.mock('../services/cowork', () => ({
     loadSessions: mocks.loadSessions,
   },
 }));
-vi.mock('../services/i18n', () => ({ i18nService: { t: (key: string) => key } }));
+vi.mock('../services/i18n', () => ({
+  // The search dialog resolves scheduled titles through i18nService.getLanguage().
+  i18nService: { t: (key: string) => key, getLanguage: () => 'zh' },
+}));
 vi.mock('./SidebarNavigationControls', () => ({ SidebarNavigationControls: () => null }));
 vi.mock('./LoginButton', () => ({ default: () => null }));
 vi.mock('./chat/ChatSkillShortcuts', () => ({ default: () => null }));
