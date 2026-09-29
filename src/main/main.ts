@@ -27,6 +27,8 @@ import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
 import { reportPiSessionFailure } from './piSessionFailure';
 import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
+import { registerArtifactFileAvailabilityHandler } from './artifactFileAvailability';
+import { observePreparedRun } from './workbenchTask/preparedRunFailure';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
@@ -58,7 +60,8 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
   CoworkSessionMode,
-  type CoworkSessionSource,
+  CoworkSessionSource,
+  normalizeRenamedSessionTitle,
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
@@ -245,6 +248,7 @@ import {
   probeCoworkModelReadiness,
 } from './libs/coworkUtil';
 import { createContentSecurityPolicy } from './contentSecurityPolicy';
+import { registerZhiyuanDeepLinkProtocol } from './deepLinkRegistration';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import {
@@ -3156,13 +3160,14 @@ if (!gotTheLock) {
     app.exit(0);
   })();
 } else {
-  // In development Electron needs the app entry point before the callback URL;
-  // otherwise Windows treats the URL itself as the application to launch.
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient('zhiyuan', process.execPath, [path.resolve(process.argv[1])]);
-  } else {
-    app.setAsDefaultProtocolClient('zhiyuan');
-  }
+  // The enterprise build signs in inside the app and never claims zhiyuan://;
+  // the community build owns it for its browser OAuth callback.
+  registerZhiyuanDeepLinkProtocol(app, {
+    isEnterpriseBuild: isEnterprise,
+    isDefaultApp: process.defaultApp === true,
+    entryPoint: process.argv[1],
+    execPath: process.execPath,
+  });
 
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
 
@@ -4995,17 +5000,25 @@ if (!gotTheLock) {
     'cowork:session:rename',
     async (_event, options: { sessionId: string; title: string }) => {
       try {
-        const title = options.title.trim();
+        const coworkStoreInstance = getCoworkStore();
+        // Scheduled rows are identified by their `source`; the stored title keeps
+        // the canonical prefix so it cannot drift from migrated/renamed rows.
+        const existing = coworkStoreInstance.getSession(options.sessionId, 0);
+        const title = normalizeRenamedSessionTitle(
+          options.title,
+          existing?.source === CoworkSessionSource.Scheduled,
+        ).trim();
         if (!title) {
           return { success: false, error: 'Title is required' };
         }
-        const coworkStoreInstance = getCoworkStore();
         coworkStoreInstance.updateSession(
           options.sessionId,
           { title },
           { userInitiatedTitleChange: true },
         );
-        return { success: true };
+        // Report the stored (normalized) title: the renderer echoes this value
+        // into redux, and a scheduled rename adds the canonical prefix.
+        return { success: true, title };
       } catch (error) {
         return {
           success: false,
@@ -6714,6 +6727,7 @@ if (!gotTheLock) {
     '.ico': 'image/x-icon',
     '.avif': 'image/avif',
   };
+  registerArtifactFileAvailabilityHandler();
   ipcMain.handle(
     'dialog:readFileAsDataUrl',
     async (
@@ -7704,31 +7718,33 @@ if (!gotTheLock) {
         const prompt =
           amendment || 'Continue the current task from its persisted state and verify the result.';
         // 2026/09/17 lixiang  resume 不等待整段跑完（对齐 Continue IPC），否则底部无法切到停止
-        void getPiRuntimeAdapter()
-          .continueSession(session.id, prompt, {
-            systemPrompt: session.systemPrompt,
-            skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
-            sessionMode: session.mode,
-            workspaceRoot: session.cwd,
-            agentId: session.agentId,
-            expertIds:
-              resumeInput?.expertIds === undefined
-                ? session.experts.slice(0, 1).map(expert => expert.expertId)
-                : normalizeSingleExpertIds(resumeInput.expertIds),
-            modelOverride: session.modelOverride,
-            approvalMode:
-              config.permissionMode === CoworkPermissionMode.AllowAll
-                ? WorkbenchApprovalMode.AllowAll
-                : WorkbenchApprovalMode.Ask,
-            goalMode: resumeInput?.goalMode,
-            imageAttachments: resumeInput?.imageAttachments,
-            fileAttachments: resumeInput?.fileAttachments,
-            _workbenchRunId: run.id,
-            _skipUserMessage: !amendment,
-          })
-          .catch(error => {
-            console.error('[WorkbenchTask] resume continue error:', error);
-          });
+        observePreparedRun(
+          () =>
+            getPiRuntimeAdapter().continueSession(session.id, prompt, {
+              systemPrompt: session.systemPrompt,
+              skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
+              sessionMode: session.mode,
+              workspaceRoot: session.cwd,
+              agentId: session.agentId,
+              expertIds:
+                resumeInput?.expertIds === undefined
+                  ? session.experts.slice(0, 1).map(expert => expert.expertId)
+                  : normalizeSingleExpertIds(resumeInput.expertIds),
+              modelOverride: session.modelOverride,
+              approvalMode:
+                config.permissionMode === CoworkPermissionMode.AllowAll
+                  ? WorkbenchApprovalMode.AllowAll
+                  : WorkbenchApprovalMode.Ask,
+              goalMode: resumeInput?.goalMode,
+              imageAttachments: resumeInput?.imageAttachments,
+              fileAttachments: resumeInput?.fileAttachments,
+              _workbenchRunId: run.id,
+              _skipUserMessage: !amendment,
+            }),
+          task,
+          run,
+          { service: getWorkbenchTaskService(), runtime: getPiRuntimeAdapter() },
+        );
       },
     });
     todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
