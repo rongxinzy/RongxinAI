@@ -139,6 +139,7 @@ import {
 } from './settings/ProviderModelRow';
 import { resolveOllamaModelEditorContext } from './settings/providerModelEditorContext';
 import { formatTokenK, TOKENS_PER_K } from './settings/tokenFormat';
+import { useIsEnterpriseBuild } from './settings/useIsEnterpriseBuild';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
@@ -875,6 +876,7 @@ const Settings: React.FC<SettingsProps> = ({
   // About tab
   const [appVersion, setAppVersion] = useState('');
   const [isDevBuild, setIsDevBuild] = useState(false);
+  const isEnterpriseBuild = useIsEnterpriseBuild();
   const [isExportingLogs, setIsExportingLogs] = useState(false);
   useEffect(() => {
     void window.electron.appInfo.getVersion().then(setAppVersion);
@@ -5120,144 +5122,148 @@ const Settings: React.FC<SettingsProps> = ({
                   <span className="text-sm text-muted-foreground">{appVersion}</span>
                 </div>
               </div>
-              <div className="px-4 py-3 border-b border-border space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-foreground">
-                    {i18nService.t('updateSectionTitle')}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {update?.status === AppUpdateStatus.Checking
-                      ? i18nService.t('updateChecking')
-                      : update?.status === AppUpdateStatus.UpToDate
-                        ? i18nService.t('updateUpToDate')
-                        : update?.status === AppUpdateStatus.Error
-                          ? i18nService.t('updateCheckFailed')
-                          : update?.info?.latestVersion
-                            ? `v${update.info.latestVersion}`
-                            : i18nService.t('updateNotChecked')}
-                  </span>
-                </div>
-                {isDownloading ? (
-                  <>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full bg-primary transition-[width] duration-200 ${progress?.percent === undefined ? 'w-1/3 animate-pulse' : ''}`}
-                        style={{
-                          width:
-                            progress?.percent === undefined
-                              ? undefined
-                              : `${Math.min(100, Math.max(0, progress.percent * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>
-                        {progress
-                          ? `${formatBytes(progress.received)}${progress.total ? ` / ${formatBytes(progress.total)}` : ''}`
-                          : i18nService.t('updateDownloading')}
+              {!isEnterpriseBuild && (
+                <>
+                  <div className="px-4 py-3 border-b border-border space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-foreground">
+                        {i18nService.t('updateSectionTitle')}
                       </span>
-                      <span>
-                        {progress?.percent !== undefined
-                          ? `${Math.round(progress.percent * 100)}%`
-                          : ''}
-                        {progress?.speed ? ` · ${formatBytes(progress.speed)}/s` : ''}
+                      <span className="text-sm text-muted-foreground">
+                        {update?.status === AppUpdateStatus.Checking
+                          ? i18nService.t('updateChecking')
+                          : update?.status === AppUpdateStatus.UpToDate
+                            ? i18nService.t('updateUpToDate')
+                            : update?.status === AppUpdateStatus.Error
+                              ? i18nService.t('updateCheckFailed')
+                              : update?.info?.latestVersion
+                                ? `v${update.info.latestVersion}`
+                                : i18nService.t('updateNotChecked')}
                       </span>
                     </div>
-                    <div className="flex gap-2">
+                    {isDownloading ? (
+                      <>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={`h-full bg-primary transition-[width] duration-200 ${progress?.percent === undefined ? 'w-1/3 animate-pulse' : ''}`}
+                            style={{
+                              width:
+                                progress?.percent === undefined
+                                  ? undefined
+                                  : `${Math.min(100, Math.max(0, progress.percent * 100))}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>
+                            {progress
+                              ? `${formatBytes(progress.received)}${progress.total ? ` / ${formatBytes(progress.total)}` : ''}`
+                              : i18nService.t('updateDownloading')}
+                          </span>
+                          <span>
+                            {progress?.percent !== undefined
+                              ? `${Math.round(progress.percent * 100)}%`
+                              : ''}
+                            {progress?.speed ? ` · ${formatBytes(progress.speed)}/s` : ''}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void window.electron.appUpdate.cancelDownload()}
+                          >
+                            {i18nService.t('updateDownloadCancel')}
+                          </Button>
+                        </div>
+                      </>
+                    ) : update?.status === AppUpdateStatus.Ready ? (
                       <Button
                         size="sm"
-                        variant="ghost"
-                        onClick={() => void window.electron.appUpdate.cancelDownload()}
+                        onClick={() => {
+                          void window.electron.appUpdate.installReady().then(result => {
+                            if (!result.success) {
+                              window.dispatchEvent(
+                                new CustomEvent('app:showToast', {
+                                  detail: {
+                                    message: normalizeError(
+                                      result.error || i18nService.t('updateInstallFailed'),
+                                    ),
+                                    isError: true,
+                                  },
+                                }),
+                              );
+                            }
+                          });
+                        }}
                       >
-                        {i18nService.t('updateDownloadCancel')}
+                        {i18nService.t('updateReadyConfirm')}
                       </Button>
-                    </div>
-                  </>
-                ) : update?.status === AppUpdateStatus.Ready ? (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      void window.electron.appUpdate.installReady().then(result => {
-                        if (!result.success) {
-                          window.dispatchEvent(
-                            new CustomEvent('app:showToast', {
-                              detail: {
-                                message: normalizeError(
-                                  result.error || i18nService.t('updateInstallFailed'),
-                                ),
-                                isError: true,
-                              },
-                            }),
-                          );
-                        }
-                      });
-                    }}
-                  >
-                    {i18nService.t('updateReadyConfirm')}
-                  </Button>
-                ) : update?.status === AppUpdateStatus.Error && update.info ? (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-destructive">
-                      {update.errorMessage || i18nService.t('updateDownloadFailed')}
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => void window.electron.appUpdate.retryDownload()}
-                    >
-                      {i18nService.t('updateRetry')}
-                    </Button>
-                  </div>
-                ) : update?.status === AppUpdateStatus.Available ? (
-                  <div className="space-y-2">
-                    {update.info?.manualDownloadOnly ? (
-                      <div className="text-xs text-muted-foreground">
-                        {i18nService.t('updateManualOnly')}
+                    ) : update?.status === AppUpdateStatus.Error && update.info ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-destructive">
+                          {update.errorMessage || i18nService.t('updateDownloadFailed')}
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => void window.electron.appUpdate.retryDownload()}
+                        >
+                          {i18nService.t('updateRetry')}
+                        </Button>
+                      </div>
+                    ) : update?.status === AppUpdateStatus.Available ? (
+                      <div className="space-y-2">
+                        {update.info?.manualDownloadOnly ? (
+                          <div className="text-xs text-muted-foreground">
+                            {i18nService.t('updateManualOnly')}
+                          </div>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          onClick={() => void window.electron.appUpdate.retryDownload()}
+                        >
+                          {i18nService.t(
+                            update.info?.manualDownloadOnly
+                              ? 'updateOpenDownloadPage'
+                              : 'updateDownloadNow',
+                          )}
+                        </Button>
+                      </div>
+                    ) : update?.status !== AppUpdateStatus.Checking &&
+                      update?.status !== AppUpdateStatus.UpToDate ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void window.electron.appUpdate.checkNow({ manual: true })}
+                      >
+                        {i18nService.t('updateCheckNow')}
+                      </Button>
+                    ) : null}
+                    {update?.status === AppUpdateStatus.Error && !update.info ? (
+                      <div className="text-xs text-destructive">
+                        {update.errorMessage || i18nService.t('updateCheckFailed')}
                       </div>
                     ) : null}
-                    <Button
-                      size="sm"
-                      onClick={() => void window.electron.appUpdate.retryDownload()}
+                    {update?.lastCheckedAt ? (
+                      <div className="text-xs text-muted-foreground">
+                        {i18nService.t('updateLastChecked')}
+                        {new Date(update.lastCheckedAt).toLocaleString()}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                    <span className="text-sm text-foreground">GitHub</span>
+                    <a
+                      href="https://github.com/rongxinzy/RongxinAI"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="theme-surface-settings-link"
                     >
-                      {i18nService.t(
-                        update.info?.manualDownloadOnly
-                          ? 'updateOpenDownloadPage'
-                          : 'updateDownloadNow',
-                      )}
-                    </Button>
+                      {i18nService.t('mcpViewOnGithub')}
+                    </a>
                   </div>
-                ) : update?.status !== AppUpdateStatus.Checking &&
-                  update?.status !== AppUpdateStatus.UpToDate ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void window.electron.appUpdate.checkNow({ manual: true })}
-                  >
-                    {i18nService.t('updateCheckNow')}
-                  </Button>
-                ) : null}
-                {update?.status === AppUpdateStatus.Error && !update.info ? (
-                  <div className="text-xs text-destructive">
-                    {update.errorMessage || i18nService.t('updateCheckFailed')}
-                  </div>
-                ) : null}
-                {update?.lastCheckedAt ? (
-                  <div className="text-xs text-muted-foreground">
-                    {i18nService.t('updateLastChecked')}
-                    {new Date(update.lastCheckedAt).toLocaleString()}
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <span className="text-sm text-foreground">GitHub</span>
-                <a
-                  href="https://github.com/rongxinzy/RongxinAI"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="theme-surface-settings-link"
-                >
-                  {i18nService.t('mcpViewOnGithub')}
-                </a>
-              </div>
+                </>
+              )}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="text-sm text-foreground">
                   {i18nService.t('aboutOfficialWebsite')}
