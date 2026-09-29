@@ -185,11 +185,14 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-          ZHIYUAN_ENTERPRISE_EXTENSION_BUNDLE: ${{ github.workspace }}\aaas\dist\extension.cjs
-          ZHIYUAN_ENTERPRISE_RENDERER_DIRECTORY: ${{ github.workspace }}\aaas\dist\ui
-          ZHIYUAN_ENTERPRISE_ADMIN_DIRECTORY: ${{ github.workspace }}\aaas\dist\admin
-          ZHIYUAN_ENTERPRISE_NOTICE_FILE: ${{ github.workspace }}\aaas\THIRD_PARTY_NOTICES.md
-          ZHIYUAN_ENTERPRISE_CONFIG_FILE: ${{ github.workspace }}\aaas\build\.enterprise-config.generated.json
+          # electron-builder resolves extraResources "from" against the project
+          # directory even for absolute paths, so these must stay relative to
+          # zhiyuan-core (same convention as the unsigned AaaS workflow).
+          ZHIYUAN_ENTERPRISE_EXTENSION_BUNDLE: '..\aaas\dist\extension.cjs'
+          ZHIYUAN_ENTERPRISE_RENDERER_DIRECTORY: '..\aaas\dist\ui'
+          ZHIYUAN_ENTERPRISE_ADMIN_DIRECTORY: '..\aaas\dist\admin'
+          ZHIYUAN_ENTERPRISE_NOTICE_FILE: '..\aaas\THIRD_PARTY_NOTICES.md'
+          ZHIYUAN_ENTERPRISE_CONFIG_FILE: '..\aaas\build\.enterprise-config.generated.json'
           APP_BUILD_VERSION: ${{ needs.prepare.outputs.package-version }}
           ZHIYUAN_UPDATE_VARIANT: lite
         run: |
@@ -211,6 +214,13 @@ jobs:
           bun run build:skills
           bun run prepare:modelscope-tokens
           bunx electron-builder --win nsis --x64 --config "$env:GITHUB_WORKSPACE\aaas\build\electron-builder.overlay-signed.cjs" --publish never
+          # electron-builder only warns ("file source doesn't exist") when an
+          # extraResources input is missing, so assert the injected marker here
+          # instead of discovering an asset-less package at verify time.
+          $injectedExtension = 'release\win-unpacked\resources\zhiyuan-enterprise\extension.cjs'
+          if (-not (Test-Path -LiteralPath $injectedExtension)) {
+            throw "Enterprise assets were not injected into the package: $injectedExtension is missing"
+          }
       - name: Verify packaged enterprise version
         working-directory: zhiyuan-core
         shell: bash
