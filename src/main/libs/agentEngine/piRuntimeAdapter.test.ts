@@ -3524,7 +3524,7 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
-    it('ends a non-retryable turn immediately instead of waiting out the retry cycle', async () => {
+    it('cancels a non-retryable SDK retry and reports failure only after it settles', async () => {
       const notices: Array<{ kind: string; attempt: number }> = [];
       adapter.on('retryNotice', (_sid, notice) =>
         notices.push({ kind: notice.kind, attempt: notice.attempt }),
@@ -3532,30 +3532,31 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hi');
 
       listener!({ type: 'turn_start' });
-      failedAttempt('401 Unauthorized: invalid api key');
+      failedAttempt('502 invalid api key');
 
-      // Reported at the failure itself — no auto_retry_end / agent_settled needed.
-      expect(errors).toHaveLength(1);
-      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
-      expect(systemErrorMessages()).toHaveLength(1);
+      expect(errors).toHaveLength(0);
+      expect(adapter.isSessionRunning('test')).toBe(true);
+      expect(systemErrorMessages()).toHaveLength(0);
       expect(completes).toHaveLength(0);
-      // Pi owns its retry timer and cannot be stopped here; the session must
-      // stay usable for the next message instead of being torn down.
       expect(mockSession.abort).not.toHaveBeenCalled();
 
-      // Pi keeps emitting retry bookkeeping after the runtime ended the turn;
-      // none of it may report the same failure twice or promise a retry.
+      // Cancelling the SDK retry must retain the original error until idle.
       listener!({ type: 'auto_retry_start', attempt: 1 });
+      await Promise.resolve();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
       listener!({
         type: 'auto_retry_end',
         success: false,
         attempt: 1,
-        finalError: '401 Unauthorized: invalid api key',
+        finalError: 'Retry cancelled',
       });
+      expect(errors).toHaveLength(0);
+      expect(adapter.isSessionRunning('test')).toBe(true);
       listener!({ type: 'agent_settled' });
 
       expect(notices).toEqual([]);
       expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
       expect(systemErrorMessages()).toHaveLength(1);
       expect(completes).toHaveLength(0);
     });
@@ -3578,29 +3579,41 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.abort).not.toHaveBeenCalled();
     });
 
-    it('completes the turn when Pi recovers after the runtime reported the failure', async () => {
+    it('retains a non-retryable failure if the SDK emits a successful-looking cancellation', async () => {
       await adapter.startSession('test', 'Hi');
 
       listener!({ type: 'turn_start' });
       failedAttempt('401 Unauthorized: invalid api key');
-      expect(errors).toHaveLength(1);
+      expect(errors).toHaveLength(0);
       expect(completes).toEqual([]);
 
-      // Pi kept retrying on its own and this time got an answer: the turn must
-      // still finalize and complete instead of staying reported as failed.
-      successfulTurn('Recovered after the failure');
+      listener!({ type: 'auto_retry_end', success: true, attempt: 1 });
       listener!({ type: 'agent_settled' });
 
-      expect(completes).toEqual(['test']);
-      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'idle' });
+      expect(completes).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
     });
 
     it('runs the next turn in the same session after a non-retryable failure', async () => {
       await adapter.startSession('test', 'Hi');
 
       listener!({ type: 'turn_start' });
-      failedAttempt('401 Unauthorized: invalid api key');
-      expect(errors).toHaveLength(1);
+      failedAttempt('502 invalid api key');
+      let finishAbort: (() => void) | undefined;
+      mockSession.abort.mockImplementationOnce(
+        () => new Promise<void>(resolve => { finishAbort = resolve; }),
+      );
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      await Promise.resolve();
+      const continuation = adapter.continueSession('test', 'Next message');
+      await Promise.resolve();
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+      listener!({ type: 'auto_retry_end', success: false, finalError: 'Retry cancelled' });
+      listener!({ type: 'agent_settled' });
+      finishAbort!();
+      await continuation;
+      expect(mockSession.prompt).toHaveBeenCalledTimes(2);
 
       // The user sends another message: this turn must run and complete.
       listener!({ type: 'turn_start' });

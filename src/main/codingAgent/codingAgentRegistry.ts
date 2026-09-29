@@ -13,7 +13,7 @@ import {
 } from '../../shared/codingAgent';
 import { AcpDiscoveryService, type AcpDiscoveryOptions } from './acp/discoveryService';
 import { BUNDLED_ACP_ADAPTERS, bundledAdapterDefinition } from './acp/bundledAdapters';
-import { AcpProbeNoAnswerError, AcpProbeService } from './acp/probeService';
+import { AcpProbeFailureError, AcpProbeService } from './acp/probeService';
 import { AcpProtocolIncompatibleError } from './acp/protocol';
 import type { CodingAgentProfileRepository } from './codingAgentProfileRepository';
 
@@ -195,12 +195,10 @@ export class CodingAgentRegistry extends EventEmitter {
       // The connection check renders a verdict for the configure-time flow: an
       // agent that answers nothing but offers a sign-in method is "needs
       // sign-in", everything else stays "unavailable".
-      const needsAuth =
-        error instanceof AcpProbeNoAnswerError &&
-        error.authMethods.some(method => method.type === 'terminal' || !method.type);
+      const needsAuth = error instanceof AcpProbeFailureError && error.needsAuth;
       const updated = {
         ...profile,
-        ...(error instanceof AcpProbeNoAnswerError ? { authMethods: error.authMethods } : {}),
+        ...(error instanceof AcpProbeFailureError ? { authMethods: error.authMethods } : {}),
         status:
           error instanceof AcpProtocolIncompatibleError
             ? CodingAgentProfileStatus.Incompatible

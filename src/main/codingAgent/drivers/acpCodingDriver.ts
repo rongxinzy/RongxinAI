@@ -4,7 +4,6 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 
 import {
-  CodingErrorDetailMessage,
   CodingErrorMessage,
   CodingEventKind,
   CodingPermissionOutcome,

@@ -103,6 +103,7 @@ export const CodingErrorMessage = {
   AcpTerminalNoId: 'ACP terminal request has no terminal ID.',
   AcpConnectionNotRunning: 'ACP agent connection is not running.',
   AcpProbeTimedOut: 'ACP probe timed out.',
+  AgentAuthRequired: 'The coding agent requires authentication.',
 
   // Built-in driver
   BuiltinAuthNotRequired: 'The built-in coding agent does not require authentication.',
@@ -258,6 +259,7 @@ export const CodingErrorI18nKey: Record<CodingErrorMessage | CodingErrorDetailMe
   [CodingErrorMessage.AcpTerminalNoId]: 'codingErrorAcpTerminalNoId',
   [CodingErrorMessage.AcpConnectionNotRunning]: 'codingErrorAcpConnectionNotRunning',
   [CodingErrorMessage.AcpProbeTimedOut]: 'codingErrorAcpProbeTimedOut',
+  [CodingErrorMessage.AgentAuthRequired]: 'codingErrorAgentAuthRequired',
   [CodingErrorMessage.BuiltinAuthNotRequired]: 'codingErrorBuiltinAuthNotRequired',
   [CodingErrorMessage.BuiltinPermissionsRuntime]: 'codingErrorBuiltinPermissionsRuntime',
   [CodingErrorMessage.BuiltinConfigOptionNotFound]: 'codingErrorBuiltinConfigOptionNotFound',

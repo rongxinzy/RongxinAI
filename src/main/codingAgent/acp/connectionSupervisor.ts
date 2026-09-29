@@ -2,6 +2,7 @@ import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_proc
 
 import { AcpErrorCode, AcpRequestError } from './protocol';
 import { CodingErrorDetailMessage, CodingErrorMessage } from '../../../shared/codingAgent';
+import { AcpRequestError as AcpResponseError } from './requestError';
 
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
@@ -384,9 +385,13 @@ export class AcpConnectionSupervisor {
             : '';
         const context = this.stderrContext.trim();
         const suffix = context ? ` Agent diagnostics: ${context.slice(-2000)}` : '';
-        pending.reject(new Error(`ACP request ${pending.method} failed${code}: ${detail}.${data}${suffix}`));
-      }
-      else pending.resolve(message.result);
+        pending.reject(
+          new AcpResponseError(
+            `ACP request ${pending.method} failed${code}: ${detail}.${data}${suffix}`,
+            message.error.code,
+          ),
+        );
+      } else pending.resolve(message.result);
     } catch (error) {
       console.warn('[AcpConnection] ignored malformed stdout protocol message:', error);
     }
