@@ -10,7 +10,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 function Stop-WithCode([int]$Code, [string]$Message) {
-  Write-Output $Message
+  # NSIS relays stdout into a single-line dialog and log field, so exception
+  # details must not span multiple lines.
+  Write-Output ($Message -replace '[\r\n]+', ' ')
   exit $Code
 }
 
@@ -77,20 +79,28 @@ function Get-Components {
   return $components
 }
 
+function ConvertTo-LongPath([string]$Path) {
+  # Windows PowerShell 5.1 is not long-path aware, so .NET enumeration must be
+  # handed an extended-length path to reach trees deeper than 260 characters.
+  if ($Path.StartsWith('\\?\')) { return $Path }
+  if ($Path.StartsWith('\\')) { return '\\?\UNC\' + $Path.Substring(2) }
+  return '\\?\' + $Path
+}
+
 function Measure-ComponentTree([string]$Root) {
   # The completion record itself must stay out of the measurement: it is
   # written after the tree is measured during expand, but present on disk
   # during cache validation.
   $rootFull = (Get-Item -LiteralPath $Root).FullName
-  $completeFull = Join-Path $rootFull '.complete'
+  $completeFull = ConvertTo-LongPath (Join-Path $rootFull '.complete')
   $fileCount = 0
   $totalBytes = [long]0
-  Get-ChildItem -LiteralPath $Root -Recurse -File -Force -ErrorAction Stop |
-    Where-Object { $_.FullName -ne $completeFull } |
-    ForEach-Object {
-      $fileCount++
-      $totalBytes += $_.Length
-    }
+  $rootInfo = [System.IO.DirectoryInfo]::new((ConvertTo-LongPath $rootFull))
+  foreach ($file in $rootInfo.EnumerateFiles('*', [System.IO.SearchOption]::AllDirectories)) {
+    if ($file.FullName -eq $completeFull) { continue }
+    $fileCount++
+    $totalBytes += $file.Length
+  }
   return [pscustomobject]@{ FileCount = $fileCount; TotalBytes = $totalBytes }
 }
 
