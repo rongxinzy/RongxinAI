@@ -248,6 +248,7 @@ import {
   probeCoworkModelReadiness,
 } from './libs/coworkUtil';
 import { createContentSecurityPolicy } from './contentSecurityPolicy';
+import { registerZhiyuanDeepLinkProtocol } from './deepLinkRegistration';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import {
@@ -3155,13 +3156,14 @@ if (!gotTheLock) {
     app.exit(0);
   })();
 } else {
-  // In development Electron needs the app entry point before the callback URL;
-  // otherwise Windows treats the URL itself as the application to launch.
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient('zhiyuan', process.execPath, [path.resolve(process.argv[1])]);
-  } else {
-    app.setAsDefaultProtocolClient('zhiyuan');
-  }
+  // The enterprise build signs in inside the app and never claims zhiyuan://;
+  // the community build owns it for its browser OAuth callback.
+  registerZhiyuanDeepLinkProtocol(app, {
+    isEnterpriseBuild: isEnterprise,
+    isDefaultApp: process.defaultApp === true,
+    entryPoint: process.argv[1],
+    execPath: process.execPath,
+  });
 
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
 
