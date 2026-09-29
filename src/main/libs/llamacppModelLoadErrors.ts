@@ -7,6 +7,7 @@ export const LlamaCppModelLoadFailureReason = {
   ContextTooLarge: 'context_too_large',
   ModelFileInvalid: 'model_file_invalid',
   ModelNotFound: 'model_not_found',
+  PortInUse: 'port_in_use',
   ServiceUnavailable: 'service_unavailable',
   StartupTimeout: 'startup_timeout',
   Unknown: 'unknown',
@@ -105,6 +106,11 @@ const startupTimeoutPatterns = [
   /did not become ready before timeout/i,
 ];
 
+const portInUsePatterns = [
+  /\beaddrinuse\b/i,
+  /address already in use/i,
+];
+
 const serviceUnavailablePatterns = [
   /(?:econnrefused|ecanceled|econnreset|socket hang up)/i,
   /fetch failed/i,
@@ -146,6 +152,9 @@ export function classifyLlamaCppModelLoadError(error: unknown): LlamaCppModelLoa
   if (matchesAny(text, modelFileInvalidPatterns)) {
     return LlamaCppModelLoadFailureReason.ModelFileInvalid;
   }
+  if (matchesAny(text, portInUsePatterns)) {
+    return LlamaCppModelLoadFailureReason.PortInUse;
+  }
   if (matchesAny(text, startupTimeoutPatterns)) {
     return LlamaCppModelLoadFailureReason.StartupTimeout;
   }
@@ -184,6 +193,8 @@ export function getLlamaCppModelLoadFailureI18nKey(reason: LlamaCppModelLoadFail
       return 'llamacppLoadModelFileInvalid';
     case LlamaCppModelLoadFailureReason.ModelNotFound:
       return 'llamacppLoadModelNotFound';
+    case LlamaCppModelLoadFailureReason.PortInUse:
+      return 'llamacppServiceStartupPortInUse';
     case LlamaCppModelLoadFailureReason.ServiceUnavailable:
       return 'llamacppLoadModelServiceUnavailable';
     case LlamaCppModelLoadFailureReason.StartupTimeout:
