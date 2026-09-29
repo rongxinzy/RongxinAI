@@ -1599,6 +1599,69 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
+    it('ends the turn with a visible error when the workbench run can no longer execute tools', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const message =
+        'Stopped the run: the output contract was never committed, so no tool call could execute.';
+      const authorizeToolCall = vi
+        .fn()
+        .mockResolvedValue({ allow: false, reason: message, terminateRun: true });
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'terminated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      expect(result).toMatchObject({ block: true });
+      // The model must not be asked again, and the user must see why.
+      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
+      expect(onError).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ message: expect.stringContaining('output contract') }),
+      );
+    });
+
     it('starts the Goal loop only when Work explicitly enables goal mode', async () => {
       await adapter.startSession('goal-work', 'Finish the requested task', {
         sessionMode: 'work',
@@ -3059,6 +3122,85 @@ describe('PiRuntimeAdapter', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('closes a whitespace-only placeholder when the turn ends without an answer', async () => {
+      const messages: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
+      const stored: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      const updateMessage = vi.fn(
+        (_sessionId: string, messageId: string, patch: { metadata?: Record<string, unknown> }) => {
+          const target = stored.find(message => message.id === messageId);
+          if (target && patch.metadata) target.metadata = { ...target.metadata, ...patch.metadata };
+        },
+      );
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: Record<string, unknown>) => {
+          const created = { ...message, id: `placeholder-${stored.length + 1}` };
+          stored.push(created as never);
+          return created;
+        },
+        getSession: () => ({ messages: stored }),
+        updateMessage,
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('test', 'Use a tool without writing an answer');
+      listener!({ type: 'turn_start' });
+      // Models routinely emit bare newlines before a tool call: the bubble is
+      // created with isStreaming and must not survive the turn.
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'text_delta', delta: '\n\n' },
+        message: { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+      });
+      const placeholder = messages.find(message => message.type === 'assistant');
+      expect(placeholder?.metadata?.isStreaming).toBe(true);
+
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '\n\n' }],
+          stopReason: 'toolUse',
+        },
+      });
+
+      expect(
+        updates.some(
+          update =>
+            update.messageId === placeholder?.id &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
+      expect(updateMessage).toHaveBeenCalledWith(
+        'test',
+        placeholder?.id,
+        expect.objectContaining({
+          metadata: expect.objectContaining({ isStreaming: false, isFinal: true }),
+        }),
+      );
+      // The persisted row is what any later session load reads.
+      const persisted = stored.find(message => message.id === placeholder?.id);
+      expect(persisted?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
     });
 
     it('should stream the answer when text starts without a thinking_end event', async () => {

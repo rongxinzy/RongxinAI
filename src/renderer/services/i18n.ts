@@ -46,6 +46,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkQueueSteerFailed: '\u5f15\u5bfc\u6d88\u606f\u53d1\u9001\u5931\u8d25',
     coworkQueueRetryFailed: '\u91cd\u8bd5\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
     coworkQueueEnqueueFailed: '\u6dfb\u52a0\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
+    coworkSubmitEmptyContent: '请输入要发送的内容',
     // 通用
     save: '保存',
     cancel: '取消',
@@ -1424,6 +1425,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     artifactOpenWithApp: '使用系统应用打开',
     artifactDocumentLoading: '正在加载文档...',
     artifactDocumentError: '文档加载失败',
+    artifactPreviewTooLarge: '文件过大，已停用网页预览，请切换到“代码”查看内容',
     artifactSheetTab: '工作表',
     artifactShowingRows: '显示 {shown} / {total} 行',
     artifactRowCount: '行',
@@ -3434,6 +3436,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkQueueSteerFailed: 'Failed to steer the message',
     coworkQueueRetryFailed: 'Failed to retry the queued message',
     coworkQueueEnqueueFailed: 'Failed to add pending message',
+    coworkSubmitEmptyContent: 'Enter something to send.',
     // Common
     save: 'Save',
     cancel: 'Cancel',
@@ -4922,6 +4925,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     artifactOpenWithApp: 'Open with System App',
     artifactDocumentLoading: 'Loading document...',
     artifactDocumentError: 'Failed to load document',
+    artifactPreviewTooLarge: 'File is too large, the web preview is disabled — open the Code tab instead',
     artifactSheetTab: 'Sheet',
     artifactShowingRows: 'Showing {shown} of {total} rows',
     artifactRowCount: 'rows',

@@ -3,7 +3,13 @@ param(
   [string]$ProjectRoot,
 
   [Parameter(Mandatory = $true)]
-  [string]$ExpectedThumbprint
+  [string]$ExpectedThumbprint,
+
+  # Packaged executable base name without extension. Defaults to the
+  # executableName from the project electron-builder.json; enterprise overlay
+  # builds pass their own product executable name instead.
+  [Parameter(Mandatory = $false)]
+  [string]$ExecutableName = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,11 +35,18 @@ $expectedCertificateDer = [Convert]::ToBase64String(
   $expectedCertificates[0].RawData
 )
 
-$builderConfig = Get-Content -LiteralPath (
-  Join-Path $ProjectRoot 'electron-builder.json'
-) -Raw -Encoding UTF8 | ConvertFrom-Json
+$appExecutableName = $ExecutableName
+if (-not $appExecutableName) {
+  $builderConfig = Get-Content -LiteralPath (
+    Join-Path $ProjectRoot 'electron-builder.json'
+  ) -Raw -Encoding UTF8 | ConvertFrom-Json
+  $appExecutableName = $builderConfig.executableName
+}
+if (-not $appExecutableName) {
+  throw 'Packaged executable name is empty; pass -ExecutableName or define executableName in electron-builder.json.'
+}
 $appExecutable = Join-Path $ProjectRoot (
-  "release\win-unpacked\$($builderConfig.executableName).exe"
+  "release\win-unpacked\$appExecutableName.exe"
 )
 $installers = @(
   Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'release') `

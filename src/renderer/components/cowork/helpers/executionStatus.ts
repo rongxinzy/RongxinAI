@@ -42,7 +42,14 @@ export const getCurrentExecutionStatus = (
     const item = items[index];
     if (item.type === 'assistant') {
       const metadata = item.message.metadata;
-      if (metadata?.isThinking && metadata.isStreaming && !metadata.isFinal) {
+      // An empty streaming bubble carries no work: a finished turn leaves
+      // placeholders behind, and they must not keep the "thinking" state alive.
+      if (
+        metadata?.isThinking &&
+        metadata.isStreaming &&
+        !metadata.isFinal &&
+        hasText(item.message.content)
+      ) {
         return { kind: ExecutionStatusKind.Thinking };
       }
       continue;
@@ -87,7 +94,8 @@ export const getFinalAnswerIndex = (
     item =>
       item.type === 'assistant' &&
       !item.message.metadata?.isThinking &&
-      item.message.metadata?.isStreaming,
+      item.message.metadata?.isStreaming &&
+      hasText(item.message.content),
   );
   // 2026/09/20 lixiang  轮次已结束时即使仍有未回填的 tool_result，也兜底展示最后一条回答，
   // 避免卡在「Running」工具态、用户看不到结果（issue #805）

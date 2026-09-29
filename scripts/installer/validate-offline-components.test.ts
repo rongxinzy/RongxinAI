@@ -111,6 +111,12 @@ function targetDir(fixture: ReturnType<typeof makeFixture>, key: string): string
   return path.join(fixture.runtimeRoot, key, componentId(key));
 }
 
+function toExtendedPath(target: string): string {
+  // The \\?\ prefix lets node fs create trees deeper than MAX_PATH regardless
+  // of the machine-wide LongPathsEnabled setting.
+  return target.startsWith('\\\\?\\') ? target : `\\\\?\\${target}`;
+}
+
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
     fs.rmSync(directory, { recursive: true, force: true });
@@ -140,6 +146,42 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
         fs.existsSync(path.join(fixture.pluginDir, `component-${target.key}.cache-valid`)),
       ).toBe(true);
     }
+  });
+
+  test('cache mode measures component trees with paths longer than 260 characters', () => {
+    const fixture = makeFixture();
+    expandFixture(fixture);
+
+    const victim = fixture.targets[0];
+    const victimDir = targetDir(fixture, victim.key);
+    // Mirror the skill-python layout (jedi/playwright payloads) whose full
+    // path under %LOCALAPPDATA% exceeds MAX_PATH and crashed the previous
+    // Get-ChildItem based measurement on machines without LongPathsEnabled.
+    let deepDirectory = path.join(victimDir, victim.prefix, 'deep');
+    while (deepDirectory.length < 300) {
+      deepDirectory = path.join(deepDirectory, 'aaaaaaaa');
+    }
+    const extendedDeepDirectory = toExtendedPath(deepDirectory);
+    fs.mkdirSync(extendedDeepDirectory, { recursive: true });
+    const addedFiles = ['leaf-one.txt', 'leaf-two.txt'];
+    let addedBytes = 0;
+    for (const name of addedFiles) {
+      const content = Buffer.from(`deep:${name}`);
+      fs.writeFileSync(`${extendedDeepDirectory}\\${name}`, content);
+      addedBytes += content.length;
+    }
+
+    // Keep the completion record consistent with the tree on disk so cache
+    // validation depends on the measurement succeeding rather than failing.
+    const completePath = path.join(victimDir, '.complete');
+    const fields = fs.readFileSync(completePath, 'utf8').trim().split('|');
+    fields[2] = String(Number.parseInt(fields[2], 10) + addedFiles.length);
+    fields[3] = String(Number.parseInt(fields[3], 10) + addedBytes);
+    fs.writeFileSync(completePath, fields.join('|'));
+
+    const cached = runValidator('cache', fixture.pluginDir, fixture.runtimeRoot);
+    expect(cached.status, cached.stderr || cached.stdout).toBe(0);
+    expect(cached.stdout).toContain(`cache-hit:${victim.key}`);
   });
 
   test('cache mode rejects a component tree left incomplete by an interrupted move', () => {

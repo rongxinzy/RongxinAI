@@ -101,6 +101,7 @@ import {
   CoworkSessionUpdateModelSchema,
   ProjectCreateDirectorySchema,
 } from '../shared/ipc/schemas';
+import { shouldRecordApiRequest } from '../shared/ipc/apiRequest';
 import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import {
   WorkbenchApprovalMode,
@@ -130,7 +131,13 @@ import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
 } from './libs/anysearchGatewayCredentials';
-import { APP_DATA_DIR_NAME, APP_NAME, APP_USER_MODEL_ID, DB_FILENAME } from './appConstants';
+import {
+  APP_DATA_DIR_NAME,
+  APP_NAME,
+  APP_USER_MODEL_ID,
+  DB_FILENAME,
+  ENTERPRISE_APP_NAME,
+} from './appConstants';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
@@ -182,6 +189,7 @@ import {
 } from './ipcHandlers/scheduledTask';
 import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerCodingAgentIpcHandlers } from './ipcHandlers/codingAgent';
+import { agentResourceDiagnostics } from './agentResourceDiagnostics';
 import { CodingRoomRepository } from './codingAgent/codingRoomRepository';
 import { CodingRoomService } from './codingAgent/codingRoomService';
 import { resolveCodingExpertSelection } from './codingAgent/builtinCodingExpertSelection';
@@ -345,9 +353,17 @@ import {
   type WindowRectangle,
 } from './windowState';
 
+// The enterprise packaging overlay injects this directory into resources. The
+// public build has no such directory and keeps the regular Zhiyuan name.
+const runtimeAppName =
+  typeof process.resourcesPath === 'string' &&
+  fs.existsSync(path.join(process.resourcesPath, 'zhiyuan-enterprise'))
+    ? ENTERPRISE_APP_NAME
+    : APP_NAME;
+
 // 设置应用程序名称
-app.name = APP_NAME;
-app.setName(APP_NAME);
+app.name = runtimeAppName;
+app.setName(runtimeAppName);
 // 2026/09/21 lixiang  开发态用独立 AUMID，并配套开始菜单快捷方式（见 ensureWindowsTaskbarBrand），
 // 避免 Windows 继续拿 Electron 默认原子图标的任务栏缓存。打包态仍用产品 AUMID。
 const WINDOWS_TASKBAR_APP_USER_MODEL_ID = app.isPackaged
@@ -1000,6 +1016,7 @@ app.commandLine.appendSwitch('disk-cache-size', String(50 * 1024 * 1024)); // 50
 
 // 配置网络服务
 app.on('ready', () => {
+  agentResourceDiagnostics.setElectronMetricsProvider(() => app.getAppMetrics());
   // 配置网络服务重启策略
   app.configureHostResolver({
     enableBuiltInResolver: true,
@@ -1010,6 +1027,7 @@ app.on('ready', () => {
 // 添加错误处理
 app.on('render-process-gone', (_event, webContents, details) => {
   console.error('[RendererProcess] Render process exited:', details);
+  agentResourceDiagnostics.logRendererProcessGone(details.reason);
   if (shouldReloadRendererProcess(details.reason, isQuitting)) {
     scheduleReload(`render-process-gone (${details.reason})`, webContents);
   }
@@ -2807,7 +2825,7 @@ const ensureWindowsTaskbarBrand = (): void => {
       appUserModelId: WINDOWS_TASKBAR_APP_USER_MODEL_ID,
       icon: iconPath,
       iconIndex: 0,
-      description: APP_NAME,
+      description: runtimeAppName,
     });
     if (!wrote || !fs.existsSync(shortcutPath)) {
       console.warn('[Main] Failed to write Windows taskbar brand shortcut:', shortcutPath);
@@ -6900,9 +6918,12 @@ if (!gotTheLock) {
 
   ipcMain.handle(ApiIpc.Fetch, async (_event, rawOptions: unknown) => {
     const options = ApiFetchSchema.input.parse(rawOptions);
-    console.log(
-      `[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`,
-    );
+    const shouldRecord = shouldRecordApiRequest(options.purpose);
+    if (shouldRecord) {
+      console.log(
+        `[api:fetch] ${options.method} ${options.url}, headers: ${serializeForLog(options.headers)}, body: ${options.body}`,
+      );
+    }
 
     const doFetch = async (headers: Record<string, string>) => {
       const response = await session.defaultSession.fetch(options.url, {
@@ -6932,6 +6953,56 @@ if (!gotTheLock) {
       };
     };
 
+    const runApiFetch = async () => {
+      try {
+        let result = await doFetch(options.headers);
+        if (shouldRecord) {
+          console.log(
+            `[api:fetch] ${options.method} ${options.url} -> ${result.status} ${result.statusText}`,
+            typeof result.data === 'object' ? JSON.stringify(result.data) : result.data,
+          );
+        }
+
+        // Auto-retry once for Copilot 401/403
+        if (
+          !result.ok &&
+          (result.status === 401 || result.status === 403) &&
+          isCopilotUrl(options.url)
+        ) {
+          if (shouldRecord) {
+            console.log('[api:fetch] Copilot auth error, attempting token refresh and retry');
+          }
+          const { headers: refreshedHeaders, retried } =
+            await retryCopilotWithRefreshedToken(options);
+          if (retried) {
+            result = await doFetch(refreshedHeaders);
+            if (shouldRecord) {
+              console.log(`[api:fetch] retry -> ${result.status} ${result.statusText}`);
+            }
+          }
+        }
+
+        return result;
+      } catch (error) {
+        if (shouldRecord) {
+          console.error(
+            `[api:fetch] ${options.method} ${options.url} -> ERROR:`,
+            error instanceof Error ? error.message : error,
+          );
+        }
+        return {
+          ok: false,
+          status: 0,
+          statusText: error instanceof Error ? error.message : 'Network error',
+          headers: {},
+          data: null as null,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    };
+
+    if (!shouldRecord) return runApiFetch();
+
     // 2026/09/17 lixiang  开发态把主进程 api:fetch 镜像到 DevTools Network（xr-net beacon）
     return trackDevNetworkRequest({
       source: 'api-fetch',
@@ -6941,45 +7012,7 @@ if (!gotTheLock) {
       getRequestBody: () => truncateNetworkBody(options.body),
       getResponseBody: result =>
         truncateNetworkBody('error' in result ? result.error : (result.data ?? result.statusText)),
-      run: async () => {
-        try {
-          let result = await doFetch(options.headers);
-          console.log(
-            `[api:fetch] ${options.method} ${options.url} -> ${result.status} ${result.statusText}`,
-            typeof result.data === 'object' ? JSON.stringify(result.data) : result.data,
-          );
-
-          // Auto-retry once for Copilot 401/403
-          if (
-            !result.ok &&
-            (result.status === 401 || result.status === 403) &&
-            isCopilotUrl(options.url)
-          ) {
-            console.log('[api:fetch] Copilot auth error, attempting token refresh and retry');
-            const { headers: refreshedHeaders, retried } =
-              await retryCopilotWithRefreshedToken(options);
-            if (retried) {
-              result = await doFetch(refreshedHeaders);
-              console.log(`[api:fetch] retry -> ${result.status} ${result.statusText}`);
-            }
-          }
-
-          return result;
-        } catch (error) {
-          console.error(
-            `[api:fetch] ${options.method} ${options.url} -> ERROR:`,
-            error instanceof Error ? error.message : error,
-          );
-          return {
-            ok: false,
-            status: 0,
-            statusText: error instanceof Error ? error.message : 'Network error',
-            headers: {},
-            data: null as null,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          };
-        }
-      },
+      run: runApiFetch,
     });
   });
 
@@ -7060,7 +7093,7 @@ if (!gotTheLock) {
 
     mainWindow = new BrowserWindow({
       ...initialWindowBounds,
-      title: APP_NAME,
+      title: runtimeAppName,
       icon: getAppIconPath(),
       ...(isMac
         ? {

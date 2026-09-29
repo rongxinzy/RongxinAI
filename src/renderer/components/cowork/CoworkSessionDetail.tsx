@@ -400,6 +400,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       setIsArtifactPanelTransitioning(true);
       setIsArtifactPanelVisible(false);
       transitionTimeout = window.setTimeout(() => {
+        setShouldRenderArtifactPanel(false);
+        setPreviewSessionId(null);
         setIsArtifactPanelTransitioning(false);
       }, ARTIFACT_PANEL_TRANSITION_MS);
     }
