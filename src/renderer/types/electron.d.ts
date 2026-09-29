@@ -834,7 +834,7 @@ interface IElectronAPI {
     renameSession: (options: {
       sessionId: string;
       title: string;
-    }) => Promise<{ success: boolean; error?: string }>;
+    }) => Promise<{ success: boolean; title?: string; error?: string }>;
     updateSessionModel: (options: {
       sessionId: string;
       modelOverride: string;
@@ -1223,6 +1223,7 @@ interface IElectronAPI {
     readFileAsDataUrl: (
       filePath: string,
     ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+    checkArtifactFile: (filePath: string) => Promise<{ success: boolean }>;
     generateThumbnail: (
       filePath: string,
     ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;

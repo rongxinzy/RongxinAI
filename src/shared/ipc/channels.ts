@@ -215,6 +215,7 @@ export const DialogIpc = {
   SelectFiles: 'dialog:selectFiles',
   SaveInlineFile: 'dialog:saveInlineFile',
   ReadFileAsDataUrl: 'dialog:readFileAsDataUrl',
+  CheckArtifactFile: 'dialog:checkArtifactFile',
   GenerateThumbnail: 'dialog:generateThumbnail',
   ShowMessageBox: 'dialog:showMessageBox',
 } as const;

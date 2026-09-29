@@ -1,6 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Skeleton } from '@shared/components/ui/skeleton';
+import { resolveArtifactPath } from '@shared/cowork/artifactPath';
 import { ArrowLeft, Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -331,19 +332,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 
   const handleOpenWithApp = useCallback(() => {
     if (selectedArtifact?.filePath) {
-      let filePath = selectedArtifact.filePath;
-      if (filePath.startsWith('file:///')) {
-        filePath = filePath.slice(7);
-      } else if (filePath.startsWith('file://')) {
-        filePath = filePath.slice(7);
-      } else if (filePath.startsWith('file:/')) {
-        filePath = filePath.slice(5);
-      }
-      // Strip leading / before Windows drive letter
-      if (/^\/[A-Za-z]:/.test(filePath)) {
-        filePath = filePath.slice(1);
-      }
-      window.electron?.shell?.openPath(filePath);
+      window.electron?.shell?.openPath(resolveArtifactPath(selectedArtifact.filePath));
     }
   }, [selectedArtifact]);
 
