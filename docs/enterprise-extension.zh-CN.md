@@ -35,3 +35,11 @@ Preload 桥只允许 `snapshot`、`login`、`changePassword` 和 `logout`。主�
 企业扩展可以使用稳定 ID 注册多个设置页。Zhiyuan 会把每个页面渲染为设置侧边栏中的独立入口，因此企业账户和企业模型即使复用同一个 Renderer bundle，也保持为两个同级目的地。
 
 `capabilities.managedProvider` 只接受一个受管配置源。配置源必须使用现有 `custom_` 供应商命名空间，并返回公开应用标准的 `ProviderConfig`。宿主把该配置同步到 `app_config.providers`，模型选择、OpenAI 兼容传输、能力判断、reasoning 兼容和 Pi runtime 均复用用户自建自定义供应商的同一条代码路径。独占配置源会隐藏可编辑供应商和本地推理入口，但不会建立第二套模型运行时。
+
+## Windows 安装包中央签名
+
+未签名的企业安装包由私有仓库的 `Build Windows enterprise package` 工作流构建。本仓库的 `Sign Zhiyuan Enterprise Windows package` 工作流把一次成功的未签名构建转成签名安装包：在 main 上手动触发，输入未签名构建的 run ID、可选且必须与未签名构建一致的 `release_version`，以及要写入 `resources/zhiyuan-enterprise/config.json` 的 AEP base URL。prepare 作业会先校验来源仓库、工作流、run 结论、必需构建步骤和未过期的未签名 artifact，再确定来源 commit 与包版本。
+
+sign 作业按精确来源 commit 重建：按来源 commit 检出私有仓库、按 `build/build-manifest.json` 锁定的 `zhiyuanCore.commit` 检出本仓库，重新构建并验证扩展、渲染 AEP 配置，然后用 `build/electron-builder.overlay-signed.cjs` 打包，使应用可执行文件和 NSIS 安装包在一次构建中完成 Authenticode 签名。上传前会校验打包版本、证书指纹、注入的企业资源和干净 PATH 下的运行时，签名安装包与 `SHA256SUMS.txt` 作为 Actions artifact 保留 14 天。
+
+签名完全复用本仓库 `release` 环境既有的 Certum 凭据，私有仓库和调用方都不需要配置任何 secret。
