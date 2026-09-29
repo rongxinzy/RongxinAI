@@ -12,6 +12,7 @@ test('uses the same theme-owned icon slot for every settings entry', () => {
     /<span\s+className="theme-settings-navigation-icon[^"]*"\s+aria-hidden="true"\s*>\s*\{tab.icon\}\s*<\/span>/,
   );
   expect(navigation).toContain('min-w-0 truncate');
+  expect(navigation).toContain('items-start justify-start');
 });
 
 test('provides a consistent settings icon slot in every theme and appearance', () => {
