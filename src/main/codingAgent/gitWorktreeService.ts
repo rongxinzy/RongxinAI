@@ -2,6 +2,8 @@ import { mkdir } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 
+import { CodingErrorMessage } from '../../shared/codingAgent';
+
 const MAX_DIFF_PREVIEW_BYTES = 256 * 1024;
 const DIFF_TRUNCATION_MARKER = '\n\n[Diff preview truncated]\n';
 
@@ -130,7 +132,7 @@ export class GitWorktreeService {
       await this.applyPatch(input.repositoryRoot, patch);
     } catch (error) {
       throw new GitWorktreeConflictError(
-        error instanceof Error ? error.message : 'The collaborator patch cannot be applied cleanly.',
+        error instanceof Error ? error.message : CodingErrorMessage.GitPatchConflict,
       );
     }
   }
@@ -141,7 +143,7 @@ export class GitWorktreeService {
       await applyGitPatch(workspaceRoot, patch, true);
     } catch (error) {
       throw new GitWorktreeConflictError(
-        error instanceof Error ? error.message : 'The collaborator patch cannot be applied cleanly.',
+        error instanceof Error ? error.message : CodingErrorMessage.GitPatchConflict,
       );
     }
     await applyGitPatch(workspaceRoot, patch, false);

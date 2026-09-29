@@ -1,6 +1,8 @@
 import { realpath } from 'fs/promises';
 import path from 'path';
 
+import { CodingErrorMessage } from '../../shared/codingAgent';
+
 /** Resolves agent filesystem targets through explicit, real-path boundaries. */
 export class WorkspaceBroker {
   private readonly allowedRoots = new Set<string>();
@@ -18,12 +20,12 @@ export class WorkspaceBroker {
       : path.resolve(this.workspaceRoot, target);
     const existing = await this.resolveExistingAncestor(absolute);
     const realRoot = await this.findAuthorizedRoot(existing.realPath);
-    if (!realRoot) throw new Error('The target is outside the authorized coding workspace.');
+    if (!realRoot) throw new Error(CodingErrorMessage.WorkspaceTargetOutside);
 
     if (existing.remaining.length === 0) return existing.realPath;
     const resolvedTarget = path.resolve(existing.realPath, ...existing.remaining);
     if (!resolvedTarget.startsWith(`${realRoot}${path.sep}`)) {
-      throw new Error('The target is outside the authorized coding workspace.');
+      throw new Error(CodingErrorMessage.WorkspaceTargetOutside);
     }
     return resolvedTarget;
   }
@@ -40,7 +42,7 @@ export class WorkspaceBroker {
       } catch {
         const parent = path.dirname(candidate);
         if (parent === candidate)
-          throw new Error('The target does not have an existing filesystem ancestor.');
+          throw new Error(CodingErrorMessage.WorkspaceTargetNoAncestor);
         remaining.unshift(path.basename(candidate));
         candidate = parent;
       }

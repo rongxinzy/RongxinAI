@@ -17,6 +17,8 @@ import {
   type CodingSessionSummary,
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
+import { reportAppError } from '../../services/appErrorText';
+import { showAppError } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import { getWorkspaceDisplayName } from '../../utils/path';
 import {
@@ -142,7 +144,7 @@ export const CodingWorkspaceSidebar = ({
     if (workspaceResult.success && workspaceResult.workspaces) {
       applyWorkspaces(workspaceResult.workspaces);
     } else {
-      setError(workspaceResult.error ?? i18nService.t('codingAgentActionFailed'));
+      showAppError(workspaceResult.error, 'codingAgentActionFailed');
     }
     if (profileResult.success && profileResult.profiles) setProfiles(profileResult.profiles);
   }, [applyWorkspaces]);
@@ -158,7 +160,6 @@ export const CodingWorkspaceSidebar = ({
   }, [refresh, selection.workspaceRoot]);
 
   const openSessionSetup = (workspace: CodingWorkspaceSummary) => {
-    setError(null);
     setExpandedIds(current => new Set(current).add(workspace.id));
     window.dispatchEvent(
       new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, {
@@ -180,7 +181,7 @@ export const CodingWorkspaceSidebar = ({
         })
       : await window.electron.codingAgent.createWorkspace(input);
     if (!result.success || !result.workspaces) {
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      setError(reportAppError(result.error, 'codingAgentActionFailed'));
       return false;
     }
     applyWorkspaces(result.workspaces);
@@ -206,13 +207,13 @@ export const CodingWorkspaceSidebar = ({
     try {
       const result = await window.electron.codingAgent.deleteWorkspace(removingWorkspace.id);
       if (!result.success || !result.workspaces) {
-        setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        showAppError(result.error, 'codingAgentActionFailed');
         return;
       }
       setRemovingWorkspace(null);
       applyWorkspaces(result.workspaces);
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     } finally {
       setIsRemoving(false);
     }
@@ -227,13 +228,13 @@ export const CodingWorkspaceSidebar = ({
         laneId: removingSession.session.id,
       });
       if (!result.success || !result.workspaces) {
-        setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        showAppError(result.error, 'codingAgentActionFailed');
         return;
       }
       setRemovingSession(null);
       applyWorkspaces(result.workspaces);
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     } finally {
       setIsRemoving(false);
     }
@@ -307,7 +308,6 @@ export const CodingWorkspaceSidebar = ({
             ))}
           </div>
         )}
-        {error ? <p className="px-2 pt-2 text-xs text-destructive">{error}</p> : null}
       </div>
       <CodingWorkspaceDialog
         open={workspaceDialogOpen}
