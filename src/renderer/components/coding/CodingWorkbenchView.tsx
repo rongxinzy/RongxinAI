@@ -34,7 +34,6 @@ import type {
   CodingAgentConfigOption,
   CodingPromptAttachment,
   CodingEventPage,
-  CodingRoomSnapshot,
   CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import {
@@ -58,6 +57,7 @@ import {
   selectSessionArtifacts,
 } from '../../store/slices/artifactSlice';
 import PageHeader from '../PageHeader';
+import { LogoLoadingState } from '../LogoLoadingState';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
 import ArtifactPanelResizeHandle from '../artifacts/ArtifactPanelResizeHandle';
 import { clampArtifactPanelWidth } from '../artifacts/artifactPanelResize';
@@ -69,7 +69,7 @@ import { CodingAuthTerminalDialog } from './CodingAuthTerminalDialog';
 import { CodingComposer } from './CodingComposer';
 import { CodingPermissionOverlay } from './CodingPermissionOverlay';
 import { CodingEventStream } from './CodingEventStream';
-import { mergeCodingRoomEventDelta } from './codingEventDelta';
+import { useCodingRoomSnapshot } from './useCodingRoomSnapshot';
 import { CodingGitPanel } from './CodingGitPanel';
 import { CodingGitQuickActions } from './CodingGitQuickActions';
 import { CodingInspector } from './CodingInspector';
@@ -97,7 +97,6 @@ import { useCodingSidePanelTransition } from './useCodingSidePanelTransition';
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
 
-const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
 const CODING_PANEL_MIN_WIDTH = 280;
 const CODING_PANEL_DEFAULT_WIDTH = 560;
 
@@ -126,13 +125,17 @@ export const CodingWorkbenchView = ({
   isSidebarCollapsed = false,
   onToggleSidebar,
 }: CodingWorkbenchViewProps) => {
-  const [snapshot, setSnapshot] = useState<CodingRoomSnapshot | null>(EMPTY_SNAPSHOT);
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [composerFocusRequestKey, setComposerFocusRequestKey] = useState(0);
   const [promptAttachments, setPromptAttachments] = useState<CodingPromptAttachment[]>([]);
+  const { snapshot, setSnapshot, bootstrapError, isCurrentWorkspace } = useCodingRoomSnapshot(
+    workspaceRoot,
+    selectedLaneId,
+    bootstrapAttempt,
+    showAppError,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
   const [sidePanelSheetOpen, setSidePanelSheetOpen] = useState(false);
@@ -172,61 +175,6 @@ export const CodingWorkbenchView = ({
   useEffect(() => {
     setPromptAttachments([]);
   }, [selectionKey]);
-  useEffect(() => {
-    setBootstrapError(null);
-    if (!workspaceRoot) {
-      setSnapshot(null);
-      return;
-    }
-    let cancelled = false;
-    const reportFailure = (message: string | undefined): void => {
-      // Without a snapshot the workbench would be stuck on its loading
-      // screen forever, so surface the failure with a retry.
-      setBootstrapError(message ?? i18nService.t('codingAgentActionFailed'));
-    };
-    void window.electron.codingAgent
-      .bootstrap(workspaceRoot)
-      .then(result => {
-        if (cancelled) return;
-        if (result.success && result.snapshot) {
-          setSnapshot(result.snapshot);
-          return;
-        }
-        reportFailure(result.error);
-      })
-      .catch(error => {
-        if (cancelled) return;
-        reportFailure(error instanceof Error ? error.message : undefined);
-      });
-    const unsubscribe = window.electron.codingAgent.onChanged(next => {
-      if (next.room.workspaceRoot === workspaceRoot) setSnapshot(next);
-    });
-    const unsubscribeDelta = window.electron.codingAgent.onEventDelta(delta => {
-      if (delta.workspaceRoot !== workspaceRoot) return;
-      setSnapshot(current => (current ? mergeCodingRoomEventDelta(current, delta) : current));
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe();
-      unsubscribeDelta();
-    };
-  }, [workspaceRoot, bootstrapAttempt]);
-  useEffect(() => {
-    if (
-      !workspaceRoot ||
-      !selectedLaneId ||
-      !snapshot?.lanes.some(lane => lane.id === selectedLaneId) ||
-      snapshot.room.activeLaneId === selectedLaneId
-    ) {
-      return;
-    }
-    void window.electron.codingAgent
-      .selectLane({ workspaceRoot, laneId: selectedLaneId })
-      .then(result => {
-        if (result.success && result.snapshot) setSnapshot(result.snapshot);
-        else showAppError(result.error, 'codingAgentActionFailed');
-      });
-  }, [selectedLaneId, snapshot, workspaceRoot]);
   useEffect(() => {
     const openSessionSetup = (event: Event) => {
       const detail = (event as CustomEvent<CodingCreateSessionEventDetail>).detail;
@@ -359,7 +307,7 @@ export const CodingWorkbenchView = ({
     return () => {
       cancelled = true;
     };
-  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, workspaceRoot]);
+  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, setSnapshot, workspaceRoot]);
   // A draft has no lane yet, so fetch the default config options of its
   // profile to show model/thinking controls before the session exists.
   const draftProfileId = draftSession?.profileId ?? null;
@@ -454,7 +402,7 @@ export const CodingWorkbenchView = ({
     } finally {
       loadingOlderEventsRef.current = false;
     }
-  }, [activeLaneId, snapshot?.eventWindows, workspaceRoot]);
+  }, [activeLaneId, setSnapshot, snapshot?.eventWindows, workspaceRoot]);
   // All lanes, not only the selected one: a turn that fails in the background must
   // still reach the user.
   useTurnFailureToast(snapshot?.events ?? []);
@@ -863,6 +811,7 @@ export const CodingWorkbenchView = ({
             ? { configOptionOverrides: draftConfigOverrides }
             : {}),
         });
+        if (!isCurrentWorkspace()) return;
         const laneId = result.snapshot?.room.activeLaneId;
         if (result.success && result.snapshot && laneId) {
           setSnapshot(result.snapshot);
@@ -885,6 +834,7 @@ export const CodingWorkbenchView = ({
           ...(promptAttachments.length > 0 ? { attachments: promptAttachments } : {}),
         },
       });
+      if (!isCurrentWorkspace()) return;
       if (result.success && result.snapshot) {
         setDraftState({ laneId: activeLane.id, value: '' });
         setPromptAttachments([]);
@@ -895,7 +845,9 @@ export const CodingWorkbenchView = ({
         setSnapshot(result.snapshot);
       } else showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      showAppError(error, 'codingAgentActionFailed');
+      if (isCurrentWorkspace()) {
+        showAppError(error, 'codingAgentActionFailed');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1011,7 +963,7 @@ export const CodingWorkbenchView = ({
             </Button>
           </div>
         ) : (
-          i18nService.t('codingAgentLoading')
+          <LogoLoadingState label={i18nService.t('codingAgentLoading')} />
         )}
       </div>
     );
