@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, Folder, Plus, Settings2, Trash2 } from 'lucide-react';
+import { Ellipsis, Folder, Trash2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
