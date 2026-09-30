@@ -246,6 +246,46 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('Get-ChildItem -Path "$INSTDIR.old*"');
   });
 
+  test('stops processes by install-root path prefix so orphaned sidecars cannot block setup', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript.indexOf('!macro StopAppProcesses')).toBeGreaterThan(-1);
+    expect(installerScript.indexOf('!macro StopAppProcesses')).toBeLessThan(
+      installerScript.indexOf('!macro customInit'),
+    );
+    expect(installerScript.match(/!insertmacro StopAppProcesses/g)).toHaveLength(2);
+
+    const macroStart = installerScript.indexOf('!macro StopAppProcesses');
+    const macroBlock = installerScript.slice(
+      macroStart,
+      installerScript.indexOf('!macroend', macroStart),
+    );
+    expect(macroBlock).toContain('Get-CimInstance Win32_Process');
+    expect(macroBlock).toContain('$$roots = @(\\"$INSTDIR\\"');
+    expect(macroBlock).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes');
+    expect(macroBlock).toContain('StartsWith($$roots[0]');
+    expect(macroBlock).toContain('StartsWith($$roots[1]');
+    expect(macroBlock).toContain('CurrentCultureIgnoreCase');
+    expect(macroBlock).toContain('Stop-Process -Id $$proc.ProcessId -Force');
+    // An in-place uninstaller runs from $INSTDIR and must not kill itself.
+    expect(macroBlock).toContain('GetCurrentProcessId');
+    expect(macroBlock).toContain('$$_.ProcessId -ne $$selfPid');
+
+    const customInitBlock = installerScript.slice(
+      installerScript.indexOf('!macro customInit'),
+      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customInit')),
+    );
+    expect(customInitBlock).toContain('!insertmacro StopAppProcesses');
+    const customUnInitBlock = installerScript.slice(
+      installerScript.indexOf('!macro customUnInit'),
+      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customUnInit')),
+    );
+    expect(customUnInitBlock).toContain('!insertmacro StopAppProcesses');
+
+    expect(installerScript).not.toContain('Stop-Process -Name 知远');
+    expect(installerScript).not.toContain('Get-Process node');
+  });
+
   test('detaches expanded runtime caches before deleting them asynchronously', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const uninstallBlock = installerScript.slice(installerScript.indexOf('!macro customUnInstall'));
