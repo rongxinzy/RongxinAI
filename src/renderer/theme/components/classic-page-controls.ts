@@ -339,8 +339,9 @@ export function classicPageControls(dark: boolean) {
       hover: { 'background-color': 'transparent', color: 'var(--zy-foreground)' },
     }),
     'page-coding-workspace-sidebar-button-3': recipe({
-      base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
-      parentHover: { opacity: '0.3' },
+      base: { opacity: '0.4', 'transition-property': 'opacity', 'transition-duration': '150ms' },
+      parentHover: { opacity: '1' },
+      parentFocus: { opacity: '1' },
     }),
     'page-active-expert-badge-button-1': recipe({
       base: { height: '1rem', width: '1rem', 'border-radius': '9999px', padding: '0rem' },
