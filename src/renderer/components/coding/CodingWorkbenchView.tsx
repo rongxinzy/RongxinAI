@@ -22,7 +22,6 @@ import {
   FileDiff,
   Minimize2,
   PanelRight,
-  Settings2,
   Terminal as TerminalIcon,
   X,
 } from 'lucide-react';
@@ -32,6 +31,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type {
   CodingAgentAvailableCommand,
   CodingAgentConfigOption,
+  CodingAgentProfile,
   CodingPromptAttachment,
   CodingEventPage,
   CodingWorkspaceSummary,
@@ -65,6 +65,7 @@ import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
+import { useCodingAgentManager } from './useCodingAgentManager';
 import { CodingAuthTerminalDialog } from './CodingAuthTerminalDialog';
 import { CodingComposer } from './CodingComposer';
 import { CodingPermissionOverlay } from './CodingPermissionOverlay';
@@ -157,7 +158,8 @@ export const CodingWorkbenchView = ({
     output: string;
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
-  const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const [agentManagerOpen, setAgentManagerOpen] = useCodingAgentManager();
+  const [managerProfiles, setManagerProfiles] = useState<CodingAgentProfile[]>([]);
   const [sessionSetupWorkspace, setSessionSetupWorkspace] = useState<CodingWorkspaceSummary | null>(
     null,
   );
@@ -667,7 +669,12 @@ export const CodingWorkbenchView = ({
 
   const discoverAgents = async (): Promise<boolean> => {
     const result = await window.electron.codingAgent.discoverAgents({ workspaceRoot });
-    if (result.success && result.snapshot) {
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
+    }
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) {
       setSnapshot(result.snapshot);
       if (activeLane?.status === CodingLaneStatus.Running)
         void codingQueue.load(
@@ -675,72 +682,45 @@ export const CodingWorkbenchView = ({
             ? activeLane.id
             : activeLane.localSessionId,
         );
-      return true;
     }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
+    return true;
   };
   const probeAgent = async (profileId: string): Promise<boolean> => {
     const result = await window.electron.codingAgent.probeAgent({ workspaceRoot, profileId });
-    if (result.success && result.snapshot) {
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
+    }
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) {
       setSnapshot(result.snapshot);
       if (activeProfile?.driverKind === CodingAgentDriverKind.Acp && activeLane) {
         void codingQueue.load(activeLane.id);
       }
-      return true;
     }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
+    return true;
   };
   const addProfile = async (
     profile: import('../../../shared/codingAgent').AddCodingAgentProfileInput,
   ): Promise<boolean> => {
     const result = await window.electron.codingAgent.addProfile({ workspaceRoot, profile });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
     }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) setSnapshot(result.snapshot);
+    return true;
   };
   const trustProfile = async (profileId: string): Promise<boolean> => {
     const result = await window.electron.codingAgent.trustProfile({ workspaceRoot, profileId });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
     }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
-  };
-  const authenticateProfile = async (profileId: string, methodId: string): Promise<boolean> => {
-    const result = await window.electron.codingAgent.authenticateProfile({
-      workspaceRoot,
-      profileId,
-      methodId,
-    });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
-    }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
-  };
-  const startTerminalAuthentication = async (
-    profileId: string,
-    methodId: string,
-  ): Promise<boolean> => {
-    const result = await window.electron.codingAgent.startAuthTerminal({
-      workspaceRoot,
-      profileId,
-      methodId,
-    });
-    if (result.success && result.terminal) {
-      setAuthTerminal({ ...result.terminal, output: '' });
-      setAuthTerminalInput('');
-      return true;
-    }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) setSnapshot(result.snapshot);
+    return true;
   };
   const submitAuthTerminalInput = () => {
     if (!authTerminal) return;
@@ -948,30 +928,63 @@ export const CodingWorkbenchView = ({
     if (result.success) onLaneSelected(laneId);
   };
 
+  // Agent profiles are global configuration, so the manager loads them without
+  // depending on the workspace snapshot (there may be no workspace yet, or the
+  // room may still be loading or have failed to load).
+  const refreshManagerProfiles = useCallback(async () => {
+    const result = await window.electron.codingAgent.listProfiles();
+    if (result.success && result.profiles) setManagerProfiles(result.profiles);
+  }, []);
+  useEffect(() => {
+    if (!agentManagerOpen) return;
+    void refreshManagerProfiles();
+  }, [agentManagerOpen, refreshManagerProfiles]);
+  useEffect(() => {
+    if (snapshot) setManagerProfiles(snapshot.profiles);
+  }, [snapshot]);
+
+  const agentManagerElement = (
+    <CodingAgentManager
+      open={agentManagerOpen}
+      onOpenChange={setAgentManagerOpen}
+      profiles={managerProfiles.filter(profile => !profile.isBuiltin)}
+      onDiscover={discoverAgents}
+      onProbe={probeAgent}
+      onAddProfile={addProfile}
+      onTrust={trustProfile}
+    />
+  );
+
   if (!workspaceRoot)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {i18nService.t('codingAgentSelectWorkspace')}
-      </div>
+      <>
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          {i18nService.t('codingAgentSelectWorkspace')}
+        </div>
+        {agentManagerElement}
+      </>
     );
   if (!snapshot)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {bootstrapError ? (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <p>{bootstrapError}</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setBootstrapAttempt(attempt => attempt + 1)}
-            >
-              {i18nService.t('retry')}
-            </Button>
-          </div>
-        ) : (
-          <LogoLoadingState label={i18nService.t('codingAgentLoading')} />
-        )}
-      </div>
+      <>
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          {bootstrapError ? (
+            <div className="flex flex-col items-center gap-3 text-center">
+              <p>{bootstrapError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setBootstrapAttempt(attempt => attempt + 1)}
+              >
+                {i18nService.t('retry')}
+              </Button>
+            </div>
+          ) : (
+            <LogoLoadingState label={i18nService.t('codingAgentLoading')} />
+          )}
+        </div>
+        {agentManagerElement}
+      </>
     );
 
   return (
@@ -1025,17 +1038,7 @@ export const CodingWorkbenchView = ({
           onCancelAuthTerminal={id => void window.electron.codingAgent.cancelAuthTerminal(id)}
           onSubmitAuthTerminalInput={submitAuthTerminalInput}
         />
-        <CodingAgentManager
-          open={agentManagerOpen}
-          onOpenChange={setAgentManagerOpen}
-          profiles={snapshot.profiles.filter(profile => !profile.isBuiltin)}
-          onDiscover={discoverAgents}
-          onProbe={probeAgent}
-          onAddProfile={addProfile}
-          onTrust={trustProfile}
-          onAuthenticate={authenticateProfile}
-          onTerminalAuthenticate={startTerminalAuthentication}
-        />
+        {agentManagerElement}
         {recoveryLane && (
           <Dialog open>
             <DialogContent showCloseButton={false}>
@@ -1121,15 +1124,6 @@ export const CodingWorkbenchView = ({
             isStreaming={activeLane?.status === CodingLaneStatus.Running}
             headerActions={
               <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={i18nService.t('codingAgentManageAgents')}
-                  onClick={() => setAgentManagerOpen(true)}
-                >
-                  <Settings2 />
-                </Button>
                 <CodingGitQuickActions
                   target={{
                     workspaceRoot,

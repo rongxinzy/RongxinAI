@@ -57,14 +57,11 @@ export class AcpRequestError extends Error {
 export const ACP_CLIENT_CAPABILITIES = {
   fs: { readTextFile: true, writeTextFile: true },
   terminal: true,
-  auth: { terminal: true },
   session: { configOptions: { boolean: {} } },
 } satisfies ClientCapabilities;
 
-/** Probe only advertises terminal authentication, which the application can execute later. */
-export const ACP_PROBE_CLIENT_CAPABILITIES = {
-  auth: ACP_CLIENT_CAPABILITIES.auth,
-} satisfies ClientCapabilities;
+/** Connection checks do not offer login or terminal authentication. */
+export const ACP_PROBE_CLIENT_CAPABILITIES = {} satisfies ClientCapabilities;
 
 /** ACP method names are sourced from the official SDK rather than duplicated. */
 export const AcpMethod = {

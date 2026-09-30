@@ -72,7 +72,7 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
-import type { CodingRoomSnapshot } from '../../shared/codingAgent';
+import type { CodingAgentProfile, CodingRoomSnapshot } from '../../shared/codingAgent';
 import type { WeixinLoginErrorCode } from '../../shared/ipc/channels';
 
 interface CodingAgentActionResult {
@@ -80,6 +80,8 @@ interface CodingAgentActionResult {
   error?: string;
   conflict?: boolean;
   snapshot?: CodingRoomSnapshot;
+  /** Profiles for manager actions that run before a workspace is open. */
+  profiles?: CodingAgentProfile[];
 }
 
 interface CodingHandoffPreviewResult {
