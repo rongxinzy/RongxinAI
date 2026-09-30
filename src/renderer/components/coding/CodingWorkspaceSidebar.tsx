@@ -185,6 +185,7 @@ export const CodingWorkspaceSidebar = ({
       return false;
     }
     applyWorkspaces(result.workspaces);
+    const wasCreate = !editingWorkspace;
     const saved = editingWorkspace
       ? result.workspaces.find(workspace => workspace.id === editingWorkspace.id)
       : result.workspaces.find(workspace => workspace.primaryRoot === input.sourceFolders[0]);
@@ -196,6 +197,10 @@ export const CodingWorkspaceSidebar = ({
         laneId: saved.activeSessionId,
         draft: null,
       });
+      // 等 selection 落稳再开「新建 Session」，避免 selectionKey 变化立刻关掉对话框
+      if (wasCreate) {
+        window.setTimeout(() => openSessionSetup(saved), 0);
+      }
     }
     setEditingWorkspace(null);
     return true;
