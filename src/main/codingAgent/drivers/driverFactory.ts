@@ -3,6 +3,7 @@ import { CodingAgentDriverKind, CodingErrorMessage } from '../../../shared/codin
 import { AcpCodingDriver } from './acpCodingDriver';
 import { BuiltinCodingDriver } from './builtinCodingDriver';
 import type { CodingAgentDriver } from './codingAgentDriver';
+import { getCodingAgentEnvironment } from '../agentEnvironment';
 
 export class CodingDriverFactory {
   constructor(
@@ -17,7 +18,7 @@ export class CodingDriverFactory {
     return new AcpCodingDriver({
       executable: profile.command,
       args: profile.args,
-      environment: { ...this.environment, ...profile.environment },
+      environment: { ...getCodingAgentEnvironment(), ...this.environment, ...profile.environment },
     });
   }
 }

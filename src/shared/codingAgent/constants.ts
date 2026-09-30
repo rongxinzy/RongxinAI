@@ -18,6 +18,27 @@ export const CodingAgentProfileStatus = {
 export type CodingAgentProfileStatus =
   (typeof CodingAgentProfileStatus)[keyof typeof CodingAgentProfileStatus];
 
+export const CodingAgentCheckPhase = {
+  Starting: 'starting',
+  Handshake: 'handshake',
+  ModelReply: 'model_reply',
+  Complete: 'complete',
+  Failed: 'failed',
+} as const;
+export type CodingAgentCheckPhase =
+  (typeof CodingAgentCheckPhase)[keyof typeof CodingAgentCheckPhase];
+
+export const CodingAgentCheckFailure = {
+  Authentication: 'authentication',
+  Startup: 'startup',
+  Protocol: 'protocol',
+  Timeout: 'timeout',
+  NoReply: 'no_reply',
+  Connection: 'connection',
+} as const;
+export type CodingAgentCheckFailure =
+  (typeof CodingAgentCheckFailure)[keyof typeof CodingAgentCheckFailure];
+
 export const CodingAgentProfileId = {
   Builtin: 'builtin-zhiyuan-coding',
 } as const;

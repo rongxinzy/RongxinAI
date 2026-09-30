@@ -11,6 +11,7 @@ export interface AuthTerminalStartedEvent {
   id: string;
   profileId: string;
   methodId: string;
+  workspaceRoot: string;
 }
 
 export interface AuthTerminalExitedEvent extends AuthTerminalStartedEvent {
@@ -40,7 +41,12 @@ export class AuthTerminalService extends EventEmitter {
     authEnvironment?: Record<string, string>;
   }): AuthTerminalStartedEvent {
     const id = randomUUID();
-    const started = { id, profileId: input.profileId, methodId: input.methodId };
+    const started = {
+      id,
+      profileId: input.profileId,
+      methodId: input.methodId,
+      workspaceRoot: input.cwd,
+    };
     const environment = Object.fromEntries(
       Object.entries({ ...input.environment, ...input.authEnvironment }).filter(
         (entry): entry is [string, string] => typeof entry[1] === 'string',

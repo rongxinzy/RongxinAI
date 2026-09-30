@@ -2,6 +2,7 @@ import { CodingAgentProfileStatus, type CodingWorkspaceSummary } from '../../../
 
 export const CodingUiEvent = {
   CreateSession: 'coding:create-session',
+  ManageAgents: 'coding:manage-agents',
 } as const;
 
 export interface CodingCreateSessionEventDetail {

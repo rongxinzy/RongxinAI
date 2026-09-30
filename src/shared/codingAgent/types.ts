@@ -1,6 +1,8 @@
 import type {
   CodingAgentDriverKind,
   CodingAgentProfileStatus,
+  CodingAgentCheckPhase,
+  CodingAgentCheckFailure,
   CodingAssignmentStatus,
   CodingEventKind,
   CodingElicitationStatus,
@@ -91,6 +93,12 @@ export interface CodingAgentProfile {
   args: string[];
   environment: Record<string, string>;
   isBuiltin: boolean;
+  /** Session-only diagnostics; never contains credentials or raw agent stderr. */
+  connectionCheck?: {
+    phase: CodingAgentCheckPhase;
+    failure?: CodingAgentCheckFailure;
+    checkedAt?: number;
+  };
 }
 
 export interface CodingRoom {

@@ -460,7 +460,8 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return runCodingHandler(CodingAgentIpc.DiscoverAgents, async () => {
         return {
           success: true,
-          snapshot: await service.discoverAgents(input.workspaceRoot),
+          snapshot: (await service.discoverAgents(input.workspaceRoot)) ?? undefined,
+          profiles: service.listProfiles(),
         };
       });
     },
@@ -471,7 +472,8 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return runCodingHandler(CodingAgentIpc.ProbeAgent, async () => {
         return {
           success: true,
-          snapshot: await service.probeAgent(input.workspaceRoot, input.profileId),
+          snapshot: (await service.probeAgent(input.workspaceRoot, input.profileId)) ?? undefined,
+          profiles: service.listProfiles(),
         };
       });
     },
@@ -480,7 +482,11 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
     CodingAgentIpc.AddProfile,
     (_event, input: { workspaceRoot: string; profile: AddCodingAgentProfileInput }) => {
       return runCodingHandler(CodingAgentIpc.AddProfile, () => {
-        return { success: true, snapshot: service.addProfile(input.workspaceRoot, input.profile) };
+        return {
+          success: true,
+          snapshot: service.addProfile(input.workspaceRoot, input.profile) ?? undefined,
+          profiles: service.listProfiles(),
+        };
       });
     },
   );
@@ -490,7 +496,8 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return runCodingHandler(CodingAgentIpc.TrustProfile, () => {
         return {
           success: true,
-          snapshot: service.trustProfile(input.workspaceRoot, input.profileId),
+          snapshot: service.trustProfile(input.workspaceRoot, input.profileId) ?? undefined,
+          profiles: service.listProfiles(),
         };
       });
     },

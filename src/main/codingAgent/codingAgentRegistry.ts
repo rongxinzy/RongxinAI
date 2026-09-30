@@ -7,6 +7,7 @@ import {
   CodingAgentEnvironmentKey,
   CodingAgentProfileId,
   CodingAgentProfileStatus,
+  CodingAgentCheckPhase,
   CodingErrorMessage,
   type CodingAgentCapabilities,
   type CodingAgentProfile,
@@ -16,6 +17,8 @@ import { BUNDLED_ACP_ADAPTERS, bundledAdapterDefinition } from './acp/bundledAda
 import { AcpProbeFailureError, AcpProbeService } from './acp/probeService';
 import { AcpProtocolIncompatibleError } from './acp/protocol';
 import type { CodingAgentProfileRepository } from './codingAgentProfileRepository';
+import { classifyProbeFailure } from './acp/probeFailure';
+import { getCodingAgentEnvironment } from './agentEnvironment';
 
 const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
   supportsLoadSession: false,
@@ -31,6 +34,7 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
 
 export class CodingAgentRegistry extends EventEmitter {
   private readonly profiles = new Map<string, CodingAgentProfile>();
+  private readonly probing = new Set<string>();
 
   constructor(
     private readonly repository?: CodingAgentProfileRepository,
@@ -165,39 +169,52 @@ export class CodingAgentRegistry extends EventEmitter {
       !profile ||
       profile.isBuiltin ||
       !profile.command ||
+      this.probing.has(profileId) ||
       // NeedsAuth is probeable too: a successful probe means the agent is
       // reachable again, and if it still needs login the next session
       // creation will mark it NeedsAuth once more.
       (profile.status !== CodingAgentProfileStatus.Detected &&
         profile.status !== CodingAgentProfileStatus.Unavailable &&
-        profile.status !== CodingAgentProfileStatus.NeedsAuth)
+        profile.status !== CodingAgentProfileStatus.NeedsAuth &&
+        profile.status !== CodingAgentProfileStatus.Ready &&
+        profile.status !== CodingAgentProfileStatus.Incompatible)
     ) {
       throw new Error(CodingErrorMessage.ProfileNotProbeable);
     }
+    this.probing.add(profileId);
     try {
       const result = await new AcpProbeService().probe({
         executable: profile.command,
         args: profile.args,
         cwd,
-        environment: { ...this.allowedEnvironment(), ...profile.environment },
+        environment: { ...getCodingAgentEnvironment(), ...profile.environment },
+        onPhase: phase => {
+          this.profiles.set(profileId, { ...profile, connectionCheck: { phase } });
+          this.emit('changed');
+        },
       });
       const updated = {
         ...profile,
         capabilities: result.capabilities,
         authMethods: result.authMethods,
         status: CodingAgentProfileStatus.Ready,
+        connectionCheck: { phase: CodingAgentCheckPhase.Complete, checkedAt: Date.now() },
       };
       this.profiles.set(updated.id, updated);
       this.repository?.save(updated);
       this.emit('changed');
       return updated;
     } catch (error) {
-      // The connection check renders a verdict for the configure-time flow: an
-      // agent that answers nothing but offers a sign-in method is "needs
-      // sign-in", everything else stays "unavailable".
+      // Only an explicit authentication failure means sign-in is required.
+      // Advertising login methods does not prove why a model returned no answer.
       const needsAuth = error instanceof AcpProbeFailureError && error.needsAuth;
       const updated = {
         ...profile,
+        connectionCheck: {
+          phase: CodingAgentCheckPhase.Failed,
+          failure: classifyProbeFailure(error),
+          checkedAt: Date.now(),
+        },
         ...(error instanceof AcpProbeFailureError ? { authMethods: error.authMethods } : {}),
         status:
           error instanceof AcpProtocolIncompatibleError
@@ -210,6 +227,8 @@ export class CodingAgentRegistry extends EventEmitter {
       this.repository?.save(updated);
       this.emit('changed');
       throw error;
+    } finally {
+      this.probing.delete(profileId);
     }
   }
 
@@ -237,6 +256,7 @@ export class CodingAgentRegistry extends EventEmitter {
         authMethods: launchUnchanged ? existing.authMethods : profile.authMethods,
         id: existing.id,
         isBuiltin: false,
+        connectionCheck: launchUnchanged ? existing.connectionCheck : undefined,
       });
       this.removeUnreferencedDuplicates(matchingProfiles, existing.id);
     }
@@ -247,6 +267,7 @@ export class CodingAgentRegistry extends EventEmitter {
         ...existing,
         description: `${adapter.profileName} is not currently installed on this device.`,
         status: CodingAgentProfileStatus.Unavailable,
+        connectionCheck: undefined,
         command: null,
         args: [],
         environment: {
@@ -344,10 +365,5 @@ export class CodingAgentRegistry extends EventEmitter {
     this.profiles.set(profile.id, profile);
     this.repository?.save(profile);
     this.emit('changed');
-  }
-
-  private allowedEnvironment(): Record<string, string | undefined> {
-    const keys = ['PATH', 'HOME', 'USER', 'SHELL', 'TMPDIR', 'TEMP', 'TMP', 'LANG', 'LC_ALL'];
-    return Object.fromEntries(keys.map(key => [key, process.env[key]]));
   }
 }

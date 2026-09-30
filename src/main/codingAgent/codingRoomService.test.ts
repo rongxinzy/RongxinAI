@@ -1819,3 +1819,38 @@ test('probeAgent revives a needs_auth profile when the agent responds', async ()
   );
   await service.dispose();
 });
+
+test('manages agent profiles without an open workspace', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  // The sidebar entry reaches the manager before any workspace is open, so
+  // profile actions must work without one — and must not invent a room for an
+  // empty root.
+  expect(
+    service.addProfile('', {
+      name: 'Local Agent',
+      description: '',
+      command: execPath,
+      args: [],
+    }),
+  ).toBeNull();
+  expect(repository.listRooms()).toEqual([]);
+
+  const profile = service.listProfiles().find(candidate => candidate.name === 'Local Agent');
+  expect(profile).toBeDefined();
+
+  expect(service.trustProfile('', profile!.id)).toBeNull();
+  expect(service.listProfiles().find(candidate => candidate.id === profile!.id)?.status).toBe(
+    CodingAgentProfileStatus.Detected,
+  );
+  await service.dispose();
+});
