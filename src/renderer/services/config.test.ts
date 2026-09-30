@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { ManagedProviderAccessMode } from '@shared/managedProviders';
 import { ProviderName } from '@shared/providers';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
@@ -89,5 +90,49 @@ describe('ConfigService', () => {
     await Promise.all([update, reload]);
 
     expect(service.getConfig().theme).toBe('dark');
+  });
+
+  describe('exclusive managed provider policy', () => {
+    const stubExclusiveManagedPolicy = () => {
+      vi.stubGlobal('window', {
+        dispatchEvent: vi.fn(),
+        electron: {
+          managedProviders: {
+            policy: vi.fn(async () => ({
+              mode: ManagedProviderAccessMode.Exclusive,
+              providerKeys: ['custom_enterprise'],
+            })),
+          },
+        },
+      });
+    };
+
+    test('disables the seeded free model and persists the suppression', async () => {
+      stubExclusiveManagedPolicy();
+      const service = new ConfigService();
+      await service.reload();
+
+      expect(service.getConfig().providers![ProviderName.Zhiyuan].enabled).toBe(false);
+      expect(storedConfig.providers![ProviderName.Zhiyuan].enabled).toBe(false);
+
+      const providers = structuredClone(service.getConfig().providers!);
+      providers[ProviderName.Zhiyuan].enabled = true;
+      await service.updateConfig({ providers });
+      expect(storedConfig.providers![ProviderName.Zhiyuan].enabled).toBe(false);
+    });
+
+    test('neither seeds nor repairs the free model while exclusive', async () => {
+      storedConfig.providers![ProviderName.Zhiyuan].enabled = false;
+      storedConfig.providers![ProviderName.Zhiyuan].models = [];
+      stubExclusiveManagedPolicy();
+      const service = new ConfigService();
+      vi.mocked(localStore.setItem).mockClear();
+
+      await service.reload();
+
+      expect(service.getConfig().providers![ProviderName.Zhiyuan].enabled).toBe(false);
+      expect(service.getConfig().providers![ProviderName.Zhiyuan].models).toEqual([]);
+      expect(localStore.setItem).not.toHaveBeenCalled();
+    });
   });
 });

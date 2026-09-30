@@ -16,6 +16,25 @@ describe('error normalization', () => {
     expect(normalizeError('Widget could not be loaded')).toBe('操作失败：Widget could not be loaded');
   });
 
+  test('leaves the app copy it already produced untouched', () => {
+    // Toasts dispatch through this function a second time; wrapping our own
+    // sentence again would read as "操作失败：加载待发送消息失败。".
+    const queueCopy = i18nService.t('codingErrorQueueLoadFailed');
+    expect(normalizeError(queueCopy)).toBe(queueCopy);
+    expect(normalizeError(i18nService.t('coworkErrorStreamInterrupted'))).toBe(
+      i18nService.t('coworkErrorStreamInterrupted'),
+    );
+  });
+
+  test('leaves the caller fallback copy untouched too', () => {
+    // appErrorText returns this copy when there is no error to translate; the
+    // isError toast path must not prefix it a second time.
+    for (const key of ['codingAgentActionFailed', 'codingGitActionFailed', 'operationFailed']) {
+      const copy = i18nService.t(key);
+      expect(normalizeError(copy)).toBe(copy);
+    }
+  });
+
   test('classifies Chinese failures and sanitizes sensitive values', () => {
     expect(normalizeError('保存失败')).not.toContain('Operation failed');
     const result = normalizeError('文件读取失败：https://example.com/a C:\\Users\\me\\secret.json');

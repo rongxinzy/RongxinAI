@@ -1,5 +1,7 @@
 import type { PiUiRuntimeSnapshot } from '../../shared/cowork/piUiRuntimeSnapshot';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
+import type { CoworkError } from '../../common/coworkError';
+import type { RuntimeRetryNotice } from '../../common/runtimeNotice';
 import type { ActivityRun } from '../../shared/activity/types';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
@@ -70,7 +72,7 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
-import type { CodingRoomSnapshot } from '../../shared/codingAgent';
+import type { CodingAgentProfile, CodingRoomSnapshot } from '../../shared/codingAgent';
 import type { WeixinLoginErrorCode } from '../../shared/ipc/channels';
 
 interface CodingAgentActionResult {
@@ -78,6 +80,8 @@ interface CodingAgentActionResult {
   error?: string;
   conflict?: boolean;
   snapshot?: CodingRoomSnapshot;
+  /** Profiles for manager actions that run before a workspace is open. */
+  profiles?: CodingAgentProfile[];
 }
 
 interface CodingHandoffPreviewResult {
@@ -834,7 +838,7 @@ interface IElectronAPI {
     renameSession: (options: {
       sessionId: string;
       title: string;
-    }) => Promise<{ success: boolean; error?: string }>;
+    }) => Promise<{ success: boolean; title?: string; error?: string }>;
     updateSessionModel: (options: {
       sessionId: string;
       modelOverride: string;
@@ -1223,6 +1227,7 @@ interface IElectronAPI {
     readFileAsDataUrl: (
       filePath: string,
     ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+    checkArtifactFile: (filePath: string) => Promise<{ success: boolean }>;
     generateThumbnail: (
       filePath: string,
     ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
@@ -1261,6 +1266,7 @@ interface IElectronAPI {
   appInfo: {
     getVersion: () => Promise<string>;
     isDev: () => Promise<boolean>;
+    isEnterprise: () => Promise<boolean>;
     getSystemLocale: () => Promise<string>;
     consumePendingLocalInferenceInstall: () => Promise<string | null>;
     relaunch: () => Promise<void>;
@@ -1277,6 +1283,9 @@ interface IElectronAPI {
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
     onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) => () => void;
+  };
+  runtimeNotices: {
+    onNotice: (callback: (notice: RuntimeRetryNotice) => void) => () => void;
   };
   log: {
     getPath: () => Promise<string>;

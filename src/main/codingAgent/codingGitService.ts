@@ -3,6 +3,7 @@ import { lstat, readFile, stat } from 'fs/promises';
 import path from 'path';
 
 import {
+  CodingErrorMessage,
   CodingGitDiffScope,
   CodingGitFileStatus,
   type CodingGitDiffInput,
@@ -281,11 +282,11 @@ const mergeNumStats = (target: Map<string, GitNumStat>, source: Map<string, GitN
 
 const requireRelativePaths = (paths: string[]): string[] => {
   const values = [...new Set(paths.map(value => value.trim()).filter(Boolean))];
-  if (!values.length) throw new Error('Select at least one Git path.');
-  if (values.length > MAX_PATHS_PER_ACTION) throw new Error('Too many Git paths were selected.');
+  if (!values.length) throw new Error(CodingErrorMessage.GitPathRequired);
+  if (values.length > MAX_PATHS_PER_ACTION) throw new Error(CodingErrorMessage.GitPathTooMany);
   for (const value of values) {
     if (value === '.' || path.isAbsolute(value) || value.split(/[\\/]/).includes('..')) {
-      throw new Error('Git paths must stay inside the selected repository.');
+      throw new Error(CodingErrorMessage.GitPathOutsideRepository);
     }
   }
   return values;
@@ -332,7 +333,7 @@ export class CodingGitService {
   ): Promise<string> {
     const title = input.title.trim();
     const base = input.base.trim();
-    if (!title || !base) throw new Error('A pull request title and base branch are required.');
+    if (!title || !base) throw new Error(CodingErrorMessage.GitPullRequestFieldsRequired);
     const args = ['pr', 'create', '--base', base, '--title', title];
     if (input.body.trim()) {
       args.push('--body', input.body);
@@ -347,7 +348,7 @@ export class CodingGitService {
       { env: { GH_PROMPT_DISABLED: '1' }, maxOutputBytes: MAX_GIT_OUTPUT_BYTES },
     );
     const url = result.stdout.trim().split(/\s+/).find(value => value.startsWith('https://'));
-    if (!url) throw new Error('GitHub did not return a pull request URL.');
+    if (!url) throw new Error(CodingErrorMessage.GitPullRequestUrlMissing);
     return url;
   }
 
@@ -513,8 +514,8 @@ export class CodingGitService {
 
   async commit(targetRoot: string, message: string, paths: string[]): Promise<void> {
     const value = message.trim();
-    if (!value) throw new Error('A Git commit message is required.');
-    if (value.length > 10_000) throw new Error('The Git commit message is too long.');
+    if (!value) throw new Error(CodingErrorMessage.GitCommitMessageRequired);
+    if (value.length > 10_000) throw new Error(CodingErrorMessage.GitCommitMessageTooLong);
     if (paths.length > 0) {
       await this.stage(targetRoot, paths);
       const stagedPaths = await runGit(targetRoot, ['diff', '--cached', '--name-only']);
@@ -563,14 +564,14 @@ export class CodingGitService {
 
   async switchBranch(targetRoot: string, branch: string): Promise<void> {
     const value = branch.trim();
-    if (!value || value.startsWith('-')) throw new Error('Invalid Git branch.');
+    if (!value || value.startsWith('-')) throw new Error(CodingErrorMessage.GitBranchInvalid);
     await runGit(targetRoot, ['check-ref-format', '--branch', value]);
     await runGit(targetRoot, ['switch', '--', value]);
   }
 
   async createBranch(targetRoot: string, branch: string): Promise<void> {
     const value = branch.trim();
-    if (!value || value.startsWith('-')) throw new Error('Invalid Git branch.');
+    if (!value || value.startsWith('-')) throw new Error(CodingErrorMessage.GitBranchInvalid);
     await runGit(targetRoot, ['check-ref-format', '--branch', value]);
     await runGit(targetRoot, ['switch', '--create', value]);
   }

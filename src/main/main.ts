@@ -27,6 +27,8 @@ import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
 import { reportPiSessionFailure } from './piSessionFailure';
 import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
+import { registerArtifactFileAvailabilityHandler } from './artifactFileAvailability';
+import { observePreparedRun } from './workbenchTask/preparedRunFailure';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
@@ -58,7 +60,8 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
   CoworkSessionMode,
-  type CoworkSessionSource,
+  CoworkSessionSource,
+  normalizeRenamedSessionTitle,
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
@@ -79,12 +82,14 @@ import {
   McpIpc,
   ManagedProviderIpc,
   ProjectIpc,
+  RuntimeNoticeIpc,
   ShellIpc,
   SkillsIpc,
   WeixinLoginErrorCode,
   WeixinInstallIpc,
   WindowIpc,
 } from '../shared/ipc/channels';
+import type { RuntimeRetryNotice } from '../common/runtimeNotice';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
 import { EnterpriseRendererIpc } from '../shared/enterpriseRenderer';
 import {
@@ -136,6 +141,7 @@ import {
   APP_USER_MODEL_ID,
   DB_FILENAME,
   ENTERPRISE_APP_NAME,
+  resolveAppDataDirName,
 } from './appConstants';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
@@ -244,11 +250,13 @@ import {
   probeCoworkModelReadiness,
 } from './libs/coworkUtil';
 import { createContentSecurityPolicy } from './contentSecurityPolicy';
+import { registerZhiyuanDeepLinkProtocol } from './deepLinkRegistration';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import {
   disposeZhiyuanEnterpriseExtension,
   initializeZhiyuanEnterpriseExtension,
+  isEnterpriseBuild,
 } from './enterpriseExtension/host';
 import {
   ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
@@ -324,7 +332,7 @@ import {
   restoreOriginalProxyEnv,
   setSystemProxyEnabled,
 } from './libs/systemProxy';
-import { getLogFilePath, getRecentMainLogEntries, initLogger } from './logger';
+import { getLogFilePath, getRecentMainLogEntries, initLogger, log } from './logger';
 import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { parseCcConnectScopedConversationId } from './im/ccConnectConversationId';
@@ -341,6 +349,7 @@ import { resolveBundledPresetExpertSnapshot } from './presetExpertSnapshot';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { startSqliteDiagnostics } from './sqliteDiagnostics';
+import { createUncaughtReporter, installStdioErrorGuards } from './stdioErrorGuard';
 import { StartupProfiler } from './startupProfiler';
 import { createTray, destroyTray, updateTrayMenu } from './trayManager';
 import { registerContextMenu } from './contextMenu';
@@ -352,13 +361,16 @@ import {
   type WindowRectangle,
 } from './windowState';
 
-// The enterprise packaging overlay injects this directory into resources. The
-// public build has no such directory and keeps the regular Zhiyuan name.
-const runtimeAppName =
-  typeof process.resourcesPath === 'string' &&
-  fs.existsSync(path.join(process.resourcesPath, 'zhiyuan-enterprise'))
-    ? ENTERPRISE_APP_NAME
-    : APP_NAME;
+// The enterprise packaging overlay injects the extension module into resources;
+// the public build has no such module and keeps the regular Zhiyuan name. The
+// same detection also selects the enterprise application data root, so product
+// naming and storage isolation can never disagree.
+const isEnterprise = isEnterpriseBuild({
+  isPackaged: app.isPackaged,
+  resourcesPath: process.resourcesPath,
+  developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
+});
+const runtimeAppName = isEnterprise ? ENTERPRISE_APP_NAME : APP_NAME;
 
 // 设置应用程序名称
 app.name = runtimeAppName;
@@ -814,7 +826,7 @@ const configureUserDataPath = (): void => {
   }
 
   const appDataPath = app.getPath('appData');
-  const targetUserDataPath = path.join(appDataPath, APP_DATA_DIR_NAME);
+  const targetUserDataPath = path.join(appDataPath, resolveAppDataDirName(isEnterprise));
   const currentUserDataPath = app.getPath('userData');
 
   if (currentUserDataPath !== targetUserDataPath) {
@@ -1039,14 +1051,27 @@ app.on('child-process-gone', (_event, details) => {
   }
 });
 
-// 处理未捕获的异常
-process.on('uncaughtException', error => {
-  console.error('Uncaught Exception:', error);
+// 终端或父进程先于应用消失时 stdout/stderr 管道会断开，之后的写入以 EPIPE 异步抛错。
+// 先吞掉这类断管道错误，否则它会被升级成未捕获异常，而兜底处理器又通过
+// console.error 写同一个断掉的管道，形成死循环并让进程永远不退。
+installStdioErrorGuards([process.stdout, process.stderr], error => {
+  log.error('[Main] stdio write failed:', error);
 });
 
-process.on('unhandledRejection', error => {
-  console.error('Unhandled Rejection:', error);
-});
+// 处理未捕获的异常
+process.on(
+  'uncaughtException',
+  createUncaughtReporter(error => {
+    console.error('Uncaught Exception:', error);
+  }),
+);
+
+process.on(
+  'unhandledRejection',
+  createUncaughtReporter(error => {
+    console.error('Unhandled Rejection:', error);
+  }),
+);
 
 process.on('exit', code => {
   console.log(`[Main] Process exiting with code: ${code}`);
@@ -1448,6 +1473,15 @@ const getCodingRoomService = (): CodingRoomService => {
     });
     runtime.on('error', (sessionId: string, error: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
+    });
+    runtime.on('retryNotice', (sessionId: string, notice: Omit<RuntimeRetryNotice, 'sessionId'>) => {
+      // Transient status: the shared prompt tells the user the model answered
+      // with an error while Pi keeps retrying, instead of leaving the turn
+      // looking frozen until the retry cycle settles.
+      const payload: RuntimeRetryNotice = { sessionId, ...notice };
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(RuntimeNoticeIpc.Notice, payload);
+      }
     });
     runtime.on('sessionInterrupted', interruption => {
       if (interruption.cause !== CoworkInterruptionCause.UserStop) {
@@ -1981,7 +2015,9 @@ const getOllamaManager = (): OllamaManager => {
 
 const getAppUpdateCoordinator = (): AppUpdateCoordinator => {
   if (!appUpdateCoordinator) {
-    appUpdateCoordinator = new AppUpdateCoordinator(getStore());
+    appUpdateCoordinator = new AppUpdateCoordinator(getStore(), undefined, undefined, {
+      enterpriseBuild: isEnterprise,
+    });
   }
   return appUpdateCoordinator;
 };
@@ -1998,7 +2034,9 @@ const checkForAppUpdate = (): void => {
 };
 
 const startAppUpdatePolling = (): void => {
-  if (appUpdatePollTimer) return;
+  // Enterprise builds receive updates through the enterprise distribution
+  // channel; the client never runs startup or periodic update checks.
+  if (isEnterprise || appUpdatePollTimer) return;
   const startupDelay =
     APP_UPDATE_STARTUP_DELAY_MIN_MS +
     Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
@@ -3147,13 +3185,14 @@ if (!gotTheLock) {
     app.exit(0);
   })();
 } else {
-  // In development Electron needs the app entry point before the callback URL;
-  // otherwise Windows treats the URL itself as the application to launch.
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient('zhiyuan', process.execPath, [path.resolve(process.argv[1])]);
-  } else {
-    app.setAsDefaultProtocolClient('zhiyuan');
-  }
+  // The enterprise build signs in inside the app and never claims zhiyuan://;
+  // the community build owns it for its browser OAuth callback.
+  registerZhiyuanDeepLinkProtocol(app, {
+    isEnterpriseBuild: isEnterprise,
+    isDefaultApp: process.defaultApp === true,
+    entryPoint: process.argv[1],
+    execPath: process.execPath,
+  });
 
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
 
@@ -3461,6 +3500,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(AppIpc.GetVersion, () => app.getVersion());
   ipcMain.handle(AppIpc.IsDev, () => canUseDevTools()); // 开发环境打开调试面板
+  ipcMain.handle(AppIpc.IsEnterprise, () => isEnterprise);
   ipcMain.handle(AppIpc.GetSystemLocale, () => app.getLocale());
   ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
     consumePendingLocalInferenceInstall(app.getPath('userData')),
@@ -4985,17 +5025,25 @@ if (!gotTheLock) {
     'cowork:session:rename',
     async (_event, options: { sessionId: string; title: string }) => {
       try {
-        const title = options.title.trim();
+        const coworkStoreInstance = getCoworkStore();
+        // Scheduled rows are identified by their `source`; the stored title keeps
+        // the canonical prefix so it cannot drift from migrated/renamed rows.
+        const existing = coworkStoreInstance.getSession(options.sessionId, 0);
+        const title = normalizeRenamedSessionTitle(
+          options.title,
+          existing?.source === CoworkSessionSource.Scheduled,
+        ).trim();
         if (!title) {
           return { success: false, error: 'Title is required' };
         }
-        const coworkStoreInstance = getCoworkStore();
         coworkStoreInstance.updateSession(
           options.sessionId,
           { title },
           { userInitiatedTitleChange: true },
         );
-        return { success: true };
+        // Report the stored (normalized) title: the renderer echoes this value
+        // into redux, and a scheduled rename adds the canonical prefix.
+        return { success: true, title };
       } catch (error) {
         return {
           success: false,
@@ -6704,6 +6752,7 @@ if (!gotTheLock) {
     '.ico': 'image/x-icon',
     '.avif': 'image/avif',
   };
+  registerArtifactFileAvailabilityHandler();
   ipcMain.handle(
     'dialog:readFileAsDataUrl',
     async (
@@ -7714,31 +7763,33 @@ if (!gotTheLock) {
         const prompt =
           amendment || 'Continue the current task from its persisted state and verify the result.';
         // 2026/09/17 lixiang  resume 不等待整段跑完（对齐 Continue IPC），否则底部无法切到停止
-        void getPiRuntimeAdapter()
-          .continueSession(session.id, prompt, {
-            systemPrompt: session.systemPrompt,
-            skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
-            sessionMode: session.mode,
-            workspaceRoot: session.cwd,
-            agentId: session.agentId,
-            expertIds:
-              resumeInput?.expertIds === undefined
-                ? session.experts.slice(0, 1).map(expert => expert.expertId)
-                : normalizeSingleExpertIds(resumeInput.expertIds),
-            modelOverride: session.modelOverride,
-            approvalMode:
-              config.permissionMode === CoworkPermissionMode.AllowAll
-                ? WorkbenchApprovalMode.AllowAll
-                : WorkbenchApprovalMode.Ask,
-            goalMode: resumeInput?.goalMode,
-            imageAttachments: resumeInput?.imageAttachments,
-            fileAttachments: resumeInput?.fileAttachments,
-            _workbenchRunId: run.id,
-            _skipUserMessage: !amendment,
-          })
-          .catch(error => {
-            console.error('[WorkbenchTask] resume continue error:', error);
-          });
+        observePreparedRun(
+          () =>
+            getPiRuntimeAdapter().continueSession(session.id, prompt, {
+              systemPrompt: session.systemPrompt,
+              skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
+              sessionMode: session.mode,
+              workspaceRoot: session.cwd,
+              agentId: session.agentId,
+              expertIds:
+                resumeInput?.expertIds === undefined
+                  ? session.experts.slice(0, 1).map(expert => expert.expertId)
+                  : normalizeSingleExpertIds(resumeInput.expertIds),
+              modelOverride: session.modelOverride,
+              approvalMode:
+                config.permissionMode === CoworkPermissionMode.AllowAll
+                  ? WorkbenchApprovalMode.AllowAll
+                  : WorkbenchApprovalMode.Ask,
+              goalMode: resumeInput?.goalMode,
+              imageAttachments: resumeInput?.imageAttachments,
+              fileAttachments: resumeInput?.fileAttachments,
+              _workbenchRunId: run.id,
+              _skipUserMessage: !amendment,
+            }),
+          task,
+          run,
+          { service: getWorkbenchTaskService(), runtime: getPiRuntimeAdapter() },
+        );
       },
     });
     todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());

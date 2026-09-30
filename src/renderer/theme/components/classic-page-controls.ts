@@ -222,7 +222,7 @@ export function classicPageControls(dark: boolean) {
     'page-expand-agent-tasks-row-button-1': recipe({
       base: {
         height: '1.75rem',
-        width: 'calc(100%+12px)',
+        width: 'calc(100% + 12px)',
         'border-radius': 'var(--zy-style-radius-md)',
         'padding-left': '38px',
         'padding-right': '0.625rem',
@@ -258,7 +258,7 @@ export function classicPageControls(dark: boolean) {
     'page-workspace-tree-node-button-2': recipe({
       base: {
         height: '1.75rem',
-        width: 'calc(100%+12px)',
+        width: 'calc(100% + 12px)',
         'border-radius': 'var(--zy-style-radius-md)',
         'padding-left': '38px',
         'padding-right': '0.625rem',
@@ -328,7 +328,7 @@ export function classicPageControls(dark: boolean) {
     'page-coding-workspace-sidebar-button-2': recipe({
       base: {
         height: '2rem',
-        width: 'calc(100%+12px)',
+        width: 'calc(100% + 12px)',
         'border-radius': 'var(--zy-style-radius-md)',
         'padding-left': '38px',
         'padding-right': '0.625rem',
@@ -339,8 +339,9 @@ export function classicPageControls(dark: boolean) {
       hover: { 'background-color': 'transparent', color: 'var(--zy-foreground)' },
     }),
     'page-coding-workspace-sidebar-button-3': recipe({
-      base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
-      parentHover: { opacity: '0.3' },
+      base: { opacity: '0.4', 'transition-property': 'opacity', 'transition-duration': '150ms' },
+      parentHover: { opacity: '1' },
+      parentFocus: { opacity: '1' },
     }),
     'page-active-expert-badge-button-1': recipe({
       base: { height: '1rem', width: '1rem', 'border-radius': '9999px', padding: '0rem' },

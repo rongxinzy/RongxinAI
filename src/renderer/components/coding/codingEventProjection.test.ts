@@ -51,6 +51,7 @@ describe('projectCodingEvents', () => {
     expect(turns[0].reasoning?.content).toBe('先检查认证流程。');
     expect(turns[0].assistantMessages).toHaveLength(1);
     expect(turns[0].assistantMessages[0].content).toBe('已经修复。');
+    expect(turns[0].assistantMessages[0].isFinalAnswer).toBe(true);
     expect(turns[0].status).toBe(CodingConversationTurnStatus.Complete);
     expect(turns[0].startedAt).toBe(1);
     expect(turns[0].completedAt).toBe(5);

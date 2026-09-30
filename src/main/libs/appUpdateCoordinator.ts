@@ -100,6 +100,18 @@ type ElectronUpdaterAdapter = Pick<
   | 'quitAndInstall'
 >;
 
+export interface AppUpdateCoordinatorOptions {
+  /**
+   * Enterprise builds receive updates through the enterprise distribution
+   * channel, so the client never configures a feed, checks for, downloads, or
+   * installs online updates.
+   */
+  readonly enterpriseBuild?: boolean;
+}
+
+const ENTERPRISE_BUILD_UPDATE_DISABLED_MESSAGE =
+  'This enterprise build does not provide online updates';
+
 const initialState = (): AppUpdateRuntimeState => ({
   status: AppUpdateStatus.Idle,
   source: null,
@@ -131,6 +143,7 @@ export class AppUpdateCoordinator {
   private readonly store: SqliteStore;
   private readonly updater: ElectronUpdaterAdapter;
   private readonly openExternal: (url: string) => Promise<unknown>;
+  private readonly enterpriseBuild: boolean;
   private checkPromise: Promise<AppUpdateCheckResult> | null = null;
   private downloadPromise: Promise<void> | null = null;
   private downloadCancellation: CancellationToken | null = null;
@@ -149,10 +162,12 @@ export class AppUpdateCoordinator {
     store: SqliteStore,
     updater: ElectronUpdaterAdapter = autoUpdater,
     openExternal: (url: string) => Promise<unknown> = url => shell.openExternal(url),
+    options: AppUpdateCoordinatorOptions = {},
   ) {
     this.store = store;
     this.updater = updater;
     this.openExternal = openExternal;
+    this.enterpriseBuild = options.enterpriseBuild === true;
     this.updater.autoDownload = false;
     this.updater.autoInstallOnAppQuit = false;
     this.updater.on('download-progress', this.onDownloadProgress);
@@ -178,6 +193,14 @@ export class AppUpdateCoordinator {
 
   async checkNow(options: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
     if (this.clearStateIfUpdatesDisabled()) {
+      if (this.enterpriseBuild && options.manual) {
+        return {
+          success: false,
+          state: { ...this.state },
+          updateFound: false,
+          error: ENTERPRISE_BUILD_UPDATE_DISABLED_MESSAGE,
+        };
+      }
       return { success: true, state: { ...this.state }, updateFound: false };
     }
     if (this.readyFreshnessPromise) {
@@ -297,7 +320,7 @@ export class AppUpdateCoordinator {
       return {
         success: false,
         state: { ...this.state },
-        error: 'Updates are disabled by enterprise policy',
+        error: this.updateDisabledMessage(),
       };
     }
     const { info, readyFileHash, readyFilePath } = this.state;
@@ -908,7 +931,16 @@ export class AppUpdateCoordinator {
   }
 
   private isUpdateDisabled(): boolean {
-    return this.store.get<{ disableUpdate?: boolean }>('enterprise_config')?.disableUpdate === true;
+    return (
+      this.enterpriseBuild ||
+      this.store.get<{ disableUpdate?: boolean }>('enterprise_config')?.disableUpdate === true
+    );
+  }
+
+  private updateDisabledMessage(): string {
+    return this.enterpriseBuild
+      ? ENTERPRISE_BUILD_UPDATE_DISABLED_MESSAGE
+      : 'Updates are disabled by enterprise policy';
   }
 
   private clearStateIfUpdatesDisabled(): boolean {

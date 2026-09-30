@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, realpath, rm, writeFile } from 'fs/promises';
+import { chmod, cp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'fs/promises';
 import path from 'path';
 import { expect, test } from 'vitest';
 
@@ -326,7 +326,11 @@ test('discovers npx packages from pnpm global node_modules layouts', async () =>
     await chmod(executable, 0o755);
     await writeFile(
       path.join(packageDir, 'package.json'),
-      JSON.stringify({ name: 'test-agent', version: '1.0.0', bin: { 'test-agent': 'dist/cli.js' } }),
+      JSON.stringify({
+        name: 'test-agent',
+        version: '1.0.0',
+        bin: { 'test-agent': 'dist/cli.js' },
+      }),
     );
     await writeFile(
       registryPath,
@@ -452,6 +456,45 @@ test('does not expose bundled bridges when their corresponding agents are not in
     }).discover();
     expect(profiles.some(profile => profile.name === 'Codex')).toBe(false);
     expect(profiles.some(profile => profile.name === 'Claude Code')).toBe(false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('ignores application CLI shims behind a shared node_modules junction', async () => {
+  const root = path.join(process.cwd(), `.coding-agent-discovery-junction-${Date.now()}`);
+  const applicationRoot = path.join(root, 'application');
+  const sharedModules = path.join(root, 'shared-node_modules');
+  const shimDirectory = path.join(sharedModules, '.bin');
+  const userDirectory = path.join(root, 'user-bin');
+  const userCodex = path.join(userDirectory, 'codex.exe');
+  try {
+    await mkdir(applicationRoot, { recursive: true });
+    await mkdir(shimDirectory, { recursive: true });
+    await mkdir(userDirectory, { recursive: true });
+    await writeFile(path.join(shimDirectory, 'codex.exe'), 'application shim');
+    await writeFile(userCodex, 'user installation');
+    await cp(
+      path.join(process.cwd(), 'node_modules', '@agentclientprotocol', 'codex-acp'),
+      path.join(sharedModules, '@agentclientprotocol', 'codex-acp'),
+      { recursive: true },
+    );
+    await symlink(sharedModules, path.join(applicationRoot, 'node_modules'), 'junction');
+    const profiles = await new AcpDiscoveryService(undefined, {
+      platform: 'win32',
+      environment: {
+        PATH: [path.join(applicationRoot, 'node_modules', '.bin'), userDirectory].join(
+          path.delimiter,
+        ),
+      },
+      home: root,
+      adapterRoot: applicationRoot,
+    }).discover();
+    expect(
+      profiles.find(profile => profile.name === 'Codex')?.environment[
+        CodingAgentEnvironmentKey.CodexPath
+      ],
+    ).toBe(await realpath(userCodex));
   } finally {
     await rm(root, { recursive: true, force: true });
   }

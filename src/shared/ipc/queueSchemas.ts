@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { CoworkQueueAttachmentLimit } from '../cowork/pendingMessageQueue';
+import { hasVisiblePromptContent } from '../cowork/submissionContent';
 
 export const CoworkQueueSessionSchema = z.string().min(1);
 
@@ -19,7 +20,12 @@ const CoworkQueueFileAttachmentSchema = z.object({
 
 export const CoworkQueueEnqueueSchema = z.object({
   sessionId: CoworkQueueSessionSchema,
-  text: z.string().trim().min(1).max(100_000),
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100_000)
+    .refine(hasVisiblePromptContent, { message: 'Message text is required.' }),
   imageAttachments: z
     .array(CoworkQueueImageAttachmentSchema)
     .max(CoworkQueueAttachmentLimit.MaxImages)
@@ -31,7 +37,12 @@ export const CoworkQueueEnqueueSchema = z.object({
 export const CoworkQueueUpdateSchema = z.object({
   sessionId: CoworkQueueSessionSchema,
   itemId: z.string().min(1),
-  text: z.string().trim().min(1).max(100_000),
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100_000)
+    .refine(hasVisiblePromptContent, { message: 'Message text is required.' }),
 });
 
 export const CoworkQueueItemSchema = z.object({

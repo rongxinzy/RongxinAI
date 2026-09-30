@@ -224,3 +224,28 @@ export function initializeZhiyuanEnterpriseExtension(
 export function disposeZhiyuanEnterpriseExtension(): Promise<void> {
   return defaultEnterpriseExtensionHost.dispose();
 }
+
+export interface ZhiyuanEnterpriseBuildDetection {
+  readonly isPackaged: boolean;
+  readonly resourcesPath?: string;
+  readonly developmentExtensionPath?: string;
+}
+
+/**
+ * Detects the enterprise build flavor from process-level information only, so
+ * callers may run it before the app is ready. Packaged builds are enterprise
+ * when the fixed extension module exists under resources; unpackaged builds
+ * opt in by pointing the development extension path at an enterprise bundle.
+ */
+export function isEnterpriseBuild(detection: ZhiyuanEnterpriseBuildDetection): boolean {
+  if (!detection.isPackaged && detection.developmentExtensionPath) return true;
+  const { resourcesPath } = detection;
+  if (typeof resourcesPath !== 'string') return false;
+  return fs.existsSync(
+    path.join(
+      path.resolve(resourcesPath),
+      ENTERPRISE_RESOURCE_DIRECTORY,
+      ENTERPRISE_EXTENSION_FILENAME,
+    ),
+  );
+}
