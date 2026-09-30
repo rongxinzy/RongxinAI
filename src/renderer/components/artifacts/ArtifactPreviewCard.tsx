@@ -180,9 +180,10 @@ const TYPE_LABEL_KEY: Record<ArtifactType, string> = {
 
 interface ArtifactPreviewCardProps {
   artifact: Artifact;
+  disabled?: boolean;
 }
 
-const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) => {
+const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact, disabled = false }) => {
   const dispatch = useDispatch();
   const isPanelOpen = useSelector(selectIsPanelOpen);
   const selectedArtifact = useSelector(selectSelectedArtifact);
@@ -207,7 +208,7 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
 
   // 2026/09/20 lixiang  右侧预览面板 toggle：同文件已打开则关闭，否则打开/切换（issue #805）
   const handleOpenPreview = async () => {
-    if (busy) return;
+    if (disabled || busy) return;
     if (isPanelOpen && selectedArtifact?.id === artifact.id) {
       dispatch(closePanel());
       return;
@@ -256,15 +257,15 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
   const title = artifact.fileName || artifact.title;
   const subtitle = t(TYPE_LABEL_KEY[artifact.type]);
   const localPath = artifact.filePath?.trim() || '';
-  const canOpenLocal = Boolean(localPath);
+  const canOpenLocal = Boolean(localPath) && !disabled;
 
   return (
     <div className="theme-page-artifact-preview-card-button-1 flex max-w-sm w-full items-center gap-3 text-left">
       <Button
         type="button"
         variant="ghost"
+        disabled={disabled || busy}
         onClick={handleOpenPreview}
-        disabled={busy}
         aria-busy={busy}
         className="flex min-w-0 flex-1 items-center justify-start gap-3 px-0 hover:bg-transparent"
       >

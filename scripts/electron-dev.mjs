@@ -29,6 +29,19 @@ function withLocalBinPath(env) {
   };
 }
 
+/**
+ * Removes the Node-runtime compatibility flag from this development process.
+ * Concurrently merges process.env into each child environment, so deleting it
+ * from a copied environment is not sufficient.
+ * @param {NodeJS.ProcessEnv} env
+ */
+function removeElectronRunAsNode(env) {
+  const keys = Object.keys(env).filter(
+    entry => entry.toLowerCase() === 'electron_run_as_node',
+  );
+  for (const key of keys) delete env[key];
+}
+
 function patchWindowsElectronIcon() {
   if (process.platform !== 'win32') return;
   const patchScript = path.join(scriptDirectory, 'patch-windows-electron-icon.mjs');
@@ -47,6 +60,8 @@ function patchWindowsElectronIcon() {
 }
 
 async function main() {
+  removeElectronRunAsNode(process.env);
+
   if (!fs.existsSync(localBinDirectory)) {
     throw new Error(`Missing ${localBinDirectory}; run npm/bun install first.`);
   }
@@ -81,6 +96,7 @@ async function main() {
     const shortcutResult = spawnSync(electronBinary, [shortcutScript], {
       cwd: projectRoot,
       stdio: 'inherit',
+      env: process.env,
     });
     if (shortcutResult.status !== 0) {
       console.warn('[electron:dev] Windows taskbar shortcut was not created.');
@@ -124,6 +140,7 @@ async function main() {
       cwd: projectRoot,
       killOthers: ['failure', 'success'],
       killSignal: 'SIGKILL',
+      successCondition: 'command-electron',
     },
   );
 

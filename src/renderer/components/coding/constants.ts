@@ -6,6 +6,8 @@ export const CodingUiEvent = {
 
 export interface CodingCreateSessionEventDetail {
   workspace: CodingWorkspaceSummary;
+  /** Agent to start the session with; omitted to ask the user for one. */
+  profileId?: string;
 }
 
 export const CodingAgentStatusI18nKey: Record<CodingAgentProfileStatus, string> = {

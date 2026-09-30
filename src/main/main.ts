@@ -332,7 +332,7 @@ import {
   restoreOriginalProxyEnv,
   setSystemProxyEnabled,
 } from './libs/systemProxy';
-import { getLogFilePath, getRecentMainLogEntries, initLogger } from './logger';
+import { getLogFilePath, getRecentMainLogEntries, initLogger, log } from './logger';
 import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { parseCcConnectScopedConversationId } from './im/ccConnectConversationId';
@@ -349,6 +349,7 @@ import { resolveBundledPresetExpertSnapshot } from './presetExpertSnapshot';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { startSqliteDiagnostics } from './sqliteDiagnostics';
+import { createUncaughtReporter, installStdioErrorGuards } from './stdioErrorGuard';
 import { StartupProfiler } from './startupProfiler';
 import { createTray, destroyTray, updateTrayMenu } from './trayManager';
 import { registerContextMenu } from './contextMenu';
@@ -1050,14 +1051,27 @@ app.on('child-process-gone', (_event, details) => {
   }
 });
 
-// 处理未捕获的异常
-process.on('uncaughtException', error => {
-  console.error('Uncaught Exception:', error);
+// 终端或父进程先于应用消失时 stdout/stderr 管道会断开，之后的写入以 EPIPE 异步抛错。
+// 先吞掉这类断管道错误，否则它会被升级成未捕获异常，而兜底处理器又通过
+// console.error 写同一个断掉的管道，形成死循环并让进程永远不退。
+installStdioErrorGuards([process.stdout, process.stderr], error => {
+  log.error('[Main] stdio write failed:', error);
 });
 
-process.on('unhandledRejection', error => {
-  console.error('Unhandled Rejection:', error);
-});
+// 处理未捕获的异常
+process.on(
+  'uncaughtException',
+  createUncaughtReporter(error => {
+    console.error('Uncaught Exception:', error);
+  }),
+);
+
+process.on(
+  'unhandledRejection',
+  createUncaughtReporter(error => {
+    console.error('Unhandled Rejection:', error);
+  }),
+);
 
 process.on('exit', code => {
   console.log(`[Main] Process exiting with code: ${code}`);

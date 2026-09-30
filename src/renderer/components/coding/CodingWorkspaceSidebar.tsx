@@ -18,7 +18,7 @@ import {
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import { reportAppError } from '../../services/appErrorText';
-import { showAppError } from '../../services/appToast';
+import { showAppError, showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import { getWorkspaceDisplayName } from '../../utils/path';
 import {
@@ -35,6 +35,7 @@ import {
 } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { CodingUiEvent, type CodingCreateSessionEventDetail } from './constants';
 import { CodingWorkspaceDialog } from './CodingWorkspaceDialog';
+import { resolveReadyDefaultProfileId } from './codingSessionDraft';
 
 export interface CodingSessionDraft {
   id: string;
@@ -159,12 +160,13 @@ export const CodingWorkspaceSidebar = ({
     });
   }, [refresh, selection.workspaceRoot]);
 
-  const openSessionSetup = (workspace: CodingWorkspaceSummary) => {
+  const startSession = (workspace: CodingWorkspaceSummary, profileId?: string) => {
     setExpandedIds(current => new Set(current).add(workspace.id));
+    const detail: CodingCreateSessionEventDetail = profileId
+      ? { workspace, profileId }
+      : { workspace };
     window.dispatchEvent(
-      new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, {
-        detail: { workspace },
-      }),
+      new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, { detail }),
     );
   };
 
@@ -197,9 +199,16 @@ export const CodingWorkspaceSidebar = ({
         laneId: saved.activeSessionId,
         draft: null,
       });
-      // 等 selection 落稳再开「新建 Session」，避免 selectionKey 变化立刻关掉对话框
+      // 新建工作区时默认 Agent 已在对话框里选定：可用就直接进入会话草稿；
+      // 不可用则提示并退回选择框。等 selection 落稳再执行，避免被 selectionKey 变化打断。
       if (wasCreate) {
-        window.setTimeout(() => openSessionSetup(saved), 0);
+        const readyProfileId = resolveReadyDefaultProfileId(profiles, saved.defaultProfileId);
+        window.setTimeout(() => {
+          startSession(saved, readyProfileId ?? undefined);
+          if (!readyProfileId) {
+            showAppToast(i18nService.t('codingWorkspaceDefaultAgentUnavailable'), { isError: true });
+          }
+        }, 0);
       }
     }
     setEditingWorkspace(null);
@@ -300,7 +309,7 @@ export const CodingWorkspaceSidebar = ({
                   })
                 }
                 onSelectionChange={onSelectionChange}
-                onCreateSession={openSessionSetup}
+                onCreateSession={startSession}
                 onEditWorkspace={target => {
                   setEditingWorkspace(target);
                   setWorkspaceDialogOpen(true);

@@ -9,6 +9,7 @@ export type LoadedArtifactFile = {
 
 const MAX_CACHE_ENTRIES = 8;
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
+const ARTIFACT_FILE_RETRY_DELAYS_MS = [100, 200, 400, 800] as const;
 
 type CachedDataUrl = {
   dataUrl: string;
@@ -123,6 +124,39 @@ export function loadArtifactFile(
     },
   );
   return load;
+}
+
+/**
+ * Reads a generated file with bounded retries because it may briefly exist
+ * between truncate and write while the coding agent is producing it.
+ */
+export async function loadArtifactFileWithRetry(
+  artifact: Artifact,
+  cwd?: string | null,
+  options?: { forceRefresh?: boolean },
+): Promise<LoadedArtifactFile | null> {
+  if (!artifact.filePath) return null;
+  const resolvedFilePath = resolveArtifactPath(artifact.filePath, cwd);
+  if (artifact.content) {
+    return { content: artifact.content, filePath: resolvedFilePath };
+  }
+
+  let loaded: LoadedArtifactFile | null = null;
+  for (let attempt = 0; attempt <= ARTIFACT_FILE_RETRY_DELAYS_MS.length; attempt += 1) {
+    if (attempt > 0 || options?.forceRefresh) invalidateArtifactFile(resolvedFilePath);
+    try {
+      loaded = await loadArtifactFile({ ...artifact, content: '' }, cwd);
+    } catch {
+      loaded = null;
+    }
+
+    const isFinalAttempt = attempt === ARTIFACT_FILE_RETRY_DELAYS_MS.length;
+    if (loaded && (loaded.content.length > 0 || isFinalAttempt)) return loaded;
+    if (!isFinalAttempt) {
+      await new Promise(resolve => setTimeout(resolve, ARTIFACT_FILE_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  return loaded;
 }
 
 export function invalidateArtifactFile(filePath: string): void {
