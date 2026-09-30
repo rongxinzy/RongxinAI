@@ -1386,24 +1386,39 @@ export class CodingRoomService extends EventEmitter {
     return relativePath;
   }
 
-  async probeAgent(workspaceRoot: string, profileId: string): Promise<CodingRoomSnapshot> {
-    await this.registry.probe(profileId, workspaceRoot);
+  /**
+   * Agent profiles are global configuration, so the manager has to keep working
+   * before any workspace exists. Only a real workspace gets a refreshed room
+   * snapshot back; otherwise the caller refreshes profiles with `listProfiles`.
+   */
+  private publishProfilesOrSnapshot(workspaceRoot: string): CodingRoomSnapshot | null {
+    if (!workspaceRoot.trim()) {
+      this.registry.refreshBuiltinReadiness();
+      return null;
+    }
     return this.publish(workspaceRoot);
   }
 
-  async discoverAgents(workspaceRoot: string): Promise<CodingRoomSnapshot> {
+  async probeAgent(workspaceRoot: string, profileId: string): Promise<CodingRoomSnapshot | null> {
+    // Connectivity only needs a directory to start the agent in; it does not
+    // depend on which workspace is open.
+    await this.registry.probe(profileId, workspaceRoot.trim() || process.cwd());
+    return this.publishProfilesOrSnapshot(workspaceRoot);
+  }
+
+  async discoverAgents(workspaceRoot: string): Promise<CodingRoomSnapshot | null> {
     await this.registry.discoverExternalAgents();
-    return this.publish(workspaceRoot);
+    return this.publishProfilesOrSnapshot(workspaceRoot);
   }
 
-  addProfile(workspaceRoot: string, input: AddCodingAgentProfileInput): CodingRoomSnapshot {
+  addProfile(workspaceRoot: string, input: AddCodingAgentProfileInput): CodingRoomSnapshot | null {
     this.registry.addUntrustedProfile(input);
-    return this.publish(workspaceRoot);
+    return this.publishProfilesOrSnapshot(workspaceRoot);
   }
 
-  trustProfile(workspaceRoot: string, profileId: string): CodingRoomSnapshot {
+  trustProfile(workspaceRoot: string, profileId: string): CodingRoomSnapshot | null {
     this.registry.trust(profileId);
-    return this.publish(workspaceRoot);
+    return this.publishProfilesOrSnapshot(workspaceRoot);
   }
 
   async authenticateProfile(
