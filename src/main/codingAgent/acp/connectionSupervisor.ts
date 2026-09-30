@@ -1,8 +1,13 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
-import { AcpErrorCode, AcpRequestError } from './protocol';
+import { ACP_AUTH_REQUIRED_CODE, AcpErrorCode, AcpRequestError } from './protocol';
 import { CodingErrorDetailMessage, CodingErrorMessage } from '../../../shared/codingAgent';
 import { AcpRequestError as AcpResponseError } from './requestError';
+import { windowsBatchArguments } from './windowsBatchLaunch';
+import {
+  isInteractiveAuthenticationPrompt,
+  passiveAgentEnvironment,
+} from './passiveAuthentication';
 
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
@@ -108,6 +113,8 @@ export class AcpConnectionSupervisor {
   private connectionGeneration = 0;
   private stderrContext = '';
   private watchdogHoldCount = 0;
+  private authenticationFailure: Error | null = null;
+  private authenticationTermination: Promise<void> | null = null;
 
   get generation(): number {
     return this.connectionGeneration;
@@ -129,7 +136,10 @@ export class AcpConnectionSupervisor {
   }
 
   async start(options: AcpConnectionLaunchOptions): Promise<void> {
+    await this.authenticationTermination;
+    this.authenticationTermination = null;
     this.disposed = false;
+    this.authenticationFailure = null;
     this.launchOptions = {
       ...options,
       args: [...options.args],
@@ -161,31 +171,43 @@ export class AcpConnectionSupervisor {
   }
 
   private async startProcess(options: AcpConnectionLaunchOptions): Promise<void> {
+    this.stdoutBuffer = '';
+    this.stderrContext = '';
     const env = Object.fromEntries(
-      Object.entries(options.environment).filter((entry): entry is [string, string] =>
-        Boolean(entry[1]),
+      Object.entries(passiveAgentEnvironment(options.environment)).filter(
+        (entry): entry is [string, string] => Boolean(entry[1]),
       ),
     );
     const isWindowsBatch =
       process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(options.executable);
     const child = spawn(
       isWindowsBatch ? process.env.ComSpec || 'cmd.exe' : options.executable,
-      isWindowsBatch ? ['/d', '/s', '/c', options.executable, ...options.args] : options.args,
+      isWindowsBatch ? windowsBatchArguments(options.executable, options.args) : options.args,
       {
         cwd: options.cwd,
         env,
         shell: false,
-        detached: true,
+        // Windows tree cleanup uses taskkill; detaching allocates a visible
+        // console for CLI agents. Unix still needs a separate process group.
+        detached: process.platform !== 'win32',
+        windowsHide: true,
+        windowsVerbatimArguments: isWindowsBatch,
         stdio: ['pipe', 'pipe', 'pipe'],
       },
     );
     this.child = child;
     this.connectionGeneration += 1;
     child.stdout.setEncoding('utf8');
-    child.stdout.on('data', chunk => this.consumeStdout(String(chunk)));
+    child.stdout.on('data', chunk => {
+      if (this.child !== child) return;
+      if (this.rejectInteractiveAuthentication(`${this.stdoutBuffer}${String(chunk)}`)) return;
+      this.consumeStdout(String(chunk));
+    });
     child.stderr.on('data', chunk => {
+      if (this.child !== child) return;
       const text = String(chunk);
       this.stderrContext = `${this.stderrContext}${text}`.slice(-MAX_STDERR_CONTEXT_BYTES);
+      if (this.rejectInteractiveAuthentication(this.stderrContext)) return;
       console.debug('[AcpConnection] agent stderr:', text);
     });
     // An agent that exits mid-write rejects the pending write asynchronously;
@@ -215,7 +237,8 @@ export class AcpConnectionSupervisor {
     params: Record<string, unknown>,
     options: { timeoutMs?: number | null; absoluteTimeoutMs?: number | null } = {},
   ): Promise<T> {
-    if (!this.child?.stdin.writable) throw new Error(CodingErrorMessage.AcpConnectionNotRunning);
+    if (!this.child?.stdin.writable)
+      throw this.authenticationFailure ?? new Error(CodingErrorMessage.AcpConnectionNotRunning);
     const id = ++this.requestId;
     const startedAt = Date.now();
     console.debug(`[AcpConnection] sent request ${method} (${id})`);
@@ -316,7 +339,11 @@ export class AcpConnectionSupervisor {
     const child = this.child;
     this.child = null;
     this.failAll(new Error(CodingErrorMessage.AcpAgentConnectionDisposed));
-    if (!child) return;
+    if (!child) {
+      await this.authenticationTermination;
+      this.authenticationTermination = null;
+      return;
+    }
     await terminateProcessTree(child);
     if (child.exitCode !== null || child.signalCode !== null) return;
     // Wait for the process to actually exit: on Windows the agent keeps its
@@ -347,8 +374,11 @@ export class AcpConnectionSupervisor {
   }
 
   private consumeMessage(line: string): void {
+    // Gemini can prefix ACP output with terminal screen controls.
+    const protocolLine = line.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').trim();
+    if (!protocolLine) return;
     try {
-      const message = JSON.parse(line) as {
+      const message = JSON.parse(protocolLine) as {
         id?: unknown;
         method?: unknown;
         params?: unknown;
@@ -468,6 +498,18 @@ export class AcpConnectionSupervisor {
       if (pending.absoluteTimeout) clearTimeout(pending.absoluteTimeout);
       pending.reject(error);
     }
+  }
+
+  private rejectInteractiveAuthentication(output: string): boolean {
+    if (!isInteractiveAuthenticationPrompt(output)) return false;
+    const error = new AcpResponseError(CodingErrorMessage.AgentAuthRequired, ACP_AUTH_REQUIRED_CODE);
+    this.authenticationFailure = error;
+    this.disposed = true;
+    const child = this.child;
+    this.child = null;
+    this.failAll(error);
+    if (child) this.authenticationTermination = terminateProcessTree(child);
+    return true;
   }
 
   private scheduleRestart(): void {

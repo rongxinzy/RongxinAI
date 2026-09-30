@@ -1,7 +1,15 @@
 import { execPath } from 'process';
+import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
+import path from 'path';
 import { expect, test } from 'vitest';
 
-import { CodingAgentProfileStatus, CodingErrorMessage } from '../../../shared/codingAgent';
+import {
+  CodingAgentCheckFailure,
+  CodingAgentCheckPhase,
+  CodingAgentProfileStatus,
+  CodingErrorMessage,
+} from '../../../shared/codingAgent';
 import { CodingAgentRegistry } from '../codingAgentRegistry';
 import {
   ACP_AUTH_REQUIRED_CODE,
@@ -90,6 +98,25 @@ test('thought output alone cannot certify a working model', async () => {
   ).rejects.toBeInstanceOf(AcpProbeNoAnswerError);
 });
 
+test('an empty response with login methods stays unavailable rather than requiring login', async () => {
+  const registry = new CodingAgentRegistry();
+  const profile = registry.addUntrustedProfile({
+    name: 'Configured agent',
+    description: '',
+    command: execPath,
+    args: ['-e', fakeAgentScript({ answerPrompt: false })],
+  });
+  registry.trust(profile.id);
+  await expect(registry.probe(profile.id, process.cwd())).rejects.toMatchObject({
+    needsAuth: false,
+  });
+  expect(registry.get(profile.id)).toMatchObject({
+    status: CodingAgentProfileStatus.Unavailable,
+    authMethods: AUTH_METHODS,
+    connectionCheck: { failure: CodingAgentCheckFailure.NoReply },
+  });
+});
+
 test.each([AcpMethod.SessionNew, AcpMethod.SessionPrompt])(
   'preserves login methods for an auth error from %s',
   async errorMethod => {
@@ -107,7 +134,73 @@ test.each([AcpMethod.SessionNew, AcpMethod.SessionPrompt])(
     expect(registry.get(untrusted.id)).toMatchObject({
       status: CodingAgentProfileStatus.NeedsAuth,
       authMethods: AUTH_METHODS,
+      connectionCheck: {
+        phase: CodingAgentCheckPhase.Failed,
+        failure: CodingAgentCheckFailure.Authentication,
+      },
     });
+  },
+);
+
+test('ready agents can be rechecked with real phase updates and duplicate checks are rejected', async () => {
+  const registry = new CodingAgentRegistry();
+  const added = registry.addUntrustedProfile({
+    name: 'test',
+    description: '',
+    command: execPath,
+    args: ['-e', fakeAgentScript()],
+  });
+  registry.trust(added.id);
+  await registry.probe(added.id, process.cwd());
+  const phases: Array<CodingAgentCheckPhase | undefined> = [];
+  registry.on('changed', () => phases.push(registry.get(added.id)?.connectionCheck?.phase));
+  const checking = registry.probe(added.id, process.cwd());
+  await expect(registry.probe(added.id, process.cwd())).rejects.toThrow(
+    CodingErrorMessage.ProfileNotProbeable,
+  );
+  await checking;
+  expect(phases).toEqual([
+    CodingAgentCheckPhase.Starting,
+    CodingAgentCheckPhase.Handshake,
+    CodingAgentCheckPhase.ModelReply,
+    CodingAgentCheckPhase.Complete,
+  ]);
+  expect(registry.get(added.id)?.connectionCheck?.checkedAt).toBeGreaterThan(0);
+});
+
+test.runIf(process.platform === 'win32')(
+  'manually added batch agents support paths and arguments with spaces after trust',
+  async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'manual ACP agent '));
+    const launcher = path.join(root, 'custom agent.cmd');
+    const argsFile = path.join(root, 'arguments.json');
+    try {
+      await writeFile(
+        path.join(root, 'agent.cjs'),
+        `require('fs').writeFileSync(${JSON.stringify(argsFile)}, JSON.stringify(process.argv.slice(2)));\n${fakeAgentScript()}`,
+      );
+      await writeFile(launcher, `@echo off\r\n"${execPath}" "%~dp0agent.cjs" %*\r\n`);
+      const registry = new CodingAgentRegistry();
+      const profile = registry.addUntrustedProfile({
+        name: ' Manual Agent ',
+        description: 'User supplied ACP command',
+        command: ` ${launcher} `,
+        args: ['argument with spaces', 'literal & echo injected', 'a|b', 'quote "value"', '%PATH%'],
+      });
+      expect(profile.name).toBe('Manual Agent');
+      expect(profile.command).toBe(launcher);
+      await expect(registry.probe(profile.id, root)).rejects.toThrow(
+        CodingErrorMessage.ProfileNotProbeable,
+      );
+      registry.trust(profile.id);
+      await expect(registry.probe(profile.id, root)).resolves.toMatchObject({
+        status: CodingAgentProfileStatus.Ready,
+        connectionCheck: { phase: CodingAgentCheckPhase.Complete },
+      });
+      expect(JSON.parse(await readFile(argsFile, 'utf8'))).toEqual(profile.args);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   },
 );
 

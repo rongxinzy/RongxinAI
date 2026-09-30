@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, Folder, Trash2 } from 'lucide-react';
+import { Ellipsis, Folder, Settings2, Trash2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -268,6 +268,17 @@ export const CodingWorkspaceSidebar = ({
           {i18nService.t('codingWorkspaceSection')}
         </h2>
         <div className="flex items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="theme-action-faint"
+            aria-label={i18nService.t('codingAgentManageAgents')}
+            title={i18nService.t('codingAgentManageAgents')}
+            onClick={() => window.dispatchEvent(new CustomEvent(CodingUiEvent.ManageAgents))}
+          >
+            <Settings2 />
+          </Button>
           <Button
             type="button"
             variant="ghost"

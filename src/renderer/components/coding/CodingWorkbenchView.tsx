@@ -22,7 +22,6 @@ import {
   FileDiff,
   Minimize2,
   PanelRight,
-  Settings2,
   Terminal as TerminalIcon,
   X,
 } from 'lucide-react';
@@ -65,6 +64,7 @@ import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
+import { useCodingAgentManager } from './useCodingAgentManager';
 import { CodingAuthTerminalDialog } from './CodingAuthTerminalDialog';
 import { CodingComposer } from './CodingComposer';
 import { CodingPermissionOverlay } from './CodingPermissionOverlay';
@@ -157,7 +157,7 @@ export const CodingWorkbenchView = ({
     output: string;
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
-  const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const [agentManagerOpen, setAgentManagerOpen] = useCodingAgentManager();
   const [sessionSetupWorkspace, setSessionSetupWorkspace] = useState<CodingWorkspaceSummary | null>(
     null,
   );
@@ -712,36 +712,6 @@ export const CodingWorkbenchView = ({
     showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
-  const authenticateProfile = async (profileId: string, methodId: string): Promise<boolean> => {
-    const result = await window.electron.codingAgent.authenticateProfile({
-      workspaceRoot,
-      profileId,
-      methodId,
-    });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
-    }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
-  };
-  const startTerminalAuthentication = async (
-    profileId: string,
-    methodId: string,
-  ): Promise<boolean> => {
-    const result = await window.electron.codingAgent.startAuthTerminal({
-      workspaceRoot,
-      profileId,
-      methodId,
-    });
-    if (result.success && result.terminal) {
-      setAuthTerminal({ ...result.terminal, output: '' });
-      setAuthTerminalInput('');
-      return true;
-    }
-    showAppError(result.error, 'codingAgentActionFailed');
-    return false;
-  };
   const submitAuthTerminalInput = () => {
     if (!authTerminal) return;
     void window.electron.codingAgent.writeAuthTerminal({
@@ -1033,8 +1003,6 @@ export const CodingWorkbenchView = ({
           onProbe={probeAgent}
           onAddProfile={addProfile}
           onTrust={trustProfile}
-          onAuthenticate={authenticateProfile}
-          onTerminalAuthenticate={startTerminalAuthentication}
         />
         {recoveryLane && (
           <Dialog open>
@@ -1121,15 +1089,6 @@ export const CodingWorkbenchView = ({
             isStreaming={activeLane?.status === CodingLaneStatus.Running}
             headerActions={
               <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={i18nService.t('codingAgentManageAgents')}
-                  onClick={() => setAgentManagerOpen(true)}
-                >
-                  <Settings2 />
-                </Button>
                 <CodingGitQuickActions
                   target={{
                     workspaceRoot,

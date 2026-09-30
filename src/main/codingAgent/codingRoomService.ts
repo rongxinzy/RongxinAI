@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { statSync } from 'fs';
 import { readFile, readdir, rename, stat, unlink, writeFile } from 'fs/promises';
 import path from 'path';
+import { getCodingAgentEnvironment } from './agentEnvironment';
 
 import {
   CodingAgentDriverKind,
@@ -179,29 +180,6 @@ export interface CodingRoomRuntime {
 
 type DriverSession = { id: string; connectionGeneration: number | null };
 
-const ACP_ENVIRONMENT_KEYS = [
-  'PATH',
-  'HOME',
-  'USER',
-  'SHELL',
-  'TMPDIR',
-  'TEMP',
-  'TMP',
-  'LANG',
-  'LC_ALL',
-  // Windows-specific variables needed for npm global resolution, shell
-  // helpers, and credential stores used by ACP agents (e.g. Kimi Code CLI).
-  'APPDATA',
-  'LOCALAPPDATA',
-  'COMSPEC',
-  'PATHEXT',
-  'SystemRoot',
-  'USERPROFILE',
-  'USERNAME',
-  'ProgramFiles',
-  'ProgramFiles(x86)',
-] as const;
-
 export class CodingRoomService extends EventEmitter {
   private readonly drivers = new Map<string, CodingAgentDriver>();
   private readonly driverSessionIds = new Map<string, DriverSession>();
@@ -259,10 +237,7 @@ export class CodingRoomService extends EventEmitter {
         listCommandChoices,
         commandCatalogGeneration,
       },
-      {
-        ...Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]])),
-        ...acpEnvironment,
-      },
+      acpEnvironment,
     );
     registry.on('changed', () => {
       for (const room of this.repository.listRooms()) this.publish(room.workspaceRoot);
@@ -1448,10 +1423,10 @@ export class CodingRoomService extends EventEmitter {
     const driver = this.driverFactory.create(profile);
     try {
       await driver.authenticate({ methodId, workspaceRoot });
-      this.registry.markReady(profileId);
     } finally {
       await driver.dispose();
     }
+    await this.registry.probe(profileId, workspaceRoot);
     return this.publish(workspaceRoot);
   }
 
@@ -2399,13 +2374,14 @@ export class CodingRoomService extends EventEmitter {
   }
 
   private allowedEnvironment(): Record<string, string | undefined> {
-    return Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]]));
+    return getCodingAgentEnvironment();
   }
 
   private async completeTerminalAuthentication(event: {
     id: string;
     profileId: string;
     methodId: string;
+    workspaceRoot: string;
     exitCode: number;
     signal?: number;
   }): Promise<void> {
@@ -2423,18 +2399,13 @@ export class CodingRoomService extends EventEmitter {
           '[CodingRoom] Authentication completed for an unavailable coding agent profile.',
         );
       } else {
-        const driver = this.driverFactory.create(profile);
         try {
-          await driver.getAuthState();
-          this.registry.markReady(event.profileId);
+          await this.registry.probe(event.profileId, event.workspaceRoot);
         } catch (error) {
           console.warn(
-            '[CodingRoom] ACP reinitialization after terminal authentication failed:',
+            '[CodingRoom] Model reply verification after terminal authentication failed:',
             error,
           );
-          this.registry.markNeedsAuth(event.profileId);
-        } finally {
-          await driver.dispose();
         }
       }
     } else {
