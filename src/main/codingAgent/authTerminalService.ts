@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import * as pty from 'node-pty';
 
+import { CodingErrorMessage } from '../../shared/codingAgent';
+
 const DEFAULT_COLUMNS = 100;
 const DEFAULT_ROWS = 30;
 
@@ -82,7 +84,7 @@ export class AuthTerminalService extends EventEmitter {
 
   private require(id: string): ActiveTerminal {
     const terminal = this.terminals.get(id);
-    if (!terminal) throw new Error('The authentication terminal is no longer active.');
+    if (!terminal) throw new Error(CodingErrorMessage.AuthTerminalGone);
     return terminal;
   }
 }

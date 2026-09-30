@@ -1,15 +1,22 @@
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import type { collectWorkbenchArtifacts } from './artifactCollector';
-import { ArtifactWorkerLimit } from './artifactWorkerConstants';
+import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstants';
+import type { ArtifactWorkerInput, WorkspaceContentInspection } from './artifactWorkerTypes';
 
 type Input = Parameters<typeof collectWorkbenchArtifacts>[0];
 type Artifacts = ReturnType<typeof collectWorkbenchArtifacts>;
-type Response = { artifacts?: Artifacts; error?: string; runMs: number };
+type Result = Artifacts | WorkspaceContentInspection;
+type Response = {
+  artifacts?: Artifacts;
+  content?: WorkspaceContentInspection;
+  error?: string;
+  runMs: number;
+};
 type Job = {
-  input: Input;
+  task: ArtifactWorkerInput;
   queuedAt: number;
-  resolve: (artifacts: Artifacts) => void;
+  resolve: (result: Result) => void;
   reject: (error: Error) => void;
   signal?: AbortSignal;
   onAbort: () => void;
@@ -36,12 +43,29 @@ export class WorkbenchArtifactWorkerPool {
     ) {
       return Promise.reject(new Error('Artifact collection input limit exceeded.'));
     }
+    return this.enqueue({ kind: ArtifactWorkerTask.Collect, input }, signal).then(
+      result => result as Artifacts,
+    );
+  }
+
+  inspectContent(bytes: ArrayBuffer, signal?: AbortSignal): Promise<WorkspaceContentInspection> {
+    if (bytes.byteLength > ArtifactWorkerLimit.WorkspaceContentBytes) {
+      return Promise.reject(new Error('Workspace content input limit exceeded.'));
+    }
+    return this.enqueue(
+      { kind: ArtifactWorkerTask.InspectWorkspaceContent, input: { bytes } },
+      signal,
+    ).then(result => result as WorkspaceContentInspection);
+  }
+
+  private enqueue(task: ArtifactWorkerInput, signal?: AbortSignal): Promise<Result> {
+    if (signal?.aborted) return Promise.reject(new Error('Artifact collection cancelled.'));
     if (this.queue.length >= ArtifactWorkerLimit.Queue) {
       return Promise.reject(new Error('Artifact collection queue is full.'));
     }
     return new Promise((resolve, reject) => {
       const job: Job = {
-        input,
+        task,
         signal,
         resolve,
         reject,
@@ -84,15 +108,32 @@ export class WorkbenchArtifactWorkerPool {
           const job = created.job;
           if (!job) return;
           console.debug(
-            `[WorkbenchArtifacts] collected run ${job.input.runId} after ${Math.round(created.startedAt! - job.queuedAt)} ms queued and ${Math.round(response.runMs)} ms running`,
+            `[WorkbenchArtifacts] completed ${job.task.kind} after ${Math.round(created.startedAt! - job.queuedAt)} ms queued and ${Math.round(response.runMs)} ms running`,
           );
-          if (
+          if (job.task.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
+            const content = response.content;
+            if (
+              response.error ||
+              !content ||
+              !/^[a-f0-9]{64}$/.test(content.sha256) ||
+              typeof content.text !== 'string' ||
+              typeof content.binary !== 'boolean' ||
+              content.text.length > ArtifactWorkerLimit.WorkspaceContentBytes
+            ) {
+              this.finish(
+                created,
+                new Error(response.error || 'Invalid workspace content worker result.'),
+              );
+            } else {
+              this.finish(created, undefined, false, content);
+            }
+          } else if (
             response.error ||
             !Array.isArray(response.artifacts) ||
             response.artifacts.some(
               artifact =>
-                artifact.taskId !== job.input.taskId ||
-                artifact.runId !== job.input.runId ||
+                artifact.taskId !== (job.task.input as Input).taskId ||
+                artifact.runId !== (job.task.input as Input).runId ||
                 !/^[a-f0-9]{64}$/.test(artifact.contentHash) ||
                 path.isAbsolute(artifact.reference) ||
                 artifact.reference.split(/[/\\]/)[0] === '..',
@@ -120,14 +161,18 @@ export class WorkbenchArtifactWorkerPool {
         ArtifactWorkerLimit.TimeoutMs,
       );
       try {
-        slot.worker.postMessage(slot.job.input);
+        const task = slot.job.task;
+        slot.worker.postMessage(
+          task,
+          task.kind === ArtifactWorkerTask.InspectWorkspaceContent ? [task.input.bytes] : [],
+        );
       } catch (error) {
         this.finish(slot, error instanceof Error ? error : new Error(String(error)), true);
       }
     }
   }
 
-  private finish(slot: Slot, error?: Error, terminate = false, artifacts?: Artifacts): void {
+  private finish(slot: Slot, error?: Error, terminate = false, result?: Result): void {
     const job = slot.job;
     clearTimeout(slot.timer);
     slot.job = undefined;
@@ -139,7 +184,7 @@ export class WorkbenchArtifactWorkerPool {
     if (job) {
       job.signal?.removeEventListener('abort', job.onAbort);
       if (error) job.reject(error);
-      else job.resolve(artifacts!);
+      else job.resolve(result!);
     }
     this.dispatch();
   }
@@ -150,3 +195,15 @@ export const collectWorkbenchArtifactsAsync = (
   input: Input,
   signal?: AbortSignal,
 ): Promise<Artifacts> => pool.collect(input, signal);
+
+export const inspectWorkspaceContentAsync = (
+  content: Uint8Array,
+  signal?: AbortSignal,
+): Promise<WorkspaceContentInspection> => {
+  if (content.byteLength > ArtifactWorkerLimit.WorkspaceContentBytes) {
+    return Promise.reject(new Error('Workspace content input limit exceeded.'));
+  }
+  // Own a bounded immutable copy: transferring a pooled Node Buffer can detach
+  // unrelated contents, and main still owns the bytes used for the file write.
+  return pool.inspectContent(Uint8Array.from(content).buffer, signal);
+};

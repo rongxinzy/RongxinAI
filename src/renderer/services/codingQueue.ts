@@ -1,3 +1,4 @@
+import { CodingErrorMessage } from '../../shared/codingAgent';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 
 type Listener = (items: CoworkPendingMessage[]) => void;
@@ -25,7 +26,8 @@ class CodingQueueService {
   }
   async load(sessionId: string): Promise<CoworkPendingMessage[]> {
     const result = await window.electron.codingAgent.listPendingMessages(sessionId);
-    if (!result.success) throw new Error(result.error ?? 'Failed to load pending messages.');
+    if (!result.success)
+      throw new Error(result.error || CodingErrorMessage.QueueLoadFailed);
     const items = result.items ?? [];
     this.publish(sessionId, items);
     return items;

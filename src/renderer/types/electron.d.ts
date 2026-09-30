@@ -1,5 +1,7 @@
 import type { PiUiRuntimeSnapshot } from '../../shared/cowork/piUiRuntimeSnapshot';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
+import type { CoworkError } from '../../common/coworkError';
+import type { RuntimeRetryNotice } from '../../common/runtimeNotice';
 import type { ActivityRun } from '../../shared/activity/types';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
@@ -1279,6 +1281,9 @@ interface IElectronAPI {
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
     onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) => () => void;
+  };
+  runtimeNotices: {
+    onNotice: (callback: (notice: RuntimeRetryNotice) => void) => () => void;
   };
   log: {
     getPath: () => Promise<string>;

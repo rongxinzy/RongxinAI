@@ -2564,7 +2564,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -2594,7 +2594,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -2656,7 +2656,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -10196,7 +10196,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -10226,7 +10226,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -10288,7 +10288,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -17843,7 +17843,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -17873,7 +17873,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -17935,7 +17935,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -25475,7 +25475,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -25505,7 +25505,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -25567,7 +25567,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -33124,7 +33124,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -33154,7 +33154,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -33216,7 +33216,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -40761,7 +40761,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -40791,7 +40791,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -40853,7 +40853,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -48413,7 +48413,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -48443,7 +48443,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -48505,7 +48505,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -56050,7 +56050,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-expand-agent-tasks-row-button-1) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -56080,7 +56080,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-workspace-tree-node-button-2) {
   height: 1.75rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;
@@ -56142,7 +56142,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-2) {
   height: 2rem;
-  width: calc(100%+12px);
+  width: calc(100% + 12px);
   border-radius: var(--zy-style-radius-md);
   padding-left: 38px;
   padding-right: 0.625rem;

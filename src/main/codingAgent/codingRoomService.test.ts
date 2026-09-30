@@ -531,7 +531,9 @@ test('cancels a stale question and frees its lane after an application restart',
     requestId: 'elicitation-restart',
     question: 'Which endpoint should I change?',
   });
-  expect(service.bootstrap(workspaceRoot).lanes[0].status).toBe(CodingLaneStatus.WaitingElicitation);
+  expect(service.bootstrap(workspaceRoot).lanes[0].status).toBe(
+    CodingLaneStatus.WaitingElicitation,
+  );
 
   // A restart drops the in-process Pi session but keeps the persisted question.
   expect(service.recoverInterruptedState()).toBe(1);
@@ -1001,9 +1003,9 @@ test('cancel leaves a lane without an active turn untouched', async () => {
   expect(cancelled).toEqual([]);
   expect(updated.lanes[0].status).toBe(CodingLaneStatus.Idle);
   expect(updated.missions[0].status).toBe(CodingMissionStatus.Draft);
-  expect(
-    updated.events.filter(event => event.kind === CodingEventKind.TurnCancelled),
-  ).toHaveLength(0);
+  expect(updated.events.filter(event => event.kind === CodingEventKind.TurnCancelled)).toHaveLength(
+    0,
+  );
 });
 
 test('reports a failed automatic collaboration stage without changing assignment state', async () => {
@@ -1045,9 +1047,9 @@ test('reports a failed automatic collaboration stage without changing assignment
   expect(updated.lanes.find(lane => lane.id === sourceLane.id)?.status).toBe(
     CodingLaneStatus.Completed,
   );
-  expect(
-    updated.assignments.find(assignment => assignment.laneId === targetLane.id)?.status,
-  ).toBe(CodingAssignmentStatus.Planned);
+  expect(updated.assignments.find(assignment => assignment.laneId === targetLane.id)?.status).toBe(
+    CodingAssignmentStatus.Planned,
+  );
   const sourceEvents = updated.events.filter(event => event.laneId === sourceLane.id);
   expect(sourceEvents.at(-1)).toMatchObject({
     kind: CodingEventKind.Message,
@@ -1797,7 +1799,7 @@ test('probeAgent revives a needs_auth profile when the agent responds', async ()
     command: execPath,
     args: [
       '-e',
-      "process.stdin.on('data', chunk => { const line = String(chunk).split('\\n')[0]; const request = JSON.parse(line); if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); });",
+      "process.stdin.on('data', chunk => { for (const line of String(chunk).split('\\n').filter(Boolean)) { const request = JSON.parse(line); const reply = result => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result }) + '\\n'); if (request.method === 'initialize') reply({ protocolVersion: 1, agentCapabilities: {} }); else if (request.method === 'session/new') reply({ sessionId: 'probe-session' }); else if (request.method === 'session/prompt') { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'probe-session', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'ok' } } } }) + '\\n'); reply({ stopReason: 'end_turn' }); } } });",
     ],
   });
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;

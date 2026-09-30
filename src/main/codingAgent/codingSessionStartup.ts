@@ -4,6 +4,8 @@ import path from 'path';
 import { buildSessionTitleFromInput } from '../../common/sessionTitle';
 import {
   CodingAgentDriverKind,
+  CodingErrorDetailMessage,
+  CodingErrorMessage,
   CodingAgentProfileId,
   CodingAgentProfileStatus,
   CodingWorkflowStage,
@@ -41,23 +43,23 @@ export const resolveSessionTarget = (
 ): ResolvedSessionTarget => {
   registry.refreshBuiltinReadiness();
   const room = repository.getRoomById(input.workspaceId);
-  if (!room) throw new Error('Coding workspace was not found.');
+  if (!room) throw new Error(CodingErrorMessage.WorkspaceNotFound);
   const profile = registry.get(input.profileId);
-  if (!profile) throw new Error('Coding agent profile was not found.');
+  if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
   if (profile.status !== CodingAgentProfileStatus.Ready) {
     if (profile.id === CodingAgentProfileId.Builtin) {
       const { error } = resolveCurrentApiConfig();
       throw new Error(
         error
-          ? `The selected coding agent is not ready to run: ${error}`
-          : 'The selected coding agent is not ready to run.',
+          ? `${CodingErrorDetailMessage.AgentNotReadyDetail} ${error}`
+          : CodingErrorMessage.ProfileNotReady,
       );
     }
-    throw new Error('The selected coding agent is not ready to run.');
+    throw new Error(CodingErrorMessage.ProfileNotReady);
   }
   const sourceRoot = path.resolve(input.sourceRoot);
   if (!repository.listWorkspaceSources(room.id).some(source => source.path === sourceRoot)) {
-    throw new Error('The selected source folder does not belong to this coding workspace.');
+    throw new Error(CodingErrorMessage.SourceFolderNotInWorkspace);
   }
   return { room, profile, sourceRoot };
 };

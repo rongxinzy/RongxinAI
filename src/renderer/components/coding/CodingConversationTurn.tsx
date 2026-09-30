@@ -9,6 +9,7 @@ import { CollapsibleContent } from '@shared/components/ui/collapsible';
 import { CheckCircle2, CircleStop, TriangleAlert } from 'lucide-react';
 import { memo, useEffect, useState, type ReactNode } from 'react';
 
+import { appErrorText } from '../../services/appErrorText';
 import { i18nService } from '../../services/i18n';
 import type { Artifact } from '../../types/artifact';
 import { formatMessageDateTime } from '../../utils/tokenFormat';
@@ -50,14 +51,14 @@ const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
     return (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <CircleStop className="size-3.5" />
-        <span>{turn.statusDetail || i18nService.t('codingAgentTurnCancelled')}</span>
+        <span>{turn.statusDetail ? appErrorText(turn.statusDetail, 'codingAgentTurnCancelled') : i18nService.t('codingAgentTurnCancelled')}</span>
       </div>
     );
   }
   return (
     <div className="flex items-center gap-1.5 text-xs text-destructive">
       <TriangleAlert className="size-3.5" />
-      <span>{turn.statusDetail || i18nService.t('codingAgentTurnFailed')}</span>
+      <span>{turn.statusDetail ? appErrorText(turn.statusDetail, 'codingAgentTurnFailed') : i18nService.t('codingAgentTurnFailed')}</span>
     </div>
   );
 };
