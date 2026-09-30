@@ -150,12 +150,6 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
 
       {/* Guide */}
       <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-        <ol className="text-xs text-muted-foreground flex flex-col gap-1 list-decimal list-inside">
-          <li>{i18nService.t('imQQGuideStep1')}</li>
-          <li>{i18nService.t('imQQGuideStep2')}</li>
-          <li>{i18nService.t('imQQGuideStep3')}</li>
-          <li>{i18nService.t('imQQGuideStep4')}</li>
-        </ol>
         {PlatformRegistry.guideUrl('qq') && (
           <Button
             type="button"
@@ -168,11 +162,17 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
                   console.error('[IM] Failed to open guide URL:', err);
                 });
             }}
-            className="theme-action-inline-underlined mt-2"
+            className="theme-action-inline-underlined mb-2"
           >
-            {i18nService.t('imViewGuide')}
+            {i18nService.t('imQQConfigLink')}
           </Button>
         )}
+        <ol className="text-xs text-muted-foreground flex flex-col gap-1 list-decimal list-inside">
+          <li>{i18nService.t('imQQGuideStep1')}</li>
+          <li>{i18nService.t('imQQGuideStep2')}</li>
+          <li>{i18nService.t('imQQGuideStep3')}</li>
+          <li>{i18nService.t('imQQGuideStep4')}</li>
+        </ol>
       </div>
 
       {/* AppID */}
