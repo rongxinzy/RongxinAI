@@ -423,6 +423,31 @@
   --zy-radius: 0.625rem;
 }
 @layer components {
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-w5drer;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -2666,7 +2691,7 @@
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -3247,7 +3272,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -6034,7 +6059,7 @@
   opacity: 1;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -6073,6 +6098,9 @@
   opacity: 1;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -6540,6 +6568,14 @@
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-w5drer {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-w5drer {
 from {
   opacity: 1;
@@ -6621,6 +6657,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-logo-loading-mark),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-logo-loading-dot),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-logo-loading-label),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-coding-session-agent),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-appearance-preview-frame),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-appearance-preview-sidebar),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-appearance-preview-main),
@@ -8055,6 +8095,31 @@ to {
   --zy-radius: 0.625rem;
 }
 @layer components {
+[data-theme="classic-dark"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="classic-dark"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-1a8g2ez;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="classic-dark"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="classic-dark"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="classic-dark"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -10298,7 +10363,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -10879,7 +10944,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -13681,7 +13746,7 @@ to {
   opacity: 1;
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="classic-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -13720,6 +13785,9 @@ to {
   opacity: 1;
 }
 [data-theme="classic-dark"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="classic-dark"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -14187,6 +14255,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-1a8g2ez {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-1a8g2ez {
 from {
   opacity: 1;
@@ -14268,6 +14344,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="classic-dark"] :where(.theme-logo-loading-mark),
+[data-theme="classic-dark"] :where(.theme-logo-loading-dot),
+[data-theme="classic-dark"] :where(.theme-logo-loading-label),
+[data-theme="classic-dark"] :where(.theme-coding-session-agent),
 [data-theme="classic-dark"] :where(.theme-appearance-preview-frame),
 [data-theme="classic-dark"] :where(.theme-appearance-preview-sidebar),
 [data-theme="classic-dark"] :where(.theme-appearance-preview-main),
@@ -15702,6 +15782,31 @@ to {
   --zy-radius: 0.5rem;
 }
 @layer components {
+[data-theme="daming-light"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="daming-light"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-1ndhedz;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="daming-light"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="daming-light"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="daming-light"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -17945,7 +18050,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -18526,7 +18631,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -21313,7 +21418,7 @@ to {
   opacity: 1;
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="daming-light"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -21352,6 +21457,9 @@ to {
   opacity: 1;
 }
 [data-theme="daming-light"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="daming-light"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -21819,6 +21927,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-1ndhedz {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-1ndhedz {
 from {
   opacity: 1;
@@ -21900,6 +22016,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="daming-light"] :where(.theme-logo-loading-mark),
+[data-theme="daming-light"] :where(.theme-logo-loading-dot),
+[data-theme="daming-light"] :where(.theme-logo-loading-label),
+[data-theme="daming-light"] :where(.theme-coding-session-agent),
 [data-theme="daming-light"] :where(.theme-appearance-preview-frame),
 [data-theme="daming-light"] :where(.theme-appearance-preview-sidebar),
 [data-theme="daming-light"] :where(.theme-appearance-preview-main),
@@ -23334,6 +23454,31 @@ to {
   --zy-radius: 0.5rem;
 }
 @layer components {
+[data-theme="daming-dark"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="daming-dark"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-1jte1h3;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="daming-dark"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="daming-dark"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="daming-dark"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -25577,7 +25722,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -26158,7 +26303,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -28960,7 +29105,7 @@ to {
   opacity: 1;
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="daming-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -28999,6 +29144,9 @@ to {
   opacity: 1;
 }
 [data-theme="daming-dark"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="daming-dark"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -29466,6 +29614,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-1jte1h3 {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-1jte1h3 {
 from {
   opacity: 1;
@@ -29547,6 +29703,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="daming-dark"] :where(.theme-logo-loading-mark),
+[data-theme="daming-dark"] :where(.theme-logo-loading-dot),
+[data-theme="daming-dark"] :where(.theme-logo-loading-label),
+[data-theme="daming-dark"] :where(.theme-coding-session-agent),
 [data-theme="daming-dark"] :where(.theme-appearance-preview-frame),
 [data-theme="daming-dark"] :where(.theme-appearance-preview-sidebar),
 [data-theme="daming-dark"] :where(.theme-appearance-preview-main),
@@ -30981,6 +31141,31 @@ to {
   --zy-radius: 0.75rem;
 }
 @layer components {
+[data-theme="changan-light"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="changan-light"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-1j4hgn9;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="changan-light"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="changan-light"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="changan-light"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -33226,7 +33411,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -33807,7 +33992,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -36597,7 +36782,7 @@ to {
   opacity: 1;
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="changan-light"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -36636,6 +36821,9 @@ to {
   opacity: 1;
 }
 [data-theme="changan-light"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="changan-light"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -37103,6 +37291,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-1j4hgn9 {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-1j4hgn9 {
 from {
   opacity: 1;
@@ -37184,6 +37380,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="changan-light"] :where(.theme-logo-loading-mark),
+[data-theme="changan-light"] :where(.theme-logo-loading-dot),
+[data-theme="changan-light"] :where(.theme-logo-loading-label),
+[data-theme="changan-light"] :where(.theme-coding-session-agent),
 [data-theme="changan-light"] :where(.theme-appearance-preview-frame),
 [data-theme="changan-light"] :where(.theme-appearance-preview-sidebar),
 [data-theme="changan-light"] :where(.theme-appearance-preview-main),
@@ -38618,6 +38818,31 @@ to {
   --zy-radius: 0.75rem;
 }
 @layer components {
+[data-theme="changan-dark"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="changan-dark"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-lvvvv1;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="changan-dark"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="changan-dark"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="changan-dark"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -40863,7 +41088,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -41444,7 +41669,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -44249,7 +44474,7 @@ to {
   opacity: 1;
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="changan-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -44288,6 +44513,9 @@ to {
   opacity: 1;
 }
 [data-theme="changan-dark"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="changan-dark"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -44755,6 +44983,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-lvvvv1 {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-lvvvv1 {
 from {
   opacity: 1;
@@ -44836,6 +45072,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="changan-dark"] :where(.theme-logo-loading-mark),
+[data-theme="changan-dark"] :where(.theme-logo-loading-dot),
+[data-theme="changan-dark"] :where(.theme-logo-loading-label),
+[data-theme="changan-dark"] :where(.theme-coding-session-agent),
 [data-theme="changan-dark"] :where(.theme-appearance-preview-frame),
 [data-theme="changan-dark"] :where(.theme-appearance-preview-sidebar),
 [data-theme="changan-dark"] :where(.theme-appearance-preview-main),
@@ -46270,6 +46510,31 @@ to {
   --zy-radius: 0.375rem;
 }
 @layer components {
+[data-theme="weiyang-light"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="weiyang-light"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-6l9g7h;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="weiyang-light"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="weiyang-light"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="weiyang-light"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -48515,7 +48780,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -49096,7 +49361,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -51886,7 +52151,7 @@ to {
   opacity: 1;
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="weiyang-light"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -51925,6 +52190,9 @@ to {
   opacity: 1;
 }
 [data-theme="weiyang-light"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="weiyang-light"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -52392,6 +52660,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-6l9g7h {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-6l9g7h {
 from {
   opacity: 1;
@@ -52473,6 +52749,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="weiyang-light"] :where(.theme-logo-loading-mark),
+[data-theme="weiyang-light"] :where(.theme-logo-loading-dot),
+[data-theme="weiyang-light"] :where(.theme-logo-loading-label),
+[data-theme="weiyang-light"] :where(.theme-coding-session-agent),
 [data-theme="weiyang-light"] :where(.theme-appearance-preview-frame),
 [data-theme="weiyang-light"] :where(.theme-appearance-preview-sidebar),
 [data-theme="weiyang-light"] :where(.theme-appearance-preview-main),
@@ -53907,6 +54187,31 @@ to {
   --zy-radius: 0.375rem;
 }
 @layer components {
+[data-theme="weiyang-dark"] :where(.theme-logo-loading-mark) {
+  width: 8rem;
+  height: auto;
+  color: var(--primary);
+}
+[data-theme="weiyang-dark"] :where(.theme-logo-loading-dot) {
+  opacity: 1;
+  animation-name: zy-component-logo-loading-dot-114pwxx;
+  animation-duration: 1.2s;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+[data-theme="weiyang-dark"] :where(.theme-logo-loading-label) {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+[data-theme="weiyang-dark"] :where(.theme-coding-session-agent) {
+  width: min(30%, 6.5rem);
+  font-size: var(--zy-component-text-xs);
+  font-weight: var(--zy-component-font-weight-normal);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
 [data-theme="weiyang-dark"] :where(.theme-appearance-preview-frame) {
   border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-background);
@@ -56152,7 +56457,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-3) {
-  opacity: 0;
+  opacity: 0.4;
   transition-property: opacity;
   transition-duration: 150ms;
 }
@@ -56733,7 +57038,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3) {
   height: 2rem;
-  width: calc(100% + 12px);
+  width: 100%;
   gap: 0.5rem;
   border-radius: var(--zy-style-radius-md);
   padding-block: 0rem;
@@ -59538,7 +59843,7 @@ to {
   opacity: 1;
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:hover *)) {
-  opacity: 0.3;
+  opacity: 1;
 }
 [data-theme="weiyang-dark"] :where(.theme-page-case-gallery-body):where(:is(.group:hover *)) {
   color: var(--foreground);
@@ -59577,6 +59882,9 @@ to {
   opacity: 1;
 }
 [data-theme="weiyang-dark"] :where(.theme-page-markdown-content-button-1):where(:is(.group:focus-within *)) {
+  opacity: 1;
+}
+[data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-3):where(:is(.group:focus-within *)) {
   opacity: 1;
 }
 [data-theme="weiyang-dark"] :where(.theme-radio):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -60044,6 +60352,14 @@ to {
   background-color: color-mix(in oklab, var(--primary) 10%, transparent);
   color: var(--primary);
 }
+@keyframes zy-component-logo-loading-dot-114pwxx {
+from {
+  opacity: 1;
+}
+to {
+  opacity: 0.35;
+}
+}
 @keyframes zy-component-skeleton-114pwxx {
 from {
   opacity: 1;
@@ -60125,6 +60441,10 @@ to {
 }
 }
 @media (prefers-reduced-motion: reduce) {
+[data-theme="weiyang-dark"] :where(.theme-logo-loading-mark),
+[data-theme="weiyang-dark"] :where(.theme-logo-loading-dot),
+[data-theme="weiyang-dark"] :where(.theme-logo-loading-label),
+[data-theme="weiyang-dark"] :where(.theme-coding-session-agent),
 [data-theme="weiyang-dark"] :where(.theme-appearance-preview-frame),
 [data-theme="weiyang-dark"] :where(.theme-appearance-preview-sidebar),
 [data-theme="weiyang-dark"] :where(.theme-appearance-preview-main),

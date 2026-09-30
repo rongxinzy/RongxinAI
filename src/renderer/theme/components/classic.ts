@@ -1,4 +1,6 @@
 import { classicAppearancePreview } from './classic-appearance-preview';
+import { logoLoadingAppearances } from './logo-loading';
+import { codingSidebarAppearances } from './coding-sidebar';
 import { classicScenes } from './classic-scenes';
 import { classicSidebar } from './classic-sidebar';
 import { classicFields } from './classic-fields';
@@ -76,6 +78,8 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     empty: {},
   });
   return {
+    ...logoLoadingAppearances(),
+    ...codingSidebarAppearances(),
     ...classicButtons(dark),
     ...classicCodingDiff(),
     ...classicSurfaces(),

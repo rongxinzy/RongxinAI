@@ -1,4 +1,6 @@
 import { TOKEN_CONTRACT } from '../tokens/contract';
+import { LOGO_LOADING_SELECTORS } from './logo-loading-contract';
+import { CODING_SIDEBAR_SELECTORS } from './coding-sidebar-contract';
 const appearanceVariables = new Set<string>([
   ...Object.values(TOKEN_CONTRACT),
   '--zy-control-icon-size',
@@ -6,6 +8,8 @@ const appearanceVariables = new Set<string>([
 
 /** Stable component hooks. Theme packages cannot supply selectors or behavior. */
 export const COMPONENT_SELECTORS = {
+  ...LOGO_LOADING_SELECTORS,
+  ...CODING_SIDEBAR_SELECTORS,
   'appearance-preview-frame': '.theme-appearance-preview-frame',
   'appearance-preview-sidebar': '.theme-appearance-preview-sidebar',
   'appearance-preview-main': '.theme-appearance-preview-main',
