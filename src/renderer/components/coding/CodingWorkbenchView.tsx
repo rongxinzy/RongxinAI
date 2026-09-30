@@ -45,6 +45,8 @@ import {
   CodingLaneStatus,
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
+import { reportAppError } from '../../services/appErrorText';
+import { showAppError, showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import {
   activateSessionArtifactView,
@@ -74,6 +76,7 @@ import { CodingInspector } from './CodingInspector';
 import { CodingSidePanelAddMenu } from './CodingSidePanelAddMenu';
 import { CodingWorkspaceFileBrowser } from './CodingWorkspaceFileBrowser';
 import { CodingSidePanelLauncher } from './CodingSidePanelLauncher';
+import { useTurnFailureToast } from './useTurnFailureToast';
 import { CodingParticipants } from './CodingParticipants';
 import { CodingSessionSetupDialog } from './CodingSessionSetupDialog';
 import {
@@ -130,7 +133,6 @@ export const CodingWorkbenchView = ({
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [composerFocusRequestKey, setComposerFocusRequestKey] = useState(0);
   const [promptAttachments, setPromptAttachments] = useState<CodingPromptAttachment[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
   const [sidePanelSheetOpen, setSidePanelSheetOpen] = useState(false);
@@ -222,7 +224,7 @@ export const CodingWorkbenchView = ({
       .selectLane({ workspaceRoot, laneId: selectedLaneId })
       .then(result => {
         if (result.success && result.snapshot) setSnapshot(result.snapshot);
-        else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        else showAppError(result.error, 'codingAgentActionFailed');
       });
   }, [selectedLaneId, snapshot, workspaceRoot]);
   useEffect(() => {
@@ -254,7 +256,8 @@ export const CodingWorkbenchView = ({
     });
     const removeExit = window.electron.codingAgent.onAuthTerminalExit(event => {
       setAuthTerminal(current => (current?.id === event.id ? null : current));
-      if (event.exitCode !== 0) setError(i18nService.t('codingAgentTerminalAuthenticationFailed'));
+      if (event.exitCode !== 0)
+        showAppToast(i18nService.t('codingAgentTerminalAuthenticationFailed'), { isError: true });
     });
     return () => {
       removeData();
@@ -347,10 +350,11 @@ export const CodingWorkbenchView = ({
       .then(result => {
         if (cancelled) return;
         if (result.success && result.snapshot) setSnapshot(result.snapshot);
-        else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        else showAppError(result.error, 'codingAgentActionFailed');
       })
       .catch(() => {
-        if (!cancelled) setError(i18nService.t('codingAgentActionFailed'));
+        if (!cancelled)
+          showAppToast(i18nService.t('codingAgentActionFailed'), { isError: true });
       });
     return () => {
       cancelled = true;
@@ -451,6 +455,9 @@ export const CodingWorkbenchView = ({
       loadingOlderEventsRef.current = false;
     }
   }, [activeLaneId, snapshot?.eventWindows, workspaceRoot]);
+  // All lanes, not only the selected one: a turn that fails in the background must
+  // still reach the user.
+  useTurnFailureToast(snapshot?.events ?? []);
   const activeMissionLanes = useMemo(
     () =>
       activeLane
@@ -716,7 +723,7 @@ export const CodingWorkbenchView = ({
         );
       return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
   const probeAgent = async (profileId: string): Promise<boolean> => {
@@ -728,7 +735,7 @@ export const CodingWorkbenchView = ({
       }
       return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
   const addProfile = async (
@@ -739,7 +746,7 @@ export const CodingWorkbenchView = ({
       setSnapshot(result.snapshot);
       return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
   const trustProfile = async (profileId: string): Promise<boolean> => {
@@ -748,7 +755,7 @@ export const CodingWorkbenchView = ({
       setSnapshot(result.snapshot);
       return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
   const authenticateProfile = async (profileId: string, methodId: string): Promise<boolean> => {
@@ -761,7 +768,7 @@ export const CodingWorkbenchView = ({
       setSnapshot(result.snapshot);
       return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
   const startTerminalAuthentication = async (
@@ -778,7 +785,7 @@ export const CodingWorkbenchView = ({
       setAuthTerminalInput('');
       return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
     return false;
   };
   const submitAuthTerminalInput = () => {
@@ -799,7 +806,7 @@ export const CodingWorkbenchView = ({
       response: { requestId, outcome, optionId },
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const respondElicitation = async (answer: string): Promise<boolean> => {
     if (!activeElicitation) return false;
@@ -812,9 +819,9 @@ export const CodingWorkbenchView = ({
         setSnapshot(result.snapshot);
         return true;
       }
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     }
     return false;
   };
@@ -829,9 +836,9 @@ export const CodingWorkbenchView = ({
         setSnapshot(result.snapshot);
         return true;
       }
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     }
     return false;
   };
@@ -839,7 +846,6 @@ export const CodingWorkbenchView = ({
     if (!prompt.trim()) return;
     if (isSubmitting) return;
     setIsSubmitting(true);
-    setError(null);
     try {
       if (draftSession) {
         const result = await window.electron.codingAgent.startSession({
@@ -864,7 +870,7 @@ export const CodingWorkbenchView = ({
           setPromptAttachments([]);
           onSessionCreated(laneId);
         } else {
-          setError(result.error ?? i18nService.t('codingSessionCreateFailed'));
+          showAppError(result.error, 'codingSessionCreateFailed');
         }
         return;
       }
@@ -887,9 +893,9 @@ export const CodingWorkbenchView = ({
           view: { laneId: activeLane.id, draft: '', scrollPosition: activeLane.scrollPosition },
         });
         setSnapshot(result.snapshot);
-      } else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      } else showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     } finally {
       setIsSubmitting(false);
     }
@@ -902,7 +908,7 @@ export const CodingWorkbenchView = ({
       includeRecoveryContext,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const cancel = async () => {
     if (!activeLane) return;
@@ -911,7 +917,7 @@ export const CodingWorkbenchView = ({
       laneId: activeLane.id,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const setLaneConfigOption = async (configId: string, value: string | boolean) => {
     if (!activeLane) return;
@@ -920,7 +926,7 @@ export const CodingWorkbenchView = ({
       option: { laneId: activeLane.id, configId, value },
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const setLaneModel = async (modelRef: string) => {
     if (!activeLane) return;
@@ -930,7 +936,7 @@ export const CodingWorkbenchView = ({
       modelOverride: modelRef,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const changeConfigOption = async (configId: string, value: string | boolean) => {
     if (draftSession) {
@@ -957,7 +963,7 @@ export const CodingWorkbenchView = ({
       setLaneChangePreview(result.preview.diff);
       return;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
   };
   const applyLaneChanges = async () => {
     if (!activeLane) return;
@@ -972,15 +978,15 @@ export const CodingWorkbenchView = ({
     }
     if (result.conflict) {
       setLaneChangePreview(null);
-      setApplyConflict(result.error ?? i18nService.t('codingAgentActionFailed'));
+      setApplyConflict(reportAppError(result.error, 'codingAgentActionFailed'));
       return;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
   };
   const selectLane = async (laneId: string) => {
     const result = await window.electron.codingAgent.selectLane({ workspaceRoot, laneId });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
     if (result.success) onLaneSelected(laneId);
   };
 
@@ -1242,7 +1248,6 @@ export const CodingWorkbenchView = ({
             }
             isRunning={activeLane?.status === CodingLaneStatus.Running}
             isSubmitting={isSubmitting}
-            hasError={Boolean(error)}
             prompt={prompt}
             focusRequestKey={composerFocusRequestKey}
             sessionId={
@@ -1361,7 +1366,6 @@ export const CodingWorkbenchView = ({
             }}
           />
         ) : null}
-        {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
       {isSidePanelPresent && (
         <aside

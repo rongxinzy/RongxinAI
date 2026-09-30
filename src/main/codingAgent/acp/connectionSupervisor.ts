@@ -1,6 +1,8 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
 import { AcpErrorCode, AcpRequestError } from './protocol';
+import { CodingErrorDetailMessage, CodingErrorMessage } from '../../../shared/codingAgent';
+import { AcpRequestError as AcpResponseError } from './requestError';
 
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
@@ -195,7 +197,9 @@ export class AcpConnectionSupervisor {
     child.once('exit', (code, signal) => {
       if (this.child !== child) return;
       this.child = null;
-      this.failAll(new Error(`ACP agent exited (${code ?? signal ?? 'unknown'}).`));
+      this.failAll(
+        new Error(`${CodingErrorDetailMessage.AcpAgentExited} (${code ?? signal ?? 'unknown'}).`),
+      );
       void terminateProcessTree(child).finally(() => this.scheduleRestart());
     });
     child.once('error', error => {
@@ -211,7 +215,7 @@ export class AcpConnectionSupervisor {
     params: Record<string, unknown>,
     options: { timeoutMs?: number | null; absoluteTimeoutMs?: number | null } = {},
   ): Promise<T> {
-    if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
+    if (!this.child?.stdin.writable) throw new Error(CodingErrorMessage.AcpConnectionNotRunning);
     const id = ++this.requestId;
     const startedAt = Date.now();
     console.debug(`[AcpConnection] sent request ${method} (${id})`);
@@ -298,7 +302,7 @@ export class AcpConnectionSupervisor {
   }
 
   notify(method: string, params: Record<string, unknown>): void {
-    if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
+    if (!this.child?.stdin.writable) throw new Error(CodingErrorMessage.AcpConnectionNotRunning);
     this.writeLine(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`, method);
   }
 
@@ -311,7 +315,7 @@ export class AcpConnectionSupervisor {
     }
     const child = this.child;
     this.child = null;
-    this.failAll(new Error('ACP agent connection was disposed.'));
+    this.failAll(new Error(CodingErrorMessage.AcpAgentConnectionDisposed));
     if (!child) return;
     await terminateProcessTree(child);
     if (child.exitCode !== null || child.signalCode !== null) return;
@@ -329,7 +333,7 @@ export class AcpConnectionSupervisor {
   private consumeStdout(chunk: string): void {
     this.stdoutBuffer += chunk;
     if (Buffer.byteLength(this.stdoutBuffer) > MAX_STDOUT_LINE_BYTES) {
-      this.failAll(new Error('ACP agent emitted an oversized stdout message.'));
+      this.failAll(new Error(CodingErrorMessage.AcpOversizedMessage));
       void this.dispose();
       return;
     }
@@ -381,9 +385,13 @@ export class AcpConnectionSupervisor {
             : '';
         const context = this.stderrContext.trim();
         const suffix = context ? ` Agent diagnostics: ${context.slice(-2000)}` : '';
-        pending.reject(new Error(`ACP request ${pending.method} failed${code}: ${detail}.${data}${suffix}`));
-      }
-      else pending.resolve(message.result);
+        pending.reject(
+          new AcpResponseError(
+            `ACP request ${pending.method} failed${code}: ${detail}.${data}${suffix}`,
+            message.error.code,
+          ),
+        );
+      } else pending.resolve(message.result);
     } catch (error) {
       console.warn('[AcpConnection] ignored malformed stdout protocol message:', error);
     }

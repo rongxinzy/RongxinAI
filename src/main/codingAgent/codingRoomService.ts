@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import { statSync } from 'fs';
 import { readFile, readdir, rename, stat, unlink, writeFile } from 'fs/promises';
@@ -6,6 +6,8 @@ import path from 'path';
 
 import {
   CodingAgentDriverKind,
+  CodingErrorDetailMessage,
+  CodingErrorMessage,
   CodingAssignmentStatus,
   CodingWorkflowStage,
   CodingEventKind,
@@ -80,6 +82,7 @@ import {
 } from './builtinCodingMcpReport';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
+import { inspectWorkspaceContentAsync } from '../workbenchTask/artifactWorkerPool';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import {
   CoworkQueueDelivery,
@@ -369,7 +372,7 @@ export class CodingRoomService extends EventEmitter {
     const sourceFolders = this.requireSourceFolders(input.sourceFolders);
     const defaultProfileId = this.requireProfile(input.defaultProfileId).id;
     if (sourceFolders.some(source => this.repository.findWorkspaceIdBySource(source))) {
-      throw new Error('A source folder already belongs to another coding workspace.');
+      throw new Error(CodingErrorMessage.WorkspaceSourceInUse);
     }
     this.repository.createWorkspace(name, sourceFolders, defaultProfileId);
     return this.listWorkspaces();
@@ -377,7 +380,7 @@ export class CodingRoomService extends EventEmitter {
 
   updateWorkspace(input: UpdateCodingWorkspaceInput): CodingWorkspaceSummary[] {
     const room = this.repository.getRoomById(input.workspaceId);
-    if (!room) throw new Error('Coding workspace was not found.');
+    if (!room) throw new Error(CodingErrorMessage.WorkspaceNotFound);
     const name = this.requireWorkspaceName(input.name);
     const sourceFolders = this.requireSourceFolders(input.sourceFolders);
     const defaultProfileId = this.requireProfile(input.defaultProfileId).id;
@@ -386,10 +389,10 @@ export class CodingRoomService extends EventEmitter {
     const referencedSources = new Set(lanes.map(lane => path.resolve(lane.sourceRoot)));
     const nextSources = new Set(sourceFolders);
     if ([...referencedSources].some(source => !nextSources.has(source))) {
-      throw new Error('A source folder with existing coding sessions cannot be removed.');
+      throw new Error(CodingErrorMessage.WorkspaceSourceNotRemovable);
     }
     if (missions.length > 0 && sourceFolders[0] !== path.resolve(room.workspaceRoot)) {
-      throw new Error('The primary source folder cannot change after a coding session is created.');
+      throw new Error(CodingErrorMessage.WorkspacePrimaryLocked);
     }
     if (
       sourceFolders.some(source => {
@@ -397,11 +400,11 @@ export class CodingRoomService extends EventEmitter {
         return owner !== null && owner !== room.id;
       })
     ) {
-      throw new Error('A source folder already belongs to another coding workspace.');
+      throw new Error(CodingErrorMessage.WorkspaceSourceInUse);
     }
     const conflict = this.repository.getRoomByRoot(sourceFolders[0]);
     if (conflict && conflict.id !== room.id) {
-      throw new Error('A coding workspace already uses this primary source folder.');
+      throw new Error(CodingErrorMessage.WorkspacePrimaryInUse);
     }
     this.repository.updateWorkspace(room.id, name, sourceFolders, defaultProfileId);
     return this.listWorkspaces();
@@ -409,7 +412,7 @@ export class CodingRoomService extends EventEmitter {
 
   deleteWorkspace(workspaceId: string): CodingWorkspaceSummary[] {
     const room = this.repository.getRoomById(workspaceId);
-    if (!room) throw new Error('Coding workspace was not found.');
+    if (!room) throw new Error(CodingErrorMessage.WorkspaceNotFound);
     const missions = this.repository.listMissions(room.id);
     const lanes = this.repository.listLanes(missions.map(mission => mission.id));
     if (
@@ -420,7 +423,7 @@ export class CodingRoomService extends EventEmitter {
           lane.status === CodingLaneStatus.WaitingElicitation,
       )
     ) {
-      throw new Error('Stop all running coding sessions before removing this workspace.');
+      throw new Error(CodingErrorMessage.WorkspaceSessionsRunning);
     }
     for (const lane of lanes) {
       void this.drivers.get(lane.id)?.dispose();
@@ -438,17 +441,17 @@ export class CodingRoomService extends EventEmitter {
     const room =
       this.repository.getRoomByRoot(workspaceRoot) ??
       this.repository.getRoomByRoot(path.resolve(workspaceRoot));
-    if (!room) throw new Error('Coding workspace was not found.');
+    if (!room) throw new Error(CodingErrorMessage.WorkspaceNotFound);
     const missions = this.repository.listMissions(room.id);
     const lanes = this.repository.listLanes(missions.map(mission => mission.id));
     const lane = lanes.find(candidate => candidate.id === laneId);
-    if (!lane) throw new Error('The coding session was not found.');
+    if (!lane) throw new Error(CodingErrorMessage.SessionNotFound);
     if (
       lane.status === CodingLaneStatus.Running ||
       lane.status === CodingLaneStatus.WaitingApproval ||
       lane.status === CodingLaneStatus.WaitingElicitation
     ) {
-      throw new Error('Stop the running coding session before deleting it.');
+      throw new Error(CodingErrorMessage.SessionRunning);
     }
     const missionLanes = lanes.filter(candidate => candidate.missionId === lane.missionId);
     const implementationLaneId = this.repository
@@ -497,7 +500,7 @@ export class CodingRoomService extends EventEmitter {
 
   async startSession(input: StartCodingSessionInput): Promise<CodingRoomSnapshot> {
     const prompt = input.prompt.trim();
-    if (!prompt) throw new Error('Prompt is required.');
+    if (!prompt) throw new Error(CodingErrorMessage.PromptRequired);
     const selectedProfile = this.registry.get(input.profileId);
     if (
       selectedProfile &&
@@ -570,9 +573,9 @@ export class CodingRoomService extends EventEmitter {
   async createMission(input: CreateCodingMissionInput): Promise<CodingRoomSnapshot> {
     this.registry.refreshBuiltinReadiness();
     const profile = this.registry.get(input.profileId);
-    if (!profile) throw new Error('Coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
     if (profile.status !== CodingAgentProfileStatus.Ready) {
-      throw new Error('The selected coding agent is not ready to run.');
+      throw new Error(CodingErrorMessage.ProfileNotReady);
     }
     const room = this.repository.getOrCreateRoom(input.workspaceRoot);
     const mission = this.repository.createMission(
@@ -650,7 +653,7 @@ export class CodingRoomService extends EventEmitter {
     text: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
     const normalized = text.trim();
-    if (!normalized) return { success: false, error: 'Message text is required.' };
+    if (!normalized) return { success: false, error: CodingErrorMessage.MessageTextRequired };
     const item: CoworkPendingMessage = {
       id: randomUUID(),
       text: normalized,
@@ -671,12 +674,12 @@ export class CodingRoomService extends EventEmitter {
     text: string,
   ): { success: boolean; error?: string } {
     const normalized = text.trim();
-    if (!normalized) return { success: false, error: 'Message text is required.' };
+    if (!normalized) return { success: false, error: CodingErrorMessage.MessageTextRequired };
     const items = this.acpPendingMessages.get(laneId) ?? [];
     const item = items.find(candidate => candidate.id === itemId);
-    if (!item) return { success: false, error: 'Pending message was not found.' };
+    if (!item) return { success: false, error: CodingErrorMessage.PendingMessageNotFound };
     if (item.status === CoworkQueueItemStatus.Sending) {
-      return { success: false, error: 'A pending message cannot be edited while sending.' };
+      return { success: false, error: CodingErrorMessage.PendingMessageEditWhileSending };
     }
     item.text = normalized;
     item.status = CoworkQueueItemStatus.Pending;
@@ -689,7 +692,7 @@ export class CodingRoomService extends EventEmitter {
     const items = this.acpPendingMessages.get(laneId) ?? [];
     const next = items.filter(item => item.id !== itemId);
     if (next.length === items.length)
-      return { success: false, error: 'Pending message was not found.' };
+      return { success: false, error: CodingErrorMessage.PendingMessageNotFound };
     if (next.length) this.acpPendingMessages.set(laneId, next);
     else this.acpPendingMessages.delete(laneId);
     this.emitPendingMessagesChanged(laneId);
@@ -703,9 +706,9 @@ export class CodingRoomService extends EventEmitter {
   ): Promise<CodingRoomSnapshot> {
     const items = this.acpPendingMessages.get(laneId) ?? [];
     const item = items.find(candidate => candidate.id === itemId);
-    if (!item) throw new Error('Pending message was not found.');
+    if (!item) throw new Error(CodingErrorMessage.PendingMessageNotFound);
     if (item.status === CoworkQueueItemStatus.Sending) {
-      throw new Error('A pending message is already being sent.');
+      throw new Error(CodingErrorMessage.PendingMessageSending);
     }
     item.delivery = CoworkQueueDelivery.Steer;
     item.status = CoworkQueueItemStatus.Sending;
@@ -728,12 +731,12 @@ export class CodingRoomService extends EventEmitter {
     const item = (this.acpPendingMessages.get(laneId) ?? []).find(
       candidate => candidate.id === itemId,
     );
-    if (!item) throw new Error('Pending message was not found.');
+    if (!item) throw new Error(CodingErrorMessage.PendingMessageNotFound);
     if (item.delivery !== CoworkQueueDelivery.FollowUp) {
-      throw new Error('This pending message must be sent as a steer.');
+      throw new Error(CodingErrorMessage.PendingMessageSteerOnly);
     }
     if (item.status === CoworkQueueItemStatus.Sending) {
-      throw new Error('A pending message is already being sent.');
+      throw new Error(CodingErrorMessage.PendingMessageSending);
     }
     item.status = CoworkQueueItemStatus.Sending;
     delete item.error;
@@ -765,7 +768,7 @@ export class CodingRoomService extends EventEmitter {
     ) {
       const profile = this.registry.get(lane.profileId);
       const prompt = input.prompt.trim();
-      if (!prompt) throw new Error('Prompt is required.');
+      if (!prompt) throw new Error(CodingErrorMessage.PromptRequired);
       if (profile?.driverKind === CodingAgentDriverKind.Builtin) {
         const driver = this.getDriver(lane);
         const session = await this.ensureDriverSession(
@@ -776,30 +779,30 @@ export class CodingRoomService extends EventEmitter {
         if (input.delivery === CodingPromptDelivery.Steer) {
           const result = await this.runtime.steerBuiltinMessage?.(session.id, prompt);
           if (result?.success) return this.publish(workspaceRoot);
-          throw new Error(result?.error ?? 'Failed to steer the coding agent.');
+          throw new Error(result?.error ?? CodingErrorMessage.SteerFailed);
         }
         const result = this.runtime.enqueueBuiltinMessage?.(session.id, prompt);
         if (result?.success) return this.publish(workspaceRoot);
-        throw new Error(result?.error ?? 'Failed to queue the coding prompt.');
+        throw new Error(result?.error ?? CodingErrorMessage.QueuePromptFailed);
       }
       if (profile?.driverKind === CodingAgentDriverKind.Acp) {
         const queued = this.enqueuePendingMessage(lane.id, prompt);
         if (!queued.success || !queued.item)
-          throw new Error(queued.error ?? 'Failed to queue the coding prompt.');
+          throw new Error(queued.error ?? CodingErrorMessage.QueuePromptFailed);
         if (input.delivery === CodingPromptDelivery.Steer) {
           return await this.steerPendingMessage(workspaceRoot, lane.id, queued.item.id);
         }
         return this.publish(workspaceRoot);
       }
-      throw new Error('This coding agent lane already has an active turn.');
+      throw new Error(CodingErrorMessage.LaneTurnActive);
     }
     const profile = this.registry.get(lane.profileId);
-    if (!profile) throw new Error('Coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
     if (profile.status !== CodingAgentProfileStatus.Ready) {
-      throw new Error('The selected coding agent is not ready to run.');
+      throw new Error(CodingErrorMessage.ProfileNotReady);
     }
     const prompt = input.prompt.trim();
-    if (!prompt) throw new Error('Prompt is required.');
+    if (!prompt) throw new Error(CodingErrorMessage.PromptRequired);
 
     const executionRoot = this.executionRoot(lane, workspaceRoot);
     if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
@@ -859,6 +862,7 @@ export class CodingRoomService extends EventEmitter {
       this.repository.updateLaneStatus(lane.id, failureStatus);
       this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.Failed);
       this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Failed);
+      console.error('[CodingRoom] turn failed:', error);
       this.repository.appendEvent(lane.id, CodingEventKind.TurnFailed, {
         error: this.errorMessage(error),
       });
@@ -877,10 +881,10 @@ export class CodingRoomService extends EventEmitter {
     const lane = this.requireLane(snapshot.lanes, laneId);
     const profile = this.registry.get(lane.profileId);
     if (!profile || profile.status !== CodingAgentProfileStatus.Ready) {
-      throw new Error('The selected coding agent is not ready to run.');
+      throw new Error(CodingErrorMessage.ProfileNotReady);
     }
     if (!lane.pendingRecoveryPrompt || !lane.pendingRecoveryContext) {
-      throw new Error('The coding session does not require recovery confirmation.');
+      throw new Error(CodingErrorMessage.RecoveryNotRequired);
     }
     const executionRoot = this.executionRoot(lane, workspaceRoot);
     if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
@@ -1002,7 +1006,7 @@ export class CodingRoomService extends EventEmitter {
     const source = this.requireLane(snapshot.lanes, sourceLaneId);
     const target = this.requireLane(snapshot.lanes, targetLaneId);
     if (source.missionId !== target.missionId) {
-      throw new Error('Handoffs require lanes in the same coding mission.');
+      throw new Error(CodingErrorMessage.HandoffSameMission);
     }
     return this.collaboration.buildHandoff({
       snapshot,
@@ -1024,7 +1028,7 @@ export class CodingRoomService extends EventEmitter {
     const source = this.requireLane(snapshot.lanes, sourceLaneId);
     const target = this.requireLane(snapshot.lanes, targetLaneId);
     if (source.missionId !== target.missionId) {
-      throw new Error('Handoffs require lanes in the same coding mission.');
+      throw new Error(CodingErrorMessage.HandoffSameMission);
     }
     const content = await this.previewHandoff(workspaceRoot, sourceLaneId, targetLaneId);
     const handoffId = this.repository.createHandoff(
@@ -1055,15 +1059,15 @@ export class CodingRoomService extends EventEmitter {
     this.registry.refreshBuiltinReadiness();
     const snapshot = this.bootstrap(workspaceRoot);
     if (!snapshot.missions.some(mission => mission.id === missionId)) {
-      throw new Error('Coding mission was not found.');
+      throw new Error(CodingErrorMessage.MissionNotFound);
     }
     const profile = this.registry.get(profileId);
-    if (!profile) throw new Error('Coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
     if (profile.status !== CodingAgentProfileStatus.Ready) {
-      throw new Error('The selected coding agent is not ready to run.');
+      throw new Error(CodingErrorMessage.ProfileNotReady);
     }
     if (!this.runtime.createIsolatedWorkspace) {
-      throw new Error('The coding runtime cannot create an isolated workspace.');
+      throw new Error(CodingErrorMessage.RuntimeIsolatedUnsupported);
     }
     const mission = snapshot.missions.find(candidate => candidate.id === missionId);
     const laneId = randomUUID();
@@ -1095,16 +1099,16 @@ export class CodingRoomService extends EventEmitter {
   ): Promise<CodingRoomSnapshot> {
     const snapshot = this.bootstrap(input.workspaceRoot);
     const mission = snapshot.missions.find(candidate => candidate.id === input.missionId);
-    if (!mission) throw new Error('Coding mission was not found.');
+    if (!mission) throw new Error(CodingErrorMessage.MissionNotFound);
     if (!this.runtime.createIsolatedWorkspace) {
-      throw new Error('The coding runtime cannot create an isolated workspace.');
+      throw new Error(CodingErrorMessage.RuntimeIsolatedUnsupported);
     }
     const implementation = snapshot.assignments.find(
       assignment =>
         assignment.missionId === mission.id &&
         assignment.workflowStage === CodingWorkflowStage.Implementation,
     );
-    if (!implementation) throw new Error('The coding mission has no implementation assignment.');
+    if (!implementation) throw new Error(CodingErrorMessage.MissionNoImplementation);
     const stages = [
       {
         profileId: input.reviewerProfileId,
@@ -1123,9 +1127,9 @@ export class CodingRoomService extends EventEmitter {
     let previousAssignmentId = implementation.id;
     for (const stage of stages) {
       const profile = this.registry.get(stage.profileId);
-      if (!profile) throw new Error('Coding agent profile was not found.');
+      if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
       if (profile.status !== CodingAgentProfileStatus.Ready) {
-        throw new Error('The selected coding agent is not ready to run.');
+        throw new Error(CodingErrorMessage.ProfileNotReady);
       }
       const laneId = randomUUID();
       const sourceRoot =
@@ -1178,16 +1182,16 @@ export class CodingRoomService extends EventEmitter {
     const snapshot = this.bootstrap(workspaceRoot);
     const lane = this.requireLane(snapshot.lanes, input.laneId);
     const option = lane.configOptions.find(candidate => candidate.id === input.configId);
-    if (!option) throw new Error('The coding agent configuration option was not found.');
+    if (!option) throw new Error(CodingErrorMessage.ConfigOptionNotFound);
     if (option.type === 'select') {
       if (
         typeof input.value !== 'string' ||
         !option.options?.some(candidate => candidate.value === input.value)
       ) {
-        throw new Error('The selected coding agent configuration value is invalid.');
+        throw new Error(CodingErrorMessage.ConfigValueInvalid);
       }
     } else if (typeof input.value !== 'boolean') {
-      throw new Error('The selected coding agent configuration value is invalid.');
+      throw new Error(CodingErrorMessage.ConfigValueInvalid);
     }
     const driver = this.getDriver(lane);
     const session = await this.ensureDriverSession(
@@ -1210,7 +1214,7 @@ export class CodingRoomService extends EventEmitter {
     const lane = this.requireLane(snapshot.lanes, laneId);
     const profile = this.registry.get(lane.profileId);
     if (profile?.driverKind !== CodingAgentDriverKind.Builtin) {
-      throw new Error('Only the built-in coding agent supports switching models here.');
+      throw new Error(CodingErrorMessage.ModelSwitchBuiltinOnly);
     }
     const normalized = modelOverride?.trim() || null;
     this.repository.updateLaneModelOverride(lane.id, normalized);
@@ -1228,10 +1232,10 @@ export class CodingRoomService extends EventEmitter {
     const lane = this.requireLane(snapshot.lanes, laneId);
     const executionRoot = this.executionRoot(lane, workspaceRoot);
     if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
-      throw new Error('Only isolated collaborator worktrees can be previewed for application.');
+      throw new Error(CodingErrorMessage.CollaboratorPreviewIsolatedOnly);
     }
     if (!this.runtime.getIsolatedWorkspaceDiff) {
-      throw new Error('The coding runtime cannot inspect isolated workspace changes.');
+      throw new Error(CodingErrorMessage.RuntimeIsolatedDiffUnsupported);
     }
     return { laneId: lane.id, diff: await this.runtime.getIsolatedWorkspaceDiff(executionRoot) };
   }
@@ -1241,13 +1245,13 @@ export class CodingRoomService extends EventEmitter {
     const lane = this.requireLane(snapshot.lanes, laneId);
     const executionRoot = this.executionRoot(lane, workspaceRoot);
     if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
-      throw new Error('Only isolated collaborator worktrees can be applied.');
+      throw new Error(CodingErrorMessage.CollaboratorApplyIsolatedOnly);
     }
     if (this.repository.getWriterLease(snapshot.room.id, lane.sourceRoot)) {
-      throw new Error('Wait for the active workspace writer before applying collaborator changes.');
+      throw new Error(CodingErrorMessage.WorkspaceWriterBusy);
     }
     if (!this.runtime.applyIsolatedWorkspaceDiff) {
-      throw new Error('The coding runtime cannot apply isolated workspace changes.');
+      throw new Error(CodingErrorMessage.RuntimeIsolatedApplyUnsupported);
     }
     await this.runtime.applyIsolatedWorkspaceDiff({
       workspaceRoot: lane.sourceRoot,
@@ -1308,7 +1312,7 @@ export class CodingRoomService extends EventEmitter {
     const relativePath = this.requireWorkspaceRelativePath(input.path);
     const directoryPath = await broker.resolveTarget(relativePath);
     const directory = await stat(directoryPath);
-    if (!directory.isDirectory()) throw new Error('The requested workspace path is not a directory.');
+    if (!directory.isDirectory()) throw new Error(CodingErrorMessage.WorkspacePathNotDirectory);
 
     const entries = await readdir(directoryPath, { withFileTypes: true });
     return entries
@@ -1328,40 +1332,42 @@ export class CodingRoomService extends EventEmitter {
   async readWorkspaceFile(input: CodingWorkspaceFileInput): Promise<CodingWorkspaceFileContent> {
     const { sourceRoot, broker } = this.resolveWorkspaceBrowser(input);
     const relativePath = this.requireWorkspaceRelativePath(input.path);
-    if (!relativePath) throw new Error('Select a workspace file to preview.');
+    if (!relativePath) throw new Error(CodingErrorMessage.FilePreviewNotSelected);
     const filePath = await broker.resolveTarget(relativePath);
     const file = await stat(filePath);
-    if (!file.isFile()) throw new Error('The requested workspace path is not a file.');
-    if (file.size > 512 * 1024) throw new Error('Files larger than 512 KB cannot be previewed.');
+    if (!file.isFile()) throw new Error(CodingErrorMessage.WorkspacePathNotFile);
+    if (file.size > 512 * 1024) throw new Error(CodingErrorMessage.FilePreviewTooLarge);
 
     const content = await readFile(filePath);
-    if (content.includes(0)) throw new Error('Binary files cannot be previewed.');
+    const inspected = await inspectWorkspaceContentAsync(content);
+    if (inspected.binary) throw new Error(CodingErrorMessage.FilePreviewBinary);
     return {
       path: path.relative(sourceRoot, filePath),
-      content: content.toString('utf8'),
-      sha256: createHash('sha256').update(content).digest('hex'),
+      content: inspected.text,
+      sha256: inspected.sha256,
     };
   }
 
   async writeWorkspaceFile(input: CodingWorkspaceFileWriteInput): Promise<CodingWorkspaceFileContent> {
-    if (typeof input.content !== 'string') throw new Error('Workspace file content must be text.');
+    if (typeof input.content !== 'string') throw new Error(CodingErrorMessage.FileEditTextRequired);
     const content = Buffer.from(input.content, 'utf8');
-    if (content.length > 512 * 1024) throw new Error('Files larger than 512 KB cannot be edited.');
+    if (content.length > 512 * 1024) throw new Error(CodingErrorMessage.FileEditTooLarge);
     const { sourceRoot, broker, roomId } = this.resolveWorkspaceBrowser(input);
     const relativePath = this.requireWorkspaceRelativePath(input.path);
-    if (!relativePath) throw new Error('Select a workspace file to edit.');
+    if (!relativePath) throw new Error(CodingErrorMessage.FileEditNotSelected);
     if (this.repository.getWriterLease(roomId, sourceRoot)) {
-      throw new Error('Wait for the active workspace writer before saving this file.');
+      throw new Error(CodingErrorMessage.FileEditWriterBusy);
     }
     const filePath = await broker.resolveTarget(relativePath);
     const fileStat = await stat(filePath);
-    if (!fileStat.isFile()) throw new Error('The requested workspace path is not a file.');
+    if (!fileStat.isFile()) throw new Error(CodingErrorMessage.WorkspacePathNotFile);
     const current = await readFile(filePath);
-    const currentSha256 = createHash('sha256').update(current).digest('hex');
-    if (currentSha256 !== input.expectedSha256) {
-      throw new Error('The file changed outside the editor. Reload it before saving.');
+    const currentInspection = await inspectWorkspaceContentAsync(current);
+    if (currentInspection.sha256 !== input.expectedSha256) {
+      throw new Error(CodingErrorMessage.FileEditChanged);
     }
-    if (current.includes(0)) throw new Error('Binary files cannot be edited.');
+    if (currentInspection.binary) throw new Error(CodingErrorMessage.FileEditBinary);
+    const nextInspection = await inspectWorkspaceContentAsync(content);
     const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
     try {
       await writeFile(temporaryPath, content, { mode: fileStat.mode });
@@ -1372,7 +1378,7 @@ export class CodingRoomService extends EventEmitter {
     return {
       path: path.relative(sourceRoot, filePath),
       content: input.content,
-      sha256: createHash('sha256').update(content).digest('hex'),
+      sha256: nextInspection.sha256,
     };
   }
 
@@ -1387,20 +1393,20 @@ export class CodingRoomService extends EventEmitter {
       this.repository
         .listRooms()
         .find(candidate => path.resolve(candidate.workspaceRoot) === workspaceRoot);
-    if (!room) throw new Error('Coding workspace was not found.');
+    if (!room) throw new Error(CodingErrorMessage.WorkspaceNotFound);
 
     const sourceRoot = path.resolve(input.sourceRoot || room.workspaceRoot);
     const source = this.repository
       .listWorkspaceSources(room.id)
       .find(candidate => path.resolve(candidate.path) === sourceRoot);
-    if (!source) throw new Error('File access is limited to folders in the coding workspace.');
+    if (!source) throw new Error(CodingErrorMessage.FileAccessNotInWorkspace);
     return { roomId: room.id, sourceRoot, broker: new WorkspaceBroker(sourceRoot) };
   }
 
   private requireWorkspaceRelativePath(value: string | undefined): string {
     const relativePath = value?.trim() ?? '';
     if (path.isAbsolute(relativePath) || relativePath.split(path.sep).includes('..')) {
-      throw new Error('Workspace paths must stay inside the selected source folder.');
+      throw new Error(CodingErrorMessage.WorkspaceRelativePath);
     }
     return relativePath;
   }
@@ -1432,12 +1438,12 @@ export class CodingRoomService extends EventEmitter {
   ): Promise<CodingRoomSnapshot> {
     const profile = this.registry.get(profileId);
     if (!profile || profile.isBuiltin || profile.status !== CodingAgentProfileStatus.NeedsAuth) {
-      throw new Error('The coding agent profile is not waiting for authentication.');
+      throw new Error(CodingErrorMessage.ProfileNotAwaitingAuth);
     }
     const method = profile.authMethods.find(candidate => candidate.id === methodId);
-    if (!method) throw new Error('The coding agent authentication method was not found.');
+    if (!method) throw new Error(CodingErrorMessage.AuthMethodNotFound);
     if (method.type === 'terminal') {
-      throw new Error('This coding agent requires interactive terminal authentication.');
+      throw new Error(CodingErrorMessage.AgentTerminalAuthRequired);
     }
     const driver = this.driverFactory.create(profile);
     try {
@@ -1456,11 +1462,11 @@ export class CodingRoomService extends EventEmitter {
   ): { id: string; profileId: string; methodId: string } {
     const profile = this.registry.get(profileId);
     if (!profile || profile.isBuiltin || profile.status !== CodingAgentProfileStatus.NeedsAuth) {
-      throw new Error('The coding agent profile is not waiting for authentication.');
+      throw new Error(CodingErrorMessage.ProfileNotAwaitingAuth);
     }
     const method = profile.authMethods.find(candidate => candidate.id === methodId);
     if (!method || method.type !== 'terminal' || !profile.command) {
-      throw new Error('The coding agent terminal authentication method is not available.');
+      throw new Error(CodingErrorMessage.TerminalAuthUnavailable);
     }
     return this.authTerminals.start({
       profileId,
@@ -1496,12 +1502,12 @@ export class CodingRoomService extends EventEmitter {
         candidate.kind === CodingEventKind.Permission &&
         candidate.payload.requestId === response.requestId,
     );
-    if (!event) throw new Error('The coding permission request was not found.');
+    if (!event) throw new Error(CodingErrorMessage.PermissionRequestNotFound);
     const lane = this.requireLane(snapshot.lanes, event.laneId);
     console.debug(`[CodingRoom] received permission response for lane ${lane.id}`);
     if (this.registry.get(lane.profileId)?.driverKind === CodingAgentDriverKind.Builtin) {
       if (!this.runtime.respondBuiltinPermission) {
-        throw new Error('The built-in coding runtime cannot respond to permissions.');
+        throw new Error(CodingErrorMessage.BuiltinPermissionUnsupported);
       }
       this.runtime.respondBuiltinPermission(
         response.requestId,
@@ -1755,7 +1761,7 @@ export class CodingRoomService extends EventEmitter {
     const existing = this.drivers.get(lane.id);
     if (existing) return existing;
     const profile = this.registry.get(lane.profileId);
-    if (!profile) throw new Error('Coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
     const driver = this.driverFactory.create(profile);
     this.registerDriver(lane, profile, driver);
     return driver;
@@ -2069,7 +2075,10 @@ export class CodingRoomService extends EventEmitter {
         return;
       }
       if (driverKind !== CodingAgentDriverKind.Builtin && !receivedAssistantResponse) {
-        throw new Error(t('codingAgentNoAssistantResponse'));
+        // The agent answered the prompt with nothing. ACP agents do not report
+        // an unusable credential, so the renderer copy names the likely causes
+        // (not signed in / missing or invalid API key / unreachable endpoint).
+        throw new Error(CodingErrorMessage.AgentNoOutput);
       }
       if (driverKind === CodingAgentDriverKind.Builtin) {
         const workbench = this.runtime.getBuiltinWorkbenchLink(lane.localSessionId);
@@ -2109,6 +2118,7 @@ export class CodingRoomService extends EventEmitter {
           error: this.errorMessage(error),
         });
       }
+      console.error('[CodingRoom] turn failed:', error);
       this.repository.appendEvent(lane.id, CodingEventKind.TurnFailed, {
         error: this.errorMessage(error),
       });
@@ -2285,7 +2295,7 @@ export class CodingRoomService extends EventEmitter {
       typeof handoff.implementationDiff === 'string' ? handoff.implementationDiff : null;
     if (implementationDiff?.trim()) {
       if (!this.runtime.applyWorkspacePatch) {
-        throw new Error('The coding runtime cannot materialize a collaborator patch.');
+        throw new Error(CodingErrorMessage.CollaboratorPatchUnsupported);
       }
       await this.runtime.applyWorkspacePatch({
         workspaceRoot: this.executionRoot(target, workspaceRoot),
@@ -2349,7 +2359,7 @@ export class CodingRoomService extends EventEmitter {
 
   private requireLane(lanes: CodingAgentLane[], laneId: string): CodingAgentLane {
     const lane = lanes.find(candidate => candidate.id === laneId);
-    if (!lane) throw new Error('Coding agent lane was not found.');
+    if (!lane) throw new Error(CodingErrorMessage.LaneNotFound);
     return lane;
   }
 
@@ -2383,7 +2393,7 @@ export class CodingRoomService extends EventEmitter {
 
   private requireMissionBaseline(mission: { gitBaseline: string | null } | undefined): string {
     if (!mission?.gitBaseline) {
-      throw new Error('Parallel collaborators require a Git workspace with a frozen baseline.');
+      throw new Error(CodingErrorMessage.CollaboratorBaselineRequired);
     }
     return mission.gitBaseline;
   }
@@ -2435,14 +2445,14 @@ export class CodingRoomService extends EventEmitter {
 
   private requireWorkspaceName(value: string): string {
     const name = value.trim();
-    if (!name) throw new Error('Coding workspace name is required.');
+    if (!name) throw new Error(CodingErrorMessage.WorkspaceNameRequired);
     return name;
   }
 
   private requireProfile(profileId: string): CodingAgentProfile {
     this.registry.refreshBuiltinReadiness();
     const profile = this.registry.get(profileId);
-    if (!profile) throw new Error('Coding agent profile was not found.');
+    if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
     return profile;
   }
 
@@ -2455,19 +2465,19 @@ export class CodingRoomService extends EventEmitter {
           .map(value => path.resolve(value)),
       ),
     ];
-    if (!folders.length) throw new Error('A coding workspace requires at least one source folder.');
+    if (!folders.length) throw new Error(CodingErrorMessage.WorkspaceSourceRequired);
     for (const folder of folders) {
       if (path.parse(folder).root === folder) {
-        throw new Error('A filesystem root cannot be used as a coding workspace source.');
+        throw new Error(CodingErrorMessage.WorkspaceSourceRootForbidden);
       }
       let stat;
       try {
         stat = statSync(folder);
       } catch {
-        throw new Error(`Coding workspace source does not exist: ${folder}`);
+        throw new Error(`${CodingErrorDetailMessage.WorkspaceSourceMissing} ${folder}`);
       }
       if (!stat.isDirectory()) {
-        throw new Error(`Coding workspace source is not a directory: ${folder}`);
+        throw new Error(`${CodingErrorDetailMessage.WorkspaceSourceNotDirectory} ${folder}`);
       }
     }
     return folders;
