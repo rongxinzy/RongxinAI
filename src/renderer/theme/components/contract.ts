@@ -1,4 +1,6 @@
 import { TOKEN_CONTRACT } from '../tokens/contract';
+import { LOGO_LOADING_SELECTORS } from './logo-loading-contract';
+import { CODING_SIDEBAR_SELECTORS } from './coding-sidebar-contract';
 const appearanceVariables = new Set<string>([
   ...Object.values(TOKEN_CONTRACT),
   '--zy-control-icon-size',
@@ -6,6 +8,8 @@ const appearanceVariables = new Set<string>([
 
 /** Stable component hooks. Theme packages cannot supply selectors or behavior. */
 export const COMPONENT_SELECTORS = {
+  ...LOGO_LOADING_SELECTORS,
+  ...CODING_SIDEBAR_SELECTORS,
   'appearance-preview-frame': '.theme-appearance-preview-frame',
   'appearance-preview-sidebar': '.theme-appearance-preview-sidebar',
   'appearance-preview-main': '.theme-appearance-preview-main',
@@ -528,6 +532,7 @@ export const COMPONENT_SELECTORS = {
   'page-settings-input-variant-2': '.theme-page-settings-input-variant-2',
   'page-settings-input-variant-3': '.theme-page-settings-input-variant-3',
   'page-settings-button-variant-7': '.theme-page-settings-button-variant-7',
+  'settings-navigation-icon': '.theme-settings-navigation-icon',
   'page-settings-button-variant-8': '.theme-page-settings-button-variant-8',
   'page-settings-button-variant-9': '.theme-page-settings-button-variant-9',
   'page-agent-task-row-button-variant-1': '.theme-page-agent-task-row-button-variant-1',

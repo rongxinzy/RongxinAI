@@ -20,6 +20,7 @@ export interface CodingConversationMessage {
   content: string;
   createdAt: number;
   role: CodingConversationRoleType;
+  isFinalAnswer: boolean;
 }
 
 export interface CodingConversationReasoning {
@@ -111,6 +112,18 @@ const getMessageId = (event: CodingEvent): string => {
   return typeof nestedMessage?.id === 'string' ? nestedMessage.id : event.id;
 };
 
+const isFinalAssistantMessage = (event: CodingEvent): boolean => {
+  const nestedMessage = asRecord(event.payload.message);
+  const nestedMetadata = asRecord(nestedMessage?.metadata);
+  const payloadMetadata = asRecord(event.payload.metadata);
+  return (
+    nestedMetadata?.isFinalAnswer === true ||
+    nestedMetadata?.isFinal === true ||
+    payloadMetadata?.isFinalAnswer === true ||
+    payloadMetadata?.isFinal === true
+  );
+};
+
 const createTurn = (event: CodingEvent): CodingConversationTurn => ({
   id: event.id,
   startedAt: event.createdAt,
@@ -137,6 +150,7 @@ const appendAssistantMessage = (
       content,
       createdAt: event.createdAt,
       role: CodingConversationRole.Assistant,
+      isFinalAnswer: isFinalAssistantMessage(event),
     });
     return;
   }
@@ -145,6 +159,7 @@ const appendAssistantMessage = (
     event.payload.streamUpdateMode === CodingStreamUpdateMode.Replace
       ? content
       : `${existing.content}${content}`;
+  existing.isFinalAnswer ||= isFinalAssistantMessage(event);
 };
 
 const activityKind = (event: CodingEvent): CodingConversationActivityKindType | null => {
@@ -306,6 +321,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
           content,
           createdAt: event.createdAt,
           role,
+          isFinalAnswer: false,
         };
         turns.push(turn);
         currentTurn = turn;
@@ -365,6 +381,8 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
     if (event.kind === CodingEventKind.TurnComplete) {
       const turn = ensureTurn(event);
       turn.status = CodingConversationTurnStatus.Complete;
+      const finalAssistantMessage = turn.assistantMessages.at(-1);
+      if (finalAssistantMessage) finalAssistantMessage.isFinalAnswer = true;
       turn.completedAt = event.createdAt;
       currentTurn = null;
       continue;

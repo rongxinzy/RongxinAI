@@ -69,6 +69,7 @@ import {
   type WorkbenchTaskChangedEvent,
 } from '../shared/workbenchTask';
 import { CodingAgentIpc } from '../shared/codingAgent';
+import { RuntimeNoticeIpc } from '../shared/ipc/channels';
 
 // Helper: typed main→renderer push listener with automatic cleanup
 const onPush = <T>(channel: string, callback: (data: T) => void): (() => void) => {
@@ -796,6 +797,8 @@ contextBridge.exposeInMainWorld('electron', {
     }) => ipcRenderer.invoke(DialogIpc.SaveInlineFile, options),
     readFileAsDataUrl: (filePath: string) =>
       ipcRenderer.invoke(DialogIpc.ReadFileAsDataUrl, filePath),
+    checkArtifactFile: (filePath: string) =>
+      ipcRenderer.invoke(DialogIpc.CheckArtifactFile, filePath),
     generateThumbnail: (filePath: string) =>
       ipcRenderer.invoke(DialogIpc.GenerateThumbnail, filePath),
     showMessageBox: (options: {
@@ -835,6 +838,7 @@ contextBridge.exposeInMainWorld('electron', {
   appInfo: {
     getVersion: () => ipcRenderer.invoke(AppIpc.GetVersion),
     isDev: () => ipcRenderer.invoke(AppIpc.IsDev),
+    isEnterprise: () => ipcRenderer.invoke(AppIpc.IsEnterprise),
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
     consumePendingLocalInferenceInstall: () =>
       ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
@@ -860,6 +864,11 @@ contextBridge.exposeInMainWorld('electron', {
     exportZip: () => ipcRenderer.invoke(LogIpc.ExportZip),
     fromRenderer: (level: string, tag: string, message: string) =>
       ipcRenderer.send(LogIpc.FromRenderer, level, tag, message),
+  },
+
+  runtimeNotices: {
+    onNotice: (callback: (notice: import('../common/runtimeNotice').RuntimeRetryNotice) => void) =>
+      onPush(RuntimeNoticeIpc.Notice, callback),
   },
 
   im: {

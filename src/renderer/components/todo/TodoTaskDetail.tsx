@@ -52,6 +52,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   const [listId, setListId] = useState(todo.listId ?? NO_LIST_VALUE);
   const [stepDraft, setStepDraft] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   // Background refreshes (onChanged -> loadData) replace the todo object; only
   // resync fields the user is not editing, otherwise in-progress edits would
   // be silently reverted by every save of another field.
@@ -224,7 +225,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
             markDirty('title');
             setTitle(event.target.value);
           }}
-          onBlur={() => void saveDetails()}
+          onBlur={event => {
+            // Let Save submit before autosave can disable the button during its click.
+            if (event.relatedTarget !== saveButtonRef.current) void saveDetails();
+          }}
           aria-label={i18nService.t('todoTitleLabel')}
           className="theme-page-todo-task-detail-input-1"
         />
@@ -352,7 +356,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               markDirty('note');
               setNote(event.target.value);
             }}
-            onBlur={() => void saveDetails()}
+            onBlur={event => {
+              if (event.relatedTarget !== saveButtonRef.current) void saveDetails();
+            }}
+            aria-label={i18nService.t('todoNote')}
             placeholder={i18nService.t('todoNotePlaceholder')}
             rows={5}
           />
@@ -466,7 +473,21 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               {i18nService.t('todoMarkActive')}
             </Button>
           )}
-          <Button type="button" onClick={() => void saveDetails(true)} disabled={isSaving}>
+          <Button
+            ref={saveButtonRef}
+            type="button"
+            onClick={() => void saveDetails(true)}
+            onBlur={() => {
+              // Passing Save with the keyboard still commits unsubmitted text edits.
+              if (
+                !isSaving &&
+                (dirtyFieldsRef.current.has('title') || dirtyFieldsRef.current.has('note'))
+              ) {
+                void saveDetails();
+              }
+            }}
+            disabled={isSaving}
+          >
             {isSaving ? i18nService.t('saving') : i18nService.t('save')}
           </Button>
         </div>

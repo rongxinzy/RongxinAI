@@ -1,3 +1,4 @@
+import { resolveArtifactPath } from '../../shared/cowork/artifactPath';
 import { isBinaryArtifactFile } from '../../shared/cowork/artifactPreview';
 import type { Artifact } from '../types/artifact';
 
@@ -8,6 +9,7 @@ export type LoadedArtifactFile = {
 
 const MAX_CACHE_ENTRIES = 8;
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
+const ARTIFACT_FILE_RETRY_DELAYS_MS = [100, 200, 400, 800] as const;
 
 type CachedDataUrl = {
   dataUrl: string;
@@ -22,21 +24,6 @@ const pathGenerations = new Map<string, number>();
 let cachedBytes = 0;
 let usageCounter = 0;
 let cacheEpoch = 0;
-
-function normalizeFilePath(rawPath: string): string {
-  let filePath = rawPath;
-  if (filePath.startsWith('file:///')) filePath = filePath.slice(7);
-  else if (filePath.startsWith('file://')) filePath = filePath.slice(7);
-  else if (filePath.startsWith('file:/')) filePath = filePath.slice(5);
-  if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1);
-  return filePath.replace(/\\/g, '/');
-}
-
-function resolveFilePath(rawPath: string, cwd?: string | null): string {
-  const filePath = normalizeFilePath(rawPath);
-  if (filePath.startsWith('/') || /^[A-Za-z]:/.test(filePath)) return filePath;
-  return `${cwd ?? ''}/${filePath}`.replace(/\\/g, '/');
-}
 
 function decodeTextDataUrl(dataUrl: string): string {
   const base64 = dataUrl.split(',')[1] || '';
@@ -59,7 +46,7 @@ function evictDataUrlCache(): void {
 
 /** Loads a path-backed artifact as a data URL through the shared preview broker. */
 export function loadArtifactDataUrl(rawPath: string, cwd?: string | null): Promise<string> {
-  const filePath = resolveFilePath(rawPath, cwd);
+  const filePath = resolveArtifactPath(rawPath, cwd);
   const cached = dataUrlCache.get(filePath);
   if (cached) {
     cached.lastUsed = ++usageCounter;
@@ -116,7 +103,7 @@ export function loadArtifactFile(
     return Promise.resolve(null);
   }
 
-  const filePath = resolveFilePath(artifact.filePath, cwd);
+  const filePath = resolveArtifactPath(artifact.filePath, cwd);
   const cached = pendingLoads.get(filePath);
   if (cached) return cached;
 
@@ -139,8 +126,41 @@ export function loadArtifactFile(
   return load;
 }
 
+/**
+ * Reads a generated file with bounded retries because it may briefly exist
+ * between truncate and write while the coding agent is producing it.
+ */
+export async function loadArtifactFileWithRetry(
+  artifact: Artifact,
+  cwd?: string | null,
+  options?: { forceRefresh?: boolean },
+): Promise<LoadedArtifactFile | null> {
+  if (!artifact.filePath) return null;
+  const resolvedFilePath = resolveArtifactPath(artifact.filePath, cwd);
+  if (artifact.content) {
+    return { content: artifact.content, filePath: resolvedFilePath };
+  }
+
+  let loaded: LoadedArtifactFile | null = null;
+  for (let attempt = 0; attempt <= ARTIFACT_FILE_RETRY_DELAYS_MS.length; attempt += 1) {
+    if (attempt > 0 || options?.forceRefresh) invalidateArtifactFile(resolvedFilePath);
+    try {
+      loaded = await loadArtifactFile({ ...artifact, content: '' }, cwd);
+    } catch {
+      loaded = null;
+    }
+
+    const isFinalAttempt = attempt === ARTIFACT_FILE_RETRY_DELAYS_MS.length;
+    if (loaded && (loaded.content.length > 0 || isFinalAttempt)) return loaded;
+    if (!isFinalAttempt) {
+      await new Promise(resolve => setTimeout(resolve, ARTIFACT_FILE_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  return loaded;
+}
+
 export function invalidateArtifactFile(filePath: string): void {
-  const normalizedPath = resolveFilePath(filePath);
+  const normalizedPath = resolveArtifactPath(filePath);
   pathGenerations.set(normalizedPath, (pathGenerations.get(normalizedPath) ?? 0) + 1);
   pendingLoads.delete(normalizedPath);
   pendingDataUrlLoads.delete(normalizedPath);

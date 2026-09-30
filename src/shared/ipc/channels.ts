@@ -215,6 +215,7 @@ export const DialogIpc = {
   SelectFiles: 'dialog:selectFiles',
   SaveInlineFile: 'dialog:saveInlineFile',
   ReadFileAsDataUrl: 'dialog:readFileAsDataUrl',
+  CheckArtifactFile: 'dialog:checkArtifactFile',
   GenerateThumbnail: 'dialog:generateThumbnail',
   ShowMessageBox: 'dialog:showMessageBox',
 } as const;
@@ -238,6 +239,7 @@ export const AppIpc = {
   SetPreventSleep: 'app:setPreventSleep',
   GetVersion: 'app:getVersion',
   IsDev: 'app:isDev',
+  IsEnterprise: 'app:isEnterprise',
   GetSystemLocale: 'app:getSystemLocale',
   ConsumePendingLocalInferenceInstall: 'app:consumePendingLocalInferenceInstall',
   Relaunch: 'app:relaunch',
@@ -355,6 +357,13 @@ export const NetworkIpc = {
   StatusChange: 'network:status-change',
 } as const;
 export type NetworkIpc = (typeof NetworkIpc)[keyof typeof NetworkIpc];
+
+// ─── Agent runtime notices ──────────────────────────────────────────────────
+/** Transient runtime status the renderer shows once and never persists. */
+export const RuntimeNoticeIpc = {
+  Notice: 'runtime:notice',
+} as const;
+export type RuntimeNoticeIpc = (typeof RuntimeNoticeIpc)[keyof typeof RuntimeNoticeIpc];
 
 // 2026/09/17 lixiang  开发态主进程 HTTP → 渲染进程 Network beacon
 export const DevNetworkIpc = {

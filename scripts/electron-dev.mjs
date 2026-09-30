@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import concurrently from 'concurrently';
 
 import { resolveDevPort } from './find-dev-port.mjs';
+import { describeNativeAbi, inspectNativeAbi, NativeAbiStatus } from './electron-native-abi.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -28,6 +29,19 @@ function withLocalBinPath(env) {
   };
 }
 
+/**
+ * Removes the Node-runtime compatibility flag from this development process.
+ * Concurrently merges process.env into each child environment, so deleting it
+ * from a copied environment is not sufficient.
+ * @param {NodeJS.ProcessEnv} env
+ */
+function removeElectronRunAsNode(env) {
+  const keys = Object.keys(env).filter(
+    entry => entry.toLowerCase() === 'electron_run_as_node',
+  );
+  for (const key of keys) delete env[key];
+}
+
 function patchWindowsElectronIcon() {
   if (process.platform !== 'win32') return;
   const patchScript = path.join(scriptDirectory, 'patch-windows-electron-icon.mjs');
@@ -46,8 +60,19 @@ function patchWindowsElectronIcon() {
 }
 
 async function main() {
+  removeElectronRunAsNode(process.env);
+
   if (!fs.existsSync(localBinDirectory)) {
     throw new Error(`Missing ${localBinDirectory}; run npm/bun install first.`);
+  }
+
+  // `npm test` rebuilds better-sqlite3 for Node's ABI and restores Electron's
+  // afterwards; starting inside that window would die later with an opaque
+  // ERR_DLOPEN_FAILED inside initStore, so fail fast with the fix command.
+  const nativeAbi = inspectNativeAbi(projectRoot);
+  if (nativeAbi !== NativeAbiStatus.Compatible) {
+    console.error(describeNativeAbi(nativeAbi));
+    process.exit(1);
   }
 
   // Windows: embed the app icon into development electron.exe so the taskbar
@@ -71,6 +96,7 @@ async function main() {
     const shortcutResult = spawnSync(electronBinary, [shortcutScript], {
       cwd: projectRoot,
       stdio: 'inherit',
+      env: process.env,
     });
     if (shortcutResult.status !== 0) {
       console.warn('[electron:dev] Windows taskbar shortcut was not created.');
@@ -90,8 +116,7 @@ async function main() {
 
   // Same startup contract as the original package.json script:
   // concurrently Vite + (wait-on assets → wait-on .electron-ready → electron)
-  const quotedElectron =
-    process.platform === 'win32' ? `"${electronBinary}"` : electronBinary;
+  const quotedElectron = process.platform === 'win32' ? `"${electronBinary}"` : electronBinary;
   const { result } = concurrently(
     [
       {
@@ -115,6 +140,7 @@ async function main() {
       cwd: projectRoot,
       killOthers: ['failure', 'success'],
       killSignal: 'SIGKILL',
+      successCondition: 'command-electron',
     },
   );
 

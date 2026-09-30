@@ -22,7 +22,6 @@ import {
   FileDiff,
   Minimize2,
   PanelRight,
-  Settings2,
   Terminal as TerminalIcon,
   X,
 } from 'lucide-react';
@@ -32,9 +31,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import type {
   CodingAgentAvailableCommand,
   CodingAgentConfigOption,
+  CodingAgentProfile,
   CodingPromptAttachment,
   CodingEventPage,
-  CodingRoomSnapshot,
   CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import {
@@ -45,6 +44,8 @@ import {
   CodingLaneStatus,
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
+import { reportAppError } from '../../services/appErrorText';
+import { showAppError, showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import {
   activateSessionArtifactView,
@@ -56,6 +57,7 @@ import {
   selectSessionArtifacts,
 } from '../../store/slices/artifactSlice';
 import PageHeader from '../PageHeader';
+import { LogoLoadingState } from '../LogoLoadingState';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
 import ArtifactPanelResizeHandle from '../artifacts/ArtifactPanelResizeHandle';
 import { clampArtifactPanelWidth } from '../artifacts/artifactPanelResize';
@@ -63,17 +65,19 @@ import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
+import { useCodingAgentManager } from './useCodingAgentManager';
 import { CodingAuthTerminalDialog } from './CodingAuthTerminalDialog';
 import { CodingComposer } from './CodingComposer';
 import { CodingPermissionOverlay } from './CodingPermissionOverlay';
 import { CodingEventStream } from './CodingEventStream';
-import { mergeCodingRoomEventDelta } from './codingEventDelta';
+import { useCodingRoomSnapshot } from './useCodingRoomSnapshot';
 import { CodingGitPanel } from './CodingGitPanel';
 import { CodingGitQuickActions } from './CodingGitQuickActions';
 import { CodingInspector } from './CodingInspector';
 import { CodingSidePanelAddMenu } from './CodingSidePanelAddMenu';
 import { CodingWorkspaceFileBrowser } from './CodingWorkspaceFileBrowser';
 import { CodingSidePanelLauncher } from './CodingSidePanelLauncher';
+import { useTurnFailureToast } from './useTurnFailureToast';
 import { CodingParticipants } from './CodingParticipants';
 import { CodingSessionSetupDialog } from './CodingSessionSetupDialog';
 import {
@@ -89,12 +93,12 @@ import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
 import { findPendingCodingPermission } from './codingPermission';
 import { resolveCodingSidePanelMaxWidth } from './codingSidePanelSizing';
+import { buildCodingSessionDraftSelection } from './codingSessionDraft';
 import { useCodingSidePanelTransition } from './useCodingSidePanelTransition';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
 
-const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
 const CODING_PANEL_MIN_WIDTH = 280;
 const CODING_PANEL_DEFAULT_WIDTH = 560;
 
@@ -123,14 +127,17 @@ export const CodingWorkbenchView = ({
   isSidebarCollapsed = false,
   onToggleSidebar,
 }: CodingWorkbenchViewProps) => {
-  const [snapshot, setSnapshot] = useState<CodingRoomSnapshot | null>(EMPTY_SNAPSHOT);
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [composerFocusRequestKey, setComposerFocusRequestKey] = useState(0);
   const [promptAttachments, setPromptAttachments] = useState<CodingPromptAttachment[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const { snapshot, setSnapshot, bootstrapError, isCurrentWorkspace } = useCodingRoomSnapshot(
+    workspaceRoot,
+    selectedLaneId,
+    bootstrapAttempt,
+    showAppError,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
   const [sidePanelSheetOpen, setSidePanelSheetOpen] = useState(false);
@@ -151,7 +158,8 @@ export const CodingWorkbenchView = ({
     output: string;
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
-  const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const [agentManagerOpen, setAgentManagerOpen] = useCodingAgentManager();
+  const [managerProfiles, setManagerProfiles] = useState<CodingAgentProfile[]>([]);
   const [sessionSetupWorkspace, setSessionSetupWorkspace] = useState<CodingWorkspaceSummary | null>(
     null,
   );
@@ -171,69 +179,19 @@ export const CodingWorkbenchView = ({
     setPromptAttachments([]);
   }, [selectionKey]);
   useEffect(() => {
-    setBootstrapError(null);
-    if (!workspaceRoot) {
-      setSnapshot(null);
-      return;
-    }
-    let cancelled = false;
-    const reportFailure = (message: string | undefined): void => {
-      // Without a snapshot the workbench would be stuck on its loading
-      // screen forever, so surface the failure with a retry.
-      setBootstrapError(message ?? i18nService.t('codingAgentActionFailed'));
-    };
-    void window.electron.codingAgent
-      .bootstrap(workspaceRoot)
-      .then(result => {
-        if (cancelled) return;
-        if (result.success && result.snapshot) {
-          setSnapshot(result.snapshot);
-          return;
-        }
-        reportFailure(result.error);
-      })
-      .catch(error => {
-        if (cancelled) return;
-        reportFailure(error instanceof Error ? error.message : undefined);
-      });
-    const unsubscribe = window.electron.codingAgent.onChanged(next => {
-      if (next.room.workspaceRoot === workspaceRoot) setSnapshot(next);
-    });
-    const unsubscribeDelta = window.electron.codingAgent.onEventDelta(delta => {
-      if (delta.workspaceRoot !== workspaceRoot) return;
-      setSnapshot(current => (current ? mergeCodingRoomEventDelta(current, delta) : current));
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe();
-      unsubscribeDelta();
-    };
-  }, [workspaceRoot, bootstrapAttempt]);
-  useEffect(() => {
-    if (
-      !workspaceRoot ||
-      !selectedLaneId ||
-      !snapshot?.lanes.some(lane => lane.id === selectedLaneId) ||
-      snapshot.room.activeLaneId === selectedLaneId
-    ) {
-      return;
-    }
-    void window.electron.codingAgent
-      .selectLane({ workspaceRoot, laneId: selectedLaneId })
-      .then(result => {
-        if (result.success && result.snapshot) setSnapshot(result.snapshot);
-        else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-      });
-  }, [selectedLaneId, snapshot, workspaceRoot]);
-  useEffect(() => {
     const openSessionSetup = (event: Event) => {
       const detail = (event as CustomEvent<CodingCreateSessionEventDetail>).detail;
+      // 新建工作区时默认 Agent 已经确定：直接进入会话，不再让用户选一次。
+      if (detail.profileId) {
+        onSessionDraftCreated(buildCodingSessionDraftSelection(detail.workspace, detail.profileId));
+        return;
+      }
       sessionSetupSelectionKeyRef.current = selectionKey;
       setSessionSetupWorkspace(detail.workspace);
     };
     window.addEventListener(CodingUiEvent.CreateSession, openSessionSetup);
     return () => window.removeEventListener(CodingUiEvent.CreateSession, openSessionSetup);
-  }, [selectionKey]);
+  }, [onSessionDraftCreated, selectionKey]);
   useEffect(() => {
     if (
       sessionSetupWorkspace &&
@@ -254,7 +212,8 @@ export const CodingWorkbenchView = ({
     });
     const removeExit = window.electron.codingAgent.onAuthTerminalExit(event => {
       setAuthTerminal(current => (current?.id === event.id ? null : current));
-      if (event.exitCode !== 0) setError(i18nService.t('codingAgentTerminalAuthenticationFailed'));
+      if (event.exitCode !== 0)
+        showAppToast(i18nService.t('codingAgentTerminalAuthenticationFailed'), { isError: true });
     });
     return () => {
       removeData();
@@ -347,15 +306,16 @@ export const CodingWorkbenchView = ({
       .then(result => {
         if (cancelled) return;
         if (result.success && result.snapshot) setSnapshot(result.snapshot);
-        else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        else showAppError(result.error, 'codingAgentActionFailed');
       })
       .catch(() => {
-        if (!cancelled) setError(i18nService.t('codingAgentActionFailed'));
+        if (!cancelled)
+          showAppToast(i18nService.t('codingAgentActionFailed'), { isError: true });
       });
     return () => {
       cancelled = true;
     };
-  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, workspaceRoot]);
+  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, setSnapshot, workspaceRoot]);
   // A draft has no lane yet, so fetch the default config options of its
   // profile to show model/thinking controls before the session exists.
   const draftProfileId = draftSession?.profileId ?? null;
@@ -450,7 +410,10 @@ export const CodingWorkbenchView = ({
     } finally {
       loadingOlderEventsRef.current = false;
     }
-  }, [activeLaneId, snapshot?.eventWindows, workspaceRoot]);
+  }, [activeLaneId, setSnapshot, snapshot?.eventWindows, workspaceRoot]);
+  // All lanes, not only the selected one: a turn that fails in the background must
+  // still reach the user.
+  useTurnFailureToast(snapshot?.events ?? []);
   const activeMissionLanes = useMemo(
     () =>
       activeLane
@@ -706,7 +669,12 @@ export const CodingWorkbenchView = ({
 
   const discoverAgents = async (): Promise<boolean> => {
     const result = await window.electron.codingAgent.discoverAgents({ workspaceRoot });
-    if (result.success && result.snapshot) {
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
+    }
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) {
       setSnapshot(result.snapshot);
       if (activeLane?.status === CodingLaneStatus.Running)
         void codingQueue.load(
@@ -714,72 +682,45 @@ export const CodingWorkbenchView = ({
             ? activeLane.id
             : activeLane.localSessionId,
         );
-      return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
+    return true;
   };
   const probeAgent = async (profileId: string): Promise<boolean> => {
     const result = await window.electron.codingAgent.probeAgent({ workspaceRoot, profileId });
-    if (result.success && result.snapshot) {
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
+    }
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) {
       setSnapshot(result.snapshot);
       if (activeProfile?.driverKind === CodingAgentDriverKind.Acp && activeLane) {
         void codingQueue.load(activeLane.id);
       }
-      return true;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
+    return true;
   };
   const addProfile = async (
     profile: import('../../../shared/codingAgent').AddCodingAgentProfileInput,
   ): Promise<boolean> => {
     const result = await window.electron.codingAgent.addProfile({ workspaceRoot, profile });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) setSnapshot(result.snapshot);
+    return true;
   };
   const trustProfile = async (profileId: string): Promise<boolean> => {
     const result = await window.electron.codingAgent.trustProfile({ workspaceRoot, profileId });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
+    if (!result.success) {
+      showAppError(result.error, 'codingAgentActionFailed');
+      return false;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
-  };
-  const authenticateProfile = async (profileId: string, methodId: string): Promise<boolean> => {
-    const result = await window.electron.codingAgent.authenticateProfile({
-      workspaceRoot,
-      profileId,
-      methodId,
-    });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
-    }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
-  };
-  const startTerminalAuthentication = async (
-    profileId: string,
-    methodId: string,
-  ): Promise<boolean> => {
-    const result = await window.electron.codingAgent.startAuthTerminal({
-      workspaceRoot,
-      profileId,
-      methodId,
-    });
-    if (result.success && result.terminal) {
-      setAuthTerminal({ ...result.terminal, output: '' });
-      setAuthTerminalInput('');
-      return true;
-    }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
+    if (result.profiles) setManagerProfiles(result.profiles);
+    if (result.snapshot) setSnapshot(result.snapshot);
+    return true;
   };
   const submitAuthTerminalInput = () => {
     if (!authTerminal) return;
@@ -799,7 +740,7 @@ export const CodingWorkbenchView = ({
       response: { requestId, outcome, optionId },
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const respondElicitation = async (answer: string): Promise<boolean> => {
     if (!activeElicitation) return false;
@@ -812,9 +753,9 @@ export const CodingWorkbenchView = ({
         setSnapshot(result.snapshot);
         return true;
       }
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     }
     return false;
   };
@@ -829,9 +770,9 @@ export const CodingWorkbenchView = ({
         setSnapshot(result.snapshot);
         return true;
       }
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     }
     return false;
   };
@@ -839,7 +780,6 @@ export const CodingWorkbenchView = ({
     if (!prompt.trim()) return;
     if (isSubmitting) return;
     setIsSubmitting(true);
-    setError(null);
     try {
       if (draftSession) {
         const result = await window.electron.codingAgent.startSession({
@@ -857,6 +797,7 @@ export const CodingWorkbenchView = ({
             ? { configOptionOverrides: draftConfigOverrides }
             : {}),
         });
+        if (!isCurrentWorkspace()) return;
         const laneId = result.snapshot?.room.activeLaneId;
         if (result.success && result.snapshot && laneId) {
           setSnapshot(result.snapshot);
@@ -864,7 +805,7 @@ export const CodingWorkbenchView = ({
           setPromptAttachments([]);
           onSessionCreated(laneId);
         } else {
-          setError(result.error ?? i18nService.t('codingSessionCreateFailed'));
+          showAppError(result.error, 'codingSessionCreateFailed');
         }
         return;
       }
@@ -879,6 +820,7 @@ export const CodingWorkbenchView = ({
           ...(promptAttachments.length > 0 ? { attachments: promptAttachments } : {}),
         },
       });
+      if (!isCurrentWorkspace()) return;
       if (result.success && result.snapshot) {
         setDraftState({ laneId: activeLane.id, value: '' });
         setPromptAttachments([]);
@@ -887,9 +829,11 @@ export const CodingWorkbenchView = ({
           view: { laneId: activeLane.id, draft: '', scrollPosition: activeLane.scrollPosition },
         });
         setSnapshot(result.snapshot);
-      } else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      } else showAppError(result.error, 'codingAgentActionFailed');
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      if (isCurrentWorkspace()) {
+        showAppError(error, 'codingAgentActionFailed');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -902,7 +846,7 @@ export const CodingWorkbenchView = ({
       includeRecoveryContext,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const cancel = async () => {
     if (!activeLane) return;
@@ -911,7 +855,7 @@ export const CodingWorkbenchView = ({
       laneId: activeLane.id,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const setLaneConfigOption = async (configId: string, value: string | boolean) => {
     if (!activeLane) return;
@@ -920,7 +864,7 @@ export const CodingWorkbenchView = ({
       option: { laneId: activeLane.id, configId, value },
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const setLaneModel = async (modelRef: string) => {
     if (!activeLane) return;
@@ -930,7 +874,7 @@ export const CodingWorkbenchView = ({
       modelOverride: modelRef,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
   };
   const changeConfigOption = async (configId: string, value: string | boolean) => {
     if (draftSession) {
@@ -957,7 +901,7 @@ export const CodingWorkbenchView = ({
       setLaneChangePreview(result.preview.diff);
       return;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
   };
   const applyLaneChanges = async () => {
     if (!activeLane) return;
@@ -972,42 +916,75 @@ export const CodingWorkbenchView = ({
     }
     if (result.conflict) {
       setLaneChangePreview(null);
-      setApplyConflict(result.error ?? i18nService.t('codingAgentActionFailed'));
+      setApplyConflict(reportAppError(result.error, 'codingAgentActionFailed'));
       return;
     }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    showAppError(result.error, 'codingAgentActionFailed');
   };
   const selectLane = async (laneId: string) => {
     const result = await window.electron.codingAgent.selectLane({ workspaceRoot, laneId });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    else showAppError(result.error, 'codingAgentActionFailed');
     if (result.success) onLaneSelected(laneId);
   };
 
+  // Agent profiles are global configuration, so the manager loads them without
+  // depending on the workspace snapshot (there may be no workspace yet, or the
+  // room may still be loading or have failed to load).
+  const refreshManagerProfiles = useCallback(async () => {
+    const result = await window.electron.codingAgent.listProfiles();
+    if (result.success && result.profiles) setManagerProfiles(result.profiles);
+  }, []);
+  useEffect(() => {
+    if (!agentManagerOpen) return;
+    void refreshManagerProfiles();
+  }, [agentManagerOpen, refreshManagerProfiles]);
+  useEffect(() => {
+    if (snapshot) setManagerProfiles(snapshot.profiles);
+  }, [snapshot]);
+
+  const agentManagerElement = (
+    <CodingAgentManager
+      open={agentManagerOpen}
+      onOpenChange={setAgentManagerOpen}
+      profiles={managerProfiles.filter(profile => !profile.isBuiltin)}
+      onDiscover={discoverAgents}
+      onProbe={probeAgent}
+      onAddProfile={addProfile}
+      onTrust={trustProfile}
+    />
+  );
+
   if (!workspaceRoot)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {i18nService.t('codingAgentSelectWorkspace')}
-      </div>
+      <>
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          {i18nService.t('codingAgentSelectWorkspace')}
+        </div>
+        {agentManagerElement}
+      </>
     );
   if (!snapshot)
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        {bootstrapError ? (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <p>{bootstrapError}</p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setBootstrapAttempt(attempt => attempt + 1)}
-            >
-              {i18nService.t('retry')}
-            </Button>
-          </div>
-        ) : (
-          i18nService.t('codingAgentLoading')
-        )}
-      </div>
+      <>
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          {bootstrapError ? (
+            <div className="flex flex-col items-center gap-3 text-center">
+              <p>{bootstrapError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setBootstrapAttempt(attempt => attempt + 1)}
+              >
+                {i18nService.t('retry')}
+              </Button>
+            </div>
+          ) : (
+            <LogoLoadingState label={i18nService.t('codingAgentLoading')} />
+          )}
+        </div>
+        {agentManagerElement}
+      </>
     );
 
   return (
@@ -1061,17 +1038,7 @@ export const CodingWorkbenchView = ({
           onCancelAuthTerminal={id => void window.electron.codingAgent.cancelAuthTerminal(id)}
           onSubmitAuthTerminalInput={submitAuthTerminalInput}
         />
-        <CodingAgentManager
-          open={agentManagerOpen}
-          onOpenChange={setAgentManagerOpen}
-          profiles={snapshot.profiles.filter(profile => !profile.isBuiltin)}
-          onDiscover={discoverAgents}
-          onProbe={probeAgent}
-          onAddProfile={addProfile}
-          onTrust={trustProfile}
-          onAuthenticate={authenticateProfile}
-          onTerminalAuthenticate={startTerminalAuthentication}
-        />
+        {agentManagerElement}
         {recoveryLane && (
           <Dialog open>
             <DialogContent showCloseButton={false}>
@@ -1157,15 +1124,6 @@ export const CodingWorkbenchView = ({
             isStreaming={activeLane?.status === CodingLaneStatus.Running}
             headerActions={
               <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={i18nService.t('codingAgentManageAgents')}
-                  onClick={() => setAgentManagerOpen(true)}
-                >
-                  <Settings2 />
-                </Button>
                 <CodingGitQuickActions
                   target={{
                     workspaceRoot,
@@ -1242,7 +1200,6 @@ export const CodingWorkbenchView = ({
             }
             isRunning={activeLane?.status === CodingLaneStatus.Running}
             isSubmitting={isSubmitting}
-            hasError={Boolean(error)}
             prompt={prompt}
             focusRequestKey={composerFocusRequestKey}
             sessionId={
@@ -1343,25 +1300,14 @@ export const CodingWorkbenchView = ({
             }}
             onManageAgents={() => setAgentManagerOpen(true)}
             onSubmit={({ profileId, sourceRoot }) => {
-              onSessionDraftCreated({
-                workspaceId: sessionSetupWorkspace.id,
-                workspaceRoot: sessionSetupWorkspace.primaryRoot,
-                laneId: null,
-                draft: {
-                  id: crypto.randomUUID(),
-                  workspaceId: sessionSetupWorkspace.id,
-                  sourceRoot,
-                  profileId,
-                  modelOverride: null,
-                  sources: sessionSetupWorkspace.sources,
-                },
-              });
+              onSessionDraftCreated(
+                buildCodingSessionDraftSelection(sessionSetupWorkspace, profileId, sourceRoot),
+              );
               setSessionSetupWorkspace(null);
               sessionSetupSelectionKeyRef.current = null;
             }}
           />
         ) : null}
-        {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
       {isSidePanelPresent && (
         <aside

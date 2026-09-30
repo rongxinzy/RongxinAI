@@ -232,7 +232,7 @@ test('declares only the client capabilities implemented by the ACP driver', asyn
   const script = [
     "let buffer=''; let capabilitiesValid=false;",
     "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
-    "if (request.method === 'initialize') { const capabilities = request.params.clientCapabilities; capabilitiesValid = capabilities.fs?.readTextFile === true && capabilities.fs?.writeTextFile === true && capabilities.terminal === true && !('plan' in capabilities) && capabilities.auth?.terminal === true && capabilities.session?.configOptions?.boolean; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); }",
+    "if (request.method === 'initialize') { const capabilities = request.params.clientCapabilities; capabilitiesValid = capabilities.fs?.readTextFile === true && capabilities.fs?.writeTextFile === true && capabilities.terminal === true && !('plan' in capabilities) && capabilities.auth === undefined && capabilities.session?.configOptions?.boolean; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); }",
     "if (request.method === 'session/new') process.stdout.write(JSON.stringify(capabilitiesValid ? { jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } } : { jsonrpc: '2.0', id: request.id, error: { message: 'missing client capabilities' } }) + '\\n');",
     '} });',
   ].join('');

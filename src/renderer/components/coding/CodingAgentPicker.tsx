@@ -29,8 +29,6 @@ interface CodingAgentPickerProps {
   onProbe: (profileId: string) => Promise<boolean>;
   onAddProfile: (input: AddCodingAgentProfileInput) => Promise<boolean>;
   onTrust: (profileId: string) => Promise<boolean>;
-  onAuthenticate: (profileId: string, methodId: string) => Promise<boolean>;
-  onTerminalAuthenticate: (profileId: string, methodId: string) => Promise<boolean>;
 }
 
 export const CodingAgentPicker = ({
@@ -40,8 +38,6 @@ export const CodingAgentPicker = ({
   onProbe,
   onAddProfile,
   onTrust,
-  onAuthenticate,
-  onTerminalAuthenticate,
 }: CodingAgentPickerProps) => {
   const [open, setOpen] = useState(false);
   const [managerOpen, setManagerOpen] = useState(false);
@@ -125,8 +121,6 @@ export const CodingAgentPicker = ({
         onAddProfile={onAddProfile}
         onProbe={onProbe}
         onTrust={onTrust}
-        onAuthenticate={onAuthenticate}
-        onTerminalAuthenticate={onTerminalAuthenticate}
       />
     </Popover>
   );

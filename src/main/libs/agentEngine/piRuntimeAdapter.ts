@@ -21,7 +21,12 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
-import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
+import {
+  classifyCoworkError,
+  CoworkErrorKind,
+  isTransient,
+  type CoworkError,
+} from '../../../common/coworkError';
 import {
   CoworkSessionExpertSource,
   normalizeSingleExpertIds,
@@ -32,6 +37,10 @@ import {
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import {
+  assertCoworkSubmissionContent,
+  hasVisiblePromptContent,
+} from '../../../shared/cowork/submissionContent';
 import {
   CoworkInterruptionCause,
   type CoworkSessionInterruption,
@@ -181,6 +190,7 @@ import type {
   PiSessionPatch,
   PiStartOptions,
 } from './piRuntimeTypes';
+import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
 
 const summarizePiHistory = (messages: readonly CoworkMessage[]) => {
   let contentBytes = 0;
@@ -316,6 +326,14 @@ interface ActivePiSession {
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
+  /**
+   * Set once a settled turn's error was shown, preventing duplicate reporting.
+   */
+  errorSurfaced: boolean;
+  /** One retry notice per turn: the user learns the model answered with an error. */
+  retryNoticeEmitted: boolean;
+  /** Retry attempts Pi reported in the current turn. */
+  retryAttempts: number;
   completionPending?: Promise<void>;
   requestStartedAt: number | null;
   firstVisibleTextAt: number | null;
@@ -352,8 +370,13 @@ interface ActivePiSession {
    * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
    * flushPendingError surfaces it once the run settles (auto_retry_end /
    * agent_settled). Cleared when a retry succeeds or the turn is reset.
+   *
+   * `sticky` marks a terminal error (including an explicitly cancelled retry).
+   * Pi can report aborted turns with a plain
+   * stop reason, so a later successful-looking assistant message must not erase
+   * them the way it erases a recovered retry.
    */
-  pendingError: { message: string; classified: CoworkError } | null;
+  pendingError: { message: string; classified: CoworkError; sticky?: boolean } | null;
   workbenchRunId: string | null;
   workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
@@ -772,12 +795,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     prompt: string,
     options: PiStartOptions = {},
   ): Promise<void> {
+    assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
     this.evictIdleSessions();
-    const hasContent =
-      prompt.trim() || (options.imageAttachments && options.imageAttachments.length > 0);
-    if (!hasContent) {
-      throw new Error('Prompt is required.');
-    }
     const expertIds = normalizeSingleExpertIds(options.expertIds);
 
     if (this.activeSessions.has(sessionId) || this.initializingSessions.has(sessionId)) {
@@ -1347,6 +1366,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         planMode: options.planMode === true,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resourceState.maxOutputTokens),
         pendingError: null,
+        errorSurfaced: false,
+        retryNoticeEmitted: false,
+        retryAttempts: 0,
         workbenchRunId,
         workbenchContract,
         workspaceRoot,
@@ -1457,10 +1479,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     prompt: string,
     options: PiContinueOptions = {},
   ): Promise<void> {
+    assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
     this.evictIdleSessions();
     const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
     const nextUnattended = options.unattended === true;
     const active = this.activeSessions.get(sessionId);
+    const retryCancellation = active && waitForPiRetryCancellation(active.piSession);
+    if (retryCancellation) await retryCancellation;
     if (active?.completionPending) await active.completionPending;
     if (!active || active.aborted) {
       if (active?.aborted) {
@@ -1565,6 +1590,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
     active.isRunning = true;
     active.turnFailed = false;
+    active.errorSurfaced = false;
+    active.retryNoticeEmitted = false;
+    active.retryAttempts = 0;
 
     const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
     const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
@@ -1680,6 +1708,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.writeTokenLimitRecovery.reset();
     active.pendingError = null;
     active.turnFailed = false;
+    active.errorSurfaced = false;
+    active.retryNoticeEmitted = false;
+    active.retryAttempts = 0;
     active.turnExperts = (this.store?.getSession(sessionId)?.experts ?? [])
       .filter(expert => active.requestedExpertIds.includes(expert.expertId))
       .map(expert => ({
@@ -2163,7 +2194,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       return { success: false, error: 'The Work session is not running.' };
     }
     const normalizedText = text.trim();
-    if (!normalizedText) return { success: false, error: 'Message text is required.' };
+    if (!hasVisiblePromptContent(normalizedText))
+      return { success: false, error: 'Message text is required.' };
     // IPC enqueue already persists; IM/internal callers still pass base64 here.
     const storedImages = this.persistImageAttachments(sessionId, imageAttachments);
     const item = this.pendingMessageQueue.enqueue(
@@ -2187,7 +2219,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       return { success: false, error: 'Pending message queue is only available in Work sessions.' };
     }
     const normalizedText = text.trim();
-    if (!normalizedText) return { success: false, error: 'Message text is required.' };
+    if (!hasVisiblePromptContent(normalizedText))
+      return { success: false, error: 'Message text is required.' };
     const item = this.pendingMessageQueue.update(sessionId, itemId, normalizedText);
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
@@ -2982,6 +3015,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (event.message?.role === 'assistant') {
           active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
           if (event.message.stopReason === 'error') {
+            // The turn was already reported as failed (non-retryable error).
+            if (active.errorSurfaced) return;
             const { text, thinking } = active.streamAccumulator.reconcile(event.message);
             if (thinking && thinking !== active.thinkingText) {
               active.thinkingText = thinking;
@@ -3008,13 +3043,28 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             // A failed turn leaves its bubble behind too; a retry streams into the
             // same id and flips the flag back on by itself.
             this.closeIdlePlaceholders(sessionId, active);
+            if (
+              !active.errorSurfaced &&
+              active.pendingError.classified.kind !== CoworkErrorKind.Unknown &&
+              !isTransient(active.pendingError.classified.kind)
+            ) {
+              // Keep the original failure until Pi settles. If the SDK retries,
+              // auto_retry_start cancels its newly installed backoff controller.
+              active.pendingError.sticky = true;
+            }
             return;
           }
 
           // A successful assistant message after failed attempts means the retry
-          // recovered — drop the deferred error so it is never surfaced.
-          active.pendingError = null;
-          active.turnFailed = false;
+          // recovered — drop the deferred error so it is never surfaced, and
+          // clear the flag so agent_end still finalizes and completes the turn.
+          // Errors the runtime recorded itself are sticky: Pi reports those
+          // turns as a plain aborted or truncated turn, which must not erase them.
+          if (!active.pendingError?.sticky) {
+            active.errorSurfaced = false;
+            active.pendingError = null;
+            active.turnFailed = false;
+          }
 
           const { text, thinking } = active.streamAccumulator.reconcile(event.message);
           const finalThinking = thinking || active.thinkingText;
@@ -3192,7 +3242,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // Failed attempt (deferred error pending): do not continue the agent
         // loop, mark completed, or emit complete. flushPendingError surfaces
         // the error when the run settles (auto_retry_end / agent_settled).
-        if (active.pendingError) break;
+        // A non-retryable error is flushed the moment it is seen, so the turn
+        // is already reported as failed by the time agent_end arrives.
+        if (active.pendingError || active.errorSurfaced) break;
         if (
           active.workbenchRunId &&
           this.workbenchTaskService &&
@@ -3218,6 +3270,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           active.thinkingLifecycle.reset();
           active.lastCompletedAnswerMessageId = null;
           active.lastCompletedAnswerText = '';
+          active.errorSurfaced = false;
+          active.retryNoticeEmitted = false;
+          active.retryAttempts = 0;
           active.toolResultMessageIdByCallId.clear();
           active.toolStartedAtByCallId.clear();
           active.piSession
@@ -3306,23 +3361,45 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
 
       case 'auto_retry_start':
-        // Pi is retrying after an error — silently wait
+        if (active.pendingError?.sticky) {
+          void cancelPiRetry(active.piSession).catch(error => {
+            console.error(`[PiRuntime] failed to cancel retry for session ${sessionId}:`, error);
+          });
+          break;
+        }
+        // Pi is retrying after an error. Retrying is invisible otherwise — the
+        // failed attempt is deferred until the run settles — so the user is told
+        // once per turn that the model answered with an error.
+        active.retryAttempts += 1;
+        if (!active.retryNoticeEmitted && active.pendingError) {
+          active.retryNoticeEmitted = true;
+          this.emit('retryNotice', sessionId, {
+            sessionId,
+            kind: active.pendingError.classified.kind,
+            message: active.pendingError.classified.message,
+            attempt: typeof event.attempt === 'number' ? event.attempt : active.retryAttempts,
+          });
+        }
         break;
 
       case 'auto_retry_end':
+        // The runtime already ended and reported this turn: retry bookkeeping
+        // must not reopen the error.
+        if (active.errorSurfaced) break;
         // Pi reports both recovered retries and final exhaustion here.
-        if (event.success === true) {
+        if (event.success === true && !active.pendingError?.sticky) {
           active.pendingError = null;
           active.turnFailed = false;
           break;
         }
-        if (event.finalError) {
+        if (event.finalError && !active.pendingError?.sticky) {
           active.pendingError = {
             message: event.finalError,
             classified: classifyCoworkError(event.finalError),
           };
         }
-        this.flushPendingError(sessionId, active);
+        // Cancellation precedes agent_settled: retain the lane and writer lease.
+        if (!active.pendingError?.sticky) this.flushPendingError(sessionId, active);
         break;
 
       case 'agent_settled':
@@ -3355,6 +3432,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const pending = active.pendingError;
     if (!pending) return;
     active.pendingError = null;
+    active.errorSurfaced = true;
     active.turnFailed = true;
     active.isRunning = false;
     if (active.answerText.trim()) {
