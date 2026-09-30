@@ -52,7 +52,7 @@ function workspace(id: string): CodingWorkspaceSummary {
 }
 
 function setup() {
-  const workspaces = [workspace('SwarmMind'), workspace('RongxinAI')];
+  const workspaces = [workspace('SwarmMind'), workspace('WorkspaceBeta')];
   const listWorkspaces = vi.fn(async () => ({ success: true, workspaces }));
   let notify: () => void = () => undefined;
   const onChanged = vi.fn((callback: (snapshot: CodingRoomSnapshot) => void) => {
@@ -107,7 +107,7 @@ function setup() {
 
 test('collapsing a workspace does not switch away from the selected session', async () => {
   const { onSelectionChange } = setup();
-  const folder = await screen.findByRole('treeitem', { name: 'RongxinAI' });
+  const folder = await screen.findByRole('treeitem', { name: 'WorkspaceBeta' });
   fireEvent.click(folder);
   expect(folder).toHaveAttribute('aria-expanded', 'false');
   expect(onSelectionChange).not.toHaveBeenCalled();
@@ -120,9 +120,9 @@ test('collapsing a workspace does not switch away from the selected session', as
 test('all folders stay collapsed when workspace data refreshes', async () => {
   const { listWorkspaces, refresh } = setup();
   const swarm = await screen.findByRole('treeitem', { name: 'SwarmMind' });
-  const rongxin = screen.getByRole('treeitem', { name: 'RongxinAI' });
+  const beta = screen.getByRole('treeitem', { name: 'WorkspaceBeta' });
   fireEvent.click(swarm);
-  fireEvent.click(rongxin);
+  fireEvent.click(beta);
   act(refresh);
   await vi.waitFor(() => expect(listWorkspaces.mock.calls.length).toBeGreaterThan(1));
   await act(async () => undefined);
@@ -130,7 +130,7 @@ test('all folders stay collapsed when workspace data refreshes', async () => {
     'aria-expanded',
     'false',
   );
-  expect(screen.getByRole('treeitem', { name: 'RongxinAI' })).toHaveAttribute(
+  expect(screen.getByRole('treeitem', { name: 'WorkspaceBeta' })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
@@ -138,16 +138,16 @@ test('all folders stay collapsed when workspace data refreshes', async () => {
 
 test('reopening a folder reveals its sessions without switching the current session', async () => {
   const { onSelectionChange } = setup();
-  const folder = await screen.findByRole('treeitem', { name: 'RongxinAI' });
+  const folder = await screen.findByRole('treeitem', { name: 'WorkspaceBeta' });
   fireEvent.click(folder);
   fireEvent.click(folder);
-  expect(await screen.findByRole('treeitem', { name: 'RongxinAI session' })).toBeVisible();
+  expect(await screen.findByRole('treeitem', { name: 'WorkspaceBeta session' })).toBeVisible();
   expect(onSelectionChange).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('treeitem', { name: 'RongxinAI session' }));
+  fireEvent.click(screen.getByRole('treeitem', { name: 'WorkspaceBeta session' }));
   expect(onSelectionChange).toHaveBeenLastCalledWith({
-    workspaceId: 'RongxinAI',
-    workspaceRoot: '/projects/RongxinAI',
-    laneId: 'RongxinAI-session',
+    workspaceId: 'WorkspaceBeta',
+    workspaceRoot: '/projects/WorkspaceBeta',
+    laneId: 'WorkspaceBeta-session',
     draft: null,
   });
 });
@@ -155,12 +155,12 @@ test('reopening a folder reveals its sessions without switching the current sess
 test('rapid collapse and reopen cancels the pending removal of the session group', async () => {
   motionSettings.reduced = false;
   setup();
-  const folder = await screen.findByRole('treeitem', { name: 'RongxinAI' });
+  const folder = await screen.findByRole('treeitem', { name: 'WorkspaceBeta' });
   fireEvent.click(folder);
   fireEvent.click(folder);
   await act(async () => new Promise(resolve => setTimeout(resolve, 250)));
   expect(folder).toHaveAttribute('aria-expanded', 'true');
-  const session = screen.getByRole('treeitem', { name: 'RongxinAI session' });
+  const session = screen.getByRole('treeitem', { name: 'WorkspaceBeta session' });
   expect(session.closest('[role="group"]')).toHaveAttribute('aria-hidden', 'false');
   expect(session.closest('.grid')).toHaveClass('opacity-100');
 });
@@ -168,13 +168,13 @@ test('rapid collapse and reopen cancels the pending removal of the session group
 test('enabling reduced motion during a collapse completes the pending collapse', async () => {
   motionSettings.reduced = false;
   const { refresh } = setup();
-  const folder = await screen.findByRole('treeitem', { name: 'RongxinAI' });
+  const folder = await screen.findByRole('treeitem', { name: 'WorkspaceBeta' });
   fireEvent.click(folder);
   motionSettings.reduced = true;
   act(refresh);
   await act(async () => undefined);
   await act(async () => new Promise(resolve => setTimeout(resolve, 250)));
-  expect(screen.queryByText('RongxinAI session')).toBeNull();
+  expect(screen.queryByText('WorkspaceBeta session')).toBeNull();
 });
 
 test('reopening a folder still completes when animation frames are suspended', async () => {
@@ -185,12 +185,12 @@ test('reopening a folder still completes when animation frames are suspended', a
   );
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   setup();
-  const folder = await screen.findByRole('treeitem', { name: 'RongxinAI' });
+  const folder = await screen.findByRole('treeitem', { name: 'WorkspaceBeta' });
   fireEvent.click(folder);
   await act(async () => new Promise(resolve => setTimeout(resolve, 250)));
   fireEvent.click(folder);
   await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
-  expect(screen.getByRole('treeitem', { name: 'RongxinAI session' }).closest('.grid')).toHaveClass(
+  expect(screen.getByRole('treeitem', { name: 'WorkspaceBeta session' }).closest('.grid')).toHaveClass(
     'opacity-100',
   );
 });
@@ -229,22 +229,22 @@ test('delayed deletion preserves a later workspace selection', async () => {
   window.electron.codingAgent.deleteSession = vi.fn(() => pending);
   fireEvent.click(screen.getAllByRole('button', { name: 'codingSessionRemove' })[0]);
   fireEvent.click(screen.getByRole('button', { name: 'confirm-remove' }));
-  fireEvent.click(screen.getByRole('treeitem', { name: 'RongxinAI session' }));
+  fireEvent.click(screen.getByRole('treeitem', { name: 'WorkspaceBeta session' }));
   await act(async () => undefined);
   await act(async () => {
     finish({
       success: true,
       workspaces: [
         { ...workspace('SwarmMind'), sessions: [], activeSessionId: null },
-        workspace('RongxinAI'),
+        workspace('WorkspaceBeta'),
       ],
     });
     await pending;
   });
   expect(onSelectionChange).toHaveBeenLastCalledWith({
-    workspaceId: 'RongxinAI',
-    workspaceRoot: '/projects/RongxinAI',
-    laneId: 'RongxinAI-session',
+    workspaceId: 'WorkspaceBeta',
+    workspaceRoot: '/projects/WorkspaceBeta',
+    laneId: 'WorkspaceBeta-session',
     draft: null,
   });
 });
