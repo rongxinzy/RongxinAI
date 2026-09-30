@@ -1264,6 +1264,7 @@ interface IElectronAPI {
   appInfo: {
     getVersion: () => Promise<string>;
     isDev: () => Promise<boolean>;
+    isEnterprise: () => Promise<boolean>;
     getSystemLocale: () => Promise<string>;
     consumePendingLocalInferenceInstall: () => Promise<string | null>;
     relaunch: () => Promise<void>;

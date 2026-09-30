@@ -250,6 +250,7 @@ import {
   probeCoworkModelReadiness,
 } from './libs/coworkUtil';
 import { createContentSecurityPolicy } from './contentSecurityPolicy';
+import { registerZhiyuanDeepLinkProtocol } from './deepLinkRegistration';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import {
@@ -2000,7 +2001,9 @@ const getOllamaManager = (): OllamaManager => {
 
 const getAppUpdateCoordinator = (): AppUpdateCoordinator => {
   if (!appUpdateCoordinator) {
-    appUpdateCoordinator = new AppUpdateCoordinator(getStore());
+    appUpdateCoordinator = new AppUpdateCoordinator(getStore(), undefined, undefined, {
+      enterpriseBuild: isEnterprise,
+    });
   }
   return appUpdateCoordinator;
 };
@@ -2017,7 +2020,9 @@ const checkForAppUpdate = (): void => {
 };
 
 const startAppUpdatePolling = (): void => {
-  if (appUpdatePollTimer) return;
+  // Enterprise builds receive updates through the enterprise distribution
+  // channel; the client never runs startup or periodic update checks.
+  if (isEnterprise || appUpdatePollTimer) return;
   const startupDelay =
     APP_UPDATE_STARTUP_DELAY_MIN_MS +
     Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
@@ -3166,13 +3171,14 @@ if (!gotTheLock) {
     app.exit(0);
   })();
 } else {
-  // In development Electron needs the app entry point before the callback URL;
-  // otherwise Windows treats the URL itself as the application to launch.
-  if (process.defaultApp && process.argv[1]) {
-    app.setAsDefaultProtocolClient('zhiyuan', process.execPath, [path.resolve(process.argv[1])]);
-  } else {
-    app.setAsDefaultProtocolClient('zhiyuan');
-  }
+  // The enterprise build signs in inside the app and never claims zhiyuan://;
+  // the community build owns it for its browser OAuth callback.
+  registerZhiyuanDeepLinkProtocol(app, {
+    isEnterpriseBuild: isEnterprise,
+    isDefaultApp: process.defaultApp === true,
+    entryPoint: process.argv[1],
+    execPath: process.execPath,
+  });
 
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
 
@@ -3480,6 +3486,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(AppIpc.GetVersion, () => app.getVersion());
   ipcMain.handle(AppIpc.IsDev, () => canUseDevTools()); // 开发环境打开调试面板
+  ipcMain.handle(AppIpc.IsEnterprise, () => isEnterprise);
   ipcMain.handle(AppIpc.GetSystemLocale, () => app.getLocale());
   ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
     consumePendingLocalInferenceInstall(app.getPath('userData')),
