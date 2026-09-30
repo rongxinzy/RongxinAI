@@ -92,6 +92,7 @@ import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
 import { findPendingCodingPermission } from './codingPermission';
 import { resolveCodingSidePanelMaxWidth } from './codingSidePanelSizing';
+import { buildCodingSessionDraftSelection } from './codingSessionDraft';
 import { useCodingSidePanelTransition } from './useCodingSidePanelTransition';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
@@ -178,12 +179,17 @@ export const CodingWorkbenchView = ({
   useEffect(() => {
     const openSessionSetup = (event: Event) => {
       const detail = (event as CustomEvent<CodingCreateSessionEventDetail>).detail;
+      // 新建工作区时默认 Agent 已经确定：直接进入会话，不再让用户选一次。
+      if (detail.profileId) {
+        onSessionDraftCreated(buildCodingSessionDraftSelection(detail.workspace, detail.profileId));
+        return;
+      }
       sessionSetupSelectionKeyRef.current = selectionKey;
       setSessionSetupWorkspace(detail.workspace);
     };
     window.addEventListener(CodingUiEvent.CreateSession, openSessionSetup);
     return () => window.removeEventListener(CodingUiEvent.CreateSession, openSessionSetup);
-  }, [selectionKey]);
+  }, [onSessionDraftCreated, selectionKey]);
   useEffect(() => {
     if (
       sessionSetupWorkspace &&
@@ -1300,19 +1306,9 @@ export const CodingWorkbenchView = ({
             }}
             onManageAgents={() => setAgentManagerOpen(true)}
             onSubmit={({ profileId, sourceRoot }) => {
-              onSessionDraftCreated({
-                workspaceId: sessionSetupWorkspace.id,
-                workspaceRoot: sessionSetupWorkspace.primaryRoot,
-                laneId: null,
-                draft: {
-                  id: crypto.randomUUID(),
-                  workspaceId: sessionSetupWorkspace.id,
-                  sourceRoot,
-                  profileId,
-                  modelOverride: null,
-                  sources: sessionSetupWorkspace.sources,
-                },
-              });
+              onSessionDraftCreated(
+                buildCodingSessionDraftSelection(sessionSetupWorkspace, profileId, sourceRoot),
+              );
               setSessionSetupWorkspace(null);
               sessionSetupSelectionKeyRef.current = null;
             }}

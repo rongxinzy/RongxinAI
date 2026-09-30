@@ -18,6 +18,10 @@ import {
   AnimatedFolderOpenIcon,
   type AnimatedFolderOpenIconHandle,
 } from '../icons/AnimatedFolderOpenIcon';
+import {
+  SidebarAnimatedMessageCirclePlusIcon,
+  type SidebarAnimatedMessageCirclePlusIconHandle,
+} from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 
 interface WorkspaceTreeNodeProps {
@@ -75,6 +79,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
   const [menuOpen, setMenuOpen] = useState(false);
   const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
+  const createTaskIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(workspace.isExpanded);
   const canRemove =
@@ -155,11 +160,18 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
               variant="ghost"
               size="icon-xs"
               onClick={() => onCreateTask(workspace)}
+              onMouseEnter={() => {
+                if (!prefersReducedMotion) createTaskIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => createTaskIconRef.current?.stopAnimation()}
               className="theme-action-muted"
               aria-label={i18nService.t('myAgentSidebarNewTask')}
             >
-              {/* 2026/09/22 lixiang  项目行快捷入口图标由加号改为小铅笔 */}
-              <Pencil className="size-3.5" />
+              <SidebarAnimatedMessageCirclePlusIcon
+                ref={createTaskIconRef}
+                size={14}
+                className="size-3.5"
+              />
             </Button>
           )}
           {canManage && (

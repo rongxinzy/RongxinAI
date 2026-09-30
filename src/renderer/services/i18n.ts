@@ -978,6 +978,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingWorkspaceEdit: '编辑编程工作区',
     codingWorkspaceDescription: '挂载一个或多个现有文件夹；知远不会移动或重命名磁盘文件。',
     codingWorkspaceDefaultAgent: '默认 Agent',
+    codingWorkspaceDefaultAgentUnavailable: '默认 Agent 当前不可用，请重新选择一个 Agent。',
     codingWorkspaceName: '工作区名称',
     codingWorkspaceNamePlaceholder: '例如：知远智能体',
     codingWorkspaceSources: '源文件夹',
@@ -4600,6 +4601,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingWorkspaceDescription:
       'Mount one or more existing folders. ZhiYuan never moves or renames files on disk.',
     codingWorkspaceDefaultAgent: 'Default agent',
+    codingWorkspaceDefaultAgentUnavailable:
+      'The default agent is unavailable. Choose another agent to continue.',
     codingWorkspaceName: 'Workspace name',
     codingWorkspaceNamePlaceholder: 'For example: ZhiYuan Agent',
     codingWorkspaceSources: 'Source folders',

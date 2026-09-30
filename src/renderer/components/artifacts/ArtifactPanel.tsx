@@ -37,7 +37,7 @@ import ArtifactRenderer from './ArtifactRenderer';
 import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
-import { invalidateArtifactFile, loadArtifactFile } from '@/services/artifactFileLoader';
+import { invalidateArtifactFile, loadArtifactFileWithRetry } from '@/services/artifactFileLoader';
 import { MAX_PREVIEW_HTML_CHARS } from './renderers/constants';
 
 // Same code-split as ArtifactRenderer — avoid static import pulling Prism into the main chunk.
@@ -164,7 +164,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     setLoadingArtifactId(artifactId);
     setArtifactLoadError(null);
 
-    loadArtifactFile(selectedArtifact, cwd)
+    loadArtifactFileWithRetry(selectedArtifact, cwd)
       .then(loaded => {
         if (cancelled) return;
         if (!loaded) {
@@ -340,7 +340,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     if (!selectedArtifact?.filePath) return;
     invalidateArtifactFile(selectedArtifact.filePath);
     try {
-      const loaded = await loadArtifactFile({ ...selectedArtifact, content: '' }, cwd);
+      const loaded = await loadArtifactFileWithRetry(
+        { ...selectedArtifact, content: '' },
+        cwd,
+        { forceRefresh: true },
+      );
       if (loaded) {
         dispatch(
           addArtifact({
