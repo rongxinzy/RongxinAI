@@ -1,25 +1,24 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
-import { useReducedMotion } from 'motion/react';
-import { useRef } from 'react';
-
-import { SidebarAnimatedActivityIcon } from '../icons/SidebarAnimatedActivityIcon';
-import { SidebarAnimatedAlarmClockIcon } from '../icons/SidebarAnimatedAlarmClockIcon';
-import { SidebarAnimatedBotIcon } from '../icons/SidebarAnimatedBotIcon';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
-import { SidebarAnimatedTerminalIcon } from '../icons/SidebarAnimatedTerminalIcon';
-import { SidebarAnimatedTodoIcon } from '../icons/SidebarAnimatedTodoIcon';
-import { SidebarAnimatedUsersIcon } from '../icons/SidebarAnimatedUsersIcon';
+import {
+  Activity,
+  AlarmClock,
+  Bot,
+  ListTodo,
+  MessageCirclePlus,
+  Terminal,
+  Users,
+} from 'lucide-react';
 
 const icons = {
-  conversation: SidebarAnimatedMessageCirclePlusIcon,
-  localInference: SidebarAnimatedBotIcon,
-  coding: SidebarAnimatedTerminalIcon,
-  todo: SidebarAnimatedTodoIcon,
-  scheduledTasks: SidebarAnimatedAlarmClockIcon,
-  activity: SidebarAnimatedActivityIcon,
-  expert: SidebarAnimatedUsersIcon,
+  conversation: MessageCirclePlus,
+  localInference: Bot,
+  coding: Terminal,
+  todo: ListTodo,
+  scheduledTasks: AlarmClock,
+  activity: Activity,
+  expert: Users,
 };
 
 export interface SidebarNavigationEntry {
@@ -35,8 +34,6 @@ export interface SidebarNavigationEntry {
 }
 
 function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
-  const iconRef = useRef<{ startAnimation: () => void; stopAnimation: () => void }>(null);
-  const reducedMotion = useReducedMotion();
   const Icon = icons[entry.icon];
   return (
     <Button
@@ -46,18 +43,12 @@ function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
       data-active={entry.active || undefined}
       data-testid={entry.testId}
       aria-current={entry.currentPage ? 'page' : undefined}
-      // Class toggle matches chat skill shortcuts: selected card bg must not rely only on data-active.
-      className={cn(entry.active && 'theme-page-sidebar-navigation-button-selected')}
       onClick={entry.onClick}
-      onMouseEnter={() => {
-        if (!reducedMotion) iconRef.current?.startAnimation();
-        entry.onIntent?.();
-      }}
-      onMouseLeave={() => iconRef.current?.stopAnimation()}
+      onMouseEnter={entry.onIntent}
       onFocus={entry.onIntent}
     >
       <div className="flex size-4 shrink-0 items-center justify-center">
-        <Icon ref={iconRef} />
+        <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
       </div>
       <span className="min-w-0 truncate">{entry.label}</span>
       {entry.running && (
@@ -88,7 +79,7 @@ export function SidebarNavigationView({
   entries,
 }: SidebarNavigationViewProps) {
   return (
-    <div className={cn('mt-2.5 flex flex-col gap-0.5 px-3', isChat ? 'pb-0' : 'pb-3')}>
+    <div className="flex flex-col gap-0.5 px-2 py-2">
       <div className="relative h-7 w-full">
         <Switch
           checked={isChat}
@@ -102,11 +93,8 @@ export function SidebarNavigationView({
             data-mode-selected={isChat === (index === 1)}
             aria-hidden="true"
             className={cn(
-              'pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center text-sm',
+              'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',
               index === 0 ? 'left-0' : 'left-1/2',
-              isChat === (index === 1)
-                ? 'font-semibold text-switch-thumb-foreground'
-                : 'font-normal text-muted-foreground',
             )}
           >
             {label}

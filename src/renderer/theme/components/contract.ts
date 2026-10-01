@@ -2,6 +2,8 @@ import { TOKEN_CONTRACT } from '../tokens/contract';
 import { runIndicatorSelectors } from './run-indicator';
 import { LOGO_LOADING_SELECTORS } from './logo-loading-contract';
 import { CODING_SIDEBAR_SELECTORS } from './coding-sidebar-contract';
+import { CHAT_TOOL_SELECTORS } from './chat-tool-contract';
+import { SHELL_SIDEBAR_SELECTORS } from './shell-sidebar-contract';
 const appearanceVariables = new Set<string>([
   ...Object.values(TOKEN_CONTRACT),
   '--zy-control-icon-size',
@@ -960,6 +962,9 @@ export const COMPONENT_SELECTORS = {
   'page-tabs-list': '.theme-page-tabs-list',
   'page-tabs-trigger': '.theme-page-tabs-trigger',
   'page-tabs-indicator': '.theme-page-tabs-indicator',
+  // Transcript compositions refine the primitive Badge and Collapsible recipes.
+  ...CHAT_TOOL_SELECTORS,
+  ...SHELL_SIDEBAR_SELECTORS,
 } as const;
 
 const enabled =

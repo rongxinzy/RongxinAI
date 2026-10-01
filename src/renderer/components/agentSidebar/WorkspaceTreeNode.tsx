@@ -6,22 +6,22 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { useReducedMotion } from 'motion/react';
-import { Ellipsis, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import {
+  Ellipsis,
+  Folder,
+  FolderOpen,
+  MessageCirclePlus,
+  Pencil,
+  Pin,
+  PinOff,
+  Trash2,
+} from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { isScratchWorkspacePath } from '../../utils/path';
 import AgentTaskRow from './AgentTaskRow';
 import ExpandAgentTasksRow from './ExpandAgentTasksRow';
-import {
-  AnimatedFolderOpenIcon,
-  type AnimatedFolderOpenIconHandle,
-} from '../icons/AnimatedFolderOpenIcon';
-import {
-  SidebarAnimatedMessageCirclePlusIcon,
-  type SidebarAnimatedMessageCirclePlusIconHandle,
-} from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 
 interface WorkspaceTreeNodeProps {
@@ -78,9 +78,6 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const [shouldRenderTasks, setShouldRenderTasks] = useState(workspace.isExpanded);
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
   const [menuOpen, setMenuOpen] = useState(false);
-  const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
-  const createTaskIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
-  const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(workspace.isExpanded);
   const canRemove =
     typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
@@ -114,15 +111,13 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
     <div className="space-y-0.5">
       <div
         data-slot="workspace-tree-row"
-        className={cn(
-          'sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors hover:shadow-subtle',
-          // 2026/09/22 lixiang  文件夹选中保持原先灰底；白底选中仅用于其下会话行
-          isActiveWorkspace && 'bg-surface-raised',
-        )}
+        data-active={isActiveWorkspace || undefined}
+        className="theme-sidebar-workspace group sticky top-0 z-20 flex w-full items-center"
       >
         <Button
           variant="ghost"
-          className="theme-page-workspace-tree-node-button-1 h-full min-w-0 flex-1 justify-start text-left"
+          size="navigation"
+          className="theme-sidebar-workspace-main min-w-0 flex-1 justify-start"
           onClick={() => {
             // 2026/09/21 lixiang  有定位回调时切换右侧项目；当前项目再点则折叠/展开
             if (onSelectWorkspace) {
@@ -131,26 +126,19 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             }
             onToggleExpanded(workspace.id);
           }}
-          onMouseEnter={() => {
-            if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
-          }}
-          onMouseLeave={() => folderIconRef.current?.stopAnimation()}
           role="treeitem"
           aria-level={1}
           aria-expanded={workspace.isExpanded}
           aria-current={isActiveWorkspace ? 'true' : undefined}
         >
-          {/* 2026/09/22 lixiang  文件夹标识用正文色（浅色≈黑） */}
-          <span className="flex size-4 shrink-0 items-center justify-center text-foreground">
-            <AnimatedFolderOpenIcon ref={folderIconRef} />
-          </span>
-          <span
-            className={cn(
-              'min-w-0 flex-1 truncate text-muted-foreground',
-              isActiveWorkspace && 'font-semibold text-foreground',
+          <span className="flex size-4 shrink-0 items-center justify-center">
+            {workspace.isExpanded ? (
+              <FolderOpen className="size-4" strokeWidth={1.75} />
+            ) : (
+              <Folder className="size-4" strokeWidth={1.75} />
             )}
-            title={workspace.path}
-          >
+          </span>
+          <span className="min-w-0 flex-1 truncate" title={workspace.path}>
             {workspace.name}
           </span>
         </Button>
@@ -160,18 +148,10 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
               variant="ghost"
               size="icon-xs"
               onClick={() => onCreateTask(workspace)}
-              onMouseEnter={() => {
-                if (!prefersReducedMotion) createTaskIconRef.current?.startAnimation();
-              }}
-              onMouseLeave={() => createTaskIconRef.current?.stopAnimation()}
               className="theme-action-muted"
               aria-label={i18nService.t('myAgentSidebarNewTask')}
             >
-              <SidebarAnimatedMessageCirclePlusIcon
-                ref={createTaskIconRef}
-                size={14}
-                className="size-3.5"
-              />
+              <MessageCirclePlus className="size-4" strokeWidth={1.75} />
             </Button>
           )}
           {canManage && (
@@ -182,9 +162,8 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                     variant="ghost"
                     size="icon-xs"
                     className={cn(
-                      'theme-page-workspace-tree-node-button-variant-1 pointer-events-none group-hover:pointer-events-auto',
-                      menuOpen &&
-                        'theme-page-workspace-tree-node-button-variant-2 pointer-events-auto',
+                      'theme-sidebar-row-action pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
+                      menuOpen && 'pointer-events-auto',
                     )}
                     aria-label={i18nService.t('workspaceActions')}
                   >
