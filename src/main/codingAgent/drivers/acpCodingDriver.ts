@@ -59,8 +59,14 @@ type EventStream = {
   error: Error | null;
 };
 
-const mergeAdjacentDriverEvents = (previous: DriverEvent, next: DriverEvent): DriverEvent | null => {
-  if (previous.kind === CodingEventKind.MessageDelta && next.kind === CodingEventKind.MessageDelta) {
+const mergeAdjacentDriverEvents = (
+  previous: DriverEvent,
+  next: DriverEvent,
+): DriverEvent | null => {
+  if (
+    previous.kind === CodingEventKind.MessageDelta &&
+    next.kind === CodingEventKind.MessageDelta
+  ) {
     const previousMessageId = previous.payload.messageId;
     if (previousMessageId !== next.payload.messageId || typeof previousMessageId !== 'string') {
       return null;
@@ -150,8 +156,29 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
 };
 const TEXT_EXTENSIONS = new Set([
-  '.c', '.cc', '.css', '.csv', '.go', '.html', '.java', '.js', '.json', '.jsx', '.md', '.py', '.rb',
-  '.rs', '.sh', '.sql', '.toml', '.ts', '.tsx', '.txt', '.xml', '.yaml', '.yml',
+  '.c',
+  '.cc',
+  '.css',
+  '.csv',
+  '.go',
+  '.html',
+  '.java',
+  '.js',
+  '.json',
+  '.jsx',
+  '.md',
+  '.py',
+  '.rb',
+  '.rs',
+  '.sh',
+  '.sql',
+  '.toml',
+  '.ts',
+  '.tsx',
+  '.txt',
+  '.xml',
+  '.yaml',
+  '.yml',
 ]);
 
 const contentBlockToMarkdown = (block: Record<string, unknown>): string | null => {
@@ -516,7 +543,9 @@ export class AcpCodingDriver implements CodingAgentDriver {
           return;
         }
         if (stopReason === AcpStopReason.MaxTokens) {
-          console.warn(`[AcpCodingDriver] session prompt hit the output limit for ${input.sessionId}`);
+          console.warn(
+            `[AcpCodingDriver] session prompt hit the output limit for ${input.sessionId}`,
+          );
           this.finishStream(input.sessionId, new Error(t('codingAgentStopMaxTokens')));
           return;
         }
@@ -797,15 +826,17 @@ export class AcpCodingDriver implements CodingAgentDriver {
       this.permissions.set(requestId, { streamSessionId, resolve, reject });
       this.syncTurnWatchdogs();
     });
-    if (!this.pushEvent(streamSessionId, {
-      kind: CodingEventKind.Permission,
-      payload: {
-        requestId,
-        sessionId: params.sessionId,
-        toolCall: params.toolCall,
-        options: params.options,
-      },
-    })) {
+    if (
+      !this.pushEvent(streamSessionId, {
+        kind: CodingEventKind.Permission,
+        payload: {
+          requestId,
+          sessionId: params.sessionId,
+          toolCall: params.toolCall,
+          options: params.options,
+        },
+      })
+    ) {
       this.releasePermission(requestId);
       throw new Error('ACP permission request could not be delivered to the session prompt.');
     }
@@ -917,10 +948,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   private async resolveWorkspacePath(value: unknown): Promise<string> {
     if (typeof value !== 'string' || !value) {
-      throw new AcpRequestError(
-        AcpErrorCode.InvalidParams,
-        CodingErrorMessage.AcpFilesystemNoPath,
-      );
+      throw new AcpRequestError(AcpErrorCode.InvalidParams, CodingErrorMessage.AcpFilesystemNoPath);
     }
     if (!this.workspaceBroker) throw new Error(CodingErrorMessage.AcpWorkspaceBrokerMissing);
     try {
@@ -964,10 +992,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   private requireTerminalId(value: unknown): string {
     if (typeof value !== 'string' || !value) {
-      throw new AcpRequestError(
-        AcpErrorCode.InvalidParams,
-        CodingErrorMessage.AcpTerminalNoId,
-      );
+      throw new AcpRequestError(AcpErrorCode.InvalidParams, CodingErrorMessage.AcpTerminalNoId);
     }
     return value;
   }
@@ -1176,7 +1201,9 @@ export class AcpCodingDriver implements CodingAgentDriver {
     for (const [requestId, pending] of this.permissions) {
       if (pending.streamSessionId !== sessionId) continue;
       this.releasePermission(requestId);
-      pending.reject(stream.error ?? new Error('ACP session prompt ended before permission response.'));
+      pending.reject(
+        stream.error ?? new Error('ACP session prompt ended before permission response.'),
+      );
     }
     for (const waiter of stream.waiters.splice(0)) {
       if (stream.error) waiter.reject(stream.error);

@@ -96,7 +96,9 @@ const runCommand = async (
         } else {
           reject(
             new Error(
-              stderr.trim() || stdout.trim() || `${command} ${args[0]} failed with exit code ${exitCode}.`,
+              stderr.trim() ||
+                stdout.trim() ||
+                `${command} ${args[0]} failed with exit code ${exitCode}.`,
             ),
           );
         }
@@ -341,13 +343,14 @@ export class CodingGitService {
       args.push('--fill');
     }
     if (input.draft) args.push('--draft');
-    const result = await runCommand(
-      'gh',
-      targetRoot,
-      args,
-      { env: { GH_PROMPT_DISABLED: '1' }, maxOutputBytes: MAX_GIT_OUTPUT_BYTES },
-    );
-    const url = result.stdout.trim().split(/\s+/).find(value => value.startsWith('https://'));
+    const result = await runCommand('gh', targetRoot, args, {
+      env: { GH_PROMPT_DISABLED: '1' },
+      maxOutputBytes: MAX_GIT_OUTPUT_BYTES,
+    });
+    const url = result.stdout
+      .trim()
+      .split(/\s+/)
+      .find(value => value.startsWith('https://'));
     if (!url) throw new Error(CodingErrorMessage.GitPullRequestUrlMissing);
     return url;
   }
@@ -387,7 +390,13 @@ export class CodingGitService {
     const statusOutput = (await runGit(targetRoot, ['status', '--porcelain=v2', '--branch', '-z']))
       .stdout;
     const parsed = parsePorcelainStatus(statusOutput);
-    const [stagedOutput, unstagedOutput, originRemoteOutput, localBranchesOutput, originHeadOutput] = await Promise.all([
+    const [
+      stagedOutput,
+      unstagedOutput,
+      originRemoteOutput,
+      localBranchesOutput,
+      originHeadOutput,
+    ] = await Promise.all([
       runGit(targetRoot, ['diff', '--no-ext-diff', '--cached', '--numstat', '-z']).then(
         result => result.stdout,
       ),
@@ -415,9 +424,17 @@ export class CodingGitService {
           ).then(result => (result.exitCode === 0 ? result.stdout.trim() : null))
         : null;
     const hasRemoteBranch = remoteTrackingHead !== null && remoteTrackingHead === parsed.head;
-    const localBranches = localBranchesOutput.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
-    const defaultBranch = originHeadOutput.trim().replace(/^origin\//, '') ||
-      (localBranches.includes('main') ? 'main' : localBranches.includes('master') ? 'master' : null);
+    const localBranches = localBranchesOutput
+      .split(/\r?\n/)
+      .map(value => value.trim())
+      .filter(Boolean);
+    const defaultBranch =
+      originHeadOutput.trim().replace(/^origin\//, '') ||
+      (localBranches.includes('main')
+        ? 'main'
+        : localBranches.includes('master')
+          ? 'master'
+          : null);
 
     await Promise.all(
       parsed.files.map(async file => {
@@ -483,7 +500,14 @@ export class CodingGitService {
     const safePaths = requireRelativePaths(paths);
     await runGit(targetRoot, ['add', '--', ...safePaths]);
     for (const safePath of safePaths) {
-      const staged = await runGit(targetRoot, ['diff', '--cached', '--name-only', '-z', '--', safePath]);
+      const staged = await runGit(targetRoot, [
+        'diff',
+        '--cached',
+        '--name-only',
+        '-z',
+        '--',
+        safePath,
+      ]);
       if (staged.stdout.split('\0').some(value => value === safePath)) continue;
       const absolutePath = path.resolve(targetRoot, safePath);
       try {
@@ -492,8 +516,15 @@ export class CodingGitService {
           throw new Error('Git could not safely stage the selected non-file path.');
         }
         const mode = (fileStat.mode & 0o111) !== 0 ? '100755' : '100644';
-        const hash = (await runGit(targetRoot, ['hash-object', '-w', '--', safePath])).stdout.trim();
-        await runGit(targetRoot, ['update-index', '--add', '--cacheinfo', `${mode},${hash},${safePath}`]);
+        const hash = (
+          await runGit(targetRoot, ['hash-object', '-w', '--', safePath])
+        ).stdout.trim();
+        await runGit(targetRoot, [
+          'update-index',
+          '--add',
+          '--cacheinfo',
+          `${mode},${hash},${safePath}`,
+        ]);
       } catch (error) {
         if (!isMissingFileError(error)) throw error;
         await runGit(targetRoot, ['update-index', '--force-remove', '--', safePath]);

@@ -106,10 +106,7 @@ const startupTimeoutPatterns = [
   /did not become ready before timeout/i,
 ];
 
-const portInUsePatterns = [
-  /\beaddrinuse\b/i,
-  /address already in use/i,
-];
+const portInUsePatterns = [/\beaddrinuse\b/i, /address already in use/i];
 
 const serviceUnavailablePatterns = [
   /(?:econnrefused|ecanceled|econnreset|socket hang up)/i,

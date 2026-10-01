@@ -1,12 +1,27 @@
 import { CodeBlock } from '@shared/components/ai-elements/code-block';
 import { Button } from '@shared/components/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@shared/components/ui/empty';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Input } from '@shared/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Textarea } from '@shared/components/ui/textarea';
-import { ChevronRight, File, FileSearch, Folder, FolderOpen, LoaderCircle, RotateCcw, Save } from 'lucide-react';
+import {
+  ChevronRight,
+  File,
+  FileSearch,
+  Folder,
+  FolderOpen,
+  LoaderCircle,
+  RotateCcw,
+  Save,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -149,7 +164,8 @@ export const CodingWorkspaceFileBrowser = ({
         if (
           directoryRequestGeneration.current !== generation ||
           directoryRequestIds.current.get(directoryPath) !== requestId
-        ) return;
+        )
+          return;
         if (!result.success || !entries) {
           showAppError(result.error, 'codingAgentFilesPreviewUnavailable');
           return;
@@ -160,7 +176,8 @@ export const CodingWorkspaceFileBrowser = ({
         if (
           directoryRequestGeneration.current !== generation ||
           directoryRequestIds.current.get(directoryPath) !== requestId
-        ) return;
+        )
+          return;
         showAppError(cause, 'codingAgentFilesPreviewUnavailable');
       } finally {
         if (
@@ -285,7 +302,9 @@ export const CodingWorkspaceFileBrowser = ({
   const supportsPreview = selectedPath !== null;
   const searchableFiles = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
-    return flattenFiles(nodes).filter(node => !query || node.path.toLocaleLowerCase().includes(query));
+    return flattenFiles(nodes).filter(
+      node => !query || node.path.toLocaleLowerCase().includes(query),
+    );
   }, [nodes, searchQuery]);
 
   return (
@@ -293,54 +312,56 @@ export const CodingWorkspaceFileBrowser = ({
       <header className="flex min-h-10 items-center justify-between gap-2 border-b border-border px-3">
         <div className="flex min-w-0 items-center gap-2">
           <FolderOpen className="size-4 shrink-0" />
-          <span className="truncate text-sm font-medium">{i18nService.t('codingAgentFilesTitle')}</span>
+          <span className="truncate text-sm font-medium">
+            {i18nService.t('codingAgentFilesTitle')}
+          </span>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-          <PopoverTrigger
-            render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={i18nService.t('codingAgentFilesFilter')}
+                />
+              }
+            >
+              <FileSearch />
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-2">
+              <Input
+                value={searchQuery}
+                placeholder={i18nService.t('codingAgentFilesFilter')}
                 aria-label={i18nService.t('codingAgentFilesFilter')}
+                onChange={event => setSearchQuery(event.target.value)}
               />
-            }
-          >
-            <FileSearch />
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-80 p-2">
-            <Input
-              value={searchQuery}
-              placeholder={i18nService.t('codingAgentFilesFilter')}
-              aria-label={i18nService.t('codingAgentFilesFilter')}
-              onChange={event => setSearchQuery(event.target.value)}
-            />
-            <ScrollArea className="mt-2 h-72">
-              <div className="space-y-1">
-                {searchableFiles.map(node => (
-                  <Button
-                    key={node.path}
-                    type="button"
-                    variant={node.path === selectedPath ? 'secondary' : 'ghost'}
-                    className="w-full justify-start gap-2"
-                    onClick={() => {
-                      setSearchOpen(false);
-                      void openFile(node);
-                    }}
-                  >
-                    <File />
-                    <span className="min-w-0 flex-1 truncate text-left">{node.path}</span>
-                  </Button>
-                ))}
-                {searchableFiles.length === 0 ? (
-                  <p className="px-2 py-3 text-sm text-muted-foreground">
-                    {i18nService.t('codingAgentFilesEmpty')}
-                  </p>
-                ) : null}
-              </div>
-            </ScrollArea>
-          </PopoverContent>
+              <ScrollArea className="mt-2 h-72">
+                <div className="space-y-1">
+                  {searchableFiles.map(node => (
+                    <Button
+                      key={node.path}
+                      type="button"
+                      variant={node.path === selectedPath ? 'secondary' : 'ghost'}
+                      className="w-full justify-start gap-2"
+                      onClick={() => {
+                        setSearchOpen(false);
+                        void openFile(node);
+                      }}
+                    >
+                      <File />
+                      <span className="min-w-0 flex-1 truncate text-left">{node.path}</span>
+                    </Button>
+                  ))}
+                  {searchableFiles.length === 0 ? (
+                    <p className="px-2 py-3 text-sm text-muted-foreground">
+                      {i18nService.t('codingAgentFilesEmpty')}
+                    </p>
+                  ) : null}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
           </Popover>
           <Button
             type="button"
@@ -365,7 +386,10 @@ export const CodingWorkspaceFileBrowser = ({
                 value: CodingWorkspaceFileView.Preview,
                 label: i18nService.t('artifactPreview'),
               },
-              { value: CodingWorkspaceFileView.Code, label: i18nService.t('codingAgentSourceFile') },
+              {
+                value: CodingWorkspaceFileView.Code,
+                label: i18nService.t('codingAgentSourceFile'),
+              },
             ]}
           />
           {fileView === CodingWorkspaceFileView.Code && (
@@ -382,8 +406,17 @@ export const CodingWorkspaceFileBrowser = ({
                 <RotateCcw data-icon="inline-start" />
                 {i18nService.t('codingAgentDiscardChanges')}
               </Button>
-              <Button type="button" size="sm" disabled={!isDirty || isSaving} onClick={() => void saveFile()}>
-                {isSaving ? <LoaderCircle data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}
+              <Button
+                type="button"
+                size="sm"
+                disabled={!isDirty || isSaving}
+                onClick={() => void saveFile()}
+              >
+                {isSaving ? (
+                  <LoaderCircle data-icon="inline-start" className="animate-spin" />
+                ) : (
+                  <Save data-icon="inline-start" />
+                )}
                 {i18nService.t('codingAgentSaveFile')}
               </Button>
             </div>
@@ -391,7 +424,9 @@ export const CodingWorkspaceFileBrowser = ({
         </div>
       )}
       <div className={showFiles ? 'grid min-h-0 flex-1 grid-cols-2' : 'min-h-0 flex-1'}>
-        <section className={showFiles ? 'min-h-0 min-w-0 border-r border-border' : 'h-full min-h-0'}>
+        <section
+          className={showFiles ? 'min-h-0 min-w-0 border-r border-border' : 'h-full min-h-0'}
+        >
           {loadingFile ? (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" />
@@ -428,7 +463,9 @@ export const CodingWorkspaceFileBrowser = ({
           ) : (
             <Empty className="h-full border-0">
               <EmptyHeader>
-                <EmptyMedia variant="icon"><File /></EmptyMedia>
+                <EmptyMedia variant="icon">
+                  <File />
+                </EmptyMedia>
                 <EmptyTitle>{i18nService.t('codingAgentFiles')}</EmptyTitle>
                 <EmptyDescription>{i18nService.t('codingAgentFilesEmpty')}</EmptyDescription>
               </EmptyHeader>
@@ -513,7 +550,9 @@ const FileTree = ({
             )}
             {directory ? expanded ? <FolderOpen /> : <Folder /> : <File />}
             <span className="min-w-0 truncate text-left">{node.name}</span>
-            {loadingPaths.has(node.path) ? <LoaderCircle className="ml-auto size-3 animate-spin" /> : null}
+            {loadingPaths.has(node.path) ? (
+              <LoaderCircle className="ml-auto size-3 animate-spin" />
+            ) : null}
           </Button>
           {directory && expanded && node.children ? (
             <div className="pl-4">

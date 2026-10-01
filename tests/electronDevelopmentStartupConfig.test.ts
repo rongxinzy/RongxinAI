@@ -64,10 +64,7 @@ test('development startup waits for Vite readiness before launching Electron', (
   assert.match(electronDevScript, /dist-electron\/\.electron-ready/);
   // Windows launches dist/electron.exe directly (quotedElectron); other platforms use `electron`.
   assert.match(electronDevScript, /quotedElectron/);
-  assert.match(
-    electronDevScript,
-    /\$\{quotedElectron\} --remote-debugging-port=9222 \./,
-  );
+  assert.match(electronDevScript, /\$\{quotedElectron\} --remote-debugging-port=9222 \./);
   assert.match(findDevPortScript, /DEFAULT_DEV_PORT = 5175/);
   assert.match(findDevPortScript, /findAvailablePort/);
   assert.match(viteConfig, /strictPort: true/);

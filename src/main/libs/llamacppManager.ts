@@ -127,7 +127,7 @@ export const LlamaCppProcessOutputStream = {
 } as const;
 
 export type LlamaCppProcessOutputStream =
-  typeof LlamaCppProcessOutputStream[keyof typeof LlamaCppProcessOutputStream];
+  (typeof LlamaCppProcessOutputStream)[keyof typeof LlamaCppProcessOutputStream];
 
 export type LlamaCppProcessOutputEvent = {
   stream: LlamaCppProcessOutputStream;
@@ -161,7 +161,8 @@ export class LlamaCppManager extends EventEmitter {
   ) {
     super();
     this.marketplaceService =
-      marketplaceService ?? new MarketplaceService(() => this.getModelsDir(), {
+      marketplaceService ??
+      new MarketplaceService(() => this.getModelsDir(), {
         fetchImpl: net.fetch,
         cacheDir: path.join(app.getPath('userData'), 'marketplace-cache'),
       });

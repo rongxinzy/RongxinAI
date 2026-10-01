@@ -107,9 +107,9 @@ describe('parsePlanEntries', () => {
   });
 
   test('skips entries without text content', () => {
-    expect(parsePlanEntries({ entries: [{ status: 'pending' }, { content: 'Real task' }] })).toEqual([
-      { content: 'Real task', status: 'pending', priority: null },
-    ]);
+    expect(
+      parsePlanEntries({ entries: [{ status: 'pending' }, { content: 'Real task' }] }),
+    ).toEqual([{ content: 'Real task', status: 'pending', priority: null }]);
   });
 });
 

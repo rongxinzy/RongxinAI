@@ -92,22 +92,10 @@ export const LinkSafetyModal: React.FC<{
 
         {/* 2026/09/15 lixiang  复制/打开按钮同行等宽排列，弹窗留出横向内边距防止按钮溢出 */}
         <div className="flex w-full gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={handleCopy}
-          >
-            {isCopied
-              ? i18nService.t('linkSafetyCopied')
-              : i18nService.t('linkSafetyCopyLink')}
+          <Button type="button" variant="outline" className="flex-1" onClick={handleCopy}>
+            {isCopied ? i18nService.t('linkSafetyCopied') : i18nService.t('linkSafetyCopyLink')}
           </Button>
-          <Button
-            type="button"
-            variant="default"
-            className="flex-1"
-            onClick={handleConfirm}
-          >
+          <Button type="button" variant="default" className="flex-1" onClick={handleConfirm}>
             {i18nService.t('linkSafetyConfirmOpen')}
           </Button>
         </div>

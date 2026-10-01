@@ -21,14 +21,20 @@ export interface BundledPresetMember {
 const PRESET_EXPERTS_DIR = ['zhiyuan-expert-manager', 'presets'];
 
 const normalizeId = (name: string): string =>
-  name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 
 const stripFrontmatter = (markdown: string): string => {
   const lines = markdown.split(/\r?\n/);
   if (lines[0]?.trim() !== '---') return markdown;
   for (let index = 1; index < lines.length; index += 1) {
     if (lines[index].trim() === '---') {
-      return lines.slice(index + 1).join('\n').trim();
+      return lines
+        .slice(index + 1)
+        .join('\n')
+        .trim();
     }
   }
   return markdown;
@@ -74,9 +80,10 @@ const buildLeadRoster = (
       const display = (displayMembers as Array<Record<string, unknown>>).find(
         entry => String(entry?.id) === memberId,
       );
-      const profession = (display?.profession as { zh?: string; en?: string } | undefined)?.zh
-        ?? (display?.profession as { zh?: string; en?: string } | undefined)?.en
-        ?? memberId;
+      const profession =
+        (display?.profession as { zh?: string; en?: string } | undefined)?.zh ??
+        (display?.profession as { zh?: string; en?: string } | undefined)?.en ??
+        memberId;
       return `- ${memberId}（${profession}）`;
     })
     .join('\n');
@@ -124,7 +131,11 @@ export function resolveBundledPresetExpertSnapshot(
     const leadAgentId = rawLeadAgent ? normalizeId(rawLeadAgent) : null;
     const selectedAgentId =
       agentId ??
-      path.basename(agentMdPath).replace(/\.md$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      path
+        .basename(agentMdPath)
+        .replace(/\.md$/i, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-');
     if (leadAgentId && selectedAgentId === leadAgentId) {
       const roster = buildLeadRoster(pluginJson, rawLeadAgent);
       if (roster) promptSnapshot = `${promptSnapshot}\n${roster}`;
@@ -132,9 +143,7 @@ export function resolveBundledPresetExpertSnapshot(
 
     // Team members never own skills; only leads and single agents do.
     const isMember = leadAgentId !== null && selectedAgentId !== leadAgentId;
-    const skillIds = isMember
-      ? []
-      : resolveSkillIdsFromRegistry(pluginJson, presetDir, skillsRoot);
+    const skillIds = isMember ? [] : resolveSkillIdsFromRegistry(pluginJson, presetDir, skillsRoot);
 
     return { promptSnapshot, skillIds };
   } catch (error) {

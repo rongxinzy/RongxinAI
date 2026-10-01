@@ -36,9 +36,7 @@ function withLocalBinPath(env) {
  * @param {NodeJS.ProcessEnv} env
  */
 function removeElectronRunAsNode(env) {
-  const keys = Object.keys(env).filter(
-    entry => entry.toLowerCase() === 'electron_run_as_node',
-  );
+  const keys = Object.keys(env).filter(entry => entry.toLowerCase() === 'electron_run_as_node');
   for (const key of keys) delete env[key];
 }
 

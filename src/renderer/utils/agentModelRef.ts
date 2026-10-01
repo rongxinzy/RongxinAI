@@ -5,9 +5,7 @@ import type { Model } from '../store/slices/modelSlice';
 type ModelRefInput = Pick<Model, 'id' | 'providerKey' | 'agentProviderId'>;
 
 function resolveModelAgentProviderId(model: ModelRefInput): string {
-  return (
-    model.agentProviderId || ProviderRegistry.getAgentProviderId(model.providerKey ?? '')
-  );
+  return model.agentProviderId || ProviderRegistry.getAgentProviderId(model.providerKey ?? '');
 }
 
 export function toAgentModelRef(model: ModelRefInput): string {
@@ -31,8 +29,7 @@ export function resolveAgentModelRef<T extends ModelRefInput>(
   if (!normalizedRef) return null;
 
   if (normalizedRef.includes('/')) {
-    const exact =
-      availableModels.find(model => toAgentModelRef(model) === normalizedRef) ?? null;
+    const exact = availableModels.find(model => toAgentModelRef(model) === normalizedRef) ?? null;
     if (exact) return exact;
 
     console.log(

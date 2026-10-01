@@ -378,7 +378,11 @@ export const AttachmentHoverCardContent = ({
   className,
   ...props
 }: AttachmentHoverCardContentProps) => (
-  <HoverCardContent align={align} className={cn("theme-control-sizing-17 w-auto", className)} {...props} />
+  <HoverCardContent
+    align={align}
+    className={cn('theme-control-sizing-17 w-auto', className)}
+    {...props}
+  />
 );
 
 // ============================================================================

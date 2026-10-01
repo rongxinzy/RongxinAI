@@ -306,18 +306,14 @@ test('retains buffered stream writes when the flush hits a locked database', () 
 
     const staleRow = lockedDb
       .prepare('SELECT payload_json FROM coding_events WHERE id = ?')
-      .get(
-        repository.listEvents([lane.id])[0].id,
-      ) as { payload_json: string };
+      .get(repository.listEvents([lane.id])[0].id) as { payload_json: string };
     expect(JSON.parse(staleRow.payload_json).content).toBe('Hel');
     expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello');
 
     repository.flushPendingStreamWrites();
     const flushedRow = lockedDb
       .prepare('SELECT payload_json FROM coding_events WHERE id = ?')
-      .get(
-        repository.listEvents([lane.id])[0].id,
-      ) as { payload_json: string };
+      .get(repository.listEvents([lane.id])[0].id) as { payload_json: string };
     expect(JSON.parse(flushedRow.payload_json).content).toBe('Hello');
   } finally {
     blocker.close();
@@ -349,10 +345,16 @@ test('persists one pending elicitation per lane and rejects duplicate responses'
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Clarify implementation');
-  const lane = repository.createLane(mission.id, CodingAgentProfileId.Builtin, '/workspace/project');
+  const lane = repository.createLane(
+    mission.id,
+    CodingAgentProfileId.Builtin,
+    '/workspace/project',
+  );
 
   const elicitation = repository.createElicitation(lane.id, 'Which API should be used?');
-  expect(() => repository.createElicitation(lane.id, 'Another question')).toThrow('already pending');
+  expect(() => repository.createElicitation(lane.id, 'Another question')).toThrow(
+    'already pending',
+  );
   expect(repository.answerElicitation(elicitation.id, 'Use v2.')).toMatchObject({
     status: CodingElicitationStatus.Answered,
     answer: 'Use v2.',
@@ -367,7 +369,11 @@ test('cancels the questions a previous application run left pending', () => {
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Resume after restart');
-  const lane = repository.createLane(mission.id, CodingAgentProfileId.Builtin, '/workspace/project');
+  const lane = repository.createLane(
+    mission.id,
+    CodingAgentProfileId.Builtin,
+    '/workspace/project',
+  );
   const elicitation = repository.createElicitation(lane.id, 'Which endpoint should change?');
 
   const cancelled = repository.cancelPendingElicitations('The application restarted.');
@@ -391,7 +397,11 @@ test('recovers the lanes and missions that were waiting for an answer', () => {
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Waiting lane');
-  const lane = repository.createLane(mission.id, CodingAgentProfileId.Builtin, '/workspace/project');
+  const lane = repository.createLane(
+    mission.id,
+    CodingAgentProfileId.Builtin,
+    '/workspace/project',
+  );
   repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingElicitation);
   repository.updateMissionStatus(mission.id, CodingMissionStatus.WaitingElicitation);
 

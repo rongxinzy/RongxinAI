@@ -19,7 +19,10 @@ const rowEvent = (row: Record<string, unknown>): CodingEvent => ({
 export class CodingEventWindowReader {
   constructor(private readonly db: Database.Database) {}
 
-  listRecent(laneIds: string[], pageSize = CodingEventWindowPageSize): {
+  listRecent(
+    laneIds: string[],
+    pageSize = CodingEventWindowPageSize,
+  ): {
     events: CodingEvent[];
     windows: CodingEventWindow[];
   } {
@@ -81,7 +84,7 @@ export class CodingEventWindowReader {
       laneId,
       events,
       hasMore,
-      nextCursor: hasMore ? events[0]?.sequence ?? null : null,
+      nextCursor: hasMore ? (events[0]?.sequence ?? null) : null,
     };
   }
 }

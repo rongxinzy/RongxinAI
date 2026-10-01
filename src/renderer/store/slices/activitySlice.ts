@@ -28,8 +28,7 @@ const activitySlice = createSlice({
       if (index >= 0) {
         if (!shouldAcceptActivityUpdate(state.runs[index], action.payload)) return;
         state.runs[index] = action.payload;
-      }
-      else state.runs.push(action.payload);
+      } else state.runs.push(action.payload);
       state.runs.sort((a, b) => b.updatedAt - a.updatedAt);
     },
   },

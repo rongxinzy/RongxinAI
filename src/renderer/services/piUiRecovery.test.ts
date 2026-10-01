@@ -79,9 +79,7 @@ test('a running bootstrap response cannot revive execution after a newer complet
   dependencies.readRuntime.mockReturnValue(response.promise);
   const pending = recovery.bootstrap();
   recovery.observe(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
-  recovery.observe(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
-  );
+  recovery.observe(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }));
   response.resolve([{ sessionId: 'A', sequence: 1, status: CoworkSessionStatus.Running }]);
   await pending;
   expect(dependencies.applyStatus).not.toHaveBeenCalled();

@@ -62,7 +62,9 @@ test('does not recreate a channel session after an API rejection', async () => {
   vi.spyOn(runtime, 'startSession').mockRejectedValue(failure);
   const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
   try {
-    await expect(handler.processMessage(createMessage(), undefined, 'workspace-1')).rejects.toThrow(failure);
+    await expect(handler.processMessage(createMessage(), undefined, 'workspace-1')).rejects.toThrow(
+      failure,
+    );
     expect(runtime.startSession).toHaveBeenCalledTimes(1);
     expect(coworkStore.sessions.size).toBe(1);
     expect(imStore.mappings).toHaveLength(1);
@@ -518,7 +520,11 @@ test('falls back to normal agent execution when detector does not recognize a sc
 test('uses only the IM platform for WeChat session titles', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
-  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore: new FakeIMStore() });
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore: new FakeIMStore(),
+  });
 
   const response = handler.processMessage(
     createMessage({ platform: 'weixin', senderName: '微信用户', content: '你好' }),
@@ -545,7 +551,11 @@ test('uses only the IM platform for WeChat session titles', async () => {
 test('uses only the IM platform for group and direct session titles', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
-  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore: new FakeIMStore() });
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore: new FakeIMStore(),
+  });
 
   const groupResponse = handler.processMessage(
     createMessage({ chatType: 'group', groupName: '产品讨论组', senderName: '测试用户' }),

@@ -39,7 +39,9 @@ export const CoworkConversationLoadingSkeleton = () => (
         data-slot="session-loading-turn"
       >
         <div className="flex justify-end">
-          <Skeleton className={cn(shimmerClassName, 'theme-scene-loading-message', turn.userClassName)} />
+          <Skeleton
+            className={cn(shimmerClassName, 'theme-scene-loading-message', turn.userClassName)}
+          />
         </div>
         <div className="flex flex-col gap-2">
           {turn.assistantLineClassNames.map(lineClassName => (
@@ -63,7 +65,12 @@ export const CoworkSessionColdStartSkeleton = () => (
         <CoworkConversationLoadingSkeleton />
       </div>
       <div className="shrink-0 px-4 pb-4">
-        <Skeleton className={cn(shimmerClassName, 'theme-scene-loading-composer mx-auto h-24 w-full max-w-5xl')} />
+        <Skeleton
+          className={cn(
+            shimmerClassName,
+            'theme-scene-loading-composer mx-auto h-24 w-full max-w-5xl',
+          )}
+        />
       </div>
     </div>
   </div>

@@ -56,9 +56,9 @@ export const ProviderModelRow = memo(function ProviderModelRow({
     isCustomProvider(providerId) &&
     Boolean(
       model.maxTokens ||
-        Object.values(model.capabilities ?? {}).some(
-          status => status === ModelCapabilityStatus.Supported,
-        ),
+      Object.values(model.capabilities ?? {}).some(
+        status => status === ModelCapabilityStatus.Supported,
+      ),
     );
 
   return (
@@ -112,10 +112,7 @@ export const ProviderModelRow = memo(function ProviderModelRow({
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
           {model.supportsImage && (
             <span
-              className={cn(
-                'rounded-md bg-primary-muted px-1.5 py-0.5 text-primary',
-                'text-xs',
-              )}
+              className={cn('rounded-md bg-primary-muted px-1.5 py-0.5 text-primary', 'text-xs')}
             >
               {i18nService.t('imageInput')}
             </span>

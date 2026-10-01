@@ -388,7 +388,13 @@ export class SqliteScheduledTaskStore {
           'UPDATE zhiyuan_scheduled_task_runs SET status = ?, finished_at = ?, duration_ms = ?, error = ? WHERE id = ?',
         )
         .run(TaskStatus.Error, finishedAt, durationMs, error, row.id);
-      onRecovered?.({ ...this.runFromRow(row), status: TaskStatus.Error, finishedAt, durationMs, error });
+      onRecovered?.({
+        ...this.runFromRow(row),
+        status: TaskStatus.Error,
+        finishedAt,
+        durationMs,
+        error,
+      });
       const task = this.get(row.task_id);
       if (task) {
         const state: TaskState = {

@@ -69,10 +69,7 @@ export function importLegacySqliteMemoryCandidates(input: {
   return { discovered, imported, skipped: discovered - imported };
 }
 
-function importLegacySqliteEntry(
-  entry: CoworkUserMemory,
-  service: ProjectMemoryService,
-): boolean {
+function importLegacySqliteEntry(entry: CoworkUserMemory, service: ProjectMemoryService): boolean {
   const fingerprint = legacyMemoryFingerprint(entry.text);
   return service.importLegacyPersonalMemoryCandidate({
     id: `${LEGACY_MEMORY_CANDIDATE_PREFIX}${fingerprint}`,

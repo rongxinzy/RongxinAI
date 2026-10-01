@@ -49,13 +49,27 @@ test('converts legacy datetime timestamps to ISO UTC on repository construction'
   new MemoryRepository(db);
 
   expect(columnValue(db, 'memory_links', 'created_at', 'link-legacy')).toBe('2026-09-09T11:10:34Z');
-  expect(columnValue(db, 'memory_links', 'updated_at', 'link-legacy')).toBe('2026-09-09T11:14:18.684Z');
-  expect(columnValue(db, 'memory_links', 'created_at', 'link-iso')).toBe('2026-09-09T11:10:34.000Z');
-  expect(columnValue(db, 'memory_candidates', 'created_at', 'candidate-legacy')).toBe('2026-09-09T11:14:02Z');
-  expect(columnValue(db, 'memory_candidates', 'expires_at', 'candidate-legacy')).toBe('2026-09-10T11:14:02Z');
-  expect(columnValue(db, 'memory_outbox', 'created_at', 'outbox-legacy')).toBe('2026-09-09T11:14:02Z');
-  expect(columnValue(db, 'memory_outbox', 'available_at', 'outbox-legacy')).toBe('2026-09-09T11:14:19.000Z');
-  expect(columnValue(db, 'memory_import_rejections', 'rejected_at', 'rejection-legacy')).toBe('2026-09-09T11:14:02Z');
+  expect(columnValue(db, 'memory_links', 'updated_at', 'link-legacy')).toBe(
+    '2026-09-09T11:14:18.684Z',
+  );
+  expect(columnValue(db, 'memory_links', 'created_at', 'link-iso')).toBe(
+    '2026-09-09T11:10:34.000Z',
+  );
+  expect(columnValue(db, 'memory_candidates', 'created_at', 'candidate-legacy')).toBe(
+    '2026-09-09T11:14:02Z',
+  );
+  expect(columnValue(db, 'memory_candidates', 'expires_at', 'candidate-legacy')).toBe(
+    '2026-09-10T11:14:02Z',
+  );
+  expect(columnValue(db, 'memory_outbox', 'created_at', 'outbox-legacy')).toBe(
+    '2026-09-09T11:14:02Z',
+  );
+  expect(columnValue(db, 'memory_outbox', 'available_at', 'outbox-legacy')).toBe(
+    '2026-09-09T11:14:19.000Z',
+  );
+  expect(columnValue(db, 'memory_import_rejections', 'rejected_at', 'rejection-legacy')).toBe(
+    '2026-09-09T11:14:02Z',
+  );
 
   db.close();
 });
@@ -125,10 +139,20 @@ test('new repository writes and fresh-schema defaults produce ISO timestamps', (
     repository.enqueue(MemoryOutboxOperation.Confirm, {});
     repository.recordImportRejection('rejected-1');
 
-    expect(columnValue(db, 'memory_links', 'created_at', 'link-fresh')).toMatch(ISO_TIMESTAMP_PATTERN);
-    expect(columnValue(db, 'memory_links', 'updated_at', 'link-fresh')).toMatch(ISO_TIMESTAMP_PATTERN);
+    expect(columnValue(db, 'memory_links', 'created_at', 'link-fresh')).toMatch(
+      ISO_TIMESTAMP_PATTERN,
+    );
+    expect(columnValue(db, 'memory_links', 'updated_at', 'link-fresh')).toMatch(
+      ISO_TIMESTAMP_PATTERN,
+    );
     expect(
-      (db.prepare("SELECT created_at AS value FROM memory_outbox WHERE id = (SELECT MIN(id) FROM memory_outbox)").get() as { value: string }).value,
+      (
+        db
+          .prepare(
+            'SELECT created_at AS value FROM memory_outbox WHERE id = (SELECT MIN(id) FROM memory_outbox)',
+          )
+          .get() as { value: string }
+      ).value,
     ).toMatch(ISO_TIMESTAMP_PATTERN);
     expect(columnValue(db, 'memory_import_rejections', 'rejected_at', 'rejected-1')).toMatch(
       ISO_TIMESTAMP_PATTERN,
@@ -139,7 +163,9 @@ test('new repository writes and fresh-schema defaults produce ISO timestamps', (
       INSERT INTO memory_links (id, memory_id, project_id, scope, session_id, source_kind, status)
         VALUES ('link-default', 2, 'project-a', 'session', 'session-a', 'session_summary', 'active');
     `);
-    expect(columnValue(db, 'memory_links', 'created_at', 'link-default')).toMatch(ISO_TIMESTAMP_PATTERN);
+    expect(columnValue(db, 'memory_links', 'created_at', 'link-default')).toMatch(
+      ISO_TIMESTAMP_PATTERN,
+    );
   } finally {
     db.close();
   }

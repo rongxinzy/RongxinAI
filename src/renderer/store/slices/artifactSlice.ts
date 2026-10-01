@@ -152,10 +152,7 @@ function shouldRevealMergedArtifact(
   // event says: a merged code block or an intermediate file never does.
   if (!revealRequested || next.role !== ArtifactRole.Deliverable) return false;
   if (next.declared === true) return true;
-  return (
-    previous.role !== ArtifactRole.Deliverable ||
-    (!previous.content && Boolean(next.content))
-  );
+  return previous.role !== ArtifactRole.Deliverable || (!previous.content && Boolean(next.content));
 }
 
 /**

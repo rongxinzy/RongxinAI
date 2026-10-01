@@ -14,7 +14,9 @@ const activitySource = readFileSync(
 
 test('keeps permission tool cards collapsed until explicitly opened', () => {
   expect(turnSource).toContain('open={expandedActivityIds.has(activity.id)}');
-  expect(turnSource).not.toContain('activity.kind === CodingConversationActivityKind.Permission ||');
+  expect(turnSource).not.toContain(
+    'activity.kind === CodingConversationActivityKind.Permission ||',
+  );
   expect(activitySource).toContain('defaultOpen={false}');
   expect(activitySource).not.toContain(
     'defaultOpen={activity.kind === CodingConversationActivityKind.Permission}',

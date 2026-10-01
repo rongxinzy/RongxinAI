@@ -190,9 +190,9 @@ test('reopening a folder still completes when animation frames are suspended', a
   await act(async () => new Promise(resolve => setTimeout(resolve, 250)));
   fireEvent.click(folder);
   await act(async () => new Promise(resolve => setTimeout(resolve, 100)));
-  expect(screen.getByRole('treeitem', { name: 'WorkspaceBeta session' }).closest('.grid')).toHaveClass(
-    'opacity-100',
-  );
+  expect(
+    screen.getByRole('treeitem', { name: 'WorkspaceBeta session' }).closest('.grid'),
+  ).toHaveClass('opacity-100');
 });
 
 test('a pending refresh cannot change selection after the sidebar unmounts', async () => {

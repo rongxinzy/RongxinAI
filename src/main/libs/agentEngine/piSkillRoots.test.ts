@@ -20,7 +20,10 @@ test('resolves nested expert skills to their preset root', () => {
   const regularRoot = path.join(root, 'SKILLs');
   const expertRoot = path.join(regularRoot, 'zhiyuan-expert-manager', 'presets', 'cad', 'skills');
   fs.mkdirSync(path.join(expertRoot, 'text-to-cad'), { recursive: true });
-  fs.writeFileSync(path.join(expertRoot, 'text-to-cad', 'SKILL.md'), '---\nname: text-to-cad\n---\n');
+  fs.writeFileSync(
+    path.join(expertRoot, 'text-to-cad', 'SKILL.md'),
+    '---\nname: text-to-cad\n---\n',
+  );
 
   expect(resolvePiSkillRoots(['text-to-cad'], [regularRoot], [expertRoot])).toEqual({
     'text-to-cad': expertRoot,

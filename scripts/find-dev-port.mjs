@@ -76,9 +76,7 @@ export async function findAvailablePort(
     }
   }
 
-  throw new Error(
-    `No available port found from ${start} within ${maxAttempts} attempts`,
-  );
+  throw new Error(`No available port found from ${start} within ${maxAttempts} attempts`);
 }
 
 /**

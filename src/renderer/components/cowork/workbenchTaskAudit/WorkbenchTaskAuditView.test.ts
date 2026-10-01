@@ -47,11 +47,7 @@ const createTask = (
   completedAt: status === WorkbenchTaskStatus.Completed ? createdAt : null,
 });
 
-const createRun = (
-  id: string,
-  attempt: number,
-  status: WorkbenchRun['status'],
-): WorkbenchRun => ({
+const createRun = (id: string, attempt: number, status: WorkbenchRun['status']): WorkbenchRun => ({
   id,
   taskId: 'task-1',
   attempt,
@@ -204,9 +200,7 @@ test('renders runs, events, approvals, and artifacts as a single timeline', () =
   // approval card, and the artifact row are all visible.
   expect(screen.getByText(i18nService.t('workbenchTaskEventRunStarted'))).toBeTruthy();
   expect(screen.getByText('×3')).toBeTruthy();
-  expect(
-    screen.getByRole('button', { name: i18nService.t('workbenchTaskApprove') }),
-  ).toBeTruthy();
+  expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskApprove') })).toBeTruthy();
   expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskDeny') })).toBeTruthy();
   expect(screen.getByText('output/report.txt')).toBeTruthy();
 });

@@ -8,11 +8,24 @@ export class CcConnectSidecarManager extends EventEmitter {
   private startedAtMs: number | null = null;
   private lastErrorMessage: string | null = null;
   private controlUrl: string | null = null;
-  constructor(private readonly executable: string, private readonly configPath: string) { super(); }
-  get pid(): number | null { return this.child?.pid ?? null; }
-  get startedAt(): number | null { return this.startedAtMs; }
-  get lastError(): string | null { return this.lastErrorMessage; }
-  get running(): boolean { return this.child !== null && this.child.exitCode === null; }
+  constructor(
+    private readonly executable: string,
+    private readonly configPath: string,
+  ) {
+    super();
+  }
+  get pid(): number | null {
+    return this.child?.pid ?? null;
+  }
+  get startedAt(): number | null {
+    return this.startedAtMs;
+  }
+  get lastError(): string | null {
+    return this.lastErrorMessage;
+  }
+  get running(): boolean {
+    return this.child !== null && this.child.exitCode === null;
+  }
   async waitForControlUrl(timeoutMs = 10_000): Promise<string> {
     if (this.controlUrl) return this.controlUrl;
     return new Promise<string>((resolve, reject) => {
@@ -89,8 +102,10 @@ export class CcConnectSidecarManager extends EventEmitter {
 function isLoopbackControlUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' &&
-      (url.hostname === 'localhost' || url.hostname === '::1' || url.hostname.startsWith('127.'));
+    return (
+      url.protocol === 'http:' &&
+      (url.hostname === 'localhost' || url.hostname === '::1' || url.hostname.startsWith('127.'))
+    );
   } catch {
     return false;
   }

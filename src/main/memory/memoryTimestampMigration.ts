@@ -17,7 +17,8 @@ const TIMESTAMP_COLUMN_TARGETS: TimestampColumnTarget[] = [
 // The GLOB pattern only matches values with a space at position 11, so ISO
 // values (which have a "T" there) are never touched; rewriting is idempotent.
 // This mirrors normalizeMemoryTimestamp in shared/memory/timestamps.ts.
-const LEGACY_DATETIME_GLOB = '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]*';
+const LEGACY_DATETIME_GLOB =
+  '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]*';
 
 /**
  * Rewrite legacy SQLite datetime('now') timestamps in the memory projection

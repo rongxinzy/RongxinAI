@@ -63,7 +63,6 @@ test('Changan owns sidebar and legacy warning/error foreground roles', () => {
   }
 });
 
-
 test('Changan keeps silk backgrounds and rounder controls inside its package', () => {
   expect(changanLight.tokens.radius).toBe('0.75rem');
   expect(damingLight.tokens.radius).toBe('0.5rem');
@@ -74,6 +73,8 @@ test('Changan keeps silk backgrounds and rounder controls inside its package', (
     expect(paint['--main-background-image']).toContain('linear-gradient');
     expect(paint['--main-background-image']).not.toContain('url(');
     expect(Number(paint['--main-background-opacity'])).toBeLessThan(0.05);
-    expect(theme.components['button-size-default'].base.height).toBe(classicLight.components['button-size-default'].base.height);
+    expect(theme.components['button-size-default'].base.height).toBe(
+      classicLight.components['button-size-default'].base.height,
+    );
   }
 });

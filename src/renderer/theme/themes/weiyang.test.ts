@@ -63,7 +63,6 @@ test('Weiyang owns sidebar and legacy warning/error foreground roles', () => {
   }
 });
 
-
 test('Weiyang keeps cloud backgrounds and carved controls inside its package', () => {
   expect(weiyangLight.tokens.radius).toBe('0.375rem');
   expect(damingLight.tokens.radius).toBe('0.5rem');
@@ -74,6 +73,8 @@ test('Weiyang keeps cloud backgrounds and carved controls inside its package', (
     expect(paint['--main-background-image']).toContain('data:image/svg+xml');
     expect(paint['--main-background-repeat']).toBe('no-repeat');
     expect(Number(paint['--main-background-opacity'])).toBeLessThan(0.2);
-    expect(theme.components['button-size-default'].base.height).toBe(classicLight.components['button-size-default'].base.height);
+    expect(theme.components['button-size-default'].base.height).toBe(
+      classicLight.components['button-size-default'].base.height,
+    );
   }
 });

@@ -6,7 +6,11 @@ import path from 'path';
 import { cpRecursiveSync } from '../fsCompat';
 
 const PYTHON_RUNTIME_DIR_NAME =
-  process.platform === 'darwin' ? 'python-mac' : process.platform === 'linux' ? 'python-linux' : 'python-win';
+  process.platform === 'darwin'
+    ? 'python-mac'
+    : process.platform === 'linux'
+      ? 'python-linux'
+      : 'python-win';
 const PYTHON_RUNTIME_STATE_FILE = 'runtime.json';
 const IS_WINDOWS = process.platform === 'win32';
 

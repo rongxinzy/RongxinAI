@@ -80,7 +80,9 @@ export function useRuntimeInstallBackgroundNotifications({
     }
     showGlobalToast(
       version
-        ? i18nService.t('localInferenceRuntimeBackgroundInstallFailed').replace('{version}', version)
+        ? i18nService
+            .t('localInferenceRuntimeBackgroundInstallFailed')
+            .replace('{version}', version)
         : i18nService.t('localInferenceRuntimeMissing'),
       true,
     );

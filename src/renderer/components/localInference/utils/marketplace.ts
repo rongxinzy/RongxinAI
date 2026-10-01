@@ -37,8 +37,7 @@ export function buildMarketplaceSearchParams(input: {
 }): MarketplaceSearchParams | null {
   const query = input.query.trim();
   const limit =
-    input.limit ??
-    (query ? MARKETPLACE_SEARCH_MAX_MODEL_COUNT : MARKETPLACE_INITIAL_MODEL_COUNT);
+    input.limit ?? (query ? MARKETPLACE_SEARCH_MAX_MODEL_COUNT : MARKETPLACE_INITIAL_MODEL_COUNT);
   if (!query) {
     return {
       limit,
@@ -71,13 +70,20 @@ export function formatMarketplaceScore(stars?: number, confidence?: string): str
   return `${stars.toFixed(1)}${confidence ? ` · ${confidence}` : ''}`;
 }
 
-export function marketplaceFitLabel(status?: NonNullable<MarketplaceModel['fit']>['status']): string {
+export function marketplaceFitLabel(
+  status?: NonNullable<MarketplaceModel['fit']>['status'],
+): string {
   switch (status) {
-    case 'excellent': return i18nService.t('marketplaceFitExcellent');
-    case 'good': return i18nService.t('marketplaceFitGood');
-    case 'limited': return i18nService.t('marketplaceFitLimited');
-    case 'unsupported': return i18nService.t('marketplaceFitUnsupported');
-    default: return i18nService.t('marketplaceFitUnknown');
+    case 'excellent':
+      return i18nService.t('marketplaceFitExcellent');
+    case 'good':
+      return i18nService.t('marketplaceFitGood');
+    case 'limited':
+      return i18nService.t('marketplaceFitLimited');
+    case 'unsupported':
+      return i18nService.t('marketplaceFitUnsupported');
+    default:
+      return i18nService.t('marketplaceFitUnknown');
   }
 }
 
@@ -129,7 +135,12 @@ export function filterMarketplaceModelsForDevice(
         case 'excellent':
           return status === 'excellent';
         case 'compatible':
-          return status === 'excellent' || status === 'good' || status === 'limited' || status === 'unknown';
+          return (
+            status === 'excellent' ||
+            status === 'good' ||
+            status === 'limited' ||
+            status === 'unknown'
+          );
         case 'unsupported':
           // The explicit unsupported filter is removed from the UI; kept for
           // type completeness of the fit filter union.

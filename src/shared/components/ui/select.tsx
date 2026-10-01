@@ -11,7 +11,7 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
     <SelectPrimitive.Group
       data-slot="select-group"
-      className={cn("theme-piece-size-select-1 scroll-my-1", className)}
+      className={cn('theme-piece-size-select-1 scroll-my-1', className)}
       {...props}
     />
   );
@@ -40,14 +40,16 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "theme-select-trigger flex w-fit items-center justify-between whitespace-nowrap select-none disabled:cursor-not-allowed *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        'theme-select-trigger flex w-fit items-center justify-between whitespace-nowrap select-none disabled:cursor-not-allowed *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 [&_svg]:pointer-events-none [&_svg]:shrink-0',
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon
-        render={<ChevronDownIcon className="theme-piece-size-select-2 theme-select-icon pointer-events-none" />}
+        render={
+          <ChevronDownIcon className="theme-piece-size-select-2 theme-select-icon pointer-events-none" />
+        }
       />
     </SelectPrimitive.Trigger>
   );
@@ -112,7 +114,7 @@ function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Prop
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "theme-select-item relative flex w-full cursor-default items-center select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
+        'theme-select-item relative flex w-full cursor-default items-center select-none data-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2',
         className,
       )}
       {...props}
@@ -135,7 +137,10 @@ function SelectSeparator({ className, ...props }: SelectPrimitive.Separator.Prop
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
-      className={cn("theme-piece-size-select-4 theme-select-separator pointer-events-none -mx-1 my-1", className)}
+      className={cn(
+        'theme-piece-size-select-4 theme-select-separator pointer-events-none -mx-1 my-1',
+        className,
+      )}
       {...props}
     />
   );
@@ -149,7 +154,7 @@ function SelectScrollUpButton({
     <SelectPrimitive.ScrollUpArrow
       data-slot="select-scroll-up-button"
       className={cn(
-        "theme-piece-size-select-5 top-0 z-10 flex w-full cursor-default items-center justify-center theme-select-scroll",
+        'theme-piece-size-select-5 top-0 z-10 flex w-full cursor-default items-center justify-center theme-select-scroll',
         className,
       )}
       {...props}
@@ -167,7 +172,7 @@ function SelectScrollDownButton({
     <SelectPrimitive.ScrollDownArrow
       data-slot="select-scroll-down-button"
       className={cn(
-        "theme-piece-size-select-6 bottom-0 z-10 flex w-full cursor-default items-center justify-center theme-select-scroll",
+        'theme-piece-size-select-6 bottom-0 z-10 flex w-full cursor-default items-center justify-center theme-select-scroll',
         className,
       )}
       {...props}

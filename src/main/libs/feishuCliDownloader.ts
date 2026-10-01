@@ -36,7 +36,10 @@ function getTarget(): FeishuCliTarget {
 }
 
 function getArchiveName(target: FeishuCliTarget): string {
-  const [platform, architecture] = target.split('-') as [keyof typeof platformNames, keyof typeof architectureNames];
+  const [platform, architecture] = target.split('-') as [
+    keyof typeof platformNames,
+    keyof typeof architectureNames,
+  ];
   const extension = platform === 'win32' ? 'zip' : 'tar.gz';
   return `${FEISHU_CLI_NAME}-${FEISHU_CLI_VERSION}-${platformNames[platform]}-${architectureNames[architecture]}.${extension}`;
 }
@@ -67,7 +70,9 @@ async function downloadArchive(urls: string[], archivePath: string): Promise<voi
       clearTimeout(timer);
     }
   }
-  throw new Error(`Feishu CLI download failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+  throw new Error(
+    `Feishu CLI download failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
 }
 
 async function sha256File(filePath: string): Promise<string> {
@@ -80,7 +85,11 @@ async function sha256File(filePath: string): Promise<string> {
   });
 }
 
-async function extractArchive(archivePath: string, target: FeishuCliTarget, destination: string): Promise<void> {
+async function extractArchive(
+  archivePath: string,
+  target: FeishuCliTarget,
+  destination: string,
+): Promise<void> {
   if (target.startsWith('win32-')) {
     await extractZip(archivePath, { dir: destination });
     return;
@@ -88,7 +97,9 @@ async function extractArchive(archivePath: string, target: FeishuCliTarget, dest
   await new Promise<void>((resolve, reject) => {
     const child = spawn('tar', ['-xzf', archivePath, '-C', destination], { windowsHide: true });
     child.once('error', reject);
-    child.once('close', code => (code === 0 ? resolve() : reject(new Error(`tar exited with ${code ?? 'unknown'}`))));
+    child.once('close', code =>
+      code === 0 ? resolve() : reject(new Error(`tar exited with ${code ?? 'unknown'}`)),
+    );
   });
 }
 
@@ -103,7 +114,8 @@ export async function installDownloadedFeishuCli(userDataPath: string): Promise<
     const archivePath = path.join(temporaryRoot, archiveName);
     await downloadArchive(getDownloadUrls(archiveName), archivePath);
     const expectedHash = archiveChecksums[target];
-    if ((await sha256File(archivePath)) !== expectedHash) throw new Error('Feishu CLI download checksum mismatch.');
+    if ((await sha256File(archivePath)) !== expectedHash)
+      throw new Error('Feishu CLI download checksum mismatch.');
     await fs.promises.mkdir(stagedBinDirectory, { recursive: true });
     await extractArchive(archivePath, target, stagedBinDirectory);
     const binaryName = process.platform === 'win32' ? `${FEISHU_CLI_NAME}.exe` : FEISHU_CLI_NAME;

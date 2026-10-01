@@ -184,7 +184,9 @@ describe('PiResearchRunController', () => {
     const workspace = path.dirname(path.dirname(path.dirname(run.runDirectory)));
     fs.writeFileSync(path.join(workspace, 'notes.txt'), 'not the final report');
 
-    expect(run.recordFile('../outside.md', 'deliverable')).toContain('inside the selected workspace');
+    expect(run.recordFile('../outside.md', 'deliverable')).toContain(
+      'inside the selected workspace',
+    );
     expect(run.recordFile('notes.txt', 'deliverable')).toContain('expects one of');
   });
 

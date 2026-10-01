@@ -102,7 +102,7 @@ const TurnBlockComponent: React.FC<{
   hideDefaultAssistantHeader?: boolean;
   // 2026/09/16 lixiang  把当前轮次的工具授权嵌进对应 ToolCard，不再叠在底部输入框上
   pendingPermission?: CoworkPermissionRequest | null;
-  onRespondToPermission?: (result: CoworkPermissionResult) => void
+  onRespondToPermission?: (result: CoworkPermissionResult) => void;
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
   /** 2026/09/20 lixiang  验收卡插在文件卡片与复制按钮之间（issue #805） */
@@ -137,7 +137,6 @@ const TurnBlockComponent: React.FC<{
       ? findToolGroupForPermission(visibleAssistantItems, pendingPermission)
       : null;
 
-
   const renderSystemMessage = (message: CoworkMessage) => {
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
     const isError = isCoworkTerminalErrorMessage(message);
@@ -171,19 +170,21 @@ const TurnBlockComponent: React.FC<{
           <Info className="size-4 shrink-0 text-muted-foreground" />
         )}
         <div className="min-w-0 text-xs whitespace-pre-wrap text-muted-foreground">{content}</div>
-        {canResume && interruption && onResumeTask && (
-          // 2026/09/17 lixiang  继续执行用主题色按钮，与提示文案同一行；可点手型、禁用禁止光标
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-auto"
-            disabled={resumeDisabled || resumeTaskId === interruption.taskId}
-            onClick={() => onResumeTask(interruption)}
-          >
-            {i18nService.t('coworkResumeTaskAction')}
-          </Button>
-        )}
+        {canResume &&
+          interruption &&
+          onResumeTask && (
+            // 2026/09/17 lixiang  继续执行用主题色按钮，与提示文案同一行；可点手型、禁用禁止光标
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="shrink-0 cursor-pointer disabled:cursor-not-allowed disabled:pointer-events-auto"
+              disabled={resumeDisabled || resumeTaskId === interruption.taskId}
+              onClick={() => onResumeTask(interruption)}
+            >
+              {i18nService.t('coworkResumeTaskAction')}
+            </Button>
+          )}
       </div>
     );
   };
@@ -440,7 +441,8 @@ const TurnBlockComponent: React.FC<{
   const isRunningThinkingItem = (item: (typeof visibleAssistantItems)[number]): boolean =>
     item.type === 'assistant' &&
     Boolean(item.message.metadata?.isThinking) &&
-    getThinkingPresentation(item.message.metadata, false, hasText(item.message.content)).isStreaming;
+    getThinkingPresentation(item.message.metadata, false, hasText(item.message.content))
+      .isStreaming;
   const hasTrailingExecutionGroup = Boolean(
     lastVisibleGroup &&
     lastVisibleGroup.items.length > 0 &&
@@ -500,24 +502,20 @@ const TurnBlockComponent: React.FC<{
         )}
         renderHeader={isOpen => (
           <ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>
-            {showCompletedSummary ? (
-              summaryIsActive &&
-              group === lastSummaryGroup &&
-              // When the block is open and its reasoning still streams, the inner
-              // "思考中" indicator already animates; the header yields to it so a
-              // single cyclic animation is on screen.
-              (!isOpen || !group.items.some(isRunningThinkingItem)) ? (
-                renderActiveStatusText(
-                  getCompletedExecutionSummaryText(getExecutionSummary(group.items)),
-                )
-              ) : (
-                getCompletedExecutionSummaryText(getExecutionSummary(group.items))
-              )
-            ) : currentStatus ? (
-              renderActiveStatusText(getExecutionStatusText(currentStatus))
-            ) : (
-              renderActiveStatusText(i18nService.t('coworkIntermediateProcess'))
-            )}
+            {showCompletedSummary
+              ? summaryIsActive &&
+                group === lastSummaryGroup &&
+                // When the block is open and its reasoning still streams, the inner
+                // "思考中" indicator already animates; the header yields to it so a
+                // single cyclic animation is on screen.
+                (!isOpen || !group.items.some(isRunningThinkingItem))
+                ? renderActiveStatusText(
+                    getCompletedExecutionSummaryText(getExecutionSummary(group.items)),
+                  )
+                : getCompletedExecutionSummaryText(getExecutionSummary(group.items))
+              : currentStatus
+                ? renderActiveStatusText(getExecutionStatusText(currentStatus))
+                : renderActiveStatusText(i18nService.t('coworkIntermediateProcess'))}
           </ChainOfThoughtHeader>
         )}
       >

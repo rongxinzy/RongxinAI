@@ -8,14 +8,43 @@ import type { Workspace } from '@shared/workspace';
 import { ChannelWorkspaceField } from './ChannelWorkspaceField';
 
 const workspaces: Workspace[] = [
-  { id: 'ws-main', name: '主工作区', path: 'C:/main', isHidden: false, pinned: false, createdAt: 1, updatedAt: 1 },
-  { id: 'ws-sandbox', name: '沙盒', path: 'C:/sandbox', isHidden: true, pinned: false, createdAt: 1, updatedAt: 1 },
-  { id: 'ws-proj', name: '项目 A', path: 'C:/proj', isHidden: false, pinned: false, createdAt: 1, updatedAt: 1 },
+  {
+    id: 'ws-main',
+    name: '主工作区',
+    path: 'C:/main',
+    isHidden: false,
+    pinned: false,
+    createdAt: 1,
+    updatedAt: 1,
+  },
+  {
+    id: 'ws-sandbox',
+    name: '沙盒',
+    path: 'C:/sandbox',
+    isHidden: true,
+    pinned: false,
+    createdAt: 1,
+    updatedAt: 1,
+  },
+  {
+    id: 'ws-proj',
+    name: '项目 A',
+    path: 'C:/proj',
+    isHidden: false,
+    pinned: false,
+    createdAt: 1,
+    updatedAt: 1,
+  },
 ];
 
 function renderField(workspaceId: string, onChange = vi.fn()) {
   render(
-    <ChannelWorkspaceField accountId="acc-1" workspaceId={workspaceId} workspaces={workspaces} onChange={onChange} />,
+    <ChannelWorkspaceField
+      accountId="acc-1"
+      workspaceId={workspaceId}
+      workspaces={workspaces}
+      onChange={onChange}
+    />,
   );
   return onChange;
 }

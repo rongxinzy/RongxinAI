@@ -5,8 +5,12 @@ import { localizeScheduledSessionTitle, resolveSessionDisplayTitle } from './ses
 
 describe('localizeScheduledSessionTitle', () => {
   test('rewrites legacy and foreign prefixes to the current UI language', () => {
-    expect(localizeScheduledSessionTitle('Scheduled: daily report', 'zh')).toBe('[定时]daily report');
-    expect(localizeScheduledSessionTitle('Scheduled: daily report', 'en')).toBe('[Cron]daily report');
+    expect(localizeScheduledSessionTitle('Scheduled: daily report', 'zh')).toBe(
+      '[定时]daily report',
+    );
+    expect(localizeScheduledSessionTitle('Scheduled: daily report', 'en')).toBe(
+      '[Cron]daily report',
+    );
     expect(localizeScheduledSessionTitle('[Cron] daily report', 'zh')).toBe('[定时]daily report');
     expect(localizeScheduledSessionTitle('[定时]计算题', 'en')).toBe('[Cron]计算题');
   });
@@ -29,8 +33,8 @@ describe('resolveSessionDisplayTitle', () => {
   });
 
   test('keeps IM sessions untouched', () => {
-    expect(resolveSessionDisplayTitle({ title: 'QQ会话', source: CoworkSessionSource.Im }, 'zh')).toBe(
-      'QQ会话',
-    );
+    expect(
+      resolveSessionDisplayTitle({ title: 'QQ会话', source: CoworkSessionSource.Im }, 'zh'),
+    ).toBe('QQ会话');
   });
 });

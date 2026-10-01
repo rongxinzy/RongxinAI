@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-  formatWeixinSetupErrorForLog,
-  isWeixinSetupTransportError,
-} from './ccConnectWeixinSetup';
+import { formatWeixinSetupErrorForLog, isWeixinSetupTransportError } from './ccConnectWeixinSetup';
 
 test('recognizes EOF as a temporary Weixin setup transport error', () => {
   expect(isWeixinSetupTransportError(new Error('Get "https://example.com": EOF'))).toBe(true);

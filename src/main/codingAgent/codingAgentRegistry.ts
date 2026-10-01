@@ -102,8 +102,7 @@ export class CodingAgentRegistry extends EventEmitter {
     args: string[];
   }): CodingAgentProfile {
     const command = input.command.trim();
-    if (!path.isAbsolute(command))
-      throw new Error(CodingErrorMessage.ProfileCommandAbsolute);
+    if (!path.isAbsolute(command)) throw new Error(CodingErrorMessage.ProfileCommandAbsolute);
     if (!input.name.trim()) throw new Error(CodingErrorMessage.ProfileNameRequired);
     if (command.includes('\0') || input.args.some(arg => !arg || arg.includes('\0'))) {
       throw new Error(CodingErrorMessage.ProfileArgumentsInvalid);
@@ -133,8 +132,7 @@ export class CodingAgentRegistry extends EventEmitter {
 
   trust(profileId: string): CodingAgentProfile {
     const profile = this.profiles.get(profileId);
-    if (!profile || profile.isBuiltin)
-      throw new Error(CodingErrorMessage.ProfileNotTrustable);
+    if (!profile || profile.isBuiltin) throw new Error(CodingErrorMessage.ProfileNotTrustable);
     const updated = { ...profile, status: CodingAgentProfileStatus.Detected };
     this.profiles.set(updated.id, updated);
     this.repository?.save(updated);
@@ -310,9 +308,11 @@ export class CodingAgentRegistry extends EventEmitter {
   private selectCanonicalDiscoveredProfile(
     profiles: CodingAgentProfile[],
   ): CodingAgentProfile | undefined {
-    return profiles.find(profile => this.repository?.isReferenced(profile.id)) ??
+    return (
+      profiles.find(profile => this.repository?.isReferenced(profile.id)) ??
       profiles.find(profile => profile.status === CodingAgentProfileStatus.Ready) ??
-      profiles[0];
+      profiles[0]
+    );
   }
 
   private isLegacyRegistryProfile(
