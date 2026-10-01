@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig } from 'motion/react';
-import { MessageCircle, Trash2 } from 'lucide-react';
+import { MessageCircle, PanelLeftClose, Trash2 } from 'lucide-react';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -43,7 +43,6 @@ import { SidebarSearchTrigger } from './shell/SidebarSearchTrigger';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
 import { workspaceService } from '../services/workspace';
 import { ShellIconButton } from './shell/ShellIconButton';
-import { SidebarAnimatedPanelLeftCloseIcon } from './icons/SidebarAnimatedPanelLeftCloseIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks } from './agentSidebar/sessionSort';
@@ -76,7 +75,7 @@ interface SidebarProps {
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
 
-const DEFAULT_SIDEBAR_WIDTH = 244;
+const DEFAULT_SIDEBAR_WIDTH = 260;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
@@ -369,7 +368,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, [updateAgentScrollEdges]);
 
   const renderSearchControl = (isChatMode = false) => (
-    <div className={cn('shrink-0 bg-surface-raised', !isChatMode && 'px-3')}>
+    <div className={cn('shrink-0', !isChatMode && 'px-2')}>
       <SidebarSearchTrigger
         label={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
         onClick={() => setSearchActive(true)}
@@ -380,7 +379,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <MotionConfig reducedMotion="user">
       <aside
-        className={`relative shrink-0 overflow-hidden bg-surface-raised ${
+        className={`theme-shell-sidebar relative shrink-0 overflow-hidden ${
           isResizing ? '' : 'sidebar-transition'
         }`}
         data-active-view={activeView}
@@ -396,25 +395,25 @@ const Sidebar: React.FC<SidebarProps> = ({
             transitionDuration: `${SIDEBAR_COLLAPSE_TRANSITION_MS}ms`,
           }}
         >
-          <div className={cn('pt-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
-            <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
+          <div className="shrink-0">
+            <div className="theme-sidebar-header draggable sidebar-header-drag flex items-center justify-between">
               <div className={cn('flex items-center gap-2', isMac && 'pl-[68px]')}>
                 <img
                   src="zhiyuan-logo-light.svg"
                   alt="知远"
-                  className="logo-light h-5 w-auto select-none"
+                  className="logo-light w-auto select-none"
                 />
                 <img
                   src="zhiyuan-logo-dark.svg"
                   alt="知远"
-                  className="logo-dark h-5 w-auto select-none"
+                  className="logo-dark w-auto select-none"
                 />
               </div>
               <ShellIconButton
                 onClick={onToggleCollapse}
                 label={i18nService.t(isCollapsed ? 'expand' : 'collapse')}
               >
-                <SidebarAnimatedPanelLeftCloseIcon />
+                <PanelLeftClose />
               </ShellIconButton>
             </div>
             <SidebarNavigationControls
@@ -434,7 +433,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <div className="relative flex min-h-0 flex-1 flex-col">
             {activeView === 'coding' ? (
-              <div className="flex min-h-0 flex-1 px-3">
+              <div className="flex min-h-0 flex-1 px-2">
                 <CodingWorkspaceSidebar
                   selection={codingSelection}
                   onSelectionChange={onCodingSelectionChange}
@@ -446,7 +445,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div
               ref={agentScrollContainerRef}
               className={cn(
-                'scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-3 pb-10',
+                'theme-sidebar-scroll scrollbar-hidden min-h-0 flex-1 overflow-y-auto',
                 activeView === 'coding' && 'hidden',
               )}
               onScroll={handleAgentScroll}
@@ -478,10 +477,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <ChatSkillShortcuts />
                   </div>
                   {renderSearchControl(true)}
-                  <div className="sticky top-0 z-30 flex h-9 items-center bg-surface-raised px-1.5">
-                    <h2 className="min-w-0 truncate text-sm font-normal text-foreground opacity-[0.28]">
-                      {i18nService.t('chatRecentTitle')}
-                    </h2>
+                  <div className="theme-sidebar-section sticky top-0 z-30 flex items-center">
+                    <h2 className="min-w-0 truncate">{i18nService.t('chatRecentTitle')}</h2>
                   </div>
                   {!chatSessionsLoaded ? (
                     <div className="flex items-center justify-center py-10 px-4 text-sm text-muted-foreground">
@@ -544,13 +541,13 @@ const Sidebar: React.FC<SidebarProps> = ({
               <>
                 <div
                   className={cn(
-                    'pointer-events-none absolute inset-x-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150',
+                    'theme-sidebar-fade theme-sidebar-fade-top pointer-events-none absolute inset-x-0 z-10',
                     workMode === WorkMode.Chat ? 'top-0' : 'top-8',
                     agentScrollEdges.top ? 'opacity-100' : 'opacity-0',
                   )}
                 />
                 <div
-                  className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
+                  className={`theme-sidebar-fade theme-sidebar-fade-bottom pointer-events-none absolute inset-x-0 bottom-0 z-10 ${
                     agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
                   }`}
                 />
@@ -559,15 +556,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {!isCollapsed && (
             <div
-              className={cn(
-                'non-draggable absolute top-0 right-0 h-full w-3 cursor-col-resize',
-                isResizing ? 'bg-border' : 'bg-transparent',
-              )}
+              className="theme-sidebar-resize non-draggable absolute top-0 right-0 h-full w-1 cursor-col-resize"
+              data-resizing={isResizing || undefined}
               onMouseDown={handleResizeStart}
             />
           )}
           {isBatchMode && activeView !== 'coding' ? (
-            <div className="px-3 pb-3 pt-1 flex items-center justify-between">
+            <div className="theme-sidebar-footer flex items-center justify-between">
               <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
                 <Checkbox
                   checked={
@@ -575,7 +570,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     allVisibleSessionIdsRef.current.length > 0
                   }
                   onCheckedChange={handleSelectAll}
-                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
                 />
                 {i18nService.t('batchSelectAll')}
               </label>
@@ -603,7 +597,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
           ) : (
-            <div className="space-y-1 px-3 pb-3 pt-1">
+            <div className="theme-sidebar-footer space-y-1">
               {updateEntry}
               {!hideLogin ? (
                 <LoginButton

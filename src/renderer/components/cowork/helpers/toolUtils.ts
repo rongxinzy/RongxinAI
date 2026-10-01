@@ -8,15 +8,6 @@ export const hasText = (value: unknown): value is string =>
 export const toTrimmedString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value.trim() : null;
 
-export const formatUnknown = (value: unknown): string => {
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
-
 export const getStringArray = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
   const lines = value.filter(item => typeof item === 'string') as string[];
@@ -83,20 +74,9 @@ export const getToolDisplayName = (toolName: string | undefined): string => {
   }
 };
 
-export const isBashLikeToolName = (toolName: string | undefined): boolean => {
-  if (!toolName) return false;
-  const n = normalizeToolName(toolName);
-  return n === 'bash' || n === 'exec' || n === 'shell';
-};
-
 export const isTodoWriteToolName = (toolName: string | undefined): boolean => {
   if (!toolName) return false;
   return normalizeToolName(toolName) === 'todowrite';
-};
-
-export const isCronToolName = (toolName: string | undefined): boolean => {
-  if (!toolName) return false;
-  return normalizeToolName(toolName) === 'cron';
 };
 
 // ── Tool input extraction ──
@@ -253,16 +233,6 @@ export const getToolInputSummary = (
 
 // ── Tool input / result display ──
 
-export const formatToolInput = (
-  toolName: string | undefined,
-  toolInput?: Record<string, unknown>,
-): string | null => {
-  if (!toolInput) return null;
-  const summary = getToolInputSummary(toolName, toolInput);
-  if (summary?.trim()) return summary;
-  return formatUnknown(toolInput);
-};
-
 export const getToolResultDisplay = (message: {
   content: string;
   metadata?: Record<string, unknown> | null;
@@ -274,23 +244,4 @@ export const getToolResultDisplay = (message: {
     return formatStructuredText(normalizeToolResultText(meta?.toolResult ?? ''));
   if (hasText(meta?.error)) return formatStructuredText(normalizeToolResultText(meta?.error ?? ''));
   return '';
-};
-
-/** Like getToolResultDisplay but preserves ANSI escape sequences for Terminal rendering. */
-export const getRawToolResult = (message: {
-  content: string;
-  metadata?: Record<string, unknown> | null;
-}): string => {
-  const meta = message.metadata;
-  const raw = hasText(message.content)
-    ? message.content
-    : hasText(meta?.toolResult)
-      ? meta?.toolResult
-      : hasText(meta?.error)
-        ? meta?.error
-        : '';
-  if (!raw) return '';
-  const trimmed = (raw ?? '').trim();
-  const errorTagMatch = trimmed.match(/^<tool_use_error>([\s\S]*?)<\/tool_use_error>$/i);
-  return errorTagMatch ? errorTagMatch[1].trim() : (raw ?? '');
 };

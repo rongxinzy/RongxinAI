@@ -1,0 +1,31 @@
+/** Compositions refine existing primitives without introducing a second sidebar. */
+export const SHELL_SIDEBAR_SELECTORS = {
+  'shell-sidebar': '.theme-shell-sidebar',
+  'shell-sidebar-header': '.theme-sidebar-header',
+  'shell-sidebar-logo': '.theme-sidebar-header img',
+  'shell-sidebar-section': '.theme-sidebar-section',
+  'shell-sidebar-scroll': '.theme-sidebar-scroll',
+  'shell-sidebar-footer': '.theme-sidebar-footer',
+  'shell-sidebar-nav':
+    '.theme-shell-sidebar .theme-button-navigation, .theme-shell-sidebar .chat-skill-shortcut',
+  'shell-sidebar-nav-selected':
+    '.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]',
+  'shell-sidebar-task': '.theme-shell-sidebar .theme-surface-agent-row',
+  'shell-sidebar-task-selected': '.theme-shell-sidebar .theme-surface-agent-selected',
+  'shell-sidebar-task-idle': '.theme-shell-sidebar .theme-surface-agent-idle',
+  'shell-sidebar-task-main': '.theme-shell-sidebar .theme-sidebar-task-main',
+  'shell-sidebar-workspace': '.theme-sidebar-workspace',
+  'shell-sidebar-workspace-main': '.theme-sidebar-workspace-main',
+  'shell-sidebar-caption': '.theme-sidebar-caption',
+  'shell-sidebar-approval': '.theme-sidebar-approval',
+  'shell-sidebar-action': '.theme-shell-sidebar .theme-sidebar-row-action',
+  'shell-sidebar-resize': '.theme-sidebar-resize',
+  'shell-sidebar-resizing': '.theme-sidebar-resize[data-resizing="true"]',
+  'shell-sidebar-fade': '.theme-sidebar-fade',
+  'shell-sidebar-fade-top': '.theme-sidebar-fade-top',
+  'shell-sidebar-fade-bottom': '.theme-sidebar-fade-bottom',
+  'shell-mode': '.theme-switch[data-mode="work-chat"]',
+  'shell-mode-thumb': '.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]',
+  'shell-mode-label': '.theme-sidebar-mode-label',
+  'shell-mode-label-selected': '.theme-sidebar-mode-label[data-mode-selected="true"]',
+} as const;

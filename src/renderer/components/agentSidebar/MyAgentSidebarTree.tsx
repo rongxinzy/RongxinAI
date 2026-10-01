@@ -7,8 +7,8 @@ import {
 } from '@shared/components/ui/dialog';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { Input } from '@shared/components/ui/input';
-import { useReducedMotion } from 'motion/react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { FolderPlus } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -28,10 +28,6 @@ import {
 import type { CoworkSessionSummary } from '../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import CreateProjectDialog from '../cowork/CreateProjectDialog';
-import {
-  AnimatedFolderPlusIcon,
-  type AnimatedFolderPlusIconHandle,
-} from '../icons/AnimatedFolderPlusIcon';
 import { isProjectWorkspaceActive, isSectionWorkspaceActive } from './activeWorkspace';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
@@ -158,8 +154,6 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   };
 
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
-  const folderPlusIconRef = useRef<AnimatedFolderPlusIconHandle>(null);
-  const prefersReducedMotion = useReducedMotion();
   const [workspacePendingRemoval, setWorkspacePendingRemoval] =
     useState<WorkspaceSidebarNode | null>(null);
   const [workspacePendingRename, setWorkspacePendingRename] = useState<WorkspaceSidebarNode | null>(
@@ -285,23 +279,17 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className="sticky top-0 z-30 flex h-9 items-center justify-between bg-surface-raised px-1.5">
-        <h2 className="min-w-0 truncate text-sm font-normal text-muted-foreground">
-          {i18nService.t('workspaces')}
-        </h2>
+      <div className="theme-sidebar-section sticky top-0 z-30 flex items-center justify-between">
+        <h2 className="min-w-0 truncate">{i18nService.t('workspaces')}</h2>
         <Button
           type="button"
           variant="ghost"
-          size="icon-sm"
+          size="icon-xs"
           onClick={() => void handleCreateWorkspace()}
-          onMouseEnter={() => {
-            if (!prefersReducedMotion) folderPlusIconRef.current?.startAnimation();
-          }}
-          onMouseLeave={() => folderPlusIconRef.current?.stopAnimation()}
           className="theme-action-muted"
           aria-label={i18nService.t('workspaceAdd')}
         >
-          <AnimatedFolderPlusIcon ref={folderPlusIconRef} />
+          <FolderPlus className="size-4" strokeWidth={1.75} />
         </Button>
       </div>
 
@@ -354,10 +342,8 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
 
       {workMode === 'work' && (
         <div className="mt-3 flex flex-col gap-0.5">
-          <div className="flex h-10 items-center bg-surface-raised px-1.5">
-            <h2 className="min-w-0 truncate text-sm font-normal text-muted-foreground">
-              {i18nService.t('scheduledTasks')}
-            </h2>
+          <div className="theme-sidebar-section flex items-center">
+            <h2 className="min-w-0 truncate">{i18nService.t('scheduledTasks')}</h2>
           </div>
 
           {scheduledWorkspaceNodes.length === 0 ? (
