@@ -1,0 +1,100 @@
+name: Author review gate
+
+# 说明:必须使用 pull_request_target(执行 main 上的本文件版本)。普通
+# pull_request / pull_request_review 会执行 PR 分支里的 workflow 版本,
+# 受管控作者可在自己分支中改写本文件使门禁失效,因此这里不使用这两种
+# 触发。本 workflow 不检出 PR 代码,仅调用 REST API,无注入面。
+# 评审人 approve 之后请对最新一次失败的 author-review-gate 运行点击
+# "Re-run all jobs"(重跑仍执行 main 上的版本)以刷新判定。
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: author-review-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  # 逗号分隔的 GitHub 登录名(不区分大小写):这些作者的 PR 必须获得
+  # REQUIRED_REVIEWER_LOGINS 中至少一人的有效 approve 才允许合并。
+  GATED_AUTHOR_LOGINS: 'LiXiang2019'
+  REQUIRED_REVIEWER_LOGINS: 'hawkli-1994'
+
+jobs:
+  author-review-gate:
+    name: author-review-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce reviewer approval for gated authors
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+
+          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+          author=$(lower "$PR_AUTHOR")
+          gated=0
+          IFS=',' read -r -a gated_logins <<< "$GATED_AUTHOR_LOGINS"
+          for candidate in "${gated_logins[@]}"; do
+            if [ -n "$candidate" ] && [ "$(lower "$candidate")" = "$author" ]; then
+              gated=1
+            fi
+          done
+
+          if [ "$gated" -ne 1 ]; then
+            echo "PR author '$PR_AUTHOR' is not gated; nothing to enforce."
+            exit 0
+          fi
+
+          echo "PR author '$PR_AUTHOR' is gated: approval from [$REQUIRED_REVIEWER_LOGINS] must cover the latest commit."
+
+          head_sha=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
+          head_ts=$(gh api "repos/$REPO/commits/$head_sha" --jq '.commit.committer.date')
+          head_epoch=$(date -u -d "$head_ts" +%s)
+          reviews=$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews")
+
+          approved=0
+          IFS=',' read -r -a required_logins <<< "$REQUIRED_REVIEWER_LOGINS"
+          for reviewer in "${required_logins[@]}"; do
+            reviewer=$(lower "$reviewer")
+            [ -z "$reviewer" ] && continue
+            latest_review=$(
+              printf '%s' "$reviews" | jq -r --arg reviewer "$reviewer" '
+                [ .[]
+                  | select((.user.login | ascii_downcase) == $reviewer)
+                  | select(.state != "PENDING" and .state != "COMMENTED")
+                ]
+                | sort_by(.submitted_at)
+                | last
+                | if . == null then empty else tostring end
+              '
+            )
+            if [ -z "$latest_review" ]; then
+              echo "::error::没有来自 '$reviewer' 的评审记录。"
+              continue
+            fi
+            state=$(printf '%s' "$latest_review" | jq -r '.state')
+            submitted_ts=$(printf '%s' "$latest_review" | jq -r '.submitted_at')
+            submitted_epoch=$(date -u -d "$submitted_ts" +%s)
+            if [ "$state" = "APPROVED" ] && [ "$submitted_epoch" -ge "$head_epoch" ]; then
+              approved=1
+              echo "'$reviewer' 已在 $submitted_ts approve(最新提交 $head_ts),门禁通过条件满足。"
+            else
+              echo "::error::'$reviewer' 的最新评审为 '$state'($submitted_ts),最新提交推送于 $head_ts;approve 必须覆盖最新提交。"
+            fi
+          done
+
+          if [ "$approved" -ne 1 ]; then
+            echo "::error::此 PR 由 '$PR_AUTHOR' 发起,合并前必须获得 $REQUIRED_REVIEWER_LOGINS 的有效 approve;approve 后请对最新的 author-review-gate 运行点击 Re-run all jobs 刷新判定。"
+            exit 1
+          fi
+
+          echo "Author review gate passed."
