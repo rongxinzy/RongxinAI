@@ -898,6 +898,20 @@
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
 }
@@ -6707,6 +6721,9 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-avatar)::after,
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-avatar-badge),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-spinner),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-run-indicator),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-run-indicator .theme-spinner),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-run-indicator-elapsed),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-field-legend),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-field-legend[data-variant="label"]),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-field-legend[data-variant="legend"]),
@@ -8508,6 +8525,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="classic-dark"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="classic-dark"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="classic-dark"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -14333,6 +14364,9 @@ to {
 [data-theme="classic-dark"] :where(.theme-avatar)::after,
 [data-theme="classic-dark"] :where(.theme-avatar-badge),
 [data-theme="classic-dark"] :where(.theme-spinner),
+[data-theme="classic-dark"] :where(.theme-run-indicator),
+[data-theme="classic-dark"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="classic-dark"] :where(.theme-run-indicator-elapsed),
 [data-theme="classic-dark"] :where(.theme-field-legend),
 [data-theme="classic-dark"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="classic-dark"] :where(.theme-field-legend[data-variant="legend"]),
@@ -16134,6 +16168,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="daming-light"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="daming-light"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="daming-light"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -21944,6 +21992,9 @@ to {
 [data-theme="daming-light"] :where(.theme-avatar)::after,
 [data-theme="daming-light"] :where(.theme-avatar-badge),
 [data-theme="daming-light"] :where(.theme-spinner),
+[data-theme="daming-light"] :where(.theme-run-indicator),
+[data-theme="daming-light"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="daming-light"] :where(.theme-run-indicator-elapsed),
 [data-theme="daming-light"] :where(.theme-field-legend),
 [data-theme="daming-light"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="daming-light"] :where(.theme-field-legend[data-variant="legend"]),
@@ -23745,6 +23796,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="daming-dark"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="daming-dark"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="daming-dark"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -29570,6 +29635,9 @@ to {
 [data-theme="daming-dark"] :where(.theme-avatar)::after,
 [data-theme="daming-dark"] :where(.theme-avatar-badge),
 [data-theme="daming-dark"] :where(.theme-spinner),
+[data-theme="daming-dark"] :where(.theme-run-indicator),
+[data-theme="daming-dark"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="daming-dark"] :where(.theme-run-indicator-elapsed),
 [data-theme="daming-dark"] :where(.theme-field-legend),
 [data-theme="daming-dark"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="daming-dark"] :where(.theme-field-legend[data-variant="legend"]),
@@ -31371,6 +31439,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="changan-light"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="changan-light"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="changan-light"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -37186,6 +37268,9 @@ to {
 [data-theme="changan-light"] :where(.theme-avatar)::after,
 [data-theme="changan-light"] :where(.theme-avatar-badge),
 [data-theme="changan-light"] :where(.theme-spinner),
+[data-theme="changan-light"] :where(.theme-run-indicator),
+[data-theme="changan-light"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="changan-light"] :where(.theme-run-indicator-elapsed),
 [data-theme="changan-light"] :where(.theme-field-legend),
 [data-theme="changan-light"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="changan-light"] :where(.theme-field-legend[data-variant="legend"]),
@@ -38987,6 +39072,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="changan-dark"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="changan-dark"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="changan-dark"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -44817,6 +44916,9 @@ to {
 [data-theme="changan-dark"] :where(.theme-avatar)::after,
 [data-theme="changan-dark"] :where(.theme-avatar-badge),
 [data-theme="changan-dark"] :where(.theme-spinner),
+[data-theme="changan-dark"] :where(.theme-run-indicator),
+[data-theme="changan-dark"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="changan-dark"] :where(.theme-run-indicator-elapsed),
 [data-theme="changan-dark"] :where(.theme-field-legend),
 [data-theme="changan-dark"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="changan-dark"] :where(.theme-field-legend[data-variant="legend"]),
@@ -46618,6 +46720,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="weiyang-light"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="weiyang-light"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="weiyang-light"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -52433,6 +52549,9 @@ to {
 [data-theme="weiyang-light"] :where(.theme-avatar)::after,
 [data-theme="weiyang-light"] :where(.theme-avatar-badge),
 [data-theme="weiyang-light"] :where(.theme-spinner),
+[data-theme="weiyang-light"] :where(.theme-run-indicator),
+[data-theme="weiyang-light"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="weiyang-light"] :where(.theme-run-indicator-elapsed),
 [data-theme="weiyang-light"] :where(.theme-field-legend),
 [data-theme="weiyang-light"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="weiyang-light"] :where(.theme-field-legend[data-variant="legend"]),
@@ -54234,6 +54353,20 @@ to {
   animation-duration: 1s;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+[data-theme="weiyang-dark"] :where(.theme-run-indicator) {
+  height: 1.5rem;
+  padding-inline: 1rem;
+  font-size: var(--zy-component-text-xs);
+  line-height: 1;
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-run-indicator .theme-spinner) {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+[data-theme="weiyang-dark"] :where(.theme-run-indicator-elapsed) {
+  font-variant-numeric: tabular-nums;
 }
 [data-theme="weiyang-dark"] :where(.theme-field-legend) {
   font-weight: var(--zy-component-font-weight-medium);
@@ -60064,6 +60197,9 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-avatar)::after,
 [data-theme="weiyang-dark"] :where(.theme-avatar-badge),
 [data-theme="weiyang-dark"] :where(.theme-spinner),
+[data-theme="weiyang-dark"] :where(.theme-run-indicator),
+[data-theme="weiyang-dark"] :where(.theme-run-indicator .theme-spinner),
+[data-theme="weiyang-dark"] :where(.theme-run-indicator-elapsed),
 [data-theme="weiyang-dark"] :where(.theme-field-legend),
 [data-theme="weiyang-dark"] :where(.theme-field-legend[data-variant="label"]),
 [data-theme="weiyang-dark"] :where(.theme-field-legend[data-variant="legend"]),

@@ -224,6 +224,10 @@ Tailwind 的语义颜色、字体、圆角和阴影映射到插件变量。页�
 
 ## 动效
 
+### 对话运行指示条
+
+运行状态位于页头下方、会话内容最上沿，不占用输入区。使用 24px 高的单行、12px 辅助文字与中性次文本色，无卡片圆角、阴影或日志预览。仅显示简短运行状态和用时；失去后台确认时明确显示正在重连。复用共享 Spinner，图标 12px，减少动效时停止旋转。尺寸与外观由主题组件 recipe 提供，定时刷新不得重渲染消息列表。
+
 - 时长：普通交互 **100–250ms**；具备明确语义过程的动态图标 **400–600ms**，统一 `ease-out`（或 `transitionTimingFunction.smooth`）。超过 600ms 的动画需要理由。
 - 可动属性只有 `opacity` 和 `transform`；禁止动画化 width/height/top/left（布局抖动）。结构性位移（如侧边栏宽度）沿用已有的受控例外，缓动同样统一 `ease-out`/`smooth`，不得用 `ease-in-out`。
 - **禁止 `transition-all`**：过渡必须限定属性（`transition-colors` / `transition-opacity` / `transition-transform`，或显式属性列表）。`transition-all` 会把布局属性卷进动画，是 width/height 被隐式动画化的主要来源。

@@ -1136,6 +1136,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       onNewChat={onNewChat}
       onToggleArtifactPanel={() => dispatch(togglePanel())}
       updateBadge={updateBadge}
+      runIndicator={isSessionSwitching ? null : <CoworkRunStatus key={currentSession.id} sessionId={currentSession.id} isStreaming={isStreaming} isDirectChat={isDirectChat} />}
     >
       {/* Export Options Modal */}
       {!isSessionSwitching && showExportOptions && (
@@ -1534,7 +1535,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   topAccessory={
                     isSessionSwitching ? null : (
                       <>
-                        <CoworkRunStatus key={currentSession.id} sessionId={currentSession.id} isStreaming={isStreaming} isDirectChat={isDirectChat} />
                         {workMode === CoworkSessionMode.Work &&
                           !isDirectChat &&
                           currentSession?.id && (
