@@ -10,6 +10,7 @@ export const ArtifactWorkerLimit = {
 
 export const ArtifactWorkerTask = {
   Collect: 'collect',
+  TransformText: 'transform-text',
   InspectWorkspaceContent: 'inspect-workspace-content',
 } as const;
 export type ArtifactWorkerTask = (typeof ArtifactWorkerTask)[keyof typeof ArtifactWorkerTask];

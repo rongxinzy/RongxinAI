@@ -1,3 +1,4 @@
+import { expectRunStart } from '../store/slices/coworkRunSlice';
 import {
   type CoworkError,
   CoworkErrorKind,
@@ -62,6 +63,8 @@ import {
 } from './coworkTerminalError';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
+import { CoworkContentBuffer } from './coworkContentBuffer';
+import { CoworkRunSync } from './coworkRunSync';
 import { PiUiRecovery } from './piUiRecovery';
 import {
   PiUiEventSequenceTracker,
@@ -81,12 +84,15 @@ const classifyError = (error: string | CoworkError): string => {
 class CoworkService {
   private streamListenerCleanups: Array<() => void> = [];
   private initialized = false;
+  private runSync?: CoworkRunSync;
   private latestLoadSessionsRequestId = 0;
   private latestLoadChatSessionsRequestId = 0;
   private latestLoadSessionRequestId = 0;
 
   async init(): Promise<void> {
     if (this.initialized) return;
+
+    this.setupStreamListeners();
 
     // Load initial config
     await this.loadConfig();
@@ -97,9 +103,6 @@ class CoworkService {
       this.loadSessions(undefined, store.getState().workspace.currentWorkspaceId ?? undefined),
       this.loadChatSessions(),
     ]);
-
-    // Set up stream listeners
-    this.setupStreamListeners();
 
     this.initialized = true;
   }
@@ -116,9 +119,6 @@ class CoworkService {
 
     // Clean up any existing listeners
     this.cleanupListeners();
-
-    // Keep the latest update per message for the next frame. Thinking and answer
-    // messages can be finalized back-to-back, so a single pending slot loses one.
     const updateBatcher = new RafMessageUpdateBatcher(updates => {
       store.dispatch(updateMessageContents(updates));
     });
@@ -135,12 +135,26 @@ class CoworkService {
         return result.session ?? null;
       },
       prepare: prepareCoworkSessionRender,
-      applyStatus: snapshot => store.dispatch(updateSessionStatus({ ...snapshot, recovered: true })),
+      applyStatus: snapshot =>
+        store.dispatch(updateSessionStatus({ ...snapshot, recovered: true })),
       applySession: (session, preserveLiveContent) =>
         store.dispatch(recoverSession({ session, preserveLiveContent })),
       flush: () => updateBatcher.flush(),
     });
     this.streamListenerCleanups.push(() => recovery.dispose());
+    const runSync = new CoworkRunSync(
+      () => updateBatcher.flush(),
+      id => recovery.recover(id),
+    );
+    this.runSync = runSync;
+    const contentBuffer = new CoworkContentBuffer(id => runSync.requestRecovery(id));
+    this.streamListenerCleanups.push(runSync.start());
+    this.streamListenerCleanups.push(
+      cowork.onStreamContentPatch(patch => {
+        const update = contentBuffer.apply(patch);
+        if (update) updateBatcher.enqueue(update);
+      }),
+    );
 
     const sequenceTracker = new PiUiEventSequenceTracker();
     const uiEventCleanup = cowork.onStreamUiEvent((event: PiUiEvent) => {
@@ -148,9 +162,15 @@ class CoworkService {
       const applyEvent = recovery.observe(event);
       if (sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
         console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
-        void recovery.recover(event.sessionId).catch(error =>
-          console.error('[CoworkService] failed to recover after a UI event sequence gap:', error),
-        );
+        runSync.requestRecovery(event.sessionId);
+        void recovery
+          .recover(event.sessionId)
+          .catch(error =>
+            console.error(
+              '[CoworkService] failed to recover after a UI event sequence gap:',
+              error,
+            ),
+          );
       }
       if (!applyEvent) return;
       switch (event.type) {
@@ -166,11 +186,19 @@ class CoworkService {
             );
           }
           store.dispatch(addMessage({ sessionId, message }));
+          const content = contentBuffer.latest(message.id);
+          if (content !== undefined)
+            updateBatcher.enqueue({ sessionId, messageId: message.id, content });
           break;
         }
         case PiUiEventType.Started:
           store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'running' }));
           break;
+        case PiUiEventType.ContentPatch: {
+          const update = contentBuffer.apply(event.patch);
+          if (update) updateBatcher.enqueue(update);
+          break;
+        }
         case PiUiEventType.MessageUpdate:
           updateBatcher.enqueue({
             sessionId: event.sessionId,
@@ -198,13 +226,16 @@ class CoworkService {
           store.dispatch(dequeuePendingPermission({ requestId: event.requestId }));
           break;
         case PiUiEventType.Interrupted:
+          updateBatcher.flush();
           store.dispatch(clearPendingPermissionsForSession(event.sessionId));
           store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
           break;
         case PiUiEventType.Completed:
+          updateBatcher.flush();
           store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'completed' }));
           break;
         case PiUiEventType.Error: {
+          updateBatcher.flush();
           const stateBeforeStatusUpdate = store.getState().cowork;
           const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
             [
@@ -231,6 +262,7 @@ class CoworkService {
         case PiUiEventType.QueueUpdated:
           break;
         case PiUiEventType.Stopped:
+          updateBatcher.flush();
           store.dispatch(clearPendingPermissionsForSession(event.sessionId));
           store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
           break;
@@ -239,9 +271,11 @@ class CoworkService {
       }
     });
     this.streamListenerCleanups.push(uiEventCleanup);
-    void recovery.bootstrap().catch(error =>
-      console.error('[CoworkService] failed to recover Pi runtime state on attach:', error),
-    );
+    void recovery
+      .bootstrap()
+      .catch(error =>
+        console.error('[CoworkService] failed to recover Pi runtime state on attach:', error),
+      );
 
     // Sessions changed listener (new channel sessions discovered by polling,
     // or reconcileWithHistory replaced messages for a channel session)
@@ -434,6 +468,8 @@ class CoworkService {
       console.error('Cowork API not available');
       return false;
     }
+
+    store.dispatch(expectRunStart({ sessionId: options.sessionId, startedAt: Date.now() }));
 
     const result = await cowork.continueSession({
       sessionId: options.sessionId,
@@ -678,6 +714,7 @@ class CoworkService {
       }
       const wasCurrentSession = store.getState().cowork.currentSessionId === sessionId;
       store.dispatch(setCurrentSession(result.session));
+      this.runSync?.requestRecovery(sessionId);
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.
       // loadSession can be called reactively (onSessionsChanged) while a task

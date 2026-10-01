@@ -2,11 +2,13 @@ import type { CoworkError } from '../../common/coworkError';
 import type { CoworkPendingMessage } from './pendingMessageQueue';
 import type { CoworkSessionInterruption } from './interruption';
 import type { CoworkToolActivityEvent } from './toolActivity';
+import { CoworkRunPolicy, type CoworkContentPatch } from './runState';
 
 export const PiUiEventType = {
   Started: 'started',
   Message: 'message',
   MessageUpdate: 'message_update',
+  ContentPatch: 'content_patch',
   ToolActivity: 'tool_activity',
   PermissionRequest: 'permission_request',
   PermissionDismiss: 'permission_dismiss',
@@ -40,8 +42,17 @@ type PiUiEventBase = {
 };
 
 export type PiUiEvent =
+  | (PiUiEventBase & {
+      type: typeof PiUiEventType.ContentPatch;
+      sessionId: string;
+      patch: CoworkContentPatch;
+    })
   | (PiUiEventBase & { type: typeof PiUiEventType.Started; sessionId: string })
-  | (PiUiEventBase & { type: typeof PiUiEventType.Message; sessionId: string; message: PiUiMessage })
+  | (PiUiEventBase & {
+      type: typeof PiUiEventType.Message;
+      sessionId: string;
+      message: PiUiMessage;
+    })
   | (PiUiEventBase & {
       type: typeof PiUiEventType.MessageUpdate;
       sessionId: string;
@@ -164,7 +175,9 @@ const isPiUiMessage = (value: unknown): value is PiUiMessage => {
     typeof value.timestamp === 'number' &&
     Number.isFinite(value.timestamp) &&
     (value.sequence === undefined ||
-      (typeof value.sequence === 'number' && Number.isInteger(value.sequence) && value.sequence > 0)) &&
+      (typeof value.sequence === 'number' &&
+        Number.isInteger(value.sequence) &&
+        value.sequence > 0)) &&
     (value.metadata === undefined || isRecord(value.metadata))
   );
 };
@@ -221,6 +234,23 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
   }
 
   switch (candidate.type) {
+    case PiUiEventType.ContentPatch: {
+      const patch = candidate.patch;
+      return (
+        isSessionId(candidate.sessionId) &&
+        isRecord(patch) &&
+        patch.sessionId === candidate.sessionId &&
+        isNonEmptyString(patch.messageId) &&
+        typeof patch.content === 'string' &&
+        patch.content.length <= CoworkRunPolicy.ContentChunkCharacters &&
+        [patch.revision, patch.baseRevision, patch.offset, patch.totalLength].every(
+          n => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0,
+        ) &&
+        typeof patch.complete === 'boolean' &&
+        typeof patch.truncated === 'boolean' &&
+        (patch.metadata === undefined || isRecord(patch.metadata))
+      );
+    }
     case PiUiEventType.Started:
       return isSessionId(candidate.sessionId);
     case PiUiEventType.Message:
@@ -242,7 +272,9 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
         isNonEmptyString(request.requestId) &&
         isNonEmptyString(request.toolName) &&
         isRecord(request.toolInput) &&
-        (request.toolUseId === undefined || request.toolUseId === null || isNonEmptyString(request.toolUseId))
+        (request.toolUseId === undefined ||
+          request.toolUseId === null ||
+          isNonEmptyString(request.toolUseId))
       );
     }
     case PiUiEventType.PermissionDismiss:

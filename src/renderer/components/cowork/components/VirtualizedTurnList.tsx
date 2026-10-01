@@ -9,7 +9,7 @@ import React, {
 } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 
-import { estimateConversationTurnHeight } from '../helpers/conversationTurnHeight';
+import { estimateCachedTurnHeight } from '../helpers/cachedTurnHeight';
 import { getConversationTurnMessageIds, type ConversationTurn } from '../helpers/messageGrouping';
 
 export interface VirtualizedTurnListHandle {
@@ -52,7 +52,7 @@ export const VirtualizedTurnList = React.forwardRef<
   );
   const tailRetryFrameRef = useRef<number | null>(null);
   const tailRetryWindowRef = useRef<Window | null>(null);
-  const estimatedTurnSizes = useMemo(() => turns.map(estimateConversationTurnHeight), [turns]);
+  const estimatedTurnSizes = useMemo(() => turns.map(estimateCachedTurnHeight), [turns]);
 
   const { internallyPrependedTurnSizes, nextMessageIdsByTurn } = useMemo(() => {
     const nextIdsByTurn = new Map<string, string[]>();

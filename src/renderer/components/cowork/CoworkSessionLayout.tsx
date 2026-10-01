@@ -25,6 +25,7 @@ interface CoworkSessionLayoutProps {
   onNewChat?: () => void;
   onToggleArtifactPanel: () => void;
   updateBadge?: React.ReactNode;
+  runIndicator?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -47,6 +48,7 @@ export function CoworkSessionLayout({
   onNewChat,
   onToggleArtifactPanel,
   updateBadge,
+  runIndicator,
   children,
 }: CoworkSessionLayoutProps) {
   const [activeView, setActiveView] = useState<CoworkSessionViewType>(
@@ -103,6 +105,8 @@ export function CoworkSessionLayout({
           />
         }
       />
+
+      {runIndicator}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <TabsContent

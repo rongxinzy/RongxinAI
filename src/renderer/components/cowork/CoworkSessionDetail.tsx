@@ -109,6 +109,7 @@ import {
 import AskUserQuestionCard from './AskUserQuestionCard';
 import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
+import { CoworkRunStatus } from './components/CoworkRunStatus';
 
 // The artifact panel only mounts when the user opens it, so keep its code
 // (and the whole renderers tree behind it) out of the cowork startup chunk.
@@ -1190,6 +1191,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       onNewChat={onNewChat}
       onToggleArtifactPanel={() => dispatch(togglePanel())}
       updateBadge={updateBadge}
+      runIndicator={isSessionSwitching ? null : <CoworkRunStatus key={currentSession.id} sessionId={currentSession.id} isStreaming={isStreaming} />}
     >
       {/* Export Options Modal */}
       {!isSessionSwitching && showExportOptions && (

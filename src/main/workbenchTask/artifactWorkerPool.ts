@@ -1,3 +1,11 @@
+import { boundWorkerInput } from './boundedWorkerInput';
+import {
+  boundToolResult,
+  TextWorkerKind,
+  type TextWorkerInput,
+  type TextWorkerOutput,
+} from './textWorkerOperations';
+import { CoworkRunPolicy } from '../../shared/cowork/runState';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import type { collectWorkbenchArtifacts } from './artifactCollector';
@@ -6,9 +14,10 @@ import type { ArtifactWorkerInput, WorkspaceContentInspection } from './artifact
 
 type Input = Parameters<typeof collectWorkbenchArtifacts>[0];
 type Artifacts = ReturnType<typeof collectWorkbenchArtifacts>;
-type Result = Artifacts | WorkspaceContentInspection;
+type Result = Artifacts | WorkspaceContentInspection | TextWorkerOutput;
 type Response = {
   artifacts?: Artifacts;
+  text?: TextWorkerOutput;
   content?: WorkspaceContentInspection;
   error?: string;
   runMs: number;
@@ -37,15 +46,43 @@ export class WorkbenchArtifactWorkerPool {
       (Array.isArray(input.workflowSnapshot?.artifacts)
         ? input.workflowSnapshot.artifacts.length
         : 0);
-    if (
-      candidates > ArtifactWorkerLimit.Candidates ||
-      Buffer.byteLength(JSON.stringify(input)) > ArtifactWorkerLimit.InputBytes
-    ) {
+    if (candidates > ArtifactWorkerLimit.Candidates)
       return Promise.reject(new Error('Artifact collection input limit exceeded.'));
+    try {
+      input = boundWorkerInput(input, {
+        nodes: 4096,
+        depth: 16,
+        characters: ArtifactWorkerLimit.InputBytes,
+      }) as Input;
+    } catch (error) {
+      return Promise.reject(error);
     }
     return this.enqueue({ kind: ArtifactWorkerTask.Collect, input }, signal).then(
       result => result as Artifacts,
     );
+  }
+
+  transform(input: TextWorkerInput, signal?: AbortSignal): Promise<TextWorkerOutput> {
+    if (
+      input.kind === TextWorkerKind.Content &&
+      (input.content.length > CoworkRunPolicy.MaximumContentCharacters + 1 ||
+        input.previous.length > CoworkRunPolicy.MaximumContentCharacters)
+    )
+      return Promise.reject(new Error('Content input limit exceeded.'));
+    try {
+      return this.enqueue(
+        {
+          kind: ArtifactWorkerTask.TransformText,
+          input:
+            input.kind === TextWorkerKind.Tool
+              ? { ...input, result: boundToolResult(input.result) }
+              : input,
+        },
+        signal,
+      ) as Promise<TextWorkerOutput>;
+    } catch (error) {
+      return Promise.reject(error);
+    }
   }
 
   inspectContent(bytes: ArrayBuffer, signal?: AbortSignal): Promise<WorkspaceContentInspection> {
@@ -110,7 +147,19 @@ export class WorkbenchArtifactWorkerPool {
           console.debug(
             `[WorkbenchArtifacts] completed ${job.task.kind} after ${Math.round(created.startedAt! - job.queuedAt)} ms queued and ${Math.round(response.runMs)} ms running`,
           );
-          if (job.task.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
+          if (job.task.kind === ArtifactWorkerTask.TransformText) {
+            const text = response.text;
+            if (
+              response.error ||
+              !text ||
+              typeof text.content !== 'string' ||
+              text.content.length > CoworkRunPolicy.MaximumContentCharacters ||
+              !Number.isSafeInteger(text.offset) ||
+              text.offset < 0
+            )
+              this.finish(created, new Error(response.error || 'Invalid text worker result.'));
+            else this.finish(created, undefined, false, text);
+          } else if (job.task.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
             const content = response.content;
             if (
               response.error ||
@@ -207,3 +256,8 @@ export const inspectWorkspaceContentAsync = (
   // unrelated contents, and main still owns the bytes used for the file write.
   return pool.inspectContent(Uint8Array.from(content).buffer, signal);
 };
+
+export const transformCoworkTextAsync = (
+  input: TextWorkerInput,
+  signal?: AbortSignal,
+): Promise<TextWorkerOutput> => pool.transform(input, signal);

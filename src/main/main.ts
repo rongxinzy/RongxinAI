@@ -27,6 +27,7 @@ import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
 import { reportPiSessionFailure } from './piSessionFailure';
 import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
+import { bindCoworkRunBridge } from './coworkRunBridge';
 import { registerArtifactFileAvailabilityHandler } from './artifactFileAvailability';
 import { observePreparedRun } from './workbenchTask/preparedRunFailure';
 import {
@@ -408,7 +409,6 @@ protocol.registerSchemesAsPrivileged([
 
 const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
 const IPC_MESSAGE_CONTENT_MAX_CHARS = 120_000;
-const IPC_UPDATE_CONTENT_MAX_CHARS = 120_000;
 const IPC_STRING_MAX_CHARS = 4_000;
 const IPC_MAX_DEPTH = 5;
 const IPC_MAX_KEYS = 80;
@@ -2106,6 +2106,10 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     broadcastUiEvent(sequencer.next(payload));
   });
 
+  const contentProjection = bindCoworkRunBridge(runtime, () => getStore().getDatabase(), patch =>
+    emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
+  );
+
   runtime.on('started', (sessionId: string) => {
     emitUiEvent({ type: PiUiEventType.Started, sessionId });
   });
@@ -2122,14 +2126,13 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   runtime.on(
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
-      const safeContent = truncateIpcString(content, IPC_UPDATE_CONTENT_MAX_CHARS);
-      emitUiEvent({
-        type: PiUiEventType.MessageUpdate,
-        sessionId,
-        messageId,
-        content: safeContent,
-        metadata,
-      });
+      void contentProjection
+        .project(sessionId, messageId, content, metadata)
+        .then(patches => {
+          for (const patch of patches)
+            emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
+        })
+        .catch(error => console.error('[PiWorkbenchForwarder] content projection failed:', error));
     },
   );
 

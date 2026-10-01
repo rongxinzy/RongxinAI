@@ -35,6 +35,7 @@ import { classicBadges } from './classic-badges';
 import { classicSelect } from './classic-select';
 import { classicButtons } from './classic-buttons';
 import { classicCodingDiff } from './classic-coding-diff';
+import { runIndicatorAppearances } from './run-indicator';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
 
 /** Codex appearance recipes are package data, never imported by React controls. */
@@ -78,6 +79,7 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     empty: {},
   });
   return {
+    ...runIndicatorAppearances(),
     ...logoLoadingAppearances(),
     ...codingSidebarAppearances(),
     ...classicButtons(dark),

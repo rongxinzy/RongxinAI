@@ -88,6 +88,7 @@ beforeEach(() => {
           return () => {};
         },
         onSessionsChanged: () => () => {},
+        onStreamContentPatch: () => () => {},
         getSession,
         getRuntimeSnapshots: async (id?: string) => snapshots.read(id),
         getConfig: async () => ({ success: false }),
@@ -119,10 +120,7 @@ test('lost completion is recovered and background resync preserves all user sele
   state.dispatch(setActiveSkillIds(['selected-skill']));
   state.dispatch(setRemoteManaged(true));
   publish(sequencer.next({ type: PiUiEventType.Started, sessionId: 'B' }));
-  publish(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'B' }),
-    true,
-  );
+  publish(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'B' }), true);
   publish(sequencer.next({ type: PiUiEventType.QueueUpdated, sessionId: 'B', items: [] }));
   await vi.waitFor(() => expect(state.getState().cowork.streamingSessionIds).not.toContain('B'));
   expect(state.getState().cowork.currentSessionId).toBe('A');
@@ -141,10 +139,7 @@ test('lost completion replaces stale live state and content in the current conve
     addSession({ ...session('A'), messages: [{ ...session('A').messages[0], content: 'stale' }] }),
   );
   publish(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
-  publish(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
-    true,
-  );
+  publish(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }), true);
   publish(sequencer.next({ type: PiUiEventType.QueueUpdated, sessionId: 'A', items: [] }));
   await vi.waitFor(() =>
     expect(state.getState().cowork.currentSession?.status).toBe(CoworkSessionStatus.Completed),
@@ -194,10 +189,42 @@ test('recovery preserves older history and newer live content when the IPC races
 test('reattaching clears previously tracked execution when runtime already completed', async () => {
   state.dispatch(addSession(session('A')));
   state.dispatch(updateSessionStatus({ sessionId: 'A', status: CoworkSessionStatus.Running }));
-  publish(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
-    true,
-  );
+  publish(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }), true);
   await coworkService.init();
   await vi.waitFor(() => expect(state.getState().cowork.streamingSessionIds).toEqual([]));
+});
+
+test('canonical bounded patches rebuild long content without reviving a completed run', async () => {
+  vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  await coworkService.init();
+  state.dispatch(addSession(session('A')));
+  publish(sequencer.next({ type: PiUiEventType.Started, sessionId: 'A' }));
+  const content = 'x'.repeat(190_000) + 'END';
+  for (let offset = 0; offset < content.length; offset += 60_000) {
+    const end = Math.min(offset + 60_000, content.length);
+    publish(
+      sequencer.next({
+        type: PiUiEventType.ContentPatch,
+        sessionId: 'A',
+        patch: {
+          sessionId: 'A',
+          messageId: 'm',
+          revision: 1,
+          baseRevision: 0,
+          offset,
+          content: content.slice(offset, end),
+          totalLength: content.length,
+          complete: end === content.length,
+          truncated: false,
+        },
+      }),
+    );
+  }
+  publish(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }));
+  await vi.waitFor(() =>
+    expect(state.getState().cowork.currentSession?.messages[0].content).toBe(content),
+  );
+  expect(state.getState().cowork.currentSession?.status).toBe(CoworkSessionStatus.Completed);
+  expect(state.getState().cowork.streamingSessionIds).toEqual([]);
 });
