@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '@shared/providers';
+import {
+  ModelCapabilityStatus,
+  ProviderModelDiscoveryErrorCode,
+  ProviderModelOrigin,
+} from '@shared/providers';
 
 import {
   applyProviderModelDiscoveryResult,
@@ -28,6 +32,7 @@ describe('mergeDiscoveredProviderModels', () => {
     expect(result).toEqual({
       models: [...existing, { id: 'model-b', name: 'Remote B' }],
       addedCount: 1,
+      removedCount: 0,
       changed: true,
     });
     expect(result.models[0]).toBe(existing[0]);
@@ -99,6 +104,85 @@ describe('mergeDiscoveredProviderModels', () => {
     expect(empty.models).toBe(existing);
     expect(failed.changed).toBe(false);
     expect(empty.changed).toBe(false);
+  });
+
+  test('prunes stale entries when the list mirrors the endpoint', () => {
+    const existing = [
+      { id: 'model-a', name: 'Current' },
+      { id: 'stale-from-old-endpoint', name: 'Stale' },
+      { id: 'legacy-entry', name: 'Legacy without origin' },
+    ];
+
+    const result = mergeDiscoveredProviderModels(
+      existing,
+      [
+        { id: 'model-a', displayName: 'Current' },
+        { id: 'model-b', displayName: 'Remote B' },
+      ],
+      { pruneMissing: true },
+    );
+
+    expect(result).toEqual({
+      models: [existing[0], { id: 'model-b', name: 'Remote B' }],
+      addedCount: 1,
+      removedCount: 2,
+      changed: true,
+    });
+  });
+
+  test('keeps user-origin entries missing from the response when pruning', () => {
+    const existing = [
+      { id: 'manual-model', name: 'Added by hand', origin: ProviderModelOrigin.User },
+      { id: 'edited-model', name: 'Saved via the form', origin: ProviderModelOrigin.User },
+    ];
+
+    const result = mergeDiscoveredProviderModels(
+      existing,
+      [{ id: 'edited-model', displayName: 'Still deployed' }],
+      { pruneMissing: true },
+    );
+
+    expect(result.models).toEqual(existing);
+    expect(result.models[0]).toBe(existing[0]);
+    expect(result.addedCount).toBe(0);
+    expect(result.removedCount).toBe(0);
+    expect(result.changed).toBe(false);
+  });
+
+  test('pruning still backfills discovery metadata on surviving entries', () => {
+    const existing = [
+      {
+        id: 'model-a',
+        name: 'Model A',
+        contextWindow: 8192,
+        capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+      },
+    ];
+
+    const result = mergeDiscoveredProviderModels(
+      existing,
+      [
+        {
+          id: 'model-a',
+          contextWindow: 32768,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      ],
+      { pruneMissing: true },
+    );
+
+    expect(result.models).toEqual([
+      {
+        id: 'model-a',
+        name: 'Model A',
+        contextWindow: 32768,
+        supportsImage: true,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Unsupported,
+          imageInput: ModelCapabilityStatus.Supported,
+        },
+      },
+    ]);
   });
 });
 
