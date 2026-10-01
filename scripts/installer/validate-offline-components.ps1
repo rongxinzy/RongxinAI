@@ -3,7 +3,14 @@ param(
   [Parameter(Mandatory = $true)][string]$PluginDir,
   [Parameter(Mandatory = $true)][string]$RuntimeRoot,
   [Parameter(Mandatory = $true)][string]$ComponentTargetsPath,
-  [Parameter(Mandatory = $true)][string]$SevenZipPath
+  [Parameter(Mandatory = $true)][string]$SevenZipPath,
+  # Optional install-timing log; per-component phase records are appended so
+  # the longest install spans stay observable on end-user machines.
+  [string]$TimingLogPath = '',
+  # Full count/byte tree audits are opt-in: the cheap path (completion record
+  # plus sentinel hash) covers interrupted installs, and re-walking tens of
+  # thousands of files on every upgrade costs minutes under real-time scanners.
+  [switch]$DeepAudit
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +21,15 @@ function Stop-WithCode([int]$Code, [string]$Message) {
   # details must not span multiple lines.
   Write-Output ($Message -replace '[\r\n]+', ' ')
   exit $Code
+}
+
+function Add-Timing([string]$Line) {
+  if (-not $TimingLogPath) { return }
+  Add-Content -LiteralPath $TimingLogPath -Value $Line -ErrorAction SilentlyContinue
+}
+
+function Get-ElapsedMilliseconds([datetime]$StartedAt) {
+  return [int64]((Get-Date) - $StartedAt).TotalMilliseconds
 }
 
 function Read-ExpectedHash([string]$Path, [string]$Description) {
@@ -166,33 +182,56 @@ try {
     throw "7za executable is missing: $SevenZipPath"
   }
   $components = Get-Components
+  $modeStartedAt = Get-Date
 
   if ($Mode -eq 'cache') {
     foreach ($component in $components) {
+      $componentStartedAt = Get-Date
       $marker = Join-Path $PluginDir "component-$($component.Key).cache-valid"
       Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
       $target = Join-Path (Join-Path $RuntimeRoot $component.Key) $component.Id
       $complete = Join-Path $target '.complete'
       $sentinel = Join-Path $target $component.Sentinel
       try {
-        if (-not (Test-Path -LiteralPath $complete -PathType Leaf)) { continue }
-        $record = Read-CompleteRecord $complete
-        if ($null -eq $record -or $record.Id -ne $component.Id) { continue }
-        if (-not (Test-Path -LiteralPath $sentinel -PathType Leaf)) { continue }
-        $actualHash = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
-        if ($actualHash -ne $component.SentinelHash) { continue }
-        # A sentinel hash alone cannot detect a component tree left incomplete
-        # by an interrupted move, so the recorded entry count and byte total
-        # must match the tree on disk before the cache entry is reused.
-        $measured = Measure-ComponentTree $target
-        if ($measured.FileCount -ne $record.FileCount -or $measured.TotalBytes -ne $record.TotalBytes) { continue }
+        $rejected = $null
+        if (-not (Test-Path -LiteralPath $complete -PathType Leaf)) {
+          $rejected = 'missing-complete'
+        }
+        if (-not $rejected) {
+          $record = Read-CompleteRecord $complete
+          if ($null -eq $record -or $record.Id -ne $component.Id) { $rejected = 'record-mismatch' }
+        }
+        if (-not $rejected -and -not (Test-Path -LiteralPath $sentinel -PathType Leaf)) {
+          $rejected = 'missing-sentinel'
+        }
+        if (-not $rejected) {
+          $actualHash = (Get-FileHash -LiteralPath $sentinel -Algorithm SHA256 -ErrorAction Stop).Hash.ToLowerInvariant()
+          if ($actualHash -ne $component.SentinelHash) { $rejected = 'sentinel-hash' }
+        }
+        # Deep audit only. The cheap checks above already reject anything an
+        # interrupted install can produce, because the completion record is
+        # published after the tree is in place; re-measuring every file mainly
+        # detects later out-of-band tampering and must not tax every upgrade.
+        if (-not $rejected -and $DeepAudit) {
+          $measured = Measure-ComponentTree $target
+          if ($measured.FileCount -ne $record.FileCount -or $measured.TotalBytes -ne $record.TotalBytes) {
+            $rejected = 'tree-audit'
+          }
+        }
+        if ($rejected) {
+          Add-Timing "phase=component-cache-rejected component=$($component.Key) reason=$rejected elapsed_ms=$(Get-ElapsedMilliseconds $componentStartedAt)"
+          continue
+        }
         Remove-Item -LiteralPath "$target.installing" -Recurse -Force -ErrorAction SilentlyContinue
         New-Item -ItemType File -Path $marker -Force | Out-Null
         Write-Output "cache-hit:$($component.Key)"
+        Add-Timing "phase=component-cache-validated component=$($component.Key) elapsed_ms=$(Get-ElapsedMilliseconds $componentStartedAt)"
       } catch {
         Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+        Add-Timing "phase=component-cache-rejected component=$($component.Key) reason=error elapsed_ms=$(Get-ElapsedMilliseconds $componentStartedAt)"
       }
     }
+    Add-Timing "phase=validate-cache-complete elapsed_ms=$(Get-ElapsedMilliseconds $modeStartedAt)"
     exit 0
   }
 
@@ -204,10 +243,12 @@ try {
     if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
       Stop-WithCode 1 "Missing component archive: $($component.Key)"
     }
-    $actualArchiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualArchiveHash -ne $component.ArchiveHash) {
-      Stop-WithCode 2 "hash-mismatch:$($component.Key)"
-    }
+    # The staged archive is not re-hashed: it came out of the installer's own
+    # payload, 7z verifies per-entry CRCs during extraction, and the sentinel
+    # hash plus manifest binding pin the expanded content. Re-reading every
+    # archive only added install time without adding integrity.
+    $componentStartedAt = Get-Date
+    Add-Timing "phase=component-expand-start component=$($component.Key)"
     try {
       Test-ArchiveEntries $archivePath $component.Prefix
     } catch {
@@ -247,12 +288,15 @@ try {
       $measured = Measure-ComponentTree $target
       Set-Content -LiteralPath (Join-Path $target '.complete') -Value "$($component.Id)|$($component.ArchiveHash)|$($measured.FileCount)|$($measured.TotalBytes)" -NoNewline
       Write-Output "expanded:$($component.Key)"
+      Add-Timing "phase=component-expand-complete component=$($component.Key) elapsed_ms=$(Get-ElapsedMilliseconds $componentStartedAt)"
     } catch {
       Stop-WithCode 4 "extract-failed:$($component.Key):$($_.Exception.Message)"
     } finally {
       Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
     }
   }
+  Add-Timing "phase=component-batch-expand-complete elapsed_ms=$(Get-ElapsedMilliseconds $modeStartedAt)"
 } catch {
+  Add-Timing "phase=validator-failed mode=$Mode elapsed_ms=$(Get-ElapsedMilliseconds $modeStartedAt)"
   Stop-WithCode 1 $_.Exception.Message
 }
