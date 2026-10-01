@@ -33,9 +33,7 @@ describe('cowork image attachments', () => {
       { name: 'shot.png', mimeType: 'image/png', base64Data: png.toString('base64') },
     ]);
 
-    expect(stored).toEqual([
-      expect.objectContaining({ name: 'shot.png', mimeType: 'image/png' }),
-    ]);
+    expect(stored).toEqual([expect.objectContaining({ name: 'shot.png', mimeType: 'image/png' })]);
     expect(stored[0]?.path).toBeTruthy();
     expect(fs.readFileSync(stored[0].path)).toEqual(png);
     expect(JSON.stringify(stored)).not.toContain(png.toString('base64'));
@@ -66,7 +64,11 @@ describe('cowork image attachments', () => {
     const result = persistMessageImageMetadata(root, 'session-1', {
       skillIds: ['a'],
       imageAttachments: [
-        { name: 'shot.png', mimeType: 'image/png', base64Data: Buffer.from('x').toString('base64') },
+        {
+          name: 'shot.png',
+          mimeType: 'image/png',
+          base64Data: Buffer.from('x').toString('base64'),
+        },
       ],
     });
     expect(result.changed).toBe(true);

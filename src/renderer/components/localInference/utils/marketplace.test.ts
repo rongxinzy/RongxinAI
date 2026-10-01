@@ -1,6 +1,10 @@
 import { expect, test } from 'vitest';
 
-import { MarketplaceCapability, type MarketplaceModel, type MarketplaceModelFile } from '../../../../shared/marketplace';
+import {
+  MarketplaceCapability,
+  type MarketplaceModel,
+  type MarketplaceModelFile,
+} from '../../../../shared/marketplace';
 import {
   MARKETPLACE_INITIAL_MODEL_COUNT,
   MARKETPLACE_MAX_PAGE_ROWS,
@@ -96,10 +100,25 @@ test('omits a generic GGUF recommendation while preserving a concrete quantizati
 
 test('recommendations filter runnable models without changing catalogue order', () => {
   const models = [
-    { id: 'limited-high', repoId: 'Qwen/Limited-High', fit: { status: 'limited' }, score: { value: 99 } },
+    {
+      id: 'limited-high',
+      repoId: 'Qwen/Limited-High',
+      fit: { status: 'limited' },
+      score: { value: 99 },
+    },
     { id: 'good-low', repoId: 'Qwen/Good-Low', fit: { status: 'good' }, score: { value: 60 } },
-    { id: 'excellent-high', repoId: 'Qwen/Excellent-High', fit: { status: 'excellent' }, score: { value: 88 } },
-    { id: 'excellent-low', repoId: 'Qwen/Excellent-Low', fit: { status: 'excellent' }, score: { value: 72 } },
+    {
+      id: 'excellent-high',
+      repoId: 'Qwen/Excellent-High',
+      fit: { status: 'excellent' },
+      score: { value: 88 },
+    },
+    {
+      id: 'excellent-low',
+      repoId: 'Qwen/Excellent-Low',
+      fit: { status: 'excellent' },
+      score: { value: 72 },
+    },
   ] as unknown as MarketplaceModel[];
 
   expect(filterMarketplaceModelsForRecommendation(models).map(model => model.id)).toEqual([
@@ -111,7 +130,12 @@ test('recommendations filter runnable models without changing catalogue order', 
 });
 test('filters models by device fit, restricting the default but opening up with "不限"', () => {
   const model = (status: string, stars = 4) =>
-    ({ id: status, repoId: status, fit: { status }, score: { stars } }) as unknown as MarketplaceModel;
+    ({
+      id: status,
+      repoId: status,
+      fit: { status },
+      score: { stars },
+    }) as unknown as MarketplaceModel;
   const models = [
     model('excellent'),
     model('good'),
@@ -132,7 +156,9 @@ test('filters models by device fit, restricting the default but opening up with 
     'limited',
     'unknown',
   ]);
-  expect(filterMarketplaceModelsForDevice(models, 'excellent').map(m => m.id)).toEqual(['excellent']);
+  expect(filterMarketplaceModelsForDevice(models, 'excellent').map(m => m.id)).toEqual([
+    'excellent',
+  ]);
   expect(filterMarketplaceModelsForDevice(models, 'unsupported').map(m => m.id)).toEqual([]);
 
   // "不限" (all) lists every GGUF model, including ones this device cannot run.
@@ -149,8 +175,14 @@ test('fit=all keeps unsupported GGUF models visible in the grid', () => {
   // The reported regression: choosing the unrestricted fit ("不限") collapsed
   // to zero cards when every match was unsupported for this device. The
   // unrestricted filter must list the models, not silently drop them.
-  const models = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(name =>
-    ({ id: name, repoId: name, fit: { status: 'unsupported' }, score: { stars: 3 } }) as unknown as MarketplaceModel,
+  const models = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(
+    name =>
+      ({
+        id: name,
+        repoId: name,
+        fit: { status: 'unsupported' },
+        score: { stars: 3 },
+      }) as unknown as MarketplaceModel,
   );
 
   expect(filterMarketplaceModelsForDevice(models, 'all')).toHaveLength(7);
@@ -199,21 +231,31 @@ test('rejects queries without any letter or digit', () => {
 
 test('page size fits whole rows into the available grid height', () => {
   // Invalid geometry falls back to the default page size.
-  expect(getMarketplacePageSize({ availableGridHeight: 0, cardHeight: 200, columnCount: 3, rowGap: 16 })).toBe(
-    MARKETPLACE_PAGE_SIZE,
-  );
-  expect(getMarketplacePageSize({ availableGridHeight: 100, cardHeight: 0, columnCount: 3, rowGap: 16 })).toBe(
-    MARKETPLACE_PAGE_SIZE,
-  );
+  expect(
+    getMarketplacePageSize({ availableGridHeight: 0, cardHeight: 200, columnCount: 3, rowGap: 16 }),
+  ).toBe(MARKETPLACE_PAGE_SIZE);
+  expect(
+    getMarketplacePageSize({ availableGridHeight: 100, cardHeight: 0, columnCount: 3, rowGap: 16 }),
+  ).toBe(MARKETPLACE_PAGE_SIZE);
 
   // 3 rows × 3 columns = 9 cards.
   expect(
-    getMarketplacePageSize({ availableGridHeight: 648, cardHeight: 200, columnCount: 3, rowGap: 16 }),
+    getMarketplacePageSize({
+      availableGridHeight: 648,
+      cardHeight: 200,
+      columnCount: 3,
+      rowGap: 16,
+    }),
   ).toBe(9);
 
   // The row cap is MARKETPLACE_MAX_PAGE_ROWS even when the viewport is tall.
   expect(
-    getMarketplacePageSize({ availableGridHeight: 5000, cardHeight: 200, columnCount: 4, rowGap: 16 }),
+    getMarketplacePageSize({
+      availableGridHeight: 5000,
+      cardHeight: 200,
+      columnCount: 4,
+      rowGap: 16,
+    }),
   ).toBe(MARKETPLACE_MAX_PAGE_ROWS * 4);
 });
 
@@ -223,7 +265,11 @@ test('grid column count derives from measured card width', () => {
   expect(getMarketplaceGridColumnCount({ gridWidth: 800, cardWidth: 380, columnGap: 16 })).toBe(2);
 });
 
-const file = (path: string, sizeBytes = 1_000, overrides: Partial<MarketplaceModelFile> = {}): MarketplaceModelFile => ({
+const file = (
+  path: string,
+  sizeBytes = 1_000,
+  overrides: Partial<MarketplaceModelFile> = {},
+): MarketplaceModelFile => ({
   path,
   sizeBytes,
   sha256: 'a'.repeat(64),

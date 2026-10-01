@@ -22,7 +22,7 @@ test('selects and deselects only the currently visible sessions', () => {
     'session-a',
     'session-b',
   ]);
-  expect(
-    [...toggleVisibleBatchSelection(new Set(['hidden-session', ...visible]), visible)],
-  ).toEqual(['hidden-session']);
+  expect([
+    ...toggleVisibleBatchSelection(new Set(['hidden-session', ...visible]), visible),
+  ]).toEqual(['hidden-session']);
 });

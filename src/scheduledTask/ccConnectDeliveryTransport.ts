@@ -1,11 +1,11 @@
-import type { IMStore } from "../main/im/imStore";
-import { tryParseCcConnectScopedConversationId } from "../main/im/ccConnectConversationId";
-import type { CoworkStore } from "../main/coworkStore";
+import type { IMStore } from '../main/im/imStore';
+import { tryParseCcConnectScopedConversationId } from '../main/im/ccConnectConversationId';
+import type { CoworkStore } from '../main/coworkStore';
 
-import type { CcConnectDeliveryClient } from "./ccConnectDeliveryClient";
-import type { SchedulerDeliveryTransport } from "./deliveryDispatcher";
+import type { CcConnectDeliveryClient } from './ccConnectDeliveryClient';
+import type { SchedulerDeliveryTransport } from './deliveryDispatcher';
 
-type DeliveryClient = Pick<CcConnectDeliveryClient, "send">;
+type DeliveryClient = Pick<CcConnectDeliveryClient, 'send'>;
 
 /**
  * Routes an already-persisted Delivery through the sidecar that owns its
@@ -16,12 +16,12 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
   private readonly clients = new Map<string, DeliveryClient>();
 
   constructor(
-    private readonly imStore: Pick<IMStore, "getCcConnectSessionKey" | "listSessionMappings">,
-    private readonly coworkStore?: Pick<CoworkStore, "addMessage">,
+    private readonly imStore: Pick<IMStore, 'getCcConnectSessionKey' | 'listSessionMappings'>,
+    private readonly coworkStore?: Pick<CoworkStore, 'addMessage'>,
   ) {}
 
   attach(accountId: string, client: DeliveryClient): void {
-    this.clients.set(requireValue("accountId", accountId), client);
+    this.clients.set(requireValue('accountId', accountId), client);
   }
 
   detach(accountId: string): void {
@@ -29,30 +29,23 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
   }
 
   async send(
-    input: Parameters<SchedulerDeliveryTransport["send"]>[0],
+    input: Parameters<SchedulerDeliveryTransport['send']>[0],
   ): Promise<{ receiptId?: string | null }> {
     const platform = normalizePlatform(
-      requireValue("delivery channel", input.task.delivery.channel),
+      requireValue('delivery channel', input.task.delivery.channel),
     );
-    const conversationId = requireValue(
-      "delivery destination",
-      input.task.delivery.to,
-    );
-    const accountId = this.resolveAccountId(platform, conversationId, input.task.delivery.accountId);
-    const client = this.clients.get(accountId);
-    if (!client)
-      throw new Error(
-        `cc-connect delivery sidecar is unavailable for account ${accountId}`,
-      );
-    const sessionKey = this.imStore.getCcConnectSessionKey(
-      accountId,
+    const conversationId = requireValue('delivery destination', input.task.delivery.to);
+    const accountId = this.resolveAccountId(
       platform,
       conversationId,
+      input.task.delivery.accountId,
     );
+    const client = this.clients.get(accountId);
+    if (!client)
+      throw new Error(`cc-connect delivery sidecar is unavailable for account ${accountId}`);
+    const sessionKey = this.imStore.getCcConnectSessionKey(accountId, platform, conversationId);
     if (!sessionKey) {
-      throw new Error(
-        `cc-connect delivery route is unknown for ${platform}:${conversationId}`,
-      );
+      throw new Error(`cc-connect delivery route is unknown for ${platform}:${conversationId}`);
     }
     await client.send({ accountId, platform, sessionKey, content: input.content });
     try {
@@ -90,7 +83,11 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
     });
   }
 
-  private resolveAccountId(platform: string, conversationId: string, configuredAccountId?: string): string {
+  private resolveAccountId(
+    platform: string,
+    conversationId: string,
+    configuredAccountId?: string,
+  ): string {
     const configured = configuredAccountId?.trim();
     if (configured) return configured;
 
@@ -106,7 +103,9 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
       .filter(accountId => this.clients.has(accountId));
     const uniqueCandidates = [...new Set(candidates)];
     if (uniqueCandidates.length === 0) {
-      throw new Error(`Scheduled task delivery accountId is required for ${platform}:${conversationId}`);
+      throw new Error(
+        `Scheduled task delivery accountId is required for ${platform}:${conversationId}`,
+      );
     }
     if (uniqueCandidates.length > 1) {
       throw new Error(
@@ -124,7 +123,7 @@ function requireValue(name: string, value: string | undefined): string {
 }
 
 function normalizePlatform(platform: string): string {
-  if (platform === "qq") return "qqbot";
-  if (platform === "lark") return "feishu";
+  if (platform === 'qq') return 'qqbot';
+  if (platform === 'lark') return 'feishu';
   return platform;
 }

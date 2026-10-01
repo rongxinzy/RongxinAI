@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import {
-  formatModelLaunchLogLine,
-  formatModelLaunchLogText,
-} from './logFormatting';
+import { formatModelLaunchLogLine, formatModelLaunchLogText } from './logFormatting';
 
 describe('model launch log formatting', () => {
   test('keeps only the short timestamp prefix and message', () => {
@@ -27,8 +24,10 @@ describe('model launch log formatting', () => {
   });
 
   test('formats each line and preserves blank lines', () => {
-    expect(formatModelLaunchLogText('2026-09-14 17:13:48.711000+08:00 - logger - INFO - One\r\n\r\nplain line')).toBe(
-      '09-14 17:13:48: One\n\nplain line',
-    );
+    expect(
+      formatModelLaunchLogText(
+        '2026-09-14 17:13:48.711000+08:00 - logger - INFO - One\r\n\r\nplain line',
+      ),
+    ).toBe('09-14 17:13:48: One\n\nplain line');
   });
 });

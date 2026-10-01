@@ -227,7 +227,10 @@ export class AcpProbeService {
         },
         { timeoutMs: PROBE_TIMEOUT_MS },
       );
-      if (typeof response.protocolVersion !== 'number' || response.protocolVersion < ACP_MINIMUM_PROTOCOL_VERSION) {
+      if (
+        typeof response.protocolVersion !== 'number' ||
+        response.protocolVersion < ACP_MINIMUM_PROTOCOL_VERSION
+      ) {
         throw new AcpProtocolIncompatibleError(response.protocolVersion);
       }
       const capabilities = response.agentCapabilities ?? response.capabilities ?? {};

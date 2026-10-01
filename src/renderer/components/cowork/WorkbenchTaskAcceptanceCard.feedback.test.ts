@@ -84,7 +84,9 @@ test.each([true, false])(
     await waitFor(() => expect(accept).toHaveBeenCalledWith('task'));
     if (success)
       await waitFor(() =>
-        expect(showAppSuccessToast).toHaveBeenCalledWith(i18nService.t('workbenchTaskAcceptedToast')),
+        expect(showAppSuccessToast).toHaveBeenCalledWith(
+          i18nService.t('workbenchTaskAcceptedToast'),
+        ),
       );
     else {
       await waitFor(() => expect(showAppErrorToast).toHaveBeenCalled());

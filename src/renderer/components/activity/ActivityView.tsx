@@ -152,9 +152,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() =>
-                    setStatusFilter(active ? ActivityStatusFilter.All : option.value)
-                  }
+                  onClick={() => setStatusFilter(active ? ActivityStatusFilter.All : option.value)}
                   className={cn(
                     'rounded-full px-2.5 py-1 text-xs leading-4 transition-colors',
                     active

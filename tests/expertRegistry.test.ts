@@ -5,16 +5,15 @@ import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { upsertExpertRegistry, getBundledSkillRoots } = require(
-  '../SKILLs/zhiyuan-expert-manager/scripts/register_expert.js',
-) as {
-  upsertExpertRegistry: (options: {
-    registryPath: string;
-    entry: Record<string, unknown>;
-    skipIfWithin?: string[];
-  }) => void;
-  getBundledSkillRoots: () => string[];
-};
+const { upsertExpertRegistry, getBundledSkillRoots } =
+  require('../SKILLs/zhiyuan-expert-manager/scripts/register_expert.js') as {
+    upsertExpertRegistry: (options: {
+      registryPath: string;
+      entry: Record<string, unknown>;
+      skipIfWithin?: string[];
+    }) => void;
+    getBundledSkillRoots: () => string[];
+  };
 
 const temporaryDirectories: string[] = [];
 
@@ -73,10 +72,7 @@ test('never records an entry inside a skipped root and cleans stale ones', () =>
   fs.writeFileSync(
     registryPath,
     JSON.stringify({
-      packages: [
-        entry('data-analyst', bundledPreset),
-        entry('user-expert', userPackage),
-      ],
+      packages: [entry('data-analyst', bundledPreset), entry('user-expert', userPackage)],
     }),
   );
 

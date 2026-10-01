@@ -1,6 +1,9 @@
 import { FileText, Globe, GraduationCap, Presentation, Table, Telescope } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { CoworkPermissionMode, type CoworkPermissionMode as CoworkPermissionModeType } from '../../../shared/cowork/constants';
+import {
+  CoworkPermissionMode,
+  type CoworkPermissionMode as CoworkPermissionModeType,
+} from '../../../shared/cowork/constants';
 import { AcademicResearchSkillIds, CoreSkillId } from '@shared/skills/constants';
 
 /**

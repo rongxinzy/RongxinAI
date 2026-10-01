@@ -18,16 +18,34 @@ export const CodingSidePanelLauncher = ({
 }: CodingSidePanelLauncherProps) => (
   <div className="flex h-full min-h-0 flex-col items-center justify-center">
     <div className="flex flex-col gap-3 p-3">
-      <Button type="button" variant="navigation" size="navigation" className="gap-2" onClick={onOpenReview}>
+      <Button
+        type="button"
+        variant="navigation"
+        size="navigation"
+        className="gap-2"
+        onClick={onOpenReview}
+      >
         <FileDiff />
         {i18nService.t('codingAgentReview')}
       </Button>
-      <Button type="button" variant="navigation" size="navigation" className="gap-2" onClick={onOpenFiles}>
+      <Button
+        type="button"
+        variant="navigation"
+        size="navigation"
+        className="gap-2"
+        onClick={onOpenFiles}
+      >
         <FolderOpen />
         {i18nService.t('codingAgentFiles')}
       </Button>
       {hasInspectorContent ? (
-        <Button type="button" variant="navigation" size="navigation" className="gap-2" onClick={onOpenInspector}>
+        <Button
+          type="button"
+          variant="navigation"
+          size="navigation"
+          className="gap-2"
+          onClick={onOpenInspector}
+        >
           <TerminalIcon />
           {i18nService.t('codingAgentInspector')}
         </Button>

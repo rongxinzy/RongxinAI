@@ -9,8 +9,7 @@ export const ExecutionStatusKind = {
   Tool: 'tool',
 } as const;
 
-export type ExecutionStatusKind =
-  (typeof ExecutionStatusKind)[keyof typeof ExecutionStatusKind];
+export type ExecutionStatusKind = (typeof ExecutionStatusKind)[keyof typeof ExecutionStatusKind];
 
 export type ExecutionStatus =
   | { kind: typeof ExecutionStatusKind.Thinking }
@@ -35,9 +34,7 @@ const getToolTarget = (toolName: string | undefined, toolInput: unknown): string
   return truncatePreview(summary.replace(/\s+/g, ' ').trim(), 80);
 };
 
-export const getCurrentExecutionStatus = (
-  items: AssistantTurnItem[],
-): ExecutionStatus | null => {
+export const getCurrentExecutionStatus = (items: AssistantTurnItem[]): ExecutionStatus | null => {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
     if (item.type === 'assistant') {

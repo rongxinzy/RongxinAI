@@ -1,9 +1,6 @@
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkFileAttachment, CoworkImageAttachment } from '../types/cowork';
-import {
-  PiUiEventSequenceTracker,
-  PiUiEventType,
-} from '../../shared/cowork/piUiEvent';
+import { PiUiEventSequenceTracker, PiUiEventType } from '../../shared/cowork/piUiEvent';
 
 type QueueListener = (items: CoworkPendingMessage[]) => void;
 
@@ -84,7 +81,10 @@ class CoworkQueueService {
       if (!this.sequenceTracker.accept(event)) return;
       if (this.sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
         void this.load(event.sessionId).catch(error =>
-          console.error('[CoworkQueueService] failed to recover after a UI event sequence gap:', error),
+          console.error(
+            '[CoworkQueueService] failed to recover after a UI event sequence gap:',
+            error,
+          ),
         );
       }
       if (event.type === PiUiEventType.QueueUpdated) {

@@ -20,7 +20,10 @@ function systemAppearance() {
     addEventListener: vi.fn(events.addEventListener.bind(events)),
     removeEventListener: vi.fn(events.removeEventListener.bind(events)),
   };
-  vi.stubGlobal('matchMedia', vi.fn(() => query));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => query),
+  );
   return {
     query,
     change(dark: boolean) {
@@ -51,7 +54,9 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   await vi.waitFor(() => expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming'));
   expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
   expect(
-    screen.getByRole('radiogroup', { name: 'appearanceMode' }).querySelector('[data-theme-preview]'),
+    screen
+      .getByRole('radiogroup', { name: 'appearanceMode' })
+      .querySelector('[data-theme-preview]'),
   ).toBeNull();
   await userEvent.setup().click(screen.getByRole('radio', { name: 'dark' }));
   expect(callbacks.onAppearanceChange).toHaveBeenCalledWith('dark');

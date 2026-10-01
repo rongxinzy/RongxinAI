@@ -169,9 +169,9 @@ test('pushes a branch to origin without requiring an upstream', async () => {
   await new CodingGitService().push(root);
 
   expect(await git(remote, ['show-ref', '--verify', 'refs/heads/feature/first-push'])).not.toBe('');
-  expect(await git(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])).toBe(
-    'origin/feature/first-push',
-  );
+  expect(
+    await git(root, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']),
+  ).toBe('origin/feature/first-push');
 });
 
 test('stages, commits, and pushes a first-time branch to origin', async () => {
@@ -187,12 +187,10 @@ test('stages, commits, and pushes a first-time branch to origin', async () => {
 
   expect(result.pushed).toBe(true);
   expect(await git(root, ['log', '-1', '--pretty=%s'])).toBe('test');
-  expect(await git(remote, ['log', '-1', '--pretty=%s', 'refs/heads/fix/whz-test'])).toBe(
-    'test',
-  );
-  expect((await service.getStatus(root, { isIsolated: false, isBusy: false })).hasRemoteBranch).toBe(
-    true,
-  );
+  expect(await git(remote, ['log', '-1', '--pretty=%s', 'refs/heads/fix/whz-test'])).toBe('test');
+  expect(
+    (await service.getStatus(root, { isIsolated: false, isBusy: false })).hasRemoteBranch,
+  ).toBe(true);
 });
 
 test('keeps a completed local commit recoverable when push fails', async () => {
@@ -200,7 +198,9 @@ test('keeps a completed local commit recoverable when push fails', async () => {
   await git(root, ['remote', 'add', 'origin', path.join(root, 'missing-remote.git')]);
   await writeFile(path.join(root, 'tracked.txt'), 'committed locally\n');
 
-  const result = await new CodingGitService().commitAndPush(root, 'test: local commit', ['tracked.txt']);
+  const result = await new CodingGitService().commitAndPush(root, 'test: local commit', [
+    'tracked.txt',
+  ]);
 
   expect(result).toMatchObject({ pushed: false });
   expect(result.pushError).toBeTruthy();

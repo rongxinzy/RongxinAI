@@ -20,9 +20,7 @@ test('detects windows and file urls as local paths', () => {
   expect(isLikelyLocalFilePath('file:///C:/Users/a/b.html')).toBe(true);
   expect(isLikelyLocalFilePath('https://example.com/a.html')).toBe(false);
   expect(
-    isLikelyLocalFilePath(
-      `${LocalPathHref.Prefix}${encodeURIComponent('D:/project/测试数据')}`,
-    ),
+    isLikelyLocalFilePath(`${LocalPathHref.Prefix}${encodeURIComponent('D:/project/测试数据')}`),
   ).toBe(true);
 });
 
@@ -61,9 +59,9 @@ test('toFileHref and stripFileProtocol round-trip windows paths', () => {
 });
 
 test('resolveOpenableLocalPath prefers resolveLocalFilePath callback', () => {
-  expect(
-    resolveOpenableLocalPath('rel/a.html', 'a.html', () => 'C:/workspace/rel/a.html'),
-  ).toBe('C:/workspace/rel/a.html');
+  expect(resolveOpenableLocalPath('rel/a.html', 'a.html', () => 'C:/workspace/rel/a.html')).toBe(
+    'C:/workspace/rel/a.html',
+  );
   expect(resolveOpenableLocalPath('C:/tmp/a.html', 'a.html')).toBe('C:/tmp/a.html');
 });
 
@@ -119,11 +117,8 @@ test('rejects size and percentage lookalikes', () => {
 
 test('resolveOpenableLocalPath resolves bare filenames via callback (cwd join)', () => {
   expect(
-    resolveOpenableLocalPath(
-      toFileHref('销售简历.html'),
-      '销售简历.html',
-      candidate =>
-        candidate === '销售简历.html' ? 'D:/project/测试数据/销售简历.html' : null,
+    resolveOpenableLocalPath(toFileHref('销售简历.html'), '销售简历.html', candidate =>
+      candidate === '销售简历.html' ? 'D:/project/测试数据/销售简历.html' : null,
     ),
   ).toBe('D:/project/测试数据/销售简历.html');
 });

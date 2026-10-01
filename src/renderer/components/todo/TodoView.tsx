@@ -196,7 +196,10 @@ const TodoView: React.FC<TodoViewProps> = ({
       if (!(activeListId === null && activeView === TodoViewFilter.All)) {
         next.add(TodoViewFilter.All);
       }
-      if (createInput.important && !(activeListId === null && activeView === TodoViewFilter.Important)) {
+      if (
+        createInput.important &&
+        !(activeListId === null && activeView === TodoViewFilter.Important)
+      ) {
         next.add(TodoViewFilter.Important);
       }
       if (
@@ -486,7 +489,10 @@ const TodoView: React.FC<TodoViewProps> = ({
               >
                 <div className="rounded-lg border border-border bg-card p-2 focus-within:ring-3 focus-within:ring-ring/30">
                   <div className="flex items-center gap-2">
-                    <Plus className="ml-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <Plus
+                      className="ml-1 size-4 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                     <Input
                       id="todo-new-input"
                       value={newTodoTitle}

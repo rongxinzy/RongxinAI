@@ -7,8 +7,7 @@ export const getThinkingPresentation = (
   /** Whether the bubble already has text; an empty one is a leftover placeholder. */
   hasContent = true,
 ) => ({
-  isStreaming:
-    hasContent && !forceComplete && Boolean(metadata?.isStreaming) && !metadata?.isFinal,
+  isStreaming: hasContent && !forceComplete && Boolean(metadata?.isStreaming) && !metadata?.isFinal,
   isComplete: forceComplete || Boolean(metadata?.isFinal),
   durationSeconds: toThinkingDurationSeconds(metadata?.thinkingDurationMs),
 });

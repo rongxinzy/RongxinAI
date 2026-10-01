@@ -99,7 +99,11 @@ export function ProviderModelEditorDialog({
 
         {error && <p className="mb-3 text-xs text-destructive">{error}</p>}
 
-        <Tabs value={tab} onValueChange={value => setTab(value as ModelEditorTab)} className="gap-4">
+        <Tabs
+          value={tab}
+          onValueChange={value => setTab(value as ModelEditorTab)}
+          className="gap-4"
+        >
           <FluidTabs
             aria-label={i18nService.t(isEditing ? 'editModel' : 'addNewModel')}
             items={[

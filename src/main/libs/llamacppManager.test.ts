@@ -986,9 +986,9 @@ test('installModel rejects a repository without cloud-verified GGUF metadata', a
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
 
-  await expect(
-    manager.installModel({ modelId: 'owner/unverified-GGUF' }),
-  ).rejects.toThrow('cloud catalogue has not verified');
+  await expect(manager.installModel({ modelId: 'owner/unverified-GGUF' })).rejects.toThrow(
+    'cloud catalogue has not verified',
+  );
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
@@ -1025,8 +1025,7 @@ test('installModel rejects checksum-valid bytes that are not a GGUF container', 
   manager.refreshModelsAfterInstall = async () => undefined as any;
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      new Response(bytes, { status: 200, headers: { 'content-length': '8' } })),
+    vi.fn(async () => new Response(bytes, { status: 200, headers: { 'content-length': '8' } })),
   );
 
   await expect(manager.installModel({ modelId: 'Qwen/Qwen3-8B-GGUF' })).rejects.toThrow(
@@ -1034,13 +1033,7 @@ test('installModel rejects checksum-valid bytes that are not a GGUF container', 
   );
   expect(
     fs.existsSync(
-      path.join(
-        modelsDir,
-        'modelscope',
-        'Qwen',
-        'Qwen3-8B-GGUF',
-        'Qwen3-8B-Q4_K_M.gguf.download',
-      ),
+      path.join(modelsDir, 'modelscope', 'Qwen', 'Qwen3-8B-GGUF', 'Qwen3-8B-Q4_K_M.gguf.download'),
     ),
   ).toBe(false);
 });
@@ -1063,20 +1056,23 @@ test('installModel keeps an interrupted partial file for a later Range resume', 
   const manager = new LlamaCppManager(() => ({ modelsDir }), marketplaceService);
   manager.refreshModelsAfterInstall = async () => undefined as any;
   const controller = new AbortController();
-  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-    if (String(input).endsWith('/model.gguf')) {
-      return new Response(bytes, { status: 200, headers: { 'content-length': '8' } });
-    }
-    return new Response(
-      new ReadableStream({
-        start(streamController) {
-          streamController.enqueue(new Uint8Array([4]));
-          streamController.close();
-        },
-      }),
-      { status: 200, headers: { 'content-length': '3' } },
-    );
-  }));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/model.gguf')) {
+        return new Response(bytes, { status: 200, headers: { 'content-length': '8' } });
+      }
+      return new Response(
+        new ReadableStream({
+          start(streamController) {
+            streamController.enqueue(new Uint8Array([4]));
+            streamController.close();
+          },
+        }),
+        { status: 200, headers: { 'content-length': '3' } },
+      );
+    }),
+  );
 
   const install = manager.installModel(
     { modelId: 'Qwen/Qwen3-8B-GGUF' },

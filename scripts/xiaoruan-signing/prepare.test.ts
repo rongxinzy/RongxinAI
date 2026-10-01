@@ -10,7 +10,7 @@ function jsonResponse(body: unknown) {
 
 test('accepts a successful Xiaoruan main windows-build run and resolves an explicit version', async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async url => {
     const href = String(url);
     if (href.includes('/actions/runs/35979555619/jobs')) {
       return jsonResponse({

@@ -157,9 +157,7 @@ test('prioritizes propagation issues, review candidates, then recent active memo
 });
 
 test('treats legacy SQLite timestamps as UTC when sorting', () => {
-  expect(parseMemoryTimestamp('2026-09-09 11:14:18')).toBe(
-    Date.parse('2026-09-09T11:14:18Z'),
-  );
+  expect(parseMemoryTimestamp('2026-09-09 11:14:18')).toBe(Date.parse('2026-09-09T11:14:18Z'));
   expect(parseMemoryTimestamp('2026-09-09T11:14:18.684Z')).toBe(
     Date.parse('2026-09-09T11:14:18.684Z'),
   );

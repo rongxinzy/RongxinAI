@@ -66,9 +66,7 @@ export const CodingInspector = ({ events, initialTab }: CodingInspectorProps) =>
               </>
             ),
             badge:
-              changes.length > 0 ? (
-                <Badge variant="secondary">{changes.length}</Badge>
-              ) : undefined,
+              changes.length > 0 ? <Badge variant="secondary">{changes.length}</Badge> : undefined,
             disabled: changes.length === 0,
           },
           {

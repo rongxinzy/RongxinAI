@@ -733,8 +733,8 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('dingtalk');
                     setActiveDingTalkInstanceId(null);
-                    setDingtalkExpanded(current =>
-                      config.dingtalk.instances.length > 0 && !current,
+                    setDingtalkExpanded(
+                      current => config.dingtalk.instances.length > 0 && !current,
                     );
                   }}
                   className={cn(
@@ -1042,7 +1042,9 @@ const IMSettings: React.FC = () => {
                   onClick={() => {
                     setActivePlatform('telegram');
                     setActiveTelegramInstanceId(null);
-                    setTelegramExpanded(current => config.telegram.instances.length > 0 && !current);
+                    setTelegramExpanded(
+                      current => config.telegram.instances.length > 0 && !current,
+                    );
                   }}
                   className={cn(
                     'theme-page-imsettings-button-variant-25 w-full justify-start',

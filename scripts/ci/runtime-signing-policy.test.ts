@@ -38,7 +38,9 @@ test('Windows packaging does not require runtime signature verification or publi
 
 test('package smoke retains component hashes and runtime presence checks without Authenticode', () => {
   const smoke = read('scripts/ci/windows-runtime-smoke.ps1');
-  expect(smoke).not.toMatch(/Assert-WindowsRuntimeSignature|Get-AuthenticodeSignature|runtime-authenticode/);
+  expect(smoke).not.toMatch(
+    /Assert-WindowsRuntimeSignature|Get-AuthenticodeSignature|runtime-authenticode/,
+  );
   expect(smoke).toContain('SHA-256 mismatch for Windows component');
   expect(smoke).toContain('Sentinel SHA-256 mismatch');
   expect(smoke).toContain("'channel-runtime\\cc-connect-sidecar.exe'");

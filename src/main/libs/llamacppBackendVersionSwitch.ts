@@ -15,9 +15,7 @@ type LlamaCppBackendSwitchPreparation =
   | { success: true; restartService: boolean }
   | { success: false; error: string };
 
-type LlamaCppBackendSwitchRestartResult =
-  | { success: true }
-  | { success: false; error: string };
+type LlamaCppBackendSwitchRestartResult = { success: true } | { success: false; error: string };
 
 function isServiceActive(status: LlamaCppServerStatus): boolean {
   return (
@@ -61,7 +59,10 @@ export async function restartLlamaCppBackendVersionService(input: {
     if (status.status === LlamaCppBackendSwitchServiceStatus.Running) {
       return { success: true };
     }
-    return { success: false, error: status.error || 'Failed to start the selected runtime version.' };
+    return {
+      success: false,
+      error: status.error || 'Failed to start the selected runtime version.',
+    };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }

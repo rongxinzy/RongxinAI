@@ -188,16 +188,40 @@ describe('getSessionStats', () => {
   test('does not derive cache hit from partial usage across messages', () => {
     const messages: CoworkMessage[] = [
       { id: 'user', type: 'user', content: 'Task', timestamp: 1 },
-      { id: 'a', type: 'assistant', content: 'A', timestamp: 2, metadata: { usage: { inputTokens: 100 } } },
-      { id: 'b', type: 'assistant', content: 'B', timestamp: 3, metadata: { usage: { cacheReadTokens: 50, cacheWriteTokens: 0 } } },
+      {
+        id: 'a',
+        type: 'assistant',
+        content: 'A',
+        timestamp: 2,
+        metadata: { usage: { inputTokens: 100 } },
+      },
+      {
+        id: 'b',
+        type: 'assistant',
+        content: 'B',
+        timestamp: 3,
+        metadata: { usage: { cacheReadTokens: 50, cacheWriteTokens: 0 } },
+      },
     ];
     expect(getSessionStats(messages).cacheHitPercent).toBeNull();
   });
 
   test('ignores aggregate overflow', () => {
     const messages: CoworkMessage[] = [
-      { id: 'a', type: 'assistant', content: 'A', timestamp: 1, metadata: { usage: { inputTokens: Number.MAX_VALUE } } },
-      { id: 'b', type: 'assistant', content: 'B', timestamp: 2, metadata: { usage: { inputTokens: Number.MAX_VALUE } } },
+      {
+        id: 'a',
+        type: 'assistant',
+        content: 'A',
+        timestamp: 1,
+        metadata: { usage: { inputTokens: Number.MAX_VALUE } },
+      },
+      {
+        id: 'b',
+        type: 'assistant',
+        content: 'B',
+        timestamp: 2,
+        metadata: { usage: { inputTokens: Number.MAX_VALUE } },
+      },
     ];
     expect(getSessionStats(messages).inputTokens).toBe(Number.MAX_VALUE);
   });

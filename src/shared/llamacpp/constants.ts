@@ -89,8 +89,7 @@ export const LlamaCppMemoryPolicy = {
   Manual: 'manual',
 } as const;
 
-export type LlamaCppMemoryPolicy =
-  (typeof LlamaCppMemoryPolicy)[keyof typeof LlamaCppMemoryPolicy];
+export type LlamaCppMemoryPolicy = (typeof LlamaCppMemoryPolicy)[keyof typeof LlamaCppMemoryPolicy];
 
 export const LlamaCppGatewayAccessMode = {
   Local: 'local',
@@ -112,8 +111,7 @@ export const LlamaCppBackendError = {
   CudaRequiresNvidiaGpu: 'cuda-requires-nvidia-gpu',
   SwitchRequiresStoppedService: 'backend-switch-requires-stopped-service',
 } as const;
-export type LlamaCppBackendError =
-  (typeof LlamaCppBackendError)[keyof typeof LlamaCppBackendError];
+export type LlamaCppBackendError = (typeof LlamaCppBackendError)[keyof typeof LlamaCppBackendError];
 
 export const LlamaCppServiceConfigFieldKey = {
   ModelsMax: 'modelsMax',

@@ -227,9 +227,7 @@ test('fetchModelScopeSkillMarketplace requests the specified page and reports mo
 test('resolveModelScopeSkillInstallSource uses the ModelScope archive instead of an upstream source URL', async () => {
   await expect(
     resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@AMap-Web/amap-lbs-skill'),
-  ).resolves.toBe(
-    'https://www.modelscope.cn/skills/@AMap-Web/amap-lbs-skill/archive/zip/master',
-  );
+  ).resolves.toBe('https://www.modelscope.cn/skills/@AMap-Web/amap-lbs-skill/archive/zip/master');
 });
 
 test('fetchModelScopeSkillMarketplace does not treat a ClawHub source URL as an install source', async () => {
@@ -288,7 +286,5 @@ test('fetchModelScopeSkillMarketplace omits an install source when the skill onl
 test('resolveModelScopeSkillInstallSource builds the official ModelScope archive endpoint', async () => {
   await expect(
     resolveModelScopeSkillInstallSource('https://modelscope.cn/skills/@demo/platform-only'),
-  ).resolves.toBe(
-    'https://www.modelscope.cn/skills/@demo/platform-only/archive/zip/master',
-  );
+  ).resolves.toBe('https://www.modelscope.cn/skills/@demo/platform-only/archive/zip/master');
 });

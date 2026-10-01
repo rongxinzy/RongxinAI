@@ -48,9 +48,7 @@ test('keeps terminal errors visible outside execution summaries', () => {
 });
 
 test('renders the working indicator instead of the retired typing dots', () => {
-  expect(source).toContain(
-    '<WorkingIndicator showCompanion={false} animateText={false} />',
-  );
+  expect(source).toContain('<WorkingIndicator showCompanion={false} animateText={false} />');
   expect(source).toContain("import { WorkingIndicator } from './WorkingIndicator';");
   expect(source).not.toContain('TypingDots');
 });

@@ -5,12 +5,13 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { registerExpert } = require('../../SKILLs/zhiyuan-expert-manager/scripts/register_expert.js') as {
-  registerExpert: (
-    expertDir: string,
-    options: { dbPath?: string; update?: boolean },
-  ) => { pluginJson: { name: string }; agentIds: string[] };
-};
+const { registerExpert } =
+  require('../../SKILLs/zhiyuan-expert-manager/scripts/register_expert.js') as {
+    registerExpert: (
+      expertDir: string,
+      options: { dbPath?: string; update?: boolean },
+    ) => { pluginJson: { name: string }; agentIds: string[] };
+  };
 
 let tempRoot: string;
 let dbPath: string;
@@ -36,7 +37,10 @@ const buildPreset = (version: string, skillIds: string[]): void => {
         skillIds,
         displayName: { en: 'Upgrade Test Agent', zh: '升级测试专家' },
         profession: { en: 'Test Profession', zh: '测试职业' },
-        displayDescription: { en: 'Test.', zh: '升级测试专家用于完整验证专家预设的原地升级语义、技能打包刷新行为与注册流程幂等性。' },
+        displayDescription: {
+          en: 'Test.',
+          zh: '升级测试专家用于完整验证专家预设的原地升级语义、技能打包刷新行为与注册流程幂等性。',
+        },
         categoryId: '04-DataAI',
         defaultInitPrompt: { zh: '测试升级', en: 'Test upgrade' },
         plugin: 'upgrade-test-preset',
@@ -89,9 +93,14 @@ const buildPreset = (version: string, skillIds: string[]): void => {
   );
   fs.writeFileSync(
     path.join(presetDir, 'skills', 'upgrade-test-skill', 'SKILL.md'),
-    ['---', 'name: upgrade-test-skill', 'description: Test skill.', '---', '', `# v${version}`].join(
-      '\n',
-    ),
+    [
+      '---',
+      'name: upgrade-test-skill',
+      'description: Test skill.',
+      '---',
+      '',
+      `# v${version}`,
+    ].join('\n'),
   );
 };
 

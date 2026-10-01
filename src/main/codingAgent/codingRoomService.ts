@@ -210,9 +210,7 @@ export class CodingRoomService extends EventEmitter {
     super();
     this.git = new CodingGitController(repository);
     this.eventWindowReader = new CodingEventWindowReader(repository.getDatabase());
-    this.eventDeltaBatcher = new CodingEventDeltaBatcher(delta =>
-      this.emit('eventDelta', delta),
-    );
+    this.eventDeltaBatcher = new CodingEventDeltaBatcher(delta => this.emit('eventDelta', delta));
     const patchBuiltinSession = this.runtime.patchBuiltinSession?.bind(this.runtime);
     const listCommandChoices = this.runtime.listCommandChoices?.bind(this.runtime);
     const commandCatalogGeneration = this.runtime.commandCatalogGeneration?.bind(this.runtime);
@@ -1270,15 +1268,21 @@ export class CodingRoomService extends EventEmitter {
     return await this.git.push(input);
   }
 
-  async switchGitBranch(input: import('../../shared/codingAgent').CodingGitBranchInput): Promise<CodingGitStatus> {
+  async switchGitBranch(
+    input: import('../../shared/codingAgent').CodingGitBranchInput,
+  ): Promise<CodingGitStatus> {
     return await this.git.switchBranch(input);
   }
 
-  async createGitBranch(input: import('../../shared/codingAgent').CodingGitBranchInput): Promise<CodingGitStatus> {
+  async createGitBranch(
+    input: import('../../shared/codingAgent').CodingGitBranchInput,
+  ): Promise<CodingGitStatus> {
     return await this.git.createBranch(input);
   }
 
-  async createGitPullRequest(input: import('../../shared/codingAgent').CodingGitPullRequestInput): Promise<string> {
+  async createGitPullRequest(
+    input: import('../../shared/codingAgent').CodingGitPullRequestInput,
+  ): Promise<string> {
     return await this.git.createPullRequest(input);
   }
 
@@ -1300,7 +1304,9 @@ export class CodingRoomService extends EventEmitter {
       .map(entry => ({
         name: entry.name,
         path: path.relative(sourceRoot, path.join(directoryPath, entry.name)),
-        kind: entry.isDirectory() ? CodingWorkspaceFileKind.Directory : CodingWorkspaceFileKind.File,
+        kind: entry.isDirectory()
+          ? CodingWorkspaceFileKind.Directory
+          : CodingWorkspaceFileKind.File,
       }));
   }
 
@@ -1323,7 +1329,9 @@ export class CodingRoomService extends EventEmitter {
     };
   }
 
-  async writeWorkspaceFile(input: CodingWorkspaceFileWriteInput): Promise<CodingWorkspaceFileContent> {
+  async writeWorkspaceFile(
+    input: CodingWorkspaceFileWriteInput,
+  ): Promise<CodingWorkspaceFileContent> {
     if (typeof input.content !== 'string') throw new Error(CodingErrorMessage.FileEditTextRequired);
     const content = Buffer.from(input.content, 'utf8');
     if (content.length > 512 * 1024) throw new Error(CodingErrorMessage.FileEditTooLarge);

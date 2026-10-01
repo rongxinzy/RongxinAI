@@ -6,7 +6,14 @@ import { collectCodingFileArtifacts, resolveArtifactFilePath } from './codingArt
 let sequence = 0;
 const event = (kind: CodingEvent['kind'], payload: Record<string, unknown>): CodingEvent => {
   sequence += 1;
-  return { id: `event-${sequence}`, laneId: 'lane-1', sequence, kind, payload, createdAt: sequence };
+  return {
+    id: `event-${sequence}`,
+    laneId: 'lane-1',
+    sequence,
+    kind,
+    payload,
+    createdAt: sequence,
+  };
 };
 
 describe('collectCodingFileArtifacts', () => {

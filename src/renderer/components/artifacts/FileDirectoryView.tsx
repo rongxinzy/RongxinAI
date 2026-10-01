@@ -144,9 +144,13 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
                         {getShortPath(artifact.filePath)}
                       </div>
                     )}
-                    {!compact && !artifact.filePath && artifact.source === CoworkArtifactSource.CodeBlock && (
-                      <div className="text-xs text-muted-foreground">{t('artifactResponseFragment')}</div>
-                    )}
+                    {!compact &&
+                      !artifact.filePath &&
+                      artifact.source === CoworkArtifactSource.CodeBlock && (
+                        <div className="text-xs text-muted-foreground">
+                          {t('artifactResponseFragment')}
+                        </div>
+                      )}
                   </div>
                   {!compact && (
                     <span className="shrink-0 text-xs text-muted-foreground uppercase">

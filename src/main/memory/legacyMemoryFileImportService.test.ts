@@ -40,9 +40,7 @@ test('imports legacy MEMORY.md entries as deterministic review candidates', () =
     importLegacyMemoryFileCandidates({ agentWorkspace: workspace, service: service as never }),
   ).toEqual({ discovered: 2, imported: 0, skipped: 2 });
   expect([...importedIds]).toHaveLength(2);
-  expect([...importedIds].every(id => id.startsWith(LEGACY_MEMORY_CANDIDATE_PREFIX))).toBe(
-    true,
-  );
+  expect([...importedIds].every(id => id.startsWith(LEGACY_MEMORY_CANDIDATE_PREFIX))).toBe(true);
   expect(importLegacyPersonalMemoryCandidate).toHaveBeenCalledWith(
     expect.objectContaining({ sourceKind: MemorySourceKind.LegacyFileImport }),
   );
@@ -50,13 +48,11 @@ test('imports legacy MEMORY.md entries as deterministic review candidates', () =
 
 test('imports every non-deleted legacy SQLite memory and deduplicates file content', () => {
   const importedIds = new Set<string>();
-  const importLegacyPersonalMemoryCandidate = vi.fn(
-    (input: { id: string; sourceKind: string }) => {
-      if (importedIds.has(input.id)) return false;
-      importedIds.add(input.id);
-      return true;
-    },
-  );
+  const importLegacyPersonalMemoryCandidate = vi.fn((input: { id: string; sourceKind: string }) => {
+    if (importedIds.has(input.id)) return false;
+    importedIds.add(input.id);
+    return true;
+  });
   const entries = [
     {
       id: 'sqlite-1',
@@ -80,9 +76,7 @@ test('imports every non-deleted legacy SQLite memory and deduplicates file conte
     },
   ];
   const store = {
-    listUserMemories: vi.fn(({ offset = 0 }: { offset?: number }) =>
-      offset === 0 ? entries : [],
-    ),
+    listUserMemories: vi.fn(({ offset = 0 }: { offset?: number }) => (offset === 0 ? entries : [])),
   };
   const service = { importLegacyPersonalMemoryCandidate };
 

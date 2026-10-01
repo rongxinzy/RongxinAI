@@ -73,10 +73,7 @@ export function LocalInferenceMemorySettingsDialog({
             htmlFor="llamacpp-memory-policy-auto"
             className="theme-scene-memory-choice flex cursor-pointer items-center gap-3"
           >
-            <RadioGroupItem
-              id="llamacpp-memory-policy-auto"
-              value={LlamaCppMemoryPolicy.Auto}
-            />
+            <RadioGroupItem id="llamacpp-memory-policy-auto" value={LlamaCppMemoryPolicy.Auto} />
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Gauge className="size-4" />
@@ -110,10 +107,7 @@ export function LocalInferenceMemorySettingsDialog({
         {isManual ? (
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
             <div className="flex items-center justify-between gap-3">
-              <Label
-                htmlFor="llamacpp-memory-budget"
-                className="theme-control-label-strong"
-              >
+              <Label htmlFor="llamacpp-memory-budget" className="theme-control-label-strong">
                 {i18nService.t('localInferenceMemoryBudgetPercent')}
               </Label>
               <span className="theme-control-label-strong">{memoryBudgetPercent}%</span>

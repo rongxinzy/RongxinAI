@@ -72,10 +72,7 @@ export const ChainOfThoughtHeader = memo(
     return (
       <Collapsible onOpenChange={setIsOpen} open={isOpen}>
         <CollapsibleTrigger
-          className={cn(
-            'theme-fold-reasoning flex w-full items-center gap-2',
-            className,
-          )}
+          className={cn('theme-fold-reasoning flex w-full items-center gap-2', className)}
           {...props}
         >
           <Icon className="size-4" />

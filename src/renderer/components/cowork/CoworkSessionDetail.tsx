@@ -1182,7 +1182,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   return (
     <CoworkSessionLayout
-      title={resolveSessionDisplayTitle(currentSession, i18nService.getLanguage()) || i18nService.t('coworkNewSession')}
+      title={
+        resolveSessionDisplayTitle(currentSession, i18nService.getLanguage()) ||
+        i18nService.t('coworkNewSession')
+      }
       sessionId={sessionId}
       isSessionSwitching={isSessionSwitching}
       isSidebarCollapsed={isSidebarCollapsed}
@@ -1191,7 +1194,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       onNewChat={onNewChat}
       onToggleArtifactPanel={() => dispatch(togglePanel())}
       updateBadge={updateBadge}
-      runIndicator={isSessionSwitching ? null : <CoworkRunStatus key={currentSession.id} sessionId={currentSession.id} isStreaming={isStreaming} />}
+      runIndicator={
+        isSessionSwitching ? null : (
+          <CoworkRunStatus
+            key={currentSession.id}
+            sessionId={currentSession.id}
+            isStreaming={isStreaming}
+          />
+        )
+      }
     >
       {/* Export Options Modal */}
       {!isSessionSwitching && showExportOptions && (
@@ -1282,11 +1293,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             {isSessionSwitching ? (
               <CoworkConversationLoadingSkeleton />
             ) : (
-              <Conversation
-                className="h-full"
-                initial="instant"
-                resize="instant"
-              >
+              <Conversation className="h-full" initial="instant" resize="instant">
                 <ConversationContent
                   className="pt-3"
                   observeContentResize={false}
@@ -1307,16 +1314,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                     {inlinePermission &&
                       onRespondToInlinePermission &&
                       !hasInlineToolPermissionCard && (
-                      <div className="px-3 pt-3">
-                        <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
-                          <CoworkPermissionModal
-                            permission={inlinePermission}
-                            onRespond={onRespondToInlinePermission}
-                            inline
-                          />
+                        <div className="px-3 pt-3">
+                          <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
+                            <CoworkPermissionModal
+                              permission={inlinePermission}
+                              onRespond={onRespondToInlinePermission}
+                              inline
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </ConversationContent>
                 <ConversationScrollButton />
@@ -1585,13 +1592,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   topAccessory={
                     isSessionSwitching ? null : (
                       <>
-                        {workMode === CoworkSessionMode.Work &&
-                          currentSession?.id && (
-                            <PendingMessageQueue
-                              sessionId={currentSession.id}
-                              isStreaming={isStreaming}
-                            />
-                          )}
+                        {workMode === CoworkSessionMode.Work && currentSession?.id && (
+                          <PendingMessageQueue
+                            sessionId={currentSession.id}
+                            isStreaming={isStreaming}
+                          />
+                        )}
                       </>
                     )
                   }

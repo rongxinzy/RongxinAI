@@ -34,7 +34,10 @@ export class LlamaCppModelDaemonRuntime {
   private controlServer: http.Server | null = null;
   private gateway: LlamaCppModelGateway | null = null;
   private readonly processes: LlamaCppModelProcessManager;
-  private readonly logWriters = new Map<string, ReturnType<typeof createLlamaCppModelRuntimeLogWriter>>();
+  private readonly logWriters = new Map<
+    string,
+    ReturnType<typeof createLlamaCppModelRuntimeLogWriter>
+  >();
   private readonly residency: LlamaCppModelResidencyManager;
 
   constructor(private readonly bootstrap: LlamaCppModelDaemonBootstrap) {
@@ -43,17 +46,20 @@ export class LlamaCppModelDaemonRuntime {
     this.processes = new LlamaCppModelProcessManager({
       getExecutablePath: async () => this.bootstrap.executablePath,
       getServiceConfig: () => this.config,
-      startupTimeoutMs: () => Math.max(1, Number.parseInt(this.config.timeout ?? '120', 10) || 120) * 1000,
+      startupTimeoutMs: () =>
+        Math.max(1, Number.parseInt(this.config.timeout ?? '120', 10) || 120) * 1000,
     });
     this.residency = new LlamaCppModelResidencyManager({
       getPolicy: () => undefined,
       unload: async modelName => await this.processes.stop(modelName),
     });
     this.processes.on(LlamaCppModelProcessEvent.Output, (event: LlamaCppModelProcessOutput) => {
-      const writer = this.logWriters.get(event.modelName) ?? createLlamaCppModelRuntimeLogWriter({
-        userDataPath: this.bootstrap.userDataPath,
-        modelName: event.modelName,
-      });
+      const writer =
+        this.logWriters.get(event.modelName) ??
+        createLlamaCppModelRuntimeLogWriter({
+          userDataPath: this.bootstrap.userDataPath,
+          modelName: event.modelName,
+        });
       this.logWriters.set(event.modelName, writer);
       void writer.append(event.text).catch(error => {
         console.warn('[LlamaCppDaemon] failed to append raw model output:', error);
@@ -88,13 +94,21 @@ export class LlamaCppModelDaemonRuntime {
     if (this.controlServer) {
       const server = this.controlServer;
       this.controlServer = null;
-      await new Promise<void>((resolve, reject) => server.close(error => (error ? reject(error) : resolve())));
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve())),
+      );
     }
   }
 
-  private async handleControlRequest(request: http.IncomingMessage, response: http.ServerResponse): Promise<void> {
+  private async handleControlRequest(
+    request: http.IncomingMessage,
+    response: http.ServerResponse,
+  ): Promise<void> {
     if (request.method !== 'POST' || request.url !== CONTROL_PATH || !this.isAuthorized(request)) {
-      this.writeJson(response, 401, { success: false, error: 'Unauthorized daemon control request.' });
+      this.writeJson(response, 401, {
+        success: false,
+        error: 'Unauthorized daemon control request.',
+      });
       return;
     }
     const input = await this.readJson(request);
@@ -233,7 +247,8 @@ export class LlamaCppModelDaemonRuntime {
     for await (const chunk of request) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       length += buffer.length;
-      if (length > MAX_CONTROL_BODY_BYTES) throw new Error('Daemon control request exceeds size limit.');
+      if (length > MAX_CONTROL_BODY_BYTES)
+        throw new Error('Daemon control request exceeds size limit.');
       chunks.push(buffer);
     }
     return JSON.parse(Buffer.concat(chunks).toString('utf8')) as LlamaCppModelDaemonRequest;

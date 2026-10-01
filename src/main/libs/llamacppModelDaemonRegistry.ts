@@ -57,7 +57,9 @@ function parseLlamaCppModelDaemonRegistry(value: unknown): LlamaCppModelDaemonRe
   ) {
     return null;
   }
-  const models = candidate.models.map(parseModel).filter((model): model is NonNullable<typeof model> => Boolean(model));
+  const models = candidate.models
+    .map(parseModel)
+    .filter((model): model is NonNullable<typeof model> => Boolean(model));
   if (models.length !== candidate.models.length) return null;
   return {
     version: DAEMON_REGISTRY_VERSION,

@@ -22,7 +22,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 const inputGroupAddonVariants = cva(
-  "flex h-auto cursor-text items-center justify-center gap-2 theme-input-group-addon select-none",
+  'flex h-auto cursor-text items-center justify-center gap-2 theme-input-group-addon select-none',
   {
     variants: {
       align: {
@@ -99,7 +99,7 @@ function InputGroupText({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
       className={cn(
-        "theme-input-group-text flex items-center gap-2 [&_svg]:pointer-events-none",
+        'theme-input-group-text flex items-center gap-2 [&_svg]:pointer-events-none',
         className,
       )}
       {...props}

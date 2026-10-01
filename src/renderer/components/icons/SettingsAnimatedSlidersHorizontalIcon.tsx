@@ -65,18 +65,34 @@ export const SettingsAnimatedSlidersHorizontalIcon = forwardRef<
         width={size}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <motion.g animate={controls} transition={TRANSITION} variants={{ normal: { x: 0 }, animate: { x: -1 } }}>
+        <motion.g
+          animate={controls}
+          transition={TRANSITION}
+          variants={{ normal: { x: 0 }, animate: { x: -1 } }}
+        >
           <path d="M21 4H3" />
           <path d="M21 12H3" />
           <path d="M21 20H3" />
         </motion.g>
-        <motion.g animate={controls} transition={TRANSITION} variants={{ normal: { x: 0 }, animate: { x: -2 } }}>
+        <motion.g
+          animate={controls}
+          transition={TRANSITION}
+          variants={{ normal: { x: 0 }, animate: { x: -2 } }}
+        >
           <path d="M14 2v4" />
         </motion.g>
-        <motion.g animate={controls} transition={TRANSITION} variants={{ normal: { x: 0 }, animate: { x: 2 } }}>
+        <motion.g
+          animate={controls}
+          transition={TRANSITION}
+          variants={{ normal: { x: 0 }, animate: { x: 2 } }}
+        >
           <path d="M8 10v4" />
         </motion.g>
-        <motion.g animate={controls} transition={TRANSITION} variants={{ normal: { x: 0 }, animate: { x: -2 } }}>
+        <motion.g
+          animate={controls}
+          transition={TRANSITION}
+          variants={{ normal: { x: 0 }, animate: { x: -2 } }}
+        >
           <path d="M16 18v4" />
         </motion.g>
       </svg>

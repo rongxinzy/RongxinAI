@@ -3,8 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 
-const [executableInput, screenshotPath = 'release/linux-render-smoke.png'] =
-  process.argv.slice(2);
+const [executableInput, screenshotPath = 'release/linux-render-smoke.png'] = process.argv.slice(2);
 if (!executableInput) {
   throw new Error(
     'usage: verify-linux-renderer.mjs <linux-unpacked-directory-or-executable> [screenshot-output]',

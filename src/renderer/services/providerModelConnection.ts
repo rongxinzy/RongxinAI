@@ -96,7 +96,9 @@ const buildGeminiGenerateContentUrl = (baseUrl: string, modelId: string): string
 const shouldUseMaxCompletionTokensForOpenAI = (provider: string, modelId: string): boolean => {
   if (provider !== 'openai') return false;
   const normalized = modelId.toLowerCase();
-  const resolved = normalized.includes('/') ? normalized.slice(normalized.lastIndexOf('/') + 1) : normalized;
+  const resolved = normalized.includes('/')
+    ? normalized.slice(normalized.lastIndexOf('/') + 1)
+    : normalized;
   return (
     resolved.startsWith('gpt-5') ||
     resolved.startsWith('o1') ||
@@ -121,10 +123,7 @@ function classifyConnectionFailure(
   if (status !== undefined && status >= 500) {
     return ProviderModelConnectionFailureKind.Server;
   }
-  if (
-    (status === 400 || status === 404) &&
-    MODEL_UNAVAILABLE_MESSAGE_PATTERN.test(message)
-  ) {
+  if ((status === 400 || status === 404) && MODEL_UNAVAILABLE_MESSAGE_PATTERN.test(message)) {
     return ProviderModelConnectionFailureKind.Model;
   }
   // status 0 is the transport sentinel for aborted / unreachable requests
@@ -159,7 +158,8 @@ export function getProviderModelConnectionTestResult(
     success: false,
     message,
     failureKind: classifyConnectionFailure(response.status, message),
-  };}
+  };
+}
 
 export async function testProviderModelConnection(
   input: ProviderModelConnectionTestInput,

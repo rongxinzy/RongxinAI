@@ -9,12 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@shared/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
 import {
   Expand,
@@ -309,8 +304,7 @@ export const CodingWorkbenchView = ({
         else showAppError(result.error, 'codingAgentActionFailed');
       })
       .catch(() => {
-        if (!cancelled)
-          showAppToast(i18nService.t('codingAgentActionFailed'), { isError: true });
+        if (!cancelled) showAppToast(i18nService.t('codingAgentActionFailed'), { isError: true });
       });
     return () => {
       cancelled = true;
@@ -368,9 +362,7 @@ export const CodingWorkbenchView = ({
     const viewport = eventStreamRef.current?.querySelector<HTMLElement>(
       '.coding-conversation-scroll',
     );
-    const distanceFromBottom = viewport
-      ? viewport.scrollHeight - viewport.scrollTop
-      : null;
+    const distanceFromBottom = viewport ? viewport.scrollHeight - viewport.scrollTop : null;
     try {
       const result = await window.electron.codingAgent.loadEventPage({
         workspaceRoot,
@@ -424,7 +416,8 @@ export const CodingWorkbenchView = ({
   const hasInspectorContent = useMemo(
     () =>
       activeEvents.some(
-        event => event.kind === CodingEventKind.FileChange || event.kind === CodingEventKind.Terminal,
+        event =>
+          event.kind === CodingEventKind.FileChange || event.kind === CodingEventKind.Terminal,
       ),
     [activeEvents],
   );
@@ -475,11 +468,7 @@ export const CodingWorkbenchView = ({
 
   const applySidePanelFrameWidth = useCallback(
     (width: number) => {
-      const nextWidth = clampArtifactPanelWidth(
-        width,
-        CODING_PANEL_MIN_WIDTH,
-        sidePanelMaxWidth,
-      );
+      const nextWidth = clampArtifactPanelWidth(width, CODING_PANEL_MIN_WIDTH, sidePanelMaxWidth);
       transientSidePanelWidthRef.current = nextWidth;
       setSidePanelWidth(nextWidth);
     },
@@ -488,11 +477,7 @@ export const CodingWorkbenchView = ({
 
   const completeSidePanelResize = useCallback(
     (width: number) => {
-      const nextWidth = clampArtifactPanelWidth(
-        width,
-        CODING_PANEL_MIN_WIDTH,
-        sidePanelMaxWidth,
-      );
+      const nextWidth = clampArtifactPanelWidth(width, CODING_PANEL_MIN_WIDTH, sidePanelMaxWidth);
       transientSidePanelWidthRef.current = null;
       setSidePanelWidth(nextWidth);
     },
@@ -505,7 +490,9 @@ export const CodingWorkbenchView = ({
     const updateMaxWidth = () => {
       const maxWidth = resolveCodingSidePanelMaxWidth(root.clientWidth, CODING_PANEL_MIN_WIDTH);
       setSidePanelMaxWidth(maxWidth);
-      setSidePanelWidth(current => clampArtifactPanelWidth(current, CODING_PANEL_MIN_WIDTH, maxWidth));
+      setSidePanelWidth(current =>
+        clampArtifactPanelWidth(current, CODING_PANEL_MIN_WIDTH, maxWidth),
+      );
     };
     updateMaxWidth();
     const observer = new ResizeObserver(updateMaxWidth);
@@ -531,8 +518,7 @@ export const CodingWorkbenchView = ({
       const selectedPermission = findPendingCodingPermission(activeEvents);
       if (selectedPermission) return selectedPermission;
     }
-    const waitingEvents =
-      snapshot?.events.filter(event => waitingLaneIds.has(event.laneId)) ?? [];
+    const waitingEvents = snapshot?.events.filter(event => waitingLaneIds.has(event.laneId)) ?? [];
     return findPendingCodingPermission(waitingEvents);
   }, [activeEvents, activeLane, snapshot]);
   const recoveryLane =
@@ -579,17 +565,20 @@ export const CodingWorkbenchView = ({
     resetSidePanelTransition();
   }, [activeLane?.id, resetSidePanelTransition]);
 
-  const openSidePanelTab = useCallback((view: CodingSidePanelViewType) => {
-    showSidePanel();
-    setSidePanelHidden(false);
-    if (view === CodingSidePanelView.Launcher) {
-      setSidePanelTabs([]);
-      setSidePanelView(CodingSidePanelView.Launcher);
-      return;
-    }
-    setSidePanelTabs(current => (current.includes(view) ? current : [...current, view]));
-    setSidePanelView(view);
-  }, [showSidePanel]);
+  const openSidePanelTab = useCallback(
+    (view: CodingSidePanelViewType) => {
+      showSidePanel();
+      setSidePanelHidden(false);
+      if (view === CodingSidePanelView.Launcher) {
+        setSidePanelTabs([]);
+        setSidePanelView(CodingSidePanelView.Launcher);
+        return;
+      }
+      setSidePanelTabs(current => (current.includes(view) ? current : [...current, view]));
+      setSidePanelView(view);
+    },
+    [showSidePanel],
+  );
 
   const restoreSidePanel = useCallback(() => {
     showSidePanel();
@@ -607,9 +596,7 @@ export const CodingWorkbenchView = ({
         requestHideSidePanel();
         return;
       }
-      setSidePanelView(active =>
-        active === view ? nextTabs.at(-1)! : active,
-      );
+      setSidePanelView(active => (active === view ? nextTabs.at(-1)! : active));
     },
     [requestHideSidePanel, sidePanelTabs],
   );
@@ -988,10 +975,7 @@ export const CodingWorkbenchView = ({
     );
 
   return (
-    <div
-      data-page-canvas
-      className="flex h-full min-h-0 flex-col bg-background"
-    >
+    <div data-page-canvas className="flex h-full min-h-0 flex-col bg-background">
       <PageHeader
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
@@ -1024,431 +1008,433 @@ export const CodingWorkbenchView = ({
       <div
         ref={workbenchRef}
         className="relative grid min-h-0 min-w-0 flex-1 grid-cols-1"
-        style={
-          isSidePanelPresent
-            ? { gridTemplateColumns: 'minmax(0, 1fr) auto' }
-            : undefined
-        }
+        style={isSidePanelPresent ? { gridTemplateColumns: 'minmax(0, 1fr) auto' } : undefined}
       >
-      <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
-        <CodingAuthTerminalDialog
-          authTerminal={authTerminal}
-          authTerminalInput={authTerminalInput}
-          onAuthTerminalInputChange={setAuthTerminalInput}
-          onCancelAuthTerminal={id => void window.electron.codingAgent.cancelAuthTerminal(id)}
-          onSubmitAuthTerminalInput={submitAuthTerminalInput}
-        />
-        {agentManagerElement}
-        {recoveryLane && (
-          <Dialog open>
-            <DialogContent showCloseButton={false}>
-              <DialogHeader>
-                <DialogTitle>{i18nService.t('codingAgentRecoveryTitle')}</DialogTitle>
-                <DialogDescription>
-                  {i18nService.t('codingAgentRecoveryDescription')}
-                </DialogDescription>
-              </DialogHeader>
-              <pre className="max-h-52 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
-                {recoveryLane.pendingRecoveryContext}
-              </pre>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void confirmSessionRecovery(false)}
-                >
-                  {i18nService.t('codingAgentRecoveryStartFresh')}
-                </Button>
-                <Button type="button" onClick={() => void confirmSessionRecovery(true)}>
-                  {i18nService.t('codingAgentRecoverySendSummary')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-        {activeLane && laneChangePreview !== null && (
-          <Dialog open onOpenChange={open => !open && setLaneChangePreview(null)}>
-            <DialogContent className="max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>{i18nService.t('codingAgentApplyChangesTitle')}</DialogTitle>
-                <DialogDescription>
-                  {i18nService.t('codingAgentApplyChangesDescription')}
-                </DialogDescription>
-              </DialogHeader>
-              <pre className="max-h-[50dvh] overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
-                {laneChangePreview || i18nService.t('codingAgentNoChanges')}
-              </pre>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setLaneChangePreview(null)}>
-                  {i18nService.t('codingAgentHandoffCancel')}
-                </Button>
-                <Button
-                  type="button"
-                  disabled={!laneChangePreview.trim()}
-                  onClick={applyLaneChanges}
-                >
-                  {i18nService.t('codingAgentApplyChangesConfirm')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-        {applyConflict && (
-          <Dialog open onOpenChange={open => !open && setApplyConflict(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{i18nService.t('codingAgentConflictTitle')}</DialogTitle>
-                <DialogDescription>
-                  {i18nService.t('codingAgentConflictDescription')}
-                </DialogDescription>
-              </DialogHeader>
-              <div>
-                <p className="mb-2 text-sm font-medium">
-                  {i18nService.t('codingAgentConflictDetails')}
-                </p>
+        <main className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <CodingAuthTerminalDialog
+            authTerminal={authTerminal}
+            authTerminalInput={authTerminalInput}
+            onAuthTerminalInputChange={setAuthTerminalInput}
+            onCancelAuthTerminal={id => void window.electron.codingAgent.cancelAuthTerminal(id)}
+            onSubmitAuthTerminalInput={submitAuthTerminalInput}
+          />
+          {agentManagerElement}
+          {recoveryLane && (
+            <Dialog open>
+              <DialogContent showCloseButton={false}>
+                <DialogHeader>
+                  <DialogTitle>{i18nService.t('codingAgentRecoveryTitle')}</DialogTitle>
+                  <DialogDescription>
+                    {i18nService.t('codingAgentRecoveryDescription')}
+                  </DialogDescription>
+                </DialogHeader>
                 <pre className="max-h-52 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
-                  {applyConflict}
+                  {recoveryLane.pendingRecoveryContext}
                 </pre>
-              </div>
-              <DialogFooter>
-                <Button type="button" onClick={() => setApplyConflict(null)}>
-                  {i18nService.t('codingAgentConflictClose')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-        <div ref={artifactRowRef} className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <CodingEventStream
-            events={activeEvents}
-            isStreaming={activeLane?.status === CodingLaneStatus.Running}
-            headerActions={
-              <>
-                <CodingGitQuickActions
-                  target={{
-                    workspaceRoot,
-                    laneId: activeLane?.id ?? undefined,
-                    sourceRoot: gitSourceRoot,
-                  }}
-                  refreshKey={gitRefreshKey}
-                  onOpenReview={() => {
-                    openSidePanelTab(CodingSidePanelView.Review);
-                    if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
-                  }}
-                />
-                {!desktopSidePanelOpen && (
+                <DialogFooter>
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={i18nService.t('codingAgentSidePanel')}
-                    aria-pressed={false}
-                    onClick={() => {
-                      restoreSidePanel();
+                    variant="outline"
+                    onClick={() => void confirmSessionRecovery(false)}
+                  >
+                    {i18nService.t('codingAgentRecoveryStartFresh')}
+                  </Button>
+                  <Button type="button" onClick={() => void confirmSessionRecovery(true)}>
+                    {i18nService.t('codingAgentRecoverySendSummary')}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {activeLane && laneChangePreview !== null && (
+            <Dialog open onOpenChange={open => !open && setLaneChangePreview(null)}>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>{i18nService.t('codingAgentApplyChangesTitle')}</DialogTitle>
+                  <DialogDescription>
+                    {i18nService.t('codingAgentApplyChangesDescription')}
+                  </DialogDescription>
+                </DialogHeader>
+                <pre className="max-h-[50dvh] overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
+                  {laneChangePreview || i18nService.t('codingAgentNoChanges')}
+                </pre>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setLaneChangePreview(null)}
+                  >
+                    {i18nService.t('codingAgentHandoffCancel')}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!laneChangePreview.trim()}
+                    onClick={applyLaneChanges}
+                  >
+                    {i18nService.t('codingAgentApplyChangesConfirm')}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {applyConflict && (
+            <Dialog open onOpenChange={open => !open && setApplyConflict(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{i18nService.t('codingAgentConflictTitle')}</DialogTitle>
+                  <DialogDescription>
+                    {i18nService.t('codingAgentConflictDescription')}
+                  </DialogDescription>
+                </DialogHeader>
+                <div>
+                  <p className="mb-2 text-sm font-medium">
+                    {i18nService.t('codingAgentConflictDetails')}
+                  </p>
+                  <pre className="max-h-52 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
+                    {applyConflict}
+                  </pre>
+                </div>
+                <DialogFooter>
+                  <Button type="button" onClick={() => setApplyConflict(null)}>
+                    {i18nService.t('codingAgentConflictClose')}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          <div ref={artifactRowRef} className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <CodingEventStream
+              events={activeEvents}
+              isStreaming={activeLane?.status === CodingLaneStatus.Running}
+              headerActions={
+                <>
+                  <CodingGitQuickActions
+                    target={{
+                      workspaceRoot,
+                      laneId: activeLane?.id ?? undefined,
+                      sourceRoot: gitSourceRoot,
+                    }}
+                    refreshKey={gitRefreshKey}
+                    onOpenReview={() => {
+                      openSidePanelTab(CodingSidePanelView.Review);
                       if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                    }}
+                  />
+                  {!desktopSidePanelOpen && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={i18nService.t('codingAgentSidePanel')}
+                      aria-pressed={false}
+                      onClick={() => {
+                        restoreSidePanel();
+                        if (window.innerWidth < 1024) setSidePanelSheetOpen(true);
+                      }}
+                    >
+                      <PanelRight />
+                    </Button>
+                  )}
+                </>
+              }
+              emptyDescription={
+                draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
+              }
+              scrollAreaRef={eventStreamRef}
+              artifactSessionKey={artifactSessionKey}
+              artifactBaseDir={activeLane?.executionRoot ?? null}
+              elicitation={activeElicitation}
+              onRespondElicitation={respondElicitation}
+              onCancelElicitation={cancelElicitation}
+              onScrollPositionChange={scrollPosition => {
+                if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
+              }}
+              onLoadOlderEvents={loadOlderEvents}
+              onReEditUserMessage={reEditUserMessage}
+            />
+            {artifactSessionKey && isArtifactPanelOpen && (
+              <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
+                <Suspense fallback={null}>
+                  <ArtifactPanelFrame
+                    sessionId={artifactSessionKey}
+                    artifacts={laneArtifacts}
+                    isOpen={isArtifactPanelOpen}
+                    isVisible
+                    isTransitioning={false}
+                    layoutMode={artifactLayoutMode}
+                    minPanelWidth={MIN_PANEL_WIDTH}
+                    maxPanelWidth={artifactPanelMaxWidth}
+                  />
+                </Suspense>
+              </ArtifactPanelErrorBoundary>
+            )}
+          </div>
+          <div className="relative shrink-0">
+            <CodingComposer
+              availableCommands={activeLane ? activeLane.availableCommands : draftAvailableCommands}
+              configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}
+              disabled={
+                draftSession
+                  ? !draftSession.profileId ||
+                    !draftSession.sourceRoot ||
+                    activeProfile?.status !== CodingAgentProfileStatus.Ready
+                  : !activeLane ||
+                    activeLane.status === CodingLaneStatus.WaitingApproval ||
+                    activeLane.status === CodingLaneStatus.WaitingElicitation
+              }
+              isRunning={activeLane?.status === CodingLaneStatus.Running}
+              isSubmitting={isSubmitting}
+              prompt={prompt}
+              focusRequestKey={composerFocusRequestKey}
+              sessionId={
+                activeProfile?.driverKind === CodingAgentDriverKind.Acp
+                  ? activeLane?.id
+                  : activeProfile?.driverKind === CodingAgentDriverKind.Builtin
+                    ? activeLane?.localSessionId
+                    : undefined
+              }
+              queueService={
+                activeProfile?.driverKind === CodingAgentDriverKind.Acp ? codingQueue : undefined
+              }
+              attachments={promptAttachments}
+              canAttachFiles={
+                activeProfile?.driverKind === CodingAgentDriverKind.Acp &&
+                activeProfile.status === CodingAgentProfileStatus.Ready
+              }
+              leadingTools={
+                activeProfile?.driverKind === CodingAgentDriverKind.Builtin && activeLane ? (
+                  <CoworkModelPicker
+                    models={availableModels}
+                    selectedModel={
+                      (activeLane.modelOverride
+                        ? resolveAgentModelRef(activeLane.modelOverride, availableModels)
+                        : null) ??
+                      defaultSelectedModel ??
+                      null
+                    }
+                    open={modelPickerOpen}
+                    onOpenChange={setModelPickerOpen}
+                    onSelect={model => void setLaneModel(toAgentModelRef(model))}
+                  />
+                ) : undefined
+              }
+              statusNotice={
+                agentNeedsProbe ? (
+                  <div className="flex items-center gap-2 px-1 pb-2 text-xs text-muted-foreground">
+                    <span>{i18nService.t('codingAgentProbeRequired')}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="theme-control-sizing-8"
+                      onClick={() => activeProfile && void probeAgent(activeProfile.id)}
+                    >
+                      {i18nService.t('codingAgentProbeAgent')}
+                    </Button>
+                  </div>
+                ) : null
+              }
+              onChange={next => {
+                if (draftSession) {
+                  setNewSessionDraftState({ id: draftSession.id, value: next });
+                } else if (activeLane) {
+                  setDraftState({ laneId: activeLane.id, value: next });
+                  saveDraft(activeLane.id, next);
+                }
+              }}
+              onAddAttachments={() => {
+                void window.electron.dialog
+                  .selectFiles({ title: i18nService.t('codingAttachmentAdd') })
+                  .then(result => {
+                    if (!result.success || result.paths.length === 0) return;
+                    setPromptAttachments(current => {
+                      const existingPaths = new Set(current.map(attachment => attachment.path));
+                      return [
+                        ...current,
+                        ...result.paths
+                          .filter(filePath => !existingPaths.has(filePath))
+                          .map(filePath => ({
+                            path: filePath,
+                            name: filePath.split(/[/\\\\]/).at(-1) ?? filePath,
+                          })),
+                      ].slice(0, 8);
+                    });
+                  });
+              }}
+              onRemoveAttachment={filePath =>
+                setPromptAttachments(current =>
+                  current.filter(attachment => attachment.path !== filePath),
+                )
+              }
+              onConfigOptionChange={(optionId, value) => void changeConfigOption(optionId, value)}
+              supportsSteerShortcut={activeProfile?.driverKind === CodingAgentDriverKind.Builtin}
+              onSend={() => void sendPrompt()}
+              onSteer={() => void sendPrompt('steer')}
+              onStop={() => void cancel()}
+            />
+            <CodingPermissionOverlay
+              permission={activePermission}
+              onRespond={respondToPermission}
+            />
+          </div>
+          {sessionSetupWorkspace ? (
+            <CodingSessionSetupDialog
+              workspace={sessionSetupWorkspace}
+              profiles={snapshot.profiles}
+              onCancel={() => {
+                setSessionSetupWorkspace(null);
+                sessionSetupSelectionKeyRef.current = null;
+              }}
+              onManageAgents={() => setAgentManagerOpen(true)}
+              onSubmit={({ profileId, sourceRoot }) => {
+                onSessionDraftCreated(
+                  buildCodingSessionDraftSelection(sessionSetupWorkspace, profileId, sourceRoot),
+                );
+                setSessionSetupWorkspace(null);
+                sessionSetupSelectionKeyRef.current = null;
+              }}
+            />
+          ) : null}
+        </main>
+        {isSidePanelPresent && (
+          <aside
+            ref={sidePanelFrameRef}
+            onTransitionEnd={event => {
+              if (event.target === event.currentTarget && event.propertyName === 'width') {
+                completeSidePanelClose();
+              }
+            }}
+            aria-hidden={!desktopSidePanelOpen || isSidePanelEntering || isSidePanelClosing}
+            className={cn(
+              'relative flex min-h-0 min-w-0 shrink-0 flex-col overflow-visible border-l border-border-subtle max-lg:hidden',
+              !isSidePanelResizing &&
+                'transition-[width] duration-200 ease-out motion-reduce:transition-none',
+              (isSidePanelEntering || isSidePanelClosing) && 'pointer-events-none',
+              sidePanelExpanded && 'absolute inset-0 z-20 bg-background',
+            )}
+            style={{
+              width: sidePanelExpanded
+                ? '100%'
+                : desktopSidePanelOpen && !isSidePanelEntering && !isSidePanelClosing
+                  ? `${renderedSidePanelWidth}px`
+                  : '0px',
+            }}
+          >
+            <ArtifactPanelResizeHandle
+              ariaLabel={i18nService.t('codingAgentSidePanel')}
+              currentWidth={resolvedSidePanelWidth}
+              minWidth={CODING_PANEL_MIN_WIDTH}
+              maxWidth={sidePanelMaxWidth}
+              disabled={sidePanelExpanded || isSidePanelEntering || isSidePanelClosing}
+              onResizeFrame={applySidePanelFrameWidth}
+              onResizeComplete={completeSidePanelResize}
+              onResizeStateChange={setIsSidePanelResizing}
+            />
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <div className="flex shrink-0 items-center gap-1 border-b border-border px-1 py-2">
+                {visibleSidePanelTabs.map(tab => {
+                  const isReview = tab === CodingSidePanelView.Review;
+                  const isInspector = tab === CodingSidePanelView.Inspector;
+                  const active = tab === sidePanelView;
+                  const tabLabel = isReview
+                    ? 'codingAgentReview'
+                    : isInspector
+                      ? 'codingAgentInspector'
+                      : 'codingAgentOpenFiles';
+                  return (
+                    <ButtonGroup
+                      key={tab}
+                      className={cn(
+                        'group shrink-0 gap-0 theme-button theme-button-size-sm',
+                        active ? 'theme-button-secondary' : 'theme-button-ghost',
+                      )}
+                    >
+                      <Button
+                        type="button"
+                        variant="embedded"
+                        size="sm"
+                        aria-pressed={active}
+                        onClick={() => openSidePanelTab(tab)}
+                      >
+                        {isReview ? <FileDiff /> : isInspector ? <TerminalIcon /> : <File />}
+                        {i18nService.t(tabLabel)}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="embedded"
+                        size="sm"
+                        className={cn(
+                          'self-center pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                          active && 'pointer-events-auto opacity-100',
+                        )}
+                        aria-label={i18nService.t('close')}
+                        onClick={() => closeSidePanelTab(tab)}
+                      >
+                        <X />
+                      </Button>
+                    </ButtonGroup>
+                  );
+                })}
+                <CodingSidePanelAddMenu
+                  onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+                  onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
+                  onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
+                  hasInspectorContent={hasInspectorContent}
+                />
+                <div className="ml-auto flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="toolbar"
+                    size="icon-sm"
+                    aria-label={i18nService.t(
+                      sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand',
+                    )}
+                    aria-pressed={sidePanelExpanded}
+                    onClick={() => setSidePanelExpanded(current => !current)}
+                  >
+                    {sidePanelExpanded ? <Minimize2 /> : <Expand />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="toolbar"
+                    size="icon-sm"
+                    aria-label={i18nService.t('codingAgentSidePanel')}
+                    onClick={() => {
+                      requestHideSidePanel();
                     }}
                   >
                     <PanelRight />
                   </Button>
-                )}
-              </>
-            }
-            emptyDescription={
-              draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
-            }
-            scrollAreaRef={eventStreamRef}
-            artifactSessionKey={artifactSessionKey}
-            artifactBaseDir={activeLane?.executionRoot ?? null}
-            elicitation={activeElicitation}
-            onRespondElicitation={respondElicitation}
-            onCancelElicitation={cancelElicitation}
-            onScrollPositionChange={scrollPosition => {
-              if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
-            }}
-            onLoadOlderEvents={loadOlderEvents}
-            onReEditUserMessage={reEditUserMessage}
-          />
-          {artifactSessionKey && isArtifactPanelOpen && (
-            <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-              <Suspense fallback={null}>
-                <ArtifactPanelFrame
-                  sessionId={artifactSessionKey}
-                  artifacts={laneArtifacts}
-                  isOpen={isArtifactPanelOpen}
-                  isVisible
-                  isTransitioning={false}
-                  layoutMode={artifactLayoutMode}
-                  minPanelWidth={MIN_PANEL_WIDTH}
-                  maxPanelWidth={artifactPanelMaxWidth}
-                />
-              </Suspense>
-            </ArtifactPanelErrorBoundary>
-          )}
-        </div>
-        <div className="relative shrink-0">
-          <CodingComposer
-            availableCommands={activeLane ? activeLane.availableCommands : draftAvailableCommands}
-            configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}
-            disabled={
-              draftSession
-                ? !draftSession.profileId ||
-                  !draftSession.sourceRoot ||
-                  activeProfile?.status !== CodingAgentProfileStatus.Ready
-                : !activeLane ||
-                  activeLane.status === CodingLaneStatus.WaitingApproval ||
-                  activeLane.status === CodingLaneStatus.WaitingElicitation
-            }
-            isRunning={activeLane?.status === CodingLaneStatus.Running}
-            isSubmitting={isSubmitting}
-            prompt={prompt}
-            focusRequestKey={composerFocusRequestKey}
-            sessionId={
-              activeProfile?.driverKind === CodingAgentDriverKind.Acp
-                ? activeLane?.id
-                : activeProfile?.driverKind === CodingAgentDriverKind.Builtin
-                  ? activeLane?.localSessionId
-                  : undefined
-            }
-            queueService={
-              activeProfile?.driverKind === CodingAgentDriverKind.Acp ? codingQueue : undefined
-            }
-            attachments={promptAttachments}
-            canAttachFiles={
-              activeProfile?.driverKind === CodingAgentDriverKind.Acp &&
-              activeProfile.status === CodingAgentProfileStatus.Ready
-            }
-            leadingTools={
-              activeProfile?.driverKind === CodingAgentDriverKind.Builtin && activeLane ? (
-                <CoworkModelPicker
-                  models={availableModels}
-                  selectedModel={
-                    (activeLane.modelOverride
-                      ? resolveAgentModelRef(activeLane.modelOverride, availableModels)
-                      : null) ??
-                    defaultSelectedModel ??
-                    null
-                  }
-                  open={modelPickerOpen}
-                  onOpenChange={setModelPickerOpen}
-                  onSelect={model => void setLaneModel(toAgentModelRef(model))}
-                />
-              ) : undefined
-            }
-            statusNotice={
-              agentNeedsProbe ? (
-                <div className="flex items-center gap-2 px-1 pb-2 text-xs text-muted-foreground">
-                  <span>{i18nService.t('codingAgentProbeRequired')}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="theme-control-sizing-8"
-                    onClick={() => activeProfile && void probeAgent(activeProfile.id)}
-                  >
-                    {i18nService.t('codingAgentProbeAgent')}
-                  </Button>
                 </div>
-              ) : null
-            }
-            onChange={next => {
-              if (draftSession) {
-                setNewSessionDraftState({ id: draftSession.id, value: next });
-              } else if (activeLane) {
-                setDraftState({ laneId: activeLane.id, value: next });
-                saveDraft(activeLane.id, next);
-              }
-            }}
-            onAddAttachments={() => {
-              void window.electron.dialog
-                .selectFiles({ title: i18nService.t('codingAttachmentAdd') })
-                .then(result => {
-                  if (!result.success || result.paths.length === 0) return;
-                  setPromptAttachments(current => {
-                    const existingPaths = new Set(current.map(attachment => attachment.path));
-                    return [
-                      ...current,
-                      ...result.paths
-                        .filter(filePath => !existingPaths.has(filePath))
-                        .map(filePath => ({
-                          path: filePath,
-                          name: filePath.split(/[/\\\\]/).at(-1) ?? filePath,
-                        })),
-                    ].slice(0, 8);
-                  });
-                });
-            }}
-            onRemoveAttachment={filePath =>
-              setPromptAttachments(current =>
-                current.filter(attachment => attachment.path !== filePath),
-              )
-            }
-            onConfigOptionChange={(optionId, value) => void changeConfigOption(optionId, value)}
-            supportsSteerShortcut={activeProfile?.driverKind === CodingAgentDriverKind.Builtin}
-            onSend={() => void sendPrompt()}
-            onSteer={() => void sendPrompt('steer')}
-            onStop={() => void cancel()}
-          />
-          <CodingPermissionOverlay permission={activePermission} onRespond={respondToPermission} />
-        </div>
-        {sessionSetupWorkspace ? (
-          <CodingSessionSetupDialog
-            workspace={sessionSetupWorkspace}
-            profiles={snapshot.profiles}
-            onCancel={() => {
-              setSessionSetupWorkspace(null);
-              sessionSetupSelectionKeyRef.current = null;
-            }}
-            onManageAgents={() => setAgentManagerOpen(true)}
-            onSubmit={({ profileId, sourceRoot }) => {
-              onSessionDraftCreated(
-                buildCodingSessionDraftSelection(sessionSetupWorkspace, profileId, sourceRoot),
-              );
-              setSessionSetupWorkspace(null);
-              sessionSetupSelectionKeyRef.current = null;
-            }}
-          />
-        ) : null}
-      </main>
-      {isSidePanelPresent && (
-        <aside
-          ref={sidePanelFrameRef}
-          onTransitionEnd={event => {
-            if (event.target === event.currentTarget && event.propertyName === 'width') {
-              completeSidePanelClose();
-            }
-          }}
-          aria-hidden={!desktopSidePanelOpen || isSidePanelEntering || isSidePanelClosing}
-          className={cn(
-            'relative flex min-h-0 min-w-0 shrink-0 flex-col overflow-visible border-l border-border-subtle max-lg:hidden',
-            !isSidePanelResizing &&
-              'transition-[width] duration-200 ease-out motion-reduce:transition-none',
-            (isSidePanelEntering || isSidePanelClosing) && 'pointer-events-none',
-            sidePanelExpanded && 'absolute inset-0 z-20 bg-background',
-          )}
-          style={{
-            width:
-              sidePanelExpanded
-                ? '100%'
-                : desktopSidePanelOpen && !isSidePanelEntering && !isSidePanelClosing
-                ? `${renderedSidePanelWidth}px`
-                : '0px',
-          }}
-          >
-          <ArtifactPanelResizeHandle
-            ariaLabel={i18nService.t('codingAgentSidePanel')}
-            currentWidth={resolvedSidePanelWidth}
-            minWidth={CODING_PANEL_MIN_WIDTH}
-            maxWidth={sidePanelMaxWidth}
-            disabled={sidePanelExpanded || isSidePanelEntering || isSidePanelClosing}
-            onResizeFrame={applySidePanelFrameWidth}
-            onResizeComplete={completeSidePanelResize}
-            onResizeStateChange={setIsSidePanelResizing}
-          />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex shrink-0 items-center gap-1 border-b border-border px-1 py-2">
-              {visibleSidePanelTabs.map(tab => {
-                const isReview = tab === CodingSidePanelView.Review;
-                const isInspector = tab === CodingSidePanelView.Inspector;
-                const active = tab === sidePanelView;
-                const tabLabel = isReview
-                  ? 'codingAgentReview'
-                  : isInspector
-                    ? 'codingAgentInspector'
-                    : 'codingAgentOpenFiles';
-                return (
-                  <ButtonGroup
-                    key={tab}
-                    className={cn(
-                      'group shrink-0 gap-0 theme-button theme-button-size-sm',
-                      active ? 'theme-button-secondary' : 'theme-button-ghost',
-                    )}
-                  >
-                    <Button
-                      type="button"
-                      variant="embedded"
-                      size="sm"
-                      aria-pressed={active}
-                      onClick={() => openSidePanelTab(tab)}
-                    >
-                      {isReview ? <FileDiff /> : isInspector ? <TerminalIcon /> : <File />}
-                      {i18nService.t(tabLabel)}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="embedded"
-                      size="sm"
-                      className={cn(
-                        'self-center pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
-                        active && 'pointer-events-auto opacity-100',
-                      )}
-                      aria-label={i18nService.t('close')}
-                      onClick={() => closeSidePanelTab(tab)}
-                    >
-                      <X />
-                    </Button>
-                  </ButtonGroup>
-                );
-              })}
-              <CodingSidePanelAddMenu
-                onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
-                onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
-                onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
-                hasInspectorContent={hasInspectorContent}
-              />
-              <div className="ml-auto flex shrink-0 items-center gap-1">
-                <Button
-                  type="button"
-                  variant="toolbar"
-                  size="icon-sm"
-                  aria-label={i18nService.t(
-                    sidePanelExpanded ? 'codingGitExitExpanded' : 'codingGitExpand',
-                  )}
-                  aria-pressed={sidePanelExpanded}
-                  onClick={() => setSidePanelExpanded(current => !current)}
-                >
-                  {sidePanelExpanded ? <Minimize2 /> : <Expand />}
-                </Button>
-                <Button
-                  type="button"
-                  variant="toolbar"
-                  size="icon-sm"
-                  aria-label={i18nService.t('codingAgentSidePanel')}
-                  onClick={() => {
-                    requestHideSidePanel();
-                  }}
-                >
-                  <PanelRight />
-                </Button>
               </div>
-          </div>
-          <div className="min-h-0 flex-1">
-            {sidePanelView === CodingSidePanelView.Launcher ? (
-              <CodingSidePanelLauncher
-                onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
-                onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
-                onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
-                hasInspectorContent={hasInspectorContent}
-              />
-            ) : sidePanelView === CodingSidePanelView.Files ? (
-              <CodingWorkspaceFileBrowser
-                workspaceRoot={workspaceRoot}
-                sourceRoot={gitSourceRoot}
-                onFileSaved={() => setGitRefreshVersion(current => current + 1)}
-              />
-            ) : sidePanelView === CodingSidePanelView.Inspector ? (
-              <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
-            ) : (
-              <CodingGitPanel
-                workspaceRoot={workspaceRoot}
-                laneId={activeLane?.id ?? null}
-                sourceRoot={gitSourceRoot}
-                refreshKey={gitRefreshKey}
-              />
-            )}
-          </div>
-          </div>
-        </aside>
-      )}
+              <div className="min-h-0 flex-1">
+                {sidePanelView === CodingSidePanelView.Launcher ? (
+                  <CodingSidePanelLauncher
+                    onOpenFiles={() => openSidePanelTab(CodingSidePanelView.Files)}
+                    onOpenReview={() => openSidePanelTab(CodingSidePanelView.Review)}
+                    onOpenInspector={() => openSidePanelTab(CodingSidePanelView.Inspector)}
+                    hasInspectorContent={hasInspectorContent}
+                  />
+                ) : sidePanelView === CodingSidePanelView.Files ? (
+                  <CodingWorkspaceFileBrowser
+                    workspaceRoot={workspaceRoot}
+                    sourceRoot={gitSourceRoot}
+                    onFileSaved={() => setGitRefreshVersion(current => current + 1)}
+                  />
+                ) : sidePanelView === CodingSidePanelView.Inspector ? (
+                  <CodingInspector events={activeEvents} initialTab={CodingInspectorTab.Terminal} />
+                ) : (
+                  <CodingGitPanel
+                    workspaceRoot={workspaceRoot}
+                    laneId={activeLane?.id ?? null}
+                    sourceRoot={gitSourceRoot}
+                    refreshKey={gitRefreshKey}
+                  />
+                )}
+              </div>
+            </div>
+          </aside>
+        )}
       </div>
       <Sheet open={sidePanelSheetOpen} onOpenChange={setSidePanelSheetOpen}>
         <SheetContent side="bottom" className="theme-control-sizing-4 h-[80dvh]">
@@ -1457,10 +1443,10 @@ export const CodingWorkbenchView = ({
               {sidePanelView === CodingSidePanelView.Launcher
                 ? i18nService.t('codingAgentSidePanel')
                 : sidePanelView === CodingSidePanelView.Files
-                ? i18nService.t('codingAgentFiles')
-                : sidePanelView === CodingSidePanelView.Inspector
-                ? i18nService.t('codingAgentInspector')
-                : i18nService.t('codingAgentReview')}
+                  ? i18nService.t('codingAgentFiles')
+                  : sidePanelView === CodingSidePanelView.Inspector
+                    ? i18nService.t('codingAgentInspector')
+                    : i18nService.t('codingAgentReview')}
             </SheetTitle>
           </SheetHeader>
           {sidePanelView === CodingSidePanelView.Launcher ? (

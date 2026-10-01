@@ -41,8 +41,7 @@ export class WorkspaceBroker {
         return { realPath: await realpath(candidate), remaining };
       } catch {
         const parent = path.dirname(candidate);
-        if (parent === candidate)
-          throw new Error(CodingErrorMessage.WorkspaceTargetNoAncestor);
+        if (parent === candidate) throw new Error(CodingErrorMessage.WorkspaceTargetNoAncestor);
         remaining.unshift(path.basename(candidate));
         candidate = parent;
       }

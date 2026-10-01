@@ -1,7 +1,4 @@
-import {
-  ContextUsageState,
-  getContextUsageState,
-} from '@shared/components/ai-elements/context';
+import { ContextUsageState, getContextUsageState } from '@shared/components/ai-elements/context';
 import { Button } from '@shared/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
@@ -80,8 +77,16 @@ export function ContextUsageIndicator({
     .reduce((total, message) => total + estimateTokens(message.content), 0);
   const rows = [
     [i18nService.t('coworkContextUsageSystem'), estimatedSystemTokens, 'var(--zy-text-secondary)'],
-    [i18nService.t('coworkContextUsageTools'), estimatedToolTokens, 'var(--zy-model-tag-violet-foreground)'],
-    [i18nService.t('coworkContextUsageMessages'), estimatedMessageTokens, 'var(--zy-skill-blue-foreground)'],
+    [
+      i18nService.t('coworkContextUsageTools'),
+      estimatedToolTokens,
+      'var(--zy-model-tag-violet-foreground)',
+    ],
+    [
+      i18nService.t('coworkContextUsageMessages'),
+      estimatedMessageTokens,
+      'var(--zy-skill-blue-foreground)',
+    ],
   ] as const;
   const estimatedTotal = rows.reduce((total, [, tokens]) => total + tokens, 0);
   const usedBarWidth = `${percent}%`;
@@ -97,7 +102,15 @@ export function ContextUsageIndicator({
                 <Button type="button" variant="ghost" size="icon-sm" aria-label={summary}>
                   <span className="sr-only">{summary}</span>
                   <svg aria-hidden="true" viewBox="0 0 20 20" className={usageStateClassName}>
-                    <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+                    <circle
+                      cx="10"
+                      cy="10"
+                      r="8"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      opacity="0.25"
+                    />
                     <circle
                       cx="10"
                       cy="10"
@@ -118,7 +131,11 @@ export function ContextUsageIndicator({
         />
         <TooltipContent>{summary}</TooltipContent>
       </Tooltip>
-      <PopoverContent side="top" align="end" className="theme-control-sizing-10 w-72 max-w-[calc(100vw-2rem)] gap-3">
+      <PopoverContent
+        side="top"
+        align="end"
+        className="theme-control-sizing-10 w-72 max-w-[calc(100vw-2rem)] gap-3"
+      >
         <div className="flex items-center justify-between gap-3 text-sm">
           <span className={`font-medium ${usageStateClassName}`}>{percent.toFixed(1)}%</span>
           <span className="shrink-0 tabular-nums text-muted-foreground">
@@ -158,7 +175,9 @@ export function ContextUsageIndicator({
               <span className="shrink-0 tabular-nums">~{formatTokenCount(tokens)}</span>
             </div>
           ))}
-          {!messageUsage ? <p className="text-xs leading-normal text-muted-foreground">{summary}</p> : null}
+          {!messageUsage ? (
+            <p className="text-xs leading-normal text-muted-foreground">{summary}</p>
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>

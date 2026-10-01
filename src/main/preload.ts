@@ -434,9 +434,12 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   cowork: {
-    getRunSnapshot: (sessionId: string, replayContent = false) => ipcRenderer.invoke(CoworkSessionIpc.RunSnapshot, sessionId, replayContent),
-    onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) => onPush(CoworkStreamIpc.RunState, callback),
-    onStreamContentPatch: (callback: (patch: CoworkContentPatch) => void) => onPush(CoworkStreamIpc.ContentPatch, callback),
+    getRunSnapshot: (sessionId: string, replayContent = false) =>
+      ipcRenderer.invoke(CoworkSessionIpc.RunSnapshot, sessionId, replayContent),
+    onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) =>
+      onPush(CoworkStreamIpc.RunState, callback),
+    onStreamContentPatch: (callback: (patch: CoworkContentPatch) => void) =>
+      onPush(CoworkStreamIpc.ContentPatch, callback),
     listWorkspaces: () => ipcRenderer.invoke(WorkspaceIpc.List),
     createWorkspace: (options: { path: string; name: string }) =>
       ipcRenderer.invoke(WorkspaceIpc.Create, options),
@@ -571,9 +574,8 @@ contextBridge.exposeInMainWorld('electron', {
     writeBootstrapFile: (filename: string, content: string) =>
       ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
 
-    onStreamUiEvent: (
-      callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void,
-    ) => onPush(CoworkStreamIpc.UiEvent, callback),
+    onStreamUiEvent: (callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void) =>
+      onPush(CoworkStreamIpc.UiEvent, callback),
     onSessionsChanged: (
       callback: (data: {
         sessionId?: string;

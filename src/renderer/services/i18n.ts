@@ -1167,14 +1167,18 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentCheckVerifiedHint: '工具已连接并收到模型回复；文件操作和工具执行尚未验证。',
     codingAgentCheckLastTime: '最近检测：{time}',
     codingAgentCheckAuthHelp: '需要登录或有效凭据。请在本机工具中完成账号和模型配置后重新检测。',
-    codingAgentCheckStartupHelp: '工具启动失败。检查安装路径和执行权限；重新安装或更新工具后重新扫描。',
+    codingAgentCheckStartupHelp:
+      '工具启动失败。检查安装路径和执行权限；重新安装或更新工具后重新扫描。',
     codingAgentCheckProtocolHelp: '连接协议不兼容。更新编程工具及其适配器后重新扫描、检测。',
     codingAgentCheckTimeoutHelp: '连接请求超时。检查网络、代理和模型服务是否可达，再重新检测。',
-    codingAgentCheckNoReplyHelp: '工具已连接，但模型没有返回内容。请在本机工具中检查登录、模型地址、凭据和额度后重新检测。',
-    codingAgentCheckConnectionHelp: '连接未完成。先确认该工具在本机终端中能够正常回复，再重新检测。',
+    codingAgentCheckNoReplyHelp:
+      '工具已连接，但模型没有返回内容。请在本机工具中检查登录、模型地址、凭据和额度后重新检测。',
+    codingAgentCheckConnectionHelp:
+      '连接未完成。先确认该工具在本机终端中能够正常回复，再重新检测。',
     codingAgentCheckNotInstalledHelp: '未找到工具安装。安装后点击“重新扫描”。',
     codingAgentCheckTrustHelp: '先确认信任，再启动工具检测连接。',
-    codingAgentCheckRequiredHelp: '已发现安装，尚未验证连接。点击“检测连接”确认工具和模型能够回复。',
+    codingAgentCheckRequiredHelp:
+      '已发现安装，尚未验证连接。点击“检测连接”确认工具和模型能够回复。',
     codingAgentBuiltinSource: '使用应用内置编程能力和当前模型配置。',
     codingAgentLocalConfigSource: '使用本机工具的账号和模型配置。',
     codingAgentDiscoveredSource: '已扫描到本机安装；使用该工具自己的账号和模型配置。',
@@ -1184,7 +1188,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentInstalledPath: '安装路径',
     codingAgentNotInstalled: '未找到安装',
     codingAgentAdapterVersion: '连接适配器版本：{version}',
-    codingAgentLocalConfigHelp: '本界面不修改工具配置。模型和账号请在对应工具中配置，修改后重新检测。',
+    codingAgentLocalConfigHelp:
+      '本界面不修改工具配置。模型和账号请在对应工具中配置，修改后重新检测。',
     codingAgentProbeRequired: '本地 Agent 尚未完成连接检测，发送时会自动检测。',
     codingAgentAuthenticate: '登录',
     codingAgentApprovePermission: '允许本次操作',
@@ -2218,7 +2223,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorServerError: '服务端出现错误，请稍后重试。',
     coworkErrorStreamInterrupted: '与模型的连接中断，本次任务已停止。请重试。',
     coworkErrorTurnTimeout: '模型长时间没有响应，本次任务已中断。请重试，或减少同时运行的任务数。',
-    coworkErrorFileWriteTruncated: '文件内容被截断，未能完整写入。请让模型分块写入或减少单次写入长度。',
+    coworkErrorFileWriteTruncated:
+      '文件内容被截断，未能完整写入。请让模型分块写入或减少单次写入长度。',
     coworkErrorSessionStartFailed: '会话启动失败：{error}',
     coworkErrorSessionContinueFailed: '发送消息失败：{error}',
     chatAgentWorkingDirectoryRequired:
@@ -2300,7 +2306,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingErrorAcpTerminalNoId: '终端操作失败：缺少终端标识。',
     codingErrorAcpConnectionNotRunning: '编程 Agent 连接已断开，请重试。',
     codingErrorAcpProbeTimedOut: '编程 Agent 检测超时，请重试。',
-    codingErrorAgentAuthRequired: '该编程 Agent 需要登录或有效的凭据，请完成登录或检查模型配置后重新检测连接。',
+    codingErrorAgentAuthRequired:
+      '该编程 Agent 需要登录或有效的凭据，请完成登录或检查模型配置后重新检测连接。',
     codingErrorAcpRequestUnsupported: '该编程 Agent 发起了暂不支持的请求。',
     codingErrorAcpRequestTimedOut: '编程 Agent 请求超时，请重试。',
     codingErrorAcpRequestFailed: '与编程 Agent 通信失败，请重试。',
@@ -4849,29 +4856,42 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentCheckComplete: 'Connection check passed',
     codingAgentCheckFailed: 'Connection check failed',
     codingAgentCheckNextStep: 'Next step',
-    codingAgentCheckRequestHint: 'The check starts the tool and sends a minimal test message. It may use model credits.',
-    codingAgentCheckVerifiedHint: 'The tool connected and the model responded. File operations and tool execution have not been verified.',
+    codingAgentCheckRequestHint:
+      'The check starts the tool and sends a minimal test message. It may use model credits.',
+    codingAgentCheckVerifiedHint:
+      'The tool connected and the model responded. File operations and tool execution have not been verified.',
     codingAgentCheckLastTime: 'Last checked: {time}',
-    codingAgentCheckAuthHelp: 'Sign-in or valid credentials are required. Configure the account and model in the local tool, then check again.',
-    codingAgentCheckStartupHelp: 'The tool failed to start. Check its installation path and permissions. Reinstall or update it, then scan again.',
-    codingAgentCheckProtocolHelp: 'The connection protocol is incompatible. Update the coding tool and its adapter, then scan and check again.',
-    codingAgentCheckTimeoutHelp: 'The connection request timed out. Check the network, proxy, and model service, then check again.',
-    codingAgentCheckNoReplyHelp: 'The tool connected but the model returned no content. Check sign-in, endpoint, credentials, and credits in the local tool, then check again.',
-    codingAgentCheckConnectionHelp: 'The connection did not complete. Confirm that the tool can respond in a local terminal, then check again.',
-    codingAgentCheckNotInstalledHelp: 'The tool installation was not found. Install it, then scan again.',
+    codingAgentCheckAuthHelp:
+      'Sign-in or valid credentials are required. Configure the account and model in the local tool, then check again.',
+    codingAgentCheckStartupHelp:
+      'The tool failed to start. Check its installation path and permissions. Reinstall or update it, then scan again.',
+    codingAgentCheckProtocolHelp:
+      'The connection protocol is incompatible. Update the coding tool and its adapter, then scan and check again.',
+    codingAgentCheckTimeoutHelp:
+      'The connection request timed out. Check the network, proxy, and model service, then check again.',
+    codingAgentCheckNoReplyHelp:
+      'The tool connected but the model returned no content. Check sign-in, endpoint, credentials, and credits in the local tool, then check again.',
+    codingAgentCheckConnectionHelp:
+      'The connection did not complete. Confirm that the tool can respond in a local terminal, then check again.',
+    codingAgentCheckNotInstalledHelp:
+      'The tool installation was not found. Install it, then scan again.',
     codingAgentCheckTrustHelp: 'Confirm trust before starting the tool to check its connection.',
-    codingAgentCheckRequiredHelp: 'The installation was found but the connection is unchecked. Check the connection to verify that the tool and model respond.',
+    codingAgentCheckRequiredHelp:
+      'The installation was found but the connection is unchecked. Check the connection to verify that the tool and model respond.',
     codingAgentBuiltinSource: 'Uses the built-in coding agent and the current model settings.',
     codingAgentLocalConfigSource: 'Uses the local tool account and model settings.',
-    codingAgentDiscoveredSource: 'Found a local installation. Uses the tool own account and model settings.',
+    codingAgentDiscoveredSource:
+      'Found a local installation. Uses the tool own account and model settings.',
     codingAgentCustomSource: 'Uses the manually added launch command and the tool own settings.',
     codingAgentShowDetails: 'Connection details',
     codingAgentHideDetails: 'Hide connection details',
     codingAgentInstalledPath: 'Installation path',
     codingAgentNotInstalled: 'Installation not found',
     codingAgentAdapterVersion: 'Connection adapter version: {version}',
-    codingAgentLocalConfigHelp: 'This panel does not change tool settings. Configure the model and account in the tool, then check again.',
-    codingAgentProbeRequired: 'This local agent has not been checked yet. It will be checked automatically when you send.',
+    codingAgentLocalConfigHelp:
+      'This panel does not change tool settings. Configure the model and account in the tool, then check again.',
+    codingAgentProbeRequired:
+      'This local agent has not been checked yet. It will be checked automatically when you send.',
     codingAgentAuthenticate: 'Sign in',
     codingAgentApprovePermission: 'Allow this action',
     codingAgentPermissionAllowOnce: 'Allow once',
@@ -5149,7 +5169,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     artifactOpenWithApp: 'Open with System App',
     artifactDocumentLoading: 'Loading document...',
     artifactDocumentError: 'Failed to load document',
-    artifactPreviewTooLarge: 'File is too large, the web preview is disabled — open the Code tab instead',
+    artifactPreviewTooLarge:
+      'File is too large, the web preview is disabled — open the Code tab instead',
     artifactSheetTab: 'Sheet',
     artifactShowingRows: 'Showing {shown} of {total} rows',
     artifactRowCount: 'rows',
@@ -5494,7 +5515,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkExecutionCompletedToolsSummary: 'Completed {tools} tool calls',
     coworkExecutionThinking: 'Working',
     coworkWorkingThinking: 'Thinking',
-    coworkContentTruncated: 'The output exceeds the display limit. Showing the first 2 million characters.',
+    coworkContentTruncated:
+      'The output exceeds the display limit. Showing the first 2 million characters.',
     coworkRunAlive: 'Background execution confirmed',
     coworkRunStarting: 'Starting the task',
     coworkRunIndicatorStarting: 'Starting',
@@ -5996,9 +6018,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorContentFiltered:
       'Content did not pass the safety review. Please modify and try again.',
     coworkErrorServerError: 'Server error occurred. Please try again later.',
-    coworkErrorStreamInterrupted: 'The model connection was interrupted. This task has stopped. Please retry.',
-    coworkErrorTurnTimeout: 'The model stopped responding. Please retry or reduce concurrent tasks.',
-    coworkErrorFileWriteTruncated: 'The file content was truncated. Ask the model to write smaller chunks.',
+    coworkErrorStreamInterrupted:
+      'The model connection was interrupted. This task has stopped. Please retry.',
+    coworkErrorTurnTimeout:
+      'The model stopped responding. Please retry or reduce concurrent tasks.',
+    coworkErrorFileWriteTruncated:
+      'The file content was truncated. Ask the model to write smaller chunks.',
     coworkErrorSessionStartFailed: 'Failed to start session: {error}',
     coworkErrorSessionContinueFailed: 'Failed to send message: {error}',
     chatAgentWorkingDirectoryRequired:
@@ -6043,8 +6068,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Another agent is writing to this workspace. Try again in a moment.',
     codingErrorProfileNotFound: 'The coding agent configuration no longer exists.',
     codingErrorProfileBuiltinNotFound: 'The built-in coding agent was not found.',
-    codingErrorProfileNotReadyDetail:
-      'The selected coding agent is not ready to run: {detail}',
+    codingErrorProfileNotReadyDetail: 'The selected coding agent is not ready to run: {detail}',
     codingErrorProfileNotReady:
       'The selected coding agent is not ready. Finish its configuration or sign-in first.',
     codingErrorProfileNotTrustable: 'This coding agent cannot be marked as trusted.',
@@ -6052,8 +6076,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingErrorProfileNotProbeable:
       'This coding agent cannot be checked right now. Verify its status.',
     codingErrorProfileNameRequired: 'Enter a name for the coding agent.',
-    codingErrorProfileCommandAbsolute:
-      'A custom coding agent command must use an absolute path.',
+    codingErrorProfileCommandAbsolute: 'A custom coding agent command must use an absolute path.',
     codingErrorProfileArgumentsInvalid: 'The custom coding agent arguments are invalid.',
     codingErrorProfileCommandMissing: 'This coding agent has no executable configured.',
     codingErrorPromptRequired: 'Enter something to send.',
@@ -6077,7 +6100,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingErrorGitCommitMessageRequired: 'Enter a commit message.',
     codingErrorGitCommitMessageTooLong: 'The commit message is too long.',
     codingErrorGitBranchInvalid: 'That branch name is invalid.',
-    codingErrorGitPatchConflict: 'The collaborator changes cannot be applied. Resolve conflicts first.',
+    codingErrorGitPatchConflict:
+      'The collaborator changes cannot be applied. Resolve conflicts first.',
     codingErrorAuthTerminalGone: 'The sign-in terminal has ended. Start sign-in again.',
     codingErrorAcpTerminalGone: 'That terminal was not found.',
     codingErrorAttachmentLimit: 'At most 8 attachments can be sent at once.',
@@ -6097,7 +6121,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingErrorAcpTerminalNoId: 'The terminal operation is missing a terminal ID.',
     codingErrorAcpConnectionNotRunning: 'The coding agent connection is closed. Try again.',
     codingErrorAcpProbeTimedOut: 'Checking the coding agent timed out. Try again.',
-    codingErrorAgentAuthRequired: 'This coding agent needs sign-in or valid credentials. Sign in or check its model configuration, then check the connection again.',
+    codingErrorAgentAuthRequired:
+      'This coding agent needs sign-in or valid credentials. Sign in or check its model configuration, then check the connection again.',
     codingErrorAcpRequestUnsupported: 'The coding agent sent a request that is not supported yet.',
     codingErrorAcpRequestTimedOut: 'The coding agent request timed out. Try again.',
     codingErrorAcpRequestFailed: 'Communication with the coding agent failed. Try again.',
@@ -6144,17 +6169,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Only folders inside the coding workspace can be accessed.',
     codingErrorProfileNotAwaitingAuth: 'This coding agent is not waiting for sign-in.',
     codingErrorAuthMethodNotFound: 'That sign-in method was not found.',
-    codingErrorAgentTerminalAuthRequired:
-      'This coding agent must be signed in through a terminal.',
+    codingErrorAgentTerminalAuthRequired: 'This coding agent must be signed in through a terminal.',
     codingErrorTerminalAuthUnavailable: 'The terminal sign-in method is not available.',
     codingErrorPermissionRequestNotFound: 'That approval request does not exist.',
-    codingErrorBuiltinPermissionUnsupported:
-      'The built-in coding runtime cannot handle approvals.',
+    codingErrorBuiltinPermissionUnsupported: 'The built-in coding runtime cannot handle approvals.',
     codingErrorQueueLoadFailed: 'Failed to load queued messages.',
     codingErrorAcpPromptCancelled: 'This request was cancelled.',
     codingErrorAcpConnectionDisposed: 'The connection to the coding agent closed. Try again.',
     codingErrorAcpPermissionNoSession: 'The approval request has no session ID.',
-    codingErrorAcpOversizedMessage: 'The coding agent sent an oversized message, so the run stopped.',
+    codingErrorAcpOversizedMessage:
+      'The coding agent sent an oversized message, so the run stopped.',
     runtimeRetryNotice: 'Retrying: {reason}',
     codingErrorAgentNoOutput:
       'The external agent returned no content, which usually means it is not signed in or its API key is missing or invalid. Sign in to that agent in a terminal, or check its model configuration, then retry.',

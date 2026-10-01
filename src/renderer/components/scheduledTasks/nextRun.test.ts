@@ -77,7 +77,5 @@ test('returns null instead of guessing for unevaluable schedules', () => {
   expect(computeNextRunAtMs({ kind: 'cron', expr: '0 9 * *' }, from)).toBeNull();
   expect(computeNextRunAtMs({ kind: 'cron', expr: 'bad 9 * * *' }, from)).toBeNull();
   expect(computeNextRunAtMs({ kind: 'cron', expr: '0 9 32 * *' }, from)).toBeNull();
-  expect(
-    computeNextRunAtMs({ kind: 'cron', expr: '0 9 * * *', tz: 'Not/AZone' }, from),
-  ).toBeNull();
+  expect(computeNextRunAtMs({ kind: 'cron', expr: '0 9 * * *', tz: 'Not/AZone' }, from)).toBeNull();
 });

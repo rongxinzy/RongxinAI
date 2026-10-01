@@ -203,10 +203,7 @@ function renderCallbackHtml(success: boolean, message: string): string {
 <body><div class="card"><h1>${success ? 'Login successful' : 'Login failed'}</h1><p>${safeMessage}</p></div></body></html>`;
 }
 
-async function exchangeCodeForTokens(params: {
-  code: string;
-  verifier: string;
-}): Promise<{
+async function exchangeCodeForTokens(params: { code: string; verifier: string }): Promise<{
   accessToken: string;
   refreshToken: string;
   idToken?: string;

@@ -502,7 +502,10 @@ export class AcpConnectionSupervisor {
 
   private rejectInteractiveAuthentication(output: string): boolean {
     if (!isInteractiveAuthenticationPrompt(output)) return false;
-    const error = new AcpResponseError(CodingErrorMessage.AgentAuthRequired, ACP_AUTH_REQUIRED_CODE);
+    const error = new AcpResponseError(
+      CodingErrorMessage.AgentAuthRequired,
+      ACP_AUTH_REQUIRED_CODE,
+    );
     this.authenticationFailure = error;
     this.disposed = true;
     const child = this.child;

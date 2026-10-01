@@ -230,7 +230,6 @@ describe('parseCodeBlockArtifacts', () => {
     expect(csv[0].type).toBe('document');
     expect(tsv[0].type).toBe('document');
   });
-
 });
 
 describe('parseToolArtifact', () => {
@@ -642,5 +641,4 @@ describe('parseFinalAnswerPathArtifactsForMessage', () => {
 
     expect(parseFinalAnswerPathArtifactsForMessage(finalAnswer(content), 'session-1')).toEqual([]);
   });
-
 });

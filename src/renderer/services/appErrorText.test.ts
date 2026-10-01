@@ -31,9 +31,9 @@ describe('coding error text', () => {
   });
 
   test('keeps the folder after an interpolated message', () => {
-    expect(
-      appErrorText(`${CodingErrorDetailMessage.WorkspaceSourceMissing} D:\\project`),
-    ).toBe(i18nService.t('codingErrorWorkspaceSourceMissing').replace('{detail}', 'D:\\project'));
+    expect(appErrorText(`${CodingErrorDetailMessage.WorkspaceSourceMissing} D:\\project`)).toBe(
+      i18nService.t('codingErrorWorkspaceSourceMissing').replace('{detail}', 'D:\\project'),
+    );
   });
 
   test('drops an extracted detail the copy has no place for', () => {
@@ -61,9 +61,7 @@ describe('coding error text', () => {
 
   test('falls back to the caller copy when there is no error', () => {
     expect(appErrorText(undefined)).toBe(i18nService.t('codingAgentActionFailed'));
-    expect(appErrorText('', 'codingGitActionFailed')).toBe(
-      i18nService.t('codingGitActionFailed'),
-    );
+    expect(appErrorText('', 'codingGitActionFailed')).toBe(i18nService.t('codingGitActionFailed'));
   });
 
   test('survives a second normalization pass', () => {
@@ -98,7 +96,9 @@ describe('coding error translations', () => {
   // A missing key makes i18nService.t() return the key itself, so an entry
   // without copy shows the user "codingErrorProfileNotReady" instead of a
   // sentence. Both catalogs must carry every key the resolver can return.
-  const keys = [...new Set([...Object.values(CodingErrorI18nKey), ...Object.values(WorkbenchErrorI18nKey)])];
+  const keys = [
+    ...new Set([...Object.values(CodingErrorI18nKey), ...Object.values(WorkbenchErrorI18nKey)]),
+  ];
 
   test.each(keys)('%s has Chinese and English copy', key => {
     i18nService.setLanguage('zh', { persist: false });

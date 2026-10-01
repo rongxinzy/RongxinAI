@@ -19,7 +19,15 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/component
 import { Spinner } from '@shared/components/ui/spinner';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { cn } from '@shared/lib/utils';
-import { ArrowRight, Box, Clock3, Ellipsis, PanelRightOpen, ScrollText, Trash2 } from 'lucide-react';
+import {
+  ArrowRight,
+  Box,
+  Clock3,
+  Ellipsis,
+  PanelRightOpen,
+  ScrollText,
+  Trash2,
+} from 'lucide-react';
 import {
   type ComponentType,
   type DragEvent,
@@ -630,7 +638,11 @@ const ModelCard = memo(function ModelCard({
                       </Badge>
                     }
                   />
-                  <HoverCardContent side="right" align="start" className="theme-control-sizing-10 w-auto min-w-52">
+                  <HoverCardContent
+                    side="right"
+                    align="start"
+                    className="theme-control-sizing-10 w-auto min-w-52"
+                  >
                     <div className="flex flex-col gap-2">
                       {details.map(item => (
                         <MetadataRow key={item.label} label={item.label} value={item.value} />

@@ -8,7 +8,10 @@ import {
 } from './llamacppModelInstallation';
 import type { MarketplaceModelFile } from '../../shared/marketplace';
 
-const file = (path: string, overrides: Partial<MarketplaceModelFile> = {}): MarketplaceModelFile => ({
+const file = (
+  path: string,
+  overrides: Partial<MarketplaceModelFile> = {},
+): MarketplaceModelFile => ({
   path,
   sizeBytes: 1_000,
   sha256: 'a'.repeat(64),
@@ -19,9 +22,7 @@ const file = (path: string, overrides: Partial<MarketplaceModelFile> = {}): Mark
 describe('split-GGUF install metadata', () => {
   test('shardGroupKey strips the part suffix and keeps subdirectories', () => {
     expect(shardGroupKey('qwq-32b-fp16-00001-of-00017.gguf')).toBe('qwq-32b-fp16');
-    expect(shardGroupKey('Q4_K_M/Model-Q4_K_M-00001-of-00004.gguf')).toBe(
-      'Q4_K_M/Model-Q4_K_M',
-    );
+    expect(shardGroupKey('Q4_K_M/Model-Q4_K_M-00001-of-00004.gguf')).toBe('Q4_K_M/Model-Q4_K_M');
     expect(shardGroupKey('Model-Q4_K_M.gguf')).toBeNull();
   });
 

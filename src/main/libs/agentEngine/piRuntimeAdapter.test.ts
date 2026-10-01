@@ -3607,7 +3607,10 @@ describe('PiRuntimeAdapter', () => {
       failedAttempt('502 invalid api key');
       let finishAbort: (() => void) | undefined;
       mockSession.abort.mockImplementationOnce(
-        () => new Promise<void>(resolve => { finishAbort = resolve; }),
+        () =>
+          new Promise<void>(resolve => {
+            finishAbort = resolve;
+          }),
       );
       listener!({ type: 'auto_retry_start', attempt: 1 });
       await Promise.resolve();

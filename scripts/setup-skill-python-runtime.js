@@ -105,8 +105,9 @@ function listRequirementFiles(skillsRoot = SKILLS_ROOT) {
     }
   };
   visit(skillsRoot);
-  return requirements.sort((left, right) =>
-    left.skillId.localeCompare(right.skillId) || left.skillDir.localeCompare(right.skillDir),
+  return requirements.sort(
+    (left, right) =>
+      left.skillId.localeCompare(right.skillId) || left.skillDir.localeCompare(right.skillDir),
   );
 }
 
@@ -168,7 +169,10 @@ function parsePythonImportNames(filePath) {
     const importMatch = line.match(/^\s*import\s+(.+)$/);
     if (!importMatch) continue;
     for (const imported of importMatch[1].split(',')) {
-      const name = imported.trim().split(/\s+as\s+/)[0].trim();
+      const name = imported
+        .trim()
+        .split(/\s+as\s+/)[0]
+        .trim();
       if (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) {
         names.add(name.split('.')[0]);
       }
@@ -424,7 +428,11 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   const pythonPath = pythonExecutableForEnvironment(sharedRoot, platform);
   const sharedManifest = readManifest(sharedRoot);
   if (!pythonPath) missing.push('shared: python executable');
-  if (!sharedManifest || sharedManifest.version !== MANIFEST_VERSION || sharedManifest.kind !== 'shared-layer') {
+  if (
+    !sharedManifest ||
+    sharedManifest.version !== MANIFEST_VERSION ||
+    sharedManifest.kind !== 'shared-layer'
+  ) {
     missing.push('shared: matching runtime.json');
   }
   if (!fs.existsSync(sharedLock)) missing.push('shared: requirements lock');
@@ -500,7 +508,9 @@ async function ensureSkillPythonRuntimes(options = {}) {
   );
   const declarations = validateSkillDependencyDeclarations(skillsRoot);
   if (!declarations.ok) {
-    throw new Error(`Skill dependency declarations are incomplete: ${declarations.missing.join('; ')}`);
+    throw new Error(
+      `Skill dependency declarations are incomplete: ${declarations.missing.join('; ')}`,
+    );
   }
   if (requirements.length === 0) {
     return { ok: true, skipped: true, environments: [] };
@@ -514,7 +524,13 @@ async function ensureSkillPythonRuntimes(options = {}) {
   const pythonVersion = getPythonVersion(base.pythonPath);
   const uvVersion = getUvVersion(base.uvPath);
   const sharedRoot = sharedEnvironmentRoot(runtimeRoot);
-  const sharedExpected = expectedSharedManifest(requirements, platform, arch, pythonVersion, uvVersion);
+  const sharedExpected = expectedSharedManifest(
+    requirements,
+    platform,
+    arch,
+    pythonVersion,
+    uvVersion,
+  );
   const existingPython = pythonExecutableForEnvironment(sharedRoot, platform);
   const healthyExistingLayer =
     existingPython &&
@@ -522,7 +538,9 @@ async function ensureSkillPythonRuntimes(options = {}) {
     manifestMatches(readManifest(sharedRoot), sharedExpected) &&
     fs.existsSync(sharedLock) &&
     lockPaths.every(lockPath => fs.existsSync(lockPath)) &&
-    requirements.every(entry => probePython(existingPython, parseImportNames(entry.requirementsPath)).ok);
+    requirements.every(
+      entry => probePython(existingPython, parseImportNames(entry.requirementsPath)).ok,
+    );
 
   if (!healthyExistingLayer) {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
@@ -572,8 +590,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
       { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } },
     );
     const environmentPython = pythonExecutableForEnvironment(sharedRoot, platform);
-    if (!environmentPython)
-      throw new Error('shared layer: uv did not create a Python executable.');
+    if (!environmentPython) throw new Error('shared layer: uv did not create a Python executable.');
     rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
     const installArgs = [
       'pip',
@@ -605,7 +622,11 @@ async function ensureSkillPythonRuntimes(options = {}) {
     const environmentRoot = skillManifestRoot(runtimeRoot, entry.skillId);
     const expected = expectedManifest(entry, platform, arch, pythonVersion, uvVersion);
     fs.mkdirSync(environmentRoot, { recursive: true });
-    fs.writeFileSync(path.join(environmentRoot, 'runtime.json'), `${JSON.stringify(expected, null, 2)}\n`, 'utf8');
+    fs.writeFileSync(
+      path.join(environmentRoot, 'runtime.json'),
+      `${JSON.stringify(expected, null, 2)}\n`,
+      'utf8',
+    );
     console.log(`[setup-skill-python-runtime] ${entry.skillId}: linked to shared layer`);
   }
 

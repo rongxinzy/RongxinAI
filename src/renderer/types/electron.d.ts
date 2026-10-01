@@ -722,9 +722,20 @@ interface IElectronAPI {
     drainOutbox: () => Promise<import('../../shared/memory').MemoryIpcResult<number>>;
   };
   cowork: {
-    getRunSnapshot: (sessionId: string, replayContent?: boolean) => Promise<{ success: boolean; snapshot: import('../../shared/cowork/runState').CoworkRunSnapshot | null; running: boolean }>;
-    onStreamRunState: (callback: (snapshot: import('../../shared/cowork/runState').CoworkRunSnapshot) => void) => () => void;
-    onStreamContentPatch: (callback: (patch: import('../../shared/cowork/runState').CoworkContentPatch) => void) => () => void;
+    getRunSnapshot: (
+      sessionId: string,
+      replayContent?: boolean,
+    ) => Promise<{
+      success: boolean;
+      snapshot: import('../../shared/cowork/runState').CoworkRunSnapshot | null;
+      running: boolean;
+    }>;
+    onStreamRunState: (
+      callback: (snapshot: import('../../shared/cowork/runState').CoworkRunSnapshot) => void,
+    ) => () => void;
+    onStreamContentPatch: (
+      callback: (patch: import('../../shared/cowork/runState').CoworkContentPatch) => void,
+    ) => () => void;
     listWorkspaces: () => Promise<{
       success: boolean;
       workspaces?: import('../../shared/workspace').Workspace[];
@@ -1257,7 +1268,9 @@ interface IElectronAPI {
     showItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
     openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
     openHtmlInBrowser: (htmlContent: string) => Promise<{ success: boolean; error?: string }>;
-    pathExists: (filePath: string) => Promise<{ success: boolean; exists: boolean; error?: string }>;
+    pathExists: (
+      filePath: string,
+    ) => Promise<{ success: boolean; exists: boolean; error?: string }>;
   };
   autoLaunch: {
     get: () => Promise<{ enabled: boolean }>;

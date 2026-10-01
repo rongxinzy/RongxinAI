@@ -1437,9 +1437,7 @@ class ProviderRegistryImpl {
 
   getAgentProviderId(providerName: string): string {
     return (
-      this.idIndex.get(providerName)?.agentProviderId ??
-      providerName ??
-      AgentProviderId.Zhiyuan
+      this.idIndex.get(providerName)?.agentProviderId ?? providerName ?? AgentProviderId.Zhiyuan
     );
   }
 
