@@ -102,6 +102,48 @@ describe('disableModelImageInputCapability', () => {
     ]);
   });
 
+  test('does not create a phantom entry for a builtin provider', () => {
+    const { store, set, read } = createFakeStore({
+      providers: {
+        zhiyuan: { enabled: true, apiKey: '', baseUrl: 'https://pool.example.com/v1' },
+      },
+    });
+    setPiCapabilityCorrectionStoreGetter(() => store);
+
+    expect(disableModelImageInputCapability('zhiyuan', 'unknown-model')).toEqual({
+      changed: false,
+    });
+    expect(set).not.toHaveBeenCalled();
+    expect(read()?.providers?.zhiyuan.models).toBeUndefined();
+  });
+
+  test('matches a stored builtin entry through its registry alias', () => {
+    const { store, read } = createFakeStore({
+      providers: {
+        openai: {
+          enabled: true,
+          apiKey: '',
+          baseUrl: 'https://api.openai.com/v1',
+          models: [
+            {
+              id: 'gpt-5.6-sol',
+              name: 'GPT-5.6 Sol',
+              supportsImage: true,
+              capabilities: { imageInput: ModelCapabilityStatus.Supported },
+            },
+          ],
+        },
+      },
+    });
+    setPiCapabilityCorrectionStoreGetter(() => store);
+
+    // The session ran under the registry alias of the stored canonical id.
+    expect(disableModelImageInputCapability('openai', 'gpt-5.6')).toEqual({ changed: true });
+    const model = read()?.providers?.openai.models?.[0];
+    expect(model?.supportsImage).toBe(false);
+    expect(model?.capabilities?.imageInput).toBe(ModelCapabilityStatus.Unsupported);
+  });
+
   test('returns changed:false when the entry is already unsupported', () => {
     const { store, set } = createFakeStore({
       providers: {

@@ -203,7 +203,14 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imErrorContentFiltered: '消息内容未通过安全审核，请修改后重试。',
     imErrorInputTooLong: '消息内容过长，请精简后重试。',
     imErrorExecutionLimit: '任务执行超时或达到上限，请简化需求后重试。',
+    imErrorModelCapabilityUnsupported:
+      '当前模型不支持该输入模态（如图像），请更换模型或检查模型配置后重试。',
+    imErrorProviderUnavailable:
+      '当前会话使用的模型服务已停用或不可用，请检查应用内的模型配置后重试。',
+    imErrorStreamInterrupted: '与模型的连接中断，本次任务已停止。请重新发送消息。',
     imErrorUnknown: '处理消息时遇到错误: {error}。请稍后重试。',
+
+    workbenchStreamStallResumeGoal: '流中断后自动续跑',
 
     // Exec approval continuation
     execApprovalApproved: '用户已确认执行该命令，请检查执行结果并继续。',
@@ -621,7 +628,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Message content did not pass safety review. Please revise and try again.',
     imErrorInputTooLong: 'Message content too long. Please shorten and try again.',
     imErrorExecutionLimit: 'Task timed out or reached limit. Please simplify and try again.',
+    imErrorModelCapabilityUnsupported:
+      'The current model does not support this input modality (e.g. images). Please switch models or check the model configuration, then try again.',
+    imErrorProviderUnavailable:
+      'The model service used by this session is disabled or unavailable. Please check the model configuration in the app and try again.',
+    imErrorStreamInterrupted:
+      'The connection to the model was interrupted and this task was stopped. Please send your message again.',
     imErrorUnknown: 'Error processing message: {error}. Please try again.',
+
+    workbenchStreamStallResumeGoal: 'Automatic resume after stream interruption',
 
     // Exec approval continuation
     execApprovalApproved:

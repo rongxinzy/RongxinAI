@@ -9,17 +9,11 @@
  * the timeout.
  *
  * The module owns only timing state. Everything it needs to know about a
- * session (whether it is waiting on user input, what to do on a stall) is
- * injected as callbacks so the state machine stays unit-testable.
+ * session (whether it is waiting on user input, what to do on a stall, how
+ * long the window is) is injected so the state machine stays unit-testable.
  */
 
 import { PiAgentEventType } from './piStreamConstants';
-
-/**
- * Stall threshold while waiting for model output. The self-hosted model can
- * legitimately take ~60s to its first token; this allows twice that.
- */
-export const STREAM_STALL_TIMEOUT_MS = 120_000;
 
 /** Events that prove the session is waiting for model output: (re)arm the countdown. */
 const ARMING_EVENTS: ReadonlySet<string> = new Set<string>([
@@ -29,18 +23,21 @@ const ARMING_EVENTS: ReadonlySet<string> = new Set<string>([
   PiAgentEventType.MessageUpdate,
   PiAgentEventType.ToolExecutionEnd,
   PiAgentEventType.AutoRetryStart,
+  PiAgentEventType.CompactionEnd,
 ]);
 
 /**
  * Events after which no model output is expected: stand the watchdog down.
  * Tool execution in particular may legitimately produce no events for a long
- * time (a bash command need not print anything).
+ * time (a bash command need not print anything), and context compaction on a
+ * slow local model can exceed the stall window without emitting anything.
  */
 const DISARMING_EVENTS: ReadonlySet<string> = new Set<string>([
   PiAgentEventType.ToolExecutionStart,
   PiAgentEventType.AgentEnd,
   PiAgentEventType.AgentSettled,
   PiAgentEventType.MessageEnd,
+  PiAgentEventType.CompactionStart,
 ]);
 
 export interface PiStreamStallWatchdogCallbacks {
@@ -59,21 +56,24 @@ export class PiStreamStallWatchdog {
 
   constructor(
     private readonly callbacks: PiStreamStallWatchdogCallbacks,
-    private readonly timeoutMs: number = STREAM_STALL_TIMEOUT_MS,
+    private readonly defaultTimeoutMs: number,
   ) {}
 
   /**
-   * Feeds one processed Pi event. Arming events (re)start the countdown,
-   * disarming events stand the watchdog down, and every other event resets an
-   * already armed countdown: any activity proves the stream is alive.
+   * Feeds one Pi event observed at the subscription point (before any display
+   * projection, so a busy transform pipeline cannot mask a dead stream).
+   * Arming events (re)start the countdown, disarming events stand the watchdog
+   * down, and every other event resets an already armed countdown: any
+   * activity proves the stream is alive. `timeoutMs` overrides the window for
+   * this session (local model servers need a wider one).
    */
-  handleEvent(sessionId: string, eventType: string): void {
+  handleEvent(sessionId: string, eventType: string, timeoutMs?: number): void {
     if (DISARMING_EVENTS.has(eventType)) {
       this.dispose(sessionId);
       return;
     }
     if (ARMING_EVENTS.has(eventType) || this.timers.has(sessionId)) {
-      this.arm(sessionId);
+      this.arm(sessionId, timeoutMs ?? this.defaultTimeoutMs);
     }
   }
 
@@ -92,7 +92,7 @@ export class PiStreamStallWatchdog {
     this.timers.clear();
   }
 
-  private arm(sessionId: string): void {
+  private arm(sessionId: string, timeoutMs: number): void {
     this.dispose(sessionId);
     const timer = setTimeout(() => {
       this.timers.delete(sessionId);
@@ -101,7 +101,7 @@ export class PiStreamStallWatchdog {
       // the watchdog, so there is nothing to re-schedule here.
       if (this.callbacks.isSuspended(sessionId)) return;
       this.callbacks.onStall(sessionId);
-    }, this.timeoutMs);
+    }, timeoutMs);
     // A watchdog must never keep the process alive on its own.
     timer.unref();
     this.timers.set(sessionId, timer);

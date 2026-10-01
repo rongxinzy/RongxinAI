@@ -274,4 +274,50 @@ describe('discoverProviderModels', () => {
       ),
     ).resolves.toEqual([{ id: 'model-a', contextWindow: 8192 }]);
   });
+
+  test('never lets the /props tool heuristic override an entry tool verdict', async () => {
+    // chat_template_caps.supports_tools is a template heuristic: many
+    // self-hosted deployments report false for tool-capable models. The
+    // entry's own claim must win or Work sessions get locked out.
+    const fetchImpl: typeof fetch = async input =>
+      String(input).endsWith('/v1/models')
+        ? Response.json({
+            data: [{ id: 'qwen3-tool' }],
+            models: [{ name: 'qwen3-tool', capabilities: ['completion', 'tools'] }],
+          })
+        : Response.json({ chat_template_caps: { supports_tools: false } });
+
+    await expect(
+      discoverProviderModels(
+        { baseUrl: 'http://llama.local:8000', apiFormat: ApiFormat.OpenAI },
+        fetchImpl,
+      ),
+    ).resolves.toEqual([
+      {
+        id: 'qwen3-tool',
+        capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+        capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
+      },
+    ]);
+  });
+
+  test('lets the /props tool heuristic fill a missing tool verdict', async () => {
+    const fetchImpl: typeof fetch = async input =>
+      String(input).endsWith('/v1/models')
+        ? Response.json({ data: [{ id: 'qwen3-plain' }] })
+        : Response.json({ chat_template_caps: { supports_tools: false } });
+
+    await expect(
+      discoverProviderModels(
+        { baseUrl: 'http://llama.local:8000', apiFormat: ApiFormat.OpenAI },
+        fetchImpl,
+      ),
+    ).resolves.toEqual([
+      {
+        id: 'qwen3-plain',
+        capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+        capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
+      },
+    ]);
+  });
 });

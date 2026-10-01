@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PiAgentEventType } from './piStreamConstants';
-import { PiStreamStallWatchdog, STREAM_STALL_TIMEOUT_MS } from './piStreamStallWatchdog';
+import { STREAM_STALL_TIMEOUT_MS } from './piStreamStallRecovery';
+import { PiStreamStallWatchdog } from './piStreamStallWatchdog';
 
 describe('PiStreamStallWatchdog', () => {
   beforeEach(() => {
@@ -14,7 +15,7 @@ describe('PiStreamStallWatchdog', () => {
 
   const createWatchdog = (isSuspended: (sessionId: string) => boolean = () => false) => {
     const onStall = vi.fn();
-    const watchdog = new PiStreamStallWatchdog({ isSuspended, onStall });
+    const watchdog = new PiStreamStallWatchdog({ isSuspended, onStall }, STREAM_STALL_TIMEOUT_MS);
     return { watchdog, onStall };
   };
 
@@ -38,14 +39,6 @@ describe('PiStreamStallWatchdog', () => {
     expect(onStall).toHaveBeenCalledWith('session');
   });
 
-  it('uses the two-minute default timeout', () => {
-    const onStall = vi.fn();
-    const watchdog = new PiStreamStallWatchdog({ isSuspended: () => false, onStall });
-    watchdog.handleEvent('session', PiAgentEventType.AgentStart);
-    vi.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS);
-    expect(onStall).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
     PiAgentEventType.AgentStart,
     PiAgentEventType.TurnStart,
@@ -53,6 +46,7 @@ describe('PiStreamStallWatchdog', () => {
     PiAgentEventType.MessageUpdate,
     PiAgentEventType.ToolExecutionEnd,
     PiAgentEventType.AutoRetryStart,
+    PiAgentEventType.CompactionEnd,
   ])('arms on %s', eventType => {
     const { watchdog, onStall } = createWatchdog();
     watchdog.handleEvent('session', eventType);
@@ -93,6 +87,7 @@ describe('PiStreamStallWatchdog', () => {
     PiAgentEventType.AgentEnd,
     PiAgentEventType.AgentSettled,
     PiAgentEventType.MessageEnd,
+    PiAgentEventType.CompactionStart,
   ])('disarms on %s', eventType => {
     const { watchdog, onStall } = createWatchdog();
     watchdog.handleEvent('session', PiAgentEventType.MessageStart);
@@ -100,6 +95,30 @@ describe('PiStreamStallWatchdog', () => {
     expect(watchdog.isArmed('session')).toBe(false);
     vi.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS * 2);
     expect(onStall).not.toHaveBeenCalled();
+  });
+
+  it('stays quiet through a compaction that outlasts the stall window', () => {
+    const { watchdog, onStall } = createWatchdog();
+    watchdog.handleEvent('session', PiAgentEventType.MessageEnd);
+    watchdog.handleEvent('session', PiAgentEventType.MessageStart);
+    watchdog.handleEvent('session', PiAgentEventType.CompactionStart);
+    // Compaction of a large context on a slow local model is silent for minutes.
+    vi.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS * 3);
+    expect(onStall).not.toHaveBeenCalled();
+
+    watchdog.handleEvent('session', PiAgentEventType.CompactionEnd);
+    vi.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS);
+    expect(onStall).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors a per-event timeout override for the session', () => {
+    const onStall = vi.fn();
+    const watchdog = new PiStreamStallWatchdog({ isSuspended: () => false, onStall }, 1000);
+    watchdog.handleEvent('session', PiAgentEventType.MessageStart, 10_000);
+    vi.advanceTimersByTime(1000);
+    expect(onStall).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(9000);
+    expect(onStall).toHaveBeenCalledTimes(1);
   });
 
   it('stands down when the session is waiting on user input', () => {

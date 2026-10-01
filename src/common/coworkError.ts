@@ -182,8 +182,10 @@ const RULES: ErrorRule[] = [
   // /50[023]/ would otherwise classify as a transient server error) ────────────
   {
     kind: CoworkErrorKind.ModelCapabilityUnsupported,
+    // A bare "mmproj" mention is not a capability verdict (logs mention the
+    // projector when loading it, too) — only failure wording after it counts.
     pattern:
-      /image input is not supported|mmproj|does not support (?:image|vision|audio|video)(?: input)?|modality not supported/i,
+      /image input is not supported|mmproj[^"\n]*(?:missing|not\s+\w+|fail\w*|unsupported)|does not support (?:image|vision|audio|video)(?: input)?|modality not supported/i,
     extract: (error: string) => {
       const m = error.match(/\b([45]\d{2})\b/);
       return m ? { statusCode: parseInt(m[1], 10) } : {};
