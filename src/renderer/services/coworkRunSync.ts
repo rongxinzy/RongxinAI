@@ -1,11 +1,5 @@
-import { CoworkSessionMode, CoworkSessionStatus } from '../../shared/cowork/constants';
-import {
-  CoworkRunPhase,
-  CoworkRunPolicy,
-  type CoworkRunSnapshot,
-} from '../../shared/cowork/runState';
+import { CoworkRunPolicy, type CoworkRunSnapshot } from '../../shared/cowork/runState';
 import { store } from '../store';
-import { recoverSession, updateSessionStatus } from '../store/slices/coworkSlice';
 import { acceptsRunSnapshot, receiveRunSnapshot } from '../store/slices/coworkRunSlice';
 
 export class CoworkRunSync {
@@ -14,7 +8,10 @@ export class CoworkRunSync {
   private readonly polling = new Set<string>();
   private readonly recoveryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-  constructor(private readonly flushContent: () => void) {}
+  constructor(
+    private readonly flushContent: () => void,
+    private readonly recoverCanonicalSession: (sessionId: string) => Promise<void>,
+  ) {}
 
   receive(snapshot: CoworkRunSnapshot): void {
     if (this.disposed) return;
@@ -25,21 +22,6 @@ export class CoworkRunSync {
     )
       return;
     store.dispatch(receiveRunSnapshot(snapshot));
-    const tracked = store.getState().cowork.streamingSessionIds.includes(snapshot.sessionId);
-    if (snapshot.running === tracked) return;
-    this.flushContent();
-    store.dispatch(
-      updateSessionStatus({
-        sessionId: snapshot.sessionId,
-        status: snapshot.running
-          ? CoworkSessionStatus.Running
-          : snapshot.phase === CoworkRunPhase.Completed
-            ? CoworkSessionStatus.Completed
-            : snapshot.phase === CoworkRunPhase.Error
-              ? CoworkSessionStatus.Error
-              : CoworkSessionStatus.Idle,
-      }),
-    );
   }
 
   requestRecovery(sessionId: string): void {
@@ -64,26 +46,11 @@ export class CoworkRunSync {
       if (this.disposed || !result.success) return;
       const expectedStart = store.getState().coworkRun?.awaitingSince[sessionId];
       if (expectedStart && (!result.snapshot || result.snapshot.startedAt < expectedStart)) return;
-      // Direct provider Chat owns its stream; recovery must never overwrite it.
-      const current = store.getState().cowork.currentSession;
-      if (!result.snapshot && current?.id === sessionId && current.mode === CoworkSessionMode.Chat)
-        return;
-      const session = await api.getSession(sessionId);
+      // Pi UI recovery owns lifecycle watermarks and history merging for Work and Chat.
+      await this.recoverCanonicalSession(sessionId);
       if (this.disposed) return;
-      if (!result.snapshot && session.session?.mode === CoworkSessionMode.Chat) return;
-      if (session.success && session.session) store.dispatch(recoverSession(session.session));
       const replay = await api.getRunSnapshot(sessionId, true);
       if (!this.disposed && replay.success && replay.snapshot) this.receive(replay.snapshot);
-      if (
-        !this.disposed &&
-        replay.success &&
-        !replay.snapshot &&
-        !replay.running &&
-        !store.getState().coworkRun?.awaitingSince[sessionId] &&
-        session.session?.mode === CoworkSessionMode.Work
-      ) {
-        store.dispatch(updateSessionStatus({ sessionId, status: CoworkSessionStatus.Idle }));
-      }
     } catch (error) {
       console.warn('[CoworkRunSync] runtime recovery failed:', error);
     } finally {

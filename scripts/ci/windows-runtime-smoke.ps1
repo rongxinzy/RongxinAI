@@ -105,12 +105,15 @@ try {
   }
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\layers\shared\Scripts\python.exe'
-  $builderConfigPath = Join-Path $ProjectRoot 'electron-builder.json'
-  Assert-Path $builderConfigPath 'electron-builder configuration'
-  $builderConfig = Get-Content -LiteralPath $builderConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
-  $appExecutableName = $builderConfig.executableName
+  $appExecutableName = $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME
   if (-not $appExecutableName) {
-    $appExecutableName = $builderConfig.productName
+    $builderConfigPath = Join-Path $ProjectRoot 'electron-builder.json'
+    Assert-Path $builderConfigPath 'electron-builder configuration'
+    $builderConfig = Get-Content -LiteralPath $builderConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $appExecutableName = $builderConfig.executableName
+    if (-not $appExecutableName) {
+      $appExecutableName = $builderConfig.productName
+    }
   }
   if (-not $appExecutableName) {
     throw 'electron-builder.json must define executableName or productName'

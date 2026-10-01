@@ -52,7 +52,8 @@ async function markProviderModelTestSuccess(
 ): Promise<void> {
   const providerConfig = config.providers?.[providerKey];
   const model = providerConfig?.models?.find(item => item.id === modelId);
-  if (!providerConfig || !model) throw new Error(`Model ${providerKey}::${modelId} is not configured`);
+  if (!providerConfig || !model)
+    throw new Error(`Model ${providerKey}::${modelId} is not configured`);
   const signature = await createProviderConnectionTestSignature({
     providerId: providerKey,
     baseUrl: providerConfig.baseUrl,
@@ -128,7 +129,7 @@ test('does not expose the managed free model when the account has no entitlement
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(false);
 });
 
-test('exclusive managed policy exposes only the synchronized custom provider', async () => {
+test('exclusive managed policy exposes the managed provider without a connection test', async () => {
   const config = createConfig();
   config.providers = {
     ...config.providers,
@@ -141,7 +142,6 @@ test('exclusive managed policy exposes only the synchronized custom provider', a
       models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
     },
   };
-  await markProviderModelTestSuccess(config, 'custom_enterprise', 'enterprise-chat');
   const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
   vi.stubGlobal('window', {
     electron: {
@@ -159,6 +159,50 @@ test('exclusive managed policy exposes only the synchronized custom provider', a
     expect.objectContaining({ id: 'enterprise-chat', providerKey: 'custom_enterprise' }),
   ]);
   expect(listRunningModels).not.toHaveBeenCalled();
+});
+
+test('keeps unmanaged custom providers behind the connection test gate', async () => {
+  const config = createConfig();
+  config.providers = {
+    ...config.providers,
+    custom_personal: {
+      enabled: true,
+      apiKey: 'user-key',
+      baseUrl: 'https://example.test/v1',
+      apiFormat: 'openai',
+      models: [{ id: 'personal-model', name: 'Personal Model' }],
+    },
+  };
+  vi.stubGlobal('window', {
+    electron: {
+      managedProviders: {
+        policy: vi.fn(async () => ({
+          mode: ManagedProviderAccessMode.Exclusive,
+          providerKeys: ['custom_enterprise'],
+        })),
+      },
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const exclusiveModels = await collectAvailableModels(config);
+  expect(exclusiveModels.some(model => model.providerKey === 'custom_personal')).toBe(false);
+
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+  const openModels = await collectAvailableModels(config);
+  expect(openModels.some(model => model.providerKey === 'custom_personal')).toBe(false);
+
+  await markProviderModelTestSuccess(config, 'custom_personal', 'personal-model');
+  const testedModels = await collectAvailableModels(config);
+  expect(
+    testedModels.some(
+      model => model.providerKey === 'custom_personal' && model.id === 'personal-model',
+    ),
+  ).toBe(true);
 });
 
 test('does not expose the legacy default model when no provider is configured', async () => {
@@ -271,6 +315,31 @@ test('preserves contextTokens for custom cloud models', () => {
   );
 
   expect(model?.contextWindow).toBe(131_072);
+});
+
+test('a discovered imageInput capability opens the attach gate despite a stale toggle', () => {
+  const config = createConfig();
+  config.providers = {
+    custom_usage: {
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'http://llama.local:8000',
+      apiFormat: 'openai',
+      models: [
+        {
+          id: 'qwen3.6-35b-a3b',
+          name: 'Qwen3.6',
+          supportsImage: false,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      ],
+    },
+  };
+
+  const model = buildConfiguredAvailableModels(config)[0];
+
+  expect(model.supportsImage).toBe(true);
+  expect(model.capabilities?.imageInput).toBe(ModelCapabilityStatus.Supported);
 });
 
 test('uses repaired provider metadata consistently for image flags and capabilities', () => {

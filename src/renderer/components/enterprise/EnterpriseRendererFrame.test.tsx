@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import {
   EnterpriseRendererMessageSource,
@@ -16,6 +16,13 @@ import { EnterpriseRendererFrame } from './EnterpriseRendererFrame';
 
 const snapshot = vi.fn<() => Promise<EnterpriseSessionResult>>();
 const catalog = vi.fn();
+
+afterEach(() => {
+  cleanup();
+  document.documentElement.removeAttribute('style');
+  document.documentElement.removeAttribute('data-theme');
+  document.documentElement.classList.remove('dark');
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -36,6 +43,84 @@ beforeEach(() => {
 });
 
 describe('EnterpriseRendererFrame', () => {
+  test('updates the page descriptor even when both settings pages share an entrypoint', () => {
+    const { rerender } = render(
+      <EnterpriseRendererFrame
+        src="about:blank"
+        title="Settings"
+        surface={EnterpriseRendererSurface.Settings}
+        pageId="account"
+        session={signedOut()}
+      />,
+    );
+    const frame = screen.getByTitle('Settings') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    rerender(
+      <EnterpriseRendererFrame
+        src="about:blank"
+        title="Settings"
+        surface={EnterpriseRendererSurface.Settings}
+        pageId="models"
+        session={signedOut()}
+      />,
+    );
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ type: EnterpriseRendererMessageType.Initialize, pageId: 'models' }),
+      '*',
+    );
+    expect(screen.getByTitle('Settings')).toBe(frame);
+  });
+  test('sends the active host tokens and updates the same frame on theme changes', async () => {
+    document.documentElement.style.setProperty('--zy-background', 'Canvas');
+    document.documentElement.style.setProperty('--zy-radius', '6px');
+    render(
+      <EnterpriseRendererFrame
+        src="about:blank"
+        title="Theme test"
+        surface={EnterpriseRendererSurface.Settings}
+        session={signedOut()}
+      />,
+    );
+    const frame = screen.getByTitle('Theme test') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    act(() =>
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: frame.contentWindow,
+          data: {
+            source: EnterpriseRendererMessageSource.Module,
+            apiVersion: 1,
+            type: EnterpriseRendererMessageType.Ready,
+          },
+        }),
+      ),
+    );
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        theme: 'light',
+        themeVariables: { '--zy-background': 'Canvas', '--zy-radius': '6px' },
+      }),
+      '*',
+    );
+    act(() => {
+      document.documentElement.classList.add('dark');
+      document.documentElement.dataset.theme = 'alternate-dark';
+      document.documentElement.style.setProperty('--zy-background', 'CanvasText');
+    });
+    await waitFor(() =>
+      expect(postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          theme: 'dark',
+          themeVariables: {
+            '--zy-background': 'CanvasText',
+            '--zy-radius': '6px',
+          },
+        }),
+        '*',
+      ),
+    );
+    expect(screen.getByTitle('Theme test')).toBe(frame);
+  });
   test('initializes the sandboxed frame for its declared surface', () => {
     render(
       <EnterpriseRendererFrame
@@ -142,7 +227,10 @@ describe('EnterpriseRendererFrame', () => {
     expect(snapshot).not.toHaveBeenCalled();
 
     window.dispatchEvent(
-      new MessageEvent('message', { source: frame.contentWindow, data: request }),
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: request,
+      }),
     );
 
     await waitFor(() => expect(snapshot).toHaveBeenCalledTimes(1));

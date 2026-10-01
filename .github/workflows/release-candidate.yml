@@ -120,10 +120,14 @@ jobs:
           VITE_SKIP_ELECTRON: '1'
       - name: Verify Presentation Studio compiler and validator
         run: npm test --prefix SKILLs/presentation-studio
-      - name: Compile and test
-        run: |
-          bun run compile:electron
-          bun run test
+      - name: Compile Electron sources used by integration tests
+        run: bun run compile:electron
+      - name: Install Electron for native ABI integration tests
+        # Dependency lifecycle scripts are disabled above; the ABI probe needs
+        # the actual target runtime, rather than a host Node approximation.
+        run: node node_modules/electron/install.js
+      - name: Run tests
+        run: bun run test
 
   build-candidate:
     needs: [prepare-candidate, quality, memory-regression]

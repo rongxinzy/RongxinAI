@@ -1,76 +1,298 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-education</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-education</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:0;display:block}
-.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
-.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
-.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
-.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
-.rule{margin-top:26px;height:1px;background:#e6e6e2}
-.body{margin-top:30px;display:grid;gap:26px;flex:1}
-.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
-.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
-.cols3{grid-template-columns:repeat(3,1fr)}
-.cols2{grid-template-columns:repeat(2,1fr)}
-.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
-.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
-.blk .num{margin-top:6px;font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
-.blk .num small{font-size:15px;font-weight:500;color:#6f737b;margin-left:8px;letter-spacing:0}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
-.matrix{margin-top:8px;border:1px solid #e6e6e2}
-.matrix .row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-top:1px solid #e6e6e2}
-.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
-.matrix .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2}
-.matrix .row div:first-child{border-left:0}
-.bars{margin-top:14px;display:grid;gap:9px}
-.bar{display:grid;grid-template-columns:74px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
-.diagram{margin-top:6px;height:230px;position:relative;border:1px solid #e6e6e2;background:radial-gradient(120% 120% at 50% 50%,#fdfaf3 0%,#fff 70%)}
-.sun{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--accent)}
-.orbit{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
-.planet{position:absolute;width:16px;height:16px;border-radius:50%;background:#4c5058}
-.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
-.mini{border:1px solid #e6e6e2;padding:16px 18px;background:#fafaf8}
-.mini b{display:block;font-size:34px;color:var(--accent);letter-spacing:-.02em}
-.mini span{display:block;margin-top:8px;font-size:14px;font-weight:600}
-.mini p{margin-top:8px;font-size:13px;color:#6f737b;line-height:1.7}
-</style></head>
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
 <body>
-<div class="slide" style="--accent:#F59E0B">
-  <div class="kicker">Science Class</div>
-  <h1>太阳系与行星探索</h1>
-  <p class="lede">中学课堂科普课件 · 从太阳系全景到行星特征对比</p>
-  <div class="rule"></div>
-  <div class="body cols2">
-    <div class="diagram">
-      <div class="sun"></div>
-      <div class="orbit" style="width:170px;height:170px;margin:-85px 0 0 -85px"></div>
-      <div class="orbit" style="width:260px;height:260px;margin:-130px 0 0 -130px"></div>
-      <div class="orbit" style="width:350px;height:350px;margin:-175px 0 0 -175px"></div>
-      <div class="planet" style="left:calc(50% + 85px - 8px);top:50%"></div>
-      <div class="planet" style="left:50%;top:calc(50% - 130px - 8px);background:#8b8f97"></div>
-      <div class="planet" style="left:calc(50% - 175px - 8px);top:calc(50% + 40px);background:#c2703f"></div>
-    </div>
-    <div>
-      <div class="blk"><h2>本页要点</h2>
-        <ul>
-          <li>八大行星按距日顺序排列，类地行星与气态巨行星差异明显</li>
-          <li>地球位于宜居带，液态水与大气层是生命存在的关键条件</li>
-          <li>探索里程碑：从伽利略观测到深空探测器着陆</li>
-        </ul>
-      </div>
-      <div class="cards3" style="grid-template-columns:1fr 1fr;margin-top:22px">
-        <div class="mini"><b>8</b><span>行星数量</span></div>
-        <div class="mini"><b>1.5 亿</b><span>日地距离（公里）</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="brandline">自然科学 · 第三章</div>
-  <div class="pageno">03 / 16</div>
-</div></body></html>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Science Class · 中学课堂</div>
+<h1>太阳系与行星探索</h1>
+<p class="lede">从太阳系全景到行星特征对比：用一节课的时间建立尺度感、分类意识与证据思维，配套一张行星数据表和一次轨道模型演示。</p>
+<div class="meta"><span>适用年级：初中八年级</span><span>学科：地理 / 科学</span><span>课时：2 课时（90 分钟）</span><span>版本：2026 秋 · 第 3 章</span></div>
+<div class="kn">
+  <div class="k"><b>8<em>颗</em></b><span>行星数量</span><p>4 颗类地行星 + 4 颗巨行星，按距日顺序排列</p></div>
+  <div class="k"><b>1.5<em>亿公里</em></b><span>日地平均距离</span><p>即 1 个天文单位（AU），光需传播 8 分 20 秒</p></div>
+  <div class="k"><b>46<em>亿年</em></b><span>太阳系年龄</span><p>太阳质量占整个太阳系的 99.86%</p></div>
+</div>
+<table class="tb">
+  <caption>核心行星速查 · 4 个代表天体的基础数据</caption>
+  <thead><tr><th>行星</th><th class="r">距日（AU）</th><th class="r">赤道直径（km）</th><th class="r">公转周期</th><th class="r">已知卫星</th><th>类型</th></tr></thead>
+  <tbody>
+    <tr><td>水星</td><td class="r mono">0.39</td><td class="r mono">4,879</td><td class="r mono">88 天</td><td class="r mono">0</td><td>类地行星</td></tr>
+    <tr><td>地球</td><td class="r mono">1.00</td><td class="r mono">12,742</td><td class="r mono">365 天</td><td class="r mono">1</td><td class="n">类地行星（宜居带）</td></tr>
+    <tr><td>木星</td><td class="r mono">5.20</td><td class="r mono">139,820</td><td class="r mono">11.9 年</td><td class="r mono">95</td><td>气态巨行星</td></tr>
+    <tr class="hi"><td>海王星</td><td class="r mono">30.05</td><td class="r mono">49,244</td><td class="r mono">165 年</td><td class="r mono">16</td><td>冰巨行星</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：1 AU = 1.5 亿公里｜来源：国际天文联合会 2026 年公布值</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 流程｜P5–P7 对比｜P8–P9 作业</div>
+</div></div>
+<div class="foot"><span>本节课结论：八颗行星按距日顺序分为类地与巨行星两类，地球位于宜居带是其独特之处。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 课堂流程</div><h1 class="pt">90 分钟教学的三个环节与时间分配</h1></div><div class="calib">课标依据：认识天体系统与地球的宇宙环境<br>课型：新授课 + 模型演示</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>封面与速查摘要</span><em>行星基础数据与本节课结论</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>背景与范围</span><em>教学目标、学情分析与教具准备</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>行星数据</span><em>八大行星的距日、直径与卫星数</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>分类与成因</span><em>类地行星与巨行星的三点差异</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>结构模型</span><em>太阳系轨道的比例与尺度演示</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>行星对比</span><em>质量、重力、大气与温度对照</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>常见误区</span><em>七个高频错误认识与纠正</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>小结与作业</span><em>课堂小结、课后任务与评价方式</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>第 1 环节 · 20 分钟</b><p>情境导入与速查表解读，让学生先找出 <b>直径最大与最小</b> 的两颗行星。</p></div>
+  <div class="q"><b>第 2 环节 · 30 分钟</b><p>分组完成行星数据表并回答：为什么 <b>类地行星的卫星数普遍偏少</b>。</p></div>
+  <div class="q"><b>第 3 环节 · 40 分钟</b><p>轨道模型演示 + 对比表填写，最后 <b>5 分钟</b> 完成随堂小结与作业布置。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>90 分钟三环节：导入 20、探究 30、模型与对比 40 分钟。</div>
+  <div class="cell"><u>下一步与责任</u>课前 1 天完成教具与学习单准备，责任人任课教师。</div>
+</div></div>
+<div class="foot"><span>课堂流程：导入 20 分钟、数据探究 30 分钟、模型与对比 40 分钟，共 90 分钟。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 背景与范围</div><h1 class="pt">教学目标、学情分析与教具准备</h1></div><div class="calib">课标：描述地球的宇宙环境<br>课时：90 分钟 · 班级规模 42 人</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>教学目标</b>能按距日顺序说出八大行星；能说出类地与巨行星的三点差异；能用 AU 换算日地距离与行星距离。</div>
+  <div class="cell"><b>学情分析</b>学生已掌握地球公转与自转，但对「行星尺度」缺乏概念，常把示意图中的行星间距当作真实比例。</div>
+  <div class="cell"><b>教具准备</b>太阳系轨道模型（可拆卸，比例 1 : 2 亿）、行星数据学习单 42 份、直径对比卡片 8 张。</div>
+  <div class="cell"><b>评价方式</b>随堂数据表 40% + 课后任务 40% + 课堂提问参与度 20%，当天回收学习单。</div>
+</div>
+<div class="sl"><i>01</i>教学边界与注意事项</div>
+<div class="steps">
+  <div class="step"><b>纳入</b><span>八大行星的名称、顺序、类型与基础数据；地球宜居的三个条件（液态水、大气层、适宜温度）。</span></div>
+  <div class="step"><b>不纳入</b><span>轨道力学计算、开普勒定律推导、矮行星与柯伊伯带的详细分类，留到高中阶段讲解。</span></div>
+  <div class="step"><b>尺度失真</b><span>模型与示意图中的轨道间距均不按真实比例，需在课堂上明确说明，避免形成错误的空间概念。</span></div>
+  <div class="step"><b>单位口径</b><span>统一使用 AU 与公里两套单位，1 AU = 1.5 亿公里，换算保留两位小数。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>范围：行星顺序与类型差异，不做轨道力学推导。</div>
+  <div class="cell"><u>下一步与责任</u>模型与示意图须标注尺度失真，避免形成错误概念。</div>
+</div></div>
+<div class="foot"><span>范围：聚焦行星顺序与类型差异，不做轨道力学推导，明确标注示意图尺度失真。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 行星数据</div><h1 class="pt">八大行星的距日、直径与卫星数</h1></div><div class="calib">单位：AU（1 AU = 1.5 亿公里）/ km<br>数据来源：国际天文联合会 2026 年公布值</div></div>
+<div class="grid2">
+  <table class="tb">
+    <caption>表 1 · 类地行星（岩石为主，密度高、卫星少）</caption>
+    <thead><tr><th>行星</th><th class="r">距日 AU</th><th class="r">直径 km</th><th class="r">卫星</th></tr></thead>
+    <tbody>
+      <tr><td>水星</td><td class="r mono">0.39</td><td class="r mono">4,879</td><td class="r mono">0</td></tr>
+      <tr><td>金星</td><td class="r mono">0.72</td><td class="r mono">12,104</td><td class="r mono">0</td></tr>
+      <tr><td>地球</td><td class="r mono">1.00</td><td class="r mono">12,742</td><td class="r mono">1</td></tr>
+      <tr class="hi"><td>火星</td><td class="r mono">1.52</td><td class="r mono">6,779</td><td class="r mono">2</td></tr>
+    </tbody>
+  </table>
+  <table class="tb">
+    <caption>表 2 · 巨行星（气态与冰巨行星，体积大、卫星多）</caption>
+    <thead><tr><th>行星</th><th class="r">距日 AU</th><th class="r">直径 km</th><th class="r">卫星</th></tr></thead>
+    <tbody>
+      <tr><td>木星</td><td class="r mono">5.20</td><td class="r mono">139,820</td><td class="r mono">95</td></tr>
+      <tr><td>土星</td><td class="r mono">9.58</td><td class="r mono">116,460</td><td class="r mono">146</td></tr>
+      <tr><td>天王星</td><td class="r mono">19.20</td><td class="r mono">50,724</td><td class="r mono">28</td></tr>
+      <tr class="hi"><td>海王星</td><td class="r mono">30.05</td><td class="r mono">49,244</td><td class="r mono">16</td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="sl"><i>02</i>四颗最大行星的赤道直径对比（木星 = 100%）</div>
+<div class="bars">
+  <div class="bar"><span>木星</span><i style="width:100%"></i><em class="mono">139,820 km</em></div>
+  <div class="bar"><span>土星</span><i style="width:83%"></i><em class="mono">116,460 km</em></div>
+  <div class="bar"><span>天王星</span><i style="width:36%"></i><em class="mono">50,724 km</em></div>
+  <div class="bar"><span>海王星</span><i style="width:35%"></i><em class="mono">49,244 km</em></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>直径反差：木星 139,820 km 是海王星 49,244 km 的 2.84 倍，距日却仅为海王星的 1/5.8。</div>
+  <div class="cell"><u>下一步与责任</u>读数训练：让学生用 1 AU = 1.5 亿公里换算木星距日公里数，答案 7.80 亿公里。</div>
+</div></div>
+<div class="foot"><span>数据：木星直径是海王星的 2.84 倍，距日却是海王星的 1/5.8，尺度反差显著。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 分类与成因</div><h1 class="pt">类地行星与巨行星的三点差异</h1></div><div class="calib">分类依据：平均密度、体积与卫星数量<br>数据取自第 4 页两张数据表</div></div>
+<div class="grid3">
+  <div class="q"><b><em>01</em>成分与密度</b><p>类地行星以硅酸盐岩石与金属铁核为主，平均密度 3.9–5.5 g/cm³；巨行星以氢、氦等气体为主，密度 0.7–1.6 g/cm³。</p></div>
+  <div class="q"><b><em>02</em>体积与质量</b><p>木星直径 139,820 km，是地球的 10.97 倍；其质量占八大行星总质量的 71.4%，类地行星合计仅占 0.44%。</p></div>
+  <div class="q"><b><em>03</em>卫星数量</b><p>类地行星合计 3 颗卫星，巨行星合计 285 颗，其中土星 146 颗、木星 95 颗，差异与引力场强度直接相关。</p></div>
+</div>
+<div class="sl"><i>03</i>分界线：为什么两类行星在火星与木星之间分开</div>
+<table class="tb">
+  <thead><tr><th>对比维度</th><th class="r">类地行星（水星—火星）</th><th class="r">巨行星（木星—海王星）</th><th>分界解释</th></tr></thead>
+  <tbody>
+    <tr><td>距日范围</td><td class="r mono">0.39–1.52 AU</td><td class="r mono">5.20–30.05 AU</td><td>分界位于 2.2–3.2 AU 的小行星带</td></tr>
+    <tr><td>平均密度</td><td class="r mono">3.9–5.5 g/cm³</td><td class="r mono">0.7–1.6 g/cm³</td><td>近太阳处轻元素被太阳风剥离</td></tr>
+    <tr><td>卫星合计</td><td class="r mono">3 颗</td><td class="r mono">285 颗</td><td>巨行星引力更强，更易俘获小天体</td></tr>
+    <tr class="hi"><td>是否宜居带</td><td class="r mono">仅地球 1 颗</td><td class="r mono">0 颗</td><td>宜居带位于 0.95–1.37 AU 区间</td></tr>
+  </tbody>
+</table><div class="note">课堂追问设计：为什么木星的卫星数量远多于地球？引导学生从质量大小与引力强度两个角度回答，再回到第 7 页的重力对照数据验证结论。</div>
+<ul class="pts">
+  <li><b>易错提醒：</b>宜居带范围为 0.95–1.37 AU，金星（0.72 AU）比地球更靠近太阳，因此并不位于宜居带内。</li>
+  <li><b>延伸提问：</b>火星距宜居带外缘 0.15 AU（1.52 AU 对 1.37 AU），平均温度低至 -63 ℃，原因与其稀薄大气和较低重力有关。</li>
+</ul><div class="note">小结：分界点位于 2.2–3.2 AU 的小行星带，宜居带 0.95–1.37 AU 内仅地球 1 颗。</div></div>
+<div class="foot"><span>分类：密度、体积与卫星数是三条分界依据，分界点位于小行星带，宜居带仅地球落入。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 结构模型</div><h1 class="pt">太阳系轨道的比例与尺度演示</h1></div><div class="calib">模型比例 1 : 2 亿（1 cm ≈ 2 万公里）<br>示意图轨道间距不按真实比例</div></div>
+<div class="orbits">
+  <div class="oc" style="width:120px;height:120px;margin:-60px 0 0 -60px"></div>
+  <div class="oc" style="width:200px;height:200px;margin:-100px 0 0 -100px"></div>
+  <div class="oc" style="width:280px;height:280px;margin:-140px 0 0 -140px"></div>
+  <div class="oc" style="width:360px;height:360px;margin:-180px 0 0 -180px"></div>
+  <div class="sun"></div>
+  <div class="pl" style="left:calc(50% + 54px);top:calc(50% - 6px)"></div>
+  <div class="pltxt" style="left:calc(50% + 74px);top:calc(50% - 8px)">水星 0.39 AU</div>
+  <div class="pl" style="left:calc(50% - 6px);top:calc(50% - 106px);background:#c2703f"></div>
+  <div class="pltxt" style="left:calc(50% + 12px);top:calc(50% - 112px)">地球 1.00 AU（宜居带）</div>
+  <div class="pl" style="left:calc(50% - 146px);top:calc(50% + 40px);background:#6f737b"></div>
+  <div class="pltxt" style="left:calc(50% - 208px);top:calc(50% + 34px)">木星 5.20 AU</div>
+  <div class="pl" style="left:calc(50% + 121px);top:calc(50% + 121px);background:#3d4046"></div>
+  <div class="pltxt" style="left:calc(50% + 138px);top:calc(50% + 116px)">海王星 30.05 AU</div>
+</div>
+<div class="legend">
+  <span><b>中心：</b>太阳（占太阳系质量 99.86%）</span>
+  <span><b>虚线圆：</b>轨道示意，共 4 条</span>
+  <span><b>实心点：</b>行星位置，自内向外分别为水星 / 地球 / 木星 / 海王星</span>
+</div>
+<div class="note">教学提示：若按真实比例绘制，海王星轨道半径需放大到太阳直径的约 3,000 倍，因此所有课堂示意图都为「示意尺度」，只表达顺序与相对关系，不表达真实距离。</div><div class="sl">模型演示的组织方式</div>
+<ul class="pts"><li>分组：42 人分 6 组，每组用 8 张直径卡片按由小到大排序，限时 8 分钟，教师巡视纠错。</li><li>纠错重点：轨道示意只表达顺序关系；若按真实比例，海王星轨道半径需放大到太阳直径的约 3,000 倍。</li></ul></div>
+<div class="foot"><span>结构：轨道由内向外依次展开，示意图只表达顺序与相对关系，不表达真实距离。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 行星对比</div><h1 class="pt">质量、重力、大气与温度对照</h1></div><div class="calib">质量口径：地球 = 1 · 温度取表面平均值<br>数据来源：国际天文联合会 2026 年公布值</div></div>
+<table class="tb">
+  <caption>表 3 · 六颗代表行星的物理特征对照</caption>
+  <thead><tr><th>行星</th><th class="r">质量（地球=1）</th><th class="r">表面重力</th><th>大气主要成分</th><th class="r">平均温度</th><th>宜居带</th></tr></thead>
+  <tbody>
+    <tr><td>水星</td><td class="r mono">0.055</td><td class="r mono">3.7 m/s²</td><td>几乎没有大气</td><td class="r mono">167 ℃</td><td>否</td></tr>
+    <tr><td>金星</td><td class="r mono">0.815</td><td class="r mono">8.9 m/s²</td><td>二氧化碳 96%</td><td class="r mono">464 ℃</td><td>否</td></tr>
+    <tr class="hi"><td>地球</td><td class="r mono">1.000</td><td class="r mono">9.8 m/s²</td><td>氮 78% · 氧 21%</td><td class="r mono">15 ℃</td><td>是</td></tr>
+    <tr><td>火星</td><td class="r mono">0.107</td><td class="r mono">3.7 m/s²</td><td>二氧化碳 95%</td><td class="r mono">-63 ℃</td><td>否（外缘外 0.15 AU）</td></tr>
+    <tr><td>木星</td><td class="r mono">317.8</td><td class="r mono">24.8 m/s²</td><td>氢 90% · 氦 10%</td><td class="r mono">-110 ℃</td><td>否</td></tr>
+    <tr><td>海王星</td><td class="r mono">17.1</td><td class="r mono">11.2 m/s²</td><td>氢 80% · 氦 19%</td><td class="r mono">-200 ℃</td><td>否</td></tr>
+  </tbody>
+</table>
+<div class="note">对比结论：木星质量是地球的 317.8 倍，但表面重力只有地球的 2.53 倍——因为巨行星没有固体表面，重力按 1 巴气压层计算。</div><div class="sl"><i>05</i>对比表的三条读取方法</div>
+<ul class="pts">
+  <li><b>先看质量：</b>木星质量是地球的 317.8 倍，表面重力却只有 2.53 倍，说明重力并不与质量成正比。</li>
+  <li><b>再看大气：</b>四颗类地行星中只有地球以氮氧为主，其余三颗均以二氧化碳为主，温室效应差异由此产生。</li>
+</ul><div class="note">三组对照记忆：密度 3.9–5.5 对 0.7–1.6 g/cm³、卫星 3 颗对 285 颗、宜居带 1 颗对 0 颗；质量与重力不成正比，木星质量是地球 317.8 倍而表面重力仅 2.53 倍；课堂验收方式为口头抽查 6 名学生，答对密度与卫星数两项即可。</div></div>
+<div class="foot"><span>对比：地球是六颗行星中唯一处于宜居带的，其氮氧大气与 15 ℃ 均温是生命存在的关键。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 常见误区</div><h1 class="pt">七个高频错误认识与纠正</h1></div><div class="calib">来源：近三年随堂测验错题统计<br>样本：3 个班级 126 名学生</div></div>
+<table class="tb">
+  <caption>表 4 · 错题统计与纠正要点</caption>
+  <thead><tr><th>常见错误认识</th><th class="r">错误率</th><th>纠正要点</th></tr></thead>
+  <tbody>
+    <tr><td>太阳系有九大行星</td><td class="r mono">41%</td><td>冥王星 2006 年被划为矮行星，现为八大行星</td></tr>
+    <tr><td>行星在示意图上的间距就是真实距离</td><td class="r mono">58%</td><td>示意图仅为示意，海王星实际距日是水星的 77 倍</td></tr>
+    <tr><td>行星离太阳越远温度一定越低</td><td class="r mono">23%</td><td>金星 464 ℃ 高于水星 167 ℃，温室效应是主因</td></tr>
+    <tr><td>巨行星都有固体表面</td><td class="r mono">36%</td><td>木星、土星为气态，重力需按 1 巴气压层计算</td></tr>
+    <tr><td>月球是行星</td><td class="r mono">17%</td><td>月球绕行星运行，属于卫星而非行星</td></tr>
+    <tr class="hi"><td>1 AU 就是地球到月球的距离</td><td class="r mono">29%</td><td>1 AU = 1.5 亿公里，地月距离约 38.4 万公里</td></tr>
+    <tr><td>土星环是一块固体圆盘</td><td class="r mono">31%</td><td>土星环由冰粒与岩屑组成，厚度仅约 10 米</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>教学难点</b><p>尺度感与单位换算是错误率最高的两处（58% 与 29%），建议在课堂上用跑道长度做实物类比。</p></div>
+  <div class="q"><b>课时约束</b><p>七大行星仅为 90 分钟课时，若需讲解矮行星与柯伊伯带，须追加 1 课时的拓展课。</p></div>
+</div><div class="note">纠错优先级：按错误率排序依次为尺度失真 58%、九大行星 41%、巨行星有固体表面 36%；每项配 1 道课堂小测，当天回收。</div></div>
+<div class="foot"><span>误区：尺度失真与单位换算错误率最高，分别达 58% 与 29%，需实物类比辅助。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 小结与作业</div><h1 class="pt">课堂小结、课后任务与评价方式</h1></div><div class="calib">作业提交：次日放学前<br>评价回收：当天学习单 42 份</div></div>
+<div class="grid4">
+  <div class="q"><b>8 颗</b><p>行星总数，按距日顺序可分为两类。</p></div>
+  <div class="q"><b>1.5 亿</b><p>日地平均距离（公里），即 1 AU。</p></div>
+  <div class="q"><b>2.84 倍</b><p>木星直径与海王星之比，尺度反差明显。</p></div>
+  <div class="q"><b>285 颗</b><p>四颗巨行星的已知卫星合计数量。</p></div>
+</div>
+<div class="sl"><i>04</i>课堂小结与课后任务</div>
+<div class="steps">
+  <div class="step"><b>小结 01</b><span>八大行星按距日顺序排列为水星、金星、地球、火星、木星、土星、天王星、海王星。</span></div>
+  <div class="step"><b>小结 02</b><span>类地行星与巨行星在成分密度、体积质量、卫星数量三个维度上呈现系统性差异。</span></div>
+  <div class="step"><b>作业 01</b><span>完成学习单第 3 题：用 1 AU = 1.5 亿公里换算木星与海王星的距日公里数，保留两位小数。</span></div>
+  <div class="step"><b>作业 02</b><span>任选一颗行星，用 150 字说明它是否可能孕育生命，至少给出两条数据支撑。次日提交。</span></div>
+</div>
+<ul class="pts">
+  <li><b>评价标准：</b>学习单 40% + 课后任务 40% + 课堂提问参与度 20%，合计 100 分。</li>
+  <li><b>拓展建议：</b>对天文兴趣浓厚的学生，可布置「绘制一张比例正确的太阳系图」作为选做任务。</li>
+</ul><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>本课核心考点：按距日顺序说出八大行星，并说出类地与巨行星在密度、体积、卫星数上的三点差异。</div>
+  <div class="cell"><u>下一步与责任</u>课后任务：完成学习单第 3 题的距离换算（1 AU = 1.5 亿公里），并任选一颗行星用 150 字说明是否宜居。</div>
+</div></div>
+<div class="foot"><span>小结：行星顺序与两类差异是核心考点，作业要求用 AU 换算并给出至少两条数据支撑。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

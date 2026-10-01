@@ -36,6 +36,9 @@ export const CoworkErrorKind = {
   NetworkError: 'network_error',
   /** Upstream server error (5xx) */
   ServerError: 'server_error',
+  StreamInterrupted: 'stream_interrupted',
+  TurnTimeout: 'turn_timeout',
+  FileWriteTruncated: 'file_write_truncated',
   /** Tool execution timeout */
   ToolTimeout: 'tool_timeout',
   /** Tool execution permission denied */
@@ -176,6 +179,28 @@ const RULES: ErrorRule[] = [
     pattern: /could not process pdf/i,
   },
 
+  // ── Stream interrupted ──────────────────────────────────────────────────
+  {
+    kind: CoworkErrorKind.StreamInterrupted,
+    // An abort or a dropped stream. Deliberately narrow: matching a bare
+    // "terminated" would swallow unrelated upstream wording.
+    pattern:
+      /\baborted\b|operation was aborted|socket hang up|premature close|stream (?:was )?(?:closed|interrupted)|ECONNRESET/i,
+  },
+
+  // ── Turn timeout / truncated writes ─────────────────────────────────────
+  // Both kinds are also set explicitly by the runtime when it knows the cause;
+  // the patterns keep the text-only paths (conversation status lines, IPC
+  // strings) classified instead of leaking English to the UI.
+  {
+    kind: CoworkErrorKind.TurnTimeout,
+    pattern: /produced no output for|turn exceeded .* without finishing|turn was stopped/i,
+  },
+  {
+    kind: CoworkErrorKind.FileWriteTruncated,
+    pattern: /file mutation payload was truncated|chunked-write guidance/i,
+  },
+
   // ── Tool timeout ────────────────────────────────────────────────────────
   {
     kind: CoworkErrorKind.ToolTimeout,
@@ -307,6 +332,7 @@ export function isTransient(kind: CoworkErrorKind): boolean {
     case CoworkErrorKind.GatewayDraining:
     case CoworkErrorKind.ServiceRestart:
     case CoworkErrorKind.ToolTimeout:
+    case CoworkErrorKind.StreamInterrupted:
       return true;
 
     default:
@@ -341,6 +367,12 @@ export function getUserErrorI18nKey(kind: CoworkErrorKind): string {
       return 'coworkErrorNetworkError';
     case CoworkErrorKind.ServerError:
       return 'coworkErrorServerError';
+    case CoworkErrorKind.StreamInterrupted:
+      return 'coworkErrorStreamInterrupted';
+    case CoworkErrorKind.TurnTimeout:
+      return 'coworkErrorTurnTimeout';
+    case CoworkErrorKind.FileWriteTruncated:
+      return 'coworkErrorFileWriteTruncated';
     case CoworkErrorKind.ToolTimeout:
       return 'coworkErrorToolTimeout';
     case CoworkErrorKind.ToolPermissionDenied:

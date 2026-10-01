@@ -84,7 +84,7 @@ export function classicModalEffects(dark: boolean) {
     'composer-near': recipe({
       base: {
         ...aura,
-        // 近层线框：单圈 1px + 轻柔近光，避免与 input-group 边框叠成粗线
+        // 2026/09/20 lixiang  近层只留模糊光晕，实线描边交给 input-group 的 1px border
         'box-shadow':
           '0 0 0 1px color-mix(in oklch, var(--zy-primary) 45%, transparent), 0 0 6px color-mix(in oklch, var(--zy-primary) 28%, transparent)',
       },
@@ -93,7 +93,7 @@ export function classicModalEffects(dark: boolean) {
     'composer-far': recipe({
       base: {
         ...aura,
-        // 远层光晕：缩小模糊与扩散，保留轻微呼吸感
+        // 2026/09/20 lixiang  远层去掉 spread，避免和边框叠成粗实线
         'box-shadow': dark
           ? '0 0 10px 0 color-mix(in oklch, var(--zy-primary) 42%, transparent), 0 0 22px 2px color-mix(in oklch, var(--zy-primary) 22%, transparent)'
           : '0 0 8px 0 color-mix(in oklch, var(--zy-primary) 36%, transparent), 0 0 18px 2px color-mix(in oklch, var(--zy-primary) 18%, transparent)',

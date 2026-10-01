@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { resolveArtifactPath } from '@shared/cowork/artifactPath';
 import { ExternalLink, FileWarning } from 'lucide-react';
 import React, { useCallback } from 'react';
 
@@ -11,20 +12,10 @@ interface UnsupportedRendererProps {
   artifact: Artifact;
 }
 
-function normalizeFilePath(filePath: string): string {
-  let normalized = filePath;
-  if (normalized.startsWith('file:///') || normalized.startsWith('file://')) {
-    normalized = normalized.slice(7);
-  } else if (normalized.startsWith('file:/')) {
-    normalized = normalized.slice(5);
-  }
-  return /^\/[A-Za-z]:/.test(normalized) ? normalized.slice(1) : normalized;
-}
-
 const UnsupportedRenderer: React.FC<UnsupportedRendererProps> = ({ artifact }) => {
   const handleOpenWithApp = useCallback(() => {
     if (artifact.filePath) {
-      void window.electron?.shell?.openPath(normalizeFilePath(artifact.filePath));
+      void window.electron?.shell?.openPath(resolveArtifactPath(artifact.filePath));
     }
   }, [artifact.filePath]);
 

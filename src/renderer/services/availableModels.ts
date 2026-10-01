@@ -8,6 +8,7 @@ import {
   createProviderConnectionTestSignature,
   isCurrentModelAvailableTest,
   isProviderEnabled,
+  ModelCapabilityStatus,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -71,11 +72,22 @@ export function buildConfiguredAvailableModels(
         return;
       }
 
-      const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+      const toggleSupportsImage = ProviderRegistry.resolveModelSupportsImage(
         providerName,
         model.id,
         model.supportsImage,
       );
+      const capabilities = ProviderRegistry.resolveModelCapabilities(
+        providerName,
+        model.id,
+        effectiveApiFormat,
+        { ...model, supportsImage: toggleSupportsImage },
+      );
+      // The endpoint layer treats an explicit imageInput capability as
+      // authoritative over a stale persisted toggle; the cowork attach gate
+      // follows the same verdict so UI gating cannot diverge from requests.
+      const supportsImage =
+        capabilities.imageInput === ModelCapabilityStatus.Supported ? true : toggleSupportsImage;
       models.push({
         id: model.id,
         name: model.name,
@@ -83,12 +95,7 @@ export function buildConfiguredAvailableModels(
         providerKey: providerName,
         agentProviderId: ProviderRegistry.getAgentProviderId(providerName),
         supportsImage,
-        capabilities: ProviderRegistry.resolveModelCapabilities(
-          providerName,
-          model.id,
-          effectiveApiFormat,
-          { ...model, supportsImage },
-        ),
+        capabilities,
         contextWindow:
           model.contextWindow ?? ('contextTokens' in model ? model.contextTokens : undefined),
       });
@@ -172,12 +179,16 @@ export function mergeAvailableModels(
 async function buildHiddenConfiguredModelKeys(
   config: AppConfig,
   allowedProviderKeys?: ReadonlySet<string>,
+  managedProviderKeys?: ReadonlySet<string>,
 ): Promise<Set<string>> {
   const hiddenModelKeys = new Set<string>();
   if (!config.providers) return hiddenModelKeys;
 
   for (const [providerName, providerConfig] of Object.entries(config.providers)) {
     if (allowedProviderKeys && !allowedProviderKeys.has(providerName)) continue;
+    // Managed provider access is gated by host entitlement, not by a user connection test;
+    // the managed projection never carries connectionTest metadata.
+    if (managedProviderKeys?.has(providerName)) continue;
     if (
       providerName === ProviderName.LlamaCpp ||
       providerName === ProviderName.Zhiyuan ||
@@ -220,9 +231,14 @@ async function buildHiddenConfiguredModelKeys(
 }
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
   const policy = await getManagedProviderAccessPolicy();
+  const managedProviderKeys = new Set(policy.providerKeys);
   const allowedProviderKeys =
-    policy.mode === ManagedProviderAccessMode.Exclusive ? new Set(policy.providerKeys) : undefined;
-  const hiddenModelKeys = await buildHiddenConfiguredModelKeys(config, allowedProviderKeys);
+    policy.mode === ManagedProviderAccessMode.Exclusive ? managedProviderKeys : undefined;
+  const hiddenModelKeys = await buildHiddenConfiguredModelKeys(
+    config,
+    allowedProviderKeys,
+    managedProviderKeys,
+  );
   const configuredModels = buildConfiguredAvailableModels(
     config,
     allowedProviderKeys,

@@ -1,10 +1,22 @@
 import { Button } from '@shared/components/ui/button';
-import { ExternalLink } from 'lucide-react';
-import React from 'react';
-import { useDispatch } from 'react-redux';
+import { resolveArtifactPath } from '@shared/cowork/artifactPath';
+import { ExternalLink, LoaderCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'sonner';
 
+import {
+  ArtifactFileAvailability,
+  probeArtifactFileAvailability,
+} from '@/services/artifactAvailability';
 import { i18nService } from '@/services/i18n';
-import { selectArtifact } from '@/store/slices/artifactSlice';
+import { selectCurrentSession } from '@/store/selectors/coworkSelectors';
+import {
+  closePanel,
+  selectArtifact,
+  selectIsPanelOpen,
+  selectSelectedArtifact,
+} from '@/store/slices/artifactSlice';
 import type { Artifact, ArtifactType } from '@/types/artifact';
 
 const t = (key: string) => i18nService.t(key);
@@ -168,38 +180,138 @@ const TYPE_LABEL_KEY: Record<ArtifactType, string> = {
 
 interface ArtifactPreviewCardProps {
   artifact: Artifact;
+  disabled?: boolean;
 }
 
-const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) => {
+const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact, disabled = false }) => {
   const dispatch = useDispatch();
+  const isPanelOpen = useSelector(selectIsPanelOpen);
+  const selectedArtifact = useSelector(selectSelectedArtifact);
+  const currentSession = useSelector(selectCurrentSession);
+  const cwd = currentSession?.id === artifact.sessionId ? currentSession.cwd : undefined;
+  const [checking, setChecking] = useState(false);
+  const busy = checking;
 
-  const handleClick = () => {
-    dispatch(selectArtifact(artifact.id));
+  // An availability answer belongs to one card identity inside one session. Any
+  // change to that identity — or unmounting the card — invalidates the pending
+  // probe, so a late answer cannot select an artifact the user has already left.
+  const probeGenerationRef = useRef(0);
+  useEffect(() => {
+    probeGenerationRef.current += 1;
+  }, [artifact.id, artifact.filePath, artifact.sessionId, currentSession?.id]);
+  useEffect(
+    () => () => {
+      probeGenerationRef.current += 1;
+    },
+    [],
+  );
+
+  // 2026/09/20 lixiang  右侧预览面板 toggle：同文件已打开则关闭，否则打开/切换（issue #805）
+  const handleOpenPreview = async () => {
+    if (disabled || busy) return;
+    if (isPanelOpen && selectedArtifact?.id === artifact.id) {
+      dispatch(closePanel());
+      return;
+    }
+    probeGenerationRef.current += 1;
+    const probeGeneration = probeGenerationRef.current;
+    setChecking(true);
+    try {
+      const state = await probeArtifactFileAvailability(artifact, cwd);
+      if (probeGeneration !== probeGenerationRef.current) return;
+      if (state === ArtifactFileAvailability.Missing) {
+        toast.error(t('fileNotFound'));
+        return;
+      }
+      dispatch(selectArtifact(artifact.id));
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  // 2026/09/20 lixiang  仅文件名打开所在文件夹；阻止冒泡，避免触发整卡预览 toggle（issue #805）
+  const handleOpenLocalFolder = async (event: React.MouseEvent | React.KeyboardEvent) => {
+    const path = artifact.filePath?.trim();
+    if (!path) return;
+    event.preventDefault();
+    event.stopPropagation();
+    probeGenerationRef.current += 1;
+    const probeGeneration = probeGenerationRef.current;
+    try {
+      const state = await probeArtifactFileAvailability(artifact, cwd);
+      if (probeGeneration !== probeGenerationRef.current) return;
+      if (state === ArtifactFileAvailability.Missing) {
+        toast.error(t('fileNotFound'));
+        return;
+      }
+      const result = await window.electron.shell.showItemInFolder(resolveArtifactPath(path, cwd));
+      if (!result?.success) {
+        console.error('[Artifact] Failed to show item in folder:', path, result?.error);
+      }
+    } catch (error) {
+      console.error('[Artifact] Failed to show item in folder:', path, error);
+    }
   };
 
   const IconComponent = TYPE_ICON_MAP[artifact.type];
   const title = artifact.fileName || artifact.title;
   const subtitle = t(TYPE_LABEL_KEY[artifact.type]);
+  const localPath = artifact.filePath?.trim() || '';
+  const canOpenLocal = Boolean(localPath) && !disabled;
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      onClick={handleClick}
-      className="theme-page-artifact-preview-card-button-1 flex items-center cursor-pointer max-w-sm w-full text-left"
-    >
-      <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-        <IconComponent className="w-5 h-5 text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-foreground truncate">{title}</div>
-        <div className="text-xs text-muted-foreground">{subtitle}</div>
-      </div>
-      <div className="shrink-0 flex items-center gap-1 text-primary text-sm font-medium">
-        <ExternalLink className="w-4 h-4" />
-        <span>{t('artifactOpen')}</span>
-      </div>
-    </Button>
+    <div className="theme-page-artifact-preview-card-button-1 flex max-w-sm w-full items-center gap-3 text-left">
+      <Button
+        type="button"
+        variant="ghost"
+        disabled={disabled || busy}
+        onClick={handleOpenPreview}
+        aria-busy={busy}
+        className="flex min-w-0 flex-1 items-center justify-start gap-3 px-0 hover:bg-transparent"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <IconComponent className="h-5 w-5 text-primary" />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+          {canOpenLocal && !busy ? (
+            // 文件名独立命中：阻止冒泡到整卡 toggle，只打开本地文件夹
+            <span
+              role="link"
+              tabIndex={0}
+              title={localPath}
+              className="theme-surface-markdown-link inline-block max-w-full cursor-pointer truncate text-sm font-medium"
+              onMouseDown={event => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={handleOpenLocalFolder}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  void handleOpenLocalFolder(event);
+                }
+              }}
+            >
+              {title}
+            </span>
+          ) : (
+            <span className="truncate text-sm font-medium text-foreground">{title}</span>
+          )}
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
+          {busy ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <>
+              <ExternalLink className="h-4 w-4" />
+              <span>{t('artifactOpen')}</span>
+            </>
+          )}
+        </div>
+      </Button>
+    </div>
   );
 };
 

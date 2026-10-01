@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-lab-report</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
+.box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
+.cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
+.cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
+.flow i{color:#b6bac0;font-style:normal}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
+</style></head><body>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Lab Report 01</div>
+      <h1>酸碱中和滴定实验报告：测定氢氧化钠溶液浓度</h1>
+      <div class="sub">适用：高中化学 / 大学基础化学 ｜ 标准盐酸 c(HCl)=0.1000 mol/L ｜ 待测 NaOH 25.00 mL ｜ 平行 3 次 · 读数精度 0.01 mL ｜ 练习 12 题</div>
+    </div>
+    <div class="note">实验报告 v2.0 · 共 10 页<br><b>数据口径</b>：0.1000 mol/L 标准盐酸滴定 25.00 mL 待测 NaOH<br>平行 3 次，相对平均偏差限值 ≤ 0.2%</div>
+  </div>
+  <div class="ask"><div class="av"></div><p>帮我写一份酸碱中和滴定的实验报告，要含完整数据表与误差分析。</p></div>
+  <p class="lead">本报告把「用 0.1000 mol/L 标准盐酸滴定未知浓度氢氧化钠溶液」完整写成可复算的讲义：先给仪器清单与实验口径，再给三次平行的原始读数与三段式计算，然后拆解六类操作误差的方向与幅度，最后用 12 道题检验并给出误差分析范文。结论：三次消耗盐酸 20.00 / 19.98 / 20.02 mL，平均 20.00 mL，c(NaOH) = 0.0800 mol/L，相对平均偏差 0.07%，平行性合格。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">3<small>次</small></div><div class="l">平行滴定：相对平均偏差 0.07%，限值 0.2%</div></div>
+    <div class="stat"><div class="n">6<small>类</small></div><div class="l">操作误差：润洗 / 气泡 / 指示剂 / 终点 / 读数 / 平行</div></div>
+    <div class="stat"><div class="n">12<small>题</small></div><div class="l">计算题：基础 6 · 进阶 4 · 挑战 2</div></div>
+  </div>
+  <div class="sec">报告结构 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:72px">阶段</th><th style="width:82px">页码</th><th>内容</th><th style="width:196px">可检查产出</th><th style="width:72px">用时</th></tr>
+    <tr><td>仪器</td><td class="num">P3</td><td>仪器清单（6 种）、实验口径与六类误差幅度</td><td>写出方程式与计算式</td><td class="num">15 分钟</td></tr>
+    <tr><td>数据</td><td class="num">P4</td><td>中和反应计量关系、三段式计算与三次平行数据</td><td>逐行复算 3 组读数</td><td class="num">30 分钟</td></tr>
+    <tr><td>误差</td><td class="num">P5</td><td>六类操作误差的方向、幅度与改进措施</td><td>误差方向表 4 行</td><td class="num">20 分钟</td></tr>
+    <tr><td>练习</td><td class="num">P6–P8</td><td>12 道分层练习与逐题解析</td><td>自批得分 ≥ 10 / 12</td><td class="num">40 分钟</td></tr>
+    <tr class="hl"><td>定稿</td><td class="num">P9–P10</td><td>自测清单与结论表述，术语表备查</td><td>报告值 c(NaOH)=0.0800 mol/L</td><td class="num">20 分钟</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">数据口径</div><p>标准盐酸 c(HCl)=0.1000 mol/L，待测 NaOH 25.00 mL，平行 3 次；读数估读至 0.01 mL，浓度保留 4 位有效数字。</p></div>
+    <div class="box"><div class="k">来源与统计窗口</div><p>来源：课堂滴定实验原始记录（2026-09-18 批次）与实验室仪器台账；窗口：同一批次 3 次平行，无剔除数据。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 背景 · P4 概念 · P5 误差 · P6 计算题 · P7–P8 解析 · P9 自测 · P10 附录。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>平均消耗盐酸 20.00 mL，c(NaOH)=0.0800 mol/L（即 3.20 g/L）</b>，相对平均偏差 0.07%。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Lab Report 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全报告 8 章 · 10 页<br>先原理、再数据、后误差与练习</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:126px">章节</th><th>一句话说明</th><th style="width:176px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>实验背景与范围</td><td>给全仪器清单与实验口径：标准液浓度、待测体积、平行次数</td><td>能报出 6 种仪器与规格</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>写清中和反应计量关系与三段式计算，并给出三次平行的原始数据</td><td>数据表 3 组可复算</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见误差与方向</td><td>列出六类操作误差，逐一判断使结果偏大还是偏小</td><td>误差方向表 4 行</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题巩固计算，进阶 4 题进入偏差与换算，挑战 2 题成段输出</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 给出答案、数值与单位核对要点</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 给出算式、数值与评分口径</td><td>自批得分 ≥ 10 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与下一阶段</td><td>6 项自测定达标线，3 个阶段把定量分析学下去</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>滴定类术语 10 条，附数据口径与版本记录备查</td><td>能解释等当点与滴定终点</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 遍读 P3–P4，把仪器规格与数据表抄进实验记录本；第 2 遍读 P5，把六类误差的偏大偏小各写一遍；第 3 遍做 P6 的 1–6 题，用 P7 自批；最后做 7–12 题对 P8，并用 P9 自测。若时间紧，可先读 P4 与 P5，但 12 道题必须全做，并在 P9 自测表上打勾。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>已掌握物质的量浓度定义式 c=n/V 与中和反应实质 H⁺ + OH⁻ → H₂O；会读滴定管刻度（自上而下增大，估读 0.01 mL）；会用 M(NaOH)=40.00 g/mol 做质量换算。若有效数字不熟，先复习四位有效数字的保留规则：本报告结果写作 0.0800 mol/L。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，便于按实验进程分次完成。</div>
+    <div>练习在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应，先做完再翻答案。</div>
+    <div>第 3–4 页是全部数据的出处：三次读数与 20.00 mL 平均值只在这里给全，其余页引用不重算。</div>
+    <div>第 5 页按「润洗 / 气泡 / 指示剂 / 终点 / 读数 / 平行」排六类误差，与第 3 页条形图逐条对应。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>数据页要动手复算，误差页要背方向，答案页只对不抄</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 实验背景与范围</div><h2 class="pt">仪器清单、实验口径与六类误差幅度</h2></div>
+    <div class="note">口径：c(HCl)=0.1000 mol/L<br>待测 NaOH 25.00 mL · 平行 3 次</div>
+  </div>
+  <div class="sec">A · 仪器与试剂清单 <em>酸用酸式管、碱用碱式管，是最先要记死的一条</em></div>
+  <table>
+    <tr><th style="width:96px">仪器</th><th style="width:216px">规格</th><th style="width:60px">数量</th><th>用途</th></tr>
+    <tr><td>酸式滴定管</td><td class="mono">50 mL，分度 0.1 mL，估读 0.01 mL</td><td class="num">1 支</td><td>盛装 0.1000 mol/L 标准盐酸；活塞耐酸，不与玻璃粘连</td></tr>
+    <tr><td>碱式滴定管</td><td class="mono">50 mL，分度 0.1 mL，估读 0.01 mL</td><td class="num">1 支</td><td>盛装待测 NaOH 溶液；碱液会腐蚀玻璃活塞，须用碱式管</td></tr>
+    <tr><td>锥形瓶</td><td class="mono">250 mL</td><td class="num">3 个</td><td>承接 25.00 mL 待测液，边滴边旋转便于观察颜色变化</td></tr>
+    <tr><td>移液管</td><td class="mono">25.00 mL（单标线）</td><td class="num">1 支</td><td>准确移取待测 NaOH 溶液 3 份，每份 25.00 mL</td></tr>
+    <tr><td>容量瓶</td><td class="mono">100 mL</td><td class="num">1 个</td><td>定容待测 NaOH 溶液，浓度由标定值核验</td></tr>
+    <tr class="hl"><td>电子天平</td><td class="mono">感量 0.0001 g</td><td class="num">1 台</td><td>称量 NaOH 固体 <b>0.3200 g</b> 配 100 mL，理论浓度即 0.0800 mol/L</td></tr>
+  </table>
+  <div class="sec">B · 六类操作误差对测定结果的影响幅度 <em>条形长度取偏差绝对值，正号=结果偏大，负号=结果偏小</em></div>
+  <div class="bars">
+    <div class="bar"><span>未润洗滴定管</span><span class="track"><i style="width:67%"></i></span><span class="v">+0.8%</span></div>
+    <div class="bar hl"><span>管尖气泡</span><span class="track"><i style="width:100%"></i></span><span class="v">+1.2%</span></div>
+    <div class="bar"><span>指示剂过量</span><span class="track"><i style="width:8%"></i></span><span class="v">+0.1%</span></div>
+    <div class="bar"><span>终点判断偏早</span><span class="track"><i style="width:42%;background:color-mix(in srgb,var(--accent) 42%,#fff)"></i></span><span class="v">−0.5%</span></div>
+    <div class="bar"><span>初读数视线偏高</span><span class="track"><i style="width:33%"></i></span><span class="v">+0.4%</span></div>
+    <div class="bar"><span>未做平行</span><span class="track"><i style="width:75%;background:color-mix(in srgb,var(--accent) 42%,#fff)"></i></span><span class="v">−0.9%</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">口径说明</div><p>读数保留 2 位小数（0.01 mL），消耗体积 = 末读数 − 初读数；浓度保留 4 位有效数字。1 滴约 0.04–0.05 mL，即 20.00 mL 的 0.2%–0.25%；限值 0.2% 对应 0.040 mL，约等于 1 滴，所以三次读数之差须控制在一滴以内。</p></div>
+    <div class="box"><div class="k">误差幅度的读法</div><p>气泡（+1.2%）是量级最大的一类：气泡占掉的管尖容积使读数差大于真正进入锥形瓶的体积，故结果偏大且幅度最大；它与未润洗（+0.8%）方向相同、常被误判为一正一反。指示剂过量只贡献 +0.1%。</p></div>
+  </div>
+  <div class="pf"><span>背景结论：<b>误差分两类——让读数偏大的（气泡、未润洗、指示剂过量、初读数视线偏高）与让读数偏小的（终点判断偏早、未做平行）</b>。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">中和反应计量关系与三次平行数据</h2></div>
+    <div class="note">反应计量比 1 : 1<br>移取待测液 25.00 mL，平行 3 次</div>
+  </div>
+  <div class="word"><b>HCl + NaOH → NaCl + H₂O</b><span class="pos">中和反应</span><span>实质：H⁺ + OH⁻ → H₂O，计量比 1 : 1</span></div>
+  <p class="lead">原理：一元强酸与一元强碱按 1 : 1 完全中和，达到等当点时 n(HCl) = n(NaOH)，即 c(HCl)·V(HCl) = c(NaOH)·V(NaOH)，故 c(NaOH) = c(HCl)·V(HCl) / V(NaOH)。测得三次消耗盐酸的平均体积 20.00 mL，代入 0.1000 mol/L 与 25.00 mL，得 c(NaOH) = 0.0800 mol/L。</p>
+  <div class="flow"><span>润洗</span><i>→</i><span>装液排气</span><i>→</i><span>移液取样</span><i>→</i><span>滴定</span><i>→</i><span>读数</span><i>→</i><span>计算</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">指示剂选择：酚酞</div><p>变色范围 <span class="mono">pH 8.2–10.0</span> 与突跃 <span class="mono">4.3–9.7</span> 的相交段覆盖终点；由红变无色，只加 2 滴。</p></div>
+    <div class="box"><div class="k">终点判断</div><p>粉红恰好褪去且 30 s 不复现即为终点，与等当点相差 <span class="mono">≤0.05 mL</span>。</p></div>
+    <div class="box"><div class="k">平行性要求</div><p>平行测定 3 次，相对平均偏差须 <span class="mono">≤ 0.2%</span>，本次实测 <span class="mono">0.07%</span>；单次偏离超限即补做，取舍规则见 P10。</p></div>
+  </div>
+  <div class="sec">数据记录与处理表 <em>每行可独立复算：末读数 − 初读数 = 消耗体积</em></div>
+  <table>
+    <tr><th style="width:186px">次数 / 项目</th><th style="width:92px">初读数 /mL</th><th style="width:92px">末读数 /mL</th><th style="width:126px">消耗 V(HCl) /mL</th><th>计算结果</th></tr>
+    <tr><td>第 1 次滴定</td><td class="num">0.50</td><td class="num">20.50</td><td class="num">20.00</td><td class="mono">c(NaOH) = 0.0800 mol/L</td></tr>
+    <tr><td>第 2 次滴定</td><td class="num">0.52</td><td class="num">20.50</td><td class="num">19.98</td><td class="mono">c(NaOH) = 0.0799 mol/L</td></tr>
+    <tr><td>第 3 次滴定</td><td class="num">0.50</td><td class="num">20.52</td><td class="num">20.02</td><td class="mono">c(NaOH) = 0.0801 mol/L</td></tr>
+    <tr class="hl"><td>平均值（3 次）</td><td class="num">0.51</td><td class="num">20.51</td><td class="num">20.00</td><td class="mono">c(NaOH) = 0.0800 mol/L</td></tr>
+    <tr><td>相对平均偏差</td><td class="gray">—</td><td class="gray">—</td><td class="gray">—</td><td class="mono">±0.013 mL（相对平均偏差 0.07% ≤ 限值 0.2%）</td></tr>
+    <tr><td>单份试液 n(NaOH)</td><td class="gray">—</td><td class="gray">—</td><td class="gray">—</td><td class="mono">0.002000 mol（0.0800 × 0.02500 L）</td></tr>
+    <tr><td>质量浓度 ρ(NaOH)</td><td class="gray">—</td><td class="gray">—</td><td class="gray">—</td><td class="mono">3.20 g/L（0.0800 mol/L × 40.00 g/mol）</td></tr>
+    <tr><td>反算校验</td><td class="gray">—</td><td class="gray">—</td><td class="num">20.00</td><td class="mono">0.0800 × 25.00 ÷ 0.1000 = 20.00 mL，与平均消耗一致</td></tr>
+  </table>
+  <div class="quote">计算示范：c(NaOH) = 0.1000 mol/L × 20.00 mL ÷ 25.00 mL = 0.0800 mol/L。两体积单位相同即可直接相除，无需换算成 L——这一步写成 20.00 ÷ 25.00 更不易出错。</div>
+  <div class="pf"><span>数据结论：<b>三次消耗 20.00 / 19.98 / 20.02 mL，平均 20.00 mL，c(NaOH)=0.0800 mol/L</b>。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见误差与方向</div><h2 class="pt">6 类操作误差与 4 行误差方向表</h2></div>
+    <div class="note">误差幅度与 P3 条形图一致<br>共 6 类 · 每类给正确做法</div>
+  </div>
+  <div class="sec">A · 6 类常见操作误差 <em>先看「后果」一列，能自己说出方向再往下</em></div>
+  <table>
+    <tr><th style="width:92px">类型</th><th style="width:206px">典型操作</th><th style="width:206px">正确做法</th><th>后果与偏差幅度</th></tr>
+    <tr><td>未润洗</td><td>用蒸馏水洗净后直接倒入标准盐酸</td><td>用标准盐酸润洗 2–3 次</td><td>残留水稀释标准液，需更多体积中和，结果偏大 <span class="mono">+0.8%</span></td></tr>
+    <tr><td>管尖气泡</td><td>装液后未排气就开始滴定并读数</td><td>快速放液排气后调零</td><td>管尖气泡消失，读数差大于实际放出量，结果偏大 <span class="mono">+1.2%</span></td></tr>
+    <tr><td>指示剂过量</td><td>一次加入 5–6 滴酚酞</td><td>只加 2 滴，颜色呈浅粉即可</td><td>指示剂自身呈弱酸性会额外耗酸，终点略延后，结果偏大 <span class="mono">+0.1%</span></td></tr>
+    <tr><td>终点偏早</td><td>粉红色还没褪净就停手并读数</td><td>滴至红色褪去且 30 s 不复现再读数</td><td>消耗体积偏小，结果偏小 <span class="mono">−0.5%</span></td></tr>
+    <tr><td>读数视线不水平</td><td>初读数俯视（视线偏高），末读数平视</td><td>视线始终与凹液面最低点水平相切</td><td>初读数偏小，消耗体积偏大，结果偏大 <span class="mono">+0.4%</span></td></tr>
+    <tr class="hl"><td>不做平行</td><td>单次滴定直接报出结果</td><td>平行测定 ≥3 次，相对平均偏差 ≤ 0.2%</td><td>随机误差无法被平均掉，单次偏差常见偏小 <span class="mono">−0.9%</span></td></tr>
+  </table>
+  <div class="sec">B · 误差方向表 <em>方向推导只走一条链：操作 → 消耗体积 V → 计算结果</em></div>
+  <table>
+    <tr><th style="width:150px">操作</th><th style="width:236px">对消耗体积 V(HCl) 的影响</th><th style="width:246px">对 c(NaOH) 的影响</th><th style="width:82px">偏大 / 偏小</th><th>相对偏差</th></tr>
+    <tr><td>未润洗滴定管</td><td>标准液被残留水稀释，需更多体积</td><td>按 0.1000 mol/L 计算，结果虚高</td><td class="num">偏大</td><td class="mono">+0.8%</td></tr>
+    <tr><td>管尖有气泡</td><td>气泡消失后补齐管尖容积，读数差偏大</td><td>V 偏大，结果偏高</td><td class="num">偏大</td><td class="mono">+1.2%</td></tr>
+    <tr><td>终点判断偏早</td><td>未中和完全就停止，V 偏小</td><td>V 偏小，结果偏低</td><td class="num">偏小</td><td class="mono">−0.5%</td></tr>
+    <tr class="hl"><td>初读数视线偏高</td><td>初读数偏小，末读数减初读数变大</td><td>V 偏大，结果偏高</td><td class="num">偏大</td><td class="mono">+0.4%</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">方向表四条共用一条规则</div><p>V 偏大 / 偏小指相对真实消耗体积：V 变大则结果偏大，变小则结果偏小。</p></div>
+    <div class="box"><div class="k">两类未列入本表的误差</div><p>指示剂过量 <span class="mono">+0.1%</span>；不做平行无固定方向，单次可达 <span class="mono">−0.9%</span>。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>误差题只需两步——先判 V 偏大还是偏小，再判 c 随之偏大还是偏小</b>。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>作答限时 30 分钟 · 自批 10 分钟（P1 记为 40 分钟）</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考方程式、计算式与基本概念</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 写出盐酸与氢氧化钠反应的中和反应化学方程式，并写出其离子方程式。</li>
+    <li><b>2.</b> 写出由滴定数据计算 c(NaOH) 的表达式，并说明式中各量的单位。</li>
+    <li><b>3.</b> 三次滴定消耗盐酸体积为 20.00、19.98、20.02 mL，求平均消耗体积。</li>
+    <li><b>4.</b> 用上题平均值计算 c(NaOH)（c(HCl)=0.1000 mol/L，V(NaOH)=25.00 mL）。</li>
+    <li><b>5.</b> 以酚酞为指示剂，用盐酸滴定 NaOH 溶液，说出滴定终点的颜色变化。</li>
+    <li><b>6.</b> 说明本实验为什么选酚酞，而不用石蕊或甲基橙。</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入偏差统计、误差方向与单位换算</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 用第 3 题数据计算三次测定的相对平均偏差，并判断是否满足 ≤ 0.2% 的要求。</li>
+    <li><b>8.</b> 若滴定管未用标准盐酸润洗，测定结果偏大还是偏小？写出推导链条。</li>
+    <li><b>9.</b> 把 c(NaOH)=0.0800 mol/L 换算成质量浓度（g/L），M(NaOH)=40.00 g/mol。</li>
+    <li><b>10.</b> 设计一次空白对照：说明用液、操作与判定标准，并说明它检验什么。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>需要写出成段文字，评分看数据与改进措施</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 写一段 150 字左右的误差分析，覆盖仪器、操作、终点判断三类误差各一处，并各配一条改进措施。</li>
+    <li><b>12.</b> 把本方法迁移到「用 KMnO₄ 标准溶液滴定草酸」：写出方程式与计算式，并说明与酸碱滴定在两处关键差异。</li>
+  </ul>
+  <div class="answer">评分口径：基础题答对即得分，只写结论不写算式的按半分（0.5 分）计；进阶题 7、8、9 必须给出数值与单位（20.00 mL、0.07%、0.0800 mol/L、3.20 g/L）；挑战题 11 需三类误差各一处且改进措施可执行，12 需写出方程式与两个差异点，缺一不得分。第 3 题写成 20.0 mL 扣 0.5 分；第 7 题偏差分母误用 19.98 或 20.02 mL 判错。</div>
+  <div class="notes">
+    <div>12 道题按 6 / 4 / 2 分层：基础练计算，进阶练误差方向与单位换算，挑战练成段表达。</div>
+    <div>做题时先把三次读数写在纸上再算，别对着 P4 的表格抄数——抄数练不出复算能力。</div>
+  </div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>，避免照着数据表套模板。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:290px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td class="mono">HCl + NaOH → NaCl + H₂O；H⁺ + OH⁻ → H₂O</td><td>两个方程式都要写。只写化学方程式漏掉「反应实质」一分的常见原因。</td></tr>
+    <tr><td class="num">2</td><td class="mono">c(NaOH) = c(HCl)·V(HCl) / V(NaOH)</td><td>c 用 mol/L，两个 V 必须同单位（同为 mL 可直接相除）；写成 c·V/V 会丢单位分。</td></tr>
+    <tr><td class="num">3</td><td class="mono">(20.00 + 19.98 + 20.02) ÷ 3 = 20.00 mL</td><td>平均值保留 2 位小数，与读数精度一致；写成 20 mL 会被判精度不足。</td></tr>
+    <tr><td class="num">4</td><td class="mono">0.1000 × 20.00 ÷ 25.00 = 0.0800 mol/L</td><td>4 位有效数字不能写成 0.08；顺序上先乘后除可减少舍入误差。</td></tr>
+    <tr><td class="num">5</td><td>红色恰好褪去成无色，且 30 s 内不复现</td><td>漏写「30 s 内不复现」即未真正判定终点，属终点偏早的典型表现。</td></tr>
+    <tr class="hl"><td class="num">6</td><td class="mono">酚酞 pH 8.2–10.0，与突跃 4.3–9.7 相交于 8.2–9.7</td><td>必须给出突跃或变色范围数值；只说「颜色明显」不得分，石蕊变色范围宽且渐变，甲基橙 3.1–4.4 与突跃只交于 4.3–4.4、终点偏酸。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 2 题漏写单位；第 4 题把 0.0800 写成 0.08（有效数字从 4 位降到 1 位）；第 5 题漏写「30 s 不复现」。三题合计 3 分，占基础题总分的一半。自批时先自查这三处，再逐题核对数值与单位。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分：进入进阶题；4–5 分：回读 P4 的计算示范；≤ 3 分：把 P4 数据表三行各复算一遍再重做本页题目。换算结果记在题目旁边，便于 P9 自测时回看。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 2 题只写 <span class="mono">c₁V₁ = c₂V₂</span> 而未给出 c(NaOH) 的显式表达式，记半分；两个 V 单位不一致又未换算的，不给分。</div>
+    <div>第 3 题结果写成 20.0 mL 的扣 0.5 分；有效数字应与测量精度匹配，滴定管估读到 0.01 mL。</div>
+    <div>第 6 题答「甲基橙颜色不如酚酞好看」的，属定性表述，须补上变色范围与突跃范围的数据对比方可得分。</div>
+    <div>批改时先独立算一遍 0.1000 × 20.00 ÷ 25.00 = 0.0800 mol/L，再对照答案；只写结论不写算式的按半分（0.5 分）计，与 P6 评分口径同一档。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在单位、有效数字与终点判定三处，不涉及计算思路</b>。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含算式、数值与评分口径<br>自批：全卷 ≥ 10 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:400px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td class="mono">偏差 0.00 / −0.02 / +0.02 mL；平均绝对偏差 0.013 mL；相对平均偏差 0.013 ÷ 20.00 = 0.07% ≤ 0.2%</td><td>分母用平均值 20.00 mL；算成 0.13% 是把 mL 当成 % 直接读。</td></tr>
+    <tr><td class="num">8</td><td>偏大：未润洗 → 残留蒸馏水稀释标准盐酸 → 实际浓度低于 0.1000 mol/L → 中和同一份 NaOH 需更多体积 → 按 0.1000 计算 c(NaOH) 偏大（约 +0.8%）</td><td>链条四步缺一不可；只写「偏大」无推导不得分。</td></tr>
+    <tr><td class="num">9</td><td class="mono">ρ = c·M = 0.0800 mol/L × 40.00 g/mol = 3.20 g/L</td><td>单位是 g/L 不是 g/mL；换算成质量分数 0.32%（25.00 mL 中 0.0800 g）同样可得分。</td></tr>
+    <tr><td class="num">10</td><td class="mono">取 25.00 mL 蒸馏水替代待测液，加 2 滴酚酞，用同批标准盐酸滴定至褪色；消耗 ≤ 0.02 mL 即合格</td><td>用于检验试剂本底与指示剂耗酸是否可忽略：0.02 mL 只占 20.00 mL 的 0.1%，低于平行性限值 0.2%。不写判定标准不得分。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>仪器误差：滴定管未校准，20 mL 量程内允差 ±0.02 mL（占 20.00 mL 的 0.1%），改进为使用前校准并在同一支管上完成三次滴定。操作误差：装液后管尖留气泡，读数差比真正进入锥形瓶的体积大约 1.2%，改进为放液排气后重新调零。终点判断：红色尚未褪净就停手，读数偏小约 0.5%，改进为滴至红色恰好褪去后观察 30 s 不复现。三项改进到位后复测，相对平均偏差为 0.07%（限值 0.2%）。</td><td>三类误差各一处且方向正确；末句须落在复测的 0.07% 上，写成「三者相加 ≤0.2%」即错（三者的量级分别是 0.1%、1.2%、0.5%，不相加）。</td></tr>
+    <tr class="hl"><td class="num">12</td><td class="mono">2MnO₄⁻ + 5H₂C₂O₄ + 6H⁺ → 2Mn²⁺ + 10CO₂↑ + 8H₂O；c(H₂C₂O₄) = (5/2)·c(KMnO₄)·V(KMnO₄)/V(H₂C₂O₄)</td><td>代入 c(KMnO₄)=0.02000 mol/L、V(KMnO₄)=20.00 mL、V(H₂C₂O₄)=25.00 mL 得 0.0400 mol/L。差异两点：① 不需外加指示剂（KMnO₄ 自身作指示剂）：滴定中滴入的紫红色随即褪去，终点是溶液出现持久的淡粉（浅紫红）色且 30 s 不退；② 需酸性（H₂SO₄）并加热 70–80 ℃，滴定先慢后快（Mn²⁺ 自催化）。缺一扣分。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">失分点排名（3 次重做统计）</div><p>3 次重做共 7 处错（处数 ≠ 扣分）：第 8 题错 3 次、第 7 题错 2 次、第 12 题错 2 次。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>10 分以上进 P9 自测；不足 10 分就先回读 P4–P5，隔天整卷重练。</p></div>
+    <div class="box"><div class="k">进阶题加分点</div><p>第 9 题给出 3.20 g/L 与 0.0800 g/25.00 mL 两个口径计满分；第 10 题须写出判定标准 0.02 mL。</p></div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在推导链缺步、偏差分母取错与迁移条件漏项三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与三阶段定量分析计划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:176px">自测项</th><th style="width:318px">达标标准</th><th style="width:74px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>写出方程式与计算式</td><td>HCl + NaOH → NaCl + H₂O，且 c(NaOH)=c(HCl)·V(HCl)/V(NaOH) 单位正确</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>数据表齐全可复核</td><td>3 组初读数、末读数与消耗体积齐全可复核</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>算出平均消耗体积</td><td>三次平均为 20.00 mL，保留 2 位小数</td><td class="num">P7</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>算出待测液浓度</td><td>0.1000 × 20.00 ÷ 25.00 = 0.0800 mol/L，4 位有效数字</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>换算质量浓度</td><td>0.0800 × 40.00 = 3.20 g/L，不把单位写成 g/mL</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>判断误差方向</td><td>未润洗、管尖气泡→偏大；终点判断偏早→偏小</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 下一阶段：三阶段定量分析计划 <em>每周 3 次实验课，按阶段给产出不给日量</em></div>
+  <table>
+    <tr><th style="width:112px">阶段</th><th style="width:84px">周次</th><th>任务</th><th style="width:250px">可检查产出</th></tr>
+    <tr><td>氧化还原滴定</td><td class="num">第 1–2 周</td><td>学 KMnO₄ 法与碘量法原理，练 2 组四平行数据计算，掌握自身指示剂与加热条件</td><td>滴定报告 2 份，各含 4 组平行数据</td></tr>
+    <tr><td>定量分析误差理论</td><td class="num">第 3–4 周</td><td>学系统误差与随机误差、有效数字规则与 t 检验判据</td><td>误差分类表 1 张 + t 检验算例 3 题</td></tr>
+    <tr class="hl"><td>实验数据处理</td><td class="num">第 5–6 周</td><td>用表格工具建立数据模板，自动算平均值、相对偏差并绘制 pH-V 滴定曲线</td><td>模板 1 套 + 滴定曲线 2 张</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">每次实验 30 分钟怎么分</div><p>10 分钟记数据；10 分钟现场复算浓度与相对偏差；10 分钟写下当次最大误差来源。</p></div>
+    <div class="box"><div class="k">坚持不下来的 3 个提醒</div><p>任务按周给不按天补；允许一周缺 1 次，缺的不堆到下周；第 5 周起停做新实验。</p></div>
+    <div class="box"><div class="k">下一讲衔接</div><p>下一讲用「数据记录表 + 误差方向表」两件套处理 KMnO₄ 滴定草酸，复用本讲的偏差统计模板。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>6 周后要求滴定报告 2 份、误差分类表 1 张、t 检验算例 3 题、数据处理模板 1 套、滴定曲线 2 张</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：滴定术语 10 条与数据口径</h2></div>
+    <div class="note">实验报告 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>复习时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:238px">术语</th><th>释义</th></tr>
+    <tr><td>滴定（titration）</td><td>用一种已知浓度的溶液，逐滴加入待测液至反应恰好完全，由消耗体积推算待测浓度。</td></tr>
+    <tr><td>标准溶液（standard solution）</td><td>浓度已准确已知的滴定剂，本实验为 c(HCl)=0.1000 mol/L 的标准盐酸。</td></tr>
+    <tr><td>指示剂（indicator）</td><td>随溶液 pH 变化而变色的物质，本实验用酚酞（变色范围 pH 8.2–10.0，加 2 滴）。</td></tr>
+    <tr><td>等当点（equivalence point）</td><td>加入的盐酸与待测 NaOH 恰好按 1 : 1 完全反应的时刻，强酸强碱滴定对应 pH ≈ 7。</td></tr>
+    <tr><td>滴定终点（end point）</td><td>指示剂变色的时刻（粉红恰好褪去且 30 s 不复现），与等当点相差不到 1 滴（≤0.05 mL）。</td></tr>
+    <tr><td>平行实验（parallel determination）</td><td>对同一样品重复测定 3 次，用于抵消随机误差；本实验相对平均偏差 0.07%，限值 0.2%。</td></tr>
+    <tr><td>相对偏差（relative deviation）</td><td>单次结果与平均值之差除以平均值，|d|÷x̄×100%；本实验三次为 0.00% / −0.10% / +0.10%。</td></tr>
+    <tr><td>润洗（rinsing）</td><td>滴定管内壁用待装溶液洗 2–3 次（每次约 5 mL），防止残留水稀释标准液，否则结果偏大约 0.8%。</td></tr>
+    <tr><td>摩尔浓度（molarity）</td><td>单位体积溶液中溶质的物质的量，符号 c，单位 mol/L；本实验 c(NaOH)=0.0800 mol/L。</td></tr>
+    <tr class="hl"><td>质量浓度（mass concentration）</td><td>单位体积溶液中溶质的质量，ρ = c·M，单位 g/L；本实验 ρ(NaOH)=0.0800×40.00=3.20 g/L。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">数据口径</div><p>标准盐酸 0.1000 mol/L，待测 NaOH 25.00 mL，平行 3 次；读数估读 0.01 mL，浓度保留 4 位有效数字。取舍规则：三份数据全部保留、不剔除；若某份与平均值之差超过 0.2%，该份作废并补做，直到三份合格数据齐备。</p></div>
+    <div class="box"><div class="k">参考依据</div><p>中和反应计量关系与 c·V 计算式；相对平均偏差 ≤ 0.2% 的平行性要求；M(NaOH)=40.00 g/mol 用于质量浓度换算。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增仪器清单表、六类误差幅度图、误差方向表、12 题分层练习与两页答案解析。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全报告末页；若只读一页，请至少完成 P6 的 1–4 题，并核对 20.00 mL 与 0.0800 mol/L 两个数值。</div>
+    <div>下一讲预告：氧化还原滴定（KMnO₄ 滴定草酸），沿用本讲的「数据记录表 + 误差方向表」两件套。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于复习自查，数据口径用于他人复算与结果比对</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>

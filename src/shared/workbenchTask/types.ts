@@ -16,7 +16,6 @@ import type {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
 } from './constants';
-import type { ProductionLoopMode, ProductionPlanItem } from '../productionLoop';
 
 export type WorkbenchJsonObject = Record<string, unknown>;
 
@@ -32,6 +31,17 @@ export interface WorkbenchOutputRequirement {
   mode: WorkbenchOutputMode;
   /** Allowed extensions or inline languages. Entries are alternatives, not substitutes for other requirements. */
   formats: string[];
+}
+
+/**
+ * Raw requirement as a model submits it: `formats` may be omitted, and a text
+ * requirement may carry formats. Both are normalized away instead of rejected,
+ * because a rejected requirement leaves the task without an output contract and
+ * every later tool call is blocked with no way for the model to recover.
+ */
+export interface WorkbenchOutputRequirementInput {
+  mode: WorkbenchOutputMode;
+  formats?: string[];
 }
 
 export interface WorkbenchVerificationCheck {
@@ -140,13 +150,6 @@ export interface WorkbenchTaskDetail {
   events: WorkbenchRunEvent[];
   artifacts: WorkbenchArtifact[];
   approvals: WorkbenchApproval[];
-  productionPlan?: WorkbenchProductionPlan | null;
-}
-
-export interface WorkbenchProductionPlan {
-  runId: string;
-  progressVersion: number;
-  items: ProductionPlanItem[];
 }
 
 export interface WorkbenchTaskChangedEvent {
@@ -179,7 +182,6 @@ export interface WorkbenchTaskResumeInput {
   skillIds?: string[];
   expertIds?: string[];
   goalMode?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: Array<{
     name: string;
     mimeType: string;

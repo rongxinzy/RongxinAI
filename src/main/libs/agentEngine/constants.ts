@@ -5,3 +5,9 @@ export const AgentLifecyclePhase = {
   Fallback: 'fallback',
 } as const;
 export type AgentLifecyclePhase = (typeof AgentLifecyclePhase)[keyof typeof AgentLifecyclePhase];
+
+export const PiToolEventType = {
+  ExecutionEnd: 'tool_execution_end',
+} as const;
+
+export const PiWebSearchToolName = 'web_search';

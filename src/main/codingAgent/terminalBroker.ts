@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
+import { CodingErrorMessage } from '../../shared/codingAgent';
+
 const MAX_OUTPUT_BYTES = 1_048_576;
 
 const utf8Tail = (buffer: Buffer, byteLimit: number): Buffer => {
@@ -94,7 +96,7 @@ export class TerminalBroker {
 
   async wait(id: string): Promise<CodingTerminalResult> {
     const active = this.terminals.get(id);
-    if (!active) throw new Error('The ACP terminal was not found.');
+    if (!active) throw new Error(CodingErrorMessage.AcpTerminalGone);
     return await active.completed;
   }
 

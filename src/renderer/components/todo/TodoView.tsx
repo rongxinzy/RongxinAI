@@ -58,7 +58,6 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [todos, setTodos] = useState<Todo[]>([]);
   const [allTodos, setAllTodos] = useState<Todo[]>([]);
   const [completedTodos, setCompletedTodos] = useState<Todo[]>([]);
-  const [completedCount, setCompletedCount] = useState(0);
   const [suggestionTodos, setSuggestionTodos] = useState<Todo[]>([]);
   const [lists, setLists] = useState<TodoList[]>([]);
   const [query, setQuery] = useState('');
@@ -70,6 +69,8 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [unseenViews, setUnseenViews] = useState<Set<TodoViewFilter>>(() => new Set());
+  const [unseenListIds, setUnseenListIds] = useState<Set<string>>(() => new Set());
 
   // Look the selected task up in the other snapshots as well: completing a task
   // moves it out of the active list and un-completing moves it out of the
@@ -90,8 +91,8 @@ const TodoView: React.FC<TodoViewProps> = ({
   );
 
   const activeCounts = useMemo<Record<TodoViewFilter, number>>(() => {
-    return countTodosByView(allTodos, completedCount, todayDateKey());
-  }, [allTodos, completedCount]);
+    return countTodosByView(allTodos, completedTodos, todayDateKey());
+  }, [allTodos, completedTodos]);
 
   const listCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -143,7 +144,6 @@ const TodoView: React.FC<TodoViewProps> = ({
     setAllTodos(allTodoItems);
     const completedTodoItems = completedResult.todos ?? [];
     setCompletedTodos(completedTodoItems);
-    setCompletedCount(completedTodoItems.length);
     setSuggestionTodos(
       allTodoItems
         .filter(todo => todo.myDayDate !== todayDateKey())
@@ -177,14 +177,46 @@ const TodoView: React.FC<TodoViewProps> = ({
     const title = newTodoTitle.trim();
     if (!title) return;
     const parsed = parseTodoInput(title);
-    const result = await todoService.create(
-      buildTodoCreateInput(title, parsed, activeView, activeListId, todayDateKey()),
+    const createInput = buildTodoCreateInput(
+      title,
+      parsed,
+      activeView,
+      activeListId,
+      todayDateKey(),
     );
+    const result = await todoService.create(createInput);
     if (!result.success) {
       showError();
       return;
     }
     setNewTodoTitle('');
+    // 新建后在「当前未停留」的目标导航上打主题色圆点，点进去后清除
+    setUnseenViews(current => {
+      const next = new Set(current);
+      if (!(activeListId === null && activeView === TodoViewFilter.All)) {
+        next.add(TodoViewFilter.All);
+      }
+      if (createInput.important && !(activeListId === null && activeView === TodoViewFilter.Important)) {
+        next.add(TodoViewFilter.Important);
+      }
+      if (
+        createInput.myDayDate &&
+        !(activeListId === null && activeView === TodoViewFilter.MyDay)
+      ) {
+        next.add(TodoViewFilter.MyDay);
+      }
+      if (
+        createInput.dueAt != null &&
+        !(activeListId === null && activeView === TodoViewFilter.Planned)
+      ) {
+        next.add(TodoViewFilter.Planned);
+      }
+      if (activeListId === null) next.delete(activeView);
+      return next;
+    });
+    if (createInput.listId && createInput.listId !== activeListId) {
+      setUnseenListIds(current => new Set(current).add(createInput.listId as string));
+    }
     await loadData();
   };
 
@@ -238,12 +270,24 @@ const TodoView: React.FC<TodoViewProps> = ({
     setActiveView(view);
     setActiveListId(null);
     setIsMobileNavigationOpen(false);
+    setUnseenViews(current => {
+      if (!current.has(view)) return current;
+      const next = new Set(current);
+      next.delete(view);
+      return next;
+    });
   };
 
   const handleSelectList = (listId: string): void => {
     setActiveListId(listId);
     setActiveView(TodoViewFilter.All);
     setIsMobileNavigationOpen(false);
+    setUnseenListIds(current => {
+      if (!current.has(listId)) return current;
+      const next = new Set(current);
+      next.delete(listId);
+      return next;
+    });
   };
 
   const focusNewTodoInput = (): void => {
@@ -290,6 +334,8 @@ const TodoView: React.FC<TodoViewProps> = ({
             activeCounts={activeCounts}
             lists={lists}
             listCounts={listCounts}
+            unseenViews={unseenViews}
+            unseenListIds={unseenListIds}
             newListName={newListName}
             newListInputId="todo-new-list-input"
             onNewListNameChange={setNewListName}
@@ -423,6 +469,7 @@ const TodoView: React.FC<TodoViewProps> = ({
                       key={todo.id}
                       todo={todo}
                       language={language}
+                      showListName={!activeListId || todo.listId !== activeListId}
                       onOpen={() => setSelectedTodoId(todo.id)}
                       onToggleComplete={completed => void handleToggleTodo(todo, completed)}
                       onToggleImportant={() => void handleToggleImportant(todo)}
@@ -478,6 +525,8 @@ const TodoView: React.FC<TodoViewProps> = ({
               activeCounts={activeCounts}
               lists={lists}
               listCounts={listCounts}
+              unseenViews={unseenViews}
+              unseenListIds={unseenListIds}
               newListName={newListName}
               newListInputId="todo-new-list-input-mobile"
               onNewListNameChange={setNewListName}
@@ -507,6 +556,7 @@ const TodoView: React.FC<TodoViewProps> = ({
               language={language}
               onUpdated={loadData}
               onError={showError}
+              onSaved={() => setSelectedTodoId(null)}
               onDelete={() => setDeleteTodo(selectedTodo)}
             />
           ) : null}

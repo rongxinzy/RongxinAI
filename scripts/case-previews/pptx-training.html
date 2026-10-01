@@ -1,73 +1,276 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-training</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-training</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:0;display:block}
-.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
-.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
-.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
-.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
-.rule{margin-top:26px;height:1px;background:#e6e6e2}
-.body{margin-top:30px;display:grid;gap:26px;flex:1}
-.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
-.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
-.cols2{grid-template-columns:1fr 1fr}
-.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
-.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
-
-.agenda{margin-top:10px;display:grid;gap:0;border:1px solid #e6e6e2}
-.agenda .row{display:grid;grid-template-columns:76px 1.3fr 1fr;border-top:1px solid #e6e6e2}
-.agenda .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
-.agenda .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2;color:#4c5058}
-.agenda .row div:first-child{border-left:0;color:var(--accent);font-weight:600}
-.metrics{margin-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.metric{border:1px solid #e6e6e2;background:#fafaf8;padding:14px 16px}
-.metric b{display:block;font-size:30px;color:var(--accent);letter-spacing:-.02em}
-.metric span{display:block;margin-top:6px;font-size:12.5px;color:#6f737b}
-</style></head>
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
 <body>
-<div class="slide" style="--accent:#F59E0B">
-  <div class="kicker">Onboarding Session</div>
-  <h1>新同事入职培训课件</h1>
-  <p class="lede">三天上手路径、常用工具清单与团队协作规范，第 1 讲：环境与流程</p>
-  <div class="rule"></div>
-  <div class="body" style="grid-template-columns:1.15fr 1fr">
-    <div class="blk">
-      <h2>01 三天课程安排</h2>
-      <div class="agenda">
-        <div class="row"><div>DAY 1</div><div>开发环境搭建与代码规范</div><div>2 小时 · 实操</div></div>
-        <div class="row"><div>DAY 2</div><div>业务背景与核心链路走查</div><div>3 小时 · 讲解</div></div>
-        <div class="row"><div>DAY 3</div><div>从需求到上线的完整流程</div><div>3 小时 · 演练</div></div>
-        <div class="row"><div>DAY 5</div><div>第一次独立提交与评审复盘</div><div>1 小时 · 复盘</div></div>
-      </div>
-      <h2 style="margin-top:24px">02 培训目标</h2>
-      <ul>
-        <li>能独立跑通本地环境并启动调试</li>
-        <li>能按规范提交代码并读懂评审意见</li>
-        <li>能说清自己负责模块上下游的依赖关系</li>
-      </ul>
-    </div>
-    <div class="blk">
-      <h2>03 上手常见卡点</h2>
-      <ul>
-        <li>首次启动需要下载运行时，请预留 15 分钟</li>
-        <li>本地模型路径不要放在系统盘，避免空间不足</li>
-        <li>遇到权限申请不要跳过，先看清申请范围</li>
-      </ul>
-      <h2 style="margin-top:24px">04 考核与资源</h2>
-      <div class="metrics">
-        <div class="metric"><b>3</b><span>天完成入门</span></div>
-        <div class="metric"><b>1</b><span>次独立提交</span></div>
-        <div class="metric"><b>6</b><span>份参考文档</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="brandline">云帆科技 · 研发中心</div>
-  <div class="pageno">02 / 12</div>
-</div></body></html>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">Onboarding Session · 入职培训</div>
+<h1>新同事入职培训课件</h1>
+<p class="lede">三天上手路径、常用工具清单与团队协作规范。第 1 讲：开发环境搭建与代码规范，配套一份可勾选的检查清单与考核标准。</p>
+<div class="meta"><span>适用对象：研发中心新入职同事</span><span>周期：入职第 1 至第 5 个工作日</span><span>形式：讲解 + 实操 + 复盘</span><span>版本：2026 秋 · 第 4 期</span></div>
+<div class="kn">
+  <div class="k"><b>3<em>天</em></b><span>完成入门路径</span><p>前三天累计 8 小时课程，第 5 天复盘 1 小时</p></div>
+  <div class="k"><b>1<em>次</em></b><span>独立代码提交</span><p>第 5 个工作日完成首次提交与评审复盘</p></div>
+  <div class="k"><b>6<em>份</em></b><span>参考文档</span><p>环境、规范、流程、权限、排障、术语各 1 份</p></div>
+</div>
+<table class="tb">
+  <caption>四天课程安排与时间投入</caption>
+  <thead><tr><th>时间</th><th>课程内容</th><th class="r">时长</th><th>形式</th></tr></thead>
+  <tbody>
+    <tr><td>DAY 1</td><td>开发环境搭建与代码规范</td><td class="r mono">2 小时</td><td>实操为主</td></tr>
+    <tr><td>DAY 2</td><td>业务背景与核心链路走查</td><td class="r mono">3 小时</td><td>讲解 + 走查</td></tr>
+    <tr><td>DAY 3</td><td>从需求到上线的完整流程</td><td class="r mono">3 小时</td><td>演练为主</td></tr>
+    <tr class="hi"><td>DAY 5</td><td>第一次独立提交与评审复盘</td><td class="r mono">1 小时</td><td>复盘为主</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：近 3 期共 23 人｜来源：阻塞记录 · 评审记录 · 课程签到表</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 路径｜P5–P7 卡点｜P8–P9 考核</div>
+</div></div>
+<div class="foot"><span>目标：第 5 个工作日结束时，新人能独立跑通环境、按规范提交代码并说清上下游依赖。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 课程导航</div><h1 class="pt">四天培养路径与课件结构</h1></div><div class="calib">累计课程时长 9 小时<br>导师 1 对 1 辅导 · 全文 9 页</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>结论摘要</span><em>三天路径、首次提交与参考文档</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>背景与范围</span><em>培训对象、前置条件与不覆盖内容</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>上手数据</span><em>近 3 期新人的上手耗时统计</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>卡点分析</span><em>环境、权限与流程的三类卡点</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>能力地图</span><em>环境 / 流程 / 规范 / 协作四层</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>误区对照</span><em>常见错误做法与正确做法</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与限制</span><em>环境差异、权限审批与导师投入</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>考核与资源</span><em>考核标准、资源清单与时间表</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>新人看这里</b><p>先完成 <b>P6 能力地图</b> 四层的自评，再按 <b>P9 时间表</b> 逐项勾选，不要跳步。</p></div>
+  <div class="q"><b>导师看这里</b><p><b>P5 卡点分析</b> 列出了 3 个高频阻塞点，建议在 DAY 1 提前帮新人绕开。</p></div>
+  <div class="q"><b>负责人看这里</b><p><b>P8 风险页</b> 给出了 3 人份的导师投入估算，需在带新前确认排期。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>路径：DAY 1 环境与规范、DAY 2 业务链路、DAY 3 流程演练、DAY 5 复盘。</div>
+  <div class="cell"><u>下一步与责任</u>课程排在迭代间隔周，允许拆成两个半天完成。</div>
+</div></div>
+<div class="foot"><span>导航：从上手数据到能力地图，最终收敛为可直接勾选的考核标准与资源清单。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 背景与范围</div><h1 class="pt">培训对象、前置条件与不覆盖内容</h1></div><div class="calib">对象：研发中心新入职同事<br>班级规模：近 3 期分别为 8 / 6 / 9 人</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>培训对象</b>研发中心新入职的工程师，近 3 期分别为 8 人、6 人、9 人，其中 62% 为应届毕业生，无生产环境经验。</div>
+  <div class="cell"><b>前置条件</b>已领取工牌与企业账号、已完成保密协议签署、已拿到开发机并接入办公网络，三项缺一不可。</div>
+  <div class="cell"><b>培训目标</b>第 5 个工作日结束前，能独立跑通本地环境、按规范完成 1 次代码提交、说出所负责模块的上下游依赖。</div>
+  <div class="cell"><b>不覆盖内容</b>不涉及具体业务算法原理、不做架构设计训练、不安排生产环境操作权限，这些留到入职 1 个月后。</div>
+</div>
+<div class="sl"><i>01</i>培训边界与责任划分</div>
+<div class="steps">
+  <div class="step"><b>导师职责</b><span>每人配 1 名导师，投入约 3 人日；负责 DAY 1 环境陪跑、DAY 3 流程演练与 DAY 5 代码评审。</span></div>
+  <div class="step"><b>新人职责</b><span>按时间表完成 6 份文档阅读与 4 次课程签到，独立完成首次提交，遇到阻塞超过 30 分钟须主动求助。</span></div>
+  <div class="step"><b>团队职责</b><span>提供可运行的最小用例仓库与预置开发环境镜像，保证新人不因环境问题消耗超过 1 小时。</span></div>
+  <div class="step"><b>退出标准</b><span>首次提交通过评审、环境检查清单 12 项全部勾选、能独立说清上下游依赖，三项同时满足才算入门完成。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>责任划分：导师 3 人日、新人 6 份文档、团队提供最小用例仓库。</div>
+  <div class="cell"><u>下一步与责任</u>退出标准三项同时满足才算入门完成，由导师确认。</div>
+</div></div>
+<div class="foot"><span>范围：聚焦环境、流程、规范、协作四项基础能力，不涉及架构与业务算法训练。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 上手数据</div><h1 class="pt">近 3 期新人的上手耗时统计</h1></div><div class="calib">样本：23 名新入职同事<br>统计口径：自然日 · 分钟</div></div>
+<table class="tb">
+  <caption>表 1 · 近 3 期新人上手关键指标</caption>
+  <thead><tr><th>期次 / 人数</th><th class="r">环境搭建耗时</th><th class="r">首次提交（第几天）</th><th class="r">权限审批耗时</th><th class="r">入门完成率</th></tr></thead>
+  <tbody>
+    <tr><td>第 1 期 · 8 人</td><td class="r mono">86 分钟</td><td class="r mono">第 4.5 天</td><td class="r mono">2.1 天</td><td class="r mono">87.5%</td></tr>
+    <tr><td>第 2 期 · 6 人</td><td class="r mono">71 分钟</td><td class="r mono">第 3.8 天</td><td class="r mono">1.6 天</td><td class="r mono">100%</td></tr>
+    <tr class="hi"><td>第 3 期 · 9 人</td><td class="r mono">62 分钟</td><td class="r mono">第 3.2 天</td><td class="r mono">1.5 天</td><td>100%</td></tr>
+  </tbody>
+</table>
+<div class="sl"><i>02</i>三期对比：环境搭建耗时与首次提交时点</div>
+<div class="bars">
+  <div class="bar"><span>第 1 期</span><i style="width:100%"></i><em class="mono">86 分钟 / 4.5 天</em></div>
+  <div class="bar"><span>第 2 期</span><i style="width:83%"></i><em class="mono">71 分钟 / 3.8 天</em></div>
+  <div class="bar"><span>第 3 期</span><i style="width:72%"></i><em class="mono">62 分钟 / 3.2 天</em></div>
+  <div class="bar"><span>目标值</span><i class="mut" style="width:29%"></i><em class="mono">25 分钟 / 2.0 天</em></div>
+</div>
+<div class="note">趋势说明：三期环境搭建耗时从 86 分钟降到 62 分钟，主要来自预置镜像与脚本化安装；距 25 分钟的目标值仍有 37 分钟差距。</div><div class="note">目标值口径：环境搭建从第 3 期的 62 分钟压到 25 分钟、首次提交从 3.2 天提前到 2.0 天、权限审批从 1.5 天压到 0.5 天；三项均由平台组与 HRBP 在入职前 T-2 日准备，任一项未就绪则课程顺延半天。<br>目标来源：三项目标值由平台组与 HRBP 依据前 3 期数据共同确认，每期复课后更新一次。</div></div>
+<div class="foot"><span>数据：上手耗时逐期改善，环境搭建 86 → 62 分钟，首次提交 4.5 → 3.2 天。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 卡点分析</div><h1 class="pt">环境、权限与流程的三类卡点</h1></div><div class="calib">来源：3 期共 23 人次阻塞记录<br>阻塞时长按自然时间累计</div></div>
+<div class="grid3">
+  <div class="q"><b><em>01</em>环境搭建卡点</b><p>首次启动需下载约 4.2 GB 运行时，内网镜像缺失时平均多耗 37 分钟；另有 6 人次因本地模型路径放在系统盘导致空间不足。</p></div>
+  <div class="q"><b><em>02</em>权限审批卡点</b><p>仓库、数据库与日志平台权限分属 3 个系统，平均审批 1.5 天；14 人次中有 5 人次空等超过 1 个工作日。</p></div>
+  <div class="q"><b><em>03</em>流程认知卡点</b><p>新人普遍不清楚分支命名与提交信息规范，首期 8 人中有 5 人的首次提交因信息不规范被退回重改。</p></div>
+</div>
+<div class="sl"><i>03</i>三类卡点的影响量化</div>
+<table class="tb">
+  <thead><tr><th>卡点类型</th><th class="r">涉及人次</th><th class="r">平均阻塞时长</th><th class="r">折算人日损失 / 期</th><th>缓解措施</th></tr></thead>
+  <tbody>
+    <tr><td>环境搭建</td><td class="r mono">19 / 23</td><td class="r mono">62 分钟</td><td class="r mono">0.8 人日 / 期</td><td>内网镜像 + 一键安装脚本</td></tr>
+    <tr><td>权限审批</td><td class="r mono">14 / 23</td><td class="r mono">1.5 天</td><td class="r mono">7.0 人日 / 期</td><td>入职前批量申请，3 系统并行提交</td></tr>
+    <tr class="hi"><td>流程认知</td><td class="r mono">11 / 23</td><td class="r mono">2.4 小时</td><td class="r mono">1.1 人日 / 期</td><td>DAY 1 增加规范讲解 30 分钟</td></tr>
+    <tr><td>三类合计（同一人可落入多类）</td><td class="r mono">44 人次</td><td class="r mono">—</td><td class="r mono">8.9 人日 / 期</td><td>折算口径：人次 × 时长 ÷ 3 期 ÷ 8 小时</td></tr>
+  </tbody>
+</table><div class="sl"><i>04</i>卡点缓解的责任与时间</div>
+<ul class="pts">
+  <li><b>环境卡点：</b>入职前 T-2 日完成内网镜像同步与一键脚本验证，责任人平台组，验收口径为搭建耗时不超过 25 分钟。</li>
+  <li><b>权限卡点：</b>3 类权限同日并行提交，目标把审批耗时从 1.5 天压到 0.5 天，责任人 HRBP 与 IT 支持。</li>
+</ul><div class="note">结论：权限审批折算 7.0 人日 / 期、占三类合计的 78.7%，是投入产出比最高的改进项。</div></div>
+<div class="foot"><span>卡点：权限审批平均阻塞 1.5 天、折算 7.0 人日 / 期，占三类合计 8.9 人日的 78.7%，损失最大。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 能力地图</div><h1 class="pt">环境 / 流程 / 规范 / 协作四层</h1></div><div class="calib">自评方式：每层 3 项全部勾选方可进入下一层<br>配套 12 项环境检查清单</div></div>
+<div class="flow">
+  <div class="fl"><u>LAYER 01</u><b>环境层</b>本地能启动服务并连上测试数据库；日志可在本地查看；断点调试可用。三项全部通过约需 62 分钟。</div>
+  <div class="fl"><u>LAYER 02</u><b>流程层</b>能读懂需求单字段；能建分支、提 PR、看 CI 结果；能说清从开发到上线的 5 个环节，约需 3 小时。</div>
+  <div class="fl"><u>LAYER 03</u><b>规范层</b>掌握分支命名与提交信息格式；能按模板写变更说明；了解代码评审的 4 条必查项，约需 2 小时。</div>
+  <div class="fl"><u>LAYER 04</u><b>协作层</b>知道求助渠道与响应时限；能主持一次 15 分钟站会同步；能说清所负责模块上下游依赖。</div>
+</div>
+<div class="sl"><i>04</i>四层的自评清单与常见未通过项</div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>环境层 · 12 项检查清单</b>含运行时版本、镜像源、本地端口、测试库连接、日志路径、模型目录（不可放系统盘）、磁盘余量 ≥20 GB 等，全部勾选方可通过。</div>
+  <div class="cell"><b>流程层 · 5 个环节</b>需求评审 → 开发自测 → 提交 PR → CI 与代码评审 → 合并上线。第 3 期新人中 4 人在自测环节漏项。</div>
+  <div class="cell"><b>规范层 · 4 条必查项</b>分支命名规范、提交信息含需求号、变更说明完整、无调试代码残留。首期 8 人中有 5 人因此被退回。</div>
+  <div class="cell"><b>协作层 · 求助渠道</b>阻塞超 30 分钟先在小组群提问，超 2 小时联系导师；导师响应时限为工作时间内 1 小时。</div>
+</div><div class="sl">自评与准入</div>
+<ul class="pts"><li>准入规则：环境层 12 项检查清单未全部通过，不得进入流程层的分支与 PR 操作。</li><li>自评节奏：DAY 1 晚自评环境层，DAY 3 晚自评流程与规范层，DAY 5 复盘时自评协作层。</li></ul></div>
+<div class="foot"><span>能力地图：四层逐级自评，环境层 12 项清单不通过则不得进入流程层。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 误区对照</div><h1 class="pt">常见错误做法与正确做法</h1></div><div class="calib">来源：3 期共 23 人次评审记录<br>误区按出现频次排序</div></div>
+<table class="tb">
+  <caption>表 2 · 新人常见误区与正确做法对照</caption>
+  <thead><tr><th>场景</th><th>常见错误做法</th><th>正确做法</th></tr></thead>
+  <tbody>
+    <tr><td>环境搭建</td><td>遇到报错反复重装，自行试错 1 小时以上</td><td class="n">阻塞超 30 分钟先在小组群提问，附完整报错信息</td></tr>
+    <tr><td>模型与数据目录</td><td>把模型文件放在系统盘，导致磁盘写满</td><td class="n">模型目录固定指向数据盘，并预留 20 GB 以上空间</td></tr>
+    <tr><td>权限申请</td><td>逐个系统依次申请，串行等待 3 天以上</td><td class="n">仓库、数据库、日志三类权限同日并行提交</td></tr>
+    <tr><td>代码提交</td><td>提交信息写「fix bug」，不含需求号与变更说明</td><td class="n">按模板填写：需求号 + 变更内容 + 自测结论</td></tr>
+    <tr><td>代码评审</td><td>只看评审结论，不了解被退回的原因</td><td class="n">逐条回复评审意见，说清修改方式与验证结果</td></tr>
+    <tr class="hi"><td>依赖认知</td><td>只关注自己负责的模块，不清楚上下游接口</td><td>画出一张上下游依赖草图，交由导师确认后再动手</td></tr>
+  </tbody>
+</table>
+<div class="note">统计：环境搭建试错与权限串行申请两项合计 7.8 人日 / 期，占三类卡点合计 8.9 人日的 87.6%，均为可在入职前规避的损失。</div><div class="sl"><i>04</i>误区纠正的两条通用原则</div>
+<ul class="pts">
+  <li><b>先问再试：</b>阻塞超过 30 分钟必须求助，把目标从「自己试出来」改为「按时交付」，避免单人空转。</li>
+  <li><b>并行而非串行：</b>权限、环境、文档三件事同日启动，避免把等待时间叠加成整天的空转。</li>
+</ul><div class="note">纠错成本：首期 8 人中 5 人的首次提交因信息不规范被退回，平均返工 2.4 小时；按第 5 页流程认知卡点的 11 人次 × 2.4 小时 ÷ 3 期 ÷ 8 小时折算，约合 1.1 人日 / 期，DAY 1 增加 30 分钟规范讲解即可回收。<br>验证方式：下一期在 DAY 1 增加 30 分钟规范讲解，用首次提交退回率对比验证效果。</div></div>
+<div class="foot"><span>误区：环境自行试错与权限串行申请两项损失占 81%，均为可提前规避的问题。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与限制</div><h1 class="pt">环境差异、权限审批与导师投入</h1></div><div class="calib">评估时点：2026-09-26<br>影响按高 / 中 / 低三档</div></div>
+<table class="tb">
+  <caption>表 3 · 培训风险与缓解措施</caption>
+  <thead><tr><th>风险项</th><th>概率</th><th>影响</th><th class="r">当前值</th><th>缓解措施</th></tr></thead>
+  <tbody>
+    <tr><td>开发机环境差异</td><td>高</td><td>中</td><td class="r mono">3 种机型</td><td>统一发放预置镜像，支持一键还原</td></tr>
+    <tr><td>权限审批超时</td><td>高</td><td>高</td><td class="r mono">1.5 天</td><td>入职前 T-2 日批量提交 3 类权限申请</td></tr>
+    <tr><td>导师时间冲突</td><td>中</td><td>高</td><td class="r mono">3 人日 / 人</td><td>提前 1 周锁定导师排期，避免与迭代撞期</td></tr>
+    <tr><td>内网镜像缺失</td><td>中</td><td>中</td><td class="r mono">多耗 37 分钟</td><td>镜像源预置到内网，安装脚本自动切换</td></tr>
+    <tr class="hi"><td>培训与业务迭代冲突</td><td>中</td><td>低</td><td class="r mono">9 小时 / 人</td><td>课程排在迭代间隔周，允许拆成两个半天完成</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>关键依赖</b><p>依赖内网镜像源与预置开发环境在入职前 T-2 日就绪；若镜像未同步，环境搭建耗时将回到 86 分钟以上。</p></div>
+  <div class="q"><b>假设前提</b><p>假设每期不超过 10 人且导师可投入 3 人日；若单期超过 15 人，需增加 1 名助教，否则辅导质量下降。</p></div>
+</div><div class="note">投入测算：每名新人需要 3 人日导师投入与 9 小时课程时间，按近期每期 6–9 人计算，单期投入约 20–30 人日，需在迭代排期时预留。</div><div class="sl">带新前的准备清单</div>
+<ul class="pts"><li>入职前：T-2 日完成内网镜像同步、账号开通与 3 类权限并行提交，责任人 HRBP 与 IT 支持。</li><li>排期：提前 1 周锁定导师 3 人日，避免与迭代撞期；单期超过 15 人须增派 1 名助教。</li></ul></div>
+<div class="foot"><span>风险：权限审批 1.5 天与导师 3 人日排期是两项关键前置，需在入职前 2 日闭环。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 考核与资源</div><h1 class="pt">考核标准、资源清单与时间表</h1></div><div class="calib">考核时点：第 5 个工作日<br>结果由导师与组长共同确认</div></div>
+<div class="grid4">
+  <div class="q"><b>3 天</b><p>前三天完成入门，第 5 天复盘后共 9 小时。</p></div>
+  <div class="q"><b>12 项</b><p>环境检查清单，须全部勾选。</p></div>
+  <div class="q"><b>1 次</b><p>独立提交并通过代码评审。</p></div>
+  <div class="q"><b>6 份</b><p>参考文档，全部阅读并签到确认。</p></div>
+</div>
+<div class="sl"><i>05</i>考核标准与时间表</div>
+<div class="steps">
+  <div class="step"><b>DAY 1</b><span>2026-10-13 上午完成环境搭建（清单 12 项全过）与代码规范讲解；下午自行跑通最小用例 · 导师陪跑 2 小时。</span></div>
+  <div class="step"><b>DAY 2–3</b><span>10-14 业务背景与核心链路走查（3 小时）；10-15 从需求到上线的流程演练（3 小时）并画出依赖草图。</span></div>
+  <div class="step"><b>DAY 5</b><span>10-19 完成首次独立提交，参加 1 小时代码评审复盘；三项退出标准同时满足即视为入门完成 · 导师确认。</span></div>
+</div>
+<div class="sl"><i>06</i>参考文档清单（本页列出 3 份，其余 3 份见内网知识库）</div>
+<div class="refs">
+  <div class="ref"><u>01</u><span>开发环境搭建手册（含镜像源与一键脚本）</span><em>第 12 版</em></div>
+  <div class="ref"><u>02</u><span>代码规范与提交信息模板</span><em>第 8 版</em></div>
+  <div class="ref"><u>03</u><span>从需求到上线的流程说明（5 个环节）</span><em>第 6 版</em></div>
+</div>
+<ul class="pts">
+  <li><b>考核方式：</b>环境清单 12 项 + 首次提交评审结论 + 依赖草图确认，三项全部通过方计入入门完成，通过率目标 100%。</li>
+  <li><b>复盘机制：</b>每期结束后回收新人阻塞记录与导师反馈，在下一期开始前更新本课件与检查清单，当前已迭代 4 期。</li>
+</ul></div>
+<div class="foot"><span>考核：环境清单、首次提交评审、依赖草图三项全过才算入门，通过率目标 100%。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

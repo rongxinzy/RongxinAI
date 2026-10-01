@@ -1,67 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>research-user</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-user</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-.serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:30px}
-.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
-.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
-.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:16px}
-h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
-td.mono{font-variant-numeric:tabular-nums}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
-li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
-.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
-.cols2{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;min-height:0;align-items:start}
-.bars{display:grid;gap:10px;margin-top:12px}
-.bar{display:grid;grid-template-columns:64px 1fr 40px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-.tag{display:inline-block;border:1px solid #e4e4e0;padding:2px 8px;font-size:11px;color:#6f737b;margin-right:6px}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head><body>
-<div class="sheet" style="--accent:#0F766E">
-  <div class="sheet-top">
-    <div class="kicker">User Research</div>
-    <h1>目标用户访谈与需求洞察</h1>
-    <div class="meta"><span>样本：24 位一线使用者</span><span>覆盖：制造 / 零售 / 金融 / 医疗 / 教育</span><span>周期：3 周</span></div>
-  </div>
-  <div class="body">
-    <div><h3>摘要</h3><p class="abstract">访谈中最稳定的诉求不是功能多少，而是"我知道它在替我做什么"。24 位受访者里有 19 位主动提到希望看到每一步的执行依据；愿意付费的前三位因素依次是数据不出本机、过程可回看、接入不改造现有流程。</p></div>
-    <div class="cols2">
-      <div><h3>需求优先级</h3>
-        <table>
-          <tr><th>需求</th><th>提及人数</th><th>当前满足度</th><th>判断</th></tr>
-          <tr><td>执行过程可回看</td><td class="mono">19 / 24</td><td>低</td><td>优先做</td></tr>
-          <tr><td>数据不出本机</td><td class="mono">17 / 24</td><td>中</td><td>优先做</td></tr>
-          <tr><td>不改现有流程接入</td><td class="mono">14 / 24</td><td>低</td><td>优先做</td></tr>
-          <tr><td>多人协作与分工</td><td class="mono">9 / 24</td><td>中</td><td>次优先</td></tr>
-          <tr><td>自定义界面外观</td><td class="mono">4 / 24</td><td>高</td><td>暂缓</td></tr>
-        </table>
-      </div>
-      <div><h3>痛点提及频次</h3>
-        <div class="bars">
-          <div class="bar"><span>结果不可解释</span><i style="width:100%"></i><span class="mono">19</span></div>
-          <div class="bar"><span>数据出境顾虑</span><i style="width:89%"></i><span class="mono">17</span></div>
-          <div class="bar"><span>接入要改流程</span><i style="width:74%"></i><span class="mono">14</span></div>
-          <div class="bar"><span>失败要重来</span><i style="width:58%"></i><span class="mono">11</span></div>
-          <div class="bar"><span>多人对不齐</span><i style="width:47%"></i><span class="mono">9</span></div>
-        </div>
-        <h3 style="margin-top:20px">引用摘录</h3>
-        <ul>
-          <li><span class="tag">制造业</span>出了问题我要能查到是哪一步，不然不敢让它在生产环节跑。</li>
-          <li><span class="tag">金融</span>能不能证明数据没出我们的机房，这决定了能不能立项。</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="sheet-foot"><span>研究方法：半结构化访谈 + 需求编码</span><span>第 2 / 10 页</span></div>
-</div></body></html>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">User Research</div><h2>目标用户访谈与需求洞察</h2></div><div class="pn">样本：24 位一线使用者 · 覆盖 5 个行业<br>周期：3 周 · 访谈时长中位数 52 分钟</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>访谈中最稳定的诉求不是功能多少，而是「我知道它在替我做什么」。24 位受访者里有 <b>19 位</b>主动提到希望看到每一步的执行依据。愿意付费的前三位因素依次是数据不出本机（17 人）、过程可回看（19 人）、接入不改造现有流程（14 人）。1,286 条原始语句经编码后收敛为 <b>12 个需求项</b>，其中 3 项同时满足「提及率高 + 当前满足度低」，构成明确的优先投入项。</p></div><div class="kpi"><div class="kc"><div class="k">受访样本</div><b class="n">24 位</b><i>5 个行业 · 3 类角色 · 访谈 3 周</i></div><div class="kc"><div class="k">需求收敛结果</div><b class="n">12 项</b><i>1,286 条语句 → 214 编码 → 37 概念</i></div><div class="kc"><div class="k">愿付中位数</div><b class="n">168 元/月</b><i>17/24 愿付 ≥ 100 元，4 人表示不确定</i></div></div><div class="cols2 eq"><div><h3>需求优先级</h3><table><thead><tr><th>需求</th><th class="n">提及人数</th><th>当前满足度</th><th>判断</th></tr></thead><tbody><tr class=""><td>执行过程可回看</td><td class="n n">19 / 24</td><td>低</td><td>优先做</td></tr><tr class=""><td>数据不出本机</td><td class="n n">17 / 24</td><td>中</td><td>优先做</td></tr><tr class=""><td>不改现有流程接入</td><td class="n n">14 / 24</td><td>低</td><td>优先做</td></tr><tr class=""><td>多人协作与分工</td><td class="n n">9 / 24</td><td>中</td><td>次优先</td></tr><tr class=""><td>自定义界面外观</td><td class="n n">4 / 24</td><td>高</td><td>暂缓</td></tr></tbody></table></div><div><h3>痛点提及频次</h3><div class="bars"><div class="bar"><span>结果不可解释</span><span class=""><i class="" style="width:100%"></i></span><span class="v">19</span></div><div class="bar"><span>数据出境顾虑</span><span class=""><i class="" style="width:89%"></i></span><span class="v">17</span></div><div class="bar"><span>接入要改流程</span><span class=""><i class="" style="width:74%"></i></span><span class="v">14</span></div><div class="bar"><span>失败要重来</span><span class=""><i class="" style="width:58%"></i></span><span class="v">11</span></div><div class="bar"><span>多人对不齐</span><span class=""><i class="" style="width:47%"></i></span><span class="v">9</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>5</span><span>10</span><span>15</span><span>20</span></span><span></span></div></div><div style="margin-top:10px"><div><h3>行业分布（人）</h3><div class="dist"><i class="" style="width:29%"></i><i class="g" style="width:21%"></i><i class="w" style="width:21%"></i><i class="g" style="width:17%"></i><i class="" style="width:12%"></i></div><div class="distlab"><span>制造 7</span><span>零售 5</span><span>金融 5</span><span>医疗 4</span><span>教育 3</span></div></div></div></div></div><div class="cols2 eq"><div><h3>口径与来源</h3><table><thead><tr><th>项</th><th>说明</th></tr></thead><tbody><tr class=""><td>样本口径</td><td>50 坐席以上组织的使用者与负责人；主动提及计入提及率，被动确认单列</td></tr></tbody></table></div><div><h3>后续页面导读</h3><ul class=""><li>第 3 页 样本结构、访谈脚本与编码流程</li><li>第 4–5 页 需求优先级全景与二维分层</li><li>第 6 页 关键洞察与带出处的一线原话</li></ul></div></div></div>
+  <div class="pf"><span>研究方法：半结构化访谈 + 需求编码 · 完整样本结构与编码流程见第 3 页</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 访谈编号 I01–I24<br>每页结论均可回溯样本量</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 研究设计与样本</td><td>对象、样本结构、脚本与编码流程</td><td>样本表 + 编码漏斗</td><td class="n n">3</td></tr><tr class=""><td>2 需求全景</td><td>需求优先级与痛点频次</td><td>优先级表 + 2 组分布图</td><td class="n n">4</td></tr><tr class=""><td>3 需求分层拆解</td><td>提及率 × 满足度二维定位</td><td>2×2 矩阵 + 需求簇</td><td class="n n">5</td></tr><tr class=""><td>4 关键洞察与证据</td><td>洞察 + 带出处的一线原话</td><td>5 条洞察 · 6 条原话</td><td class="n n">6</td></tr><tr class=""><td>5 情景推演</td><td>三档投入范围的结果差异</td><td>3 情景 + 敏感度</td><td class="n n">7</td></tr><tr class=""><td>6 风险与信息缺口</td><td>自报偏差与样本限制</td><td>5 项风险 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 结论与建议动作</td><td>结论与分阶段落地</td><td>3 条结论 · 3 阶段动作</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>样本清单、编码规则、术语</td><td>样本构成表 + 术语表</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>三种读法</h3><ul class=""><li>做产品优先级：第 1 页摘要 + 第 5 页分层 + 第 9 页动作</li><li>做定价：第 6 页愿付结构 + 第 7 页情景</li><li>复核方法：第 3 页编码流程 + 第 10 页样本清单</li></ul></div><div><h3>引用的书写规则</h3><ul class=""><li>每条结论后括注样本量与访谈编号，如（19/24，I03、I11）</li><li>原话保留受访者用词，不做修辞改写，仅做去标识处理</li><li>涉及行业差异时标注该行业样本量，样本 < 5 的行业不单独下结论</li></ul></div></div><div><h3>引用与编号规范</h3><table><thead><tr><th>项</th><th>规则</th><th>示例</th></tr></thead><tbody><tr class=""><td>访谈编号</td><td>按访谈顺序编号 I01–I24，行业信息随编号保留</td><td>I03 = 制造行业第 3 位受访者</td></tr></tbody></table></div></div>
+  <div class="pf"><span>样本量小于 5 的行业（医疗 4、教育 3）不单独出结论，仅作趋势参考</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Design & Sample</div><h2>研究设计、样本结构与编码流程</h2></div><div class="pn">访谈窗 2026-08-11 – 2026-08-29<br>全部访谈录音并经受访者同意</div></div>
+  <div class="pc"><div class="cols2 wide"><div><h3>样本结构</h3><table><thead><tr><th>维度</th><th>构成</th><th class="n">人数</th><th>说明</th></tr></thead><tbody><tr class=""><td>行业</td><td>制造 / 零售 / 金融 / 医疗 / 教育</td><td class="n n">7/5/5/4/3</td><td>制造样本最多，用于覆盖重流程场景</td></tr><tr class=""><td>角色</td><td>一线使用者 / 团队负责人 / IT 与安全</td><td class="n n">11/8/5</td><td>IT 与安全参与采购决策</td></tr><tr class=""><td>组织规模</td><td>50–200 人 / 200 人以上</td><td class="n n">15/9</td><td>中型团队为增量客段</td></tr><tr class=""><td>使用经验</td><td>已用同类工具 ≥ 6 个月 / 未用</td><td class="n n">16/8</td><td>对比有无经验者的需求差异</td></tr></tbody></table></div><div><h3>编码流程</h3><div class="tl"><div class="r"><b>原始语句 1,286</b><span>两轮录音转写 + 逐句切分，去除寒暄与重复</span></div><div class="r"><b>初级编码 214</b><span>开放编码，保留受访者原词（如「查到哪一步」）</span></div><div class="r"><b>概念 37</b><span>合并同义编码，如「可追溯」「能回看」合并为「过程可见」</span></div><div class="r"><b>需求项 12</b><span>按可交付粒度收敛，进入优先级评估</span></div></div></div></div><div class="cols2 eq"><div><h3>访谈脚本结构</h3><ul class=""><li>破冰 5 分钟：当前工作流与工具使用现状</li><li>关键事件 20 分钟：最近一次不满意的使用经历，追问具体动作与后果</li><li>取舍 15 分钟：三组二选一取舍题（可回看 vs 更快、本地 vs 更全）</li><li>付费 10 分钟：愿付区间与决策链上的否决角色</li></ul></div><div><h3>编码质量控制</h3><ul class=""><li>两名编码者独立编码前 6 场访谈，一致性 0.81</li><li>分歧编码由第三人裁定，共裁定 23 条</li><li>需求项合并需 2 人同意，合并记录留档可复核</li><li>所有原始语句与编码对应关系保留，支持抽样回溯</li></ul></div></div><div><h3>样本流失与构成核对</h3><table><thead><tr><th>阶段</th><th class="n">人数</th><th>说明</th><th>影响</th></tr></thead><tbody><tr class=""><td>联系并同意受访</td><td class="n">34 人</td><td>覆盖 5 个行业、3 类角色</td><td>—</td></tr><tr class=""><td>退出或未能安排</td><td class="n">10 人</td><td>时间冲突 4 人、话题敏感 3 人、未能安排 3 人</td><td>IT 与安全角色占比略低于计划</td></tr><tr class=""><td>完成并纳入分析</td><td class="n">24 人</td><td>行业 7/5/5/4/3，角色 11/8/5</td><td>构成与目标客段一致</td></tr></tbody></table></div></div>
+  <div class="pf"><span>编码一致性 0.81（前 6 场），达到可接受的 0.75 门槛；裁定记录见附录</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Landscape</div><h2>需求优先级与痛点全景</h2></div><div class="pn">提及人数按主动提及计，被动确认单列<br>优先级得分公式见页脚</div></div>
+  <div class="pc"><div class="cols2 wide"><div><h3>需求优先级（含加权得分）</h3><table><thead><tr><th>需求</th><th class="n">主动提及</th><th class="n">被动确认</th><th>满足度</th><th class="n">优先级得分</th><th>判断</th></tr></thead><tbody><tr class=""><td>执行过程可回看</td><td class="n n">19</td><td class="n n">5</td><td>低</td><td class="n n hl">81</td><td>优先做</td></tr><tr class=""><td>数据不出本机</td><td class="n n">17</td><td class="n n">7</td><td>中</td><td class="n n">75</td><td>优先做</td></tr><tr class=""><td>不改现有流程接入</td><td class="n n">14</td><td class="n n">8</td><td>低</td><td class="n n">64</td><td>优先做</td></tr><tr class=""><td>多人协作与分工</td><td class="n n">9</td><td class="n n">11</td><td>中</td><td class="n n">47</td><td>次优先</td></tr><tr class=""><td>自定义界面外观</td><td class="n n">4</td><td class="n n">6</td><td>高</td><td class="n n">22</td><td>暂缓</td></tr></tbody></table></div><div><h3>按角色看优先级差异</h3><table><thead><tr><th>需求</th><th>一线使用者 11 人</th><th>团队负责人 8 人</th><th>IT 与安全 5 人</th></tr></thead><tbody><tr class=""><td>执行过程可回看</td><td>10 人</td><td>7 人</td><td>2 人</td></tr><tr class=""><td>数据不出本机</td><td>7 人</td><td>5 人</td><td>5 人</td></tr><tr class=""><td>不改现有流程接入</td><td>7 人</td><td>6 人</td><td>1 人</td></tr><tr class=""><td>多人协作与分工</td><td>3 人</td><td>6 人</td><td>0 人</td></tr></tbody></table></div></div><div><h3>痛点提及频次（按行业拆分）</h3><table><thead><tr><th>痛点</th><th class="n">制造 7</th><th class="n">零售 5</th><th class="n">金融 5</th><th class="n">医疗 4</th><th class="n">教育 3</th><th class="n">合计</th></tr></thead><tbody><tr class=""><td>结果不可解释</td><td class="n">6</td><td class="n">4</td><td class="n">5</td><td class="n">2</td><td class="n">2</td><td class="n n hl">19</td></tr><tr class=""><td>数据出境顾虑</td><td class="n">4</td><td class="n">3</td><td class="n">5</td><td class="n">3</td><td class="n">2</td><td class="n n">17</td></tr><tr class=""><td>接入要改流程</td><td class="n">6</td><td class="n">3</td><td class="n">2</td><td class="n">2</td><td class="n">1</td><td class="n n">14</td></tr><tr class=""><td>失败要重来</td><td class="n">3</td><td class="n">3</td><td class="n">2</td><td class="n">2</td><td class="n">1</td><td class="n n">11</td></tr><tr class=""><td>多人对不齐</td><td class="n">3</td><td class="n">2</td><td class="n">1</td><td class="n">2</td><td class="n">1</td><td class="n n">9</td></tr></tbody></table></div></div>
+  <div class="pf"><span>优先级得分 = 主动提及 × 4 + 被动确认 × 1，满分 120（按 24 人折算）</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Needs Breakdown</div><h2>需求分层与二维定位</h2></div><div class="pn">行：主动提及率（阈值 60%，即 14/24）；列：当前满足度（低 < 3.2、中 3.2–3.9、高 ≥ 3.9）<br>四格按「提及率高→低 × 满足度低→高」排布</div></div>
+  <div class="pc"><div class="mx"><div><div class="t">高提及 · 低满足：立即投入（3 项）</div><p>过程可回看 19 人 / 接入不改流程 14 人 / 失败可续跑 11 人</p><ul class=""><li>合计覆盖 24 人中的 22 人</li><li>三项目前均无成熟方案</li></ul></div><div><div class="t">高提及 · 高满足：维持即可（1 项）</div><p>自定义界面外观 4 人提及、满足度自评 4.2/5</p><ul class=""><li>不构成差异化</li><li>投入产出比最低</li></ul></div><div><div class="t">低提及 · 低满足：观察（2 项）</div><p>多人协作 9 人 / 权限分级 6 人</p><ul class=""><li>在 200 人以上组织中提及率升至 7/9</li><li>随客户规模上行会变重要</li></ul></div><div><div class="t">低提及 · 高满足：暂缓（6 项）</div><p>导出格式、快捷键、主题色、通知、搜索、模板</p><ul class=""><li>满足度自评均 ≥ 3.9/5</li><li>不进入本轮规划</li></ul></div></div><div class="cols2 eq"><div><h3>三个需求簇</h3><ul class=""><li><b>可信执行簇</b>（过程可回看 + 失败可续跑 + 结果可解释）：19 人提及，覆盖制造业 6/7</li><li><b>数据边界簇</b>（数据不出本机 + 日志留存 + 导出可控）：17 人提及，金融 5/5 全部提及</li><li><b>无感接入簇</b>（不改现有流程 + 复用现有权限 + 可嵌入既有系统）：14 人提及，制造 6/7</li></ul></div><div><h3>二维定位的阈值依据</h3><ul class=""><li>高提及阈值取 60%（14/24），略高于样本中位数 12.5 人</li><li>低满足阈值取自评均值 3.2/5 以下，中满足取 3.2–3.9</li><li>低满足阈值取 3.2/5、高满足阈值取 3.9/5，调整阈值会改变象限归属，但不改变前三项的判断顺序</li></ul></div></div><div><h3>三个需求簇的来源与覆盖</h3><table><thead><tr><th>需求簇</th><th>包含需求</th><th>主动提及人数</th><th>行业集中度</th></tr></thead><tbody><tr class=""><td>可信执行簇</td><td>过程可回看、失败可续跑、结果可解释</td><td>19 人</td><td>制造业 6/7</td></tr><tr class=""><td>数据边界簇</td><td>数据不出本机、日志留存、导出可控</td><td>17 人</td><td>金融 5/5</td></tr><tr class=""><td>无感接入簇</td><td>不改现有流程、复用现有权限、可嵌入系统</td><td>14 人</td><td>制造业 6/7</td></tr></tbody></table></div></div>
+  <div class="pf"><span>三个需求簇共覆盖 22/24 位受访者的至少一项主动提及</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Insights & Evidence</div><h2>关键洞察与一线原话</h2></div><div class="pn">原话经去标识处理，保留受访者用词<br>每条洞察标注样本量与访谈编号</div></div>
+  <div class="pc"><table><thead><tr><th>#</th><th>洞察</th><th>量化证据</th><th>访谈编号</th></tr></thead><tbody><tr class=""><td>1</td><td>用户要的是可解释的执行过程，不是更多功能</td><td>19/24 主动提及「查到哪一步」；功能数量在 24 人中仅 2 人主动提及</td><td>I03、I07、I11、I19</td></tr><tr class=""><td>2</td><td>数据边界是金融与医疗的立项前置条件</td><td>金融 5/5、医疗 3/4 将「数据不出本机」列为能否立项的决定因素</td><td>I05、I09、I14</td></tr><tr class=""><td>3</td><td>流程改造成本被严重低估</td><td>制造 6/7 提到接入需改现有流程，其中 4 人估算改造需 2 周以上人力</td><td>I01、I08、I12、I21</td></tr><tr class=""><td>4</td><td>失败重来是信任崩塌的触发点</td><td>11/24 提到「一次失败就不敢再用」，且多在首次使用 3 次内发生</td><td>I02、I13、I18</td></tr><tr class=""><td>5</td><td>协作需求随组织规模突变</td><td>50–200 人组织 2/15 提及；200 人以上 7/9 提及</td><td>I04、I16、I22</td></tr></tbody></table><div class="cols2 eq"><div><h3>一线原话</h3><ul class=""><li><b>制造业（I03）</b>「出了问题我要能查到是哪一步，不然不敢让它在生产环节跑。」</li><li><b>金融（I05）</b>「能不能证明数据没出我们的机房，这决定了能不能立项。」</li><li><b>零售（I12）</b>「接进来要改我们现有的流程，光开会就开了两周，最后没做。」</li><li><b>制造业（I18）</b>「第一次试就跑错，我就再也没用过。」</li><li><b>医疗（I14）</b>「审计要看记录，我们拿不出来就只能先停。」</li><li><b>教育（I22）</b>「就我们三个人用，谈不上协作。」</li></ul></div><div><h3>洞察的量化含义</h3><ul class=""><li>把「首次 3 次使用内不出错」作为硬指标，可覆盖 11/24 人提到的信任崩塌风险</li><li>为金融与医疗各做一份数据边界的可验证证明，直接对应 8/9 位受访者的立项条件</li><li>200 人以上组织的协作需求是中型客段的 5.8 倍，产品分层应以此为界</li></ul></div></div><div><h3>原话使用与转写留存规范</h3><table><thead><tr><th>项</th><th>规则</th></tr></thead><tbody><tr class=""><td>改写边界</td><td>保留受访者原词，仅做去标识与口语语序整理，不改动含义</td></tr></tbody></table></div></div>
+  <div class="pf"><span>原话与洞察的证据链可抽样回溯至转写原文（保留 12 个月）</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Scenarios</div><h2>三档投入范围的结果推演</h2></div><div class="pn">推演基于需求簇覆盖人数与愿付中位数<br>非财务预测</div></div>
+  <div class="pc"><table><thead><tr><th>投入范围</th><th>覆盖需求</th><th>覆盖受访者</th><th>愿付中位数变化</th><th class="n">风险</th><th>概率</th></tr></thead><tbody><tr class=""><td>只做前三项</td><td>过程可回看、数据不出本机、接入不改流程</td><td>22/24 至少覆盖 1 项</td><td>168 元/月（不变）</td><td class="n">协作需求随客户变大而暴露</td><td class="n">45%</td></tr><tr class=""><td>前三项 + 协作</td><td>加上多人协作与权限分级</td><td>22/24 + 200 人以上组织的 7/9</td><td>196 元/月（+28 元）</td><td class="n">中型客段为不常用功能付费</td><td class="n">40%</td></tr><tr class=""><td>全量 12 项</td><td>含暂缓的 6 项界面类需求</td><td>24/24</td><td>172 元/月（几乎无提升）</td><td class="n">研发资源分散，前三项被拖慢</td><td class="n">15%</td></tr></tbody></table><div><h3>愿付敏感度：各需求项对愿付意愿的拉动</h3><div class="bars"><div class="bar"><span>数据不出本机</span><span class=""><i class="" style="width:89%"></i></span><span class="v">+38 元</span></div><div class="bar"><span>过程可回看</span><span class=""><i class="" style="width:74%"></i></span><span class="v">+26 元</span></div><div class="bar"><span>接入不改流程</span><span class=""><i class="" style="width:63%"></i></span><span class="v">+18 元</span></div><div class="bar"><span>多人协作</span><span class=""><i class="" style="width:41%"></i></span><span class="v">+28 元</span></div><div class="bar"><span>界面自定义</span><span class=""><i class="" style="width:9%"></i></span><span class="v">+3 元</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></span><span></span></div></div></div><div class="cols2 eq"><div><h3>推演假设</h3><ul class=""><li>愿付意愿与需求覆盖呈线性关系，未考虑竞品价格变化</li><li>假设样本结构与目标客段一致，中型组织占 15/24</li><li>假设交付能力允许在 6 个月内滚动上线</li></ul></div><div><h3>推翻推演的条件</h3><ul class=""><li>200 人以上组织在后续抽样中占比低于 20%，协作项价值下降</li><li>出现把「数据不出本机」作为免费能力的竞品，愿付拉动失效</li></ul></div></div><div><h3>三档投入的范围界定</h3><p>第一档对应可信执行簇与数据边界簇，第二档追加协作与权限分级，第三档包含 6 项满足度自评已达 3.8/5 的界面类需求。</p></div></div>
+  <div class="pf"><span>推荐第二档（前三项 + 协作）：愿付提升 28 元/月，且能覆盖 200 人以上客段的 7/9 需求</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Risks & Gaps</div><h2>偏差、风险与信息缺口</h2></div><div class="pn">访谈研究的三类系统性偏差均需明示<br>缺口项标注补齐方式</div></div>
+  <div class="pc"><table><thead><tr><th>偏差 / 风险</th><th>表现</th><th>对结论的影响</th><th>缓释方式</th></tr></thead><tbody><tr class=""><td>自报偏差</td><td>受访者高估自己在流程改造上的容忍度</td><td>「接入要改流程」的痛点可能被低估</td><td>用 3 个已上线项目的实际改造工时反向校验</td></tr><tr class=""><td>社会赞许偏差</td><td>受访者倾向给出听起来更专业的答案</td><td>合规与安全类需求的提及率可能虚高</td><td>在取舍题中做隐式验证（二选一而非直接提问）</td></tr><tr class=""><td>样本规模有限</td><td>22 项结论基于 24 人，分行业后最小样本 3 人</td><td>行业级结论不可单独采信</td><td>医疗与教育不下独立结论，仅作趋势</td></tr><tr class=""><td>回忆偏差</td><td>关键事件法依赖回忆，时间跨度达 6 个月</td><td>具体动作细节可能失真</td><td>优先采信 3 个月内发生的事件（占比 17/24）</td></tr><tr class=""><td>编码者主观合并</td><td>概念合并由 2 人裁定</td><td>需求项边界可能偏移</td><td>合并记录留档，抽样 20 条复核</td></tr></tbody></table><div class="cols2 eq"><div><h3>信息缺口</h3><ul class=""><li>缺少未使用者样本：8 位未用同类工具的受访者未单独分析其流失原因</li><li>未覆盖采购财务角色，愿付区间缺少预算口径的交叉验证</li><li>未做定量问卷，12 个需求项的分布无法外推到总体</li><li>缺少竞品用户的对照访谈，需求是绝对判断而非相对判断</li></ul></div><div><h3>本次成立的假设</h3><ul class=""><li>访谈中表达的需求在真实采购中会被同样加权</li><li>5 个行业足以覆盖主要使用场景，未纳入政府与能源</li><li>愿付中位数可代表中型客段的出资意愿</li></ul></div></div><div><h3>三类偏差的方向与抵消关系</h3><table><thead><tr><th>偏差</th><th>方向</th><th>受影响结论</th><th>与其它偏差的关系</th></tr></thead><tbody><tr class=""><td>自报偏差</td><td>高估流程改造容忍度</td><td>「接入要改流程」可能被低估</td><td>与第 2 项方向相反，部分抵消</td></tr><tr class=""><td>社会赞许偏差</td><td>高估合规与安全需求</td><td>数据边界簇占比可能虚高</td><td>与第 1 项方向相反，部分抵消</td></tr><tr class=""><td>回忆偏差</td><td>细节失真，方向不确定</td><td>关键事件的具体动作</td><td>靠 3 个月内事件样本削弱</td></tr></tbody></table></div></div>
+  <div class="pf"><span>自报与社会赞许两类偏差方向相反，可能部分抵消，但不可据此认为结论无偏</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Recommendations</div><h2>结论与建议动作</h2></div><div class="pn">结论对应第 6 页洞察<br>动作按 0–12 个月三阶段推进</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">结论一</div><b class="n class="sm"">可信执行是第一优先级</b><i>19/24 主动提及，覆盖 22/24 的至少一项</i></div><div class="kc"><div class="k">结论二</div><b class="n">数据边界决定立项</b><i>金融 5/5、医疗 3/4 视为立项前置条件</i></div><div class="kc"><div class="k">结论三</div><b class="n">协作需求按规模分层</b><i>200 人以上 7/9 提及，中型仅 2/15</i></div></div><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>上线执行过程可回看（逐步留痕 + 一键导出日志），目标首次使用 3 次内零错误；发布数据边界说明页，覆盖部署形态、导出能力、日志留存三项证明</span></div><div class="r"><b>3–6 月</b><span>把接入改造压到「不改现有流程」：复用客户现有权限体系，交付 3 个可嵌入方案；为金融与医疗各出一份可审计的证明模板</span></div><div class="r"><b>6–12 月</b><span>按组织规模上线协作与权限分级，先面向 200 人以上客户灰度；用 3 个已上线项目校验流程改造成本估算</span></div></div></div><div class="cols2 eq"><div><h3>责任与交付物</h3><table><thead><tr><th>动作</th><th>负责角色</th><th>交付物</th><th>验证方式</th></tr></thead><tbody><tr class=""><td>过程可回看</td><td>产品 + 工程</td><td>留痕视图 + 导出日志</td><td>首次 3 次使用零错误</td></tr><tr class=""><td>数据边界说明</td><td>安全 + 法务</td><td>证明页 + 模板</td><td>金融与医疗客户认可</td></tr><tr class=""><td>无感接入</td><td>交付 + 工程</td><td>3 个嵌入方案</td><td>改造工时 ≤ 2 天</td></tr></tbody></table></div><div><h3>衡量指标</h3><ul class=""><li>首次 3 次使用内出错率 / 目标 < 5%</li><li>接入改造工时中位数 / 目标 ≤ 2 天</li><li>愿付中位数 / 目标 ≥ 190 元/月</li><li>200 人以上客户协作功能使用率 / 目标 ≥ 60%</li></ul></div></div><div><h3>里程碑与通过标准</h3><table><thead><tr><th>里程碑</th><th>时间</th><th>通过标准</th></tr></thead><tbody><tr class=""><td>过程可回看上线</td><td>第 3 月</td><td>首次 3 次使用内零错误</td></tr></tbody></table></div></div>
+  <div class="pf"><span>三阶段动作对应第 7 页推荐档位（前三项 + 协作），放弃 6 项界面类需求</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>样本清单、编码规则与术语</h2></div><div class="pn">24 位受访者信息已去标识<br>转写原文保留 12 个月</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>行业</th><th>角色</th><th>组织规模</th><th>使用经验</th><th>关键贡献</th></tr></thead><tbody><tr class=""><td>I01–I07</td><td>制造</td><td>一线 3 / 负责人 2 / IT 2</td><td>6 家中型、1 家大型</td><td>5 人有经验</td><td>流程改造痛点、可追溯需求</td></tr><tr class=""><td>I08–I12</td><td>零售</td><td>一线 3 / 负责人 2</td><td>4 家中型、1 家大型</td><td>3 人有经验</td><td>接入成本、失败重来</td></tr><tr class=""><td>I13–I17</td><td>金融</td><td>一线 2 / 负责人 1 / IT 2</td><td>3 家中型、2 家大型</td><td>4 人有经验</td><td>数据边界、审计留痕</td></tr><tr class=""><td>I18–I21</td><td>医疗</td><td>一线 2 / 负责人 1 / IT 1</td><td>3 家中型、1 家大型</td><td>2 人有经验</td><td>首次使用信任、审计要求</td></tr><tr class=""><td>I22–I24</td><td>教育</td><td>一线 1 / 负责人 2</td><td>3 家中小型</td><td>2 人有经验</td><td>协作不足、规模差异</td></tr></tbody></table><div class="cols2 eq"><div><h3>编码规则</h3><ul class=""><li>开放编码保留受访者原词，不做术语替换</li><li>同义合并需 2 名编码者同意，合并记录留档</li><li>需求项要求「可交付粒度」，粒度过大则拆分</li><li>一致性 0.81（前 6 场），分歧 23 条由第三人裁定</li></ul></div><div><h3>术语表</h3><ul class=""><li><b>主动提及</b>：受访者未受提示时自发提到的需求</li><li><b>被动确认</b>：在提示后才认可的需求</li><li><b>关键事件法</b>：围绕近一次具体经历追问细节的访谈方法</li><li><b>社会赞许偏差</b>：受访者给出更符合期待答案的倾向</li><li><b>需求簇</b>：相互关联、常被同时提及的需求集合</li></ul></div></div><div><h3>存档与合规</h3><table><thead><tr><th>项</th><th>做法</th><th>留存期</th></tr></thead><tbody><tr class=""><td>录音与转写</td><td>经受访者同意后录音，去标识后存档</td><td>12 个月</td></tr><tr class=""><td>身份信息</td><td>与转写分离存放，仅研究负责人可访问</td><td>12 个月</td></tr></tbody></table></div></div>
+  <div class="pf"><span>样本清单仅列区间信息，个体身份信息单独存档不入报告 · 版本 v2026.09</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

@@ -24,3 +24,18 @@ test('commits structured output requirements through the runtime callback', asyn
   await execute('call', { requirements });
   expect(commit).toHaveBeenCalledWith(requirements);
 });
+
+test('the tool accepts a text requirement without formats', async () => {
+  const commit = vi.fn();
+  const tool = buildPiTaskOutputTool(commit);
+  const parameters = tool.parameters as {
+    properties: {
+      requirements: { items: { required: string[] } };
+    };
+  };
+  expect(parameters.properties.requirements.items.required).toEqual(['mode']);
+  await (tool.execute as (_id: string, params: unknown) => Promise<unknown>)('call', {
+    requirements: [{ mode: WorkbenchOutputMode.Text }],
+  });
+  expect(commit).toHaveBeenCalledWith([{ mode: WorkbenchOutputMode.Text }]);
+});

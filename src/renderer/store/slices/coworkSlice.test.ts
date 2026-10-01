@@ -1,3 +1,4 @@
+import { CoworkExecutionMode } from '../../../shared/cowork/constants';
 import { expect, test } from 'vitest';
 
 import {
@@ -13,6 +14,7 @@ import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types
 import coworkReducer, {
   addMessage,
   addSession,
+  prependMessages,
   clearCurrentSessionForWorkspaceChange,
   clearPendingPermissionsForSession,
   clearLoadingSessionId,
@@ -33,13 +35,12 @@ import coworkReducer, {
 const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) => ({
   id: 'session-1',
   title: 'Test Session',
-  claudeSessionId: null,
   status: CoworkSessionStatusValue.Completed,
   pinned: false,
   cwd: '/tmp',
   systemPrompt: '',
   modelOverride: '',
-  executionMode: 'local' as const,
+  executionMode: CoworkExecutionMode.Local,
   activeSkillIds: [],
   workspaceId: 'workspace-test',
   agentId: 'main',
@@ -52,13 +53,17 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   ...overrides,
 });
 
+test('initial permission mode allows all tools', () => {
+  expect(coworkReducer(undefined, { type: 'init' }).config.permissionMode).toBe(CoworkPermissionMode.AllowAll);
+});
+
 test('setConfig loads Pi-owned cowork configuration', () => {
   const state = coworkReducer(
     undefined,
     setConfig({
       workingDirectory: '/tmp',
       systemPrompt: '',
-      executionMode: 'local',
+      executionMode: CoworkExecutionMode.Local,
       permissionMode: CoworkPermissionMode.Ask,
       embeddingEnabled: false,
       embeddingProvider: 'openai',
@@ -340,6 +345,16 @@ test('updateSessionStatus marks the active session as streaming while it is runn
   expect(runningState.streamingSessionIds).toEqual(['session-1']);
 });
 
+test('loading a persisted running snapshot does not create a live stream', () => {
+  const state = coworkReducer(
+    undefined,
+    addSession(makeSession({ status: CoworkSessionStatusValue.Running })),
+  );
+
+  expect(state.streamingSessionIds).toEqual([]);
+  expect(state.streamingSessions).toEqual({});
+});
+
 test('a stale completed snapshot does not clear a tracked live session stream', () => {
   const runningState = coworkReducer(
     coworkReducer(undefined, addSession(makeSession())),
@@ -358,7 +373,10 @@ test('a stale completed snapshot does not clear a tracked live session stream', 
 test('keeps streaming messages when another session is selected', () => {
   const sessionOne = makeSession({ id: 'session-1', status: CoworkSessionStatusValue.Running });
   const sessionTwo = makeSession({ id: 'session-2' });
-  const streamingState = coworkReducer(undefined, addSession(sessionOne));
+  const streamingState = coworkReducer(
+    coworkReducer(undefined, addSession(sessionOne)),
+    updateSessionStatus({ sessionId: sessionOne.id, status: CoworkSessionStatusValue.Running }),
+  );
   const switchedState = coworkReducer(streamingState, setCurrentSession(sessionTwo));
   const updatedState = coworkReducer(
     switchedState,
@@ -392,7 +410,10 @@ test('merges complete loaded history into a tracked streaming session', () => {
     messagesOffset: 30,
     totalMessages: 31,
   });
-  const streamingState = coworkReducer(undefined, addSession(runningSession));
+  const streamingState = coworkReducer(
+    coworkReducer(undefined, addSession(runningSession)),
+    updateSessionStatus({ sessionId: runningSession.id, status: CoworkSessionStatusValue.Running }),
+  );
   const updatedState = coworkReducer(
     streamingState,
     updateMessageContents([
@@ -424,6 +445,53 @@ test('merges complete loaded history into a tracked streaming session', () => {
   expect(restoredState.currentSession?.messages[2]?.content).toBe('complete live response');
   expect(restoredState.currentSession?.messagesOffset).toBe(0);
   expect(restoredState.currentSession?.status).toBe(CoworkSessionStatusValue.Running);
+});
+
+test('reloading a recent page keeps the initial prompt before replies and preserves its offset', () => {
+  const messages = Array.from({ length: 65 }, (_, index) => ({
+    id: `message-${index}`,
+    type: index === 0 ? 'user' as const : 'assistant' as const,
+    content: `content-${index}`,
+    timestamp: 1,
+  }));
+  const running = makeSession({
+    status: CoworkSessionStatusValue.Running,
+    messages,
+    totalMessages: messages.length,
+  });
+  let state = coworkReducer(
+    coworkReducer(undefined, addSession(running)),
+    updateSessionStatus({ sessionId: running.id, status: CoworkSessionStatusValue.Running }),
+  );
+  state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
+  state = coworkReducer(state, setCurrentSession({
+    ...running, messages: messages.slice(15), messagesOffset: 15,
+  }));
+  expect(state.currentSession?.messages.map(message => message.id))
+    .toEqual(messages.map(message => message.id));
+  expect(state.currentSession?.messagesOffset).toBe(0);
+  expect(state.currentSession?.totalMessages).toBe(65);
+  expect(state.streamingSessions[running.id].messages[0].type).toBe('user');
+});
+
+test('loaded older pages survive switching away from a running session', () => {
+  const older = { id: 'user', type: 'user' as const, content: 'question', timestamp: 1 };
+  const recent = { id: 'reply', type: 'assistant' as const, content: 'reply', timestamp: 2 };
+  const running = makeSession({
+    status: CoworkSessionStatusValue.Running,
+    messages: [recent], messagesOffset: 1, totalMessages: 2,
+  });
+  let state = coworkReducer(
+    coworkReducer(undefined, addSession(running)),
+    updateSessionStatus({ sessionId: running.id, status: CoworkSessionStatusValue.Running }),
+  );
+  state = coworkReducer(state, prependMessages({
+    sessionId: running.id, messages: [older], newOffset: 0,
+  }));
+  state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
+  state = coworkReducer(state, setCurrentSession(running));
+  expect(state.currentSession?.messages).toEqual([older, recent]);
+  expect(state.currentSession?.messagesOffset).toBe(0);
 });
 
 test('tracks parallel transient tool activities by session and call id', () => {
@@ -639,9 +707,7 @@ test('a refreshed session list keeps the run start of a session that is still ru
   expect(settled.sessions[0]?.runStartedAt ?? null).toBeNull();
 });
 
-test('addMessage stamps a run start for a session that arrives already running', () => {
-  // Channel and IM turns flip no status in the renderer, so the first message
-  // of such a turn is what dates the run.
+test('addMessage does not infer a run start from message arrival', () => {
   const state = coworkReducer(
     undefined,
     setSessions([makeSummary('session-1', { status: CoworkSessionStatusValue.Running })]),
@@ -655,5 +721,5 @@ test('addMessage stamps a run start for a session that arrives already running',
     }),
   );
 
-  expect(withMessage.sessions[0]?.runStartedAt).toBe(700);
+  expect(withMessage.sessions[0]?.runStartedAt).toBeUndefined();
 });

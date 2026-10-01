@@ -167,8 +167,7 @@ export function collectWorkbenchArtifacts(input: {
     const contentHash = hashFile(resolved);
     const declaredHash = candidate.sha256 ?? null;
     const provenance =
-      candidate.source === WorkbenchArtifactCandidateSource.DomainWorkflow ||
-      candidate.source === WorkbenchArtifactCandidateSource.ProductionInspection
+      candidate.source === WorkbenchArtifactCandidateSource.DomainWorkflow
         ? WorkbenchArtifactProvenance.Controller
         : WorkbenchArtifactProvenance.Workspace;
     artifacts.push({

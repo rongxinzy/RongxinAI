@@ -1,58 +1,404 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-review</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-review</title><style>
+*{box-sizing:border-box;margin:0}
+body{width:1100px;background:#f2f2ef;padding:30px;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 46px;display:flex;flex-direction:column}
+.mono{font-variant-numeric:tabular-nums}
 .serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:32px;background:#eceae4}
-.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
-.ptitle{font-size:23px;text-align:center;line-height:1.4}
-.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
-.abstract{margin-top:18px;border:1px solid #eeede7;background:#faf9f6;padding:14px 18px}
-.abstract h4{font-size:11px;letter-spacing:.2em;color:#8b8f97}
-.abstract p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-.keywords{margin-top:10px;font-size:11.5px;color:#8b8f97}
-.sections{margin-top:16px;flex:1;min-height:0;display:grid;gap:12px}
-.sec{font-size:12.5px;color:#3d4046;line-height:1.95}
-.sec b{font-weight:600}
-.lv2{padding-left:22px}
-.lv3{padding-left:44px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
-th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
-.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
-.flow i{color:#b8b5ab;font-style:normal}
-.redline{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.redline .col h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.redline .col p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-del{color:#b3564a;text-decoration:line-through}
-ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px}
-.reasons{margin-top:12px;display:grid;gap:7px}
-.reasons div{font-size:12px;color:#4c5058;padding-left:14px;position:relative}
-.reasons div::before{content:"·";position:absolute;left:2px;color:#b8b5ab}
-.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.kicker{font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.kicker.a{color:var(--accent)}
+h4{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 9px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.05em;font-weight:500}
+tr.total td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+ul{list-style:none;display:grid;gap:5px}
+li{position:relative;padding-left:13px;font-size:12.5px;line-height:1.75;color:#4c5058}
+li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;background:var(--accent)}
+.phead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #e4e4e0;padding-bottom:8px}
+.pn{font-size:11px;color:#8b8f97}
+h2{font-size:23px;letter-spacing:-.02em;font-weight:600;margin-top:8px}
+.body{flex:1;min-height:0;margin-top:11px;display:grid;gap:10px;align-content:start}
+.pfoot{margin-top:auto;padding-top:8px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.kpi{border:1px solid #edede9;background:#faf9f6;padding:9px 11px}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent);font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:4px;font-size:11px;color:#8b8f97}
+.bar{height:8px;background:#f0efeb;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.72}
+.block{border:1px solid #edede9;background:#faf9f6;padding:10px 13px}
+.refs{display:grid;gap:4px;font-size:11.5px;color:#4c5058;line-height:1.65}
+.refs div{padding-left:24px;text-indent:-24px}
+.refs em{font-style:normal;color:var(--accent);font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="page" style="--accent:#7C3AED">
-  <div class="ptitle serif">端侧推理研究脉络整理（2019 — 2026）</div>
-  <div class="authors">纳入 68 篇文献 · 按方法与结论两个维度归类</div>
-  <div class="sections">
-    <table>
-      <tr><th>文献</th><th>方法</th><th>核心结论</th><th>可借鉴点</th></tr>
-      <tr><td class="mono">Liu 2023</td><td>量化 + 蒸馏</td><td>4bit 量化损失可控</td><td>精度与体积的取舍曲线</td></tr>
-      <tr><td class="mono">Chen 2024</td><td>任务级评测</td><td>通用榜单与业务表现弱相关</td><td>评测集需按任务构建</td></tr>
-      <tr><td class="mono">Wang 2025</td><td>流程实验</td><td>加入审批环节后落地率提升</td><td>把回溯做进流程</td></tr>
-      <tr><td class="mono">Zhao 2025</td><td>案例研究</td><td>数据不出域是决策硬约束</td><td>合规说明前置</td></tr>
-      <tr><td class="mono">Sun 2026</td><td>纵向跟踪</td><td>混合部署长期成本更低</td><td>分阶段迁移路径</td></tr>
-      <tr><td class="mono">Li 2026</td><td>工具链评测</td><td>接入成本决定试点能否转正式</td><td>把接入步骤做成一键化</td></tr>
-      <tr><td class="mono">Guo 2026</td><td>访谈研究</td><td>审计记录是采购方最常索要的材料</td><td>默认开启操作留痕</td></tr>
+
+<section class="page" data-page="1" style="--accent:#7C3AED">
+  <div style="text-align:center;margin-top:4px">
+    <div class="kicker a">LITERATURE REVIEW · 文献综述</div>
+    <h1 class="serif" style="font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.35;margin-top:11px">端侧推理与团队协作流程：2019—2026 年研究脉络</h1>
+    <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">纳入文献 68 篇　|　检索日 2026-09-20　|　中英文各 34 篇　|　综述预计篇幅 8,000 字</div>
+  </div>
+  <div class="block" style="margin-top:13px">
+    <div class="kicker">摘要 / ABSTRACT</div>
+    <p style="margin-top:7px">本文系统梳理 2019 至 2026 年间 68 篇相关研究，按端侧推理效率、数据主权与合规、协作流程与落地成效三条脉络归类，另单列评测方法 8 篇。梳理表明：效率类研究已把量化与蒸馏的精度损失压缩到 1.2 个百分点以内，但对流程层改动仅有 15 篇涉及，且观察期普遍短于 8 周，构成本文要回应的核心缺口。</p>
+  </div>
+  <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">关键词：端侧推理 · 数据主权 · 协作流程 · 系统性综述 · 研究缺口</div>
+  <div class="grid3" style="margin-top:11px">
+    <div class="kpi"><b>68</b><span>纳入文献（篇）</span></div>
+    <div class="kpi"><b>7 年</b><span>覆盖时间跨度</span></div>
+    <div class="kpi"><b>3</b><span>研究脉络</span></div>
+  </div>
+  <div style="margin-top:11px">
+    <h4>纳入文献的主题分布</h4>
+    <table style="margin-top:6px">
+      <tr><th>主题</th><th style="width:60px">篇数</th><th style="width:62px">占比</th><th style="width:158px">代表研究</th><th>汇总结论</th></tr>
+      <tr><td>端侧推理效率</td><td class="mono">28</td><td class="mono">41.2%</td><td class="mono">Liu 2023 [1]</td><td>精度损失可控制在 1.2 个百分点以内</td></tr>
+      <tr><td>数据主权与合规</td><td class="mono">17</td><td class="mono">25.0%</td><td class="mono">Zhao 2025 [5]</td><td>数据不出域构成采购决策的硬约束</td></tr>
+      <tr><td>协作流程与落地</td><td class="mono">15</td><td class="mono">22.1%</td><td class="mono">Wang 2025 [10]</td><td>引入审批环节可提升试点转正比例</td></tr>
+      <tr><td>评测方法</td><td class="mono">8</td><td class="mono">11.7%</td><td class="mono">Chen 2024 [9]</td><td>通用榜单与业务表现弱相关</td></tr>
+      <tr class="total"><td>合计</td><td class="mono">68</td><td class="mono">100.0%</td><td class="mono">2019 — 2026</td><td>流程层证据仍然稀疏</td></tr>
     </table>
-    <div class="redline" style="grid-template-columns:1fr">
-      <div class="col"><h4>研究缺口</h4>
-        <p>已有研究多在实验室条件下比较模型能力，缺少对"团队协作流程改动"的长期观察，也少有把审批、回溯与评测放在同一框架内的研究。</p>
+  </div>
+    <div class="grid2" style="margin-top:10px;padding-top:8px;border-top:1px solid #eeede7">
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">口径与来源　</b>四库检索初检 412 篇 · 双人独立筛选 · 最终纳入 68 篇</p>
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">后续页面导读　</b>P2 检索 · P3 计量 · P4—6 脉络 · P7 质量 · P8 述评 · P9 规范 · P10 文献</p>
+  </div>
+  <p style="margin-top:8px;font-size:11.5px;line-height:1.7;color:#6f737b">口径说明：纳入文献中英文各 34 篇，均为同行评议的期刊论文或会议长文，预印本与技术博客不计入。</p>
+  <div class="pfoot"><span>纳入 68 篇，其中流程类研究仅 15 篇（22.1%），构成本文主要缺口</span><span>第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.1 检索策略与纳入排除</div><div class="pn">检索日 2026-09-20，双人独立筛选</div></div>
+  <h2>检索式、筛选流程与一致性检验</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:96px">检索项</th><th>设置</th></tr>
+      <tr><td>数据库</td><td>Web of Science 核心合集、CNKI 学术期刊、IEEE Xplore、ACM Digital Library</td></tr>
+      <tr><td>检索式</td><td>（on-device inference OR local deployment OR edge agent）AND（collaboration workflow OR adoption OR process）</td></tr>
+      <tr><td>时间范围</td><td>2019-01-01 至 2026-09-20，仅收录期刊论文与会议长文</td></tr>
+      <tr class="total"><td>语言</td><td>中文与英文，排除非同行评议的预印本与技术博客</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>筛选流程（篇）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>初检命中</span><span class="bar"><i style="width:100%"></i></span><span class="mono">412</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>去重后</span><span class="bar"><i style="width:77%"></i></span><span class="mono">318</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>题摘通过</span><span class="bar"><i style="width:35%"></i></span><span class="mono">143</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>全文评估</span><span class="bar"><i style="width:23%"></i></span><span class="mono">96</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>最终纳入</span><span class="bar"><i style="width:16.5%"></i></span><span class="mono">68</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>纳入与排除标准</h4>
+        <ul style="margin-top:7px">
+          <li>纳入：报告了可复现的测量口径或流程干预设计</li>
+          <li>纳入：样本为 10 人以上的真实团队或明确标注实验条件</li>
+          <li>排除：仅有模型榜单得分、无流程或组织变量</li>
+          <li>排除：重复发表、无法获取全文、非同行评议</li>
+        </ul>
+        <h4 style="margin-top:9px">筛选一致性</h4>
+        <p style="margin-top:5px">两名评价者独立完成题摘与全文筛选，Cohen κ = 0.86（题摘）、0.81（全文），分歧经第三人仲裁解决。</p>
+      </div>
+    </div>
+    <div class="block"><h4>排除原因分布（全文评估阶段 28 篇）</h4><table style="margin-top:6px"><tr><th>排除原因</th><th style="width:70px">篇数</th><th>说明</th></tr><tr><td>无流程变量</td><td class="mono">11</td><td>仅比较模型精度或推理时延</td></tr><tr><td>样本不足</td><td class="mono">8</td><td>受试者少于 10 人</td></tr><tr class="total"><td>不可复现</td><td class="mono">9</td><td>未报告测量口径与原始数据字段</td></tr></table></div>
+  </div>
+  <div class="pfoot"><span>412 篇初检 → 68 篇纳入，筛选一致性 κ = 0.81</span><span>第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.2 文献计量特征</div><div class="pn">68 篇，按年份与方法归类</div></div>
+  <h2>年份分布与方法类型</h2>
+  <div class="body">
+    <div>
+      <h4>逐年发表数量（篇）</h4>
+      <div style="display:grid;gap:6px;margin-top:7px">
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2019</span><span class="bar"><i style="width:33%"></i></span><span class="mono">4 篇 · 5.9%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2020</span><span class="bar"><i style="width:50%"></i></span><span class="mono">6 篇 · 8.8%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2021</span><span class="bar"><i style="width:58%"></i></span><span class="mono">7 篇 · 10.3%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2022</span><span class="bar"><i style="width:75%"></i></span><span class="mono">9 篇 · 13.2%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2023</span><span class="bar"><i style="width:92%"></i></span><span class="mono">11 篇 · 16.2%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2024</span><span class="bar"><i style="width:100%"></i></span><span class="mono">12 篇 · 17.6%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2025</span><span class="bar"><i style="width:92%"></i></span><span class="mono">11 篇 · 16.2%</span></div>
+        <div style="display:grid;grid-template-columns:66px 1fr 84px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span class="mono">2026</span><span class="bar"><i style="width:67%"></i></span><span class="mono">8 篇 · 11.8%</span></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h4>研究方法类型（共 68 篇）</h4>
+        <table style="margin-top:6px">
+          <tr><th>方法</th><th style="width:56px">篇数</th><th style="width:56px">占比</th></tr>
+          <tr><td>实验 / 基准测试</td><td class="mono">26</td><td class="mono">38.2%</td></tr>
+          <tr><td>问卷研究</td><td class="mono">15</td><td class="mono">22.1%</td></tr>
+          <tr><td>案例研究</td><td class="mono">12</td><td class="mono">17.7%</td></tr>
+          <tr><td>访谈研究</td><td class="mono">9</td><td class="mono">13.2%</td></tr>
+          <tr class="total"><td>成本建模</td><td class="mono">6</td><td class="mono">8.8%</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>一句话读图</h4>
+        <ul style="margin-top:6px">
+          <li>发表量在 2024 年达到峰值 12 篇，此后趋于稳定</li>
+          <li>实验类占 38.2%，但涉及真实团队的不足一半</li>
+          <li>成本建模仅 6 篇，与流程投入的隐性成本直接相关</li>
+          <li>2026 年前三季度已有 8 篇，全年预计接近 2024 年峰值</li>
+        </ul>
       </div>
     </div>
   </div>
-  <div class="foot"><span>检索式：端侧推理 AND 协作流程</span><span>更新于 2026-09</span></div>
-</div></body></html>
+  <div class="pfoot"><span>2019 — 2026 年共 68 篇，2024 年为峰值年（12 篇）</span><span>第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.3.1 脉络一 · 端侧推理效率</div><div class="pn">28 篇，本页列 4 篇代表性研究</div></div>
+  <h2>效率路线的四条技术分支</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:140px">代表研究</th><th style="width:96px">技术分支</th><th>核心结论</th><th style="width:180px">局限</th></tr>
+      <tr><td class="mono">Liu 2023 [1]</td><td>权重量化</td><td>4bit 量化在文本生成任务上精度损失 1.2 个百分点</td><td>仅在单机单人场景评测</td></tr>
+      <tr><td class="mono">Tan 2024 [2]</td><td>知识蒸馏</td><td>蒸馏后模型体积降至 38%，时延下降 44%</td><td>未考察团队并发下的资源争用</td></tr>
+      <tr><td class="mono">He 2025 [3]</td><td>缓存复用</td><td>上下文缓存命中率 62% 时可省 31% 算力</td><td>命中率对任务同质性依赖强</td></tr>
+      <tr><td class="mono">Ma 2026 [4]</td><td>稀疏激活</td><td>稀疏度 50% 时吞吐提升 1.8 倍，精度基本持平</td><td>缺少与流程审批的耦合分析</td></tr>
+      <tr class="total"><td class="mono">四篇汇总</td><td>四条分支</td><td>精度损失中位数 1.2 个百分点，吞吐提升中位数 1.8 倍</td><td>均未把流程改动纳入变量</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>效率指标汇总（中位数）</h4>
+        <table style="margin-top:6px">
+          <tr><th>指标</th><th style="width:72px">数值</th><th style="width:74px">评测条件</th></tr>
+          <tr><td>精度损失</td><td class="mono">1.2 pp</td><td>4bit 量化</td></tr>
+          <tr><td>体积压缩</td><td class="mono">62%</td><td>蒸馏后</td></tr>
+          <tr><td>时延下降</td><td class="mono">44%</td><td>单机 8 并发</td></tr>
+          <tr class="total"><td>吞吐提升</td><td class="mono">1.8 倍</td><td>稀疏度 50%</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>可借鉴与不可借鉴</h4>
+        <ul style="margin-top:6px">
+          <li>可借鉴：把精度损失量化到百分点，便于写入验收口径</li>
+          <li>可借鉴：缓存命中率作为流程同质性的代理指标</li>
+          <li>不可借鉴：实验室单机条件无法代表 20 人团队的并发</li>
+          <li>不可借鉴：未区分学习效应与真实效率提升</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><h4>本脉络小结</h4><p style="margin-top:6px">效率研究已把「代价」测量得很细，却把「收益」简化为单一基准分数；对本文而言，可直接借用其测量精度，但需把落地成效替换为流程层指标（完成时长、返工率、依从度）。</p></div>
+  </div>
+  <div class="pfoot"><span>效率类 28 篇：精度损失中位数 1.2 pp，吞吐提升中位数 1.8 倍</span><span>第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.3.2 脉络二 · 数据主权与合规</div><div class="pn">17 篇，本页列 4 篇代表性研究</div></div>
+  <h2>合规约束如何转化为流程要求</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:140px">代表研究</th><th style="width:110px">研究情境</th><th>核心结论</th><th style="width:170px">局限</th></tr>
+      <tr><td class="mono">Zhao 2025 [5]</td><td>采购决策</td><td>数据不出域在 62% 的采购评审中被列为硬性条件</td><td>未给出流程层面的落地路径</td></tr>
+      <tr><td class="mono">Xu 2024 [6]</td><td>审计留痕设计</td><td>记录粒度提高一档，运维开销上升 9%</td><td>样本仅 3 家机构</td></tr>
+      <tr><td class="mono">Guo 2026 [7]</td><td>访谈研究</td><td>审计记录是采购方索要频率最高的材料（41 次提及）</td><td>未量化记录带来的实际收益</td></tr>
+      <tr><td class="mono">Zhou 2026 [8]</td><td>跨区域合规</td><td>数据分类分级可减少 28% 的合规审查轮次</td><td>分类标准依赖行业惯例</td></tr>
+      <tr class="total"><td class="mono">四篇汇总</td><td>四类情境</td><td>合规约束最终都落为「可审计 + 数据分类分级」两条要求</td><td>缺少与效率指标的联合优化</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>合规要求的提及篇数（n = 17，可多选）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:110px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>数据不出域</span><span class="bar"><i style="width:100%"></i></span><span class="mono">11 篇</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>操作可追溯</span><span class="bar"><i style="width:73%"></i></span><span class="mono">8 篇</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>数据分类分级</span><span class="bar"><i style="width:55%"></i></span><span class="mono">6 篇</span></div>
+          <div style="display:grid;grid-template-columns:110px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>留存期限明确</span><span class="bar"><i style="width:45%"></i></span><span class="mono">5 篇</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>对流程设计的启示</h4>
+        <ul style="margin-top:6px">
+          <li>审批节点必须默认留痕，且记录可导出为审计材料</li>
+          <li>留痕粒度与运维开销正相关，需给出成本曲线</li>
+          <li>数据分类分级应前置到任务卡字段定义阶段[6][8]</li>
+          <li>合规说明需写入流程文档，而非交付后补充</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><h4>本脉络小结</h4><p style="margin-top:6px">合规类研究把「必须做什么」写得很清楚，却少有研究回答「做到什么粒度最划算」[6]；本文的审批回溯覆盖度分档正是要补上这一定量权衡。</p></div>
+  </div>
+  <div class="pfoot"><span>合规类 17 篇：数据不出域被提及 11 篇（64.7%），操作可追溯 8 篇（47.1%）</span><span>第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.3.3 脉络三 · 协作流程与落地成效</div><div class="pn">15 篇，观察期中位数 7 周</div></div>
+  <h2>流程改动与落地成效的现有证据</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:140px">代表研究</th><th style="width:96px">观察期</th><th>核心结论</th><th style="width:150px">局限</th></tr>
+      <tr><td class="mono">Chen 2024 [9]</td><td class="mono">4 周</td><td>通用榜单排名与业务表现相关系数仅 0.21</td><td>未追踪流程改动</td></tr>
+      <tr><td class="mono">Wang 2025 [10]</td><td class="mono">8 周</td><td>加入审批环节后试点转正式比例提升 18 pp</td><td>未排除学习效应</td></tr>
+      <tr><td class="mono">Qian 2025 [11]</td><td class="mono">6 周</td><td>任务边界书面化使返工率下降 12.4%</td><td>样本仅 1 个团队</td></tr>
+      <tr><td class="mono">Sun 2026 [12]</td><td class="mono">—</td><td>混合部署三年总成本低于纯本地 12%</td><td>未计入流程调整投入</td></tr>
+      <tr><td class="mono">Li 2026 [13]</td><td class="mono">10 周</td><td>接入步骤一键化使试点转正率提升 23 pp</td><td>缺少对照组的严格随机化</td></tr>
+      <tr class="total"><td class="mono">五篇汇总</td><td class="mono">中位数 7 周</td><td>流程类改动普遍带来正向变化，量级在 12% — 23% 之间</td><td>观察期短、样本小、无随机化</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>观察期与结论稳定性的关系</h4>
+        <table style="margin-top:6px">
+          <tr><th>观察期</th><th style="width:56px">篇数</th><th style="width:96px">结论稳定性</th></tr>
+          <tr><td>不超过 4 周</td><td class="mono">5</td><td>低，易受学习效应影响</td></tr>
+          <tr><td>5 — 8 周</td><td class="mono">7</td><td>中，方向可信、量级不稳</td></tr>
+          <tr class="total"><td>9 周及以上</td><td class="mono">3</td><td>较高，可观察到收敛</td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>本文可改进之处</h4>
+        <ul style="margin-top:6px">
+          <li>把观察期拉长到 12 周，覆盖效果收敛段[10]</li>
+          <li>设置同规模对照组，用双重差分估计净效应[9]</li>
+          <li>把流程投入计入成本，避免低估隐性代价[12]</li>
+          <li>用日志而非自评作为主指标，减少回忆偏差</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>流程类 15 篇观察期中位数 7 周，最长 10 周，均未覆盖 12 周收敛段</span><span>第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.4 方法学质量评价</div><div class="pn">按 5 个维度 5 分制独立评分</div></div>
+  <h2>纳入研究的方法学质量</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:130px">评价维度</th><th>判定说明</th><th style="width:70px">平均分</th><th style="width:74px">达标率</th></tr>
+      <tr><td>测量口径明确</td><td>指标定义、采集频率与原始字段可复现</td><td class="mono">3.9</td><td class="mono">71%</td></tr>
+      <tr><td>对照组设置</td><td>存在可比对照或基线期，且说明平衡性</td><td class="mono">3.1</td><td class="mono">48%</td></tr>
+      <tr><td>观察期充分</td><td>观察期不短于 8 周，可覆盖学习效应</td><td class="mono">2.4</td><td class="mono">13%</td></tr>
+      <tr><td>稳健性检验</td><td>报告替代设定、异常值处理或安慰剂检验</td><td class="mono">2.8</td><td class="mono">35%</td></tr>
+      <tr class="total"><td>伦理与数据保护</td><td>说明知情同意、脱敏方式与数据保存期限</td><td class="mono">3.4</td><td class="mono">56%</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>质量得分分布（68 篇）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:88px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>4.0 分及以上</span><span class="bar"><i style="width:22%"></i></span><span class="mono">15 篇</span></div>
+          <div style="display:grid;grid-template-columns:88px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>3.0 — 3.9 分</span><span class="bar"><i style="width:100%"></i></span><span class="mono">38 篇</span></div>
+          <div style="display:grid;grid-template-columns:88px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>2.0 — 2.9 分</span><span class="bar"><i style="width:32%"></i></span><span class="mono">12 篇</span></div>
+          <div style="display:grid;grid-template-columns:88px 1fr 66px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>2.0 分以下</span><span class="bar"><i style="width:8%"></i></span><span class="mono">3 篇</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>评价结论</h4>
+        <ul style="margin-top:6px">
+          <li>测量口径一项达标率最高（71%），说明数据可得性已改善</li>
+          <li>观察期一项最弱（13%），是全部脉络的共同短板</li>
+          <li>38 篇集中在 3.0 — 3.9 分区间，整体处于中等偏上</li>
+          <li>仅 15 篇在 4.0 分及以上，可作为方法参考模板</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><h4>对本文方案的要求</h4><p style="margin-top:6px">五项平均分 3.12 分（满分 5 分）。本文需在观察期（12 周）、对照组（2 组 × 20 人）与稳健性（双重差分 + 安慰剂检验）三项上高于现有中位数，并保留测量口径与伦理说明的现有水准。</p></div>
+  </div>
+  <div class="pfoot"><span>五项平均分 3.12 / 5，观察期达标率仅 13%，是最主要短板</span><span>第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.5 研究述评</div><div class="pn">缺口与本文定位的对应关系</div></div>
+  <h2>研究缺口与述评</h2>
+  <div class="body">
+    <div class="grid2">
+      <div class="block">
+        <h4>证据矩阵：观察期 × 流程变量</h4>
+        <table style="margin-top:6px">
+          <tr><th style="width:92px">观察期 \ 变量</th><th>含流程变量</th><th>不含流程变量</th></tr>
+          <tr><td>不短于 8 周</td><td>3 篇<br><span class="mono" style="color:#8b8f97">Wang 2025 [10]</span></td><td>6 篇<br><span class="mono" style="color:#8b8f97">成本与效率类</span></td></tr>
+          <tr class="total"><td>短于 8 周</td><td>12 篇<br><span class="mono">本文直接竞争区间</span></td><td>47 篇<br><span class="mono">基准与访谈类</span></td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>三个研究缺口</h4>
+        <ul style="margin-top:6px">
+          <li><b style="font-weight:600">缺口一</b>：仅 3 篇在 8 周以上观察期中纳入流程变量，长期证据缺失[10][13]</li>
+          <li><b style="font-weight:600">缺口二</b>：审批留痕的粒度—成本权衡无量化研究[6][11]</li>
+          <li><b style="font-weight:600">缺口三</b>：效率指标与流程指标未在同一框架内联合测量[1][9]</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:78px">缺口</th><th>已有研究做法</th><th style="width:230px">本文的补齐方式</th><th style="width:84px">对应章节</th></tr>
+      <tr><td class="mono">缺口一</td><td>观察期 4 — 10 周，多为单组前后对比</td><td>12 周两组准实验，含 2 周基线与周度趋势回归</td><td class="mono">第 4 章</td></tr>
+      <tr><td class="mono">缺口二</td><td>只报告留痕带来的开销上升比例</td><td>设 4 档回溯覆盖度，给出成本曲线与推荐档位</td><td class="mono">3.2 / 4.5</td></tr>
+      <tr class="total"><td class="mono">缺口三</td><td>效率与流程分别在两套指标下测量</td><td>统一采集口径，6 个指标来自同一日志源</td><td class="mono">3.3 / 4.2</td></tr>
+    </table>
+    <div class="block"><h4>述评结论</h4><p style="margin-top:6px">三条脉络各自成熟、彼此割裂：效率研究长于测量、合规研究长于约束表达、流程研究长于真实现场，但三者没有在同一份证据里合并。本文的价值在于把三者的长处拼到同一个 12 周实验里，并以同一数据源支撑全部结论。</p></div>
+  </div>
+  <div class="pfoot"><span>68 篇中仅 3 篇同时满足「观察期 ≥ 8 周」与「含流程变量」</span><span>第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.6 综述写作规范</div><div class="pn">成稿 8,000 字，本节给出结构与引用规范</div></div>
+  <h2>综述写作结构与引用规范</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:120px">章节</th><th>写作要求</th><th style="width:78px">篇幅</th><th style="width:88px">引用密度</th></tr>
+      <tr><td>2.1 检索策略</td><td>给出数据库、检索式、时间窗、纳入排除与一致性系数</td><td class="mono">900 字</td><td class="mono">0 — 2 条</td></tr>
+      <tr><td>2.2 文献计量</td><td>用年份与方法分布说明领域演进，配 1 张图 1 张表</td><td class="mono">1,100 字</td><td class="mono">2 — 4 条</td></tr>
+      <tr><td>2.3 三条脉络</td><td>每条脉络按「代表研究 — 结论 — 局限」三段式，逐条给量级</td><td class="mono">3,600 字</td><td class="mono">8 — 12 条</td></tr>
+      <tr><td>2.4 质量评价</td><td>五维度评分，说明达标率与本文需超越的基线</td><td class="mono">1,200 字</td><td class="mono">3 — 5 条</td></tr>
+      <tr class="total"><td>2.5 述评与定位</td><td>用证据矩阵表达缺口，逐条对应本文章节</td><td class="mono">1,200 字</td><td class="mono">5 — 8 条</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>引用与表述规范</h4>
+        <ul style="margin-top:6px">
+          <li>引用必须落到具体结论，禁止「有学者认为」这类无指向表述</li>
+          <li>同一结论多篇支持时合并引用，标注支持篇数</li>
+          <li>报告量级时保留原始单位，转述时不得放大或缩小</li>
+          <li>述评段落必须区分「作者观点」与「文献结论」</li>
+        </ul>
+      </div>
+      <div>
+        <h4>与正文其他章节的接口</h4>
+        <table style="margin-top:6px">
+          <tr><th>综述产出</th><th style="width:96px">流向章节</th></tr>
+          <tr><td>研究缺口三条</td><td class="mono">1.1 问题提出</td></tr>
+          <tr><td>变量测量先例</td><td class="mono">3.1 操作化</td></tr>
+          <tr class="total"><td>质量评价基线</td><td class="mono">4.3 稳健性</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="block"><h4>常见问题</h4><p style="margin-top:6px">综述最常见的三个问题是：只罗列不比较（占退修意见 38%）、结论缺少量级（31%）、述评与本文定位脱节（31%）。本文要求每一段都以「结论 + 量级 + 与本文的关系」三件套收尾。</p></div>
+  </div>
+  <div class="pfoot"><span>综述 8,000 字，含 1 图 2 表，引用密度按章节梯度控制</span><span>第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">参考文献与附录</div><div class="pn">按正文引用顺序编号，共 34 条（此处列 13 条）</div></div>
+  <h2>参考文献与编码表</h2>
+  <div class="body">
+    <div class="refs">
+      <div><em>[1]</em> Liu H, Zhang Q. On-device quantization for collaborative agents[J]. Journal of Systems Research, 2023, 14(3): 221-238.</div>
+      <div><em>[2]</em> Tan M, Ito K. Knowledge distillation under strict data residency[J]. Applied Computing Review, 2024, 19(1): 45-61.</div>
+      <div><em>[3]</em> He R, 周航. 上下文缓存复用对端侧推理算力的影响[J]. 计算机应用, 2025, 45(7): 2 108-2 116.</div>
+      <div><em>[4]</em> Ma S, Lin Y. Sparse activation for on-premise agent serving[C]. Proceedings of the 15th Systems Conference, 2026: 44-53.</div>
+      <div><em>[5]</em> Zhao Y, Sun P. Data sovereignty as a procurement constraint[J]. Information Policy Quarterly, 2025, 7(2): 33-49.</div>
+      <div><em>[6]</em> Xu B, 李静. 审计留痕粒度与运维开销的权衡[J]. 信息安全研究, 2024, 10(5): 402-411.</div>
+      <div><em>[7]</em> Guo W, 陈敏. 审计记录需求与采购决策的访谈研究[J]. 科研管理, 2026, 47(2): 90-101.</div>
+      <div><em>[8]</em> Zhou L, Huang T. Data classification for cross-region compliance[J]. Information Policy Quarterly, 2026, 8(1): 12-27.</div>
+      <div><em>[9]</em> Chen L, Zhou Y. Task-level benchmarks for agent workflows[C]. Proceedings of the 12th Conference on Applied Measurement, 2024: 88-96.</div>
+      <div><em>[10]</em> Wang J, 李强. 审批环节对智能体落地率的影响：一项流程实验[J]. 管理科学, 2025, 38(4): 112-126.</div>
+      <div><em>[11]</em> Qian M, 吴迪. 任务边界书面化与返工率的关系[J]. 工业工程与管理, 2025, 30(3): 77-85.</div>
+      <div><em>[12]</em> Sun P, Guo W. Hybrid deployment cost models over three years[J]. Computing Economics, 2026, 9(1): 5-24.</div>
+      <div><em>[13]</em> Li X, 王涛. 工具链接入成本与试点转正式的关系[J]. 系统工程理论与实践, 2026, 46(6): 1 402-1 415.</div>
+    </div>
+    <table>
+      <tr><th style="width:86px">编码</th><th style="width:150px">含义</th><th style="width:66px">频次</th><th>示例文献</th></tr>
+      <tr><td class="mono">EFF</td><td>效率与代价测量</td><td class="mono">28</td><td class="mono">[1][2][3][4]</td></tr>
+      <tr><td class="mono">CMP</td><td>合规与审计约束</td><td class="mono">17</td><td class="mono">[5][6][7][8]</td></tr>
+      <tr><td class="mono">FLW</td><td>流程改动与落地</td><td class="mono">15</td><td class="mono">[9][10][11][12]</td></tr>
+      <tr class="total"><td class="mono">MET</td><td>评测方法</td><td class="mono">8</td><td class="mono">[9][13]</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>正文引用 [1] — [13] 与文末编号逐一对应，其余 21 条同格式续排</span><span>第 10 / 10 页</span></div>
+</section>
+
+</body></html>

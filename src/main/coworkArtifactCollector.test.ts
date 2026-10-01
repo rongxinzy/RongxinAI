@@ -103,11 +103,11 @@ describe('collectSessionArtifactCandidates', () => {
     });
   });
 
-  test('declared kind code/document/image wins over extension inference', () => {
+  test('declared kind cannot override a known file extension', () => {
     const candidates = collectSessionArtifactCandidates([
       message('declare-code', 1, 'tool_use', '', {
         toolName: 'declare_artifact',
-        toolInput: { filePath: 'D:/output/notes.md', kind: 'code' },
+        toolInput: { filePath: 'D:/output/notes.md', kind: 'document' },
       }),
       message('declare-document', 2, 'tool_use', '', {
         toolName: 'declare_artifact',
@@ -117,12 +117,17 @@ describe('collectSessionArtifactCandidates', () => {
         toolName: 'declare_artifact',
         toolInput: { filePath: 'D:/output/icon.svg', kind: 'image' },
       }),
+      message('declare-kind-only', 4, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolInput: { filePath: 'D:/output/blob.bin', kind: 'model' },
+      }),
     ]);
 
     expect(candidates.map(candidate => candidate.artifact.type)).toEqual([
-      'code',
-      'document',
-      'image',
+      'markdown',
+      'text',
+      'svg',
+      'model',
     ]);
   });
 
@@ -173,6 +178,22 @@ describe('collectSessionArtifactCandidates', () => {
         toolInput: { path: 'failed.html', content: 'not written' },
       }),
       message('result-1', 2, 'tool_result', 'failed', {
+        toolUseId: 'call-1',
+        isError: true,
+      }),
+    ]);
+
+    expect(candidates).toEqual([]);
+  });
+
+  test('ignores declarations whose matching tool result failed', () => {
+    const candidates = collectSessionArtifactCandidates([
+      message('declare-1', 1, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolUseId: 'call-1',
+        toolInput: { filePath: 'failed.pptx' },
+      }),
+      message('result-1', 2, 'tool_result', 'file does not exist', {
         toolUseId: 'call-1',
         isError: true,
       }),

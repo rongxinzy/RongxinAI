@@ -12,6 +12,9 @@ test('routes CAD model extensions to the model artifact type', () => {
   for (const extension of ['.stl', '.obj', '.gltf', '.glb', '.ply', '.3mf']) {
     expect(getArtifactTypeByExtension(`model${extension}`)).toBe('model');
   }
+  expect(getArtifactTypeByExtension('drawing.dxf')).toBe('document');
+  expect(getArtifactTypeByExtension('body.step')).toBe('unsupported');
+  expect(getArtifactTypeByExtension('body.stp')).toBe('unsupported');
   // Unrelated formats must keep their existing mapping.
   expect(getArtifactTypeByExtension('report.pdf')).toBe('document');
   expect(getArtifactTypeByExtension('photo.png')).toBe('image');

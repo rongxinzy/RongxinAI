@@ -134,7 +134,8 @@ export const UserBubble: React.FC<{
 
   return (
     <div className="w-full py-2 focus:outline-none" tabIndex={0}>
-      <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end pl-4">
+      {/* 2026/09/20 lixiang  与 TurnBlock 对齐加宽（issue #805） */}
+      <div className="mx-auto flex w-full max-w-6xl min-w-[320px] flex-col items-end pl-4">
         {hasTextContent && (
           <Message from="user" className="ml-auto items-end">
             <MessageContent className="theme-message-cowork-user">

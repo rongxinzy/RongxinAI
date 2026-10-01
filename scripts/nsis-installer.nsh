@@ -5,6 +5,33 @@
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
 
+; electron-builder's CHECK_APP_RUNNING treats any process whose image path
+; starts with $INSTDIR as "app still running". Sidecars (cc-connect,
+; llama-server, python, git) survive a force-killed main process, so kill by
+; install-root/runtime-cache path prefix instead of by process name; otherwise
+; orphaned sidecars keep the "cannot be closed" retry dialog up forever.
+; The caller itself is excluded: an in-place uninstaller runs from $INSTDIR.
+!macro StopAppProcesses
+  System::Call 'kernel32::GetCurrentProcessId()i .r9'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    $$roots = @(\"$INSTDIR\", \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\");\
+    $$selfPid = $9;\
+    $$isTarget = { param($$p) $$p -and ($$p.StartsWith($$roots[0], \"CurrentCultureIgnoreCase\") -or $$p.StartsWith($$roots[1], \"CurrentCultureIgnoreCase\")) };\
+    $$stopped = 0;\
+    foreach ($$proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.ProcessId -ne $$selfPid -and (& $$isTarget $$_.Path) })) {\
+      Stop-Process -Id $$proc.ProcessId -Force -ErrorAction SilentlyContinue;\
+      $$stopped += 1;\
+    };\
+    $$remaining = @();\
+    for ($$i = 0; $$i -lt 20; $$i++) {\
+      $$remaining = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.ProcessId -ne $$selfPid -and (& $$isTarget $$_.Path) });\
+      if ($$remaining.Count -eq 0) { break };\
+      Start-Sleep -Milliseconds 500;\
+    };\
+    Write-Output \"stopped=$$stopped remaining=$$($$remaining.Count)\""'
+  Pop $0
+!macroend
+
 ; electron-builder compiles the uninstaller before the installer. Its assisted
 ; template does not insert installation pages while BUILD_UNINSTALLER is set,
 ; so keep the page state and callbacks out of that compilation pass.
@@ -107,16 +134,7 @@ FunctionEnd
 
   DetailPrint "[Installer] Stopping running 知远 processes"
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
-    for ($$i = 0; $$i -lt 15; $$i++) {\
-      $$appProcesses = @(Get-Process -Name 知远 -ErrorAction SilentlyContinue);\
-      $$nodeProcesses = @(Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" });\
-      if (($$appProcesses.Count + $$nodeProcesses.Count) -eq 0) { break };\
-      Start-Sleep -Milliseconds 500;\
-    }"'
-  Pop $0
+  !insertmacro StopAppProcesses
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
   !insertmacro OpenTimingLogForAppend $8
@@ -289,7 +307,10 @@ FunctionEnd
     StrCpy $R9 "离线组件归档包含不安全路径或链接元数据。"
     Goto OfflineComponentInstallFailed
   ComponentBatchExtractFailed:
-    StrCpy $R9 "离线组件展开失败。请检查磁盘空间或安全软件后重试。"
+    ; Keep the failing component key and the 7za exit code or exception detail
+    ; from the validator in the dialog and the install timing log. The validator
+    ; already folds newlines, so $1 is a single line.
+    StrCpy $R9 "离线组件展开失败：$1。请检查磁盘空间或安全软件后重试。"
     Goto OfflineComponentInstallFailed
   ComponentBatchVerificationFailed:
     StrCpy $R9 "离线组件健康检查失败，哨兵文件缺失或校验不匹配。"
@@ -558,10 +579,8 @@ FunctionEnd
 !macroend
 
 !macro customUnInit
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue"'
-  Pop $0
+  DetailPrint "[Uninstaller] Stopping running 知远 processes"
+  !insertmacro StopAppProcesses
 !macroend
 
 !macro customUnInstall

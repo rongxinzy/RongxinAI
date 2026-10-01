@@ -18,17 +18,23 @@ export const AssistantBubble: React.FC<{
   resolveLocalFilePath?: (href: string, text: string) => string | null;
   mapDisplayText?: (value: string) => string;
   turnMetadata?: CoworkMessageMetadata | null;
-}> = ({ message, mapDisplayText, turnMetadata }) => {
+}> = ({ message, mapDisplayText, resolveLocalFilePath, turnMetadata }) => {
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
-  const isStreaming = Boolean(message.metadata?.isStreaming);
+  // An empty streaming bubble is a leftover placeholder, not an in-flight answer.
+  const isStreaming = Boolean(message.metadata?.isStreaming) && rawContent.trim().length > 0;
   const modelLabel = getMessageModelLabel(turnMetadata);
 
   return (
     <div className="py-1 focus:outline-none">
       <Message from="assistant">
         <MessageContent>
-          <StreamingMarkdownResponse content={rawContent} isStreaming={isStreaming} />
+          {/* 2026/09/20 lixiang  下传本地路径解析，使盘符路径可点打开（issue #805） */}
+          <StreamingMarkdownResponse
+            content={rawContent}
+            isStreaming={isStreaming}
+            resolveLocalFilePath={resolveLocalFilePath}
+          />
           <CoworkContentNotice truncated={message.metadata?.contentTruncated} />
         </MessageContent>
       </Message>

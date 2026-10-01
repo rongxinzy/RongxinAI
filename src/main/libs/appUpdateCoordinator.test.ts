@@ -700,4 +700,83 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(result.state.status).toBe(AppUpdateStatus.Idle);
     expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
+
+  test('never configures a feed or touches the network in enterprise builds', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const coordinator = new AppUpdateCoordinator(
+      new MemoryStore() as unknown as SqliteStore,
+      undefined,
+      undefined,
+      { enterpriseBuild: true },
+    );
+
+    const result = await coordinator.checkNow();
+
+    expect(result).toMatchObject({ success: true, updateFound: false });
+    expect(result.state.status).toBe(AppUpdateStatus.Idle);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updaterMocks.autoUpdater.setFeedURL).not.toHaveBeenCalled();
+    expect(updaterMocks.autoUpdater.checkForUpdates).not.toHaveBeenCalled();
+  });
+
+  test('answers manual checks with an explicit message in enterprise builds', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const coordinator = new AppUpdateCoordinator(
+      new MemoryStore() as unknown as SqliteStore,
+      undefined,
+      undefined,
+      { enterpriseBuild: true },
+    );
+
+    const result = await coordinator.checkNow({ manual: true });
+
+    expect(result.success).toBe(false);
+    expect(result.updateFound).toBe(false);
+    expect(result.error).toBe('This enterprise build does not provide online updates');
+    expect(result.state.status).toBe(AppUpdateStatus.Idle);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updaterMocks.autoUpdater.setFeedURL).not.toHaveBeenCalled();
+  });
+
+  test('drops a cached ready update without a network recheck in enterprise builds', async () => {
+    const store = new MemoryStore();
+    store.set('app_update_ready_v2', {
+      envelope: {},
+      filePath: downloadedFile,
+      sha512: updaterSha512,
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const coordinator = new AppUpdateCoordinator(
+      store as unknown as SqliteStore,
+      undefined,
+      undefined,
+      { enterpriseBuild: true },
+    );
+
+    expect(coordinator.getState().status).toBe(AppUpdateStatus.Idle);
+    expect(store.get('app_update_ready_v2')).toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updaterMocks.autoUpdater.setFeedURL).not.toHaveBeenCalled();
+  });
+
+  test('refuses to install updates in enterprise builds', async () => {
+    const coordinator = new AppUpdateCoordinator(
+      new MemoryStore() as unknown as SqliteStore,
+      undefined,
+      undefined,
+      { enterpriseBuild: true },
+    );
+
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('This enterprise build does not provide online updates');
+    expect(result.state.status).toBe(AppUpdateStatus.Idle);
+    expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
+    expect(installerMocks.installWindowsNsis).not.toHaveBeenCalled();
+  });
 });

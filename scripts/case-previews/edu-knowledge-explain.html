@@ -1,62 +1,367 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-knowledge-explain</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-knowledge-explain</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
-.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
-.ask p{font-size:14px;color:#3d4046;line-height:1.6}
-.ans{flex:1;min-height:0;padding:24px 26px;display:flex;flex-direction:column;gap:18px}
-.ans h2{font-size:16px;letter-spacing:-.01em}
-.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.hr{height:1px;background:#edede9}
-.word{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.word b{font-size:34px;letter-spacing:-.02em}
-.word span{font-size:14px;color:#6f737b}
-.pos{font-size:12px;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px}
-.def{font-size:15px;color:#3d4046}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
 .box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
-.quote{font-size:14.5px;color:#3d4046;line-height:1.9;border-left:3px solid var(--accent);padding-left:16px}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
-.steps{display:grid;gap:12px}
-.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
-.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
-.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
-.formula{font-size:16px;color:#16171a;margin-top:4px}
-.answer{margin-top:6px;background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:12px 16px;font-size:14px}
-.cmp{display:grid;gap:12px}
-.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
 .cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
 .cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
-.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
-.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
-.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
 .flow i{color:#b6bac0;font-style:normal}
-.notes{display:grid;gap:8px}
-.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="panel" style="--accent:#10B981">
-  <div class="ask"><div class="avatar"></div><p>用通俗的话讲讲光合作用是什么。</p></div>
-  <div class="ans">
-    <div class="box"><div class="k">一句话概括</div><p>植物用阳光做燃料，把水和二氧化碳加工成自己的食物，顺便把氧气放出来。</p></div>
-    <div class="box"><div class="k">生活类比</div><p>叶子是一座开在阳光下的厨房：水是从根部送进来的原料，二氧化碳从气孔飘进来，阳光是灶火，做出来的菜就是葡萄糖。</p></div>
-    <div class="flow"><span>光能</span><i>→</i><span>叶绿体</span><i>→</i><span>水 + 二氧化碳</span><i>→</i><span>葡萄糖</span><i>+</i><span>氧气</span></div>
-    <div class="hr"></div>
-    <h3>思考题</h3>
-    <div class="notes">
-      <div>如果没有阳光，植物当天还能不能继续生长？为什么？</div>
-      <div>为什么说地球上的氧气几乎都来自光合作用？</div>
-      <div>大棚里补光灯的作用，和阳光是不是同一件事？</div>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Science 01</div>
+      <h1>光合作用：地球上最大的能量转换工厂</h1>
+      <div class="sub">适用：初中 / 高中衔接 ｜ 概念 6 · 反应式 1 · 练习 12 题 ｜ 节奏：3 天，合计约 145 分钟</div>
     </div>
-    <div class="box"><div class="k">记住一句话</div><p>光合作用是地球上最大的能量转换工厂：太阳的账，最终记在每一条食物链上。</p>
-    </div>
+    <div class="note">讲义 v2.0 · 共 10 页<br><b>数据口径</b>：一株中等大小树木（树高 8 m）<br>日尺度估算，化学计量按 1 mol 葡萄糖计</div>
   </div>
-</div></body></html>
+  <div class="ask"><div class="av"></div><p>用通俗的话讲讲光合作用是什么。</p></div>
+  <p class="lead"><b>一句话概括：</b>植物用阳光做燃料，把水和二氧化碳加工成自己的食物，顺便把氧气放出来。本讲以「叶子是一座开在阳光下的厨房」为主线，把光合作用拆成两段工序：光反应在类囊体薄膜上把光能变成 ATP 与 NADPH，并裂解水放出氧气；暗反应在叶绿体基质里用这些能量把二氧化碳固定成葡萄糖。学完应能默写总反应式、说清氧气的来源，并算出一株树一天的碳收支。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">1<small>个</small></div><div class="l">总反应式：6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂</div></div>
+    <div class="stat"><div class="n">6<small>个</small></div><div class="l">关键概念：光反应 / 暗反应 / 叶绿体 / 叶绿素 / 气孔 / 光饱和点</div></div>
+    <div class="stat"><div class="n">12<small>题</small></div><div class="l">分层练习：基础 6 · 进阶 4 · 挑战 2</div></div>
+  </div>
+  <div class="sec">学习路径 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:72px">阶段</th><th style="width:84px">时点</th><th>内容</th><th style="width:196px">可检查产出</th><th style="width:76px">用时</th></tr>
+    <tr><td>入门</td><td class="num">第 1 天</td><td>两段工序与六个阶段的场所、原料与产物（P3）</td><td>阶段卡片 6 张</td><td class="num">25 分钟</td></tr>
+    <tr><td>精读</td><td class="num">第 1 天</td><td>总反应式拆解与八个核心术语（P4）</td><td>默写反应式 3 遍全对</td><td class="num">30 分钟</td></tr>
+    <tr><td>纠错</td><td class="num">第 2 天</td><td>6 类常见误解与光合 / 呼吸逐项对照（P5）</td><td>错误说法改正清单 6 条</td><td class="num">20 分钟</td></tr>
+    <tr><td>练习</td><td class="num">第 2–3 天</td><td>12 道分层练习 + 逐题解析（P6–P8）</td><td>自批得分 ≥ 10 / 12</td><td class="num">45 分钟</td></tr>
+    <tr class="hl"><td>自测</td><td class="num">第 3 天</td><td>6 项自测清单与 4 周探究计划（P9–P10）</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">25 分钟</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">数据口径</div><p>一株中等高度树木（树高 8 m）的日尺度估算；化学计量按 1 mol 葡萄糖换算，48 g CO₂ 对应 33 g 葡萄糖与 35 g O₂。</p></div>
+    <div class="box"><div class="k">来源与统计窗口</div><p>植物生理学通用教材与课堂实测记录；统计窗口为 2026-09 整理，含 200 份作业批改的错题分布。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录 · P3 知识脉络 · P4 核心概念 · P5 纠错 · P6 练习 · P7–P8 解析 · P9 自测 · P10 术语表，共 10 页。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>吸进 6 个 CO₂ 与 6 个水，放出 1 个葡萄糖与 6 个氧气</b>，这笔账两边一个原子都不差。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Science 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全讲 8 章 · 10 页<br>先概念、再练习、后自测</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:132px">章节</th><th>一句话说明</th><th style="width:172px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>知识脉络</td><td>讲清两段工序与六个阶段的场所、原料、产物与能量变化</td><td>能默写六个阶段表</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>把总反应式逐项拆开，用厨房类比串起原料、能量与产物</td><td>默写反应式 3 遍全对</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见错误</td><td>列出 6 类高频误解，并把光合作用与呼吸作用逐项对照</td><td>错误改正清单 6 条</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题巩固概念与默写，进阶 4 题进入推理、单位换算与实验思路，挑战 2 题做完整的实验设计与碳收支解释，每题 1 分</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 逐题给出答案要点与最易丢分处</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 的参考解、换算过程与评分口径</td><td>自批得分 ≥ 10 / 12</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与下一阶段</td><td>6 项自测清单定达标线，4 周探究计划把知识变成实验</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>光合作用术语 10 条、数据口径与版本记录，便于查证复习</td><td>能解释碳汇与 ATP</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把六个阶段抄成卡片；第 2 天读 P5 后立刻做 P6 的 1–6 题，用 P7 自批；第 3 天做 7–12 题，对照 P8，最后完成 P9 自测。每天结束时把错题记在同一个本子上，第二天先看错题再学新内容。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>知道细胞的基本结构（细胞膜、细胞质、细胞核），会用质量守恒配平化学方程式，能读懂 mol、g、L 三种单位。不会配平先复习 15 分钟；本讲不要求背中间产物的名称，但要求说得出每个阶段发生在膜上还是基质里。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录完全一致，便于按天拆分任务：第 1 天读 P3–P4，第 2 天读 P5 并做 P6 的前 6 题，第 3 天做完后 6 题再完成 P9 自测。</div>
+    <div>练习全部放在第 6 页，答案分两页在第 7、8 页，题号 1–12 一一对应；请先限时做完再翻答案，改错时写下错因并回到对应概念页，而不是只抄正确解法。</div>
+    <div>第 9 页的 4 周探究计划可以直接当作业本用：每周只推进一件事，产出必须能拿出来给别人看，做不到就说明记录方式需要重来。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>概念页读两遍，练习页限时做，答案页只对不抄</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 知识脉络</div><h2 class="pt">两段工序与六个阶段：物质从哪来，能量怎么走</h2></div>
+    <div class="note">口径：一株中等大小树木（树高 8 m）<br>日尺度估算 · 场所指叶肉细胞内的结构</div>
+  </div>
+  <div class="sec">A · 六个阶段 <em>第 1–2 行是两段工序，第 3–5 行是工序内部的环节，第 6 行是产物去向；六行不是并列的六件事</em></div>
+  <table>
+    <tr><th style="width:78px">阶段</th><th style="width:124px">场所</th><th style="width:176px">原料 / 输入</th><th style="width:224px">产物 / 输出</th><th>能量变化 / 去向</th></tr>
+    <tr><td>光反应</td><td>类囊体薄膜</td><td>H₂O、光能、ADP、NADP⁺</td><td>O₂、ATP、NADPH</td><td>光能 → 活跃化学能</td></tr>
+    <tr><td>暗反应</td><td>叶绿体基质</td><td>CO₂、ATP、NADPH</td><td>三碳糖（C₃ 糖）→ 葡萄糖</td><td>活跃化学能 → 稳定化学能</td></tr>
+    <tr><td>水的光解</td><td>类囊体薄膜</td><td>2H₂O、光能</td><td>4H⁺ + 4e⁻ + O₂</td><td>拆开 O—H 键，氧以 O₂ 放出</td></tr>
+    <tr><td>CO₂ 固定</td><td>叶绿体基质</td><td>CO₂ + C₅（五碳化合物）</td><td>2 分子 C₃（三碳化合物）</td><td>不直接耗能，靠酶催化</td></tr>
+    <tr><td>C₃ 还原</td><td>叶绿体基质</td><td>C₃、ATP、NADPH</td><td>三碳糖（C₃ 糖）</td><td>消耗 ATP 与 NADPH</td></tr>
+    <tr class="hl"><td>产物去向</td><td>叶绿体</td><td>三碳糖、蔗糖</td><td>葡萄糖、淀粉、纤维素（运往全身）</td><td>约 40% 用于生长，60% 供呼吸与储存</td></tr>
+  </table>
+  <div class="sec">B · 一株中等大小树木一天的物质收支 <em>逐条基准：①②③ 以 48 g 为满格；④ 以当日吸水 205 L 为满格（其中 200 L 蒸腾、约 20 g 进入光合、其余用于生长）；⑤ 以到达叶片 1.38×10⁷ J 为满格；⑥ 是占比不是质量。六行量纲不同，不可互相比较</em></div>
+  <div class="bars">
+    <div class="bar"><span class="mono">吸收 CO₂</span><span class="track"><i style="width:100%"></i></span><span class="v">48 g</span></div>
+    <div class="bar"><span class="mono">释放 O₂</span><span class="track"><i style="width:73%"></i></span><span class="v">35 g</span></div>
+    <div class="bar"><span class="mono">合成葡萄糖</span><span class="track"><i style="width:69%"></i></span><span class="v">33 g</span></div>
+    <div class="bar"><span class="mono">蒸腾失水</span><span class="track"><i style="width:98%"></i></span><span class="v">200 L</span></div>
+    <div class="bar"><span class="mono">吸收光能（J）</span><span class="track"><i style="width:87%"></i></span><span class="v">1.2×10⁷</span></div>
+    <div class="bar hl"><span class="mono">葡萄糖用于生长</span><span class="track"><i style="width:40%"></i></span><span class="v">40 %</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">六个阶段怎么记</div><p>先拆水（水的光解）→ 再存货（ATP 与 NADPH，两种能量货币）→ 后固定（CO₂ 固定）→ 最后还原成糖（C₃ 还原）；两段工序一在膜上、一在基质里。记住「膜上取能、基质造糖」八个字。</p></div>
+    <div class="box"><div class="k">一个常被忽视的换算</div><p>一天真正进入光合作用的水只有约 20 g，而蒸腾散失 200 L，相差约 1 万倍；所以「多浇水」不等于「光合更强」。</p></div>
+  </div>
+  <div class="pf"><span>知识脉络一句话：<b>光反应管「把光变成钱」，暗反应管「把钱换成货」</b>。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">总反应式拆解：原料、能量与产物各归其位</h2></div>
+    <div class="note">化学计量按 1 mol 葡萄糖计<br>葡萄糖分子量 180，是最小可核算单位</div>
+  </div>
+  <div class="word"><b style="font-size:26px">6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂</b><span class="pos">总反应式</span><span>条件：光照与叶绿体；能量来自光能</span></div>
+  <p class="lead">读法：左边是原料——6 个二氧化碳与 6 个水；箭头代表叶绿体里两段工序的合称；右边是产物——1 个葡萄糖与 6 个氧气。按质量算：264 g CO₂ + 108 g H₂O 生成 180 g 葡萄糖与 192 g O₂，两边合计都是 372 g，一个原子都不差。</p>
+  <div class="flow"><span>光能</span><i>→</i><span>叶绿体</span><i>→</i><span>水 + CO₂</span><i>→</i><span>葡萄糖</span><i>+</i><span>氧气</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">厨房类比</div><p>叶子是一座开在阳光下的厨房：水从根部送进来，CO₂ 从气孔飘进来，阳光是灶火，做出来的菜就是葡萄糖。</p></div>
+    <div class="box"><div class="k">记忆锚点</div><p>「六水六碳出六氧，一个葡萄糖进账」——反应式两边必须同时配平，缺一边就不是化学，是作文。</p></div>
+    <div class="box"><div class="k">产物去向</div><p>葡萄糖约 60% 立刻供呼吸或转成淀粉储存，约 40% 变成纤维素与木质素，成为树干与枝叶。</p></div>
+  </div>
+  <div class="sec">8 个核心术语 <em>覆盖本讲 6 个关键概念，另加葡萄糖、ATP 与 NADPH、蒸腾作用；全日照＝晴天正午的直射强度</em></div>
+  <table>
+    <tr><th style="width:166px">术语</th><th>通俗解释</th><th>生活对应</th></tr>
+    <tr><td>叶绿体 / 叶绿素</td><td>叶绿体是车间，叶绿素是里面的绿色色素</td><td>厨房与灶火里的火焰</td></tr>
+    <tr><td>光反应</td><td>必须有光的一段工序，在类囊体薄膜上</td><td>白天开火炒菜</td></tr>
+    <tr><td>暗反应</td><td>用 ATP 与 NADPH 把 CO₂ 变成糖</td><td>打烊后装盘、入库</td></tr>
+    <tr><td>气孔</td><td>叶片表皮的可开闭通道，CO₂ 由此进入</td><td>厨房的窗户</td></tr>
+    <tr><td>葡萄糖</td><td>光合作用的直接产物，可存成淀粉</td><td>刚出锅的那道菜</td></tr>
+    <tr><td>ATP 与 NADPH</td><td>光反应造出的两种能量货币</td><td>灶台上现用的柴火</td></tr>
+    <tr><td>光饱和点</td><td>光再强也不提速的拐点，约 1/3 全日照</td><td>火太大只会烧糊锅</td></tr>
+    <tr class="hl"><td>蒸腾作用</td><td>水以水蒸气形式从气孔散失，日达 200 L</td><td>厨房的抽油烟机</td></tr>
+  </table>
+  <div class="quote">记住一句话：光合作用是地球上最大的能量转换工厂——太阳的账，最终记在每一条食物链上。</div>
+  <div class="pf"><span>一句话结论：<b>光合作用的账本很干净——吸进 6 个 CO₂ 和 6 个水，放出 1 个葡萄糖和 6 个氧气</b>。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见错误</div><h2 class="pt">6 类高频误解与光合 / 呼吸逐项对照</h2></div>
+    <div class="note">来源：课堂提问与作业批改 200 份<br>对照表按场所—原料—产物—时间四栏比较</div>
+  </div>
+  <div class="sec">A · 6 类常见错误 <em>先看「典型错误说法」一列，能自己改对再往下</em></div>
+  <table>
+    <tr><th style="width:84px">类型</th><th style="width:250px">典型错误说法</th><th style="width:290px">正确说法</th><th>原因与纠正</th></tr>
+    <tr><td>混淆过程</td><td>白天光合、晚上呼吸</td><td>呼吸昼夜不停，光合只在有光时</td><td>夜间只呼吸，棚内 CO₂ 反而升高</td></tr>
+    <tr><td>生长误解</td><td>植物只在白天长个子</td><td>生长看的是一天的净积累</td><td>细胞伸长多在夜间，主干增粗也在夜里</td></tr>
+    <tr><td>来源误解</td><td>氧气是 CO₂ 变来的</td><td>氧气全部来自水的光解</td><td>用 H₂¹⁸O 标记，放出的 O₂ 含 ¹⁸O</td></tr>
+    <tr><td>概念混淆</td><td>叶绿素就是叶绿体</td><td>叶绿体是车间，叶绿素是色素</td><td>色素嵌在类囊体薄膜上，叶绿体含有它</td></tr>
+    <tr><td>忽略气孔</td><td>光够就能一直光合</td><td>气孔关闭会切断 CO₂ 供给</td><td>正午高温使气孔关闭出现「光合午休」，速率可降三成</td></tr>
+    <tr class="hl"><td>光照误解</td><td>光越强光合越快</td><td>饱和点以下随光强上升，达到后不再上升</td><td>约 1/3 全日照即饱和，强光反致灼伤</td></tr>
+  </table>
+  <div class="sec">B · 光合作用与呼吸作用对照 <em>四栏逐项比较，数值取自 P3 的日收支</em></div>
+  <table>
+    <tr><th style="width:100px">比较项</th><th style="width:360px">光合作用</th><th style="width:360px">呼吸作用</th><th>依据 / 数值</th></tr>
+    <tr><td>场所</td><td>叶绿体的类囊体薄膜与基质</td><td>细胞质基质与线粒体</td><td>见 P3 阶段表</td></tr>
+    <tr><td>原料</td><td>CO₂、H₂O 与光能</td><td>葡萄糖与 O₂</td><td>一天吸 48 g CO₂</td></tr>
+    <tr><td>产物</td><td>葡萄糖与 O₂</td><td>CO₂、H₂O 与能量</td><td>一天放 35 g O₂</td></tr>
+    <tr class="hl"><td>发生时间</td><td>有光时进行，光一停就停</td><td>昼夜不停，温度越高越快</td><td>夜间 CO₂ 高约两成</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">一句话区分</div><p>光合作用是「存钱」，呼吸作用是「花钱」；白天两者同时进行，净结果是存，所以树能长大。</p></div>
+    <div class="box"><div class="k">交卷前 3 秒自检</div><p>一看氧气来源是不是水；二看时间是不是「有光才进行」；三看场所是不是叶绿体。三条对上，这一章的错误清零。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>6 类错误里有 4 类只靠「场所 + 时间 + 氧气来源」三问就能拦住</b>。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>限时 25 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考概念与默写，不做计算</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 写出光合作用的总反应式，并在箭头上注明发生条件。</li>
+    <li><b>2.</b> 指出总反应式左边的原料与右边的产物各是什么，各有几个分子。</li>
+    <li><b>3.</b> 说出光反应与暗反应各自的场所，写到具体结构名称。</li>
+    <li><b>4.</b> 用一句话区分叶绿素与叶绿体，并说明二者的包含关系。</li>
+    <li><b>5.</b> 白天光合作用与呼吸作用能否同时进行？完全没有光的当天，植物还能不能继续合成有机物？请分别说明理由，并从「光反应是否发生」这一点展开，不要只答「能」或「不能」。</li>
+    <li><b>6.</b> 气孔在光合作用中起什么作用？为什么干旱时气孔会关闭？</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入推理、实验思路与换算</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 设计同位素标记思路证明放出的 O₂ 来自水而不是 CO₂：写清标记哪一种物质、检测什么指标，并说明为什么今天大气中的氧气几乎都来自光合作用这一条途径；答题时按「标记—检测—结论」三步写。</li>
+    <li><b>8.</b> 大棚补光灯的作用和阳光是不是同一件事？写出至少两条差异与判断依据。</li>
+    <li><b>9.</b> 已知一株树一天固定 48 g CO₂，请写出完整换算步骤：先由 264 g CO₂ 得 1 mol 葡萄糖，再折算质量，最后算出一天大约合成多少克葡萄糖、放出多少克 O₂（取整数，每步都要带单位）。</li>
+    <li><b>10.</b> 解释什么是光饱和点，并说明为什么「光照越强，光合越快」不成立。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>要写过程，评分看变量控制与数据</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 设计一个验证「光合作用需要光」的对照实验：写出材料、分组、自变量、因变量、控制变量与预期结果，并说明用什么试剂检测、凭什么现象判断哪一组发生了光合作用，最后用一句话给出结论。</li>
+    <li><b>12.</b> 用一天的碳收支解释「森林是碳汇」（碳汇＝从大气中吸收并固定 CO₂ 的体系），并说明它在什么情况下会变成碳源；请把 48 g 这个数字写进判断句里。</li>
+  </ul>
+  <div class="answer">评分口径：每题 1 分；基础题答案完整才得满分，漏写条件或数量的按半分（0.5 分）计；第 9 题必须写出「6 mol CO₂ → 1 mol 葡萄糖」的换算过程，只写结果不得分；第 11 题缺自变量或控制变量即扣半分（0.5 分）。</div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题，隔 10 分钟再做 7–12 题</b>，避免机械套模板。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 题</div>
+  </div>
+  <table>
+    <tr><th style="width:40px">题</th><th style="width:400px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td class="mono">6CO₂ + 6H₂O →（光照、叶绿体）C₆H₁₂O₆ + 6O₂</td><td>条件必须写在箭头上方：漏写「光照」「叶绿体」扣半分；左右两边顺序可以互换，但两边原子数不配平的一律不得分，写成「CO₂ + H₂O → 葡萄糖 + O₂」的也扣分。</td></tr>
+    <tr><td class="num">2</td><td>原料：6 个 CO₂ 与 6 个 H₂O；产物：1 个葡萄糖与 6 个 O₂</td><td>分子个数必须与原式一致，把 O₂ 写成 O 直接不得分；只说「二氧化碳和水」而不写 6 个的扣一半分，漏掉「1 个葡萄糖」的同样扣分。</td></tr>
+    <tr><td class="num">3</td><td>光反应在类囊体薄膜，暗反应在叶绿体基质</td><td>只答「叶绿体」太笼统，必须分别写清类囊体薄膜与叶绿体基质两个具体结构，缺一个扣半分，场所写反不得分。</td></tr>
+    <tr><td class="num">4</td><td>叶绿体是细胞器（车间），叶绿素是其中的绿色色素；叶绿体含有叶绿素</td><td>二者是整体与部分的关系：叶绿体含有叶绿素，说成叶绿素含有叶绿体即错，这是最常见的写反。</td></tr>
+    <tr><td class="num">5</td><td>白天两者同时进行；完全无光的当天只呼吸不起光合，因光反应缺光即停</td><td>白天谁占优看净结果：净吸收 CO₂ 说明光合大于呼吸。</td></tr>
+    <tr class="hl"><td class="num">6</td><td>气孔是 CO₂ 的入口，也是 O₂ 与水蒸气的出口；干旱时关闭以减少失水</td><td>要写出「减少失水与保证 CO₂ 供给」这对矛盾：气孔关小了省水，却也断了 CO₂，正午的光合午休由此而来。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 1 题漏写条件、第 3 题只答「叶绿体」、第 5 题漏掉「无光当天只呼吸」。三题合计 3 分，占基础题总分的一半。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分：进入进阶题；4–5 分：回读 P3 的六个阶段表；≤ 3 分：把两段工序与两个场所各默写 3 遍再重做本页。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 1 题只写反应式不写「光照、叶绿体」的，按漏条件处理，扣半分。</div>
+    <div>第 2 题把产物写成「葡萄糖和氧气」却没写数量的，扣半分；数量就藏在配平系数里。</div>
+    <div>第 5 题答「不能同时进行」的，是把光合与呼吸当成二选一，回看 P5 的对照表。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在条件、场所与净结果三处，不涉及复杂计算</b>。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含换算过程与评分口径<br>自批：全卷 ≥ 10 / 12 达标</div>
+  </div>
+  <table>
+    <tr><th style="width:40px">题</th><th style="width:460px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td>分别用 H₂¹⁸O 与 C¹⁸O₂ 各标记一组植物，检测放出的 O₂ 的同位素组成：只有水被标记时 O₂ 才含 ¹⁸O，说明氧来自水的光解；今天大气中的氧气几乎都来自这一反应</td><td>必须写出两组对照（一组只标记水、一组只标记 CO₂）与检测指标；只写「标记水」不写得数不得分。</td></tr>
+    <tr><td class="num">8</td><td>不等效：补光灯只含红蓝光等少数波段，且叶片处光强通常只有晴天阳光的 1/5</td><td>判断依据要落到「光谱成分 + 光强」两条；只写「阳光更好」不给分，也不等于补光完全无效。</td></tr>
+    <tr><td class="num">9</td><td>264 g CO₂ 对应 180 g 葡萄糖与 192 g O₂；48 g CO₂ 得 33 g 葡萄糖、35 g O₂，两边质量都是 372 g，摩尔比始终是 6 : 6 : 1 : 6</td><td>三步都要写：先由 264 g CO₂ 得 1 mol 葡萄糖，再按 180 g 换算质量，最后回推 O₂ 的克数；只写结果不得分，把 48 g 直接除以 6 当作答案的同样扣分。</td></tr>
+    <tr><td class="num">10</td><td>光饱和点是光强增加而光合速率不再上升的拐点，此时限制因素是酶与 CO₂ 供给</td><td>约相当于 1/3 全日照；答「光太强会晒死」不准确——真正的限制因素是酶与 CO₂ 供给，强光还会引起灼伤与气孔关闭。</td></tr>
+    <tr class="hl"><td class="num">11</td><td>材料：同种绿植 2 盆；A 组照光，B 组黑纸遮光；自变量为光，因变量为是否产生淀粉（碘液检测），其余条件相同；预期 A 组遇碘变蓝、B 组不变蓝</td><td>自变量、因变量、控制变量与预期结果缺一项扣分；必须写出「其余条件相同」，只写「把一盆放到暗处」视为没有对照组，两组用同一盆植物连做的也不得分。</td></tr>
+    <tr class="hl"><td class="num">12</td><td>一天净吸收 48 g CO₂，远大于夜间呼吸释放的 CO₂，净收支为正，故森林是碳汇；若呼吸与分解超过当年固定的量则变碳源</td><td>要用「48 g 吸收」与夜间消耗对比说明净值：只背「森林是碳汇」这句话、不给出收支方向的不得分；能补一句「砍伐与火灾会把碳汇变碳源」的可加分。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">失分点排名（近 5 次重做统计）</div><p>第 9 题不写摩尔关系 4 次错、第 11 题漏控制变量 3 次错、第 8 题只答「阳光更好」2 次错。三处合计 9 次失分，占 5 次重做全部失分（10 次）的九成。</p><p>其中第 9 题与第 11 题属于「步骤写不全」，第 8 题属于「结论没落到依据」；前者补中间步骤，后者回读 P3 的物质收支表。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>12 分进入 P9 自测；10–11 分重做错题所在小节；≤ 9 分回读 P3–P4，隔天整卷重练一次。</p><p>重做时只做错题所在的题型，不整卷重抄；每道错题旁写清「错在哪一步、对应哪一页」，一周后只看这些批注。</p></div>
+    <div class="box"><div class="k">进阶与挑战加分点</div><p>第 9 题写出 264 g → 180 g 的摩尔关系、第 11 题写出两组对照，只要变量清楚即可给满分。</p><p>挑战题允许用示意图代替文字，但自变量、因变量、控制变量三个词必须出现，缺词即扣分。</p></div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在换算过程、变量控制与「等效性判断」三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与 4 周探究计划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:190px">自测项</th><th style="width:330px">达标标准</th><th style="width:84px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>默写总反应式</td><td>写出 6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂ 且两边配平</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>说出两段工序的场所</td><td>能指出类囊体薄膜与叶绿体基质两个结构，并说清哪段工序在哪</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>区分光合与呼吸</td><td>从场所、原料、产物、时间四栏各说出一条，并说出夜间谁在走</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>解释氧气来源</td><td>说出氧气来自水的光解，并给出标记实验思路</td><td class="num">P7</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>完成一天收支换算</td><td>由 48 g CO₂ 推出 33 g 葡萄糖与 35 g O₂</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>说出光饱和点含义</td><td>光强超过约 1/3 全日照后速率不再上升及其原因</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 下一阶段：4 周探究计划 <em>每周只做一件事，产出必须能拿出来看</em></div>
+  <table>
+    <tr><th style="width:100px">阶段</th><th style="width:74px">周次</th><th>任务</th><th style="width:296px">可检查产出</th></tr>
+    <tr><td>观察</td><td class="num">第 1 周</td><td>每天记录 1 盆绿植的光照时长、气孔开闭与叶片状态</td><td>观察表 7 行</td></tr>
+    <tr><td>实验与测量</td><td class="num">第 2–3 周</td><td>做遮光对照实验并用碘液检测淀粉，同时记录每日 CO₂ 收支估算，每天一行、写清光照时长</td><td>实验记录 14 行</td></tr>
+    <tr class="hl"><td>结论</td><td class="num">第 4 周</td><td>汇总数据，写出「光合作用需要光」的结论与偏差说明</td><td>结论页 1 份</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">4 周计划的每天 25 分钟怎么分</div><p>8 分钟记概念与反应式；7 分钟画一遍两段工序流程图；10 分钟做 3 道题并立即对答案。</p></div>
+    <div class="box"><div class="k">实验最容易做错的 3 件事</div><p>遮光不严导致对照组漏光；只做一组没有对照；同一盆植物连做两组，变量没控制住。</p></div>
+    <div class="box"><div class="k">下一讲衔接</div><p>下一讲用同样的收支方法学「细胞呼吸」，把两段过程的净收支放在同一张表里比较。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>4 周后要求观察表 7 行、实验记录 14 行、结论页 1 份</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：光合作用术语 10 条与数据口径</h2></div>
+    <div class="note">讲义 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>复习时只看「释义」这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:164px">术语</th><th>释义</th></tr>
+    <tr><td>光合作用</td><td>绿色植物利用光能，把 CO₂ 与 H₂O 合成有机物并放出 O₂ 的过程。</td></tr>
+    <tr><td>光反应</td><td>在类囊体薄膜上进行、必须有光的一段工序，产物是 O₂、ATP 与 NADPH。</td></tr>
+    <tr><td>暗反应</td><td>在叶绿体基质中进行，用 ATP 与 NADPH 把 CO₂ 还原成糖；本身不直接需要光，但依赖光反应供给这两种物质。</td></tr>
+    <tr><td>叶绿体</td><td>光合作用发生的细胞器，由双层膜、类囊体薄膜与基质组成。</td></tr>
+    <tr><td>叶绿素</td><td>嵌在类囊体薄膜上的绿色色素，主要吸收红光与蓝紫光，反射绿光。</td></tr>
+    <tr><td>气孔</td><td>叶片表皮上的可开闭通道，CO₂ 由此进入，O₂ 与水蒸气由此散出。</td></tr>
+    <tr><td>蒸腾作用</td><td>水分以水蒸气形式从气孔散失的过程，一天可达 200 L，是水上升的动力。</td></tr>
+    <tr><td>光饱和点</td><td>光强增加而光合速率不再上升的拐点，约相当于 1/3 全日照。</td></tr>
+    <tr><td>碳汇</td><td>从大气中吸收并固定 CO₂ 的体系；一株中等树木一天净固定约 48 g CO₂。</td></tr>
+    <tr class="hl"><td>ATP</td><td>细胞通用的能量货币，光反应生成、暗反应消耗，是两段工序之间的现金。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">数据口径</div><p>一株中等大小树木（树高 8 m）的日尺度估算；CO₂、O₂ 与葡萄糖按 1 mol 葡萄糖的化学计量关系换算。质量与时长保留到整数位，光能按两位有效数字给出。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 由单页摘要扩写为 10 页：新增物质收支图、6 类错误表、12 题分层练习与 4 周探究计划。</p></div>
+    <div class="box"><div class="k">使用提示</div><p>术语表用于复习自查；跨页数字以本页口径为准，自己实验的数据请标注测量日期与环境温度。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全讲末页；若跳过前 9 页，请至少完成 P6 的 1–6 题与 P9 自测清单的第 1、5 项。</div>
+    <div>全讲 10 页、6 个关键概念、12 道题的数值在各页保持一致，引用时请注明「讲义 v2.0」。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于复习自查，数据口径用于引用与实验对照</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>

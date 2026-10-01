@@ -1,6 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Skeleton } from '@shared/components/ui/skeleton';
+import { resolveArtifactPath } from '@shared/cowork/artifactPath';
 import { ArrowLeft, Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -36,7 +37,8 @@ import ArtifactRenderer from './ArtifactRenderer';
 import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
-import { invalidateArtifactFile, loadArtifactFile } from '@/services/artifactFileLoader';
+import { invalidateArtifactFile, loadArtifactFileWithRetry } from '@/services/artifactFileLoader';
+import { MAX_PREVIEW_HTML_CHARS } from './renderers/constants';
 
 // Same code-split as ArtifactRenderer — avoid static import pulling Prism into the main chunk.
 const CodeRenderer = React.lazy(() => import('./renderers/CodeRenderer'));
@@ -162,7 +164,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     setLoadingArtifactId(artifactId);
     setArtifactLoadError(null);
 
-    loadArtifactFile(selectedArtifact, cwd)
+    loadArtifactFileWithRetry(selectedArtifact, cwd)
       .then(loaded => {
         if (cancelled) return;
         if (!loaded) {
@@ -175,6 +177,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
           }),
         );
+        // An oversized page has no usable preview: show its source instead of a
+        // blank notice, so a saved web page can never take over the app.
+        if (selectedArtifact.type === 'html' && loaded.content.length > MAX_PREVIEW_HTML_CHARS) {
+          dispatch(setActiveTab('code'));
+        }
       })
       .catch(() => {
         if (!cancelled) setArtifactLoadError(artifactId);
@@ -325,19 +332,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 
   const handleOpenWithApp = useCallback(() => {
     if (selectedArtifact?.filePath) {
-      let filePath = selectedArtifact.filePath;
-      if (filePath.startsWith('file:///')) {
-        filePath = filePath.slice(7);
-      } else if (filePath.startsWith('file://')) {
-        filePath = filePath.slice(7);
-      } else if (filePath.startsWith('file:/')) {
-        filePath = filePath.slice(5);
-      }
-      // Strip leading / before Windows drive letter
-      if (/^\/[A-Za-z]:/.test(filePath)) {
-        filePath = filePath.slice(1);
-      }
-      window.electron?.shell?.openPath(filePath);
+      window.electron?.shell?.openPath(resolveArtifactPath(selectedArtifact.filePath));
     }
   }, [selectedArtifact]);
 
@@ -345,7 +340,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     if (!selectedArtifact?.filePath) return;
     invalidateArtifactFile(selectedArtifact.filePath);
     try {
-      const loaded = await loadArtifactFile({ ...selectedArtifact, content: '' }, cwd);
+      const loaded = await loadArtifactFileWithRetry(
+        { ...selectedArtifact, content: '' },
+        cwd,
+        { forceRefresh: true },
+      );
       if (loaded) {
         dispatch(
           addArtifact({
@@ -353,6 +352,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
           }),
         );
+        // An oversized page has no usable preview: show its source instead of a
+        // blank notice, so a saved web page can never take over the app.
+        if (selectedArtifact.type === 'html' && loaded.content.length > MAX_PREVIEW_HTML_CHARS) {
+          dispatch(setActiveTab('code'));
+        }
       }
     } catch {
       // File unreadable or missing

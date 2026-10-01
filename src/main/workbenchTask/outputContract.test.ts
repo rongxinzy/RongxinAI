@@ -19,7 +19,6 @@ import {
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { setWorkbenchOutputRequirements, normalizeOutputRequirements } from './outputContract';
 import { initializeWorkbenchTaskSchema } from './schema';
-import { initializeProductionLoopSchema } from '../productionLoop/schema';
 import { WorkbenchTaskService } from './taskService';
 import { classifyWorkbenchToolRisk } from './riskClassifier';
 
@@ -31,7 +30,6 @@ vi.mock('./artifactWorkerPool', () => ({
 const fixture = () => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
-  initializeProductionLoopSchema(db);
   const service = new WorkbenchTaskService(db);
   const { task, run } = service.beginRun({
     sessionId: 'session',
@@ -242,13 +240,26 @@ test('rejects invalid and unbounded output contracts', () => {
     normalizeOutputRequirements([{ mode: WorkbenchOutputMode.File, formats: ['../xlsx'] }]),
   ).toThrow();
   expect(() =>
-    normalizeOutputRequirements([{ mode: WorkbenchOutputMode.Text, formats: ['xlsx'] }]),
-  ).toThrow();
-  expect(() =>
     normalizeOutputRequirements(
       Array.from({ length: 17 }, () => ({ mode: WorkbenchOutputMode.Text, formats: [] })),
     ),
   ).toThrow();
+});
+
+test('normalizes the contract shapes a model actually submits', () => {
+  // A model writing a text requirement tends to attach a format ("markdown").
+  // Text deliverables are never matched against a format, so the format is
+  // normalized away instead of rejected: rejecting it leaves the task without a
+  // contract, and the pre-execution gate then blocks every tool call forever.
+  expect(
+    normalizeOutputRequirements([{ mode: WorkbenchOutputMode.Text, formats: ['markdown'] }]),
+  ).toEqual([{ mode: WorkbenchOutputMode.Text, formats: [] }]);
+  expect(normalizeOutputRequirements([{ mode: WorkbenchOutputMode.Text }])).toEqual([
+    { mode: WorkbenchOutputMode.Text, formats: [] },
+  ]);
+  expect(normalizeOutputRequirements([{ mode: WorkbenchOutputMode.File }])).toEqual([
+    { mode: WorkbenchOutputMode.File, formats: [] },
+  ]);
 });
 
 test('a text task with a scratch script completes without accepting the script or response fragment', async () => {

@@ -26,7 +26,7 @@ test('recovery queries persisted sequence and creation time and replays the comp
   const runtime = Object.assign(new EventEmitter(), { isSessionRunning: () => false });
   const handler = vi.spyOn(ipcMain, 'handle');
   try {
-    bindCoworkRunBridge(runtime as unknown as PiRuntimeAdapter, () => database);
+    bindCoworkRunBridge(runtime as unknown as PiRuntimeAdapter, () => database, vi.fn());
     const snapshotHandler = handler.mock.calls.find(
       ([channel]) => channel === CoworkSessionIpc.RunSnapshot,
     )![1];

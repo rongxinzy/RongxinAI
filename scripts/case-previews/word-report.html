@@ -1,79 +1,86 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>word-report</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>word-report</title><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased;display:grid;gap:26px;padding:30px;justify-items:center}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 40px 18px;display:flex;flex-direction:column}
+.ph{display:flex;align-items:flex-start;gap:20px;border-bottom:1px solid #edede9;padding-bottom:12px}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+h1{font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.18;margin-top:7px}
+h2{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.2;margin-top:7px}
+.cap{margin-left:auto;text-align:right;font-size:11px;color:#8b8f97;line-height:1.75;padding-top:2px}
+.meta{display:flex;gap:18px;margin-top:8px;font-size:11.5px;color:#8b8f97;flex-wrap:wrap}
+.meta span{position:relative}
+.meta span+span::before{content:"";position:absolute;left:-10px;top:5px;width:3px;height:3px;background:#c9c9c3}
+.body{flex:1;min-height:0;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.body>*{flex:0 0 auto}
+.stack{flex:none}
+.bars{flex:none}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#8b8f97}
+.pf b{font-weight:500;color:#6f737b}
+.sec{font-size:11px;letter-spacing:.22em;color:#8b8f97;text-transform:uppercase}
+.sec.dark{color:#6f737b;letter-spacing:.16em}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:500;letter-spacing:.06em;color:#6f737b;background:#f6f6f3;text-align:left;padding:5px 10px;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+td{font-size:12.5px;color:#3d4046;padding:5px 10px;border-bottom:1px solid #edede9;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.dn th{padding:3px 9px}
+table.dn td{padding:3px 9px}
+table.dn2 th{padding:2px 8px}
+table.dn2 td{padding:2px 8px}
+.cols.mid{align-items:center}
+.cols.mid>*{min-width:0}
+th.r,td.r{text-align:right}
+tr.sum td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.hc,th.hc{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+td.mut{color:#8b8f97}
+.lead{font-size:12.5px;color:#4c5058;line-height:1.55}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{border:1px solid #e4e4e0;padding:8px 12px}
+.kpi .k{font-size:11px;color:#8b8f97;letter-spacing:.08em}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.kpi .n{font-size:11px;color:#8b8f97;margin-top:3px;line-height:1.5}
+.cols{display:flex;gap:26px;align-items:flex-start}
+.cols>*{min-width:0}
+.cols.g40{display:grid;grid-template-columns:1fr 300px;gap:26px}
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:118px 1fr 64px;align-items:center;gap:11px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
+.bar .r{text-align:right;color:#3d4046}
+.bar.tight{grid-template-columns:96px 1fr 58px;gap:9px}
+.pts{display:grid;gap:6px}
+.pt{font-size:12.5px;color:#4c5058;line-height:1.55;padding-left:13px;position:relative}
+.pt::before{content:"";position:absolute;left:0;top:6px;width:5px;height:5px;background:var(--accent)}
+.note{font-size:11px;color:#8b8f97;line-height:1.7}
+.stack{display:flex;height:10px;border:1px solid #e4e4e0}
+.stack i{display:block;height:100%;background:var(--accent)}
+.stack i:nth-child(2){opacity:.74}
+.stack i:nth-child(3){opacity:.56}
+.stack i:nth-child(4){opacity:.4}
+.stack i:nth-child(5){opacity:.27}
+.stack i:nth-child(6){opacity:.18}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:0;font-size:11px;color:#6f737b}
+.legend b{font-weight:500;color:#3d4046;font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:6px 11px;font-size:12.5px;color:#3d4046}
+.chip b{font-weight:600;font-variant-numeric:tabular-nums;color:#16171a}
+.badge{font-size:11px;padding:1px 6px;border:1px solid #e4e4e0;color:#6f737b;font-weight:400}
+.badge.ac{background:color-mix(in srgb,var(--accent) 10%,#fff);border-color:transparent;color:#16171a;font-weight:500}
+.tnote{font-size:11px;color:#8b8f97;line-height:1.5;margin-top:0}
+.cv{display:grid;gap:3px}
+.cv div{font-size:11px;color:#4c5058;line-height:1.4;padding-left:11px;position:relative}
+.cv div::before{content:"";position:absolute;left:0;top:6px;width:4px;height:4px;background:var(--accent)}
+.pg{font-size:11px;color:#6f737b;line-height:1.5}
+.pg b{color:#3d4046;font-weight:500;letter-spacing:.04em}
+.wrap{display:flex;flex-direction:column;gap:9px}
 
-body{padding:30px}
-.win{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.win-top{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #e9e9e5;font-size:13px}
-.dot{width:9px;height:9px;border-radius:50%;background:#e2e2dd}
-.file{font-weight:600;margin-left:6px}
-.menu{display:flex;gap:18px;color:#8b8f97;font-size:12px;margin-left:auto}
-.grid{flex:1;min-height:0;overflow:hidden}
-.row{display:grid;border-top:1px solid #edede9}
-.row:first-child{border-top:0}
-.cell{border-right:1px solid #edede9;padding:8px 12px;font-size:12.5px;color:#3d4046;white-space:nowrap;overflow:hidden}
-.row:last-child .cell{border-bottom:0}
-.head{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em}
-.idx{background:#f6f6f3;color:#9a9ea6;font-size:11px;text-align:center;padding:8px 0}
-.total{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
-.hi{background:color-mix(in srgb,var(--accent) 12%,#fff)}
-.split{flex:1;display:grid;grid-template-columns:1.15fr 1fr;min-height:0}
-.pane{padding:18px 20px;border-right:1px solid #e9e9e5;min-width:0}
-.pane:last-child{border-right:0}
-.pane h3{font-size:12px;letter-spacing:.14em;color:#8b8f97;text-transform:uppercase}
-.bars{margin-top:16px;display:grid;gap:11px}
-.bar{display:grid;grid-template-columns:56px 1fr 44px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-.shot{margin-top:14px;border:1px dashed #cfcfc9;background:#fafaf8;height:190px;padding:14px;display:flex;align-items:center;justify-content:center}
-.shot table{border-collapse:collapse;font-size:11px;color:#6f737b;background:#fff}
-.shot td,.shot th{border:1px solid #e4e4e0;padding:5px 9px}
-.arrow{display:flex;align-items:center;justify-content:center;font-size:22px;color:#b6bac0}
-.files{display:grid;gap:10px;margin-top:14px}
-.fcard{display:flex;align-items:center;gap:10px;border:1px solid #e4e4e0;background:#fafaf8;padding:10px 12px;font-size:12.5px}
-.fcard b{margin-left:auto;color:#6f737b;font-weight:500}
-.fcard .tag{background:#eceae4;color:#6f737b;font-size:11px;padding:2px 7px}
-.doc{background:#fff;border:1px solid #e4e4e0;height:100%;padding:22px 26px;overflow:hidden}
-.doc h2{font-size:19px}
-.doc .meta{margin-top:8px;font-size:11.5px;color:#9a9ea6}
-.doc p{margin-top:12px;font-size:12.5px;color:#4c5058;line-height:1.85}
-.doc .chart{margin-top:14px;height:96px;border:1px solid #edede9;background:linear-gradient(180deg,#fff,#fafaf8);display:flex;align-items:flex-end;gap:8px;padding:12px}
-.doc .chart i{flex:1;background:var(--accent);opacity:.8}
-.doc ul{margin-top:12px;list-style:none;display:grid;gap:6px}
-.doc li{font-size:12.5px;color:#4c5058;padding-left:14px;position:relative}
-.doc li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
 </style></head><body>
-<div class="win" style="--accent:#8B5CF6">
-  <div class="win-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
-    <span class="file">月度经营分析报告.docx</span>
-    <span class="menu"><span>开始</span><span>插入</span><span>视图</span></span>
-  </div>
-  <div class="split" style="grid-template-columns:1fr 44px 1.25fr">
-    <div class="pane">
-      <h3>数据来源</h3>
-      <div class="grid" style="margin-top:12px;border:1px solid #edede9">
-        <div class="row" style="grid-template-columns:1fr 68px"><div class="cell head">月份</div><div class="cell head">营收</div></div>
-        <div class="row" style="grid-template-columns:1fr 68px"><div class="cell">7 月</div><div class="cell mono">284</div></div>
-        <div class="row" style="grid-template-columns:1fr 68px"><div class="cell">8 月</div><div class="cell mono">312</div></div>
-        <div class="row" style="grid-template-columns:1fr 68px"><div class="cell">9 月</div><div class="cell mono">368</div></div>
-        <div class="row" style="grid-template-columns:1fr 68px"><div class="cell total">季度</div><div class="cell total mono">964</div></div>
-      </div>
-      <p style="margin-top:14px;font-size:12px;color:#8b8f97;line-height:1.8">单位：万元<br>口径：已确认收入，含税</p>
-    </div>
-    <div class="arrow">→</div>
-    <div class="pane">
-      <div class="doc">
-        <h2>月度经营分析报告</h2>
-        <div class="meta">数据截至 9 月 30 日 · 经营分析组</div>
-        <p>本季度营收 964 万元，环比增长 12.8%。增长主要来自西南与华东两个区域，其中西南区域环比提升 18.9%，高于整体增速 6.1 个百分点。</p>
-        <div class="chart" style="height:150px"><i style="height:62%"></i><i style="height:70%"></i><i style="height:86%"></i><i style="height:100%"></i><i style="height:74%"></i><i style="height:58%"></i><i style="height:66%"></i><i style="height:80%"></i></div>
-        <ul>
-          <li>结构上，续费贡献稳定，新签占比提升到 34%</li>
-          <li>成本端，履约时长中位数从 14m 降到 12m 38s</li>
-          <li>风险：华北渠道结构变化尚未归因，需下月单独复盘</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</div></body></html>
+<section class="page" style="--accent:#8B5CF6" data-page="1"><div class="ph"><div><div class="kicker">Data Analysis · 报告成稿</div><h1>数据自动成稿的月度经营分析报告</h1><div class="meta"><span>篇幅：4,580 字 · 5 表 · 3 图 · 14 页</span><span>口径：管理会计，含税，万元</span><span>取数：FS-01 / CRM / 工单系统</span><span>基期：2026Q2 的 854.5 万元</span></div></div><div class="cap mono">月度经营分析报告.docx<br>v2.3 · 2026-10-04 发布</div></div><div class="body"><div class="lead">本季度营收 964.0 万元（环比 +12.8%，基期 854.5 万元），毛利率 42.4%，新签占比 31.6%，履约时长中位数压到 12m38s。报告按 6 章、4,580 字、5 表 3 图成稿，抽查 42 个引用数字全部与源表一致；华北 −2.1% 是唯一业务异常，达预警线（−1.0%）的 2.10 倍，已补写归因专章。</div><div class="kpis"><div class="kpi"><div class="k">营业收入</div><b class="mono">964.0 万元</b><div class="n">环比 +12.8%，高于季度目标 +10.0% 的 2.8 个百分点</div></div><div class="kpi"><div class="k">毛利率</div><b class="mono">42.4%</b><div class="n">毛利 408.7 万元，由基期 40.7% 提升 1.7 个百分点</div></div><div class="kpi"><div class="k">报告成稿</div><b class="mono">4,580 字 / 5 表 / 3 图</b><div class="n">抽查 42 个引用数字与源表逐一对齐</div></div></div><div class="sec dark">表 1 月度经营指标（金额单位：万元）</div><table class="dn"><thead><tr><th>月份</th><th class="r hc">营业收入</th><th class="r">基期</th><th class="r">环比</th><th class="r">毛利率</th><th class="r">新签占比</th><th>履约中位数</th></tr></thead><tbody><tr><td>7 月</td><td class="r hc">284.0</td><td class="r">259.0</td><td class="r">+9.7%</td><td class="r">41.6%</td><td class="r">29.0%</td><td>14m02s</td></tr><tr><td>8 月</td><td class="r hc">312.0</td><td class="r">283.5</td><td class="r">+10.1%</td><td class="r">42.3%</td><td class="r">31.0%</td><td>13m20s</td></tr><tr><td>9 月</td><td class="r hc">368.0</td><td class="r">312.0</td><td class="r">+17.9%</td><td class="r">43.1%</td><td class="r">34.0%</td><td>12m38s</td></tr><tr class='sum'><td>季度合计</td><td class="r">964.0</td><td class="r">854.5</td><td class="r">+12.8%</td><td class="r">42.4%</td><td class="r">31.6%</td><td>12m38s</td></tr></tbody></table><div class="stack"><i style="width:40.04%"></i><i style="width:35.48%"></i><i style="width:16.18%"></i><i style="width:8.30%"></i></div><div class="legend"><span>标准版 <b>386.0 万</b></span><span>专业版 <b>342.0 万</b></span><span>企业版 <b>156.0 万</b></span><span>增值服务 <b>80.0 万</b></span></div><div class="tnote">校验：6 条规则命中 10 处（格式类 7 处 + 业务类 3 项）；最大偏差倍数 2.10×（华北营收降幅 ÷ 预警线）。异常清单见第 6 页，质量分 98.8 见第 7 页。</div><div class="cols"><div class="wrap"><div class="sec dark">口径与来源</div><div class="cv"><div>数据口径：管理会计口径含税，单位万元；毛利率 =（营收 − 成本）÷ 营收</div><div>数据来源：财务系统 FS-01 月结单 + CRM 商机表 + 工单系统 + HR 系统</div><div>统计窗口：2026-07 ~ 2026-09，取数时点 2026-10-03 06:00，基期 2026Q2 的 854.5 万元</div></div></div><div class="wrap"><div class="sec dark">页面导读（共 9 页）</div><div class="pg"><b>P2–P4 数据与口径</b> P2 6 章结构、字数与图… · P3 五类指标口径与来源系… · P4 产品线与成本两张明细…</div><div class="pg"><b>P5–P7 分析与校验</b> P5 效率指标、目标达成与… · P6 3 项业务异常 + … · P7 6 条成稿校验规则与…</div><div class="pg"><b>P8–P9 结论与附录</b> P8 结论、耗时结构与五步… · P9 数据来源、术语表与修…</div></div></div></div><div class="pf"><span>结论：营收 964.0 万元、环比 +12.8%，毛利率 42.4%，14 页成稿</span><span class="mono">第 1 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="2"><div class="ph"><div><div class="kicker">Outline Map · 报告结构</div><h2>6 章结构、字数与图表分布</h2></div><div class="cap mono">成稿 4,580 字 · 14 页<br>图表编号唯一，附页码索引</div></div><div class="body"><div class="sec dark">表 2-1 章节结构</div><table class=""><thead><tr><th>章节</th><th>字数</th><th>表</th><th>图</th><th>页码范围</th></tr></thead><tbody><tr><td>1 摘要</td><td class="hc">420</td><td>0</td><td>0</td><td>第 1 页</td></tr><tr><td>2 经营概况</td><td class="hc">1,180</td><td>2</td><td>0</td><td>第 2–4 页</td></tr><tr><td>3 收入结构</td><td class="hc">960</td><td>1</td><td>2</td><td>第 5–7 页</td></tr><tr><td>4 成本与效率</td><td class="hc">1,240</td><td>1</td><td>1</td><td>第 8–11 页</td></tr><tr><td>5 风险与展望</td><td class="hc">780</td><td>1</td><td>0</td><td>第 12–13 页</td></tr><tr><td>6 附录：口径与来源</td><td class="hc">0</td><td>0</td><td>0</td><td>第 14 页</td></tr><tr class='sum'><td>合计 6 章</td><td>4,580</td><td>5</td><td>3</td><td>1–14 页</td></tr></tbody></table><div class="sec dark">各章节字数占比</div><div class="bars"><div class="bar"><span>1 摘要</span><i style="width:33.9%"></i><span class="r mono">420 字</span></div><div class="bar"><span>2 经营概况</span><i style="width:95.2%"></i><span class="r mono">1,180 字</span></div><div class="bar"><span>3 收入结构</span><i style="width:77.4%"></i><span class="r mono">960 字</span></div><div class="bar"><span>4 成本与效率</span><i style="width:100.0%"></i><span class="r mono">1,240 字</span></div><div class="bar"><span>5 风险与展望</span><i style="width:62.9%"></i><span class="r mono">780 字</span></div></div><div class="pts"><div class="pt">摘要固定 420 字，只放 3 个结论，保证管理层 1 分钟内读完。</div><div class="pt">收入结构章含 2 张图（产品线占比、区域增速对比），成本与效率章含 1 张图（履约时长趋势）。</div><div class="pt">附录页码固定在第 14 页，以清单形式承载口径、数据来源与修订记录，不计入正文字数。</div></div></div><div class="pf"><span>6 章结构：4,580 字、5 张表、3 张图，页码索引完整</span><span class="mono">第 2 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="3"><div class="ph"><div><div class="kicker">Caliber · 口径与取数</div><h2>五类指标口径与来源系统</h2></div><div class="cap mono">取数时间 10-03 06:00<br>全部指标可追溯到源表字段</div></div><div class="body"><div class="sec dark">表 3-1 指标口径与来源</div><table class="dn"><thead><tr><th>指标</th><th>来源系统</th><th>更新频率</th><th>引用章节</th></tr></thead><tbody><tr><td>营业收入 / 成本</td><td>财务系统 FS-01</td><td>月结 T+3</td><td class="hc">2.2 / 4.1 / 5.3 节</td></tr><tr><td>新签金额 / 商机数</td><td>CRM 商机表</td><td>每日 06:00</td><td class="hc">3.2 节</td></tr><tr><td>履约时长</td><td>工单系统</td><td>小时级</td><td class="hc">4.3 节</td></tr><tr><td>人员与工时</td><td>HR 系统</td><td>每月 1 日</td><td class="hc">4.2 节</td></tr><tr><td>上年同期与基期</td><td>财务系统 FS-01</td><td>年度冻结</td><td class="hc">2.3 / 3.3 节</td></tr><tr class='sum'><td>合计 5 类指标</td><td>4 个系统</td><td>—</td><td>覆盖全部 6 章</td></tr></tbody></table><div class="sec dark">取数与成稿耗时（合计 50 分钟）</div><div class="bars"><div class="bar"><span>数据取数</span><i style="width:46.2%"></i><span class="r mono">12m</span></div><div class="bar"><span>图表生成</span><i style="width:15.4%"></i><span class="r mono">4m</span></div><div class="bar"><span>正文撰写</span><i style="width:100.0%"></i><span class="r mono">26m</span></div><div class="bar"><span>一致性校验</span><i style="width:23.1%"></i><span class="r mono">6m</span></div><div class="bar"><span>成稿导出</span><i style="width:7.7%"></i><span class="r mono">2m</span></div></div><div class="pts"><div class="pt">营收按确认口径统计：964.0 万元与财务月结单一致，差异 0 元。</div><div class="pt">履约时长取中位数（非均值），避免长尾工单拉偏；季度值取 9 月 12m38s，不取三月平均。</div><div class="pt">毛利率 =（营收 − 成本）÷ 营收，成本含履约、人力、云算力、市场、管理五类，合计 555.3 万元。</div><div class="pt">基期一律取 2026Q2 财务口径 854.5 万元，不使用去年同期，避免季节性误读。</div></div></div><div class="pf"><span>5 类指标口径来自 4 个系统，与财务月结一致</span><span class="mono">第 3 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="4"><div class="ph"><div><div class="kicker">Detail · 明细数据</div><h2>产品线与成本两张明细表</h2></div><div class="cap mono">营收 964.0 − 成本 555.3 = 毛利 408.7 万元<br>毛利率 42.4%</div></div><div class="body"><div class="sec dark">表 4-1 产品线收入结构（万元）</div><table class="dn"><thead><tr><th>产品线</th><th class="r">营业收入</th><th class="r">基期</th><th class="r">环比</th><th class="r">占比</th><th class="r">毛利率</th></tr></thead><tbody><tr><td>标准版</td><td class="r">386.0</td><td class="r">353.0</td><td class="r">+9.3%</td><td class="r hc">40.04%</td><td class="r">45.1%</td></tr><tr><td>专业版</td><td class="r">342.0</td><td class="r">298.0</td><td class="r">+14.8%</td><td class="r hc">35.48%</td><td class="r">42.2%</td></tr><tr><td>企业版</td><td class="r">156.0</td><td class="r">131.0</td><td class="r">+19.1%</td><td class="r hc">16.18%</td><td class="r">39.4%</td></tr><tr><td>增值服务</td><td class="r">80.0</td><td class="r">72.5</td><td class="r">+10.3%</td><td class="r hc">8.30%</td><td class="r">36.2%</td></tr><tr class='sum'><td>合计</td><td class="r">964.0</td><td class="r">854.5</td><td class="r">+12.8%</td><td class="r">100.00%</td><td class="r">42.4%</td></tr></tbody></table><div class="sec dark">表 4-2 成本结构（万元）</div><table class="dn"><thead><tr><th>成本项</th><th class="r">本季金额</th><th class="r">基期</th><th class="r">环比</th><th class="r">占营收</th><th class="r">占成本</th></tr></thead><tbody><tr><td>履约成本</td><td class="r">186.0</td><td class="r">172.0</td><td class="r">+8.1%</td><td class="r hc">19.3%</td><td class="r">33.5%</td></tr><tr><td>人力成本</td><td class="r">148.0</td><td class="r">140.0</td><td class="r">+5.7%</td><td class="r hc">15.4%</td><td class="r">26.7%</td></tr><tr><td>云与算力</td><td class="r">62.0</td><td class="r">52.0</td><td class="r">+19.2%</td><td class="r hc">6.4%</td><td class="r">11.2%</td></tr><tr><td>市场与获客</td><td class="r">96.0</td><td class="r">88.0</td><td class="r">+9.1%</td><td class="r hc">10.0%</td><td class="r">17.3%</td></tr><tr><td>管理与行政</td><td class="r">63.3</td><td class="r">54.7</td><td class="r">+15.7%</td><td class="r hc">6.6%</td><td class="r">11.4%</td></tr><tr class='sum'><td>成本合计</td><td class="r">555.3</td><td class="r">506.7</td><td class="r">+9.6%</td><td class="r">57.6%</td><td class="r">100.0%</td></tr></tbody></table><div class="cols mid"><div style="flex:1.35"><div class="sec dark">成本项占营收比重</div><div class="bars"><div class="bar"><span>履约成本</span><i style="width:57.6%"></i><span class="r mono">19.3%</span></div><div class="bar"><span>人力成本</span><i style="width:45.8%"></i><span class="r mono">15.4%</span></div><div class="bar"><span>云与算力</span><i style="width:19.2%"></i><span class="r mono">6.4%</span></div><div class="bar"><span>市场与获客</span><i style="width:29.7%"></i><span class="r mono">10.0%</span></div><div class="bar"><span>管理与行政</span><i style="width:19.6%"></i><span class="r mono">6.6%</span></div></div></div><div style="flex:1"><div class="tnote">成本环比 +9.6% 低于营收环比 +12.8%，使毛利率由基期 40.7% 升至 42.4%（+1.7 个百分点）；占营收比重最高的履约成本由 20.1% 降至 19.3%（−0.8 个百分点）。</div></div></div></div><div class="pf"><span>产品线与成本两表明细勾稽，毛利 408.7 万元</span><span class="mono">第 4 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="5"><div class="ph"><div><div class="kicker">Efficiency · 效率与结构</div><h2>效率指标、目标达成与区域增速</h2></div><div class="cap mono">履约时长取中位数<br>区域增速以基期加权计算</div></div><div class="body"><div class="sec dark">表 5-1 效率指标与目标达成</div><table class=""><thead><tr><th>指标</th><th>7 月</th><th>8 月</th><th>9 月</th><th>季度</th><th>目标</th><th>达成</th></tr></thead><tbody><tr><td>履约时长中位数（分:秒）</td><td>14m02s</td><td>13m20s</td><td>12m38s</td><td>12m38s</td><td>≤12m00s</td><td class="hc">差 38 秒</td></tr><tr><td>单均履约成本（元）</td><td>6,546</td><td>6,293</td><td>5,960</td><td>6,263</td><td>≤6,000</td><td class="hc">差 263 元</td></tr><tr><td>新签占比（%）</td><td>29.0</td><td>31.0</td><td>34.0</td><td>31.6</td><td>≥32.0</td><td class="hc">差 0.4 个百分点</td></tr><tr><td>客户续费率（%）</td><td>88.2</td><td>89.1</td><td>90.4</td><td>89.2</td><td>≥90.0</td><td class="hc">差 0.8 个百分点</td></tr><tr><td>人均营收（万元/月）</td><td>1.33</td><td>1.46</td><td>1.72</td><td>1.50</td><td>≥1.40</td><td class="hc">达标</td></tr><tr class='sum'><td>合计 5 项</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>4 项未达标 / 1 项达标</td></tr></tbody></table><div class="sec dark">履约时长中位数（秒，越低越好）</div><div class="bars"><div class="bar"><span>7 月</span><i style="width:100.0%"></i><span class="r mono">842s</span></div><div class="bar"><span>8 月</span><i style="width:95.0%"></i><span class="r mono">800s</span></div><div class="bar"><span>9 月</span><i style="width:90.0%"></i><span class="r mono">758s</span></div></div><div class="pts"><div class="pt">履约时长连续三月下降，累计压缩 84 秒（−10.0%），主因是 8 月起启用智能派单，派单环节省下 41 秒。</div><div class="pt">单均履约成本 = 当月履约成本 ÷ 当月工单数（履约成本 63.5 / 62.3 / 60.2 万元，工单 97 / 99 / 101 单），季度 6,263 元 = 履约成本 186.0 万元 ÷ 297 单；人均营收按期末在职 214 人折算：季度人均 4.50 万元，月均 1.50 万元。</div><div class="pt">新签占比 34.0% 创季度新高，但新签单均首年金额环比下降约 7%，需关注低价签约对后续毛利的影响。</div><div class="pt">区域增速分化 21.0 个百分点：华东 +12.4%、西南 +18.9%，华北 −2.1%（唯一负增长）。</div></div></div><div class="pf"><span>效率：履约时长 12m38s，距目标差 38 秒；新签占比 31.6%</span><span class="mono">第 5 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="6"><div class="ph"><div><div class="kicker">Anomaly · 差异与异常</div><h2>3 项业务异常 + 5 处格式异常</h2></div><div class="cap mono">偏差倍数 = 实际偏离 ÷ 允许偏离<br>格式类按每版允许 1 处计</div></div><div class="body"><div class="sec dark">表 6-1 异常清单（按偏差倍数降序）</div><table class=""><thead><tr><th>编号</th><th>对象</th><th>阈值</th><th>实际</th><th class="hc">偏差倍数</th><th>处置</th></tr></thead><tbody><tr><td>A-01</td><td>华北营收增速</td><td>预警线 −1.0%</td><td>−2.1%</td><td class="hc">2.10×</td><td>补写华北归因专章</td></tr><tr><td>A-02</td><td>单位混用（万元 / 元）</td><td>每版 ≤1 处</td><td>2 处</td><td class="hc">2.00×</td><td>统一为万元并重排</td></tr><tr><td>A-03</td><td>图表编号重复</td><td>每版 ≤1 处</td><td>2 处</td><td class="hc">2.00×</td><td>重编为图 3-1 / 3-2</td></tr><tr><td>A-04</td><td>云与算力成本环比</td><td>≤12.0%</td><td>+19.2%（+10.0 万元）</td><td class="hc">1.60×</td><td>标注 8.0 万元一次性采购</td></tr><tr><td>A-05</td><td>履约时长中位数</td><td>≤12m00s</td><td>12m38s</td><td class="hc">1.05×</td><td>列入 10 月改进项</td></tr><tr><td>A-06</td><td>页眉版本号</td><td>与文末一致</td><td>页眉 v2.1</td><td class="hc">—</td><td>同步更新为 v2.3</td></tr><tr class='sum'><td>合计</td><td>6 类 10 处</td><td>—</td><td>—</td><td>2.10×</td><td>业务 3 项 + 格式 7 处（单位 2 / 编号 2 / 术语 2 / 版本 1）</td></tr></tbody></table><div class="sec dark">异常分布（按类型，处 / 项）</div><div class="bars"><div class="bar"><span>业务异常</span><i style="width:100.0%"></i><span class="r mono">3 项</span></div><div class="bar"><span>单位混用</span><i style="width:100.0%"></i><span class="r mono">2 处</span></div><div class="bar"><span>图表编号</span><i style="width:100.0%"></i><span class="r mono">2 处</span></div><div class="bar"><span>术语混用</span><i style="width:100.0%"></i><span class="r mono">2 处</span></div><div class="bar"><span>版本号</span><i style="width:50.0%"></i><span class="r mono">1 处</span></div></div><div class="pts"><div class="pt">华北 −2.1% 已补写「渠道结构变化」专章，含分销单量 −213 单与折扣政策调整两项证据。</div><div class="pt">云与算力 +19.2% 对应 52.0 → 62.0 万元：8.0 万元为新增推理集群实例的一次性采购，其余 2.0 万元为用量自然增长，已在成本章标注一次性因素。</div><div class="pt">单位混用与图表编号重复均为模板缺陷，v2.3 模板已改为自动编号与单位锁定，可避免复发。</div></div></div><div class="pf"><span>异常 6 类 10 处（格式 7 + 业务 3），最大偏差倍数 2.10×</span><span class="mono">第 6 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="7"><div class="ph"><div><div class="kicker">Validation · 校验与质量</div><h2>6 条成稿校验规则与质量分</h2></div><div class="cap mono">综合质量分 98.8（五项等权）<br>42 个引用数字逐一对齐源表</div></div><div class="body"><div class="sec dark">表 7-1 成稿校验规则</div><table class=""><thead><tr><th>规则</th><th>检查内容</th><th>级别</th><th>命中</th><th>处置动作</th></tr></thead><tbody><tr><td>R-01</td><td>42 个引用数字与源表逐一对齐</td><td>阻断</td><td class="hc">0</td><td>—</td></tr><tr><td>R-02</td><td>金额单位统一为万元</td><td>警告</td><td class="hc">2</td><td>统一单位并重排数字</td></tr><tr><td>R-03</td><td>6 章齐全且摘要 ≤420 字</td><td>阻断</td><td class="hc">0</td><td>—</td></tr><tr><td>R-04</td><td>图表编号唯一、正文引用可解析</td><td>警告</td><td class="hc">2</td><td>自动重编图表号</td></tr><tr><td>R-05</td><td>术语一致（履约 / 交付 二选一）</td><td>警告</td><td class="hc">2</td><td>统一为「履约」</td></tr><tr><td>R-06</td><td>页眉与文末版本号一致</td><td>警告</td><td class="hc">1</td><td>同步为 v2.3</td></tr><tr class='sum'><td>合计 6 条</td><td>阻断 2 条 / 警告 4 条</td><td>—</td><td>7</td><td>已全部闭环</td></tr></tbody></table><div class="sec dark">五维质量分（%）</div><div class="bars"><div class="bar"><span>数据引用一致</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>章节完整</span><i style="width:100.0%"></i><span class="r mono">100.0</span></div><div class="bar"><span>术语一致</span><i style="width:98.6%"></i><span class="r mono">98.6</span></div><div class="bar"><span>格式规范</span><i style="width:96.4%"></i><span class="r mono">96.4</span></div><div class="bar"><span>编号唯一</span><i style="width:99.2%"></i><span class="r mono">99.2</span></div></div><div class="pts"><div class="pt">数据引用一致 100%：42 个数字与 FS-01 / CRM / 工单系统逐一对齐，含 3 处月末重述项。</div><div class="pt">格式规范 96.4% 的扣分来自 2 处单位混用与 2 处图表编号重复，均属模板问题而非数据问题。</div><div class="pt">术语一致 98.6%：「履约」与「交付」混用 2 处，已按术语表统一，模板加入禁用词检查。</div></div></div><div class="pf"><span>质量分 98.8：数据引用一致与章节完整均 100%</span><span class="mono">第 7 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="8"><div class="ph"><div><div class="kicker">Conclusion & Actions · 结论与动作</div><h2>结论、耗时结构与五步动作</h2></div><div class="cap mono">成稿 50 分钟，其中正文 26 分钟<br>验收标准可自动校验</div></div><div class="body"><div class="sec dark">表 8-1 分阶段处理动作</div><table class=""><thead><tr><th>阶段</th><th>动作</th><th>责任人</th><th>期限</th><th>验收标准</th></tr></thead><tbody><tr><td>立即</td><td>统一金额单位与图表编号并重新导出 PDF</td><td>谭亦文</td><td>10-06</td><td class="hc">R-02 / R-04 命中为 0</td></tr><tr><td>本周</td><td>补写华北归因专章（含分销单量与折扣政策）</td><td>周曼</td><td>10-10</td><td class="hc">专章 ≥600 字并含 2 项证据</td></tr><tr><td>本周</td><td>标注云算力 8.0 万元一次性采购（52.0 → 62.0 万元）</td><td>蒋雪</td><td>10-10</td><td class="hc">成本章含一次性说明</td></tr><tr><td>本月</td><td>智能派单二次优化，履约时长压至 12m00s</td><td>徐海鹏</td><td>10-31</td><td class="hc">10 月中位数 ≤12m00s</td></tr><tr><td>下季度</td><td>把 6 条成稿规则接入模板自动校验</td><td>高晓鹭</td><td>12-31</td><td class="hc">新稿自动出校验报告</td></tr></tbody></table><div class="sec dark">成稿耗时分解（合计 50 分钟）</div><div class="bars"><div class="bar"><span>数据取数</span><i style="width:46.2%"></i><span class="r mono">12m</span></div><div class="bar"><span>图表生成</span><i style="width:15.4%"></i><span class="r mono">4m</span></div><div class="bar"><span>正文撰写</span><i style="width:100.0%"></i><span class="r mono">26m</span></div><div class="bar"><span>一致性校验</span><i style="width:23.1%"></i><span class="r mono">6m</span></div><div class="bar"><span>成稿导出</span><i style="width:7.7%"></i><span class="r mono">2m</span></div></div><div class="pts"><div class="pt">营收 964.0 万元、环比 +12.8%，增量 109.5 万元中企业版贡献 22.8%（+25.0 万元）。</div><div class="pt">毛利率 42.4%，较基期 40.7% 提升 1.7 个百分点，主要来自履约成本占营收由 20.1% 降至 19.3%（下降 0.8 个百分点）。</div><div class="pt">履约时长 12m38s 距目标 12m00s 差 38 秒，智能派单再优化可覆盖，预计 11 月达标。</div><div class="pt">华北 −2.1% 与云算力 +19.2% 是本期两项需管理层决策的异常，均已写入第 5 章风险与展望。</div></div></div><div class="pf"><span>五步动作：立即 1 项、本周 2 项、本月 1 项、下季度 1 项</span><span class="mono">第 8 / 9 页</span></div></section>
+<section class="page" style="--accent:#8B5CF6" data-page="9"><div class="ph"><div><div class="kicker">Appendix · 附录</div><h2>数据来源、术语表与修订记录</h2></div><div class="cap mono">源系统与口径版本可追溯<br>修订留痕 3 版</div></div><div class="body"><div class="sec dark">表 9-1 数据来源清单</div><table class="dn"><thead><tr><th>数据源</th><th>提供方</th><th>覆盖周期</th><th>记录数</th><th>口径备注</th></tr></thead><tbody><tr><td>财务系统 FS-01 月结单</td><td>财务共享中心</td><td>2026-07 ~ 09</td><td>3</td><td>3 期月结单，含 5 个成本科目，单位万元</td></tr><tr><td>CRM 商机表</td><td>销售运营</td><td>2026-07 ~ 09</td><td>2,418</td><td>新签金额按合同首年额</td></tr><tr><td>工单系统履约记录</td><td>交付中心</td><td>2026-07 ~ 09</td><td>297</td><td>已交付工单，剔除测试工单 42 条</td></tr><tr><td>HR 人员与工时</td><td>人力资源部</td><td>2026-09-30 快照</td><td>214</td><td>人均营收按期末在职人数</td></tr></tbody></table><div class="sec dark">表 9-2 术语表</div><table class="dn"><thead><tr><th>术语</th><th>定义</th></tr></thead><tbody><tr><td>履约时长</td><td>工单从受理到交付的中位数时长，精确到秒</td></tr><tr><td>新签占比</td><td>新签合同首年金额 ÷ 当期营业收入</td></tr><tr><td>毛利率</td><td>（营业收入 − 营业成本）÷ 营业收入，成本含五类科目</td></tr><tr><td>偏差倍数</td><td>实际偏离 ÷ 允许偏离；阈值为 0 时以「—」表示</td></tr><tr class='sum'><td>一次性因素</td><td>不构成经常性趋势的支出，如云与算力新增推理集群实例的 8.0 万元采购</td></tr></tbody></table><div class="sec dark">表 9-3 修订记录</div><table class="dn"><thead><tr><th>版本</th><th>日期</th><th>变更</th><th>责任人</th></tr></thead><tbody><tr><td>v2.0</td><td>2026-10-03</td><td>季度初稿：6 章结构、4,580 字</td><td>周曼</td></tr><tr><td>v2.1</td><td>2026-10-04</td><td>补写华北归因专章与云算力一次性说明</td><td>蒋雪</td></tr><tr><td>v2.3</td><td>2026-10-04</td><td>统一单位与图表编号，同步页眉版本号</td><td>谭亦文</td></tr></tbody></table></div><div class="pf"><span>附录：4 个数据源、5 条术语、3 版修订记录</span><span class="mono">第 9 / 9 页</span></div></section>
+</body></html>

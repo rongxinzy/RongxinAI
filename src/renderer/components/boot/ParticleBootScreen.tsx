@@ -17,8 +17,15 @@ type Phase = (typeof Phase)[keyof typeof Phase];
 
 const MAX_PARTICLES = 4200;
 const ALPHA_THRESHOLD = 140;
-// Hold only long enough for particles to land; init is usually done well before this.
+// Floor for how long assemble may run when init finishes early.
 const MIN_TOTAL_MS = 1100;
+// After enough particles land, hold the formed mark briefly before disperse.
+const BLOOM_HOLD_MS = 220;
+// Safety: never block disperse forever if a few edge particles refuse to settle.
+const MAX_ASSEMBLE_MS = 3200;
+const SETTLE_RATIO = 0.99;
+const PHYSICS_FRAME_MS = 1000 / 60;
+const MAX_PHYSICS_STEPS = 4;
 const DISPERSE_DURATION_MS = 480;
 const FADE_IN_MS = 420;
 /** Logo display width caps (fraction of container, absolute px). */
@@ -51,12 +58,63 @@ interface Particle {
   settled: boolean;
 }
 
-const resolveIsDark = (): boolean =>
-  document.documentElement.classList.contains('dark') ||
-  document.documentElement.dataset.theme === 'classic-dark';
+const resolveIsDark = (): boolean => {
+  const root = document.documentElement;
+  const themeId = root.dataset.theme ?? '';
+  return root.classList.contains('dark') || themeId === 'classic-dark' || themeId.endsWith('-dark');
+};
 
 const logoSourceForTheme = (isDark: boolean): string =>
   isDark ? 'zhiyuan-logo-dark-1600.png' : 'zhiyuan-logo-light-1600.png';
+
+/** 字标右上角的品牌蓝点。整字改成纯白/纯黑时必须留下，否则不像知远。 */
+const isBrandAccent = (color: string): boolean => {
+  const match = color.match(/rgb\((\d+),(\d+),(\d+)\)/);
+  if (!match) return false;
+  const red = Number(match[1]);
+  const green = Number(match[2]);
+  const blue = Number(match[3]);
+  return blue >= 180 && red <= 80 && green >= 60 && green <= 180;
+};
+
+const BRAND_ACCENT = 'rgb(22,119,255)';
+
+/** 解析 computed color。透明层不算深色，避免 rgba(0,0,0,0) 被误判。 */
+const opaqueRgb = (color: string): [number, number, number] | null => {
+  const match = color.match(
+    /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/,
+  );
+  if (!match) return null;
+  const alphaToken = match[4];
+  const alpha =
+    alphaToken === undefined
+      ? 1
+      : alphaToken.endsWith('%')
+        ? Number(alphaToken.slice(0, -1)) / 100
+        : Number(alphaToken);
+  if (!Number.isFinite(alpha) || alpha < 0.5) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+};
+
+/**
+ * 只看最上层不透明背景。启动屏自己有底色时不再看 html，
+ * 避免 html 已是深色、面板仍是浅色时把粒子画成白色。
+ * 面板透明时才回退到 body / html。
+ */
+const bootSurfaceIsDark = (element: HTMLElement | null): boolean => {
+  const candidates = [
+    element ? getComputedStyle(element).backgroundColor : '',
+    getComputedStyle(document.body).backgroundColor,
+    getComputedStyle(document.documentElement).backgroundColor,
+  ];
+  for (const color of candidates) {
+    const rgb = opaqueRgb(color);
+    if (!rgb) continue;
+    const luminance = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
+    return luminance < 150;
+  }
+  return resolveIsDark();
+};
 
 const loadSampledLogo = (src: string): Promise<SampledLogo> =>
   new Promise((resolve, reject) => {
@@ -174,10 +232,46 @@ export const ParticleBootScreen: React.FC<ParticleBootScreenProps> = ({
     let sampled: SampledLogo | null = null;
     let phase: Phase = Phase.Assemble;
     let mountTime = 0;
+    let lastFrameTime = 0;
+    let assembleReadyAt = 0;
     let disperseStart = 0;
     let exitNotified = false;
     let cssWidth = 0;
     let cssHeight = 0;
+
+    const stepAssemblePhysics = (elapsed: number) => {
+      for (const particle of particles) {
+        if (particle.settled) continue;
+        if (elapsed < particle.delay) {
+          // Pre-delay: dust drifts in place.
+          particle.x += particle.vx;
+          particle.y += particle.vy;
+          continue;
+        }
+        particle.vx += (particle.tx - particle.x) * particle.stiffness;
+        particle.vy += (particle.ty - particle.y) * particle.stiffness;
+        particle.vx *= particle.damping;
+        particle.vy *= particle.damping;
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        const distance = Math.hypot(particle.tx - particle.x, particle.ty - particle.y);
+        const speed = Math.hypot(particle.vx, particle.vy);
+        if (distance < 1.2 && speed < 0.6) {
+          particle.settled = true;
+          particle.x = particle.tx;
+          particle.y = particle.ty;
+        }
+      }
+    };
+
+    const countSettledRatio = (): number => {
+      if (particles.length === 0) return 0;
+      let settled = 0;
+      for (const particle of particles) {
+        if (particle.settled) settled += 1;
+      }
+      return settled / particles.length;
+    };
 
     const layoutTargets = () => {
       if (!sampled || cssWidth === 0 || cssHeight === 0) return;
@@ -253,11 +347,32 @@ export const ParticleBootScreen: React.FC<ParticleBootScreenProps> = ({
     const tick = (now: number) => {
       if (disposed) return;
       if (!mountTime) mountTime = now;
+      if (!lastFrameTime) lastFrameTime = now;
       const elapsed = now - mountTime;
 
-      if (phase === Phase.Assemble && exitingRef.current && elapsed >= MIN_TOTAL_MS) {
-        beginDisperse(now);
+      if (phase === Phase.Assemble) {
+        // Spring steps are frame-based; catch up on slow frames so wall-clock
+        // settle time stays close to 60fps instead of stretching with jank.
+        const frameBudget = Math.min(now - lastFrameTime, PHYSICS_FRAME_MS * MAX_PHYSICS_STEPS);
+        lastFrameTime = now;
+        const steps = Math.max(1, Math.round(frameBudget / PHYSICS_FRAME_MS));
+        for (let step = 0; step < steps; step += 1) {
+          stepAssemblePhysics(elapsed);
+        }
+
+        if (!assembleReadyAt && countSettledRatio() >= SETTLE_RATIO) {
+          assembleReadyAt = now;
+        }
+
+        const bloomReady = assembleReadyAt > 0 && now - assembleReadyAt >= BLOOM_HOLD_MS;
+        const assembleTimedOut = elapsed >= MAX_ASSEMBLE_MS;
+        // Wait for the mark to finish forming (then a short bloom) before disperse,
+        // even if the main process already signaled exiting.
+        if (exitingRef.current && elapsed >= MIN_TOTAL_MS && (bloomReady || assembleTimedOut)) {
+          beginDisperse(now);
+        }
       }
+
       if (phase === Phase.Disperse && now - disperseStart >= DISPERSE_DURATION_MS) {
         if (!exitNotified) {
           exitNotified = true;
@@ -268,6 +383,9 @@ export const ParticleBootScreen: React.FC<ParticleBootScreenProps> = ({
 
       ctx.clearRect(0, 0, cssWidth, cssHeight);
       const fadeIn = Math.min(1, elapsed / FADE_IN_MS);
+      // 每帧按启动屏实际背景取反色，不使用 logo 采样色（深色 logo 接近白，浅色 logo 接近黑）。
+      const paintWhite = bootSurfaceIsDark(container);
+      ctx.globalCompositeOperation = 'source-over';
 
       for (const particle of particles) {
         let alpha = particle.baseAlpha * fadeIn;
@@ -279,24 +397,6 @@ export const ParticleBootScreen: React.FC<ParticleBootScreenProps> = ({
             alpha *= shimmer;
             particle.x = particle.tx + Math.sin(now * 0.0011 + particle.jitterPhase) * 0.7;
             particle.y = particle.ty + Math.cos(now * 0.0009 + particle.jitterPhase) * 0.7;
-          } else if (elapsed >= particle.delay) {
-            particle.vx += (particle.tx - particle.x) * particle.stiffness;
-            particle.vy += (particle.ty - particle.y) * particle.stiffness;
-            particle.vx *= particle.damping;
-            particle.vy *= particle.damping;
-            particle.x += particle.vx;
-            particle.y += particle.vy;
-            const distance = Math.hypot(particle.tx - particle.x, particle.ty - particle.y);
-            const speed = Math.hypot(particle.vx, particle.vy);
-            if (distance < 1.2 && speed < 0.6) {
-              particle.settled = true;
-              particle.x = particle.tx;
-              particle.y = particle.ty;
-            }
-          } else {
-            // Pre-delay: dust drifts in place.
-            particle.x += particle.vx;
-            particle.y += particle.vy;
           }
         } else {
           // Disperse: decelerating outward drift with a slight upward lift.
@@ -310,8 +410,16 @@ export const ParticleBootScreen: React.FC<ParticleBootScreenProps> = ({
           }
         }
 
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = particle.color;
+        if (isBrandAccent(particle.color)) {
+          ctx.fillStyle = BRAND_ACCENT;
+          ctx.globalAlpha = Math.min(1, Math.max(alpha, fadeIn * 0.92));
+        } else if (paintWhite) {
+          ctx.fillStyle = '#ffffff';
+          ctx.globalAlpha = Math.min(1, Math.max(alpha, fadeIn * 0.92));
+        } else {
+          ctx.fillStyle = '#141820';
+          ctx.globalAlpha = Math.min(1, Math.max(alpha, fadeIn * 0.92));
+        }
         ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
       }
       ctx.globalAlpha = 1;
@@ -362,7 +470,12 @@ export const ParticleBootScreen: React.FC<ParticleBootScreenProps> = ({
         </div>
       ) : (
         <>
-          <canvas ref={canvasRef} className="absolute inset-0" aria-hidden="true" />
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 z-10"
+            style={{ mixBlendMode: 'normal' }}
+            aria-hidden="true"
+          />
           <p className="absolute inset-x-0 bottom-14 text-center text-sm text-muted-foreground motion-safe:animate-pulse">
             {i18nService.t('loading')}
           </p>

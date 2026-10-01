@@ -1,5 +1,7 @@
 import { TOKEN_CONTRACT } from '../tokens/contract';
 import { runIndicatorSelectors } from './run-indicator';
+import { LOGO_LOADING_SELECTORS } from './logo-loading-contract';
+import { CODING_SIDEBAR_SELECTORS } from './coding-sidebar-contract';
 const appearanceVariables = new Set<string>([
   ...Object.values(TOKEN_CONTRACT),
   '--zy-control-icon-size',
@@ -7,6 +9,8 @@ const appearanceVariables = new Set<string>([
 
 /** Stable component hooks. Theme packages cannot supply selectors or behavior. */
 export const COMPONENT_SELECTORS = {
+  ...LOGO_LOADING_SELECTORS,
+  ...CODING_SIDEBAR_SELECTORS,
   'appearance-preview-frame': '.theme-appearance-preview-frame',
   'appearance-preview-sidebar': '.theme-appearance-preview-sidebar',
   'appearance-preview-main': '.theme-appearance-preview-main',
@@ -500,7 +504,6 @@ export const COMPONENT_SELECTORS = {
     '.theme-page-pi-runtime-model-config-select-trigger-1',
   'page-pi-runtime-model-config-select-trigger-2':
     '.theme-page-pi-runtime-model-config-select-trigger-2',
-  'page-active-skill-badge-button-1': '.theme-page-active-skill-badge-button-1',
   'page-installed-skill-grid-card-1': '.theme-page-installed-skill-grid-card-1',
   'page-installed-skill-grid-button-1': '.theme-page-installed-skill-grid-button-1',
   'page-marketplace-skill-grid-button-1': '.theme-page-marketplace-skill-grid-button-1',
@@ -531,6 +534,7 @@ export const COMPONENT_SELECTORS = {
   'page-settings-input-variant-2': '.theme-page-settings-input-variant-2',
   'page-settings-input-variant-3': '.theme-page-settings-input-variant-3',
   'page-settings-button-variant-7': '.theme-page-settings-button-variant-7',
+  'settings-navigation-icon': '.theme-settings-navigation-icon',
   'page-settings-button-variant-8': '.theme-page-settings-button-variant-8',
   'page-settings-button-variant-9': '.theme-page-settings-button-variant-9',
   'page-agent-task-row-button-variant-1': '.theme-page-agent-task-row-button-variant-1',
@@ -556,6 +560,8 @@ export const COMPONENT_SELECTORS = {
   'page-chat-skill-shortcuts-button-variant-1': '.theme-page-chat-skill-shortcuts-button-variant-1',
   'page-chat-skill-shortcuts-button-variant-2': '.theme-page-chat-skill-shortcuts-button-variant-2',
   'page-chat-skill-shortcuts-button-variant-3': '.theme-page-chat-skill-shortcuts-button-variant-3',
+  // Selected nav row: same card+border language as chat skill shortcuts (class toggle, not only data-active).
+  'page-sidebar-navigation-button-selected': '.theme-page-sidebar-navigation-button-selected',
   'page-coding-workspace-sidebar-button-variant-1':
     '.theme-page-coding-workspace-sidebar-button-variant-1',
   'page-coding-workspace-sidebar-button-variant-2':

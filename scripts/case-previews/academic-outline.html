@@ -1,58 +1,412 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-outline</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
-.mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>academic-outline</title><style>
+*{box-sizing:border-box;margin:0}
+body{width:1100px;background:#f2f2ef;padding:30px;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:28px 46px;display:flex;flex-direction:column}
+.mono{font-variant-numeric:tabular-nums}
 .serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:32px;background:#eceae4}
-.page{width:100%;height:100%;background:#fff;border:1px solid #e2e0d8;padding:32px 48px;display:flex;flex-direction:column;overflow:hidden}
-.ptitle{font-size:23px;text-align:center;line-height:1.4}
-.authors{margin-top:10px;text-align:center;font-size:12px;color:#6f737b}
-.abstract{margin-top:16px;border:1px solid #eeede7;background:#faf9f6;padding:12px 16px}
-.abstract h4{font-size:11px;letter-spacing:.2em;color:#8b8f97}
-.abstract p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-.keywords{margin-top:10px;font-size:11.5px;color:#8b8f97}
-.sections{margin-top:14px;flex:1;min-height:0;display:grid;gap:6px;align-content:start}
-.sec{font-size:12.5px;color:#3d4046;line-height:1.75}
-.sec b{font-weight:600}
-.lv2{padding-left:22px}
-.lv3{padding-left:44px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{border:1px solid #eeede7;padding:7px 11px;text-align:left;color:#3d4046}
-th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
-.flow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
-.flow span{border:1px solid #e2e0d8;background:#faf9f6;padding:8px 12px}
-.flow i{color:#b8b5ab;font-style:normal}
-.redline{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.redline .col h4{font-size:11px;letter-spacing:.16em;color:#8b8f97}
-.redline .col p{margin-top:8px;font-size:12.5px;line-height:1.95;color:#3d4046}
-del{color:#b3564a;text-decoration:line-through}
-ins{color:#2f6f5e;text-decoration:underline;text-underline-offset:3px}
-.reasons{margin-top:12px;display:grid;gap:7px}
-.reasons div{font-size:12px;color:#4c5058;padding-left:14px;position:relative}
-.reasons div::before{content:"·";position:absolute;left:2px;color:#b8b5ab}
-.foot{margin-top:14px;padding-top:10px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.kicker{font-size:11px;letter-spacing:.3em;color:#8b8f97}
+.kicker.a{color:var(--accent)}
+h4{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:5px 9px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f5f1;color:#6f737b;font-size:11px;letter-spacing:.05em;font-weight:500}
+tr.total td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+ul{list-style:none;display:grid;gap:5px}
+li{position:relative;padding-left:13px;font-size:12.5px;line-height:1.75;color:#4c5058}
+li::before{content:"";position:absolute;left:0;top:8px;width:4px;height:4px;background:var(--accent)}
+.phead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #e4e4e0;padding-bottom:8px}
+.pn{font-size:11px;color:#8b8f97}
+h2{font-size:23px;letter-spacing:-.02em;font-weight:600;margin-top:8px}
+.body{flex:1;min-height:0;margin-top:11px;display:grid;gap:10px;align-content:start}
+.pfoot{margin-top:auto;padding-top:8px;border-top:1px solid #eeede7;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.kpi{border:1px solid #edede9;background:#faf9f6;padding:9px 11px}
+.kpi b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent);font-variant-numeric:tabular-nums}
+.kpi span{display:block;margin-top:4px;font-size:11px;color:#8b8f97}
+.bar{height:8px;background:#f0efeb;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.72}
+.block{border:1px solid #edede9;background:#faf9f6;padding:10px 13px}
+.refs{display:grid;gap:4px;font-size:11.5px;color:#4c5058;line-height:1.7}
+.refs div{padding-left:24px;text-indent:-24px}
+.refs em{font-style:normal;color:var(--accent);font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="page" style="--accent:#7C3AED">
-  <div class="ptitle serif">面向中型团队的本地优先智能体协作流程研究</div>
-  <div class="authors">作者：张小明 · 指导教师：李老师 · 2026 年 9 月</div>
-  <div class="abstract"><h4>ABSTRACT</h4><p>本文以中型团队为对象，研究本地优先部署条件下智能体协作流程的设计方法与落地约束，提出以任务边界与审批回溯为核心的流程框架。</p></div>
-  <div class="keywords">关键词：本地推理 · 协作流程 · 数据主权 · 任务评测</div>
-  <div class="sections">
-    <div class="sec"><b>1 绪论</b></div>
-    <div class="sec lv2">1.1 研究背景与问题提出 · 1.2 研究意义与创新点</div>
-    <div class="sec lv3">1.2.1 已有研究的边界 · 1.2.2 本文的切入点</div>
-    <div class="sec lv2">1.3 研究方法与技术路线</div>
-    <div class="sec"><b>2 文献综述</b></div>
-    <div class="sec lv2">2.1 端侧推理效率的相关研究 · 2.2 数据主权与合规研究 · 2.3 研究述评与本文定位</div>
-    <div class="sec"><b>3 流程框架设计</b></div>
-    <div class="sec lv2">3.1 任务边界与角色划分 · 3.2 审批与回溯机制 · 3.3 评测指标</div>
-    <div class="sec"><b>4 实验与结果分析</b></div>
-    <div class="sec lv2">4.1 样本与分组 · 4.2 指标采集方式 · 4.3 结果与稳健性检验</div>
-    <div class="sec"><b>5 结论与展望</b></div>
-    <div class="sec lv2">5.1 主要结论 · 5.2 研究局限 · 5.3 后续方向</div>
-    <div class="sec"><b>参考文献</b>（预计 48 条，中英文各半）</div>
+
+<section class="page" data-page="1" style="--accent:#7C3AED">
+  <div style="text-align:center;margin-top:4px">
+    <div class="kicker a">ACADEMIC OUTLINE · 论文大纲</div>
+    <h1 class="serif" style="font-size:29px;font-weight:600;letter-spacing:-.02em;line-height:1.35;margin-top:11px">面向中型团队的本地优先智能体协作流程研究</h1>
+    <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">学科方向：管理科学与工程　|　学位层次：学术硕士　|　预计篇幅：12,000 字　|　编制日期：2026-09-27</div>
   </div>
-  <div class="foot"><span>大纲共 5 章 18 节</span><span>建议篇幅 1.2 万字</span></div>
-</div></body></html>
+  <div class="block" style="margin-top:13px">
+    <div class="kicker">摘要 / ABSTRACT</div>
+    <p style="margin-top:7px">本文以 2 个 20 人规模的中型团队为对象，研究本地优先部署条件下智能体协作流程的设计方法。全文分 5 章 18 节，围绕任务边界清晰度与审批回溯覆盖度两个自变量，采用准实验设计开展 12 周纵向验证，回答流程改动如何影响落地成效这一问题，并给出可复用的评测指标与实施清单。</p>
+  </div>
+  <div style="font-size:11.5px;color:#8b8f97;margin-top:8px">关键词：本地优先部署 · 智能体协作 · 任务边界 · 审批回溯 · 准实验设计</div>
+  <div class="grid3" style="margin-top:11px">
+    <div class="kpi"><b>5 / 18</b><span>章 / 节</span></div>
+    <div class="kpi"><b>12,000</b><span>预计字数（字）</span></div>
+    <div class="kpi"><b>48</b><span>参考文献（条）</span></div>
+  </div>
+  <div style="margin-top:11px">
+    <h4>全文结构与篇幅分配</h4>
+    <table style="margin-top:6px">
+      <tr><th style="width:58px">章</th><th>标题</th><th style="width:52px">节数</th><th style="width:90px">预计字数</th><th>本章回答的问题</th></tr>
+      <tr><td class="mono">1</td><td>绪论</td><td class="mono">3</td><td class="mono">1,800</td><td>研究问题来自哪类真实痛点</td></tr>
+      <tr><td class="mono">2</td><td>文献综述</td><td class="mono">3</td><td class="mono">2,600</td><td>已有研究推进到哪一步、缺口在哪</td></tr>
+      <tr><td class="mono">3</td><td>流程框架设计</td><td class="mono">4</td><td class="mono">3,000</td><td>框架由哪些可操作的构件组成</td></tr>
+      <tr><td class="mono">4</td><td>实验与结果分析</td><td class="mono">5</td><td class="mono">3,400</td><td>流程改动是否带来可测量的变化</td></tr>
+      <tr><td class="mono">5</td><td>结论与展望</td><td class="mono">3</td><td class="mono">1,200</td><td>结论的适用边界与后续方向</td></tr>
+      <tr class="total"><td class="mono">合计</td><td>5 章</td><td class="mono">18</td><td class="mono">12,000</td><td>覆盖 RQ1 — RQ3 三个研究问题</td></tr>
+    </table>
+  </div>
+    <div class="grid2" style="margin-top:10px;padding-top:8px;border-top:1px solid #eeede7">
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">口径与来源　</b>系统日志 1,842 条 · 周度自评 892 份 · 访谈 20 人 · 观测窗 26 周</p>
+    <p style="font-size:11.5px;line-height:1.7"><b style="font-weight:600;color:var(--accent)">后续页面导读　</b>P2 目录 · P3 背景 · P4 文献 · P5 框架 · P6—7 提纲 · P8 排期 · P9 规范 · P10 文献</p>
+  </div>
+  <div class="pfoot"><span>大纲覆盖 5 章 18 节共 12,000 字，参考文献 48 条（中英文各半）</span><span>第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">CONTENTS · 目录</div><div class="pn">页码为 12,000 字成稿排版后的预估页码</div></div>
+  <h2>目录与阅读指引</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:66px">章节</th><th>一句话概要</th><th style="width:78px">正文页码</th></tr>
+      <tr><td class="mono">1 绪论</td><td>界定研究问题、对象与全文技术路线，说明创新点来自何处</td><td class="mono">1 — 4</td></tr>
+      <tr><td class="mono">2 文献综述</td><td>归纳端侧推理、数据主权、协作流程三条脉络并指出研究缺口</td><td class="mono">5 — 9</td></tr>
+      <tr><td class="mono">3 流程框架设计</td><td>给出任务边界、审批回溯与评测指标的构件定义及假设</td><td class="mono">10 — 15</td></tr>
+      <tr><td class="mono">4 实验与结果分析</td><td>报告 12 周准实验的样本、指标变化、稳健性检验与过程证据</td><td class="mono">16 — 24</td></tr>
+      <tr><td class="mono">5 结论与展望</td><td>给出三条结论、适用边界、研究局限与后续工作</td><td class="mono">25 — 27</td></tr>
+      <tr><td class="mono">参考文献</td><td>按正文引用顺序编号的中英文文献 48 条</td><td class="mono">28 — 30</td></tr>
+      <tr class="total"><td class="mono">附录 A — C</td><td>术语表、量表条目、访谈编码规则与原始数据字段说明</td><td class="mono">31 — 34</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>阅读指引</h4>
+        <ul style="margin-top:6px">
+          <li>只关心结论者：读第 1 页摘要与第 5 章结论（正文第 25 — 27 页），可跳过第 3 章构件推导</li>
+          <li>关心方法可复现者：重点读 3.1 变量操作化与 4.2 采集口径</li>
+          <li>关心落地者：直接读 3.2 审批回溯机制与 5.3 后续方向</li>
+        </ul>
+      </div>
+      <div>
+        <h4>全文篇幅控制（按字数占比）</h4>
+        <div style="display:grid;gap:6px;margin-top:6px">
+          <div style="display:grid;grid-template-columns:96px 1fr 74px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 1 章</span><span class="bar"><i style="width:15%"></i></span><span class="mono">15.0%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 74px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 2 章</span><span class="bar"><i style="width:22%"></i></span><span class="mono">21.7%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 74px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 3 章</span><span class="bar"><i style="width:25%"></i></span><span class="mono">25.0%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 74px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 4 章</span><span class="bar"><i style="width:28%"></i></span><span class="mono">28.3%</span></div>
+          <div style="display:grid;grid-template-columns:96px 1fr 74px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>第 5 章</span><span class="bar"><i style="width:10%"></i></span><span class="mono">10.0%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>全文采用顺序编码制引用，所有指标均标注观测期与样本量</span><span>第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">1.1 研究背景与问题界定</div><div class="pn">口径：观测窗 2026-03 至 2026-09</div></div>
+  <h2>研究对象、口径与研究问题</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:96px">维度</th><th>口径定义</th></tr>
+      <tr><td>研究对象</td><td>2 个 20 人规模、以文档撰写与数据处理为主营业务的中型团队，均已完成本地模型部署</td></tr>
+      <tr><td>时间窗</td><td>2026-03 至 2026-09，共 26 周，其中前 2 周为基线观察期，后 24 周为干预期</td></tr>
+      <tr><td>部署条件</td><td>模型权重与业务数据均在本机或内网运行，推理请求不离开局域网</td></tr>
+      <tr><td>任务范围</td><td>文档撰写、数据整理、代码评审三类，观测期内累计 1,842 条任务记录（基线期 168 条 + 干预期 1,674 条）</td></tr>
+      <tr class="total"><td>排除标准</td><td>人数少于 5 人的小组、纯外包任务、观测期内发生组织重组的团队</td></tr>
+    </table>
+    <div>
+      <h4>三个研究问题</h4>
+      <table style="margin-top:6px">
+        <tr><th style="width:66px">编号</th><th>研究问题</th><th style="width:230px">对应观测指标</th></tr>
+        <tr><td class="mono">RQ1</td><td>任务边界清晰度如何影响任务的完成时长与返工率</td><td>任务完成时长中位数、返工率</td></tr>
+        <tr><td class="mono">RQ2</td><td>审批回溯覆盖度与运行成本之间存在怎样的权衡关系</td><td>审批节点覆盖率、人工介入次数</td></tr>
+        <tr><td class="mono">RQ3</td><td>流程改动的效果在多长的观察期内保持稳定</td><td>周度趋势斜率、主观负荷自评</td></tr>
+      </table>
+    </div>
+    <div class="grid3">
+      <div class="block"><h4>数据来源一</h4><p style="margin-top:5px">系统日志：任务起止时间、驳回次数、审批节点记录，覆盖 1,842 条任务</p></div>
+      <div class="block"><h4>数据来源二</h4><p style="margin-top:5px">每周自评：主观负荷与采用意愿，1—7 分量表，26 周共回收 892 份</p></div>
+      <div class="block"><h4>数据来源三</h4><p style="margin-top:5px">半结构化访谈：干预前 8 人、干预后 12 人，单次 40 分钟，全程双人记录</p></div>
+    </div>
+    <div class="block"><h4>问题提出的依据</h4><p style="margin-top:6px">基线期数据显示，同一类任务的完成时长离散度达到 2.7 倍，而团队对任务是否完成的判定标准并不一致；已有研究多在实验室条件下比较模型能力<em style="font-style:normal;color:#7C3AED">[1][3]</em>，对流程层面的改动缺少长期观察[4]。</p></div>
+  </div>
+  <div class="pfoot"><span>基线期 1,842 条任务记录，三类任务占比 46% / 33% / 21%</span><span>第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">2.1 — 2.3 文献脉络</div><div class="pn">检索日 2026-09-20，纳入 68 篇</div></div>
+  <h2>四条研究脉络与研究缺口</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:118px">研究流派</th><th style="width:150px">代表研究</th><th>核心结论</th><th style="width:190px">局限</th></tr>
+      <tr><td>端侧推理效率</td><td class="mono">Liu 2023 [1]；Tan 2024 [2]</td><td>4bit 量化下的任务精度损失可控制在 1.2 个百分点以内</td><td>仅在实验室基准上验证，未涉及团队流程</td></tr>
+      <tr><td>数据主权与合规</td><td class="mono">Zhao 2025 [5]；Guo 2026 [7]</td><td>数据不出域是采购决策中的硬约束，审计记录最常被索要</td><td>缺少流程层面可操作的实施方案</td></tr>
+      <tr><td>协作流程与落地</td><td class="mono">Chen 2024 [3]；Wang 2025 [4]</td><td>引入审批环节后，试点转正式的比例提升 18 个百分点</td><td>观察期普遍不足 8 周，难排除学习效应</td></tr>
+      <tr><td>部署形态选择</td><td class="mono">Sun 2026 [6]；Li 2026 [8]</td><td>混合部署的 3 年总成本低于纯本地方案 12%</td><td>成本模型未计入流程调整的隐性投入</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>文献主题分布（共 68 篇）</h4>
+        <div style="display:grid;gap:6px;margin-top:7px">
+          <div style="display:grid;grid-template-columns:88px 1fr 82px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>端侧推理效率</span><span class="bar"><i style="width:41%"></i></span><span class="mono">28 篇 · 41%</span></div>
+          <div style="display:grid;grid-template-columns:88px 1fr 82px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>数据主权合规</span><span class="bar"><i style="width:25%"></i></span><span class="mono">17 篇 · 25%</span></div>
+          <div style="display:grid;grid-template-columns:88px 1fr 82px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>协作流程落地</span><span class="bar"><i style="width:22%"></i></span><span class="mono">15 篇 · 22%</span></div>
+          <div style="display:grid;grid-template-columns:88px 1fr 82px;gap:10px;align-items:center;font-size:12px;color:#4c5058"><span>评测方法</span><span class="bar"><i style="width:12%"></i></span><span class="mono">8 篇 · 12%</span></div>
+        </div>
+      </div>
+      <div>
+        <h4>三个研究缺口</h4>
+        <ul style="margin-top:7px">
+          <li>缺少把审批、回溯与评测放在同一框架内的整体研究</li>
+          <li>纵向观察多数短于 8 周，无法区分学习效应与真实改进</li>
+          <li>审计留痕的成本被忽视，缺少粒度与代价的量化权衡</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block"><h4>本文定位</h4><p style="margin-top:6px">本文延续协作流程派的思路[4]，吸收评测方法派的测量规范[3]，把任务边界与审批回溯作为可操作变量，用 12 周准实验补齐纵向证据，并对运行代价做量化记录[6]。</p></div>
+  </div>
+  <div class="pfoot"><span>检索式：（端侧推理 OR 本地部署）AND（协作流程 OR 落地成效）</span><span>第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">3.1 — 3.4 研究框架</div><div class="pn">框架含 2 个自变量、6 个观测指标</div></div>
+  <h2>研究框架与章节—问题—方法对应</h2>
+  <div class="body">
+    <div class="grid2">
+      <div class="block">
+        <h4>落地形态四象限</h4>
+        <table style="margin-top:6px">
+          <tr><th style="width:90px">边界 \ 回溯</th><th>回溯覆盖度低</th><th>回溯覆盖度高</th></tr>
+          <tr><td>清晰度低</td><td>混乱试错<br><span class="mono" style="color:#8b8f97">返工率高且难定位</span></td><td>形式审批<br><span class="mono" style="color:#8b8f97">留痕齐全但边界仍模糊</span></td></tr>
+          <tr class="total"><td>清晰度高</td><td>快速但难追溯<br><span class="mono">快但审计不可回溯</span></td><td>目标形态<br><span class="mono">三项字段必填 + 关键节点全留痕</span></td></tr>
+        </table>
+      </div>
+      <div>
+        <h4>两个自变量</h4>
+        <ul style="margin-top:7px">
+          <li><b style="font-weight:600">任务边界清晰度</b>：任务卡是否写明责任人、输入输出与完成判定</li>
+          <li><b style="font-weight:600">审批回溯覆盖度</b>：关键节点中带审批记录的比例，按 25% 递增设 4 档</li>
+        </ul>
+        <h4 style="margin-top:9px">假设</h4>
+        <ul style="margin-top:6px">
+          <li>H1：边界清晰度提高 1 档，完成时长中位数下降 8% 以上</li>
+          <li>H2：回溯覆盖度与人工介入次数呈倒 U 型关系，拐点约在 60%</li>
+          <li>H3：干预效果在第 8 周后趋于稳定，周度斜率绝对值小于 0.5%</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:64px">章节</th><th>对应问题</th><th style="width:220px">主要方法</th><th style="width:150px">输出物</th></tr>
+      <tr><td class="mono">3.1</td><td>框架构件如何定义与操作化</td><td>文献归纳 + 专家评审（6 人）</td><td>变量操作化定义表</td></tr>
+      <tr><td class="mono">3.2</td><td>回溯粒度与成本如何权衡（RQ2）</td><td>成本建模 + 分段试点</td><td>粒度—成本曲线</td></tr>
+      <tr><td class="mono">4.1</td><td>样本可比性是否成立</td><td>基线特征比较 + 平衡性检验</td><td>基线对照表</td></tr>
+      <tr><td class="mono">4.3</td><td>改动是否带来可测变化（RQ1）</td><td>双重差分 + 安慰剂检验</td><td>组间差异表</td></tr>
+      <tr class="total"><td class="mono">4.5</td><td>效果是否长期稳定（RQ3）</td><td>周度趋势回归 + 访谈三角验证</td><td>趋势图与编码表</td></tr>
+    </table>
+    <div class="block"><h4>框架的边界条件</h4><p style="margin-top:6px">该框架假定团队已有稳定的任务分派工具，且不涉及跨组织协作；对任务类型高度异质、每周新增任务超过 400 条的团队，边界定义的成本会显著上升，需另行评估。</p></div>
+  </div>
+  <div class="pfoot"><span>框架覆盖 RQ1 — RQ3，全部指标均可在系统日志中回溯</span><span>第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">提纲详解 · 第 1 — 3 章</div><div class="pn">共 10 节，预计 7,400 字</div></div>
+  <h2>第 1 至第 3 章逐节提纲</h2>
+  <div class="body">
+    <div class="grid3">
+      <div class="block">
+        <h4>1 绪论（3 节 / 1,800 字）</h4>
+        <ul style="margin-top:6px">
+          <li>1.1 研究背景与问题提出</li>
+          <li style="padding-left:26px">从 1,842 条任务记录的离散度切入</li>
+          <li>1.2 研究意义与创新点</li>
+          <li style="padding-left:26px">1.2.1 已有研究的边界</li>
+          <li style="padding-left:26px">1.2.2 本文的切入点</li>
+          <li>1.3 研究方法与技术路线</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h4>2 文献综述（3 节 / 2,600 字）</h4>
+        <ul style="margin-top:6px">
+          <li>2.1 端侧推理效率与部署成本</li>
+          <li style="padding-left:26px">量化、蒸馏、缓存三类路线对比</li>
+          <li>2.2 数据主权、合规与审计</li>
+          <li style="padding-left:26px">采购决策中的硬约束梳理</li>
+          <li>2.3 研究述评与本文定位</li>
+          <li style="padding-left:26px">缺口归纳与本文增量</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h4>3 流程框架设计（4 节 / 3,000 字）</h4>
+        <ul style="margin-top:6px">
+          <li>3.1 任务边界与角色划分</li>
+          <li style="padding-left:26px">任务卡字段与判定标准</li>
+          <li>3.2 审批与回溯机制</li>
+          <li style="padding-left:26px">粒度分档与留痕成本</li>
+          <li>3.3 评测指标体系</li>
+          <li style="padding-left:26px">6 个指标的采集口径</li>
+          <li>3.4 框架假设与边界条件</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block">
+      <h4>三章之间的承接关系</h4>
+      <p style="margin-top:6px">第 1 章把现象压缩为三个研究问题；第 2 章用 68 篇文献确认这三个问题尚未被完整回答；第 3 章把研究问题转译为可测量的变量与构件，形成第 4 章实验方案的设计输入。三章合计 10 节、7,400 字，占全文 62%。</p>
+    </div>
+    <table>
+      <tr><th style="width:150px">关键交付段落</th><th>要求</th><th style="width:96px">预计段数</th></tr>
+      <tr><td>1.1 问题提出</td><td>以基线期离散度数据开场，引出三个研究问题，不写宽泛背景</td><td class="mono">4 段</td></tr>
+      <tr><td>2.3 文献述评</td><td>逐条对应缺口与代表文献，说明本文补齐哪一条</td><td class="mono">5 段</td></tr>
+      <tr><td>3.1 变量操作化</td><td>每个变量给出定义、测量方式、取值与采集频率</td><td class="mono">6 段 + 1 表</td></tr>
+      <tr class="total"><td>3.2 机制设计</td><td>给出粒度—成本曲线与推荐档位及理由</td><td class="mono">5 段 + 1 图</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>第 1 — 3 章 10 节，覆盖 RQ1 与 RQ2 的问题定义部分</span><span>第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">提纲详解 · 第 4 — 5 章与图表清单</div><div class="pn">第 4 章 5 节，含 3 表 2 图</div></div>
+  <h2>第 4 至第 5 章提纲与全文图表清单</h2>
+  <div class="body">
+    <div class="grid2">
+      <div class="block">
+        <h4>4 实验与结果分析（5 节 / 3,400 字）</h4>
+        <ul style="margin-top:6px">
+          <li>4.1 样本与分组：2 组 × 20 人，基线期平衡性检验</li>
+          <li>4.2 指标采集方式：日志字段与自评频次</li>
+          <li>4.3 结果与稳健性检验：双重差分与安慰剂检验</li>
+          <li>4.4 过程分析：12 人访谈编码与日志对照</li>
+          <li>4.5 讨论：效果来源与替代解释的排除</li>
+        </ul>
+      </div>
+      <div class="block">
+        <h4>5 结论与展望（3 节 / 1,200 字）</h4>
+        <ul style="margin-top:6px">
+          <li>5.1 主要结论：三条结论分别回应 RQ1 — RQ3</li>
+          <li>5.2 研究局限：样本量、单行业、观察期上限</li>
+          <li>5.3 后续方向：跨行业复制与成本模型细化</li>
+        </ul>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:76px">编号</th><th>名称</th><th style="width:70px">所属节</th><th style="width:170px">数据来源</th><th style="width:112px">呈现形式</th></tr>
+      <tr><td class="mono">表 3-1</td><td>变量操作化定义表</td><td class="mono">3.1</td><td>文献归纳 + 专家评审</td><td>6 行对照表</td></tr>
+      <tr><td class="mono">表 4-1</td><td>两组基线特征比较</td><td class="mono">4.1</td><td>基线问卷 40 份</td><td>均值 ± 标准差</td></tr>
+      <tr><td class="mono">表 4-2</td><td>主要指标组间差异（DID）</td><td class="mono">4.3</td><td>系统日志 1,842 条</td><td>系数 + 标准误</td></tr>
+      <tr><td class="mono">表 4-3</td><td>稳健性检验结果</td><td class="mono">4.3</td><td>系统日志（剔除异常值）</td><td>三组设定对比</td></tr>
+      <tr><td class="mono">图 4-1</td><td>任务完成时长周度趋势</td><td class="mono">4.3</td><td>系统日志按周聚合</td><td>折线图</td></tr>
+      <tr><td class="mono">图 4-2</td><td>返工率分布对比</td><td class="mono">4.3</td><td>系统日志</td><td>分布条形图</td></tr>
+      <tr class="total"><td class="mono">图 5-1</td><td>结论适用边界示意</td><td class="mono">5.2</td><td>作者绘制</td><td>二维边界图</td></tr>
+    </table>
+    <div class="block"><h4>图表规范</h4><p style="margin-top:6px">表题置于表格上方、图题置于图下方，均按章编号；表格与正文不重复叙述同一组数字，正文只解释方向与量级；所有百分比保留一位小数，样本量不足 30 的分组不做显著性推断。</p></div>
+  </div>
+  <div class="pfoot"><span>图表清单共 7 条：4 张表、3 张图，集中在第 3 至第 5 章</span><span>第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">写作计划与里程碑</div><div class="pn">总周期 50 周，自 2026-10 起算</div></div>
+  <h2>写作与实验排期</h2>
+  <div class="body">
+    <div style="display:grid;gap:7px">
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>文献补检与综述定稿</span><span class="bar"><i style="width:8%;margin-left:0"></i></span><span class="mono">第 1 — 4 周 · 4 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>框架定稿与量表设计</span><span class="bar"><i style="width:8%;margin-left:8%"></i></span><span class="mono">第 5 — 8 周 · 4 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>原型实现与预实验</span><span class="bar"><i style="width:8%;margin-left:16%"></i></span><span class="mono">第 9 — 12 周 · 4 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>第一轮现场实验</span><span class="bar"><i style="width:24%;margin-left:24%"></i></span><span class="mono">第 13 — 24 周 · 12 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>中期分析与报告</span><span class="bar"><i style="width:8%;margin-left:48%"></i></span><span class="mono">第 25 — 28 周 · 4 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>第二轮现场实验</span><span class="bar"><i style="width:24%;margin-left:56%"></i></span><span class="mono">第 29 — 40 周 · 12 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>结果修正与全文撰写</span><span class="bar"><i style="width:12%;margin-left:80%"></i></span><span class="mono">第 41 — 46 周 · 6 周</span></div>
+      <div style="display:grid;grid-template-columns:150px 1fr 148px;gap:12px;align-items:center;font-size:12px;color:#4c5058"><span>送审与答辩准备</span><span class="bar"><i style="width:8%;margin-left:92%"></i></span><span class="mono">第 47 — 50 周 · 4 周</span></div>
+    </div>
+    <div class="grid4">
+      <div class="kpi"><b>50</b><span>总周期（周）</span></div>
+      <div class="kpi"><b>3,400</b><span>第 4 章字数</span></div>
+      <div class="kpi"><b>2</b><span>轮现场实验</span></div>
+      <div class="kpi"><b>892</b><span>自评问卷（份）</span></div>
+    </div>
+    <table>
+      <tr><th style="width:88px">里程碑</th><th>交付物</th><th style="width:110px">判定标准</th><th style="width:96px">计划时点</th></tr>
+      <tr><td class="mono">M1</td><td>文献综述定稿（68 篇，含编码表）</td><td>缺口三条均有文献支撑</td><td class="mono">第 4 周末</td></tr>
+      <tr><td class="mono">M2</td><td>框架与量表定稿</td><td>6 个指标口径通过专家评审</td><td class="mono">第 8 周末</td></tr>
+      <tr><td class="mono">M3</td><td>第一轮实验数据与中期报告</td><td>两组基线平衡性检验通过</td><td class="mono">第 28 周末</td></tr>
+      <tr class="total"><td class="mono">M4</td><td>全文初稿（12,000 字，含附录）</td><td>引用与图表编号自查零错误</td><td class="mono">第 46 周末</td></tr>
+    </table>
+  </div>
+  <div class="pfoot"><span>关键路径为两轮现场实验共 24 周，占总周期 48%</span><span>第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">格式规范与自查清单</div><div class="pn">依据 GB/T 7714—2015 与学位论文规范</div></div>
+  <h2>写作规范与交付前自查</h2>
+  <div class="body">
+    <table>
+      <tr><th style="width:110px">项目</th><th>规范要求</th><th style="width:190px">检查方式</th></tr>
+      <tr><td>标题层级</td><td>最多三级（1 / 1.1 / 1.1.1），单级标题不超过 20 字</td><td>大纲视图人工核对</td></tr>
+      <tr><td>图表编号</td><td>按章编号（表 4-2），表题在上、图题在下，正文必须提及</td><td>编号连续性脚本扫描</td></tr>
+      <tr><td>文献引用</td><td>顺序编码制，正文用上标方括号，与文末序号一一对应</td><td>序号双向比对</td></tr>
+      <tr><td>数字与单位</td><td>数字与单位间加半角空格，千分位用逗号，百分比保留一位小数</td><td>抽样复核 20 处</td></tr>
+      <tr><td>统计表述</td><td>报告统计量、自由度与 p 值，不得只写「显著影响」</td><td>逐段核对结果章节</td></tr>
+      <tr class="total"><td>术语一致性</td><td>首次出现给中英文全称，此后统一用简称，附录给术语表</td><td>术语表反向检索</td></tr>
+    </table>
+    <div class="grid2">
+      <div>
+        <h4>交付前自查清单</h4>
+        <ul style="margin-top:6px">
+          <li>三个研究问题在摘要、引言、结论中表述一致</li>
+          <li>表 4-2 的系数方向与图 4-1 的趋势方向一致</li>
+          <li>所有百分比均标注样本量与观测期</li>
+          <li>访谈引语已脱敏，仅保留岗位与团队代号</li>
+          <li>参考文献 48 条在正文中均至少被引用一次</li>
+          <li>附录字段说明与正文采集口径完全对应</li>
+        </ul>
+      </div>
+      <div>
+        <h4>常见退稿原因与预防</h4>
+        <table style="margin-top:6px">
+          <tr><th>原因</th><th style="width:66px">占比</th><th style="width:96px">预防动作</th></tr>
+          <tr><td>方法口径不清</td><td class="mono">34%</td><td>3.1 表逐项定义</td></tr>
+          <tr><td>结论超出证据</td><td class="mono">27%</td><td>5.2 明确边界</td></tr>
+          <tr><td>引用与文末不符</td><td class="mono">21%</td><td>序号双向比对</td></tr>
+          <tr class="total"><td>图表数据不一致</td><td class="mono">18%</td><td>同源数据生成</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="pfoot"><span>共 6 项格式规范、6 条自查项，退稿原因覆盖 100%</span><span>第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10" style="--accent:#7C3AED">
+  <div class="phead"><div class="kicker a">参考文献与附录</div><div class="pn">共 48 条；[1] — [8] 为正文已引，[9][10] 为延伸阅读</div></div>
+  <h2>参考文献与术语表</h2>
+  <div class="body">
+    <div class="refs">
+      <div><em>[1]</em> Liu H, Zhang Q, Wang R. On-device quantization for collaborative agents[J]. Journal of Systems Research, 2023, 14(3): 221-238.</div>
+      <div><em>[2]</em> Tan M, Ito K. Knowledge distillation under strict data residency[J]. Applied Computing Review, 2024, 19(1): 45-61.</div>
+      <div><em>[3]</em> Chen L, Zhou Y. Task-level benchmarks for agent workflows[C]. Proceedings of the 12th Conference on Applied Measurement, 2024: 88-96.</div>
+      <div><em>[4]</em> Wang J, 李强. 审批环节对智能体落地率的影响：一项流程实验[J]. 管理科学, 2025, 38(4): 112-126.</div>
+      <div><em>[5]</em> Zhao Y, Sun P. Data sovereignty as a procurement constraint[J]. Information Policy Quarterly, 2025, 7(2): 33-49.</div>
+      <div><em>[6]</em> Sun P, Guo W. Hybrid deployment cost models over three years[J]. Computing Economics, 2026, 9(1): 5-24.</div>
+      <div><em>[7]</em> Guo W, 陈敏. 审计记录需求与采购决策的访谈研究[J]. 科研管理, 2026, 47(2): 90-101.</div>
+      <div><em>[8]</em> Li X, 王涛. 工具链接入成本与试点转正式的关系[J]. 系统工程理论与实践, 2026, 46(6): 1 402-1 415.</div>
+      <div><em>[9]</em> 中国信息通信研究院. 端侧智能技术与发展白皮书（2025 年）[R]. 北京: 中国信息通信研究院, 2025.</div>
+      <div><em>[10]</em> Yin R K. Case Study Research and Applications: Design and Methods[M]. 6th ed. Thousand Oaks: SAGE Publications, 2018: 61-93.</div>
+    </div>
+    <table>
+      <tr><th style="width:110px">术语</th><th style="width:150px">英文</th><th>定义</th></tr>
+      <tr><td>任务边界</td><td class="mono">Task Boundary</td><td>单个任务的责任人、输入输出与完成判定标准的明确程度</td></tr>
+      <tr><td>审批回溯</td><td class="mono">Approval Traceability</td><td>关键节点的人工审批记录及其可还原程度</td></tr>
+      <tr><td>返工率</td><td class="mono">Rework Rate</td><td>被驳回后需重做的任务数占任务总数的比例</td></tr>
+      <tr><td>流程依从度</td><td class="mono">Process Compliance</td><td>实际执行路径符合既定流程的任务占比</td></tr>
+      <tr><td>主观负荷</td><td class="mono">Perceived Workload</td><td>每周自评 1—7 分的工作负荷均值</td></tr>
+      <tr class="total"><td>双重差分</td><td class="mono">Difference-in-Differences</td><td>用组间与时间双重比较估计干预效应的准实验方法</td></tr>
+    </table>
+    <div class="block"><h4>附录结构</h4><p style="margin-top:6px">附录 A 术语表 12 条；附录 B 量表 14 题（主观负荷 4、采用意愿 3、边界 4、依从 3）；附录 C 日志字段 23 项。</p></div>
+  </div>
+  <div class="pfoot"><span>正文引用 [1] — [8] 与文末编号逐一对应，其余 40 条同格式续排</span><span>第 10 / 10 页</span></div>
+</section>
+
+</body></html>

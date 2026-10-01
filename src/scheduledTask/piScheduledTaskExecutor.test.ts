@@ -94,7 +94,7 @@ function createCoworkStore() {
 
 test('runs a canonical task in its workspace and waits for complete', async () => {
   const startSession = vi.fn(async (id: string) => {
-    queueMicrotask(() => runtime.emit('complete', id, null));
+    queueMicrotask(() => runtime.emit('complete', id));
   });
   const runtime = Object.assign(new EventEmitter(), {
     isSessionActive: () => false,
@@ -108,7 +108,7 @@ test('runs a canonical task in its workspace and waits for complete', async () =
     new PiScheduledTaskExecutor(runtime as never, store as never).execute(task, run),
   ).resolves.toEqual({ sessionId: session.id, output: 'done' });
   expect(store.createSession).toHaveBeenCalledWith(
-    'Scheduled: task',
+    '[定时]task',
     session.cwd,
     'Default prompt',
     'local',
@@ -136,7 +136,7 @@ test('runs a canonical task in its workspace and waits for complete', async () =
 
 test('reuses the workspace session referenced by a managed session key', async () => {
   const startSession = vi.fn(async (id: string) => {
-    queueMicrotask(() => runtime.emit('complete', id, null));
+    queueMicrotask(() => runtime.emit('complete', id));
   });
   const runtime = Object.assign(new EventEmitter(), {
     isSessionActive: () => false,
@@ -165,14 +165,14 @@ test('reuses the workspace session referenced by a managed session key', async (
 test('reuses one stable dedicated session for every run of a task-bound task', async () => {
   const startSession = vi.fn(async (id: string) => {
     runtimeActive = true;
-    queueMicrotask(() => runtime.emit('complete', id, null));
+    queueMicrotask(() => runtime.emit('complete', id));
   });
   let runtimeActive = false;
   const runtime = Object.assign(new EventEmitter(), {
     isSessionActive: () => runtimeActive,
     startSession,
     continueSession: vi.fn(async (id: string) => {
-      queueMicrotask(() => runtime.emit('complete', id, null));
+      queueMicrotask(() => runtime.emit('complete', id));
     }),
     stopSession: () => undefined,
   });
@@ -194,7 +194,7 @@ test('reuses one stable dedicated session for every run of a task-bound task', a
 
   await new PiScheduledTaskExecutor(runtime as never, store as never).execute(taskBoundTask, run);
   expect(store.createSession).toHaveBeenCalledWith(
-    'Scheduled: task',
+    '[定时]task',
     session.cwd,
     'Default prompt',
     'local',
@@ -230,13 +230,13 @@ test('serializes overlapping runs for a task-bound session', async () => {
     await new Promise<void>(resolve => {
       releaseFirst = resolve;
     });
-    queueMicrotask(() => runtime.emit('complete', id, null));
+    queueMicrotask(() => runtime.emit('complete', id));
   });
   const runtime = Object.assign(new EventEmitter(), {
     isSessionActive: () => runtimeActive,
     startSession,
     continueSession: vi.fn(async (id: string) => {
-      queueMicrotask(() => runtime.emit('complete', id, null));
+      queueMicrotask(() => runtime.emit('complete', id));
     }),
     stopSession: () => undefined,
   });

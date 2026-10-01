@@ -105,7 +105,7 @@ export function createTray(getWindow: () => BrowserWindow | null): Tray {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip(APP_NAME);
+  tray.setToolTip(app.name || APP_NAME);
 
   contextMenu = buildContextMenu(getWindow);
 

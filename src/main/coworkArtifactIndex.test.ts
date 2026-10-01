@@ -176,4 +176,36 @@ describe('CoworkArtifactIndex', () => {
       }),
     ]);
   });
+
+  test('does not persist failed declarations across incremental batches', () => {
+    insertMessage('declare-1', 1, 'tool_use', '', {
+      toolName: 'declare_artifact',
+      toolUseId: 'call-1',
+      toolInput: { filePath: 'D:/output/missing.pptx' },
+    });
+    expect(index.refreshSession('session-1')).toEqual([]);
+
+    insertMessage('result-1', 2, 'tool_result', 'file does not exist', {
+      toolUseId: 'call-1',
+      isError: true,
+    });
+    expect(index.refreshSession('session-1')).toEqual([]);
+  });
+
+  test('persists a successful declaration when its result arrives later', () => {
+    insertMessage('declare-1', 1, 'tool_use', '', {
+      toolName: 'declare_artifact',
+      toolUseId: 'call-1',
+      toolInput: { filePath: 'D:/output/report.pptx' },
+    });
+    expect(index.refreshSession('session-1')).toEqual([]);
+
+    insertMessage('result-1', 2, 'tool_result', 'Artifact declared', {
+      toolUseId: 'call-1',
+      isError: false,
+    });
+    expect(index.refreshSession('session-1')).toEqual([
+      expect.objectContaining({ fileName: 'report.pptx', declared: true }),
+    ]);
+  });
 });

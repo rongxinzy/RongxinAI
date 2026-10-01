@@ -1,59 +1,366 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-math-explain</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>edu-math-explain</title><style>
+*{box-sizing:border-box;margin:0}
+html{width:1100px;background:#f2f2ef}
+body{width:1100px;margin:0;background:#f2f2ef;display:grid;gap:26px;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;-webkit-font-smoothing:antialiased}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:30px}
-.panel{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.ask{display:flex;gap:14px;padding:19px 26px;background:#fafaf8;border-bottom:1px solid #edede9}
-.avatar{width:24px;height:24px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:2px}
-.ask p{font-size:14px;color:#3d4046;line-height:1.6}
-.ans{flex:1;min-height:0;padding:24px 26px;display:flex;flex-direction:column;gap:18px}
-.ans h2{font-size:16px;letter-spacing:-.01em}
-.ans h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.hr{height:1px;background:#edede9}
-.word{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
-.word b{font-size:34px;letter-spacing:-.02em}
-.word span{font-size:14px;color:#6f737b}
-.pos{font-size:12px;color:#fff;background:var(--accent);padding:2px 8px;border-radius:2px}
-.def{font-size:15px;color:#3d4046}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.box{border:1px solid #edede9;background:#fafaf8;padding:16px 18px}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:22px 30px 16px;display:flex;flex-direction:column;gap:10px;--accent:#10B981}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #edede9;padding-bottom:8px;flex:none}
+.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
+.ph h1{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:6px;line-height:1.1}
+.ph .sub{font-size:12.5px;color:#6f737b;margin-top:8px}
+.ph .note{font-size:11px;color:#9a9ea6;line-height:1.7;text-align:right;max-width:340px;flex:none}
+.ph .note b{color:#6f737b;font-weight:500}
+.pf{margin-top:auto;border-top:1px solid #edede9;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;font-size:11px;color:#9a9ea6;flex:none}
+.pf b{color:#4c5058;font-weight:500}
+h2.pt{font-size:23px;font-weight:600;letter-spacing:-.02em;line-height:1.15}
+.sec{font-size:13.5px;font-weight:600;letter-spacing:-.01em;flex:none}
+.sec em{font-style:normal;font-size:11px;font-weight:400;color:#9a9ea6;letter-spacing:.08em;margin-left:8px}
+p.lead{font-size:12.5px;color:#4c5058;line-height:1.7}
+.ask{display:flex;gap:12px;align-items:flex-start;padding:8px 13px;background:#fafaf8;border:1px solid #edede9;flex:none}
+.ask .av{width:20px;height:20px;border-radius:50%;background:#e6e6e2;flex:none;margin-top:1px}
+.ask p{font-size:12.5px;color:#3d4046;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.box{border:1px solid #edede9;background:#fafaf8;padding:9px 12px}
 .box .k{font-size:11px;letter-spacing:.14em;color:#8b8f97}
-.box p{margin-top:8px;font-size:13.5px;color:#3d4046;line-height:1.8}
-.quote{font-size:14.5px;color:#3d4046;line-height:1.9;border-left:3px solid var(--accent);padding-left:16px}
-.chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid #e4e4e0;padding:4px 10px;font-size:12.5px;color:#4c5058}
-.steps{display:grid;gap:12px}
-.step{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:start}
-.step .n{width:24px;height:24px;border:1px solid var(--accent);color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center}
-.step .t{font-size:13.5px;color:#3d4046;line-height:1.8}
-.formula{font-size:16px;color:#16171a;margin-top:4px}
-.answer{margin-top:6px;background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:12px 16px;font-size:14px}
-.cmp{display:grid;gap:12px}
-.cmp .before,.cmp .after{padding:12px 16px;font-size:13.5px;line-height:1.8}
+.box p{margin-top:5px;font-size:12.5px;color:#3d4046;line-height:1.65}
+.stat{border:1px solid #edede9;padding:8px 12px}
+.stat .n{font-size:26px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .n small{font-size:12.5px;font-weight:400;color:#6f737b;margin-left:3px}
+.stat .l{font-size:11px;color:#8b8f97;letter-spacing:.06em;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:4px 9px;text-align:left;color:#3d4046;vertical-align:top;line-height:1.5}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500}
+tr.hl td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600;color:#16171a}
+td.num{font-variant-numeric:tabular-nums}
+td.gray{color:#8b8f97}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid #e4e4e0;padding:3px 9px;font-size:12.5px;color:#4c5058}
+.chip.on{border-color:color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a}
+.notes{display:grid;gap:5px}
+.notes div{font-size:12.5px;color:#4c5058;line-height:1.62;padding-left:15px;position:relative}
+.notes div::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+.steps{display:grid;gap:6px}
+.step{display:grid;grid-template-columns:20px 1fr;gap:10px;align-items:start}
+.step .n{width:20px;height:20px;border:1px solid var(--accent);color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.step .t{font-size:12.5px;color:#3d4046;line-height:1.62}
+.cmp{display:grid;gap:7px}
+.cmp .before,.cmp .after{padding:8px 12px;font-size:12.5px;line-height:1.62}
 .cmp .before{background:#fafaf8;border:1px solid #edede9;color:#8b8f97}
 .cmp .after{border:1px solid color-mix(in srgb,var(--accent) 45%,#fff);background:color-mix(in srgb,var(--accent) 6%,#fff);color:#3d4046}
-.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:6px}
-.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:#3d4046}
-.flow span{border:1px solid #e4e4e0;padding:8px 12px;background:#fafaf8}
+.cmp .tag{font-size:11px;letter-spacing:.12em;color:#8b8f97;display:block;margin-bottom:3px}
+.flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#3d4046}
+.flow span{border:1px solid #e4e4e0;padding:5px 10px;background:#fafaf8}
 .flow i{color:#b6bac0;font-style:normal}
-.notes{display:grid;gap:8px}
-.notes div{font-size:13.5px;color:#4c5058;line-height:1.7;padding-left:16px;position:relative}
-.notes div::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
+.quote{font-size:12.5px;color:#3d4046;line-height:1.7;border-left:3px solid var(--accent);padding-left:13px}
+.answer{background:color-mix(in srgb,var(--accent) 8%,#fff);border-left:3px solid var(--accent);padding:8px 12px;font-size:12.5px;line-height:1.65;color:#3d4046}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:120px 1fr 56px;align-items:center;gap:10px;font-size:12.5px;color:#4c5058}
+.bar .track{height:9px;background:#f0f0ec;position:relative}
+.bar .track i{position:absolute;left:0;top:0;bottom:0;background:var(--accent)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;color:#6f737b}
+.bar.hl{font-weight:600;color:#16171a}
+.word{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.word b{font-size:32px;font-weight:600;letter-spacing:-.02em}
+.word span{font-size:13.5px;color:#6f737b}
+.pos{font-size:11px;color:#fff;background:var(--accent);padding:2px 7px}
+ul.tight{list-style:none;display:grid;gap:4px}
+ul.tight li{font-size:12.5px;color:#3d4046;line-height:1.6;padding-left:15px;position:relative}
+ul.tight li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;background:var(--accent)}
+ul.tight li b{font-variant-numeric:tabular-nums}
 </style></head><body>
-<div class="panel" style="--accent:#10B981">
-  <div class="ask"><div class="avatar"></div><p>f(x) = x² − 2x + 3 在区间 [0, 3] 上的最小值是多少？请写出过程。</p></div>
-  <div class="ans">
-    <div class="steps">
-      <div class="step"><span class="n">1</span><div class="t">配方，把二次函数写成顶点式<div class="formula mono">f(x) = (x − 1)² + 2</div></div></div>
-      <div class="step"><span class="n">2</span><div class="t">读出对称轴与开口方向：对称轴 <span class="mono">x = 1</span>，二次项系数为正，开口向上</div></div>
-      <div class="step"><span class="n">3</span><div class="t">判断对称轴是否落在区间内：<span class="mono">1 ∈ [0, 3]</span>，所以最小值在顶点处取得</div></div>
-      <div class="step"><span class="n">4</span><div class="t">比较端点值：<span class="mono">f(0) = 3</span>，<span class="mono">f(3) = 6</span></div></div>
+
+<section class="page" data-page="1">
+  <div class="ph">
+    <div>
+      <div class="kicker">Education · Math 01</div>
+      <h1>二次函数在闭区间上的最值：分类讨论四步法</h1>
+      <div class="sub">适用：高一必修一 / 高考一轮 ｜ 主题函数 1 · 题型 6 类 · 区间情形 5 类 · 解题 4 步 ｜ 练习 12 题（必做 9 道） ｜ 节奏：3 天完成，累计 130 分钟</div>
     </div>
-    <div class="answer"><b>结论：</b>最小值 <span class="mono">f(1) = 2</span>，最大值 <span class="mono">f(3) = 6</span>。</div>
-    <div class="box"><div class="k">易错点</div><p>区间不含端点或对称轴落在区间外时，最值只在端点处比较，不能再套顶点值。</p></div>
-    <div class="box"><div class="k">同类练习</div><p>把区间换成 <span class="mono">[2, 4]</span>：对称轴落在区间外，此时最小值在离对称轴最近的端点 <span class="mono">x = 2</span> 处取得，<span class="mono">f(2) = 3</span>。</p></div>
+    <div class="note">讲义 v2.0 · 共 10 页<br><b>例题口径</b>：以 f(x) = x² − 2x + 3 为主线<br>区间 [0, 3]、[2, 4]、[−1, 2]、[−3, −1] 为对照</div>
   </div>
-</div></body></html>
+  <div class="ask"><div class="av"></div><p>f(x) = x² − 2x + 3 在区间 [0, 3] 上的最小值是多少？请写出过程。</p></div>
+  <p class="lead">本讲用一条主线函数 f(x) = x² − 2x + 3 打通闭区间最值：先配成 (x − 1)² + 2，读出对称轴 x = 1 与顶点 (1, 2)，再判断轴与闭区间的相对位置（轴在区间左外侧 / 左半区 / 中点 / 右半区 / 右外侧，共 5 类），最后在「顶点值 + 两个端点值」三个候选中取值。学完应能在 3 分钟内完成 [0, 3] 这类区间的最值书写，并对含参 a 的区间最值给出完整分类讨论。</p>
+  <div class="grid3">
+    <div class="stat"><div class="n">9<small>道</small></div><div class="l">分层练习必做 9 道（1–9），另设选做 3 道（10–12）</div></div>
+    <div class="stat"><div class="n">5<small>类</small></div><div class="l">区间情形：轴在左外侧 / 左半区 / 中点 / 右半区 / 右外侧</div></div>
+    <div class="stat"><div class="n">4<small>步</small></div><div class="l">解题法：配方 → 读对称轴 → 判位置 → 比较端点</div></div>
+  </div>
+  <div class="sec">学习路径 <em>本页即封面摘要，第 2 页给出逐章指引</em></div>
+  <table>
+    <tr><th style="width:72px">阶段</th><th style="width:80px">时点</th><th>内容</th><th style="width:190px">可检查产出</th><th style="width:72px">用时</th></tr>
+    <tr><td>入门</td><td class="num">第 1 天</td><td>一般式、配方、对称轴 x = −b/2a 与单调区间（P3）</td><td>对称轴与顶点卡片 6 张</td><td class="num">20 分钟</td></tr>
+    <tr><td>精读</td><td class="num">第 1 天</td><td>x² − 2x + 3 配方全过程与 5 类区间情形对照表（P4）</td><td>4 类相对位置各写 1 例</td><td class="num">25 分钟</td></tr>
+    <tr><td>纠错</td><td class="num">第 2 天</td><td>6 类常见错误与 4 行最值对照表（P5）</td><td>错题清单 6 条</td><td class="num">20 分钟</td></tr>
+    <tr><td>练习</td><td class="num">第 2–3 天</td><td>12 道分层练习（限时 30 分钟）与逐题解析（P6–P8）</td><td>必做 9 道（1–9）全对</td><td class="num">45 分钟</td></tr>
+    <tr class="hl"><td>自测</td><td class="num">第 3 天</td><td>6 项自测清单与 3 行 6 周计划（P9–P10）</td><td>自测达标 ≥ 5 / 6 项（第 5、6 项为硬性项）</td><td class="num">20 分钟</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">口径与来源</div><p>主线函数 f(x) = x² − 2x + 3；对照区间 [0, 3]、[2, 4]、[−1, 2]、[−3, −1] 共 4 个；考频口径为近 3 年模考真题 32 道，含参最值 6 次、恒成立 5 次；练习按基础 6 / 进阶 4 / 挑战 2 配比。</p></div>
+    <div class="box"><div class="k">后续页面导读</div><p>P2 目录与阅读指引；P3 公式表与考频；P4 配方与 5 类情形；P5 六类错误；P6 十二题练习；P7–P8 逐题解析；P9 自测与 6 周计划；P10 术语表与来源。</p></div>
+  </div>
+  <div class="pf"><span>核心结论：<b>[0, 3] 上最小值 2（x = 1 时取到）、最大值 6（x = 3 时取到）</b>，顶点只在轴落在区间内时参与比较。</span><span class="mono">第 1 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="2">
+  <div class="ph">
+    <div><div class="kicker">Education · Math 01</div><h2 class="pt">目录与阅读指引</h2></div>
+    <div class="note">全讲 8 章 · 共 10 页<br>先概念、再练习、后自测</div>
+  </div>
+  <div class="sec">章节清单 <em>每章一句话说明「读完能做什么」</em></div>
+  <table>
+    <tr><th style="width:40px">章</th><th style="width:126px">章节</th><th>一句话说明</th><th style="width:166px">完成标志</th><th style="width:56px">页码</th></tr>
+    <tr><td class="num">1</td><td>知识脉络</td><td>讲清一般式、配方、对称轴、开口方向、单调区间与闭区间最值的分工，附 6 类题型考频</td><td>能默写 6 条公式表</td><td class="num">P3</td></tr>
+    <tr><td class="num">2</td><td>核心概念与例子</td><td>把 x² − 2x + 3 配成 (x − 1)² + 2，并给出 4 类相对位置的最值对照</td><td>三类情形各写 1 例</td><td class="num">P4</td></tr>
+    <tr><td class="num">3</td><td>常见错误</td><td>列出 6 类高频错误，并用 4 行数值对照表给出正确最值</td><td>错题清单 6 条</td><td class="num">P5</td></tr>
+    <tr><td class="num">4</td><td>分层练习</td><td>基础 6 题练配方与判轴，进阶 4 题进区间与参数，挑战 2 题写完整分类讨论</td><td>12 题全部作答</td><td class="num">P6</td></tr>
+    <tr><td class="num">5</td><td>答案解析（上）</td><td>基础题 1–6 逐题给出答案、思路与失分点</td><td>1–6 题全对</td><td class="num">P7</td></tr>
+    <tr><td class="num">6</td><td>答案解析（下）</td><td>进阶与挑战题 7–12 的完整解答与分类依据</td><td>必做 9 道全对</td><td class="num">P8</td></tr>
+    <tr><td class="num">7</td><td>自测与下一阶段</td><td>6 项自测清单定达标线，3 行 6 周计划排含参、根的分布与恒成立</td><td>自测达标 ≥ 5 / 6 项</td><td class="num">P9</td></tr>
+    <tr class="hl"><td class="num">8</td><td>附录：术语表</td><td>顶点、对称轴、判别式等 10 条术语与参考口径，供复习查证</td><td>能解释 10 条术语</td><td class="num">P10</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">建议阅读顺序</div><p>第 1 天读 P3–P4，把配方过程与 5 类相对位置写成卡片（P4 的 8 行对照表建议手抄一遍，覆盖轴在左、轴在左半区、轴在右半区、轴在右四类）；第 2 天读 P5 后立刻做 P6 的 1–6 题，用 P7 自批；第 3 天做 7–12 题，对照 P8，最后完成 P9 自测。每读完一页在页脚右侧核对页码，避免跳页；P4 的 4 类相对位置与 P5 的 6 类错误是同一件事的正反两面，建议连着读。</p></div>
+    <div class="box"><div class="k">前置要求</div><p>会解一元一次方程；知道 a ≠ 0 时 ax² + bx + c 才是二次函数；能计算 −b/2a 与 4ac − b²。本讲只用配方法、对称轴公式与端点代入，不涉及导数；若配方不熟，先用 10 分钟练 3 道 x² + kx 型配方。若代入不熟，先把 x = 1 代入 x² − 2x + 3 算出 2、把 x = 3 代入算出 6，用具体数字确认代入无误再进入 P3。</p></div>
+  </div>
+  <div class="notes">
+    <div>每页页脚右侧是本页序号，共 10 页；页码与目录一致，便于按计划分天完成。</div>
+    <div>练习在第 6 页共 12 题（必做 1–9），答案分两页在第 7、8 页，题号一一对应，先做完再翻答案。</div>
+  </div>
+  <div class="pf"><span>阅读原则：<b>概念页读两遍，练习页限时做，答案页只对不抄</b>。</span><span class="mono">第 2 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="3">
+  <div class="ph">
+    <div><div class="kicker">Chapter 01 · 知识脉络</div><h2 class="pt">二次函数六件事与六类题型的考频</h2></div>
+    <div class="note">口径：近 3 年模考真题 32 道<br>一题可同时计入多个考点</div>
+  </div>
+  <div class="sec">A · 决定最值的六件事 <em>动手前先定位：这一条公式管什么</em></div>
+  <table>
+    <tr><th style="width:104px">概念</th><th style="width:252px">公式</th><th style="width:236px">作用</th><th>例（f(x) = x² − 2x + 3）</th></tr>
+    <tr><td>二次函数一般式</td><td class="mono">f(x) = ax² + bx + c（a ≠ 0）</td><td>统一形式，先看 a 的符号定开口方向</td><td class="mono">a = 1，b = −2，c = 3</td></tr>
+    <tr><td>配方法</td><td class="mono">f(x) = a(x + b/(2a))² + (4ac − b²) / (4a)</td><td>把一般式化成顶点式（含系数 a），读出顶点坐标</td><td class="mono">x² − 2x + 3 = (x − 1)² + 2</td></tr>
+    <tr class="hl"><td>对称轴</td><td class="mono">x = −b/2a</td><td>把定义域切成两半，是单调性的分界点</td><td class="mono">x = −(−2) / 2 = 1</td></tr>
+    <tr><td>开口方向</td><td class="mono">a &gt; 0 向上；a &lt; 0 向下</td><td>决定顶点是最小值点还是最大值点</td><td class="mono">a = 1 &gt; 0 → 顶点 (1, 2) 是最小值</td></tr>
+    <tr><td>单调区间</td><td class="mono">a &gt; 0：轴左减、轴右增（a &lt; 0 相反）</td><td>轴在区间外时，据此判断区间上的增减</td><td class="mono">在 (−∞, 1] 减，[1, +∞) 增</td></tr>
+    <tr><td>闭区间最值</td><td class="mono">f(m)、f(n)、f(轴)（轴在区间内）</td><td>把无穷多取值收敛为 2–3 个候选数</td><td class="mono">[0, 3]：候选 f(0) = 3、f(3) = 6、f(1) = 2 → 最小 2、最大 6</td></tr>
+  </table>
+  <div class="sec">B · 六类题型在 32 道模考真题中的出现次数 <em>合计 31 次，含参最值是拉开差距的一类</em></div>
+  <div class="bars">
+    <div class="bar hl"><span>求闭区间最值</span><span class="track"><i style="width:100%"></i></span><span class="v">11</span></div>
+    <div class="bar"><span>含参最值</span><span class="track"><i style="width:55%"></i></span><span class="v">6</span></div>
+    <div class="bar"><span>恒成立</span><span class="track"><i style="width:45%"></i></span><span class="v">5</span></div>
+    <div class="bar"><span>实际应用</span><span class="track"><i style="width:36%"></i></span><span class="v">4</span></div>
+    <div class="bar"><span>图像判断</span><span class="track"><i style="width:27%"></i></span><span class="v">3</span></div>
+    <div class="bar"><span>根的分布</span><span class="track"><i style="width:18%"></i></span><span class="v">2</span></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><div class="k">三要素决定最值</div><p>轴决定分界，开口决定顶点是最大还是最小，端点决定另一半最值；三者缺一，分类讨论就写不全。</p></div>
+    <div class="box"><div class="k">考频读法</div><p>「求闭区间最值」11 次居首，是必得分题；「含参最值」6 次与恒成立 5 次合计 11 次，共用同一套分类讨论。</p></div>
+  </div>
+  <div class="pf"><span>知识脉络一句话：<b>求闭区间最值（11 次）、含参最值（6 次）、恒成立（5 次）三类题型共用一套 4 步法</b>。</span><span class="mono">第 3 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="4">
+  <div class="ph">
+    <div><div class="kicker">Chapter 02 · 核心概念与例子</div><h2 class="pt">配方全过程与 5 类区间情形的最值</h2></div>
+    <div class="note">主线函数：f(x) = x² − 2x + 3<br>顶点 (1, 2) · 轴 x = 1 · 开口向上</div>
+  </div>
+  <div class="word"><b>f(x) = x² − 2x + 3</b><span>配方 → (x − 1)² + 2</span><span class="pos">轴 x = 1</span><span>顶点 (1, 2) · 判别式 Δ = −8 &lt; 0</span></div>
+  <p class="lead">配方过程：x² − 2x + 3 = (x² − 2x + 1) + 3 − 1 = (x − 1)² + 2，即「加一次项系数一半的平方（1），再减回去」。由此读三个结论：a = 1 &gt; 0 开口向上；对称轴 x = −b/2a = 2 / 2 = 1；顶点 (1, 2) 是最小值点，最小值 2。</p>
+  <div class="flow"><span>① 配方 → (x − 1)² + 2</span><i>→</i><span>② 读对称轴 x = 1</span><i>→</i><span>③ 判轴与区间位置</span><i>→</i><span>④ 比较端点与顶点</span></div>
+  <div class="grid3">
+    <div class="box"><div class="k">配方结果</div><p><span class="mono">x² − 2x + 3 = (x − 1)² + 2</span>，顶点 (1, 2)：括号内取 0 时最小，故最小值 2；a &lt; 0 时顶点给最大值。</p></div>
+    <div class="box"><div class="k">记忆锚点</div><p>「先看轴在不在区间内」：轴在区间内，顶点值是候选；轴在区间外，区间上单调，最值只在两端点。</p></div>
+    <div class="box"><div class="k">三类区间情形（5 类的合并）</div><p>轴在区间左 → 单调递增；轴在区间内 → 顶点给一侧最值；轴在区间右 → 单调递减；再按中点细分共 5 类。</p></div>
+  </div>
+  <div class="sec">5 类区间情形（4 类相对位置 + 中点特例）× 最值取法 <em>第 5 类见下方引注</em></div>
+  <table>
+    <tr><th style="width:96px">情形</th><th style="width:186px">位置条件（轴 = −b/2a）</th><th style="width:66px">最值</th><th style="width:66px">取值式</th><th>数值验证（对应区间）</th></tr>
+    <tr><td>① 左外侧</td><td class="mono">轴 ≤ m</td><td>最小值</td><td class="mono">f(m)</td><td class="mono">[2, 4]：f(2) = 4 − 4 + 3 = 3</td></tr>
+    <tr><td>① 左外侧</td><td class="mono">轴 ≤ m</td><td>最大值</td><td class="mono">f(n)</td><td class="mono">[2, 4]：f(4) = 16 − 8 + 3 = 11</td></tr>
+    <tr><td>② 左半区</td><td class="mono">m &lt; 轴 &lt; (m+n)/2</td><td>最小值</td><td class="mono">f(轴)</td><td class="mono">[0, 3]：f(1) = 2</td></tr>
+    <tr><td>② 左半区</td><td class="mono">m &lt; 轴 &lt; (m+n)/2</td><td>最大值</td><td class="mono">f(n)</td><td class="mono">[0, 3]：f(3) = 6</td></tr>
+    <tr><td>③ 右半区</td><td class="mono">(m+n)/2 &lt; 轴 &lt; n</td><td>最小值</td><td class="mono">f(轴)</td><td class="mono">[−1, 2]：f(1) = 2</td></tr>
+    <tr><td>③ 右半区</td><td class="mono">(m+n)/2 &lt; 轴 &lt; n</td><td>最大值</td><td class="mono">f(m)</td><td class="mono">[−1, 2]：f(−1) = 6</td></tr>
+    <tr><td>④ 右外侧</td><td class="mono">轴 ≥ n</td><td>最小值</td><td class="mono">f(n)</td><td class="mono">[−3, −1]：f(−1) = 6</td></tr>
+    <tr class="hl"><td>④ 右外侧</td><td class="mono">轴 ≥ n</td><td>最大值</td><td class="mono">f(m)</td><td class="mono">[−3, −1]：f(−3) = 9 + 6 + 3 = 18</td></tr>
+  </table>
+  <div class="quote">第 5 类「轴 = 中点」（②③ 的临界）：区间 [−1, 3] 的中点 1 = 轴，f(−1) = f(3) = 6，最小值 2（x = 1），最大值 6。</div>
+  <div class="pf"><span>一句话结论：<b>闭区间最值只有三个候选：f(m)、f(n) 与顶点值（轴在区间内时才参选）</b>。</span><span class="mono">第 4 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="5">
+  <div class="ph">
+    <div><div class="kicker">Chapter 03 · 常见错误</div><h2 class="pt">6 类高频错误与 4 行最值对照</h2></div>
+    <div class="note">来源：本讲配套 12 题的自批统计<br>共 6 类 · 每类给出正确写法</div>
+  </div>
+  <div class="sec">A · 6 类常见错误 <em>先看「典型错误」一列，能自己改对再往下</em></div>
+  <table>
+    <tr><th style="width:108px">类型</th><th style="width:210px">典型错误</th><th style="width:240px">正确写法</th><th>原因与记忆点</th></tr>
+    <tr><td>忽略 a 正负</td><td class="mono">写「最大值是 2」</td><td class="mono">a = 1 &gt; 0，顶点值 2 是最小值</td><td>顶点给最大还是最小由 a 的符号决定。</td></tr>
+    <tr><td>轴外仍套顶点</td><td class="mono">[2, 4] 上写 min = 2</td><td class="mono">轴 1 ∉ [2, 4]，min = 3</td><td>顶点值只在轴落进区间时才可达。</td></tr>
+    <tr><td>只比顶点</td><td>只写最小值 2，不写最大值</td><td class="mono">再算 f(0) = 3、f(3) = 6，最大 6</td><td>轴把区间分成两段相反单调，端点都要算。</td></tr>
+    <tr><td>忽略开闭区间</td><td class="mono">把 (0, 3) 当成 [0, 3]</td><td>开区间无最大值，min = 2 仍取到</td><td>端点取不到时最值可能不存在，只能写上确界 6。</td></tr>
+    <tr><td>对称轴符号写反</td><td class="mono">x = b / 2a = −1</td><td class="mono">x = −b / 2a = 2 / 2 = 1</td><td class="mono">b = −2</td></tr>
+    <tr class="hl"><td>漏写取等条件</td><td>只写「最小值为 2」</td><td class="mono">当且仅当 x = 1 时取最小值 2</td><td>最值必须给出取等条件，否则解答不完整。</td></tr>
+  </table>
+  <div class="sec">B · 三种区间情形的正确最值 <em>对照表，数值与 P4 完全一致</em></div>
+  <table>
+    <tr><th style="width:190px">轴与区间位置</th><th style="width:176px">最小值</th><th style="width:176px">最大值</th><th>数值（f(x) = x² − 2x + 3）</th></tr>
+    <tr><td>轴在左（[2, 4]）</td><td class="mono">f(m) = f(2) = 3</td><td class="mono">f(n) = f(4) = 11</td><td>区间递增：min 3（x = 2）· max 11（x = 4）</td></tr>
+    <tr><td>轴在内（[0, 3]）</td><td class="mono">f(轴) = f(1) = 2</td><td class="mono">f(n) = f(3) = 6</td><td>轴偏左半区：max 6（x = 3），f(0) = 3 不是最大</td></tr>
+    <tr><td>轴在内（[−1, 2]）</td><td class="mono">f(轴) = f(1) = 2</td><td class="mono">f(m) = f(−1) = 6</td><td>轴偏右半区：最大值取左端点，min 2（x = 1）</td></tr>
+    <tr class="hl"><td>轴在右（[−3, −1]）</td><td class="mono">f(n) = f(−1) = 6</td><td class="mono">f(m) = f(−3) = 18</td><td>区间递减：min 6（x = −1）· max 18（x = −3）</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">动笔前 3 秒自检</div><p>一看 a 的符号；二算 x = −b/2a（b 本身带负号）；三比轴与区间端点的大小。这三条对上，开口与轴相关的错误基本清零。</p></div>
+    <div class="box"><div class="k">开区间与闭区间的差别</div><p>[0, 3]：最小 2、最大 6 都存在；(0, 3)：最小 2 仍取到（x = 1），最大不存在，上确界为 6。</p></div>
+  </div>
+  <div class="pf"><span>纠错结论：<b>最值失分只有两个源头：开口没判、轴没和区间比大小</b>。</span><span class="mono">第 5 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="6">
+  <div class="ph">
+    <div><div class="kicker">Chapter 04 · 分层练习</div><h2 class="pt">12 道题：基础 6 · 进阶 4 · 挑战 2</h2></div>
+    <div class="note">每题 1 分，满分 12 分<br>必做 1–9 · 限时 30 分钟 · 答案见 P7–P8</div>
+  </div>
+  <div class="sec">基础题 6 道 <em>只考配方、对称轴与代入，不做分类讨论</em></div>
+  <ul class="tight">
+    <li><b>1.</b> 用配方法把 f(x) = x² − 2x + 3 化成顶点式，并写出顶点坐标。</li>
+    <li><b>2.</b> 写出 f(x) = x² − 2x + 3 的对称轴方程与开口方向。</li>
+    <li><b>3.</b> 判断开口方向并求对称轴：f(x) = −x² + 4x − 1。</li>
+    <li><b>4.</b> 求 f(x) = 2x² − 8x + 5 的顶点坐标，并说明它是最大值点还是最小值点。</li>
+    <li><b>5.</b> 求 f(x) = x² − 2x + 3 在 x = 0 与 x = 3 处的函数值，并比较大小。</li>
+    <li><b>6.</b> 判断对称轴 x = 1 与闭区间 [2, 4]、[−1, 2] 的位置关系（轴在区间左侧 / 区间内 / 区间右侧）。</li>
+  </ul>
+  <div class="sec">进阶题 4 道 <em>进入闭区间最值与参数讨论，第 7–9 题必做</em></div>
+  <ul class="tight">
+    <li><b>7.</b> 求 f(x) = x² − 2x + 3 在闭区间 [0, 3] 上的最小值与最大值，并写出各自取到时的 x 值。</li>
+    <li><b>8.</b> 求 f(x) = x² − 2x + 3 在闭区间 [2, 4] 上的最小值与最大值，并说明为什么不能用顶点值 2。</li>
+    <li><b>9.</b> 含参讨论：求 f(x) = x² − 2ax + 3 在闭区间 [0, 3] 上的最小值 m(a)，按对称轴 x = a 与区间的位置分类写出结论。</li>
+    <li><b>10.</b> 恒成立：若 f(x) = x² − 2x + 3 ≥ m 对一切 x ∈ [0, 3] 恒成立，求实数 m 的取值范围（选做）。</li>
+  </ul>
+  <div class="sec">挑战题 2 道 <em>需要写出完整分类依据与分段结论</em></div>
+  <ul class="tight">
+    <li><b>11.</b> 设 g(x) = −x² + 2ax + 1（a 为参数），求 g(x) 在闭区间 [0, 2] 上的最大值 M(a)：写出分类依据、每一类的 M(a) 表达式与取到最大值的 x 值。</li>
+    <li><b>12.</b> 固定 f(x) = x² − 2x + 3，让闭区间 [t, t + 2] 沿 x 轴平移：写出最小值 m(t) 关于 t 的分段表达式，并说明 t 取哪些值时 m(t) 恒等于 2。</li>
+  </ul>
+  <div class="answer">评分口径：每题满分 1 分，按两段给分——结果段 0.5 分 + 依据与取等段 0.5 分；只写结果不写依据的得 0.5 分（第 7、8 题取到最值的 x 值、第 9、11 题的分类归属、第 12 题的三段表达式与 t 的范围，都属依据段）。必做 1–9 题全对为达标（9 分），选做 10–12 题共 3 分，不计入达标线。第 9、11 题须正确归属 a = 0、a = 3 与 a = 2 的取等。第 11、12 题对应 P8 解析表最后两行，做错时回读 P4 的 4 类相对位置表。自批顺序建议：先对 1–6 题并把错题抄进清单，再对 7–9 题核对取等条件，最后对 10–12 题核对参数分段与端点归属。错题清单要标注所属情形（轴在左 / 内 / 右）与失分类型（结果段或依据段），隔天重做同型题 2 道并入下一次自批，连续两次全对即可跳过该题型。</div>
+  <div class="pf"><span>练习建议：<b>先做 1–6 题（限时 10 分钟），隔 10 分钟再做 7–12 题</b>，避免机械套顶点值。</span><span class="mono">第 6 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="7">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（上）</div><h2 class="pt">基础题 1–6 逐题解析</h2></div>
+    <div class="note">题号与 P6 一一对应<br>本页对应基础题 6 道，共 6 分</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:282px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">1</td><td class="mono">f(x) = (x − 1)² + 2，顶点 (1, 2)</td><td>配方：x² − 2x + 1 − 1 + 3 = (x − 1)² + 2。只写顶点式不写顶点坐标扣一半分；减回去的 1 漏减会得 (x − 1)² + 3。</td></tr>
+    <tr><td class="num">2</td><td class="mono">对称轴 x = 1，开口向上（a = 1 &gt; 0）</td><td>对称轴 x = −b/2a = −(−2)/2 = 1。写成 x = −1 是符号失分；只答「开口向上」不写依据 a = 1 不扣分但过程不全。</td></tr>
+    <tr><td class="num">3</td><td class="mono">开口向下（a = −1 &lt; 0），对称轴 x = 2</td><td>x = −b/2a = −4 / (−2) = 2。把 a = −1 当 1 判成开口向上是本类最高频错误。</td></tr>
+    <tr><td class="num">4</td><td class="mono">顶点 (2, −3)，是最小值点，最小值 −3</td><td>轴 x = 8 / 4 = 2，f(2) = 8 − 16 + 5 = −3。把 x = 2 当成最小值、或算成 f(2) = 3 都不得分。</td></tr>
+    <tr><td class="num">5</td><td class="mono">f(0) = 3，f(3) = 9 − 6 + 3 = 6，f(0) &lt; f(3)</td><td>代入时 −2x 的负号要跟着走。两值算对但比较方向写反扣半分。</td></tr>
+    <tr class="hl"><td class="num">6</td><td class="mono">与 [2, 4]：轴在区间左侧（1 &lt; 2）；与 [−1, 2]：轴在区间内（−1 &lt; 1 &lt; 2）</td><td>必须写出左右方向，「不在区间内」这种答法在后面选最值时必然出错。</td></tr>
+  </table>
+  <div class="grid2">
+    <div class="box"><div class="k">本页三处最容易丢分</div><p>第 1 题漏减回 1（常数写成 3）；第 3 题把 a = −1 判成开口向上；第 6 题不写轴与端点的方向关系。三题合计 3 分，占基础题总分 6 分的一半；第 2 题符号写错会连带 P6 的第 8 题一起错。基础题只要这三处不出错，6 分可以拿满。第 1、2 题是 P4 配方过程的直接复现，两题都错说明配方没过关，先回 P4 重练再往下做；第 3、4 题分别考开口方向与顶点坐标，错则说明公式记忆有偏差。</p></div>
+    <div class="box"><div class="k">自批换算（基础题部分）</div><p>6 分：直接进入进阶题；4–5 分：回读 P3 公式表的配方与对称轴两行；≤ 3 分：把 P4 的配方过程抄写 3 遍，再重做本页 1–6 题。自批时把错题按题号写进清单，标注所属情形（轴在左 / 内 / 右），便于 P9 自测第 3 项逐条核对。换算按 6 题满分 6 分计，与 P1 学习路径的「入门 20 分钟 + 精读 25 分钟」学习量对应：基础题不过关就不开始进阶题；清单编号 1–6 与 P6 题号对齐，避免错题与题号脱节。</p></div>
+  </div>
+  <div class="sec">本页逐题批改细则 <em>按这三条给分，避免「差不多对」</em></div>
+  <div class="notes">
+    <div>第 1 题写成 <span class="mono">(x − 1)² + 3</span> 的属漏减回 1，判断式对照 x² − 2x + 3 的常数项即可自查，给 0.5 分。</div>
+    <div>第 4 题要求同时回答顶点与「最大 / 最小」，只给坐标而未说明性质的记 0.5 分。</div>
+    <div>第 6 题的区间 [−1, 2] 中点 0.5 &lt; 轴 1，属「轴在右半区」，能写出半区归属的加记满分。</div>
+  </div>
+  <div class="pf"><span>上半页结论：<b>基础题失分只在配方减回项、a 的符号与轴区方向三处</b>。</span><span class="mono">第 7 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="8">
+  <div class="ph">
+    <div><div class="kicker">Chapter 05 · 答案解析（下）</div><h2 class="pt">进阶与挑战题 7–12 解析</h2></div>
+    <div class="note">含分类依据与分段结论<br>自批：必做 9 道全对达标</div>
+  </div>
+  <table>
+    <tr><th style="width:36px">题</th><th style="width:300px">参考答案</th><th>思路与失分点</th></tr>
+    <tr><td class="num">7</td><td class="mono">轴 1 ∈ [0, 3]：f(0) = 3，f(1) = 2，f(3) = 6 → 最小值 2（x = 1），最大值 6（x = 3）</td><td>三个候选值必须都算出来再比较；漏写「x = 1 时取到」按取等条件缺失扣分，把 f(0) = 3 当最大值即错。</td></tr>
+    <tr><td class="num">8</td><td class="mono">轴 1 &lt; 2，在 [2, 4] 上单调递增 → 最小值 f(2) = 3（x = 2），最大值 f(4) = 11（x = 4）</td><td>顶点值 2 不在区间内、不可达；直接写最小值 2 是套用顶点值的典型错误，同时须说明单调性。</td></tr>
+    <tr><td class="num">9</td><td class="mono">轴 x = a：a &lt; 0 → m(a) = f(0) = 3；0 ≤ a ≤ 3 → m(a) = f(a) = 3 − a²；a &gt; 3 → m(a) = f(3) = 12 − 6a</td><td>分类依据是轴与 [0, 3] 的位置；a = 0 与 a = 3 归入中间段（两段在端点值相等）；a &gt; 3 时须写明区间上单调递减。</td></tr>
+    <tr><td class="num">10</td><td class="mono">恒成立 ⟺ m ≤ min f(x) = 2（x ∈ [0, 3]）→ m ≤ 2</td><td>把「≥」误读成用最大值 6，得 m ≤ 6 是方向性错误；写成 m &lt; 2 丢掉取等（m = 2 时仅 x = 1 取等）。</td></tr>
+    <tr class="hl"><td class="num">11</td><td class="mono">a &lt; 0 → M(a) = g(0) = 1；0 ≤ a ≤ 2 → M(a) = g(a) = a² + 1；a &gt; 2 → M(a) = g(2) = 4a − 3</td><td>开口向下（a = −1 &lt; 0），对称轴 x = a 与 [0, 2] 的位置即分类依据；a = 2 时两段相等（5 = 5），漏取等扣分。</td></tr>
+    <tr class="hl"><td class="num">12</td><td class="mono">t &lt; −1 → m(t) = f(t + 2) = t² + 2t + 3；−1 ≤ t ≤ 1 → m(t) = f(1) = 2；t &gt; 1 → m(t) = f(t) = t² − 2t + 3</td><td>m(t) ≡ 2 当且仅当 −1 ≤ t ≤ 1（轴 1 落在 [t, t + 2] 内）；t &lt; −1 段应取右端点，取错端点会写出 t² − 2t + 3。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">失分点排名（12 题自批统计）</div><p>第 8 题套用顶点值 3 次错、第 9 题漏取等 2 次错、第 12 题取错端点 2 次错，三次自批合计 7 处错。</p></div>
+    <div class="box"><div class="k">全卷换算</div><p>12 分直接进入 P9 自测；10–11 分重做错题所在小节后进入 P9；9 分（必做 1–9 全对）达达标线，补做错题即可；≤ 8 分回读 P4–P5，隔天整卷重练。</p></div>
+    <div class="box"><div class="k">挑战题加分点</div><p>第 11 题点明「轴在区间左 / 内 / 右」这一分类依据即可拿到依据段 0.5 分，不鼓励堆砌长过程。</p></div>
+  </div>
+  <div class="pf"><span>下半页结论：<b>扣分集中在套用顶点值、分类取等与端点方向三处</b>。</span><span class="mono">第 8 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="9">
+  <div class="ph">
+    <div><div class="kicker">Chapter 06 · 自测与下一阶段</div><h2 class="pt">6 项自测清单与 6 周进阶计划</h2></div>
+    <div class="note">自测达标线：6 项中 ≥ 5 项<br>第 5、6 项为硬性项，未达标即整讲未通过<br>未达标项回到对应页重读</div>
+  </div>
+  <div class="sec">A · 自测清单 <em>每项都要有可观察的动作，不打「差不多」的分</em></div>
+  <table>
+    <tr><th style="width:32px">序</th><th style="width:176px">自测项</th><th style="width:308px">达标标准</th><th style="width:80px">未达标回读</th><th>自评</th></tr>
+    <tr><td class="num">1</td><td>配方与顶点</td><td>3 分钟内用配方法写出含系数 a 的顶点式，并写出顶点坐标</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">2</td><td>轴与开口</td><td>对 2x²−8x+5 说出轴 x=2 与顶点</td><td class="num">P3</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">3</td><td>5 类区间情形</td><td>说出 5 类位置各自的最值取到处</td><td class="num">P4</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">4</td><td>两条主区间取值</td><td>[0,3] 得 2 / 6；[2,4] 得 3 / 11</td><td class="num">P5</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr><td class="num">5</td><td>必做 9 道全对</td><td>1–9 题一次做对，第 9 题取等正确</td><td class="num">P6</td><td class="gray">□ 达标　□ 未达标</td></tr>
+    <tr class="hl"><td class="num">6</td><td>参数与恒成立</td><td>说出 3 / 3−a² / 12−6a 与 m ≤ 2</td><td class="num">P8</td><td class="gray">□ 达标　□ 未达标</td></tr>
+  </table>
+  <div class="sec">B · 下一阶段：6 周进阶计划 <em>每周 3 次，每次 25 分钟</em></div>
+  <table>
+    <tr><th style="width:112px">阶段</th><th style="width:72px">周次</th><th>任务</th><th style="width:250px">可检查产出</th></tr>
+    <tr><td>含参二次函数</td><td class="num">第 1–2 周</td><td>轴含参的三类讨论，每次 2 道最小值题，共 10 道</td><td>分类讨论卷 1 份，10 题全对</td></tr>
+    <tr><td>根的分布</td><td class="num">第 3–4 周</td><td>用 Δ、端点值符号、轴位置、开口四件事判断，共 12 组</td><td>根的分布判断表 1 张（12 组）</td></tr>
+    <tr class="hl"><td>恒成立问题</td><td class="num">第 5–6 周</td><td>恒成立转化为最值（≥ 用最小、≤ 用最大），练 8 题</td><td>恒成立专题 8 题，限时 30 分钟</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">每次 25 分钟怎么分</div><p>8 分钟读概念与对照表；10 分钟做 2 道区间最值题；7 分钟核对取等条件。三段合计 25 分钟，超时就停手，不把当次的题推到下一次。</p></div>
+    <div class="box"><div class="k">未达标怎么办</div><p>第 5 项未达标先重做 P6 的 1–6 题；第 6 项未达标回读 P8 中第 9、10 题的解析行。两项都未达标时，用一次完整时段只补 P4–P5，不进入下一阶段。</p></div>
+    <div class="box"><div class="k">下一讲衔接</div><p>下一讲用同一套 4 步法处理含参二次函数在给定区间上的值域，先复用 P4 的 4 类相对位置与候选值对照表。</p></div>
+  </div>
+  <div class="pf"><span>计划结论：<b>6 周后要求含参卷 10 题全对、根的分布表 12 组、恒成立 8 题限时完成</b>。</span><span class="mono">第 9 / 10 页</span></div>
+</section>
+
+<section class="page" data-page="10">
+  <div class="ph">
+    <div><div class="kicker">Appendix · 术语表与来源</div><h2 class="pt">附录：二次函数最值术语 10 条</h2></div>
+    <div class="note">讲义 v2.0 · 2026-09 修订<br>术语按出现顺序排列</div>
+  </div>
+  <div class="sec">A · 术语表 <em>复习时只看这一列即可自查</em></div>
+  <table>
+    <tr><th style="width:150px">术语</th><th>释义</th></tr>
+    <tr><td>顶点</td><td>抛物线的最高点或最低点；x² − 2x + 3 的顶点为 (1, 2)。</td></tr>
+    <tr><td>对称轴</td><td>抛物线左右对称的竖直线，方程 x = −b/2a；本讲主线函数为 x = 1。</td></tr>
+    <tr><td>判别式</td><td>Δ = b² − 4ac，判断与 x 轴交点个数；x² − 2x + 3 的 Δ = −8 &lt; 0，无交点。</td></tr>
+    <tr><td>单调区间</td><td>函数保持递增或递减的区间；a &gt; 0 时轴左递减、轴右递增。</td></tr>
+    <tr><td>闭区间</td><td>形如 [m, n] 的区间，两端点都能取到；(m, n) 为开区间，端点取不到。</td></tr>
+    <tr><td>最值</td><td>区间上取得的最大值或最小值，须给出取等条件，如「x = 1 时取最小值 2」。</td></tr>
+    <tr><td>参变量</td><td>除自变量外出现在系数里的字母，如 x² − 2ax + 3 中的 a，需分类讨论。</td></tr>
+    <tr><td>恒成立</td><td>不等式对区间内每个 x 都成立；f(x) ≥ m 在 [0, 3] 上等价于 m ≤ 最小值 2。</td></tr>
+    <tr><td>值域</td><td>函数取值的集合；x² − 2x + 3 在 [0, 3] 上的值域为 [2, 6]，全局为 [2, +∞)。</td></tr>
+    <tr class="hl"><td>分类讨论</td><td>按轴与闭区间的相对位置（5 类）分别求最值，并写出取到时的 x 值。</td></tr>
+  </table>
+  <div class="grid3">
+    <div class="box"><div class="k">参考口径</div><p>考频口径为近 3 年模考真题 32 道，一题可计多个考点，六类合计 31 次。</p></div>
+    <div class="box"><div class="k">版本记录</div><p>v2.0 于 2026-09 扩写为 10 页：新增考频图、最值对照表与 12 题练习。</p></div>
+    <div class="box"><div class="k">使用提示</div><p>先读 P3 公式表再读 P4 配方；练习限时；P9 第 5 项未达标就不进入 P9 计划中的含参二次函数阶段。</p></div>
+  </div>
+  <div class="notes">
+    <div>本页为全讲末页；若跳过前 9 页，请至少完成 P6 的 1–6 题与 P9 自测清单的第 1、3 项。</div>
+    <div>下一讲预告：含参二次函数在给定区间上的值域与根的分布，沿用本讲的 4 步法与候选值对照表。</div>
+    <div>术语复习方法：遮住释义列，只看 10 个术语名，能口述公式与适用条件的记通过，隔天再复查一遍。</div>
+  </div>
+  <div class="pf"><span>附录用途：<b>术语表用于复习自查，参考口径用于核对数字来源</b>。</span><span class="mono">第 10 / 10 页</span></div>
+</section>
+
+</body></html>

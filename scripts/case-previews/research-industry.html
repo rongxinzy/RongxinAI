@@ -1,62 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>research-industry</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-industry</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-.serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:30px}
-.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
-.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
-.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:18px}
-h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
-.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0}
-.bars{display:grid;gap:10px;margin-top:12px}
-.bar{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
-td.mono{font-variant-numeric:tabular-nums}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
-li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
-.timeline{display:grid;gap:0;margin-top:12px}
-.tl{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
-.tl:first-child{border-top:0}
-.tl b{color:var(--accent);font-weight:600}
-.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head><body>
-<div class="sheet" style="--accent:#0F766E">
-  <div class="sheet-top">
-    <div class="kicker">Industry Research</div>
-    <h1>本地优先 AI 工具行业趋势报告</h1>
-    <div class="meta"><span>数据截至 2026 年 9 月</span><span>样本：42 家厂商 · 18 份行业报告</span></div>
-  </div>
-  <div class="body">
-    <div><h3>摘要</h3><p class="abstract">行业从"功能堆叠"转向"数据可控"。2026 年前三个季度，支持本地部署的产品在制造业与金融两个行业的采购占比从 21% 提升到 38%，交付周期与数据出境合规是采购决策的前两位因素。</p></div>
-    <div class="cols2">
-      <div><h3>细分市场规模（指数）</h3>
-        <div class="bars">
-          <div class="bar"><span>制造业</span><i style="width:92%"></i><span class="mono">92</span></div>
-          <div class="bar"><span>零售</span><i style="width:68%"></i><span class="mono">68</span></div>
-          <div class="bar"><span>金融</span><i style="width:54%"></i><span class="mono">54</span></div>
-          <div class="bar"><span>医疗</span><i style="width:31%"></i><span class="mono">31</span></div>
-          <div class="bar"><span>教育</span><i style="width:24%"></i><span class="mono">24</span></div>
-        </div>
-      </div>
-      <div><h3>趋势判断</h3>
-        <ul>
-          <li>本地推理硬件成本下降，让私有化从大客户下沉到中型团队</li>
-          <li>模型能力趋同，竞争点转向数据接入与可追溯性</li>
-          <li>合规审计要求正在变成产品的默认能力</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="sheet-foot"><span>研究方法：桌面研究 + 深度访谈</span><span>第 1 / 12 页</span></div>
-</div></body></html>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">Industry Research</div><h2>本地优先 AI 工具行业趋势报告</h2></div><div class="pn">数据截至 2026 年 9 月<br>样本：42 家厂商 · 18 份行业报告 · 31 位采购决策人</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>行业从「功能堆叠」转向「数据可控」。2026 年前三个季度，支持本地部署的产品在制造业与金融两个行业的采购金额占比从 2025 年全年的 <b>21%</b> 升至 <b>38%</b>，一年提升 17 个百分点；交付周期与数据出境合规连续两个季度位居采购决策因素前两位，功能数量与中标结果的相关性仅为 0.21。</p></div><div class="kpi"><div class="kc"><div class="k">本地部署采购占比</div><b class="n">38%</b><i>2026 Q1–Q3，2025 全年为 21%</i></div><div class="kc"><div class="k">样本规模</div><b class="n">42 家</b><i>厂商 42 · 报告 18 · 决策人 31</i></div><div class="kc"><div class="k">交付周期中位数</div><b class="n">7 周</b><i>较 2024 年 11 周缩短 4 周</i></div></div><div class="cols2"><div><h3>细分市场规模指数（制造业 = 100）</h3><div class="bars"><div class="bar"><span>制造业</span><span class=""><i class="" style="width:92%"></i></span><span class="v">92</span></div><div class="bar"><span>零售</span><span class=""><i class="" style="width:68%"></i></span><span class="v">68</span></div><div class="bar"><span>金融</span><span class=""><i class="" style="width:54%"></i></span><span class="v">54</span></div><div class="bar"><span>医疗</span><span class=""><i class="" style="width:31%"></i></span><span class="v">31</span></div><div class="bar"><span>教育</span><span class=""><i class="" style="width:24%"></i></span><span class="v">24</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></span><span></span></div></div></div><div><h3>趋势判断</h3><ul class=""><li>本地推理硬件成本下降，私有化从超大客户下沉到 50–200 人中型团队，该段合同数占比较 2024 年翻倍</li><li>模型能力趋同，竞争点转向数据接入完整度与执行过程可追溯性</li><li>合规审计要求成为产品默认能力，18 份行业报告中 14 份将其列为基础配置</li></ul></div></div><div class="cols2 eq"><div><h3>口径与来源</h3><table><thead><tr><th>项</th><th>说明</th></tr></thead><tbody><tr class=""><td>采购占比</td><td>按合同金额计算；未披露部署形态的中小厂商按纯云归档</td></tr><tr class=""><td>统计窗口</td><td>2024-01-01 – 2026-09-30，2026 Q4 未纳入</td></tr><tr class=""><td>样本来源</td><td>42 家厂商披露 + 18 份行业报告 + 31 份采购决策人问卷</td></tr></tbody></table></div><div><h3>后续页面导读</h3><ul class=""><li>第 3 页 研究问题、指标定义与已知偏差</li><li>第 4–5 页 市场全景与政策/技术/需求/供给四维拆解</li><li>第 6–7 页 关键洞察与证据、2027 年三情景推演</li><li>第 8–10 页 风险与信息缺口、结论动作、来源清单</li></ul></div></div></div>
+  <div class="pf"><span>研究方法：桌面研究 + 厂商访谈 + 采购决策人问卷 · 结论见第 9 页</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 第 1 页为可独立阅读的摘要封面<br>数据页均标注口径与时间窗</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 研究问题与口径</td><td>界定研究问题、指标定义与数据来源</td><td>4 个研究问题 · 4 项指标口径表</td><td class="n n">3</td></tr><tr class=""><td>2 市场全景</td><td>部署形态三年变化与行业分布</td><td>数据表 + 分布图 + 行业条形图</td><td class="n n">4</td></tr><tr class=""><td>3 影响因素拆解</td><td>政策 / 技术 / 需求 / 供给四维</td><td>2×2 矩阵 + 强度条形图</td><td class="n n">5</td></tr><tr class=""><td>4 关键洞察与证据</td><td>洞察逐条附证据数字</td><td>5 条洞察 · 每条 1–2 个数字</td><td class="n n">6</td></tr><tr class=""><td>5 情景与推演</td><td>2027 年占比的三种情景</td><td>情景表 + 触发条件 + 概率</td><td class="n n">7</td></tr><tr class=""><td>6 风险与信息缺口</td><td>样本偏差与口径限制</td><td>5 项风险 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 结论与建议动作</td><td>结论与分阶段动作</td><td>3 条结论 · 3 阶段动作 · 责任</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>来源清单、术语表、口径声明</td><td>5 组来源（A–E）· 5 条术语</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>如何使用本报告</h3><ul class=""><li>只看结论：读第 1 页摘要 + 第 9 页结论与动作</li><li>做决策：追加第 4 页市场全景与第 7 页情景推演</li><li>复核数据：翻到第 3 页口径表与第 10 页来源清单</li></ul></div><div><h3>置信度标注约定（按顺序判定，先满足者为准）</h3><ul class=""><li><b>高</b>：两个以上独立来源交叉校验（本报告 62% 的数据项）</li><li><b>中</b>：未达「高」，且为单一来源或样本少于 10 个（占比 31%）</li><li><b>低</b>：未达「中」，为推断值，仅用于情景推演（占比 7%）</li></ul></div></div><div><h3>篇幅与抽读方式</h3><p>第 3–8 页为分析主体共 6 页，第 9–10 页为结论与来源；每页均标注口径或证据来源，可单独抽读而不失上下文。</p></div></div>
+  <div class="pf"><span>章节页码与正文一致，正文数据截至 2026 年 9 月</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Scope & Definitions</div><h2>研究问题与数据口径</h2></div><div class="pn">口径决定结论<br>所有指标均给出定义与已知偏差</div></div>
+  <div class="pc"><div><h3>四个研究问题</h3><ul class=""><li>本地优先部署在 2026 年的实际采购占比是多少，与 2024 年基线相比变化多大？</li><li>驱动采购从云端转向本地的前三位因素是什么，权重如何？</li><li>哪些行业与客户规模段是增量来源，交付能力是否跟得上？</li><li>2027 年这一占比的合理区间与触发条件是什么？</li></ul></div><div><h3>指标口径表</h3><table><thead><tr><th>指标</th><th>定义</th><th>数据来源</th><th>已知偏差</th></tr></thead><tbody><tr class=""><td>本地部署采购占比</td><td>合同中明确要求本地或私有环境部署的合同金额 ÷ 样本合同总额</td><td>42 家厂商披露 + 31 份采购问卷</td><td>未披露部署形态的中小厂商按纯云归档，可能低估 3–5 个百分点</td></tr><tr class=""><td>细分市场规模指数</td><td>以制造业 = 100 为基准的相对规模，剔除外币汇率影响</td><td>18 份行业报告交叉校验</td><td>行业分类口径不统一，跨行业比较误差约 ±8</td></tr><tr class=""><td>交付周期中位数</td><td>合同签署到首批用户可用的周数，P95 截尾</td><td>厂商实施团队访谈（n=12）</td><td>自报数据偏乐观，实际可能长 1–2 周</td></tr><tr class=""><td>因素强度得分</td><td>31 位决策人排序加权：第一提及 3 分、第二 2 分、第三 1 分，归一化到百分制</td><td>采购决策人问卷（n=31）</td><td>样本 22 人来自华东，区域集中</td></tr></tbody></table></div><div class="cols2 eq"><div><h3>时间窗</h3><div class="tl"><div class="r"><b>2024 全年</b><span>基线年，用于计算三年变化</span></div><div class="r"><b>2025 全年</b><span>本地部署占比 21%，作为中期对照</span></div><div class="r"><b>2026 Q1–Q3</b><span>主数据窗口，占比 38%</span></div><div class="r"><b>2026-09-30</b><span>数据截止，Q4 未纳入</span></div></div></div><div><h3>不做什么</h3><ul class=""><li>不预测具体厂商份额，样本不足以支撑个体精度</li><li>不纳入海外市场，口径仅覆盖国内采购合同</li><li>不评估模型能力本身，只评估采购与交付行为</li><li>不引用未公开的内部定价，价格项以区间呈现</li></ul></div></div></div>
+  <div class="pf"><span>口径表同步用于第 4、5、7 页的全部数字 · 依据第 10 页来源清单</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Market Landscape</div><h2>部署形态三年变化与行业分布</h2></div><div class="pn">主数据窗口 2026 Q1–Q3<br>占比按合同金额口径，三年合计均为 100%</div></div>
+  <div class="pc"><div class="cols2 wide"><div><h3>部署形态占比（按合同金额）</h3><table><thead><tr><th>部署形态</th><th class="n">2024</th><th class="n">2025</th><th class="n">2026 Q1–Q3</th><th class="n">三年变化</th></tr></thead><tbody><tr class=""><td>本地优先</td><td class="n">12%</td><td class="n">21%</td><td class="n">38%</td><td class="n">+26pct</td></tr><tr class=""><td>混合（云 + 本地）</td><td class="n">24%</td><td class="n">29%</td><td class="n">31%</td><td class="n">+7pct</td></tr><tr class=""><td>纯云</td><td class="n">64%</td><td class="n">50%</td><td class="n">31%</td><td class="n">−33pct</td></tr><tr class="tot"><td>合计</td><td class="n">100%</td><td class="n">100%</td><td class="n">100%</td><td class="n">—</td></tr></tbody></table></div><div><h3>2026 Q1–Q3 结构</h3><div class="dist"><i class="" style="width:38%"></i><i class="g" style="width:31%"></i><i class="w" style="width:31%"></i></div><div class="distlab"><span>本地优先 38%</span><span>混合 31%</span><span>纯云 31%</span></div><div style="margin-top:12px"><table><thead><tr><th>交付与成本指标</th><th class="n">2024</th><th class="n">2026 Q1–Q3</th></tr></thead><tbody><tr class=""><td>交付周期中位数</td><td class="n">11 周</td><td class="n">7 周</td></tr><tr class=""><td>单次推理成本（2024 = 100）</td><td class="n">100</td><td class="n">32</td></tr><tr class=""><td>50–200 人客段合同数占比</td><td class="n">26%</td><td class="n">54%</td></tr></tbody></table></div></div></div><div><h3>重点行业本地优先采购占比</h3><div class="bars"><div class="bar"><span>制造业</span><span class=""><i class="" style="width:61%"></i></span><span class="v">61%</span></div><div class="bar"><span>金融</span><span class=""><i class="" style="width:47%"></i></span><span class="v">47%</span></div><div class="bar"><span>医疗</span><span class=""><i class="" style="width:29%"></i></span><span class="v">29%</span></div><div class="bar"><span>零售</span><span class=""><i class="" style="width:18%"></i></span><span class="v">18%</span></div><div class="bar"><span>教育</span><span class=""><i class="" style="width:12%"></i></span><span class="v">12%</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>20%</span><span>40%</span><span>60%</span><span>80%</span></span><span></span></div></div></div><div><h3>结构变化的两个驱动力</h3><table><thead><tr><th>驱动力</th><th>可观察变化</th><th>受影响行业</th><th>证据来源</th></tr></thead><tbody><tr class=""><td>端侧推理成本两年下降 68%</td><td>中型客段合同数占比 26% → 54%</td><td>制造、零售</td><td>42 家厂商披露 + 12 个项目记录</td></tr><tr class=""><td>合规要求成为基础配置</td><td>14/18 份报告把审计与留痕列为基础项</td><td>金融、医疗</td><td>18 份行业报告交叉校验</td></tr></tbody></table></div></div>
+  <div class="pf"><span>制造业与金融的本地优先采纳率最高（61% / 47%）· 数据见第 10 页来源 A1–A3</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Driver Breakdown</div><h2>政策、技术、需求、供给四维拆解</h2></div><div class="pn">四维互不独立：政策创造需求，供给限制增速<br>强度得分为 31 位决策人加权</div></div>
+  <div class="pc"><div class="mx"><div><div class="t">政策 Policy</div><p>数据出境与审计要求构成硬约束。18 份行业报告中 <b>14 份</b>把内容标识与审计留痕列为基础配置，占 78%。</p><ul class=""><li>触发条件：面向公众提供服务或处理个人信息</li><li>证据形式：留存期限 ≥ 6 个月的调用日志</li></ul></div><div><div class="t">技术 Technology</div><p>端侧推理成本两年下降 <b>68%</b>（2024 = 100 → 2026 = 32），使 50–200 人团队也能承担私有化。</p><ul class=""><li>量化与蒸馏把显存门槛降到单卡 24GB</li><li>中型团队单坐席年成本从 1.4 万降至 0.6 万</li></ul></div><div><div class="t">需求 Demand</div><p>采购决策权重前三位：数据可控 <b>76%</b>、交付周期 <b>58%</b>、总拥有成本 <b>41%</b>。</p><ul class=""><li>功能数量与中标相关性仅 0.21</li><li>安全与合规职能在 24/31 家样本中拥有一票否决权</li></ul></div><div><div class="t">供给 Supply</div><p>具备本地交付能力的厂商仅 <b>13/42</b> 家（31%），交付能力是增速上限。</p><ul class=""><li>13 家中 9 家集中在华东与华南</li><li>7 周以内交付的厂商中标率 63%，整体为 38%</li></ul></div></div><div><h3>影响因素强度得分（百分制）</h3><div class="bars"><div class="bar"><span>数据可控</span><span class=""><i class="" style="width:76%"></i></span><span class="v">76</span></div><div class="bar"><span>交付周期</span><span class=""><i class="" style="width:58%"></i></span><span class="v">58</span></div><div class="bar"><span>总拥有成本</span><span class=""><i class="" style="width:41%"></i></span><span class="v">41</span></div><div class="bar"><span>生态集成</span><span class=""><i class="" style="width:34%"></i></span><span class="v">34</span></div><div class="bar"><span>界面体验</span><span class=""><i class="" style="width:22%"></i></span><span class="v">22</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></span><span></span></div></div></div></div>
+  <div class="pf"><span>强度得分 = 第一提及 3 分 / 第二 2 分 / 第三 1 分加权 · n = 31</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Insights & Evidence</div><h2>关键洞察与证据</h2></div><div class="pn">每条洞察至少一个可追溯数字<br>证据等级标注见第 2 页约定</div></div>
+  <div class="pc"><table><thead><tr><th>#</th><th>洞察</th><th>支撑证据</th><th>证据等级</th></tr></thead><tbody><tr class=""><td>1</td><td>胜负手从功能清单转向数据可控</td><td>数据可控第一提及率 76%；功能数量与中标相关性 0.21</td><td>高</td></tr><tr class=""><td>2</td><td>中型团队是增量主战场</td><td>50–200 人客段合同数占比 26%（2024）→ 54%（2026 Q1–Q3）</td><td>高</td></tr><tr class=""><td>3</td><td>交付周期已成为可量化的竞争力</td><td>中位数 11 周 → 7 周；7 周内交付者中标率 63% vs 整体 38%</td><td>中</td></tr><tr class=""><td>4</td><td>合规从项目制变为产品制</td><td>14/18 份报告将审计与标识列为基础配置；24/31 家样本中安全职能可否决项目</td><td>高</td></tr><tr class=""><td>5</td><td>生态集成仍是普遍短板</td><td>62% 受访者仍需人工搬运跨工具数据，无统一出口</td><td>中</td></tr></tbody></table><div class="cols2 eq"><div><h3>洞察的量化含义</h3><ul class=""><li>若把交付周期从 7 周压到 5 周，按 63% 与 38% 的中标率差值测算，同等线索量下中标数约增加 <b>1.7 倍</b></li><li>中型客段客单价中位数 21.3 万元，仅为大型客段的 38%，但销售周期短 45 天</li><li>生态缺口意味着 <b>1 次/周·人</b> 的无效搬运时间，50 人团队年损失约 2600 工时</li></ul></div><div><h3>反例与边界</h3><ul class=""><li>医疗行业样本仅 4 家，其 29% 的采纳率置信区间宽（±12pct），不宜作为单一决策依据</li><li>教育行业 12% 的占比主要由预算周期驱动，与合规压力的相关性不显著</li><li>零售行业 18% 中约半数来自连锁总部的集中采购，门店侧几乎为零</li></ul></div></div><div><h3>洞察到动作的映射</h3><table><thead><tr><th>洞察</th><th>建议动作</th><th>责任角色</th><th>验证指标</th></tr></thead><tbody><tr class=""><td>1 数据可控</td><td>把数据边界做成可验证证明（形态 + 导出 + 留存）</td><td>产品 + 安全</td><td>客户侧认可率 ≥ 80%</td></tr><tr class=""><td>2 中型客段是增量</td><td>发布 50–200 人客段标准化交付包</td><td>交付</td><td>该客段合同数占比 ≥ 54%</td></tr><tr class=""><td>3 交付周期是竞争力</td><td>把交付周期中位数从 7 周压到 5 周</td><td>交付 + 工程</td><td>7 周内交付项目占比 ≥ 60%</td></tr><tr class=""><td>4 合规产品化</td><td>审计与标识纳入默认能力，不做项目定制</td><td>产品 + 法务</td><td>14 项基础能力默认开启</td></tr><tr class=""><td>5 生态集成短板</td><td>补齐 3 个高频工具的跨工具数据出口</td><td>工程</td><td>人工搬运时长下降 50%</td></tr></tbody></table></div></div>
+  <div class="pf"><span>证据等级：高 = 多来源交叉；中 = 单来源或样本 < 10；低 = 推断值</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Scenarios</div><h2>2027 年情景推演</h2></div><div class="pn">概率为 31 位决策人问卷均值，非精确预测<br>基准情景为当前趋势线性外推</div></div>
+  <div class="pc"><table><thead><tr><th>情景</th><th class="n">2027 本地优先占比</th><th>触发条件</th><th>早期信号</th><th class="n">概率</th></tr></thead><tbody><tr class=""><td>加速</td><td class="n">63%</td><td>端侧算力成本再降 ≥ 30%，或头部两家厂商把本地部署设为默认形态</td><td>中型客段合同数占比突破 65%</td><td class="n n">20%</td></tr><tr class=""><td>基准</td><td class="n">52%</td><td>维持 2025→2026 的爬升斜率，交付供给按年增 25%</td><td>季度占比环比保持 +3pct 以上</td><td class="n n">55%</td></tr><tr class=""><td>放缓</td><td class="n">34%</td><td>云端推理价格战压低切换动机，混合模式成为事实默认</td><td>混合形态占比连续两季超过本地优先</td><td class="n n">25%</td></tr></tbody></table><div><h3>关键变量的敏感度</h3><div class="bars"><div class="bar"><span>端侧算力成本 −30%</span><span class=""><i class="" style="width:63%"></i></span><span class="v">+11pct</span></div><div class="bar"><span>交付供给 +25%</span><span class=""><i class="" style="width:52%"></i></span><span class="v">基准</span></div><div class="bar"><span>云端价格 −40%</span><span class=""><i class="" style="width:34%"></i></span><span class="v">−18pct</span></div><div class="bar"><span>合规细则收紧</span><span class=""><i class="" style="width:58%"></i></span><span class="v">+6pct</span></div><div class="axis"><span></span><span class="t"><span>30%</span><span>40%</span><span>50%</span><span>60%</span><span>70%</span></span><span></span></div></div></div><div class="cols2 eq"><div><h3>推演假设</h3><ul class=""><li>假设样本客段结构不变，中型团队继续扩大占比</li><li>假设不出现颠覆性监管变化，现有合规要求延续</li><li>假设端侧硬件年降价幅度保持 15%–20%</li></ul></div><div><h3>如何证伪</h3><ul class=""><li>连续两个季度占比环比低于 +1pct，基准情景失效</li><li>13 家本地交付厂商中有 3 家以上退出该业务，供给瓶颈提前显现</li></ul></div></div><div><h3>情景概率的来源与口径</h3><p>概率为 31 位采购决策人问卷的平均值，非精确预测；若样本扩至 60 人以上，需重算概率并在第 8 页更新不确定性说明。</p></div></div>
+  <div class="pf"><span>情景非预测，用于压力测试建议动作的稳健性 · 概率均值 20/55/25</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Risks & Gaps</div><h2>风险、假设与信息缺口</h2></div><div class="pn">风险按「影响 × 概率」排序<br>缺口项标注补齐方式与时间</div></div>
+  <div class="pc"><table><thead><tr><th>风险</th><th>对结论的影响</th><th>概率</th><th>缓释动作</th></tr></thead><tbody><tr class=""><td>样本区域集中（31 人中 22 人来自华东）</td><td>区域代表性不足，结论可能偏乐观</td><td>中</td><td>2026 Q4 补华南、华北各 10 份问卷</td></tr><tr class=""><td>中小厂商未披露部署形态</td><td>本地优先占比或被低估 3–5pct</td><td>中</td><td>用交付周期与合同单价交叉推定</td></tr><tr class=""><td>行业报告分类口径不统一</td><td>细分规模指数不可直接横向比较</td><td>高</td><td>统一折算到制造业 = 100 基准重算</td></tr><tr class=""><td>交付周期为自报数据</td><td>7 周可能低估 1–2 周</td><td>中</td><td>抽查 12 个实施项目的验收记录</td></tr><tr class=""><td>合规细则可能调整</td><td>影响 2027 情景概率分布</td><td>低</td><td>每季度复核一次细则与配套指引</td></tr></tbody></table><div class="cols2 eq"><div><h3>信息缺口</h3><ul class=""><li>缺少 2026 Q4 数据，无法判断 38% 是趋势还是季度峰值</li><li>未覆盖 200 人以上企业的内部自建团队，这部分需求不可见</li><li>医疗与教育合计样本 7 家，行业级结论置信度低</li><li>海外同类产品未纳入，缺少跨境对照基线</li></ul></div><div><h3>本次成立的假设</h3><ul class=""><li>合同金额可代表采购意愿强度，虽不含实施人力成本</li><li>42 家厂商样本覆盖了国内市场约 70% 的可获得合同</li><li>决策人排序权重在季度间稳定，未随项目类型变化</li></ul></div></div><div><h3>缓释动作的责任与检查频率</h3><table><thead><tr><th>风险</th><th>缓释动作</th><th>责任角色</th><th>检查频率</th></tr></thead><tbody><tr class=""><td>样本区域集中</td><td>补华南、华北各 10 份决策人问卷</td><td>研究</td><td>2026 Q4 一次</td></tr><tr class=""><td>部署形态未披露</td><td>用交付周期与合同单价交叉推定</td><td>研究 + 数据</td><td>每季度</td></tr><tr class=""><td>行业分类口径不统一</td><td>统一折算到制造业 = 100 基准重算</td><td>数据</td><td>报告发布前</td></tr><tr class=""><td>交付周期为自报数据</td><td>抽查实施项目验收记录</td><td>交付</td><td>每季度抽查 6 个</td></tr></tbody></table></div></div>
+  <div class="pf"><span>风险未缓释前，第 7 页加速情景概率应下调至 12%</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Recommendations</div><h2>结论与建议动作</h2></div><div class="pn">结论对应第 6 页洞察<br>动作按 0–12 个月三阶段推进</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">结论一</div><b class="n">数据可控是主战场</b><i>先做可证明的数据边界，再做功能覆盖</i></div><div class="kc"><div class="k">结论二</div><b class="n">中型客段决定增速</b><i>50–200 人客段合同数占比已达 54%</i></div><div class="kc"><div class="k">结论三</div><b class="n">交付能力是瓶颈</b><i>仅 13/42 家厂商具备本地交付团队</i></div></div><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>把「数据不出本机 + 调用日志留存 ≥ 6 个月」做成默认能力并出可验证证明；交付 1 份合规自检清单（27 项）</span></div><div class="r"><b>3–6 月</b><span>针对 50–200 人客段推出标准化交付包，把交付周期从 7 周压到 5 周；补齐 3 个高频工具的跨工具数据出口</span></div><div class="r"><b>6–12 月</b><span>在制造业与金融各落地 5 家标杆，交付周期与中标率的关联在内部数据中复核一次；按季度复核合规细则</span></div></div></div><div class="cols2 eq"><div><h3>责任与交付物</h3><table><thead><tr><th>动作</th><th>负责角色</th><th>交付物</th></tr></thead><tbody><tr class=""><td>合规能力默认化</td><td>产品 + 安全</td><td>自检清单 + 证明页</td></tr><tr class=""><td>标准化交付包</td><td>交付团队</td><td>实施手册 v1 + 模板</td></tr><tr class=""><td>跨工具出口</td><td>工程</td><td>3 个连接器</td></tr></tbody></table></div><div><h3>衡量指标</h3><ul class=""><li>交付周期中位数 / 目标 ≤ 5 周</li><li>7 周内交付项目的中标率 / 目标 ≥ 60%</li><li>跨工具人工搬运时长 / 目标下降 50%</li><li>季度占比复核 / 每季 1 次，偏差 > 5pct 触发复盘</li></ul></div></div><div><h3>动作与结论的对应关系</h3><p>三个阶段动作依次对应结论一（可证明的数据边界）、结论二（50–200 人客段交付包）、结论三（交付周期与生态出口）。</p></div></div>
+  <div class="pf"><span>三阶段动作合计 12 个月，与第 7 页基准情景一致</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>参考来源与附录</h2></div><div class="pn">来源按类型编号，正文引用编号<br>不引用未公开的内部定价信息</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>来源类型</th><th>数量 / 规模</th><th>时间窗</th><th>用于正文</th></tr></thead><tbody><tr class=""><td>A1–A3</td><td>厂商公开披露与年报</td><td>42 家厂商</td><td>2024-01 – 2026-09</td><td>第 4 页部署形态占比</td></tr><tr class=""><td>B1</td><td>行业研究机构公开报告</td><td>18 份</td><td>2025-06 – 2026-09</td><td>第 4、5 页指数与合规项</td></tr><tr class=""><td>C1–C2</td><td>采购决策人问卷</td><td>31 份有效问卷</td><td>2026-07 – 2026-09</td><td>第 1、5、7 页权重与概率</td></tr><tr class=""><td>D1</td><td>实施团队访谈</td><td>12 个交付项目</td><td>2026-03 – 2026-08</td><td>第 4、6 页交付周期</td></tr><tr class=""><td>E1</td><td>公开监管文本与配套指引</td><td>3 份</td><td>2026-04 – 2026-09</td><td>第 5、8 页合规要求</td></tr></tbody></table><div class="cols2 eq"><div><h3>术语表</h3><ul class=""><li><b>本地优先</b>：默认在客户自有环境运行，云端仅作可选增强</li><li><b>混合形态</b>：核心数据本地、弹性算力云端</li><li><b>客段</b>：按坐席数划分的客户规模分组，本报告用 50–200 人段</li><li><b>P95 截尾</b>：剔除最慢 5% 样本后的中位数口径</li><li><b>证据等级</b>：高 / 中 / 低，规则见第 2 页</li></ul></div><div><h3>口径与免责声明</h3><ul class=""><li>本报告全部数字基于公开资料与自愿参与的问卷，不代表总体真值</li><li>指数类指标为相对值，不可直接与货币金额换算</li><li>情景概率为受访者主观均值，仅用于动作的稳健性检验</li><li>每季度更新一次，重大口径变更会在来源清单中标注版本号</li></ul></div></div><div><h3>来源可得性与更新频率</h3><table><thead><tr><th>来源</th><th>可得性</th><th>更新频率</th><th>复核责任</th></tr></thead><tbody><tr class=""><td>厂商披露与行业报告（A/B）</td><td>公开可得，部分需订阅</td><td>季度 / 半年</td><td>研究</td></tr><tr class=""><td>决策人问卷与实施记录（C/D）</td><td>内部采集，含客户信息</td><td>季度 / 月度</td><td>研究 + 交付</td></tr></tbody></table></div><div><h3>版本与溯源</h3><p>本页来源编号与正文引用一一对应，缺失任一来源会直接影响第 4、6、7 页的结论置信度。</p></div></div>
+  <div class="pf"><span>来源版本 v2026.09 · 下次复核 2026-12-15</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

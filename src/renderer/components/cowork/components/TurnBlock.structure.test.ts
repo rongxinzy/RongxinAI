@@ -23,9 +23,6 @@ test('settles execution counts after an answer or when the turn reaches a termin
     /const isAnswer =\s*item\.type === 'assistant' &&\s*!item\.message\.metadata\?\.isThinking &&\s*hasText\(item\.message\.content\);/,
   );
   expect(source).toContain('flush(isAnswer);');
-  expect(source).toContain(
-    'const showCompletedSummary = group.followedByAnswer || isTurnComplete || toolsSettled;',
-  );
 });
 
 test('keeps recoverable interruptions outside reasoning and exposes a resume button', () => {
@@ -51,9 +48,28 @@ test('keeps terminal errors visible outside execution summaries', () => {
 });
 
 test('renders the working indicator instead of the retired typing dots', () => {
-  expect(source).toContain('{showTypingIndicator && <WorkingIndicator />}');
+  expect(source).toContain(
+    '<WorkingIndicator showCompanion={false} animateText={false} />',
+  );
   expect(source).toContain("import { WorkingIndicator } from './WorkingIndicator';");
   expect(source).not.toContain('TypingDots');
+});
+
+test('keeps the default companion aligned with active and terminal turn outcomes', () => {
+  expect(source).toContain("import { AgentCompanion } from '../../agentCompanion/AgentCompanion';");
+  expect(source).toContain('resolveAgentCompanionState({');
+  expect(source).toContain(
+    'hasTerminalOutcome: Boolean(lastVisibleItem && isStandaloneSystemItem(lastVisibleItem))',
+  );
+  expect(source).toContain(') : !hideDefaultAssistantHeader ? (');
+  expect(source).not.toContain('className="size-9"');
+});
+
+test('places beforeCopySlot above the copy button for acceptance cards', () => {
+  // 2026/09/20 lixiang  issue #805：验收卡在复制按钮之上
+  expect(source).toContain('beforeCopySlot?: React.ReactNode');
+  expect(source).toContain('{beforeCopySlot}');
+  expect(source).toContain('hasDeliverableArtifacts || copyContent || beforeCopySlot');
 });
 
 test('keeps active tool details in the total summary without adding a child row', () => {
@@ -61,6 +77,5 @@ test('keeps active tool details in the total summary without adding a child row'
   expect(source).toContain('<ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>');
   expect(source).toContain('<ChainOfThoughtHeader icon={Wrench}>');
   expect(source).toContain('getExecutionStatusText(toolActivityStatus)');
-  expect(source).toContain('toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup');
   expect(source).not.toContain('key={`tool-activity-${latestToolActivity.toolCallId}`}');
 });

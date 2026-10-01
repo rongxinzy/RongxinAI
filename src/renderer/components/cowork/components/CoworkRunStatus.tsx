@@ -21,11 +21,9 @@ export function getRunStatusText(snapshot: CoworkRunSnapshot | undefined, now: n
 export function CoworkRunStatus({
   sessionId,
   isStreaming,
-  isDirectChat = false,
 }: {
   sessionId: string;
   isStreaming: boolean;
-  isDirectChat?: boolean;
 }) {
   const snapshot = useSelector((state: RootState) => state.coworkRun.bySession[sessionId]);
   const awaitingSince = useSelector((state: RootState) => state.coworkRun.awaitingSince[sessionId]);
@@ -45,10 +43,7 @@ export function CoworkRunStatus({
     0,
     Math.floor((now - (live?.startedAt ?? awaitingSince ?? mountedAt)) / 1_000),
   );
-  const status =
-    isDirectChat && !live
-      ? i18nService.t('coworkRunIndicatorGenerating')
-      : getRunStatusText(live, now);
+  const status = getRunStatusText(live, now);
   const clock = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
   return (
     <div

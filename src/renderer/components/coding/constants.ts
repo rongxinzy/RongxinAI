@@ -2,10 +2,13 @@ import { CodingAgentProfileStatus, type CodingWorkspaceSummary } from '../../../
 
 export const CodingUiEvent = {
   CreateSession: 'coding:create-session',
+  ManageAgents: 'coding:manage-agents',
 } as const;
 
 export interface CodingCreateSessionEventDetail {
   workspace: CodingWorkspaceSummary;
+  /** Agent to start the session with; omitted to ask the user for one. */
+  profileId?: string;
 }
 
 export const CodingAgentStatusI18nKey: Record<CodingAgentProfileStatus, string> = {
@@ -104,7 +107,6 @@ export type CodingToolPartState = (typeof CodingToolPartState)[keyof typeof Codi
 export const CodingComposerStatus = {
   Submitted: 'submitted',
   Streaming: 'streaming',
-  Error: 'error',
 } as const;
 export type CodingComposerStatus =
   (typeof CodingComposerStatus)[keyof typeof CodingComposerStatus];

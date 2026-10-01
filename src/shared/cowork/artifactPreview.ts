@@ -1,4 +1,5 @@
 import type { CoworkArtifactType } from './artifacts';
+import { ArtifactTypeByLanguage } from './artifactClassification';
 
 /**
  * Canonical file-preview policy shared by artifact discovery and the renderer.
@@ -48,6 +49,7 @@ export const ArtifactTypeByExtension = {
   '.go': 'code',
   '.rs': 'code',
   '.md': 'markdown',
+  '.markdown': 'markdown',
   '.txt': 'text',
   '.log': 'text',
   '.csv': 'document',
@@ -74,12 +76,18 @@ export const ArtifactTypeByExtension = {
   '.ppsx': 'document',
   '.ppsm': 'document',
   '.pdf': 'document',
+  // 2D CAD drawings preview in-app; BREP formats fall back to system apps.
+  '.dxf': 'document',
   '.stl': 'model',
   '.obj': 'model',
   '.gltf': 'model',
   '.glb': 'model',
   '.ply': 'model',
   '.3mf': 'model',
+  '.step': 'unsupported',
+  '.stp': 'unsupported',
+  '.iges': 'unsupported',
+  '.igs': 'unsupported',
 } as const satisfies Record<string, CoworkArtifactType>;
 
 const ARTIFACT_PREVIEW_MODE_BY_TYPE: Record<CoworkArtifactType, ArtifactPreviewMode> = {
@@ -145,6 +153,25 @@ export function getArtifactExtension(filePath: string): string {
 export function getArtifactTypeByExtension(filePath: string): CoworkArtifactType | null {
   const extension = getArtifactExtension(filePath) as keyof typeof ArtifactTypeByExtension;
   return ArtifactTypeByExtension[extension] ?? null;
+}
+
+/**
+ * Resolve the artifact preview type for a path-backed file.
+ *
+ * Known extensions are authoritative. Models frequently pass a generic
+ * `kind` such as "document" for any deliverable; trusting that over `.md` /
+ * `.stl` / `.dxf` demotes files into DocumentRenderer's open-with-app
+ * fallback and breaks in-app preview.
+ */
+export function resolveCoworkArtifactType(
+  filePath: string,
+  declaredKind?: string | null,
+): CoworkArtifactType | null {
+  const fromExtension = getArtifactTypeByExtension(filePath);
+  if (fromExtension) return fromExtension;
+
+  if (!declaredKind) return null;
+  return ArtifactTypeByLanguage[declaredKind.toLowerCase()] ?? null;
 }
 
 export function getArtifactPreviewMode(type: CoworkArtifactType): ArtifactPreviewMode {
