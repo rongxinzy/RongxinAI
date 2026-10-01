@@ -19,51 +19,11 @@ export type ExecutionStatus =
       target?: string;
     };
 
-export type ExecutionSummary = {
-  thinkingSteps: number;
-  toolCalls: number;
-  completedTools: number;
-  failedTools: number;
-  incompleteTools: number;
-};
-
 const getToolTarget = (toolName: string | undefined, toolInput: unknown): string | undefined => {
   if (!toolInput || typeof toolInput !== 'object') return undefined;
   const summary = getToolInputSummary(toolName, toolInput as Record<string, unknown>);
   if (!summary) return undefined;
   return truncatePreview(summary.replace(/\s+/g, ' ').trim(), 80);
-};
-
-export const getCurrentExecutionStatus = (items: AssistantTurnItem[]): ExecutionStatus | null => {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    const item = items[index];
-    if (item.type === 'assistant') {
-      const metadata = item.message.metadata;
-      // An empty streaming bubble carries no work: a finished turn leaves
-      // placeholders behind, and they must not keep the "thinking" state alive.
-      if (
-        metadata?.isThinking &&
-        metadata.isStreaming &&
-        !metadata.isFinal &&
-        hasText(item.message.content)
-      ) {
-        return { kind: ExecutionStatusKind.Thinking };
-      }
-      continue;
-    }
-
-    if (item.type === 'tool_group' && !item.group.toolResult) {
-      const metadata = item.group.toolUse.metadata;
-      const toolName = typeof metadata?.toolName === 'string' ? metadata.toolName : undefined;
-      return {
-        kind: ExecutionStatusKind.Tool,
-        toolName,
-        target: getToolTarget(toolName, metadata?.toolInput),
-      };
-    }
-  }
-
-  return null;
 };
 
 export const getToolActivityExecutionStatus = (activity: CoworkToolActivity): ExecutionStatus => ({
@@ -164,49 +124,4 @@ export const getExecutionStatusText = (status: ExecutionStatus): string => {
 
   const actionText = i18nService.t(getToolActionTranslationKey(status.toolName));
   return status.target ? `${actionText} ${status.target}` : actionText;
-};
-
-export const getExecutionSummary = (items: AssistantTurnItem[]): ExecutionSummary | null => {
-  const thinkingSteps = items.filter(
-    item => item.type === 'assistant' && Boolean(item.message.metadata?.isThinking),
-  ).length;
-  const toolGroups = items.filter(
-    (item): item is Extract<AssistantTurnItem, { type: 'tool_group' }> =>
-      item.type === 'tool_group',
-  );
-  if (thinkingSteps === 0 && toolGroups.length === 0) return null;
-
-  const failedTools = toolGroups.filter(group => {
-    const metadata = group.group.toolResult?.metadata;
-    return Boolean(metadata?.isError || metadata?.error);
-  }).length;
-  const incompleteTools = toolGroups.filter(group => !group.group.toolResult).length;
-
-  return {
-    thinkingSteps,
-    toolCalls: toolGroups.length,
-    completedTools: toolGroups.length - failedTools - incompleteTools,
-    failedTools,
-    incompleteTools,
-  };
-};
-
-export const getCompletedExecutionSummaryText = (summary: ExecutionSummary | null): string => {
-  if (!summary || (summary.thinkingSteps === 0 && summary.toolCalls === 0)) {
-    return i18nService.t('coworkIntermediateProcess');
-  }
-  if (summary.thinkingSteps === 0) {
-    return i18nService
-      .t('coworkExecutionCompletedToolsSummary')
-      .replace('{tools}', String(summary.toolCalls));
-  }
-  if (summary.toolCalls === 0) {
-    return i18nService
-      .t('coworkExecutionCompletedThinkingSummary')
-      .replace('{thinking}', String(summary.thinkingSteps));
-  }
-  const template = i18nService.t('coworkExecutionCompletedSummary');
-  return template
-    .replace('{thinking}', String(summary.thinkingSteps))
-    .replace('{tools}', String(summary.toolCalls));
 };

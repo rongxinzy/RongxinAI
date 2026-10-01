@@ -7,7 +7,7 @@ import { i18nService } from '../../../services/i18n';
 import type { ConversationTurn } from '../helpers/messageGrouping';
 import { TurnBlock } from './TurnBlock';
 
-test('preserves the companion DOM from waiting through streaming and completion', () => {
+test('uses a static waiting status through streaming and completion', () => {
   const turn: ConversationTurn = { id: 'stable-turn', userMessage: null, assistantItems: [] };
   const view = render(
     createElement(TurnBlock, {
@@ -17,8 +17,8 @@ test('preserves the companion DOM from waiting through streaming and completion'
       showCopyButtons: false,
     }),
   );
-  const companion = view.getByRole('img', { name: i18nService.t('agentCompanionThinkingLabel') });
-  const images = Array.from(companion.querySelectorAll('img'));
+  expect(view.queryByRole('img')).toBeNull();
+  expect(view.getByRole('status')).toHaveTextContent(i18nService.t('coworkWorkingThinking'));
   const streamingTurn: ConversationTurn = {
     ...turn,
     assistantItems: [
@@ -41,10 +41,8 @@ test('preserves the companion DOM from waiting through streaming and completion'
       showCopyButtons: false,
     }),
   );
-  expect(view.getByRole('img', { name: i18nService.t('agentCompanionThinkingLabel') })).toBe(
-    companion,
-  );
-  expect(Array.from(companion.querySelectorAll('img'))).toEqual(images);
+  expect(view.queryByRole('img')).toBeNull();
+  expect(view.getByText('Streaming answer')).toBeVisible();
   expect(view.queryByRole('status')).toBeNull();
   view.rerender(
     createElement(TurnBlock, {
@@ -53,9 +51,8 @@ test('preserves the companion DOM from waiting through streaming and completion'
       showCopyButtons: false,
     }),
   );
-  expect(view.getByRole('img', { name: i18nService.t('agentCompanionCompletedLabel') })).toBe(
-    companion,
-  );
+  expect(view.queryByRole('img')).toBeNull();
+  expect(view.queryByRole('status')).toBeNull();
 });
 
 test('keeps the companion absent when the default header is hidden', () => {

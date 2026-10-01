@@ -1121,7 +1121,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {turn.userMessage && (
             <div
               data-export-role="user-message"
-              className={isLastTurn ? 'animate-message-in' : undefined}
               {...(userRailIdx >= 0 ? { 'data-rail-index': userRailIdx } : undefined)}
             >
               <UserBubble
@@ -1134,7 +1133,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {showAssistantBlock && (
             <div
               data-export-role="assistant-block"
-              className={isLastTurn ? 'animate-message-in' : undefined}
               {...(asstRailIdx >= 0 ? { 'data-rail-index': asstRailIdx } : undefined)}
             >
               <TurnBlock

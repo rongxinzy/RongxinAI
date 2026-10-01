@@ -406,10 +406,6 @@ select::-ms-expand {
   }
 }
 
-/* Work/Chat positioning is shared; its appearance values belong to the package. */
-[data-mode='work-chat'] [data-slot='switch-thumb'] {
-  background-color: var(--zy-style-work-chat-thumb) !important;
-}
 /* Base UI select popup dimensions use runtime CSS variables. */
 [data-slot='select-content'] {
   width: var(--anchor-width) !important;
@@ -417,51 +413,18 @@ select::-ms-expand {
   transform-origin: var(--transform-origin) !important;
 }
 
-/* Work/Chat mode Switch — neutral track, transparent 3D thumb, text-driven state */
-[data-mode='work-chat'][data-slot='switch'] {
-  width: 100% !important;
-  height: 28px !important;
-}
-/* Work/Chat toggle — track color token (darker than sidebar bg-surface-raised #F0F1F4) */
-:root {
-  --work-chat-track-bg: var(--zy-style-work-chat-track);
-}
-.dark {
-  --work-chat-track-bg: var(--zy-style-work-chat-track);
-}
-
-/* Track: bordered to distinguish from sidebar bg, relative for absolute thumb */
-[data-mode='work-chat'][data-slot='switch'][data-unchecked],
-[data-mode='work-chat'][data-slot='switch'][data-checked] {
-  background-color: var(--work-chat-track-bg) !important;
-  box-shadow: var(--shadow-inset) !important;
-  border-color: var(--zy-border) !important;
-  position: relative !important;
-}
-/* Track: allow thumb overflow */
-[data-mode='work-chat'][data-slot='switch'] {
-  overflow: visible !important;
-}
-/* Thumb: glass, centered at 25%/75%, crosses track center */
+/* Work/Chat geometry belongs here; appearance and motion come from its recipe. */
 [data-mode='work-chat'] [data-slot='switch-thumb'] {
-  width: calc(50% + 4px) !important;
-  height: calc(100% + 4px) !important;
-  border-radius: var(--zy-style-work-chat-thumb-radius) !important;
-  box-shadow: var(--shadow-card) !important;
-  position: absolute !important;
-  transition: left 200ms ease !important;
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  transform: none;
 }
 [data-mode='work-chat'] [data-slot='switch-thumb'][data-unchecked] {
-  left: -2px;
-  top: -2px;
-  transform: none;
-  translate: none !important;
+  translate: 0px;
 }
 [data-mode='work-chat'] [data-slot='switch-thumb'][data-checked] {
-  left: calc(50% - 2px);
-  top: -2px;
-  transform: none;
-  translate: none !important;
+  translate: calc(100% + 4px) 0px;
 }
 
 /* Marketplace model selector: keep the five-row popup and scrollbar inside its rounded surface. */
