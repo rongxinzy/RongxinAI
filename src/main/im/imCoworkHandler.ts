@@ -1168,6 +1168,12 @@ export class IMCoworkHandler extends EventEmitter {
       case CoworkErrorKind.ToolTimeout:
       case CoworkErrorKind.MaxIterations:
         return t('imErrorExecutionLimit');
+      case CoworkErrorKind.ModelCapabilityUnsupported:
+        return t('imErrorModelCapabilityUnsupported');
+      case CoworkErrorKind.ProviderUnavailable:
+        return t('imErrorProviderUnavailable');
+      case CoworkErrorKind.StreamInterrupted:
+        return t('imErrorStreamInterrupted');
       default:
         return t('imErrorUnknown', { error: error.message });
     }

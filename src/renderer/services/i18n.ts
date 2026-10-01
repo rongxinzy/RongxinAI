@@ -2214,7 +2214,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorCouldNotProcessPdf: '无法处理 PDF 文件。请尝试将 PDF 转换为文本格式后重新发送。',
     coworkErrorModelNotFound: '请求的模型不存在或不可用，请在设置中检查模型配置。',
     coworkErrorModelCapabilityUnsupported:
-      '当前模型实际不支持图像输入（服务器缺少视觉组件）。已自动关闭该模型的图像输入能力，请重新发送消息。',
+      '当前模型不支持图像输入（服务端缺少视觉组件）。系统已尝试自动关闭该模型的图像输入能力，请重试；若仍失败请检查模型配置。',
     coworkErrorProviderUnavailable:
       '该会话使用的模型供应商已停用或模型已被移除。请到设置中重新启用供应商或切换其他模型后重试。',
     coworkErrorGatewayDisconnected: 'AI 引擎连接中断，请重试。如果问题持续，请尝试重启应用。',
@@ -6011,7 +6011,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorModelNotFound:
       'The requested model does not exist or is unavailable. Please check the model configuration in settings.',
     coworkErrorModelCapabilityUnsupported:
-      'The current model does not actually support image input (the server is missing the vision component). Image input has been disabled for this model automatically — please resend your message.',
+      'The current model does not support image input (the server is missing the vision component). Image input has been automatically disabled for this model — please try again; if it still fails, check the model configuration.',
     coworkErrorProviderUnavailable:
       'The model provider used by this session is disabled or the model has been removed. Re-enable the provider or switch to another model in Settings, then try again.',
     coworkErrorGatewayDisconnected:

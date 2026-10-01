@@ -19,6 +19,15 @@ test('llama.cpp mmproj 500 classifies as ModelCapabilityUnsupported, not ServerE
   expect(result.statusCode).toBe(500);
 });
 
+test('a bare mmproj mention without failure wording is not a capability error', () => {
+  expect(classifyCoworkError('loaded the mmproj projector in 240ms').kind).not.toBe(
+    CoworkErrorKind.ModelCapabilityUnsupported,
+  );
+  expect(classifyCoworkError('using mmproj file at /models/vision.mmproj').kind).not.toBe(
+    CoworkErrorKind.ModelCapabilityUnsupported,
+  );
+});
+
 test('capability errors from other wordings classify as ModelCapabilityUnsupported', () => {
   expect(classifyCoworkError('model does not support image input').kind).toBe(
     CoworkErrorKind.ModelCapabilityUnsupported,

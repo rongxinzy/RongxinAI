@@ -61,8 +61,11 @@ function applyDiscoveredMetadata(
     // A runtime probe (llama.cpp /props) measures the loaded model directly, so
     // its verdicts may overwrite a stale stored one — including a downgrade
     // from Supported to Unsupported. Unmarked discovery payloads keep the
-    // conservative fill-only-missing behavior.
-    const probeSourced = discovered.capabilitiesSource === DiscoveryCapabilitiesSource.RuntimeProbe;
+    // conservative fill-only-missing behavior. Entries the user edited by hand
+    // (origin "user") are never overwritten by a probe.
+    const probeSourced =
+      discovered.capabilitiesSource === DiscoveryCapabilitiesSource.RuntimeProbe &&
+      current.origin !== ProviderModelOrigin.User;
     const currentCapabilities: MutableModelCapabilities = { ...next.capabilities };
     let capabilitiesChanged = false;
     for (const key of MODEL_CAPABILITY_KEYS) {

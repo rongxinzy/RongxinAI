@@ -265,6 +265,7 @@ vi.mock('../coworkUtil', async importOriginal => {
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { t } from '../../i18n';
 import { PiDocumentReaderSystemPrompt, PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
@@ -3699,6 +3700,17 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
+    it('does not touch the image capability verdict for non-image capability errors', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('500 {"code":500,"message":"this model does not support audio input"}');
+
+      expect(hoisted.mockDisableModelImageInputCapability).not.toHaveBeenCalled();
+      listener!({ type: 'agent_settled' });
+      expect(errors[0]?.kind).toBe(CoworkErrorKind.ModelCapabilityUnsupported);
+    });
+
     it('cancels a non-retryable SDK retry and reports failure only after it settles', async () => {
       const notices: Array<{ kind: string; attempt: number }> = [];
       adapter.on('retryNotice', (_sid, notice) =>
@@ -4203,6 +4215,190 @@ describe('PiRuntimeAdapter', () => {
         await authorization;
         stallAdapter.stopAllSessions();
         db.close();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('uses a wider stall window for local providers', async () => {
+      vi.useFakeTimers();
+      // No timeout override: the default mock resolves a llamacpp local model.
+      const localAdapter = new PiRuntimeAdapter();
+      try {
+        const errors: CoworkError[] = [];
+        localAdapter.on('error', (_sessionId, error) => errors.push(error));
+
+        await localAdapter.startSession('local-stall', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+
+        // Prompt evaluation on a slow local server is silent well past the
+        // default two-minute window; that must not kill a healthy turn.
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(errors).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(480_000);
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        localAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the default stall window for hosted providers', async () => {
+      vi.useFakeTimers();
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-openai',
+          baseURL: 'https://api.openai.com/v1',
+          model: 'gpt-5',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'openai',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          modelName: 'gpt-5',
+          contextWindow: 272000,
+          contextTokens: 272000,
+          maxTokens: 16384,
+        },
+      });
+      const hostedAdapter = new PiRuntimeAdapter();
+      try {
+        const errors: CoworkError[] = [];
+        hostedAdapter.on('error', (_sessionId, error) => errors.push(error));
+
+        await hostedAdapter.startSession('hosted-stall', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+
+        await vi.advanceTimersByTimeAsync(119_000);
+        expect(errors).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        hostedAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the original error classification when the stream stalls mid-retry', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const errors: CoworkError[] = [];
+        stallAdapter.on('error', (_sessionId, error) => errors.push(error));
+        const persisted: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+        stallAdapter.setCoworkStore({
+          getSession: vi.fn(() => ({ messages: [], experts: [], mode: undefined })),
+          addMessage: vi.fn((_sessionId: string, message: { type: string }) => {
+            persisted.push(message as { type: string; metadata?: Record<string, unknown> });
+            return message;
+          }),
+          updateSession: vi.fn(),
+          updateMessage: vi.fn(),
+        } as unknown as CoworkStore);
+
+        await stallAdapter.startSession('retry-stall', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        // A transient failure Pi is about to retry, then silence.
+        listener({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [],
+            stopReason: 'error',
+            errorMessage: '429 Too Many Requests: overloaded',
+          },
+        });
+        listener({ type: 'auto_retry_start', attempt: 1 });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        // The user must see the rate limit they can act on, not a generic
+        // stream-interrupted error replacing it.
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.RateLimited);
+        // The persisted error bubble keeps the original text plus the stall fact.
+        const errorBubble = persisted.find(
+          message => message.type === 'system' && message.metadata?.error,
+        );
+        expect(errorBubble?.metadata?.error).toContain('429 Too Many Requests');
+        expect(errorBubble?.metadata?.error as string).toContain('stream stalled');
+        stallAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('rebuilds a stalled session from the full persisted history', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const getSession = vi.fn(() => ({
+          messages: [],
+          experts: [],
+          mode: undefined,
+        }));
+        stallAdapter.setCoworkStore({
+          getSession,
+          addMessage: vi.fn((_sessionId: string, message: unknown) => message),
+          updateSession: vi.fn(),
+          updateMessage: vi.fn(),
+        } as unknown as CoworkStore);
+        stallAdapter.on('error', () => {});
+
+        await stallAdapter.startSession('stall-history', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        // The rebuild must not silently page the transcript down to the last
+        // 30 messages; null asks the store for the full history.
+        expect(getSession).toHaveBeenCalledWith('stall-history', null);
+        stallAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('labels the automatic resume run with a localized goal', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+          run: { id: `run-${beginRun.mock.calls.length}` },
+        }));
+        stallAdapter.setWorkbenchTaskService({
+          beginRun,
+          updateRunContext: vi.fn(),
+          hasPendingApprovalForSession: vi.fn(() => false),
+          on: vi.fn(),
+          off: vi.fn(),
+        } as unknown as WorkbenchTaskService);
+        stallAdapter.on('error', () => {});
+
+        await stallAdapter.startSession('stall-goal', 'Move files');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(beginRun).toHaveBeenCalledTimes(2);
+        const resumeGoal = beginRun.mock.calls[1][0].goal as string;
+        expect(resumeGoal).toBe(t('workbenchStreamStallResumeGoal'));
+        expect(resumeGoal).not.toContain('stream stalled');
+        stallAdapter.stopAllSessions();
       } finally {
         vi.useRealTimers();
       }

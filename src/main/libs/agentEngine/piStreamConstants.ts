@@ -27,6 +27,8 @@ export const PiAgentEventType = {
   ToolExecutionStart: 'tool_execution_start',
   ToolExecutionEnd: 'tool_execution_end',
   AutoRetryStart: 'auto_retry_start',
+  CompactionStart: 'compaction_start',
+  CompactionEnd: 'compaction_end',
 } as const;
 
 export type PiAgentEventType = (typeof PiAgentEventType)[keyof typeof PiAgentEventType];

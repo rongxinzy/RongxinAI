@@ -434,14 +434,31 @@ async function enrichWithLlamaCppProps(
   }
   const detected = parseLlamaCppRuntimeCapabilities(payload);
   if (Object.keys(detected).length === 0) return entries;
-  // A successful /props probe is ground truth: the server just told us what
-  // the loaded model can do, so it overrides stale /v1/models claims (e.g. a
-  // sibling section declaring "multimodal" while no mmproj is loaded).
-  return entries.map(entry => ({
-    ...entry,
-    capabilities: { ...(entry.capabilities ?? {}), ...detected },
-    capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
-  }));
+  // A successful /props probe is ground truth for modalities: the server just
+  // told us what the loaded model can see, so it overrides stale /v1/models
+  // claims (e.g. a sibling section declaring "multimodal" while no mmproj is
+  // loaded). The tool verdict is different: chat_template_caps is a template
+  // heuristic that many self-hosted deployments report as false for
+  // tool-capable models, so it may only fill a gap, never override the entry.
+  const probeModalities: { -readonly [K in keyof ModelCapabilities]?: ModelCapabilities[K] } = {};
+  for (const key of ['imageInput', 'videoInput', 'audioInput'] as const) {
+    const status = detected[key];
+    if (status !== undefined) probeModalities[key] = status;
+  }
+  return entries.map(entry => {
+    const capabilities: { -readonly [K in keyof ModelCapabilities]?: ModelCapabilities[K] } = {
+      ...(entry.capabilities ?? {}),
+      ...probeModalities,
+    };
+    if (capabilities.toolCalling === undefined && detected.toolCalling !== undefined) {
+      capabilities.toolCalling = detected.toolCalling;
+    }
+    return {
+      ...entry,
+      capabilities,
+      capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
+    };
+  });
 }
 
 export async function discoverProviderModels(

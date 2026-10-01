@@ -14,7 +14,12 @@
  * no new IPC channel is added here for that.
  */
 
-import { ModelCapabilityStatus, type ProviderConfig } from '../../../shared/providers';
+import {
+  isLocalProviderName,
+  ModelCapabilityStatus,
+  ProviderRegistry,
+  type ProviderConfig,
+} from '../../../shared/providers';
 import type { SqliteStore } from '../../sqliteStore';
 
 type ProviderModelEntry = NonNullable<ProviderConfig['models']>[number];
@@ -61,15 +66,31 @@ export function disableModelImageInputCapability(
     }
 
     const models = provider.models ?? [];
-    // Case-insensitive id match, same as resolveModelEndpoint.
-    const existing = models.find(
-      model => model.id.trim().toLowerCase() === normalizedModelId.toLowerCase(),
-    );
+    // Case-insensitive id match plus registry alias resolution, same as
+    // resolveModelEndpoint: a session may run under an alias of the stored id.
+    const catalogModel = ProviderRegistry.getModel(providerName, normalizedModelId);
+    const existing = models.find(model => {
+      if (model.id.trim().toLowerCase() === normalizedModelId.toLowerCase()) return true;
+      return (
+        catalogModel !== undefined &&
+        ProviderRegistry.getModel(providerName, model.id)?.id === catalogModel.id
+      );
+    });
     if (
       existing &&
       existing.capabilities?.imageInput === ModelCapabilityStatus.Unsupported &&
       existing.supportsImage === false
     ) {
+      return { changed: false };
+    }
+
+    // Creating a minimal entry is only meaningful for providers whose model
+    // list is user-managed; for builtin providers (zhiyuan etc.) a missing
+    // entry would be a phantom row the settings page cannot reconcile.
+    if (!existing && !isLocalProviderName(providerName) && !providerName.startsWith('custom_')) {
+      console.warn(
+        `[PiCapabilityCorrection] no stored model entry for ${normalizedModelId} on builtin provider ${providerName}, skipping capability update`,
+      );
       return { changed: false };
     }
 
