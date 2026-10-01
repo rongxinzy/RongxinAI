@@ -73,6 +73,43 @@ function Invoke-Installer {
   Write-Host "[WindowsInstallerSmoke] Completed $Label in ${elapsed}s"
 }
 
+function Get-LatestRunLog {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  # The installer appends to install-timing.log across runs; assertions must
+  # only see the latest run, bounded by its phase=run-start marker.
+  $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8)
+  $lastStart = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^phase=run-start') { $lastStart = $i }
+  }
+  if ($lastStart -lt 0) { return ($lines -join "`n") }
+  return ($lines[$lastStart..($lines.Count - 1)] -join "`n")
+}
+
+function Assert-InstallDurationBudget {
+  param(
+    [Parameter(Mandatory = $true)][string]$Log,
+    [Parameter(Mandatory = $true)][string]$Label,
+    [Parameter(Mandatory = $true)][int]$BudgetSeconds
+  )
+
+  # Warn-only for now: collect real-runner numbers first, then turn the
+  # budgets into hard gates once a baseline exists.
+  if ($Log -notmatch 'phase=install-complete total_ms=(\d+)') {
+    throw "No install-complete record found for ${Label}"
+  }
+  $seconds = [math]::Round([double]$Matches[1] / 1000, 1)
+  Write-Host "[WindowsInstallerSmoke] ${Label} duration: ${seconds}s (budget ${BudgetSeconds}s)"
+  $summaryPath = $env:GITHUB_STEP_SUMMARY
+  if ($summaryPath -and (Test-Path -LiteralPath $summaryPath)) {
+    Add-Content -LiteralPath $summaryPath -Value "- ${Label} duration: ${seconds}s (budget ${BudgetSeconds}s)"
+  }
+  if ($seconds -gt $BudgetSeconds) {
+    Write-Warning "[WindowsInstallerSmoke] ${Label} exceeded its duration budget: ${seconds}s > ${BudgetSeconds}s"
+  }
+}
+
 function Wait-ForUninstallCompletion {
   param(
     [Parameter(Mandatory = $true)][string]$InstallRoot,
@@ -133,13 +170,17 @@ try {
   ) 'installed ACP registry and bundled bridge verification'
   Assert-Path $timingLog 'cold installation timing log'
 
-  $coldLog = Get-Content -LiteralPath $timingLog -Raw -Encoding UTF8
+  $coldLog = Get-LatestRunLog $timingLog
   if (($coldLog | Select-String -AllMatches 'phase=component-cache-miss ').Matches.Count -ne 7) {
     throw 'Cold installation did not expand exactly seven offline components'
+  }
+  if ($coldLog -notmatch 'phase=custom-install-start ') {
+    throw 'Cold installation did not record the application-files phase marker'
   }
   if ($coldLog -notmatch 'phase=install-complete .*component_set=ready') {
     throw 'Cold installation did not record a ready component set'
   }
+  Assert-InstallDurationBudget $coldLog 'cold installation' 300
 
   foreach ($key in $componentKeys) {
     $current = Join-Path (Join-Path $runtimeRoot $key) 'current'
@@ -154,7 +195,7 @@ try {
   Assert-Path (Join-Path $installRoot 'resources\channel-runtime\cc-connect-sidecar.exe') 'upgraded channel runtime'
   Assert-Path (Join-Path $installRoot 'resources\memory\engram.exe') 'upgraded memory runtime'
   Assert-Path $timingLog 'upgrade timing log'
-  $upgradeLog = Get-Content -LiteralPath $timingLog -Raw -Encoding UTF8
+  $upgradeLog = Get-LatestRunLog $timingLog
   if (($upgradeLog | Select-String -AllMatches 'phase=component-cache-hit ').Matches.Count -ne 7) {
     throw 'Repeated installation did not reuse exactly seven offline components'
   }
@@ -164,6 +205,7 @@ try {
   if ($upgradeLog -notmatch 'phase=install-complete .*component_set=ready') {
     throw 'Repeated installation did not record a ready component set'
   }
+  Assert-InstallDurationBudget $upgradeLog 'cache-hit upgrade' 180
 
   $uninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File)
   if ($uninstallers.Count -ne 1) {

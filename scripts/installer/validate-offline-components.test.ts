@@ -18,29 +18,34 @@ function sha256Hex(buffer: Buffer): string {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
 
-function runValidator(mode: 'cache' | 'expand', pluginDir: string, runtimeRoot: string) {
-  return spawnSync(
-    'powershell.exe',
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      scriptPath,
-      '-Mode',
-      mode,
-      '-PluginDir',
-      pluginDir,
-      '-RuntimeRoot',
-      runtimeRoot,
-      '-ComponentTargetsPath',
-      targetsPath,
-      '-SevenZipPath',
-      sevenZipPath,
-    ],
-    { encoding: 'utf8' },
-  );
+function runValidator(
+  mode: 'cache' | 'expand',
+  pluginDir: string,
+  runtimeRoot: string,
+  options: { deepAudit?: boolean } = {},
+) {
+  const args = [
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    scriptPath,
+    '-Mode',
+    mode,
+    '-PluginDir',
+    pluginDir,
+    '-RuntimeRoot',
+    runtimeRoot,
+    '-ComponentTargetsPath',
+    targetsPath,
+    '-SevenZipPath',
+    sevenZipPath,
+  ];
+  if (options.deepAudit) {
+    args.push('-DeepAudit');
+  }
+  return spawnSync('powershell.exe', args, { encoding: 'utf8' });
 }
 
 function componentId(key: string): string {
@@ -138,7 +143,7 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
     }
   });
 
-  test('cache mode measures component trees with paths longer than 260 characters', () => {
+  test('deep audit measures component trees with paths longer than 260 characters', () => {
     const fixture = makeFixture();
     expandFixture(fixture);
 
@@ -169,12 +174,31 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
     fields[3] = String(Number.parseInt(fields[3], 10) + addedBytes);
     fs.writeFileSync(completePath, fields.join('|'));
 
+    const cached = runValidator('cache', fixture.pluginDir, fixture.runtimeRoot, {
+      deepAudit: true,
+    });
+    expect(cached.status, cached.stderr || cached.stdout).toBe(0);
+    expect(cached.stdout).toContain(`cache-hit:${victim.key}`);
+  });
+
+  test('the default cache path accepts a tree with a missing non-sentinel file', () => {
+    const fixture = makeFixture();
+    expandFixture(fixture);
+
+    // Out-of-band tampering (a deleted payload file) is what the deep audit
+    // exists for; the default path must stay cheap and accept the component,
+    // because re-walking every file on every upgrade costs minutes with
+    // real-time scanners enabled.
+    const victim = fixture.targets[1];
+    const victimDir = targetDir(fixture, victim.key);
+    fs.rmSync(path.join(victimDir, victim.prefix, 'extra.txt'));
+
     const cached = runValidator('cache', fixture.pluginDir, fixture.runtimeRoot);
     expect(cached.status, cached.stderr || cached.stdout).toBe(0);
     expect(cached.stdout).toContain(`cache-hit:${victim.key}`);
   });
 
-  test('cache mode rejects a component tree left incomplete by an interrupted move', () => {
+  test('deep audit rejects a component tree left incomplete by an interrupted move', () => {
     const fixture = makeFixture();
     expandFixture(fixture);
 
@@ -182,7 +206,9 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
     const victimDir = targetDir(fixture, victim.key);
     fs.rmSync(path.join(victimDir, victim.prefix, 'extra.txt'));
 
-    const cached = runValidator('cache', fixture.pluginDir, fixture.runtimeRoot);
+    const cached = runValidator('cache', fixture.pluginDir, fixture.runtimeRoot, {
+      deepAudit: true,
+    });
     expect(cached.status).toBe(0);
     expect(cached.stdout).not.toContain(`cache-hit:${victim.key}`);
     expect(cached.stdout).toContain(`cache-hit:${fixture.targets[0].key}`);
