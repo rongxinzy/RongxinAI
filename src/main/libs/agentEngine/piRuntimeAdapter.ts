@@ -168,6 +168,7 @@ import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
 import { prependWorkbenchTaskBoundary } from './piWorkbenchTaskBoundary';
+import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
 import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
@@ -263,6 +264,7 @@ interface PiUsage {
 }
 
 interface PiEvent {
+  displayResultText?: string;
   type: string;
   success?: boolean;
   attempt?: number;
@@ -297,6 +299,7 @@ interface PiEvent {
 }
 
 interface ActivePiSession {
+  eventProjection?: PiEventProjectionQueue<PiEvent>;
   sessionId: string;
   piSession: PiSession;
   abortController: AbortController;
@@ -1383,6 +1386,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       };
       activeSession = active;
 
+      // Session ownership stays on main; display transforms preserve SDK event order.
+      active.eventProjection = new PiEventProjectionQueue<PiEvent>(
+        event => this.handlePiEvent(sessionId, active, event),
+        abortController.signal,
+        error => console.error('[PiRuntime] event projection failed:', error),
+      );
       console.debug(
         `[PiRuntime] Pi session created for ${sessionId} in ${piSessionCreatedAt - piSessionCreateStartedAt}ms`,
       );
@@ -1392,7 +1401,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (abortController.signal.aborted || this.activeSessions.get(sessionId) !== active) {
           return;
         }
-        this.handlePiEvent(sessionId, active, event);
+        this.emit('executionEvent', sessionId, event);
+        active.eventProjection?.push(event);
       });
 
       if (!isCurrentInitialization()) {
@@ -1452,6 +1462,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.capabilities,
         undefined,
       );
+      await active.eventProjection?.drain();
       await active.completionPending;
     } catch (error) {
       // A stopped turn can immediately restart from the first queued follow-up.
@@ -1801,6 +1812,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.capabilities,
         options._streamingBehavior,
       );
+      await active.eventProjection?.drain();
       await active.completionPending;
     } catch (error) {
       active.isRunning = false;
@@ -3171,7 +3183,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (removeActivity) this.emit('toolActivity', sessionId, removeActivity);
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
-        const resultText = extractToolResultText(event.result);
+        const resultText = event.displayResultText ?? '';
         const resultIsError = Boolean(event.isError) || extractToolResultIsError(event.result);
         agentResourceDiagnostics.recordPiToolResult(sessionId, resultText.length * 2);
         if (active.workbenchRunId) {
@@ -4333,30 +4345,6 @@ function toToolInputRecord(args: unknown): Record<string, unknown> {
   }
   if (args === undefined || args === null) return {};
   return { value: args };
-}
-
-/** Extract a display string from a Pi tool result (string, {text}, array of blocks, or JSON). */
-function extractToolResultText(result: unknown): string {
-  if (result === undefined || result === null) return '';
-  if (typeof result === 'string') return result;
-  if (Array.isArray(result)) {
-    return result
-      .map(b => extractToolResultText(b))
-      .filter(Boolean)
-      .join('\n');
-  }
-  if (typeof result === 'object') {
-    const obj = result as Record<string, unknown>;
-    if (typeof obj.text === 'string') return obj.text;
-    if (typeof obj.content === 'string') return obj.content;
-    if (Array.isArray(obj.content)) return extractToolResultText(obj.content);
-    try {
-      return JSON.stringify(obj);
-    } catch {
-      return String(result);
-    }
-  }
-  return String(result);
 }
 
 function extractToolResultIsError(result: unknown): boolean {

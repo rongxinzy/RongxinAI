@@ -1,3 +1,4 @@
+import { runTextWorkerOperation } from './textWorkerOperations';
 import { parentPort } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { collectWorkbenchArtifacts } from './artifactCollector';
@@ -7,7 +8,12 @@ import type { ArtifactWorkerInput } from './artifactWorkerTypes';
 parentPort?.on('message', (job: ArtifactWorkerInput) => {
   const startedAt = performance.now();
   try {
-    if (job.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
+    if (job.kind === ArtifactWorkerTask.TransformText) {
+      parentPort?.postMessage({
+        text: runTextWorkerOperation(job.input),
+        runMs: performance.now() - startedAt,
+      });
+    } else if (job.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
       if (
         !(job.input.bytes instanceof ArrayBuffer) ||
         job.input.bytes.byteLength > ArtifactWorkerLimit.WorkspaceContentBytes
@@ -24,6 +30,8 @@ parentPort?.on('message', (job: ArtifactWorkerInput) => {
         runMs: performance.now() - startedAt,
       });
     } else {
+      if (Buffer.byteLength(JSON.stringify(job.input)) > ArtifactWorkerLimit.InputBytes)
+        throw new Error('Artifact collection input limit exceeded.');
       const artifacts = collectWorkbenchArtifacts(job.input);
       parentPort?.postMessage({ artifacts, runMs: performance.now() - startedAt });
     }

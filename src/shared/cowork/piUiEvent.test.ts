@@ -1,10 +1,41 @@
 import { expect, test } from 'vitest';
+import { CoworkRunPolicy } from './runState';
 import {
   isPiUiEvent,
   PiUiEventSequenceTracker,
   PiUiEventSequencer,
   PiUiEventType,
 } from './piUiEvent';
+
+test('content patches share the canonical event sequence and validate bounded payloads', () => {
+  const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
+  const event = sequencer.next({
+    type: PiUiEventType.ContentPatch,
+    sessionId: 'a',
+    patch: {
+      sessionId: 'a',
+      messageId: 'm',
+      revision: 1,
+      baseRevision: 0,
+      offset: 0,
+      content: 'text',
+      totalLength: 4,
+      complete: true,
+      truncated: false,
+    },
+  });
+  if (event.type !== PiUiEventType.ContentPatch) throw new Error('Expected content patch');
+  expect(isPiUiEvent(event)).toBe(true);
+  expect(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'a' }).sequence).toBe(2);
+  expect(isPiUiEvent({ ...event, patch: { ...event.patch, sessionId: 'b' } })).toBe(false);
+  expect(isPiUiEvent({ ...event, patch: { ...event.patch, offset: -1 } })).toBe(false);
+  expect(
+    isPiUiEvent({
+      ...event,
+      patch: { ...event.patch, content: 'x'.repeat(CoworkRunPolicy.ContentChunkCharacters + 1) },
+    }),
+  ).toBe(false);
+});
 
 test('sequences events independently per session and globally for dismissals', () => {
   let id = 0;

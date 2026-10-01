@@ -1,4 +1,5 @@
 import { TOKEN_CONTRACT } from '../tokens/contract';
+import { runIndicatorSelectors } from './run-indicator';
 import { LOGO_LOADING_SELECTORS } from './logo-loading-contract';
 import { CODING_SIDEBAR_SELECTORS } from './coding-sidebar-contract';
 const appearanceVariables = new Set<string>([
@@ -126,6 +127,7 @@ export const COMPONENT_SELECTORS = {
   'avatar-outline-blend': '.theme-avatar::after',
   'avatar-badge-blend': '.theme-avatar-badge',
   spinner: '.theme-spinner',
+  ...runIndicatorSelectors,
   'field-legend': '.theme-field-legend',
   'field-legend-label': '.theme-field-legend[data-variant="label"]',
   'field-legend-heading': '.theme-field-legend[data-variant="legend"]',

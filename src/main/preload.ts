@@ -49,6 +49,7 @@ import type {
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../shared/cowork/constants';
+import type { CoworkRunSnapshot, CoworkContentPatch } from '../shared/cowork/runState';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
@@ -354,7 +355,7 @@ contextBridge.exposeInMainWorld('electron', {
     showSystemMenu: (position: { x: number; y: number }) =>
       ipcRenderer.send(WindowIpc.ShowSystemMenu, position),
     toggleDevTools: () => ipcRenderer.invoke(WindowIpc.ToggleDevTools), // 切换调试面板
-    openDevTools: () => ipcRenderer.invoke(WindowIpc.OpenDevTools), 
+    openDevTools: () => ipcRenderer.invoke(WindowIpc.OpenDevTools),
     onStateChanged: (
       callback: (state: {
         isMaximized: boolean;
@@ -433,6 +434,9 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   cowork: {
+    getRunSnapshot: (sessionId: string, replayContent = false) => ipcRenderer.invoke(CoworkSessionIpc.RunSnapshot, sessionId, replayContent),
+    onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) => onPush(CoworkStreamIpc.RunState, callback),
+    onStreamContentPatch: (callback: (patch: CoworkContentPatch) => void) => onPush(CoworkStreamIpc.ContentPatch, callback),
     listWorkspaces: () => ipcRenderer.invoke(WorkspaceIpc.List),
     createWorkspace: (options: { path: string; name: string }) =>
       ipcRenderer.invoke(WorkspaceIpc.Create, options),
