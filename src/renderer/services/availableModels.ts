@@ -8,6 +8,7 @@ import {
   createProviderConnectionTestSignature,
   isCurrentModelAvailableTest,
   isProviderEnabled,
+  ModelCapabilityStatus,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -71,11 +72,22 @@ export function buildConfiguredAvailableModels(
         return;
       }
 
-      const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+      const toggleSupportsImage = ProviderRegistry.resolveModelSupportsImage(
         providerName,
         model.id,
         model.supportsImage,
       );
+      const capabilities = ProviderRegistry.resolveModelCapabilities(
+        providerName,
+        model.id,
+        effectiveApiFormat,
+        { ...model, supportsImage: toggleSupportsImage },
+      );
+      // The endpoint layer treats an explicit imageInput capability as
+      // authoritative over a stale persisted toggle; the cowork attach gate
+      // follows the same verdict so UI gating cannot diverge from requests.
+      const supportsImage =
+        capabilities.imageInput === ModelCapabilityStatus.Supported ? true : toggleSupportsImage;
       models.push({
         id: model.id,
         name: model.name,
@@ -83,12 +95,7 @@ export function buildConfiguredAvailableModels(
         providerKey: providerName,
         agentProviderId: ProviderRegistry.getAgentProviderId(providerName),
         supportsImage,
-        capabilities: ProviderRegistry.resolveModelCapabilities(
-          providerName,
-          model.id,
-          effectiveApiFormat,
-          { ...model, supportsImage },
-        ),
+        capabilities,
         contextWindow:
           model.contextWindow ?? ('contextTokens' in model ? model.contextTokens : undefined),
       });
