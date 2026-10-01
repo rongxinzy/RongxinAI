@@ -28,6 +28,8 @@ import type {
   CoworkPermissionResult,
 } from '../../../types/cowork';
 import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
+import { AgentCompanion } from '../../agentCompanion/AgentCompanion';
+import { resolveAgentCompanionState } from '../../agentCompanion/constants';
 import {
   ExecutionStatusKind,
   getCompletedExecutionSummaryText,
@@ -103,6 +105,8 @@ const TurnBlockComponent: React.FC<{
   onRespondToPermission?: (result: CoworkPermissionResult) => void
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
+  /** 2026/09/20 lixiang  验收卡插在文件卡片与复制按钮之间（issue #805） */
+  beforeCopySlot?: React.ReactNode;
 }> = ({
   turn,
   artifacts,
@@ -120,11 +124,12 @@ const TurnBlockComponent: React.FC<{
   pendingPermission = null,
   onRespondToPermission,
   expandToolResults = false,
+  beforeCopySlot = null,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
   const primaryExpert = getTurnPrimaryExpert(turn);
-
-  const showAssistantHeader = Boolean(primaryExpert) || !hideDefaultAssistantHeader;
+  const renderActiveStatusText = (text: string) =>
+    primaryExpert ? <Shimmer duration={1}>{text}</Shimmer> : <span>{text}</span>;
 
   // 2026/09/16 lixiang  只把授权挂到匹配到的那一个正在执行的工具上
   const pendingToolGroup =
@@ -243,6 +248,7 @@ const TurnBlockComponent: React.FC<{
       const { durationSeconds, isComplete, isStreaming } = getThinkingPresentation(
         meta,
         forceComplete,
+        hasText(item.message.content),
       );
       const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
@@ -259,7 +265,7 @@ const TurnBlockComponent: React.FC<{
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
               if (isComplete) return <p>{d ? `已思考 ${d} 秒` : '思考完成'}</p>;
-              if (s) return <Shimmer duration={1}>思考中…</Shimmer>;
+              if (s) return renderActiveStatusText('思考中…');
               return <p>思考内容</p>;
             }}
           />
@@ -392,6 +398,17 @@ const TurnBlockComponent: React.FC<{
       ? visibleAssistantItems[finalAnswerIndex]
       : null;
   const standaloneSystemItems = visibleAssistantItems.filter(isStandaloneSystemItem);
+  const lastVisibleItem = visibleAssistantItems[visibleAssistantItems.length - 1];
+  const defaultCompanionState = resolveAgentCompanionState({
+    isTurnComplete,
+    hasAssistantAnswer: visibleAssistantItems.some(
+      item =>
+        item.type === 'assistant' &&
+        !item.message.metadata?.isThinking &&
+        hasText(item.message.content),
+    ),
+    hasTerminalOutcome: Boolean(lastVisibleItem && isStandaloneSystemItem(lastVisibleItem)),
+  });
   const executionItems =
     finalAnswerIndex >= 0
       ? visibleAssistantItems.filter(
@@ -404,15 +421,47 @@ const TurnBlockComponent: React.FC<{
     ? getToolActivityExecutionStatus(latestToolActivity)
     : null;
   const lastVisibleGroup = visibleGroups[visibleGroups.length - 1];
-  const lastVisibleGroupFirstItem = lastVisibleGroup?.items[0];
+  // A group whose tools already produced results (or whose turn ended) shows a
+  // settled summary instead of a live status; everything else renders a
+  // shimmering "running" header.
+  const isSummarizedGroup = (group: (typeof groups)[number]): boolean =>
+    group.followedByAnswer ||
+    isTurnComplete ||
+    (group.items.some(item => item.type === 'tool_group') &&
+      group.items.every(item => item.type !== 'tool_group' || Boolean(item.group.toolResult)));
+  // Answer-led groups render through renderItem and own no header.
+  const isAnswerLeadingGroup = (group: (typeof groups)[number]): boolean => {
+    const first = group.items[0];
+    return (
+      (first?.type === 'assistant' && !first.message.metadata?.isThinking) ||
+      Boolean(first && isStandaloneSystemItem(first))
+    );
+  };
+  const isRunningThinkingItem = (item: (typeof visibleAssistantItems)[number]): boolean =>
+    item.type === 'assistant' &&
+    Boolean(item.message.metadata?.isThinking) &&
+    getThinkingPresentation(item.message.metadata, false, hasText(item.message.content)).isStreaming;
   const hasTrailingExecutionGroup = Boolean(
-    lastVisibleGroupFirstItem &&
-    !(
-      lastVisibleGroupFirstItem.type === 'assistant' &&
-      !lastVisibleGroupFirstItem.message.metadata?.isThinking
-    ) &&
-    !isStandaloneSystemItem(lastVisibleGroupFirstItem),
+    lastVisibleGroup &&
+    lastVisibleGroup.items.length > 0 &&
+    !isAnswerLeadingGroup(lastVisibleGroup),
   );
+  // The bottom tool indicator renders only for a trailing answer group; the
+  // summary row must not defer to an indicator that is suppressed, otherwise a
+  // preparing tool leaves the screen with nothing animating.
+  const showTrailingToolStatus =
+    toolActivityStatus !== null && !finalAnswerItem && !hasTrailingExecutionGroup;
+  const hasLiveGroup = visibleGroups.some(
+    group => !isAnswerLeadingGroup(group) && !isSummarizedGroup(group),
+  );
+  // At most one cyclic animation may be on screen per DESIGN.md. The collapsed
+  // "completed N steps" row is the fallback activity signal: a stalled turn has
+  // nothing else moving, so it shimmers only when no other indicator is rendered.
+  const summaryIsActive =
+    !isTurnComplete && !showTypingIndicator && !showTrailingToolStatus && !hasLiveGroup;
+  // The fallback belongs to the last group that renders a summary header: a
+  // trailing interim answer renders plainly and must not silence it.
+  const lastSummaryGroup = [...visibleGroups].reverse().find(group => !isAnswerLeadingGroup(group));
 
   const isExecutionStep = (item: (typeof visibleAssistantItems)[number] | undefined) =>
     item?.type === 'tool_group' ||
@@ -433,10 +482,7 @@ const TurnBlockComponent: React.FC<{
 
     // A turn that has ended, or a group whose tools already have results, never
     // keeps a live "正在执行命令" header. Resume only highlights the new command.
-    const toolsSettled =
-      group.items.some(item => item.type === 'tool_group') &&
-      group.items.every(item => item.type !== 'tool_group' || Boolean(item.group.toolResult));
-    const showCompletedSummary = group.followedByAnswer || isTurnComplete || toolsSettled;
+    const showCompletedSummary = isSummarizedGroup(group);
     const currentStatus = showCompletedSummary ? null : getCurrentExecutionStatus(group.items);
     const isActiveTool = currentStatus?.kind === ExecutionStatusKind.Tool;
     return (
@@ -452,16 +498,29 @@ const TurnBlockComponent: React.FC<{
               item.type === 'tool_group' && item.group.toolUse.id === pendingToolGroup.toolUse.id,
           ),
         )}
+        renderHeader={isOpen => (
+          <ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>
+            {showCompletedSummary ? (
+              summaryIsActive &&
+              group === lastSummaryGroup &&
+              // When the block is open and its reasoning still streams, the inner
+              // "思考中" indicator already animates; the header yields to it so a
+              // single cyclic animation is on screen.
+              (!isOpen || !group.items.some(isRunningThinkingItem)) ? (
+                renderActiveStatusText(
+                  getCompletedExecutionSummaryText(getExecutionSummary(group.items)),
+                )
+              ) : (
+                getCompletedExecutionSummaryText(getExecutionSummary(group.items))
+              )
+            ) : currentStatus ? (
+              renderActiveStatusText(getExecutionStatusText(currentStatus))
+            ) : (
+              renderActiveStatusText(i18nService.t('coworkIntermediateProcess'))
+            )}
+          </ChainOfThoughtHeader>
+        )}
       >
-        <ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>
-          {showCompletedSummary ? (
-            getCompletedExecutionSummaryText(getExecutionSummary(group.items))
-          ) : currentStatus ? (
-            <Shimmer duration={1}>{getExecutionStatusText(currentStatus)}</Shimmer>
-          ) : (
-            <Shimmer duration={1}>{i18nService.t('coworkIntermediateProcess')}</Shimmer>
-          )}
-        </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
           {group.items.map((item, idx) =>
             renderItem(item, idx, false, false, true, idx === group.items.length - 1),
@@ -494,27 +553,38 @@ const TurnBlockComponent: React.FC<{
 
   return (
     <div className="py-2">
-      <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
+      {/* 2026/09/20 lixiang  对话列加宽，缓解代码块/表格过窄（issue #805） */}
+      <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 py-3">
-            {showAssistantHeader && (
+            {primaryExpert ? (
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                {primaryExpert ? (
-                  <>
-                    <ExpertAvatar
-                      name={primaryExpert.presetId}
-                      label={primaryExpert.expertName}
-                      className="size-7 rounded-full border-0"
-                    />
-                    <span className="truncate">{primaryExpert.expertName}</span>
-                  </>
+                <ExpertAvatar
+                  name={primaryExpert.presetId}
+                  label={primaryExpert.expertName}
+                  className="size-7 rounded-full border-0"
+                />
+                <span className="truncate">{primaryExpert.expertName}</span>
+              </div>
+            ) : !hideDefaultAssistantHeader ? (
+              <div className="flex items-center gap-2">
+                <AgentCompanion state={defaultCompanionState} />
+                {showTypingIndicator ? (
+                  <WorkingIndicator showCompanion={false} animateText={false} />
                 ) : (
-                  <span>{i18nService.t('cowork')}</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {i18nService.t('cowork')}
+                  </span>
                 )}
               </div>
-            )}
+            ) : null}
             {finalAnswerItem && executionItems.length > 0 && (
-              <ExecutionSummary summary={executionSummary} persistKey={`execsummary-${turn.id}`}>
+              <ExecutionSummary
+                summary={executionSummary}
+                persistKey={`execsummary-${turn.id}`}
+                // Matches the live status rows: they only shimmer for expert turns.
+                active={summaryIsActive && primaryExpert !== undefined}
+              >
                 {executionItems.map((item, index) => {
                   const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
                   const connectsToNextStep =
@@ -533,16 +603,19 @@ const TurnBlockComponent: React.FC<{
                 renderExecutionGroup(group, `turn-group-${index}`, index === lastAnswerGroupIndex),
               )
             )}
-            {toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup && (
+            {showTrailingToolStatus && (
               <ChainOfThought key="transient-working-summary" defaultOpen={false}>
                 <ChainOfThoughtHeader icon={Wrench}>
-                  <Shimmer duration={1}>{getExecutionStatusText(toolActivityStatus)}</Shimmer>
+                  {renderActiveStatusText(getExecutionStatusText(toolActivityStatus))}
                 </ChainOfThoughtHeader>
               </ChainOfThought>
             )}
-            {showTypingIndicator && <WorkingIndicator />}
+            {showTypingIndicator && (primaryExpert || hideDefaultAssistantHeader) && (
+              <WorkingIndicator showCompanion={false} />
+            )}
             {/* 2026/09/17 lixiang  文件卡片与复制按钮上下间距收紧 */}
-            {(hasDeliverableArtifacts || copyContent) && (
+            {/* 2026/09/20 lixiang  验收卡在复制按钮之上（issue #805） */}
+            {(hasDeliverableArtifacts || copyContent || beforeCopySlot) && (
               <div className="-mt-1 flex flex-col gap-1">
                 {hasDeliverableArtifacts && artifacts && (
                   <div className="flex flex-wrap gap-2">
@@ -555,6 +628,7 @@ const TurnBlockComponent: React.FC<{
                       ))}
                   </div>
                 )}
+                {beforeCopySlot}
                 {copyContent && (
                   <div className="flex items-center gap-1">
                     <CopyButton content={copyContent} visible />

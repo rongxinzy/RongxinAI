@@ -27,7 +27,6 @@ import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig } from './config';
 import { agentService } from './services/agent';
-import { apiService } from './services/api';
 import {
   collectAvailableModels,
   getManagedProviderAccessPolicy,
@@ -128,6 +127,10 @@ const App: React.FC = () => {
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
+  const [isLocalInferenceDormant, setIsLocalInferenceDormant] = useState(false);
+  // 2026/09/21 lixiang  keep-alive 视图隐藏超过该时长后真正卸载以释放内存，
+  // 回到视图时重挂载（activeTab 等会话状态经 localStorage 恢复）。
+  const LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS = 10 * 60 * 1000;
   const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -234,11 +237,6 @@ const App: React.FC = () => {
         mark('configService.init done');
 
         const config = configService.getConfig();
-        apiService.setConfig({
-          apiKey: config.api.key,
-          baseUrl: config.api.baseUrl,
-        });
-
         themeService.initialize();
         mark('themeService done');
 
@@ -322,11 +320,6 @@ const App: React.FC = () => {
     };
 
     const handleConfigUpdated = () => {
-      const config = configService.getConfig();
-      apiService.setConfig({
-        apiKey: config.api.key,
-        baseUrl: config.api.baseUrl,
-      });
       void refreshAvailableModels().catch(() => undefined);
     };
     const handleLlamaCppRunningModelsChanged = () => {
@@ -339,6 +332,9 @@ const App: React.FC = () => {
         .then(() => notifyLlamaCppRunningModelsChanged())
         .catch(() => undefined);
     };
+    const handleManagedProvidersChanged = () => {
+      void refreshAvailableModels().catch(() => undefined);
+    };
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
@@ -348,6 +344,9 @@ const App: React.FC = () => {
     window.addEventListener(ZhiyuanModelPoolEvent.AuthChanged, handleLlamaCppRunningModelsChanged);
     const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
       handleLlamaCppModelBindingsChanged,
+    );
+    const unsubscribeManagedProviders = window.electron.managedProviders.onChanged(
+      handleManagedProvidersChanged,
     );
     return () => {
       window.removeEventListener('config-updated', handleConfigUpdated);
@@ -360,6 +359,7 @@ const App: React.FC = () => {
         handleLlamaCppRunningModelsChanged,
       );
       unsubscribeModelBindings();
+      unsubscribeManagedProviders();
     };
   }, [dispatch, isInitialized]);
 
@@ -397,8 +397,18 @@ const App: React.FC = () => {
   useEffect(() => {
     if (mainView === 'localInference') {
       setHasMountedLocalInference(true);
+      setIsLocalInferenceDormant(false);
+      return;
     }
-  }, [mainView]);
+    // 视图切走后仍保留 keep-alive 渲染一小段时间（快速往返不闪加载态），
+    // 超时后置为休眠：卸载组件树、释放 CodeMirror/图标/模型列表等内存；
+    // 进行中的运行时安装不依赖本视图存活（进度挂在主进程，重挂载可恢复）。
+    if (!hasMountedLocalInference) return;
+    const timer = window.setTimeout(() => {
+      setIsLocalInferenceDormant(true);
+    }, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [mainView, hasMountedLocalInference, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS]);
 
   useEffect(() => {
     if (!managedProviderPolicy || managedModelsOnly) return;
@@ -441,7 +451,9 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isInitialized || !defaultSelectedModel?.id) return;
+    // In exclusive managed mode the host bridge owns model.defaultModel in app_config;
+    // writing the renderer selection back would race its refresh loop.
+    if (!isInitialized || managedModelsOnly || !defaultSelectedModel?.id) return;
     const config = configService.getConfig();
     if (
       config.model.defaultModel === defaultSelectedModel.id &&
@@ -456,7 +468,7 @@ const App: React.FC = () => {
         defaultModelProvider: defaultSelectedModel.providerKey,
       },
     });
-  }, [isInitialized, defaultSelectedModel?.id, defaultSelectedModel?.providerKey]);
+  }, [isInitialized, managedModelsOnly, defaultSelectedModel?.id, defaultSelectedModel?.providerKey]);
 
   const handleShowSettings = useCallback((options?: SettingsOpenOptions) => {
     setSettingsOptions({
@@ -548,25 +560,32 @@ const App: React.FC = () => {
     setIsSidebarCollapsed(prev => !prev);
   }, []);
 
-  const openNewConversation = useCallback(() => {
-    // Only clear when already on home (no session) 鈥?preserve __home__ draft when returning from a session
-    const shouldClearInput = mainView === 'cowork' && !currentSessionId;
-    if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
-    coworkService.clearSession();
-    dispatch(clearSelection());
-    setMainView('cowork');
-    window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent('cowork:focus-input', {
-          detail: { clear: shouldClearInput },
-        }),
-      );
-    }, 0);
-  }, [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView]);
+  const openNewConversation = useCallback(
+    (options?: { clearExperts?: boolean }) => {
+      // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
+      const shouldClearInput = mainView === 'cowork' && !currentSessionId;
+      if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
+      coworkService.clearSession();
+      dispatch(clearSelection());
+      setMainView('cowork');
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('cowork:focus-input', {
+            detail: {
+              clear: shouldClearInput,
+              // New-chat entry clears the prompt expert chip; expert-page entry omits this so #100 can seed.
+              clearExperts: options?.clearExperts === true,
+            },
+          }),
+        );
+      }, 0);
+    },
+    [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView],
+  );
 
   const handleNewChat = useCallback(() => {
     dispatch(clearActiveSkills());
-    openNewConversation();
+    openNewConversation({ clearExperts: true });
   }, [dispatch, openNewConversation]);
 
   const handleTryMcp = useCallback(
@@ -728,10 +747,6 @@ const App: React.FC = () => {
   const handleCloseSettings = () => {
     setShowSettings(false);
     const config = configService.getConfig();
-    apiService.setConfig({
-      apiKey: config.api.key,
-      baseUrl: config.api.baseUrl,
-    });
     void collectAvailableModels(config)
       .then(allModels => {
         dispatch(setAvailableModels(allModels));
@@ -953,7 +968,7 @@ const App: React.FC = () => {
               data-main-canvas
               className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]"
             >
-              {hasMountedLocalInference && !managedModelsOnly && (
+              {hasMountedLocalInference && !isLocalInferenceDormant && !managedModelsOnly && (
                 <div
                   className={
                     mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'

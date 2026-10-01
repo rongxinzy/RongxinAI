@@ -66,6 +66,39 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(validatorScript).toContain('Stop-WithCode 2 "hash-mismatch:$($component.Key)"');
   });
 
+  test('measures component trees with long-path-safe enumeration', () => {
+    const validatorScript = fs.readFileSync(offlineComponentValidatorPath, 'utf8');
+
+    // Get-ChildItem is not long-path aware under Windows PowerShell 5.1 and
+    // throws DirectoryNotFoundException on trees deeper than 260 characters,
+    // so the measurement must go through .NET with an extended-length path.
+    expect(validatorScript).not.toContain('Get-ChildItem -LiteralPath $Root -Recurse');
+    expect(validatorScript).toContain('[System.IO.DirectoryInfo]::new((ConvertTo-LongPath $rootFull))');
+    expect(validatorScript).toContain(
+      "EnumerateFiles('*', [System.IO.SearchOption]::AllDirectories)",
+    );
+    expect(validatorScript).toContain("if ($Path.StartsWith('\\\\')) { return '\\\\?\\UNC\\' + $Path.Substring(2) }");
+    expect(validatorScript).toContain("return '\\\\?\\' + $Path");
+    // The completion record must stay excluded from the measurement.
+    expect(validatorScript).toContain("if ($file.FullName -eq $completeFull) { continue }");
+    expect(validatorScript.match(/Measure-ComponentTree \$target/g)).toHaveLength(2);
+    // NSIS relays stdout into a single-line dialog and log field.
+    expect(validatorScript).toContain("Write-Output ($Message -replace '[\\r\\n]+', ' ')");
+  });
+
+  test('reports the failing component when offline component extraction fails', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const failureBlock = installerScript.slice(
+      installerScript.indexOf('ComponentBatchExtractFailed:'),
+      installerScript.indexOf('ComponentBatchVerificationFailed:'),
+    );
+
+    expect(failureBlock).not.toContain('StrTrimNewLines');
+    expect(failureBlock).toContain('离线组件展开失败：$1。请检查磁盘空间或安全软件后重试。');
+    expect(failureBlock).not.toContain('"离线组件展开失败。请检查磁盘空间或安全软件后重试。"');
+    expect(failureBlock).toContain('Goto OfflineComponentInstallFailed');
+  });
+
   test('uses per-user installation and rolls back pointer changes after normal failures', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
@@ -211,6 +244,46 @@ describe('NSIS offline resource and local inference flow', () => {
       installerScript.indexOf('RuntimeLinksReady:'),
     );
     expect(installerScript).toContain('Get-ChildItem -Path "$INSTDIR.old*"');
+  });
+
+  test('stops processes by install-root path prefix so orphaned sidecars cannot block setup', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript.indexOf('!macro StopAppProcesses')).toBeGreaterThan(-1);
+    expect(installerScript.indexOf('!macro StopAppProcesses')).toBeLessThan(
+      installerScript.indexOf('!macro customInit'),
+    );
+    expect(installerScript.match(/!insertmacro StopAppProcesses/g)).toHaveLength(2);
+
+    const macroStart = installerScript.indexOf('!macro StopAppProcesses');
+    const macroBlock = installerScript.slice(
+      macroStart,
+      installerScript.indexOf('!macroend', macroStart),
+    );
+    expect(macroBlock).toContain('Get-CimInstance Win32_Process');
+    expect(macroBlock).toContain('$$roots = @(\\"$INSTDIR\\"');
+    expect(macroBlock).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes');
+    expect(macroBlock).toContain('StartsWith($$roots[0]');
+    expect(macroBlock).toContain('StartsWith($$roots[1]');
+    expect(macroBlock).toContain('CurrentCultureIgnoreCase');
+    expect(macroBlock).toContain('Stop-Process -Id $$proc.ProcessId -Force');
+    // An in-place uninstaller runs from $INSTDIR and must not kill itself.
+    expect(macroBlock).toContain('GetCurrentProcessId');
+    expect(macroBlock).toContain('$$_.ProcessId -ne $$selfPid');
+
+    const customInitBlock = installerScript.slice(
+      installerScript.indexOf('!macro customInit'),
+      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customInit')),
+    );
+    expect(customInitBlock).toContain('!insertmacro StopAppProcesses');
+    const customUnInitBlock = installerScript.slice(
+      installerScript.indexOf('!macro customUnInit'),
+      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customUnInit')),
+    );
+    expect(customUnInitBlock).toContain('!insertmacro StopAppProcesses');
+
+    expect(installerScript).not.toContain('Stop-Process -Name 知远');
+    expect(installerScript).not.toContain('Get-Process node');
   });
 
   test('detaches expanded runtime caches before deleting them asynchronously', () => {

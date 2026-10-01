@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -93,6 +94,47 @@ test('oversized files fail with a structured worker error', async () => {
       ],
     }),
   ).rejects.toThrow('file size limit');
+});
+
+test('workspace content hashing and decoding stay within the shared worker boundary', async () => {
+  const bytes = Buffer.alloc(ArtifactWorkerLimit.WorkspaceContentBytes, 65);
+  bytes[0] = 0;
+  const inspectSync = () => ({
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+    text: bytes.toString('utf8'),
+    binary: bytes.includes(0),
+  });
+  let ticks = 0;
+  const interval = setInterval(() => {
+    ticks += 1;
+  }, 1);
+  try {
+    const startedSync = performance.now();
+    let baseline = inspectSync();
+    for (let index = 0; index < 32; index += 1) baseline = inspectSync();
+    const syncMs = performance.now() - startedSync;
+    expect(ticks).toBe(0);
+    const startedWorker = performance.now();
+    for (let index = 0; index < 32; index += 1) {
+      const transferred = Uint8Array.from(bytes).buffer;
+      expect(await pool.inspectContent(transferred)).toEqual(baseline);
+      expect(transferred.byteLength).toBe(0);
+    }
+    expect(ticks).toBeGreaterThan(0);
+    console.log(
+      `[WorkspaceContentTest] synchronous inspection blocked for ${Math.round(syncMs)} ms; worker inspection took ${Math.round(performance.now() - startedWorker)} ms with ${ticks} main-thread timer ticks`,
+    );
+  } finally {
+    clearInterval(interval);
+  }
+  await expect(
+    pool.inspectContent(new ArrayBuffer(ArtifactWorkerLimit.WorkspaceContentBytes + 1)),
+  ).rejects.toThrow('input limit');
+  const cancellation = new AbortController();
+  const pending = pool.inspectContent(Uint8Array.from(bytes).buffer, cancellation.signal);
+  cancellation.abort();
+  await expect(pending).rejects.toThrow('cancelled');
+  expect((await pool.collect(input)).length).toBe(1);
 });
 test('file hashing leaves the main event loop responsive compared with the synchronous baseline', async () => {
   const filePath = path.join(fixture, 'timing.txt');

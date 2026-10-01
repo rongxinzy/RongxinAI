@@ -30,6 +30,12 @@ test('creates todos and filters the core views', () => {
     expect(repository.list({ view: TodoView.Completed }).map(todo => todo.id)).toEqual([
       ordinary.id,
     ]);
+
+    repository.update(important.id, { status: TodoStatus.Completed });
+    expect(repository.list({ view: TodoView.Important }).map(todo => todo.id)).toEqual([
+      important.id,
+    ]);
+    expect(repository.list({ view: TodoView.Important })[0]?.status).toBe(TodoStatus.Completed);
   } finally {
     db.close();
   }

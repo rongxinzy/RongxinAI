@@ -1,62 +1,280 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-ai-intro</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>pptx-ai-intro</title><style>*{box-sizing:border-box;margin:0;padding:0}
+html{background:#f2f2ef}
+body{--accent:#F59E0B;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;background:#f2f2ef;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;display:grid;gap:26px;padding:30px;justify-content:center}
+.page{width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;padding:40px 56px 0;display:flex;flex-direction:column}
+.wrap{flex:1;min-height:0;overflow:hidden;padding-bottom:54px;display:flex;flex-direction:column;gap:15px}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-
-body{padding:0;display:block}
-.slide{width:1100px;height:688px;background:#fff;padding:56px 64px 0;position:relative;display:flex;flex-direction:column}
-.slide::before{content:"";position:absolute;left:0;top:0;width:100%;height:6px;background:var(--accent)}
-.kicker{font-size:12px;letter-spacing:.34em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:18px;font-size:46px;line-height:1.2;letter-spacing:-.01em}
-.lede{margin-top:14px;font-size:15px;color:#6f737b;max-width:60ch}
-.rule{margin-top:26px;height:1px;background:#e6e6e2}
-.body{margin-top:30px;display:grid;gap:26px;flex:1}
-.pageno{position:absolute;right:64px;bottom:34px;font-size:12px;color:#9a9ea6}
-.brandline{position:absolute;left:64px;bottom:34px;font-size:12px;color:#9a9ea6;letter-spacing:.14em}
-.cols3{grid-template-columns:repeat(3,1fr)}
-.cols2{grid-template-columns:repeat(2,1fr)}
-.blk h2{font-size:15px;letter-spacing:.06em;color:var(--accent)}
-.blk p{margin-top:10px;font-size:14px;line-height:1.75;color:#4c5058}
-.blk .num{margin-top:6px;font-size:52px;font-weight:700;line-height:1;letter-spacing:-.03em}
-.blk .num small{font-size:15px;font-weight:500;color:#6f737b;margin-left:8px;letter-spacing:0}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:14px;color:#4c5058;line-height:1.7}
-li::before{content:"";position:absolute;left:0;top:10px;width:6px;height:6px;background:var(--accent)}
-.matrix{margin-top:8px;border:1px solid #e6e6e2}
-.matrix .row{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;border-top:1px solid #e6e6e2}
-.matrix .row:first-child{border-top:0;background:#fafaf8;font-size:12px;color:#6f737b;letter-spacing:.08em}
-.matrix .row div{padding:11px 14px;font-size:13px;border-left:1px solid #e6e6e2}
-.matrix .row div:first-child{border-left:0}
-.bars{margin-top:14px;display:grid;gap:9px}
-.bar{display:grid;grid-template-columns:74px 1fr 46px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:8px;background:var(--accent);opacity:.85}
-.diagram{margin-top:6px;height:230px;position:relative;border:1px solid #e6e6e2;background:radial-gradient(120% 120% at 50% 50%,#fdfaf3 0%,#fff 70%)}
-.sun{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:var(--accent)}
-.orbit{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
-.planet{position:absolute;width:16px;height:16px;border-radius:50%;background:#4c5058}
-.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
-.mini{border:1px solid #e6e6e2;padding:16px 18px;background:#fafaf8}
-.mini b{display:block;font-size:34px;color:var(--accent);letter-spacing:-.02em}
-.mini span{display:block;margin-top:8px;font-size:14px;font-weight:600}
-.mini p{margin-top:8px;font-size:13px;color:#6f737b;line-height:1.7}
-</style></head>
+.kick{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.kick.m{color:#8b8f97}
+h1.pt{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin-top:10px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;border-bottom:1px solid #e4e4e0;padding-bottom:13px}
+.calib{font-size:11px;color:#8b8f97;line-height:1.7;text-align:right;max-width:340px}
+.foot{position:absolute;left:56px;right:56px;bottom:0;height:50px;display:flex;align-items:center;justify-content:space-between;gap:20px;font-size:11px;color:#9a9ea6;border-top:1px solid #edede9}
+.cover h1{font-size:38px;font-weight:600;letter-spacing:-.025em;line-height:1.2;margin-top:15px}
+.lede{font-size:13.5px;color:#6f737b;line-height:1.7;max-width:86ch}
+.meta{display:flex;flex-wrap:wrap;gap:22px;font-size:11px;color:#8b8f97;border-top:1px solid #edede9;padding-top:11px}
+.sl{font-size:13.5px;font-weight:600;letter-spacing:-.01em}
+.sl i{font-style:normal;color:var(--accent);margin-right:7px;font-variant-numeric:tabular-nums}
+.note{font-size:11px;color:#8b8f97;line-height:1.65}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.kn{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.kn .k{border:1px solid #e4e4e0;background:#fafaf8;padding:13px 15px}
+.kn .k b{display:block;font-size:29px;font-weight:600;letter-spacing:-.025em;line-height:1.05}
+.kn .k b em{font-style:normal;font-size:13px;font-weight:500;color:#6f737b;margin-left:4px;letter-spacing:0}
+.kn .k span{display:block;margin-top:7px;font-size:12.5px;font-weight:600}
+.kn .k p{margin-top:5px;font-size:11px;color:#6f737b;line-height:1.6}
+table.tb{width:100%;border-collapse:collapse;font-size:12.5px}
+table.tb caption{caption-side:top;text-align:left;font-size:11px;color:#8b8f97;padding-bottom:7px}
+table.tb th{font-size:11px;font-weight:600;letter-spacing:.06em;color:#6f737b;text-align:left;padding:8px 12px;background:#fafaf8;border-bottom:1px solid #e4e4e0;white-space:nowrap}
+table.tb td{padding:8px 12px;border-bottom:1px solid #edede9;color:#4c5058}
+table.tb .r{text-align:right}
+table.tb td.n{color:#16171a;font-weight:600}
+table.tb tr.hi td{background:color-mix(in srgb,var(--accent) 8%,#fff);color:#16171a;font-weight:600}
+ul.pts{display:grid;gap:7px}
+ul.pts li{position:relative;padding-left:14px;font-size:12.5px;line-height:1.65;color:#4c5058;list-style:none}
+ul.pts li::before{content:"";position:absolute;left:0;top:7px;width:5px;height:5px;background:var(--accent)}
+ul.pts li b{color:#16171a;font-weight:600}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:96px 1fr 66px;align-items:center;gap:12px;font-size:11.5px;color:#6f737b}
+.bar i{display:block;height:9px;background:var(--accent);font-style:normal}
+.bar i.mut{background:#c9ccd2}
+.bar em{font-style:normal;text-align:right;color:#3d4046}
+.vb{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:end;height:180px;border-bottom:1px solid #e4e4e0}
+.vb>div{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.vb em{font-style:normal;font-size:11px;color:#3d4046;margin-bottom:5px}
+.vb i{display:block;width:64%;background:var(--accent);font-style:normal}
+.vb span{font-size:10.5px;color:#6f737b;padding-top:6px}
+.steps{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.step{background:#fff;display:grid;grid-template-columns:76px 1fr;gap:14px;padding:9px 14px;font-size:12.5px;color:#4c5058}
+.step b{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.cellbox{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.cell{background:#fff;padding:13px 15px;font-size:12px;color:#4c5058;line-height:1.65}
+.cell b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:5px}
+.cell u{display:block;text-decoration:none;font-size:10.5px;letter-spacing:.16em;color:var(--accent);margin-bottom:4px}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.fl{background:#fff;padding:12px 14px;font-size:11.5px;color:#4c5058;line-height:1.6}
+.fl b{display:block;font-size:12.5px;color:#16171a;font-weight:600;margin-bottom:4px}
+.fl u{display:block;text-decoration:none;color:var(--accent);font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+.refs{display:grid;background:#e4e4e0;gap:1px;border:1px solid #e4e4e0}
+.ref{background:#fff;display:grid;grid-template-columns:30px 1fr 92px;gap:12px;align-items:center;padding:8px 13px;font-size:12px;color:#4c5058}
+.ref u{text-decoration:none;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums}
+.ref em{font-style:normal;text-align:right;color:#8b8f97;font-size:11px}
+.toc .ref{grid-template-columns:30px 1.02fr 1.62fr 54px}
+.tag{display:inline-block;font-size:10.5px;letter-spacing:.08em;color:#6f737b;border:1px solid #e4e4e0;padding:1px 6px;margin:0 6px 4px 0}
+.orbits{position:relative;height:296px;border:1px solid #e4e4e0;background:#fff}
+.oc{position:absolute;left:50%;top:50%;border:1px dashed #d9d8d2;border-radius:50%}
+.sun{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:var(--accent)}
+.pl{position:absolute;width:12px;height:12px;border-radius:50%;background:#4c5058}
+.pltxt{position:absolute;font-size:10.5px;color:#6f737b;white-space:nowrap}
+.legend{display:flex;gap:22px;font-size:11px;color:#8b8f97;flex-wrap:wrap}
+.legend b{color:#3d4046;font-weight:600}
+.q{border:1px solid #e4e4e0;padding:13px 15px}
+.q b{display:block;font-size:12.5px;font-weight:600;margin-bottom:6px}
+.q b em{font-style:normal;color:var(--accent);margin-right:6px}
+.q p{font-size:11.5px;color:#6f737b;line-height:1.65}
+.q p b{display:inline;font-size:11.5px;color:#16171a}</style></head>
 <body>
-<div class="slide" style="--accent:#F59E0B">
-  <div class="kicker">AI Literacy</div>
-  <h1>零基础认识人工智能</h1>
-  <p class="lede">三个问题讲清楚：AI 是什么、怎么工作、能用在哪儿</p>
-  <div class="rule"></div>
-  <div class="body">
-    <div class="cards3">
-      <div class="mini"><b>01</b><span>它是什么</span><p>让机器从大量例子中总结规律，再用这套规律处理没见过的新问题</p></div>
-      <div class="mini"><b>02</b><span>怎么工作</span><p>数据 → 训练 → 模型 → 推理。模型不是数据库，它记住的是规律而不是原文</p></div>
-      <div class="mini"><b>03</b><span>用在哪儿</span><p>写作、翻译、识图、预测、客服、检索，凡是重复的判断类工作都可能被替代</p></div>
-    </div>
-    <div class="blk" style="margin-top:8px">
-      <h2>一句话总结</h2>
-      <p>人工智能不是替你思考，而是把你重复做过的思考，变成可以复用的工具。</p>
-    </div>
-  </div>
-  <div class="pageno">04 / 12</div>
-</div></body></html>
+<section class="page" data-page="1">
+<div class="wrap"><div class="kick">AI Literacy · 通识讲稿</div>
+<h1>零基础认识人工智能</h1>
+<p class="lede">用三个问题讲清楚：AI 是什么、怎么工作、能用在哪儿。面向非技术岗位同事的 45 分钟通识课，全程不含代码，配套一份自查清单。</p>
+<div class="meta"><span>面向：非技术岗位同事</span><span>时长：45 分钟（讲座 30 分钟 + 演示 15 分钟）</span><span>形式：讲座 + 现场演示</span><span>版本：2026 秋 · 第 4 期</span></div>
+<div class="kn">
+  <div class="k"><b>3<em>个问题</em></b><span>核心框架</span><p>是什么、怎么工作、能用在哪儿</p></div>
+  <div class="k"><b>6<em>类场景</em></b><span>典型应用</span><p>写作与润色、代码辅助、翻译改写、客服回复、识图录入、数据分析</p></div>
+  <div class="k"><b>0<em>行代码</em></b><span>课程门槛</span><p>课程全程不涉及编程，只讲判断与边界</p></div>
+</div>
+<table class="tb">
+  <caption>三个问题的一句话回答（本讲核心框架）</caption>
+  <thead><tr><th>问题</th><th>一句话回答</th><th>关键区分</th></tr></thead>
+  <tbody>
+    <tr><td>它是什么</td><td>让机器从大量例子中总结规律，再用规律处理没见过的新问题</td><td>不是检索数据库，而是归纳规律</td></tr>
+    <tr><td>怎么工作</td><td>数据 → 训练 → 模型 → 推理，四步形成闭环</td><td>模型记住的是规律，不是原文</td></tr>
+    <tr class="hi"><td>用在哪儿</td><td>写作与润色、代码辅助、翻译改写、客服回复、识图录入、数据分析等重复判断类工作</td><td>越重复、越有历史数据，越容易被替代</td></tr>
+  </tbody>
+</table><div class="cellbox" style="grid-template-columns:1.35fr 1fr">
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>口径与来源</u>口径：52 份问卷自评 1–5 分｜来源：内部问卷 · 评测集 · 120 次抽样</div>
+  <div class="cell" style="white-space:nowrap;padding:9px 15px"><u>后续页面导读</u>P2–P4 现状｜P5–P7 原理｜P8–P9 清单</div>
+</div></div>
+<div class="foot"><span>结论：人工智能不是替你思考，而是把你重复做过的思考，变成可以复用的工具。</span><span class="mono">第 1 / 9 页</span></div>
+</section>
+<section class="page" data-page="2">
+<div class="wrap"><div class="head"><div><div class="kick">01 · 课程导航</div><h1 class="pt">45 分钟讲稿的章节结构与阅读路径</h1></div><div class="calib">形式：讲座 30 分钟 + 演示 15 分钟<br>全程不含代码 · 全文 9 页</div></div>
+<div class="refs toc">
+  <div class="ref"><u>01</u><span>结论摘要</span><em>三个问题的一句话回答与核心框架</em><em class="mono">P1</em></div>
+  <div class="ref"><u>02</u><span>背景与范围</span><em>听众画像、常见误解与术语口径</em><em class="mono">P3</em></div>
+  <div class="ref"><u>03</u><span>使用现状</span><em>内部 6 类场景的使用率与满意度</em><em class="mono">P4</em></div>
+  <div class="ref"><u>04</u><span>能力与边界</span><em>模型擅长什么、又会在哪里出错</em><em class="mono">P5</em></div>
+  <div class="ref"><u>05</u><span>工作原理</span><em>数据到推理的四步链条与三类模型</em><em class="mono">P6</em></div>
+  <div class="ref"><u>06</u><span>范式对比</span><em>传统软件与 AI 系统的六点差异</em><em class="mono">P7</em></div>
+  <div class="ref"><u>07</u><span>风险与限制</span><em>幻觉、隐私、版权、依赖与数字错误</em><em class="mono">P8</em></div>
+  <div class="ref"><u>08</u><span>结论与行动</span><em>使用三原则与上手清单</em><em class="mono">P9</em></div>
+</div>
+<div class="grid3">
+  <div class="q"><b>先看什么</b><p>时间紧张时依次阅读 <b>P1、P5、P8</b>：框架、边界与风险，这三页决定了使用方式。</p></div>
+  <div class="q"><b>现场演示</b><p>第 3 环节用同一个问题分别向 <b>2 个模型</b> 提问，对比回答差异，直观感受幻觉。</p></div>
+  <div class="q"><b>带走什么</b><p>末尾的 <b>五条上手清单</b> 可直接贴在工作台，作为日常使用 AI 的检查项。</p></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>全文 9 页：P1 框架 → P3 边界 → P8 风险 → P9 清单。</div>
+  <div class="cell"><u>下一步与责任</u>离场前完成五条上手清单的第 1 条自检。</div>
+</div></div>
+<div class="foot"><span>导航：八个章节从框架到边界，重点是第 5 页的能力边界与第 8 页的风险清单。</span><span class="mono">第 2 / 9 页</span></div>
+</section>
+<section class="page" data-page="3">
+<div class="wrap"><div class="head"><div><div class="kick">02 · 背景与范围</div><h1 class="pt">听众画像、常见误解与术语口径</h1></div><div class="calib">听众：非技术岗位 60 人<br>课前问卷回收 52 份</div></div>
+<div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><b>听众画像</b>运营、销售、客服与职能岗位共 60 人，其中 52 人日常已使用至少 1 个 AI 工具，24 人每周使用超过 5 次。</div>
+  <div class="cell"><b>常见误解</b>课前问卷显示：71% 认为「AI 输出一定是准确的」，46% 认为「对话内容不会被留存」，33% 认为「模型会实时联网」。</div>
+  <div class="cell"><b>术语口径</b>本讲中「模型」指大语言模型；「训练」指用历史数据调整参数；「推理」指模型生成一次回答的过程。</div>
+  <div class="cell"><b>不涉及内容</b>不讲解算法原理与参数调优，不演示编程接口，不推荐具体厂商产品，只讲通用判断方法。</div>
+</div>
+<div class="sl"><i>01</i>本讲的三个认知目标</div>
+<div class="steps">
+  <div class="step"><b>目标一</b><span>能用自己的话说出「模型记住的是规律，不是原文」，并解释为什么它不能当作检索数据库使用。</span></div>
+  <div class="step"><b>目标二</b><span>能说出至少三类适合交给 AI 的任务，以及两类不适合交给 AI 的任务，并说明判断依据。</span></div>
+  <div class="step"><b>目标三</b><span>掌握「交叉验证、匿名化、标注来源」三条使用纪律，能识别一次典型的事实性错误。</span></div>
+  <div class="step"><b>课后动作</b><span>每人用同一个问题分别问两个模型，提交 200 字对比记录，指出其中至少一处事实性差异。</span></div>
+</div><div class="cellbox" style="grid-template-columns:1fr 1fr">
+  <div class="cell"><u>本页结论</u>三个认知目标：说清规律机制、判断任务适配、掌握三条纪律。</div>
+  <div class="cell"><u>下一步与责任</u>课前问卷三项误解须在课中逐条纠正，责任人讲师沈彤。</div>
+</div></div>
+<div class="foot"><span>范围：只讲通用判断方法，不涉及算法与厂商，课前问卷显示三项高频误解。</span><span class="mono">第 3 / 9 页</span></div>
+</section>
+<section class="page" data-page="4">
+<div class="wrap"><div class="head"><div><div class="kick">03 · 使用现状</div><h1 class="pt">内部 6 类场景的使用率与满意度</h1></div><div class="calib">样本：52 份有效问卷<br>周期：2026-08-01 至 09-15（6 周）</div></div>
+<table class="tb">
+  <caption>表 1 · AI 工具的内部使用情况（按使用率降序）</caption>
+  <thead><tr><th>使用场景</th><th class="r">使用率</th><th class="r">周均使用次数</th><th class="r">满意度</th><th>主要用途</th></tr></thead>
+  <tbody>
+    <tr><td>写作与润色</td><td class="r mono">68%</td><td class="r mono">9.4 次</td><td class="r mono">4.4 / 5</td><td>周报、邮件、公告初稿</td></tr>
+    <tr><td>代码与公式辅助</td><td class="r mono">52%</td><td class="r mono">12.1 次</td><td class="r mono">4.6 / 5</td><td>脚本片段、表格公式</td></tr>
+    <tr><td>翻译与改写</td><td class="r mono">41%</td><td class="r mono">5.2 次</td><td class="r mono">4.2 / 5</td><td>对外文档、客户邮件</td></tr>
+    <tr><td>客服回复草拟</td><td class="r mono">33%</td><td class="r mono">3.8 次</td><td class="r mono">3.9 / 5</td><td>标准问题话术生成</td></tr>
+    <tr><td>识图与票据录入</td><td class="r mono">34%</td><td class="r mono">3.1 次</td><td class="r mono">3.7 / 5</td><td>发票与合同信息提取</td></tr>
+    <tr class="hi"><td>数据分析与解读</td><td class="r mono">27%</td><td class="r mono">2.6 次</td><td class="r mono">3.6 / 5</td><td>指标异动归因初筛</td></tr>
+  </tbody>
+</table>
+<div class="sl"><i>02</i>五类场景的使用率对比（%）</div>
+<div class="bars">
+  <div class="bar"><span>写作润色</span><i style="width:68%"></i><em class="mono">68%</em></div>
+  <div class="bar"><span>代码辅助</span><i style="width:52%"></i><em class="mono">52%</em></div>
+  <div class="bar"><span>翻译改写</span><i style="width:41%"></i><em class="mono">41%</em></div>
+  <div class="bar"><span>识图录入</span><i style="width:34%"></i><em class="mono">34%</em></div>
+  <div class="bar"><span>客服回复</span><i style="width:33%"></i><em class="mono">33%</em></div>
+  <div class="bar"><span>数据分析</span><i style="width:27%"></i><em class="mono">27%</em></div>
+</div>
+<div class="note">数据说明：满意度按 1–5 分自评；识图录入与数据分析两类场景满意度最低（3.7 与 3.6 分），主要反馈是「结果需要人工复核」。</div></div>
+<div class="foot"><span>现状：写作润色使用率最高（68%），数据分析满意度最低（3.6 分），复核成本是主因。</span><span class="mono">第 4 / 9 页</span></div>
+</section>
+<section class="page" data-page="5">
+<div class="wrap"><div class="head"><div><div class="kick">04 · 能力与边界</div><h1 class="pt">模型擅长什么、又会在哪里出错</h1></div><div class="calib">数据来源：公开评测集 + 内部 120 次抽样<br>评测时点：2026 年 9 月</div></div>
+<div class="grid3">
+  <div class="q"><b><em>擅长</em>有明确模式的改写</b><p>摘要、扩写、语气调整、格式转换等任务，模型一次通过率可达 85% 以上，且速度是人工的 20–40 倍。</p></div>
+  <div class="q"><b><em>擅长</em>有大量样本的判断</b><p>分类、抽取、初筛类任务，在标注样本充足时准确率可达 85% 以上，适合做人工的前置过滤。</p></div>
+  <div class="q"><b><em>不擅长</em>需要精确事实的回答</b><p>人名、日期、金额、法条等精确信息错误率明显上升，通用问答场景的幻觉率区间为 3%–18%。</p></div>
+</div>
+<div class="sl"><i>03</i>四类典型任务的可靠度分层</div>
+<table class="tb">
+  <thead><tr><th>任务类型</th><th class="r">一次通过率（整段正确）</th><th class="r">人工复核成本</th><th>建议用法</th></tr></thead>
+  <tbody>
+    <tr><td>改写与格式转换</td><td class="r mono">88%–92%</td><td class="r mono">低（&lt; 1 分钟）</td><td class="n">可直接使用，抽查即可</td></tr>
+    <tr><td>分类与信息抽取</td><td class="r mono">78%–86%</td><td class="r mono">低（1–2 分钟）</td><td class="n">批量使用，抽样校验</td></tr>
+    <tr><td>事实性问答</td><td class="r mono">62%–74%</td><td class="r mono">高（5–10 分钟）</td><td class="n">必须交叉验证后使用</td></tr>
+    <tr class="hi"><td>数字与计算类结论</td><td class="r mono">54%–61%</td><td class="r mono">高（&gt; 10 分钟）</td><td>仅用于思路参考，数字须自行重算</td></tr>
+  </tbody>
+</table><div class="note">演示设计：现场用同一个事实性问题分别询问两个模型，比对回答中的日期与金额差异，直观呈现「同题不同答」的现象。口径区分：表中「一次通过率」指整段回答完全正确、四档区间不重叠，与第 8 页「幻觉率」不可直接换算。</div>
+<ul class="pts">
+  <li><b>可靠度判断：</b>凡输出包含人名、日期、金额、法条四类信息之一的，一律按「需复核」处理，不区分模型。</li>
+  <li><b>复核成本：</b>一次事实核对约 2 分钟，相比重做一份材料可节省 20 分钟以上，复核始终值得做。</li>
+</ul><div class="note">复核纪律：输出含人名、日期、金额、法条四类信息之一，一律按需复核处理，不区分模型。</div></div>
+<div class="foot"><span>边界：改写与分类可放心用，事实与数字类结论必须交叉验证，幻觉率区间 3%–18%。</span><span class="mono">第 5 / 9 页</span></div>
+</section>
+<section class="page" data-page="6">
+<div class="wrap"><div class="head"><div><div class="kick">05 · 工作原理</div><h1 class="pt">数据到推理的四步链条与三类模型</h1></div><div class="calib">四步为串联关系，任一步缺失都无法工作<br>参数量区间 7B–671B</div></div>
+<div class="flow">
+  <div class="fl"><u>STEP 01</u><b>数据</b>收集原始语料与业务样本，规模可达 15 万亿 token；数据质量决定能力上限，噪声会被模型一并学到。</div>
+  <div class="fl"><u>STEP 02</u><b>训练</b>用数据反复调整模型参数，参数规模 7B–671B；这一步成本最高，通常需要数百张加速卡运行数周。</div>
+  <div class="fl"><u>STEP 03</u><b>模型</b>训练完成后参数被冻结，形成一个可复用的规律集合；它记住的是规律，不是训练语料的原文。</div>
+  <div class="fl"><u>STEP 04</u><b>推理</b>用户提问时模型按规律生成回答，单次耗时 0.8–3.5 秒；上下文窗口通常为 128K token。</div>
+</div>
+<div class="sl"><i>04</i>三类模型的能力差异</div>
+<div class="cellbox" style="grid-template-columns:repeat(3,1fr)">
+  <div class="cell"><u>类型 01</u><b>判别式模型</b>只做分类与打分，例如判断一张工单属于哪一类。输出稳定、成本低，准确率可达 92% 以上，但不生成新内容。</div>
+  <div class="cell"><u>类型 02</u><b>生成式模型</b>生成文本、代码与结构化内容。灵活度最高，也是幻觉的主要来源，适合配合人工复核使用。</div>
+  <div class="cell"><u>类型 03</u><b>多模态模型</b>同时处理文字、图片与表格。适合识图与票据录入类任务，但对专业图表的读数仍可能出错，错读率约 4%–11%。</div>
+</div><div class="note">常见追问：模型会实时联网吗？默认不会——训练完成后参数被冻结，除工具调用外无法获取训练时点之后的信息，旧数据问题需人工补充上下文。</div>
+<ul class="pts">
+  <li><b>上下文窗口：</b>128K token 约等于 9 万汉字，超出部分会被截断，长文档建议分章节提问。</li>
+  <li><b>成本结构：</b>训练成本最高且一次性，推理成本按调用量线性增长，规模化使用时需单独测算。</li>
+</ul><div class="note">记忆锚点：四步中只有「训练」会改变参数，「推理」只是按既有规律生成输出；判别式模型只输出分类与分数、不生成新内容，任务是否需要产出新内容决定判别式与生成式的选择。</div></div>
+<div class="foot"><span>原理：数据 → 训练 → 模型 → 推理四步串联，模型冻结的是规律，幻觉来自生成过程。</span><span class="mono">第 6 / 9 页</span></div>
+</section>
+<section class="page" data-page="7">
+<div class="wrap"><div class="head"><div><div class="kick">06 · 范式对比</div><h1 class="pt">传统软件与 AI 系统的六点差异</h1></div><div class="calib">对比基准：规则型业务系统<br>结论用于判断任务该交给谁</div></div>
+<table class="tb">
+  <caption>表 2 · 传统软件与 AI 系统的能力对照</caption>
+  <thead><tr><th>对比维度</th><th>传统软件</th><th>AI 系统</th><th>使用含义</th></tr></thead>
+  <tbody>
+    <tr><td>执行逻辑</td><td>人写的规则，逐条判断</td><td class="n">从样本中学到的规律</td><td>AI 无需穷举规则，但需要样本</td></tr>
+    <tr><td>输出特性</td><td>同一输入必得同一输出</td><td class="n">同一输入可能给出不同表述</td><td>结果需人工判断而非机械比对</td></tr>
+    <tr><td>错误形式</td><td>报错、崩溃，可被立即发现</td><td class="n">看似合理的错误结论</td><td>最危险的错误是「像对的」</td></tr>
+    <tr><td>上线门槛</td><td>需求明确即可开发</td><td class="n">需要足量且有标注的数据</td><td>数据不足时先补数据再谈模型</td></tr>
+    <tr><td>维护方式</td><td>改代码即可修复</td><td class="n">需补充样本并重新评估</td><td>修错成本高于传统系统</td></tr>
+    <tr class="hi"><td>适用边界</td><td>流程固定、规则清晰的场景</td><td class="n">模式模糊、样本充足的场景</td><td>两者互补，不是替代关系</td></tr>
+  </tbody>
+</table>
+<div class="note">判断口诀：规则能写清楚的交软件，规则写不清楚但有大量历史样本的交 AI，两者都不满足的先补数据。</div><div class="sl"><i>04</i>两类系统在成本结构上的差异</div>
+<ul class="pts">
+  <li><b>传统软件：</b>前期开发成本高，上线后边际成本接近于零；故障可复现、可定位、可一次性修复。</li>
+  <li><b>AI 系统：</b>前期训练成本高，上线后仍有持续推理与复核成本；错误不可复现，只能靠补充样本降低发生概率。</li>
+</ul><div class="note">选择口诀：规则写得清楚交传统软件，规则写不清但有大量历史样本交 AI；判断标准是任务是否存在稳定的输入到输出映射，以及是否有足够标注样本支撑评估；两者都不满足时先补数据，不要直接把流程交给模型。</div></div>
+<div class="foot"><span>对比：AI 的核心差异是「可能给出看似合理的错误」，因此复核成本必须计入方案。</span><span class="mono">第 7 / 9 页</span></div>
+</section>
+<section class="page" data-page="8">
+<div class="wrap"><div class="head"><div><div class="kick">07 · 风险与限制</div><h1 class="pt">幻觉、隐私、版权、依赖与数字错误</h1></div><div class="calib">评估时点：2026-09<br>影响程度按高 / 中 / 低三档</div></div>
+<table class="tb">
+  <caption>表 3 · 五类风险与对应使用纪律</caption>
+  <thead><tr><th>风险项</th><th>影响</th><th class="r">实测水平</th><th>使用纪律</th></tr></thead>
+  <tbody>
+    <tr><td>事实性幻觉（无来源事实占比）</td><td>高</td><td class="r mono">3%–18%</td><td>人名、金额、法条必须回原始来源核对</td></tr>
+    <tr><td>敏感信息外流</td><td>高</td><td class="r mono">不可逆</td><td>客户名单与合同条款先匿名化再提问</td></tr>
+    <tr><td>版权与来源不清</td><td>中</td><td class="r mono">难以追溯</td><td>对外发布的成品须人工重写并标注来源</td></tr>
+    <tr><td>过度依赖导致能力退化</td><td>中</td><td class="r mono">长期累积</td><td>关键判断先自己给结论，再用 AI 交叉验证</td></tr>
+    <tr class="hi"><td>数字与计算错误</td><td>高</td><td class="r mono">39%–46%</td><td>所有数字结论自行重算，不直接引用模型输出</td></tr>
+  </tbody>
+</table>
+<div class="grid2">
+  <div class="q"><b>最容易忽视的一点</b><p>幻觉不是「模型坏了」，而是生成机制的固有特性；它说得越流畅，越需要停下来核对。</p></div>
+  <div class="q"><b>本讲的假设前提</b><p>上述错误率来自通用问答与内部抽样场景，垂直领域的实测值会随数据质量显著变化，需单独评估。</p></div>
+</div><div class="note">现场自查：把上一次用 AI 产出的对外文档拿出来，逐项核对其中的人名、金额与日期，通常会发现问题至少一处。这一步比任何讲解都更能建立风险意识。</div><div class="sl">使用纪律与检查动作</div>
+<ul class="pts"><li>事实核对：人名、日期、金额、法条回到原始来源逐项核对，一次约 2 分钟。</li><li>脱敏提问：提问前用占位符替换客户姓名、联系方式与合同金额，未公开财务数据不得进入对话框。</li></ul></div>
+<div class="foot"><span>风险：事实与数字类错误率最高，所有金额与计算结论必须自行重算后再使用。</span><span class="mono">第 8 / 9 页</span></div>
+</section>
+<section class="page" data-page="9">
+<div class="wrap"><div class="head"><div><div class="kick">08 · 结论与行动</div><h1 class="pt">使用三原则与上手清单</h1></div><div class="calib">落地节奏：本周开始执行<br>复盘：1 个月后回收使用反馈</div></div>
+<div class="grid4">
+  <div class="q"><b>3 类</b><p>适合交给 AI 的任务：改写、分类、初筛。</p></div>
+  <div class="q"><b>2 类</b><p>不适合：精确事实回答、数字结论生成。</p></div>
+  <div class="q"><b>3%–18%</b><p>通用问答场景的幻觉率区间。</p></div>
+  <div class="q"><b>0 行</b><p>本讲门槛：不需要写任何代码即可上手。</p></div>
+</div>
+<div class="sl"><i>05</i>使用三原则</div>
+<div class="steps">
+  <div class="step"><b>原则一</b><span>交叉验证：任何事实与数字，回到原始来源核对一次，成本约 2 分钟，可避免绝大部分错误。</span></div>
+  <div class="step"><b>原则二</b><span>匿名化：提问前去除客户姓名、联系方式、合同金额等敏感字段，用占位符替代后再提问。</span></div>
+  <div class="step"><b>原则三</b><span>标注来源：对外发布的成品必须人工重写并注明数据出处，不直接引用模型生成的内容。</span></div>
+</div>
+<div class="sl"><i>06</i>五条上手清单</div>
+<ul class="pts">
+  <li><b>任务选择：</b>先问自己「这件事有大量历史样本吗」，没有样本就先补数据，不要急着上模型。</li>
+  <li><b>提示写法：</b>把角色、目标、输出格式、禁止事项写清楚，一次给全比反复追问更省时间。</li>
+  <li><b>结果复核：</b>改写类抽查即可，事实类与数字类必须逐项核对，并在文档中保留核对痕迹。</li>
+  <li><b>数据安全：</b>客户名单、合同条款、未公开财务数据一律不进入对话框，改用脱敏样本提问。</li>
+  <li><b>能力保持：</b>每周至少一次先自己写结论再用 AI 对照，避免判断力被工具替代。</li>
+</ul><div class="note">复盘约定：1 个月后回收 52 份问卷的使用反馈，并统计一次因 AI 输出导致的返工次数。</div></div>
+<div class="foot"><span>行动：落实交叉验证、匿名化、标注来源三原则，按五条清单执行并在 1 个月后回收反馈。</span><span class="mono">第 9 / 9 页</span></div>
+</section>
+</body></html>

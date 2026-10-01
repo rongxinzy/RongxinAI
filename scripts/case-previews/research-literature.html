@@ -1,60 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>research-literature</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-literature</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-.serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:30px}
-.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
-.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
-.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:18px}
-h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
-.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0}
-.bars{display:grid;gap:10px;margin-top:12px}
-.bar{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
-td.mono{font-variant-numeric:tabular-nums}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
-li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
-.timeline{display:grid;gap:0;margin-top:12px}
-.tl{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
-.tl:first-child{border-top:0}
-.tl b{color:var(--accent);font-weight:600}
-.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head><body>
-<div class="sheet" style="--accent:#0F766E">
-  <div class="sheet-top">
-    <div class="kicker">Literature Review</div>
-    <h1>研究脉络与关键观点整理</h1>
-    <div class="meta"><span>纳入文献 68 篇</span><span>时间范围：2019 — 2026</span></div>
-  </div>
-  <div class="body">
-    <div><h3>主题聚类</h3>
-      <table>
-        <tr><th>主题</th><th>文献数</th><th>核心观点</th></tr>
-        <tr><td>端侧推理效率</td><td class="mono">24</td><td>量化与蒸馏能把推理成本压到可接受区间</td></tr>
-        <tr><td>数据主权</td><td class="mono">19</td><td>数据不出域是采购决策的硬约束</td></tr>
-        <tr><td>人机协作流程</td><td class="mono">15</td><td>把审批与回溯做进流程，落地率显著提高</td></tr>
-        <tr><td>评测方法</td><td class="mono">10</td><td>任务级评测比通用榜单更贴近业务</td></tr>
-      </table>
-    </div>
-    <div><h3>脉络</h3>
-      <div class="timeline">
-        <div class="tl"><b>2019</b><span>以云端 API 为中心，讨论集中在能力边界</span></div>
-        <div class="tl"><b>2022</b><span>端侧部署进入视野，效率与效果被放在一起权衡</span></div>
-        <div class="tl"><b>2025</b><span>数据主权与合规成为独立议题，出现流程化研究</span></div>
-        <div class="tl"><b>2026</b><span>研究重心转向可审计的协作流程与任务级评测</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="sheet-foot"><span>检索式：本地推理 AND 数据主权</span><span>第 2 / 12 页</span></div>
-</div></body></html>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">Literature Review</div><h2>研究脉络与关键观点整理</h2></div><div class="pn">纳入文献 68 篇 · 初检 412 篇<br>时间范围：2019 — 2026（截至 9 月）</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>从 412 篇初检文献中纳入 <b>68 篇</b>（纳入率 16.5%）。四条主题线中「端侧推理效率」文献量最大（24 篇）但结论最一致，「数据主权」19 篇的结论分歧最大：11 篇认为数据不出域是采购硬约束，6 篇认为混合形态足以满足要求。真正的研究缺口在于<b>评测方法</b>——仅 10 篇，且没有一篇给出可复用的任务级评测集。</p></div><div class="kpi"><div class="kc"><div class="k">纳入文献</div><b class="n">68 篇</b><i>初检 412 篇，纳入率 16.5%</i></div><div class="kc"><div class="k">证据强度分布</div><b class="n class="sm"">22 / 34 / 12</b><i>强 / 中 / 弱，强证据仅占 32%</i></div><div class="kc"><div class="k">实证研究占比</div><b class="n">45%</b><i>31 篇实证，其余为案例、综述与仿真</i></div></div><div class="cols2 eq"><div><h3>主题聚类</h3><table><thead><tr><th>主题</th><th class="n">文献数</th><th>核心观点</th></tr></thead><tbody><tr class=""><td>端侧推理效率</td><td class="n n">24</td><td>量化与蒸馏把推理成本压到可接受区间</td></tr><tr class=""><td>数据主权</td><td class="n n">19</td><td>数据不出域是采购决策的硬约束（存在分歧）</td></tr><tr class=""><td>人机协作流程</td><td class="n n">15</td><td>把审批与回溯做进流程，落地率显著提高</td></tr><tr class=""><td>评测方法</td><td class="n n">10</td><td>任务级评测比通用榜单更贴近业务</td></tr></tbody></table></div><div><h3>研究脉络</h3><div class="tl"><div class="r"><b>2019</b><span>以云端 API 为中心，讨论集中在能力边界</span></div><div class="r"><b>2022</b><span>端侧部署进入视野，效率与效果被放在一起权衡</span></div><div class="r"><b>2025</b><span>数据主权与合规成为独立议题，出现流程化研究</span></div><div class="r"><b>2026</b><span>重心转向可审计的协作流程与任务级评测（仅 4 篇，尚未成势）</span></div></div></div></div><div class="cols2 eq"><div><h3>口径与来源</h3><table><thead><tr><th>项</th><th>说明</th></tr></thead><tbody><tr class=""><td>检索范围</td><td>3 个数据库、4 组检索式，语种限中英文</td></tr><tr class=""><td>检索日期</td><td>2026-09-12，时间范围 2019-01-01 起</td></tr><tr class=""><td>筛选口径</td><td>初检 412 篇 → 去重 318 → 摘要筛 96 → 全文评估 74 → 纳入 68</td></tr></tbody></table></div><div><h3>后续页面导读</h3><ul class=""><li>第 3 页 检索式、纳入排除标准与筛选漏斗</li><li>第 4–5 页 年份/方法/主题三维分布与四主题拆解</li><li>第 6–7 页 关键观点证据强度与三组学术争议</li><li>第 8–10 页 研究缺口、结论动作与来源附录</li></ul></div></div></div>
+  <div class="pf"><span>检索式：本地推理 AND 数据主权 · 检索策略与纳排标准见第 3 页</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 证据强度规则见第 3 页<br>文献编号 R01–R68</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 检索策略与纳排</td><td>检索式、数据库与筛选漏斗</td><td>检索式 4 组 + 4 阶段漏斗</td><td class="n n">3</td></tr><tr class=""><td>2 文献全景</td><td>年份、方法、主题三维分布</td><td>3 组分布图 + 方法表</td><td class="n n">4</td></tr><tr class=""><td>3 主题脉络拆解</td><td>四主题的成熟度与共识度</td><td>2×2 矩阵 + 每主题观点</td><td class="n n">5</td></tr><tr class=""><td>4 关键观点与证据</td><td>每条观点的文献支撑与强度</td><td>5 条观点 · 支撑文献数</td><td class="n n">6</td></tr><tr class=""><td>5 争议与未解问题</td><td>文献间的冲突与推演</td><td>3 组争议 + 情景</td><td class="n n">7</td></tr><tr class=""><td>6 研究缺口与风险</td><td>缺口清单与覆盖偏倚</td><td>5 项风险 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 结论与后续动作</td><td>对实践的结论与追踪计划</td><td>3 条结论 · 3 阶段动作</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>检索式明细、强度规则、术语</td><td>4 组检索式 + 术语表</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>证据强度规则</h3><ul class=""><li><b>强</b>：实证设计可复现，样本 ≥ 30，结论在其他研究中被复现（22 篇）</li><li><b>中</b>：实证或案例，样本 < 30 或未被复现（34 篇）</li><li><b>弱</b>：观点性论述、单案例或方法不透明（12 篇）</li></ul></div><div><h3>综述取用方式</h3><ul class=""><li>找共识：读第 6 页证据强度为「强」的 5 条观点</li><li>找机会：读第 7 页的三组争议，争议处即研究缺口</li><li>找方法：读第 4 页方法与第 10 页检索式明细</li></ul></div></div><div><h3>编号与计数规则</h3><table><thead><tr><th>项</th><th>规则</th><th>示例</th></tr></thead><tbody><tr class=""><td>文献编号</td><td>按纳入顺序编号 R01–R68，正文按编号引用</td><td>R03 = 第 3 篇纳入文献</td></tr></tbody></table></div></div>
+  <div class="pf"><span>文献编号规则：R01–R68，按纳入顺序编号，正文按编号引用</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Search & Screening</div><h2>检索策略、纳排标准与筛选漏斗</h2></div><div class="pn">检索日 2026-09-12<br>全部检索在 3 个数据库完成</div></div>
+  <div class="pc"><div class="cols2 wide"><div><h3>检索式与命中数</h3><table><thead><tr><th>组</th><th>检索式（节选）</th><th class="n">命中</th><th>语种</th></tr></thead><tbody><tr class=""><td>Q1</td><td>"local inference" AND ("on-device" OR "edge model")</td><td class="n n">158</td><td>英文</td></tr><tr class=""><td>Q2</td><td>("data sovereignty" OR "data residency") AND AI</td><td class="n n">112</td><td>英文</td></tr><tr class=""><td>Q3</td><td>本地推理 AND (数据主权 OR 数据不出域)</td><td class="n n">86</td><td>中文</td></tr><tr class=""><td>Q4</td><td>("human-in-the-loop" AND audit) AND workflow</td><td class="n n">56</td><td>英文</td></tr><tr class="tot"><td>合计</td><td>去重后 318 篇</td><td class="n">412</td><td>—</td></tr></tbody></table></div><div><h3>筛选漏斗</h3><div class="tl"><div class="r"><b>初检 412</b><span>4 组检索式合计命中，去重后 318 篇</span></div><div class="r"><b>摘要筛 96</b><span>排除主题不符 208 篇、非研究性文本 14 篇</span></div><div class="r"><b>全文评估 74</b><span>获取全文 82 篇，其中 8 篇无法获取</span></div><div class="r"><b>最终纳入 68</b><span>排除方法不透明 3 篇、数据不可得 2 篇、重复发表 1 篇</span></div></div></div></div><div><h3>纳入与排除标准</h3><table><thead><tr><th>维度</th><th>纳入</th><th>排除</th></tr></thead><tbody><tr class=""><td>主题</td><td>同时涉及本地/端侧推理与数据可控性</td><td>仅讨论模型能力或仅讨论合规条文</td></tr><tr class=""><td>时间</td><td>2019-01-01 至 2026-09-12</td><td>早于 2019 或为预印本未评审版本</td></tr><tr class=""><td>类型</td><td>期刊论文、会议论文、可核查的机构报告</td><td>新闻稿、厂商白皮书、无方法说明的博客</td></tr><tr class=""><td>语言</td><td>中文、英文</td><td>其他语种（未做翻译检索）</td></tr><tr class=""><td>可核查性</td><td>方法、样本与数据可得性有明确说明</td><td>关键数据不可得或拒绝提供</td></tr></tbody></table></div><div><h3>筛选执行说明</h3><p>初检 412 篇中 94 篇为重复记录，去重后 318 篇；摘要阶段排除主题不符 208 篇、非研究性文本 14 篇；全文评估阶段有 8 篇无法获取全文，最终纳入 68 篇。筛选由 2 名研究者独立完成，分歧 11 篇交第三人裁定。</p></div></div>
+  <div class="pf"><span>漏斗各阶段数量合计自洽：318 − 96 − 74 − 68 的逐级排除记录见附录</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Landscape</div><h2>年份、方法与主题三维分布</h2></div><div class="pn">68 篇全部纳入统计<br>2026 年仅覆盖 1–9 月，绝对值不可与整年比较</div></div>
+  <div class="pc"><div><h3>年份分布（篇）</h3><div class="bars"><div class="bar"><span>2019</span><span class=""><i class="" style="width:50%"></i></span><span class="v">6</span></div><div class="bar"><span>2020</span><span class=""><i class="" style="width:58%"></i></span><span class="v">7</span></div><div class="bar"><span>2021</span><span class=""><i class="" style="width:67%"></i></span><span class="v">8</span></div><div class="bar"><span>2022</span><span class=""><i class="" style="width:92%"></i></span><span class="v">11</span></div><div class="bar"><span>2023</span><span class=""><i class="" style="width:100%"></i></span><span class="v">12</span></div><div class="bar"><span>2024</span><span class=""><i class="" style="width:100%"></i></span><span class="v">12</span></div><div class="bar"><span>2025</span><span class=""><i class="" style="width:67%"></i></span><span class="v">8</span></div><div class="bar"><span>2026（1–9 月）</span><span class=""><i class="" style="width:33%"></i></span><span class="v">4</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>3</span><span>6</span><span>9</span><span>12</span></span><span></span></div></div></div><div class="cols2 wide"><div><h3>方法分布（篇）</h3><table><thead><tr><th>研究方法</th><th class="n">篇数</th><th class="n">占比</th><th>平均证据强度</th></tr></thead><tbody><tr class=""><td>实证研究</td><td class="n n">31</td><td class="n">45%</td><td>中偏高（强证据 12 篇）</td></tr><tr class=""><td>案例研究</td><td class="n n">19</td><td class="n">28%</td><td>中（强证据 4 篇）</td></tr><tr class=""><td>综述与元分析</td><td class="n n">12</td><td class="n">18%</td><td>强（强证据 6 篇）</td></tr><tr class=""><td>仿真与推演</td><td class="n n">6</td><td class="n">9%</td><td>弱（无强证据）</td></tr><tr class="tot"><td>合计</td><td class="n">68</td><td class="n">100%</td><td>—</td></tr></tbody></table></div><div><h3>主题 × 年份交叉（重点年份）</h3><table><thead><tr><th>主题</th><th class="n">2019–2021</th><th class="n">2022–2024</th><th class="n">2025–2026</th></tr></thead><tbody><tr class=""><td>端侧推理效率</td><td class="n">6</td><td class="n">14</td><td class="n">4</td></tr><tr class=""><td>数据主权</td><td class="n">2</td><td class="n">9</td><td class="n">8</td></tr><tr class=""><td>人机协作流程</td><td class="n">3</td><td class="n">7</td><td class="n">5</td></tr><tr class=""><td>评测方法</td><td class="n">2</td><td class="n">5</td><td class="n">3</td></tr><tr class="tot"><td>合计</td><td class="n">13</td><td class="n">35</td><td class="n">20</td></tr></tbody></table></div></div></div>
+  <div class="pf"><span>交叉表合计 13 + 35 + 20 = 68，与主题聚类（24/19/15/10）一致</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Themes</div><h2>四主题的成熟度与共识度拆解</h2></div><div class="pn">成熟度 = 该主题内实证篇数占比（阈值 50%）；共识度 = 结论方向一致率（阈值 65%）<br>四格按「成熟度高→低 × 共识度低→高」排布，每格给出文献数</div></div>
+  <div class="pc"><div class="mx"><div><div class="t">高成熟 · 高共识：端侧推理效率（24 篇）</div><p>14 篇实证支持量化与蒸馏可把单位推理成本压到云端方案的 30%–55%。</p><ul class=""><li>成熟度 58%（14/24），高于 50% 阈值</li><li>共识度 92%（22/24），高于 65% 阈值</li></ul></div><div><div class="t">高成熟 · 低共识：数据主权（19 篇）</div><p>10 篇实证（成熟度 53%）；11 篇认为「数据不出域」是硬约束，6 篇认为混合形态可满足。</p><ul class=""><li>共识度 58%（11/19），低于阈值</li><li>分歧根源是「可控」缺操作性定义</li></ul></div><div><div class="t">低成熟 · 高共识：人机协作流程（15 篇）</div><p>5 篇实证（成熟度 33%）；其中 4 篇给出量化提升区间，另 1 篇仅定性结论。</p><ul class=""><li>共识度 67%（10/15），高于阈值</li><li>样本多为单组织案例，外部效度待验证</li></ul></div><div><div class="t">低成熟 · 低共识：评测方法（10 篇）</div><p>2 篇实证（成熟度 20%）；普遍主张任务级评测优于通用榜单，但未给出可复用评测集。</p><ul class=""><li>共识度 40%（4/10），低于阈值</li><li>无一篇公开完整评测集与脚本</li></ul></div></div><div class="cols2 eq"><div><h3>主题间引用关系</h3><ul class=""><li>「数据主权」与「评测方法」几乎无交叉引用（交叉引用仅 3 次）</li><li>「端侧推理效率」为被引最多的主题，被其余三主题合计引用 87 次</li><li>「人机协作流程」的 15 篇中有 9 篇同时引用「数据主权」，说明流程研究正被合规议题拉动</li></ul></div><div><h3>四个主题的下一步</h3><ul class=""><li>端侧推理效率：已可支撑工程决策，转为持续跟踪</li><li>数据主权：需要统一「可控」的操作性定义，这是最紧迫的理论工作</li><li>人机协作流程：需要多组织对照研究，单案例结论不足以推广</li><li>评测方法：缺口最大，也最容易由实践者补齐</li></ul></div></div><div><h3>共识度与成熟度的计算明细</h3><table><thead><tr><th>主题</th><th class="n">共识度</th><th class="n">成熟度（实证占比）</th><th>计算方式</th></tr></thead><tbody><tr class=""><td>端侧推理效率</td><td class="n">92%（22/24）</td><td class="n">58%（14/24）</td><td>结论方向一致文献数 ÷ 该主题总文献数</td></tr><tr class=""><td>数据主权</td><td class="n">58%（11/19）</td><td class="n">47%（9/19）</td><td>同上，方向按「是否认可硬约束」判定</td></tr></tbody></table></div></div>
+  <div class="pf"><span>共识度按结论方向而非结论强度计算，计算明细见附录</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Claims & Evidence</div><h2>关键观点与证据强度</h2></div><div class="pn">支撑文献数指明确支持该观点的篇数<br>强度按第 2 页规则判定</div></div>
+  <div class="pc"><table><thead><tr><th>#</th><th>观点</th><th>支撑文献数</th><th>代表文献</th><th>证据强度</th><th>反向证据</th></tr></thead><tbody><tr class=""><td>1</td><td>量化与蒸馏可把单位推理成本降至云端方案的 30%–55%</td><td>14 / 24</td><td>R03、R11、R26</td><td>强</td><td>2 篇指出长上下文场景收益显著缩水</td></tr><tr class=""><td>2</td><td>数据不出域在多行业是采购的硬约束</td><td>11 / 19</td><td>R07、R31、R44</td><td>中</td><td>6 篇认为混合形态已满足要求</td></tr><tr class=""><td>3</td><td>把审批与回溯嵌入流程可提高落地率</td><td>10 / 15</td><td>R19、R52</td><td>中</td><td>其中 4 篇给出 20–35pct 量化区间，均为单组织案例</td></tr><tr class=""><td>4</td><td>任务级评测比通用榜单更贴近业务表现</td><td>8 / 10</td><td>R09、R60</td><td>中</td><td>未给出可复用评测集</td></tr><tr class=""><td>5</td><td>端侧部署的能耗与散热在连续负载下成为新瓶颈</td><td>5 / 24</td><td>R22、R38</td><td>弱</td><td>多为仿真结论，缺实测</td></tr></tbody></table><div class="cols2 eq"><div><h3>证据强度的现实含义</h3><ul class=""><li>仅观点 1 达到「强」，可直接用于方案取舍；其余需补内部验证</li><li>观点 5 虽只有 5 篇支持但全部指向同一风险，值得纳入设计余量考量</li><li>19 篇数据主权文献中，仅 4 篇给出可操作的定义，理论与实践的落差明显</li></ul></div><div><h3>可复用的量化结论</h3><ul class=""><li>推理成本压降区间：30%–55%（14 篇一致）</li><li>落地率提升区间：20–35 个百分点（10 篇）</li><li>端侧能耗增幅：连续负载 3 小时后功耗上升 18%–24%（2 篇实测）</li></ul></div></div><div><h3>五条观点的落地建议与验证方式</h3><table><thead><tr><th>观点</th><th>落地建议</th><th>验证方式</th><th>责任</th></tr></thead><tbody><tr class=""><td>1 端侧成本压降 30%–55%</td><td>按 30% 保守值做 3 类负载的成本测算</td><td>内部实测复核成本曲线</td><td>工程 + 财务</td></tr><tr class=""><td>2 数据不出域是硬约束</td><td>把「数据可控」定义为 3 项可审计指标</td><td>在 1 次采购评审中试用该定义</td><td>安全 + 法务</td></tr><tr class=""><td>3 流程嵌入提升落地率</td><td>把审批与回溯做进既有流程，而非新增步骤</td><td>在 2 个团队做前后对比</td><td>产品</td></tr><tr class=""><td>4 任务级评测更贴近业务</td><td>自建 120 条任务级评测集</td><td>评测集被 ≥ 3 个团队复用</td><td>算法</td></tr><tr class=""><td>5 端侧能耗是新瓶颈</td><td>在硬件选型中预留 25% 功耗余量</td><td>连续负载 3 小时的实测功耗</td><td>工程</td></tr></tbody></table></div></div>
+  <div class="pf"><span>观点 1 为唯一强证据结论，可作为工程决策依据；观点 2、3、4 需内部验证后再引用</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Debates</div><h2>文献冲突与未解问题</h2></div><div class="pn">争议处即研究缺口<br>情景为基于文献的推演，非预测</div></div>
+  <div class="pc"><table><thead><tr><th>争议</th><th>一方观点</th><th>另一方观点</th><th>分歧根源</th><th>影响</th></tr></thead><tbody><tr class=""><td>数据可控的判定标准</td><td>11 篇：数据不出域是硬约束，混合形态不达标</td><td>6 篇：只要可审计、可导出，混合形态即满足</td><td>「可控」缺少操作性定义</td><td>采购门槛宽严不一，方案设计反复</td></tr><tr class=""><td>端侧部署的适用边界</td><td>14 篇：成本优势在中低负载下稳定成立</td><td>5 篇：长上下文与连续负载下优势消失</td><td>负载模型与测试条件不同</td><td>硬件选型余量难以确定</td></tr><tr class=""><td>评测方法的选择</td><td>8 篇：任务级评测更贴近业务</td><td>综述类文献倾向沿用公开榜单便于比较</td><td>缺少共同基准</td><td>跨研究结论不可比</td></tr></tbody></table><div><h3>三种推演：如果争议被解决</h3><div class="bars"><div class="bar"><span>可控定义统一 → 采购周期</span><span class=""><i class="" style="width:40%"></i></span><span class="v">缩短 30%</span></div><div class="bar"><span>负载边界明确 → 硬件余量</span><span class=""><i class="" style="width:55%"></i></span><span class="v">下调 15%</span></div><div class="bar"><span>评测集公开 → 结论可比性</span><span class=""><i class="" style="width:75%"></i></span><span class="v">提升显著</span></div><div class="bar"><span>维持现状 → 复用成本</span><span class=""><i class="" style="width:100%"></i></span><span class="v">不变</span></div><div class="axis"><span></span><span class="t"><span>低</span><span>中</span><span>高</span></span><span></span></div></div></div><div class="cols2 eq"><div><h3>三个未解问题</h3><ul class=""><li>「数据可控」能否给出可测量、可审计的操作性定义？</li><li>在什么负载区间内，端侧部署的总拥有成本低于云端？</li><li>任务级评测集能否公开、复用并跨组织比较？</li></ul></div><div><h3>本综述不做的事</h3><ul class=""><li>不裁决争议，只呈现分歧与证据强度</li><li>不纳入未评审的预印本，避免引入未定稿结论</li><li>不做元分析合并，各研究方法异质性过高</li></ul></div></div></div>
+  <div class="pf"><span>三组争议集中指向同一基础工作：操作性定义与共同基准的缺位</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Gaps & Risks</div><h2>研究缺口、检索局限与偏倚</h2></div><div class="pn">缺口按对本业务的紧迫度排序<br>偏倚项标注可检验方式</div></div>
+  <div class="pc"><table><thead><tr><th>缺口 / 风险</th><th>表现</th><th>影响</th><th>补齐方式</th></tr></thead><tbody><tr class=""><td>缺少操作性定义</td><td>「数据可控」在 19 篇中定义各不相同</td><td>结论无法直接用于采购门槛设计</td><td>自行定义并以内部数据校准</td></tr><tr class=""><td>无公开任务级评测集</td><td>10 篇评测文献均未提供完整数据集</td><td>无法横向比较方案效果</td><td>自建 120 条任务的内部评测集</td></tr><tr class=""><td>检索语种仅中英</td><td>其他语种未纳入</td><td>可能遗漏区域性研究</td><td>下一轮加入日文与德文检索</td></tr><tr class=""><td>中文库覆盖有限</td><td>Q3 命中 86 篇，明显少于英文组</td><td>中文实践类研究可能被低估</td><td>增补 2 个中文库重跑 Q3</td></tr><tr class=""><td>预印本全部排除</td><td>最新方法可能晚 6–12 个月进入综述</td><td>结论时效性偏保守</td><td>对前 5 篇预印本单独标注跟踪</td></tr></tbody></table><div class="cols2 eq"><div><h3>覆盖偏倚检查</h3><ul class=""><li>年份偏倚：2022–2024 占 35/68（51%），与端侧部署关注度上升一致</li><li>方法偏倚：仿真相对于实证更易发表负面结论，观点 5 可能被放大</li><li>组织偏倚：案例研究 19 篇中有 12 篇来自同一类制造业场景</li></ul></div><div><h3>检索复现说明</h3><ul class=""><li>检索式、日期与数据库均在第 3 页与附录列出，可完整复现</li><li>全文评估阶段的排除原因逐条留存，可复核</li><li>证据强度判定由 2 人独立完成，分歧 7 篇交第三人裁定</li></ul></div></div><div><h3>缺口的补齐方式与排期</h3><table><thead><tr><th>缺口</th><th>补齐方式</th><th>责任</th><th>时间</th></tr></thead><tbody><tr class=""><td>操作性定义缺位</td><td>自建定义并在采购评审中试用</td><td>安全 + 法务</td><td>0–3 月</td></tr><tr class=""><td>无公开任务级评测集</td><td>自建 120 条任务集并开放复用</td><td>算法</td><td>3–6 月</td></tr><tr class=""><td>检索语种仅中英</td><td>增加日文与德文两组检索式</td><td>研究</td><td>下一轮检索</td></tr><tr class=""><td>中文库覆盖有限</td><td>增补 2 个中文库重跑 Q3</td><td>研究</td><td>下一轮检索</td></tr></tbody></table></div></div>
+  <div class="pf"><span>覆盖偏倚中「案例集中于制造业」对观点 3 的外部效度影响最大</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Conclusions</div><h2>结论与后续追踪动作</h2></div><div class="pn">结论只采信第 6 页证据强度为「强」或跨主题一致的观点<br>追踪动作按季度执行</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">结论一</div><b class="n">端侧成本优势可采信</b><i>14 篇一致给出 30%–55% 压降区间，唯一强证据</i></div><div class="kc"><div class="k">结论二</div><b class="n">数据可控需自建定义</b><i>19 篇中仅 4 篇给出可操作定义，无法直接引用</i></div><div class="kc"><div class="k">结论三</div><b class="n">评测集是最大机会</b><i>评测方法仅 10 篇，且无公开基准</i></div></div><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>以 14 篇实证的压降区间为输入，完成一次内部端侧成本测算（覆盖 3 类负载），输出硬件余量建议</span></div><div class="r"><b>3–6 月</b><span>自建 120 条任务级评测集，覆盖 4 类业务场景；把「数据可控」定义为 3 项可审计指标（部署形态、导出能力、日志留存）</span></div><div class="r"><b>6–12 月</b><span>对观点 2、3、4 做内部验证；每季度重跑一次检索式，跟踪预印本转正情况</span></div></div></div><div class="cols2 eq"><div><h3>责任与交付物</h3><table><thead><tr><th>动作</th><th>负责角色</th><th>交付物</th></tr></thead><tbody><tr class=""><td>端侧成本测算</td><td>工程 + 财务</td><td>测算表 + 硬件建议</td></tr><tr class=""><td>评测集建设</td><td>算法</td><td>120 条任务集 + 脚本</td></tr><tr class=""><td>季度检索跟踪</td><td>研究</td><td>差异清单（新增/排除）</td></tr></tbody></table></div><div><h3>衡量指标</h3><ul class=""><li>评测集复用次数 / 目标 ≥ 3 个团队使用</li><li>「数据可控」定义被 ≥ 1 次采购评审采用</li><li>季度检索新增文献纳入率 / 关注是否 ≥ 15%</li><li>强证据观点占比 / 目标从 32% 提到 50%</li></ul></div></div><div><h3>季度追踪计划</h3><table><thead><tr><th>动作</th><th>频率</th><th>输出</th><th>触发升级条件</th></tr></thead><tbody><tr class=""><td>重跑 4 组检索式</td><td>每季度</td><td>新增 / 排除文献差异清单</td><td>单季度新增 ≥ 15 篇纳入级文献</td></tr></tbody></table></div></div>
+  <div class="pf"><span>结论仅覆盖证据充分项；观点 5 作为设计余量输入，不作为决策依据</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>参考来源、检索明细与术语</h2></div><div class="pn">完整文献清单 R01–R68 随报告附件提供<br>本页为可公开的来源构成</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>来源构成</th><th>规模</th><th>时间窗</th><th>用途</th></tr></thead><tbody><tr class=""><td>Q1</td><td>英文学术库：local inference / on-device</td><td>158 篇</td><td>2019 – 2026-09</td><td>主题 1、4</td></tr><tr class=""><td>Q2</td><td>英文学术库：data sovereignty / residency</td><td>112 篇</td><td>2019 – 2026-09</td><td>主题 2</td></tr><tr class=""><td>Q3</td><td>中文库：本地推理 / 数据不出域</td><td>86 篇</td><td>2019 – 2026-09</td><td>主题 2、3</td></tr><tr class=""><td>Q4</td><td>英文学术库：human-in-the-loop + audit</td><td>56 篇</td><td>2019 – 2026-09</td><td>主题 3</td></tr><tr class=""><td>S1</td><td>机构公开报告（可核查方法）</td><td>7 篇</td><td>2023 – 2026</td><td>背景与量级对照</td></tr><tr class=""><td>S2</td><td>被纳入文献的参考文献回溯</td><td>23 篇</td><td>2019 – 2026</td><td>补充检索</td></tr></tbody></table><div class="cols2 eq"><div><h3>术语表</h3><ul class=""><li><b>端侧推理</b>：在终端或客户自有硬件上完成模型推理</li><li><b>量化 / 蒸馏</b>：降低推理成本的两类主要模型压缩手段</li><li><b>证据强度</b>：强 / 中 / 弱，规则见第 2 页</li><li><b>共识度</b>：结论方向一致文献数 ÷ 该主题总文献数</li><li><b>任务级评测</b>：以真实业务任务而非通用榜单衡量效果</li></ul></div><div><h3>附录与免责</h3><ul class=""><li>68 篇文献的编号、题名、年份、方法见随报告附件（附件不入本页）</li><li>证据强度判定记录包含 2 名评定人与 7 篇第三人裁定记录</li><li>综述结论反映文献观点，不代表本团队实测结果</li><li>追踪版本 v2026.09，下次重跑检索 2026-12-12</li></ul></div></div><div><h3>附件与留存</h3><table><thead><tr><th>附件</th><th>内容</th><th>留存期</th></tr></thead><tbody><tr class=""><td>文献清单</td><td>R01–R68 的题名、年份、方法与编号</td><td>随报告长期留存</td></tr></tbody></table></div></div>
+  <div class="pf"><span>检索式明细可完整复现 · 追踪版本 v2026.09 · 下次重跑 2026-12-12</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

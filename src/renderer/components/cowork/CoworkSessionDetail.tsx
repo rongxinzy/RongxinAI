@@ -10,10 +10,15 @@ import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { resolveArtifactPath } from '../../../shared/cowork/artifactPath';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
-import type { ProductionLoopMode } from '../../../shared/productionLoop';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
+import type { DetectedArtifact } from '../../services/artifactParser';
+import {
+  openAvailableArtifact,
+  prepareAvailableArtifacts,
+} from '../../services/artifactAvailability';
 import {
   detectArtifactsFromMessages,
   getArtifactTypeFromExtension,
@@ -29,6 +34,7 @@ import {
   selectIsStreaming,
   selectRemoteManaged,
 } from '../../store/selectors/coworkSelectors';
+import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import {
   addArtifact,
   activateSessionArtifactView,
@@ -100,8 +106,6 @@ import {
   COWORK_COMPOSER_INSET_VALUE,
   useCoworkComposerInset,
 } from './hooks/useCoworkComposerInset';
-import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
-import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
 import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
@@ -122,12 +126,10 @@ interface CoworkSessionDetailProps {
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   onContinue: (
     prompt: string,
-    skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,
-    productionLoopMode?: ProductionLoopMode,
   ) => boolean | void | Promise<boolean | void>;
   onStop: () => void;
   isSidebarCollapsed?: boolean;
@@ -135,9 +137,6 @@ interface CoworkSessionDetailProps {
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
   workMode?: 'work' | 'chat';
-  isDirectChat?: boolean;
-  localThinkingEnabled?: boolean;
-  onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
   inlineQuestionPermission?: CoworkPermissionRequest | null;
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
   inlinePermission?: CoworkPermissionRequest | null;
@@ -204,9 +203,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onNewChat,
   updateBadge,
   workMode = 'work',
-  isDirectChat = false,
-  localThinkingEnabled,
-  onLocalThinkingEnabledChange,
   inlineQuestionPermission,
   onRespondToInlineQuestion,
   inlinePermission,
@@ -294,6 +290,46 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   );
 
   const artifactDetectionServiceRef = useRef<ArtifactDetectionService | null>(null);
+  // Whether this session produced anything while we were watching it. Revealing the
+  // artifact panel is a live-delivery signal: opening an old session must not pop
+  // the panel for artifacts it already had.
+  const liveRunRef = useRef(false);
+  const isStreamingRef = useRef(isStreaming);
+  const detectionQueueRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+    // Sticky on purpose: detection runs once the run has settled, so liveness has
+    // to outlive the streaming flag.
+    if (isStreaming) liveRunRef.current = true;
+  }, [isStreaming]);
+  // A session that is already streaming has no transition to observe, so liveness
+  // follows the current streaming state on every session switch.
+  useEffect(() => {
+    liveRunRef.current = isStreamingRef.current;
+  }, [sessionId]);
+
+  // Adds a detection batch, revealing only the artifacts the agent declared as
+  // deliverables during a live run and whose file is actually readable. The
+  // readability probe runs for the whole batch before anything is dispatched, so
+  // insertion order (and therefore "newest deliverable wins") never depends on
+  // which file happened to be read first.
+  const addDetectedArtifacts = useCallback(
+    async (detected: DetectedArtifact[]) => {
+      const targetSessionId = sessionId;
+      if (!targetSessionId) return;
+
+      const available = await prepareAvailableArtifacts(
+        detected,
+        liveRunRef.current,
+        currentSession?.cwd,
+      );
+
+      available.forEach(({ artifact, reveal }) => {
+        dispatch(addArtifact({ sessionId: targetSessionId, artifact, reveal }));
+      });
+    },
+    [dispatch, sessionId, currentSession?.cwd],
+  );
 
   // Initialize/replace artifact detection service when session changes
   useEffect(() => {
@@ -304,17 +340,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
 
     const service = new ArtifactDetectionService(detected => {
-      for (const { artifact } of detected) {
-        // Keep path-backed artifacts visible while their file contents remain deferred.
-        dispatch(addArtifact({ sessionId, artifact }));
-      }
+      // Batches must land in detection order: a slow readability probe in an older
+      // batch must not settle the selection after a newer batch was added.
+      detectionQueueRef.current = detectionQueueRef.current
+        .then(() => addDetectedArtifacts(detected))
+        .catch(error => {
+          console.error('[ArtifactDetection] failed to add detected artifacts:', error);
+        });
     });
     artifactDetectionServiceRef.current = service;
 
     return () => {
       service.terminate();
     };
-  }, [sessionId, dispatch]);
+  }, [sessionId, dispatch, addDetectedArtifacts]);
 
   useEffect(() => {
     let animationFrame: number | undefined;
@@ -351,6 +390,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       setIsArtifactPanelTransitioning(true);
       setIsArtifactPanelVisible(false);
       transitionTimeout = window.setTimeout(() => {
+        setShouldRenderArtifactPanel(false);
+        setPreviewSessionId(null);
         setIsArtifactPanelTransitioning(false);
       }, ARTIFACT_PANEL_TRANSITION_MS);
     }
@@ -417,22 +458,24 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     if (!persisted || persisted.length === 0) return;
 
     const existingIds = new Set((previewArtifacts || []).map(a => a.id));
-    for (const artifact of persisted) {
-      // Only add if not already present. Path-level deduplication in the
-      // artifact slice reconciles persisted declarations with loaded files.
-      if (!existingIds.has(artifact.id)) {
-        dispatch(
-          addArtifact({
-            sessionId,
-            artifact: {
-              ...artifact,
-              sessionId,
-            },
-          }),
-        );
-      }
-    }
-  }, [sessionId, currentSession?.artifacts]); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    void prepareAvailableArtifacts(
+      persisted
+        .filter(artifact => !existingIds.has(artifact.id))
+        .map(artifact => ({
+          artifact: { ...artifact, sessionId },
+          needsFileLoad: Boolean(artifact.filePath),
+        })),
+      false,
+      currentSession?.cwd,
+    ).then(available => {
+      if (cancelled) return;
+      available.forEach(({ artifact }) => dispatch(addArtifact({ sessionId, artifact })));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, currentSession?.artifacts, currentSession?.cwd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Synchronous artifact detection on session mount so artifact cards
   // appear in the first-paint frame instead of popping in after the async
@@ -444,6 +487,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const detected = detectArtifactsFromMessages(currentSession.messages, sessionId);
     if (detected.length > 0) {
       for (const { artifact } of detected) {
+        // Inline content is immediately available; file candidates use the validated worker batch.
+        if (artifact.filePath) continue;
         dispatch(addArtifact({ sessionId, artifact }));
       }
       // The async useEffect pass below will also call processMessages.
@@ -464,6 +509,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- message count and updatedAt cover message additions and content updates
   }, [sessionId, messagesLength, currentSession?.updatedAt, isStreaming]);
 
+  // The session the registered document listeners belong to. A link probe that
+  // settles after a session switch (or after unmount) must not change the
+  // selection of a session the user has already left.
+  const artifactListenerSessionIdRef = useRef<string | null>(sessionId ?? null);
+  useEffect(() => {
+    artifactListenerSessionIdRef.current = sessionId ?? null;
+    return () => {
+      artifactListenerSessionIdRef.current = null;
+    };
+  }, [sessionId]);
+
   // Intercept clicks on artifact-compatible file links → open in panel
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -476,16 +532,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const href = anchor.getAttribute('href') || '';
       if (!href.startsWith('file://')) return;
 
-      let filePath: string;
-      try {
-        filePath = decodeURIComponent(href.replace(/^file:\/\//, ''));
-      } catch {
-        filePath = href.replace(/^file:\/\//, '');
-      }
-      // Strip leading / before Windows drive letter
-      if (/^\/[A-Za-z]:/.test(filePath)) {
-        filePath = filePath.slice(1);
-      }
+      const filePath = resolveArtifactPath(href);
 
       const lastDot = filePath.lastIndexOf('.');
       if (lastDot === -1) return;
@@ -500,7 +547,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick,
       );
       if (existing) {
-        dispatch(selectArtifact(existing.id));
+        // The probe may settle after the user switched sessions; only a verdict for
+        // the session that registered this listener may change the selection.
+        void openAvailableArtifact(
+          existing,
+          () => dispatch(selectArtifact(existing.id)),
+          currentSession?.cwd,
+          { isCurrent: () => artifactListenerSessionIdRef.current === sessionId },
+        );
       }
       // No fallback creation — artifacts are now declared via declare_artifact tool,
       // not created from ad-hoc link clicks or regex parsing.
@@ -508,7 +562,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     container.addEventListener('click', handleLinkClick, true);
     return () => container.removeEventListener('click', handleLinkClick, true);
-  }, [sessionId, sessionArtifacts, dispatch]);
+  }, [sessionId, sessionArtifacts, dispatch, currentSession?.cwd]);
   // ─── End artifact detection ─────────────────────────────────────────
 
   // Cleanup nav timers on unmount
@@ -951,10 +1005,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   );
 
   const messages = currentSession?.messages;
-  const todoQueue = useTodoQueueLifecycle({
-    isStreaming,
-    sessionId,
-  });
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
@@ -1105,7 +1155,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 pendingPermission={isLastTurn ? inlinePermission : null}
                 onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
                 expandToolResults={isExportingImage}
-                hideDefaultAssistantHeader={hideDefaultAssistantHeader}
+                // 2026/09/20 lixiang  验收卡放在末轮复制按钮上方（issue #805）
+                beforeCopySlot={
+                  isLastTurn && sessionId ? (
+                    <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
+                  ) : null
+                }
               />
             </div>
           )}
@@ -1127,7 +1182,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   return (
     <CoworkSessionLayout
-      title={currentSession.title || i18nService.t('coworkNewSession')}
+      title={resolveSessionDisplayTitle(currentSession, i18nService.getLanguage()) || i18nService.t('coworkNewSession')}
       sessionId={sessionId}
       isSessionSwitching={isSessionSwitching}
       isSidebarCollapsed={isSidebarCollapsed}
@@ -1136,7 +1191,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       onNewChat={onNewChat}
       onToggleArtifactPanel={() => dispatch(togglePanel())}
       updateBadge={updateBadge}
-      runIndicator={isSessionSwitching ? null : <CoworkRunStatus key={currentSession.id} sessionId={currentSession.id} isStreaming={isStreaming} isDirectChat={isDirectChat} />}
+      runIndicator={isSessionSwitching ? null : <CoworkRunStatus key={currentSession.id} sessionId={currentSession.id} isStreaming={isStreaming} />}
     >
       {/* Export Options Modal */}
       {!isSessionSwitching && showExportOptions && (
@@ -1253,18 +1308,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                       onRespondToInlinePermission &&
                       !hasInlineToolPermissionCard && (
                       <div className="px-3 pt-3">
-                        <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
+                        <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
                           <CoworkPermissionModal
                             permission={inlinePermission}
                             onRespond={onRespondToInlinePermission}
                             inline
                           />
                         </div>
-                      </div>
-                    )}
-                    {sessionId && (
-                      <div className="px-3 pt-3">
-                        <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
                       </div>
                     )}
                   </div>
@@ -1528,7 +1578,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             ref={composerOverlayRef}
             className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
           >
-            <div className="mx-auto w-full max-w-5xl min-w-[320px] pl-4">
+            <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
               <div className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4">
                 <CoworkPromptInput
                   ref={promptInputRef}
@@ -1536,14 +1586,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                     isSessionSwitching ? null : (
                       <>
                         {workMode === CoworkSessionMode.Work &&
-                          !isDirectChat &&
                           currentSession?.id && (
                             <PendingMessageQueue
                               sessionId={currentSession.id}
                               isStreaming={isStreaming}
                             />
                           )}
-                        <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
                       </>
                     )
                   }
@@ -1572,10 +1620,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   permissionMode={permissionMode}
                   onPermissionModeChange={onPermissionModeChange}
                   showModelSelector={true}
-                  isDirectChat={isDirectChat}
-                  showLocalThinkingToggle={isDirectChat}
-                  localThinkingEnabled={localThinkingEnabled}
-                  onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
                   resumeTaskActive={Boolean(resumeTaskId)}
                   onCancelTaskResume={onCancelTaskResume}
                   sessionId={displayedSessionId ?? currentSession?.id}

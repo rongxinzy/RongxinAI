@@ -133,7 +133,6 @@ export const WorkbenchArtifactCandidateSource = {
   Declaration: 'declaration',
   ToolEffect: 'tool_effect',
   DomainWorkflow: 'domain_workflow',
-  ProductionInspection: 'production_inspection',
 } as const;
 export type WorkbenchArtifactCandidateSource =
   (typeof WorkbenchArtifactCandidateSource)[keyof typeof WorkbenchArtifactCandidateSource];

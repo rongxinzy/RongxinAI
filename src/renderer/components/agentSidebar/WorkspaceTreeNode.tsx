@@ -7,7 +7,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
-import { Ellipsis, FolderOpen, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { Ellipsis, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -28,7 +28,11 @@ interface WorkspaceTreeNodeProps {
   workspace: WorkspaceSidebarNode;
   isBatchMode: boolean;
   selectedIds: Set<string>;
+  /** 当前选中的工作区（右侧应对齐到该项目） */
+  isActiveWorkspace?: boolean;
   onToggleExpanded: (workspaceId: string) => void;
+  /** 点击项目名称：切换当前工作区并定位右侧 */
+  onSelectWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onCreateTask: (workspace: WorkspaceSidebarNode) => void;
   onRenameWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onRemoveWorkspace?: (workspace: WorkspaceSidebarNode) => void;
@@ -52,7 +56,9 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   workspace,
   isBatchMode,
   selectedIds,
+  isActiveWorkspace = false,
   onToggleExpanded,
+  onSelectWorkspace,
   onCreateTask,
   onRenameWorkspace,
   onRemoveWorkspace,
@@ -82,10 +88,6 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
     typeof onRenameWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
   const canManage = canRemove || canRename;
 
-  const handleOpenWorkspaceFolder = () => {
-    void window.electron.shell.openPath(workspace.path);
-  };
-
   useEffect(() => {
     let frame = 0;
     let timeout = 0;
@@ -112,12 +114,23 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
     <div className="space-y-0.5">
       <div
         data-slot="workspace-tree-row"
-        className="sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors hover:shadow-subtle"
+        className={cn(
+          'sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors hover:shadow-subtle',
+          // 2026/09/22 lixiang  文件夹选中保持原先灰底；白底选中仅用于其下会话行
+          isActiveWorkspace && 'bg-surface-raised',
+        )}
       >
         <Button
           variant="ghost"
           className="theme-page-workspace-tree-node-button-1 h-full min-w-0 flex-1 justify-start text-left"
-          onClick={() => onToggleExpanded(workspace.id)}
+          onClick={() => {
+            // 2026/09/21 lixiang  有定位回调时切换右侧项目；当前项目再点则折叠/展开
+            if (onSelectWorkspace) {
+              onSelectWorkspace(workspace);
+              return;
+            }
+            onToggleExpanded(workspace.id);
+          }}
           onMouseEnter={() => {
             if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
           }}
@@ -125,11 +138,19 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
           role="treeitem"
           aria-level={1}
           aria-expanded={workspace.isExpanded}
+          aria-current={isActiveWorkspace ? 'true' : undefined}
         >
-          <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+          {/* 2026/09/22 lixiang  文件夹标识用正文色（浅色≈黑） */}
+          <span className="flex size-4 shrink-0 items-center justify-center text-foreground">
             <AnimatedFolderOpenIcon ref={folderIconRef} />
           </span>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground" title={workspace.path}>
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate text-muted-foreground',
+              isActiveWorkspace && 'font-semibold text-foreground',
+            )}
+            title={workspace.path}
+          >
             {workspace.name}
           </span>
         </Button>
@@ -172,10 +193,6 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 }
               />
               <DropdownMenuContent align="end" className="min-w-[124px]">
-                <DropdownMenuItem onClick={handleOpenWorkspaceFolder}>
-                  <FolderOpen className="h-3.5 w-3.5" />
-                  {i18nService.t('openFolder')}
-                </DropdownMenuItem>
                 {canRename && (
                   <DropdownMenuItem onClick={() => onRenameWorkspace(workspace)}>
                     <Pencil className="h-3.5 w-3.5" />

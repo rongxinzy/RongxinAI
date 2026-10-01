@@ -375,7 +375,7 @@ select::-ms-expand {
   transition-duration: 340ms;
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
-/* 获焦只改边框色，光晕交给 ::before/::after，避免再叠一圈描边 */
+/* 2026/09/20 lixiang  获焦只保留 1px 边框，不再叠一层 box-shadow 实线 */
 .input-aura:focus-within [data-slot='input-group'] {
   border-color: color-mix(in oklch, var(--ring) 40%, transparent);
   border-width: 1px;

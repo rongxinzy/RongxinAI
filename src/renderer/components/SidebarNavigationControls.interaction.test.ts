@@ -118,7 +118,7 @@ test('preserves activity status and skill-aware new-conversation highlighting', 
     screen.getByTestId('sidebar-view-activity').querySelector('span[aria-hidden="true"]'),
   ).toBeTruthy();
   view.rerender(createElement(SidebarNavigationControls, { ...handlers, workMode: WorkMode.Chat }));
-  expect(screen.getByTestId('sidebar-new-conversation')).toHaveAttribute('data-active', 'false');
+  expect(screen.getByTestId('sidebar-new-conversation')).not.toHaveAttribute('data-active');
   mocks.state = { activity: { runs: [] }, skill: { activeSkillIds: [] } };
   view.rerender(createElement(SidebarNavigationControls, { ...handlers, workMode: WorkMode.Chat }));
   expect(screen.getByTestId('sidebar-new-conversation')).toHaveAttribute('data-active', 'true');

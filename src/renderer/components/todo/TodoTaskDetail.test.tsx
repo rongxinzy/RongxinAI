@@ -46,6 +46,7 @@ const renderDetail = (
       onUpdated={onUpdated}
       onError={vi.fn()}
       onDelete={vi.fn()}
+      onSaved={vi.fn()}
     />,
   );
 };
@@ -142,6 +143,7 @@ test('an edit made while a save is in flight keeps its value after the save reso
       onUpdated={vi.fn().mockResolvedValue(undefined)}
       onError={vi.fn()}
       onDelete={vi.fn()}
+      onSaved={vi.fn()}
     />,
   );
   expect(titleInput.value).toBe('Second edit');

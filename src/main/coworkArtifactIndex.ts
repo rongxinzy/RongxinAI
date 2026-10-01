@@ -7,7 +7,7 @@ import {
   type CoworkArtifactMessage,
 } from './coworkArtifactCollector';
 
-export const COWORK_ARTIFACT_INDEX_VERSION = 7;
+export const COWORK_ARTIFACT_INDEX_VERSION = 8;
 
 interface ArtifactIndexStateRow {
   cursor_sequence: number;
@@ -120,7 +120,19 @@ export class CoworkArtifactIndex {
            ORDER BY sequence ASC`,
         )
         .all(sessionId, cursor) as MessageRow[];
-      const messages = rows.map(row => this.mapMessage(row));
+      const contextRows =
+        !rebuild && rows.length > 0
+          ? (this.db
+              .prepare(
+                `SELECT id, type, content, metadata, created_at, sequence
+                 FROM cowork_messages
+                 WHERE session_id = ? AND sequence <= ?
+                 ORDER BY sequence DESC
+                 LIMIT 1`,
+              )
+              .all(sessionId, cursor) as MessageRow[])
+          : [];
+      const messages = [...contextRows, ...rows].map(row => this.mapMessage(row));
       for (const candidate of collectSessionArtifactCandidates(messages)) {
         this.upsertCandidate(sessionId, candidate);
       }

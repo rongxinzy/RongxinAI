@@ -17,7 +17,6 @@ export function classicInteractiveSurfaces(dark: boolean) {
     'border-style': 'solid',
     'border-color': 'var(--border)',
   };
-  const sidebar = 'color-mix(in srgb, var(--zy-text-primary) 4%, transparent)';
   const session = dark
     ? 'color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent)'
     : 'color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent)';
@@ -124,6 +123,8 @@ export function classicInteractiveSurfaces(dark: boolean) {
     'surface-agent-row': recipe({
       base: {
         ...transition,
+        ...border,
+        'border-color': 'transparent',
         'border-radius': 'var(--zy-style-radius-md)',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
@@ -131,12 +132,23 @@ export function classicInteractiveSurfaces(dark: boolean) {
       focus,
       pressed,
     }),
+    // 2026/09/22 lixiang  选中会话用 card 白底+描边+加粗，对齐「新建任务」导航选中，避免灰底不显眼
     'surface-agent-selected': recipe({
-      base: { 'background-color': sidebar, color: 'var(--foreground)' },
+      base: {
+        ...border,
+        'background-color': 'var(--card)',
+        color: 'var(--foreground)',
+        'font-weight': 'var(--zy-component-font-weight-semibold)',
+      },
     }),
     'surface-agent-idle': recipe({
       base: { color: 'var(--muted-foreground)' },
-      hover: { 'background-color': sidebar, color: 'var(--foreground)' },
+      // 2026/09/22 lixiang  hover 与选中同用 card 白底，避免灰底与白底选中不一致
+      hover: {
+        ...border,
+        'background-color': 'var(--card)',
+        color: 'var(--foreground)',
+      },
     }),
     'surface-agent-inactive': recipe({
       base: { 'background-color': 'transparent', color: 'var(--zy-text-secondary)' },

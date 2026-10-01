@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import {
+  CodingErrorMessage,
   type CodingAgentAvailableCommand,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
@@ -138,7 +139,7 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     return { authenticated: true, canAuthenticate: false };
   }
   async authenticate(_request: CodingAgentAuthRequest): Promise<void> {
-    throw new Error('The built-in coding agent does not require authentication.');
+    throw new Error(CodingErrorMessage.BuiltinAuthNotRequired);
   }
   async createSession(input: {
     workspaceRoot: string;
@@ -193,7 +194,7 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     await this.runtime.cancel(sessionId);
   }
   async respondToPermission(_response: CodingPermissionResponse): Promise<void> {
-    throw new Error('Built-in permissions are handled by the coding runtime.');
+    throw new Error(CodingErrorMessage.BuiltinPermissionsRuntime);
   }
   async setConfigOption(
     sessionId: string,
@@ -203,12 +204,12 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     const options = this.sessionConfigOptions.get(sessionId) ?? this.buildOptions();
     this.sessionConfigOptions.set(sessionId, options);
     const option = options.find(candidate => candidate.id === configId);
-    if (!option) throw new Error('The built-in coding agent configuration option was not found.');
+    if (!option) throw new Error(CodingErrorMessage.BuiltinConfigOptionNotFound);
     if (
       typeof value !== 'string' ||
       !option.options?.some(candidate => candidate.value === value)
     ) {
-      throw new Error('The selected built-in coding agent configuration value is invalid.');
+      throw new Error(CodingErrorMessage.BuiltinConfigValueInvalid);
     }
     option.currentValue = value;
     if (configId === BuiltinCodingConfigId.ThinkingLevel) {

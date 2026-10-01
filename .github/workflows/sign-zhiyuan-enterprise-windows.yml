@@ -1,0 +1,299 @@
+name: Sign Zhiyuan Enterprise Windows package
+
+# Central Certum signing for the closed rongxinzy/zhiyuanAaaS enterprise
+# Windows installer. The Certum credentials (CERTUM_USER_ID, CERTUM_OTP_URI,
+# CERTUM_CERT_THUMBPRINT) are this repository's existing release environment
+# secrets; callers and satellite repositories do not configure any secret.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Successful zhiyuanAaaS unsigned Build Windows enterprise package Actions run ID
+        required: true
+        type: string
+      release_version:
+        description: 'Enterprise package SemVer matching the unsigned build (e.g. 1.0.0). Optional leading v is stripped. Leave empty to read the version from the unsigned build artifact name.'
+        required: false
+        type: string
+        default: ''
+      aep_base_url:
+        description: AEP base URL baked into resources/zhiyuan-enterprise/config.json of the signed package.
+        required: true
+        type: string
+        default: 'http://172.18.5.188:30196'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: enterprise-certum-signing
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  prepare:
+    if: github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      source-repository: ${{ steps.source.outputs.source-repository }}
+      source-run-id: ${{ steps.source.outputs.source-run-id }}
+      source-sha: ${{ steps.source.outputs.source-sha }}
+      package-version: ${{ steps.source.outputs.package-version }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - id: source
+        name: Validate Zhiyuan Enterprise unsigned package run
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          RUNTIME_ARTIFACT_READ_TOKEN: ${{ secrets.AAAS_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+        run: node scripts/enterprise-signing/prepare.mjs
+      - name: Record handoff identity
+        env:
+          SOURCE_RUN_ID: ${{ steps.source.outputs.source-run-id }}
+          SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.package-version }}
+          AEP_BASE_URL: ${{ inputs.aep_base_url }}
+        run: |
+          {
+            echo '### Zhiyuan Enterprise signing handoff'
+            echo
+            echo "- source run: \`$SOURCE_RUN_ID\`"
+            echo "- source commit: \`$SOURCE_SHA\`"
+            echo "- package version: \`$PACKAGE_VERSION\`"
+            echo "- AEP base URL: \`$AEP_BASE_URL\`"
+            echo "- method: rebuild with \`electron-builder.overlay-signed.cjs\` (app + installer)"
+            echo
+            echo "https://github.com/rongxinzy/zhiyuanAaaS/actions/runs/$SOURCE_RUN_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sign:
+    needs: prepare
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 120
+    steps:
+      - name: Checkout ZhiYuan Certum action and CI scripts
+        uses: actions/checkout@v6
+        with:
+          path: zhiyuan
+      - name: Checkout enterprise extension source commit
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.prepare.outputs.source-repository }}
+          ref: ${{ needs.prepare.outputs.source-sha }}
+          path: aaas
+          token: ${{ secrets.AAAS_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN }}
+      - name: Resolve pinned ZhiYuan core commit
+        id: manifest
+        shell: pwsh
+        run: |
+          $manifest = Get-Content aaas/build/build-manifest.json -Raw | ConvertFrom-Json
+          $commit = $manifest.zhiyuanCore.commit
+          if ($commit -notmatch '^[0-9a-f]{40}$') {
+            throw 'build-manifest.json must pin zhiyuanCore.commit to a full commit SHA.'
+          }
+          "core_commit=$commit" >> $env:GITHUB_OUTPUT
+      - name: Checkout pinned ZhiYuan core
+        uses: actions/checkout@v6
+        with:
+          repository: rongxinzy/RongxinAI
+          ref: ${{ steps.manifest.outputs.core_commit }}
+          path: zhiyuan-core
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Install and verify enterprise extension
+        working-directory: aaas
+        run: |
+          npm ci
+          npm run check
+      - name: Render enterprise AEP config
+        working-directory: aaas
+        shell: pwsh
+        env:
+          INPUT_AEP_BASE_URL: ${{ inputs.aep_base_url }}
+        run: |
+          $baseUrl = "$env:INPUT_AEP_BASE_URL".Trim()
+          if ($baseUrl.Length -eq 0) {
+            throw 'aep_base_url is required for a signed enterprise build.'
+          }
+          node scripts/render-enterprise-config.mjs --base-url $baseUrl --output build/.enterprise-config.generated.json
+          if ($LASTEXITCODE -ne 0) {
+            throw "render-enterprise-config.mjs failed with exit code $LASTEXITCODE."
+          }
+      - name: Verify enterprise package inputs
+        working-directory: aaas
+        env:
+          ZHIYUAN_ENTERPRISE_CONFIG_FILE: build/.enterprise-config.generated.json
+        run: npm run verify:package-inputs
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            zhiyuan-core/resources/PortableGit-*.7z.exe
+            zhiyuan-core/resources/uv-win-runtime.zip
+            zhiyuan-core/resources/mingit
+            zhiyuan-core/resources/uv-win
+            zhiyuan-core/resources/python-win
+            zhiyuan-core/resources/skill-python
+            zhiyuan-core/vendor/engram-runtime
+            zhiyuan-core/vendor/channel-runtime
+          key: enterprise-signing-${{ steps.manifest.outputs.core_commit }}-${{ hashFiles('aaas/package-lock.json', 'aaas/build/build-manifest.json', 'zhiyuan-core/bun.lock', 'zhiyuan-core/scripts/**') }}
+          restore-keys: |
+            enterprise-signing-${{ steps.manifest.outputs.core_commit }}-
+      - name: Install host dependencies
+        working-directory: zhiyuan-core
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun run apply:patches
+      - name: Prepare Windows runtimes
+        working-directory: zhiyuan-core
+        run: |
+          bun run setup:mingit
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+          bun run channel:runtime:win-x64
+          bun run engram:runtime:win-x64
+      - name: Connect Certum SimplySign
+        id: certum
+        uses: ./zhiyuan/.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      - name: Build signed enterprise installer
+        working-directory: zhiyuan-core
+        shell: pwsh
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum.outputs.thumbprint }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          # electron-builder resolves extraResources "from" against the project
+          # directory even for absolute paths, so these must stay relative to
+          # zhiyuan-core (same convention as the unsigned AaaS workflow).
+          ZHIYUAN_ENTERPRISE_EXTENSION_BUNDLE: '..\aaas\dist\extension.cjs'
+          ZHIYUAN_ENTERPRISE_RENDERER_DIRECTORY: '..\aaas\dist\ui'
+          ZHIYUAN_ENTERPRISE_ADMIN_DIRECTORY: '..\aaas\dist\admin'
+          ZHIYUAN_ENTERPRISE_NOTICE_FILE: '..\aaas\THIRD_PARTY_NOTICES.md'
+          ZHIYUAN_ENTERPRISE_CONFIG_FILE: '..\aaas\build\.enterprise-config.generated.json'
+          APP_BUILD_VERSION: ${{ needs.prepare.outputs.package-version }}
+          ZHIYUAN_UPDATE_VARIANT: lite
+        run: |
+          $enterpriseInputs = @(
+            $env:ZHIYUAN_ENTERPRISE_EXTENSION_BUNDLE,
+            $env:ZHIYUAN_ENTERPRISE_RENDERER_DIRECTORY,
+            $env:ZHIYUAN_ENTERPRISE_ADMIN_DIRECTORY,
+            $env:ZHIYUAN_ENTERPRISE_NOTICE_FILE,
+            $env:ZHIYUAN_ENTERPRISE_CONFIG_FILE
+          )
+          foreach ($inputPath in $enterpriseInputs) {
+            if (-not (Test-Path -LiteralPath $inputPath)) {
+              throw "Enterprise package input does not exist: $inputPath"
+            }
+          }
+          node scripts/ensure-build-version.js
+          bun run prepare:update-release
+          bun run build
+          bun run build:skills
+          bun run prepare:modelscope-tokens
+          bunx electron-builder --win nsis --x64 --config "$env:GITHUB_WORKSPACE\aaas\build\electron-builder.overlay-signed.cjs" --publish never
+          # electron-builder only warns ("file source doesn't exist") when an
+          # extraResources input is missing, so assert the injected marker here
+          # instead of discovering an asset-less package at verify time.
+          $injectedExtension = 'release\win-unpacked\resources\zhiyuan-enterprise\extension.cjs'
+          if (-not (Test-Path -LiteralPath $injectedExtension)) {
+            throw "Enterprise assets were not injected into the package: $injectedExtension is missing"
+          }
+      - name: Verify packaged enterprise version
+        working-directory: zhiyuan-core
+        shell: bash
+        run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare.outputs.package-version }}'
+      # The authenticode script runs from the zhiyuan checkout (this repository's
+      # main) because the manifest-pinned core commit may predate the
+      # -ExecutableName parameter required by the enterprise product name.
+      - name: Verify Windows Authenticode signatures
+        shell: powershell
+        env:
+          ENTERPRISE_EXECUTABLE_NAME: 知远企业版
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File zhiyuan/scripts/ci/verify-windows-authenticode.ps1
+          -ProjectRoot '${{ github.workspace }}/zhiyuan-core'
+          -ExpectedThumbprint '${{ steps.certum.outputs.thumbprint }}'
+          -ExecutableName $env:ENTERPRISE_EXECUTABLE_NAME
+      - name: Verify injected enterprise package
+        working-directory: aaas
+        env:
+          ZHIYUAN_ELECTRON_PACKAGE_DIR: ${{ github.workspace }}\zhiyuan-core\release\win-unpacked
+          # verify-electron-package.mjs compares the packaged config.json against
+          # this file; without it the check falls back to the example config and
+          # reports a hash mismatch.
+          ZHIYUAN_ENTERPRISE_CONFIG_FILE: build/.enterprise-config.generated.json
+        run: npm run verify:electron-package
+      - name: Verify packaged runtimes with a clean PATH
+        shell: powershell
+        env:
+          ZHIYUAN_ELECTRON_EXECUTABLE_NAME: 知远企业版
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File zhiyuan-core/scripts/ci/windows-runtime-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}\zhiyuan-core
+      - name: Write installer checksums
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem zhiyuan-core/release -Filter '*.exe' -File)
+          if ($installers.Count -eq 0) {
+            throw 'No Windows installer was generated.'
+          }
+          $lines = foreach ($installer in $installers) {
+            $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($installer.Name)"
+          }
+          $lines | Set-Content zhiyuan-core/release/SHA256SUMS.txt -Encoding utf8NoBOM
+          $lines
+      - uses: actions/upload-artifact@v6
+        with:
+          name: zhiyuan-enterprise-windows-signed-${{ needs.prepare.outputs.package-version }}-${{ github.run_number }}
+          path: |
+            zhiyuan-core/release/*.exe
+            zhiyuan-core/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Publish signed package summary
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ needs.prepare.outputs.source-run-id }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source-sha }}
+          PACKAGE_VERSION: ${{ needs.prepare.outputs.package-version }}
+          AEP_BASE_URL: ${{ inputs.aep_base_url }}
+          SIGNED_ARTIFACT: zhiyuan-enterprise-windows-signed-${{ needs.prepare.outputs.package-version }}-${{ github.run_number }}
+        run: |
+          {
+            echo '### Signed Zhiyuan Enterprise Windows package'
+            echo
+            echo "- signing run: \`$GITHUB_RUN_ID\`"
+            echo "- source run: \`$SOURCE_RUN_ID\`"
+            echo "- source commit: \`$SOURCE_SHA\`"
+            echo "- package version: \`$PACKAGE_VERSION\`"
+            echo "- AEP base URL: \`$AEP_BASE_URL\`"
+            echo "- artifact: \`$SIGNED_ARTIFACT\` (app + installer signed during packaging)"
+            echo
+            echo "https://github.com/rongxinzy/RongxinAI/actions/runs/$GITHUB_RUN_ID"
+          } >> "$GITHUB_STEP_SUMMARY"

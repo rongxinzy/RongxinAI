@@ -31,6 +31,7 @@ interface TodoTaskDetailProps {
   onUpdated: () => Promise<void>;
   onError: () => void;
   onDelete: () => void;
+  onSaved: () => void;
 }
 
 const NO_LIST_VALUE = 'none';
@@ -42,6 +43,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   onUpdated,
   onError,
   onDelete,
+  onSaved,
 }) => {
   const [title, setTitle] = useState(todo.title);
   const [note, setNote] = useState(todo.note);
@@ -50,6 +52,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
   const [listId, setListId] = useState(todo.listId ?? NO_LIST_VALUE);
   const [stepDraft, setStepDraft] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   // Background refreshes (onChanged -> loadData) replace the todo object; only
   // resync fields the user is not editing, otherwise in-progress edits would
   // be silently reverted by every save of another field.
@@ -95,7 +98,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
     for (const field of fields) dirtyFieldsRef.current.delete(field);
   };
 
-  const saveDetails = async (): Promise<void> => {
+  const saveDetails = async (closeOnSuccess = false): Promise<void> => {
     const trimmedTitle = title.trim();
     if (dirtyFieldsRef.current.has('title') && !trimmedTitle) {
       // An empty title cannot be persisted; drop only that field and restore
@@ -134,7 +137,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
       sent.listId = listId;
       fieldSaveSequenceRef.current.set('listId', request);
     }
-    if (Object.keys(input).length === 0) return;
+    if (Object.keys(input).length === 0) {
+      if (closeOnSuccess) onSaved();
+      return;
+    }
     setIsSaving(true);
     try {
       const result = await todoService.update(todo.id, input);
@@ -167,6 +173,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
           if (latest.listId === sent.listId) clearDirty('listId');
         }
         if (isNewestResponse) await onUpdated();
+        if (closeOnSuccess) onSaved();
       } else {
         onError();
       }
@@ -218,7 +225,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
             markDirty('title');
             setTitle(event.target.value);
           }}
-          onBlur={() => void saveDetails()}
+          onBlur={event => {
+            // Let Save submit before autosave can disable the button during its click.
+            if (event.relatedTarget !== saveButtonRef.current) void saveDetails();
+          }}
           aria-label={i18nService.t('todoTitleLabel')}
           className="theme-page-todo-task-detail-input-1"
         />
@@ -346,7 +356,10 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               markDirty('note');
               setNote(event.target.value);
             }}
-            onBlur={() => void saveDetails()}
+            onBlur={event => {
+              if (event.relatedTarget !== saveButtonRef.current) void saveDetails();
+            }}
+            aria-label={i18nService.t('todoNote')}
             placeholder={i18nService.t('todoNotePlaceholder')}
             rows={5}
           />
@@ -460,7 +473,21 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               {i18nService.t('todoMarkActive')}
             </Button>
           )}
-          <Button type="button" onClick={() => void saveDetails()} disabled={isSaving}>
+          <Button
+            ref={saveButtonRef}
+            type="button"
+            onClick={() => void saveDetails(true)}
+            onBlur={() => {
+              // Passing Save with the keyboard still commits unsubmitted text edits.
+              if (
+                !isSaving &&
+                (dirtyFieldsRef.current.has('title') || dirtyFieldsRef.current.has('note'))
+              ) {
+                void saveDetails();
+              }
+            }}
+            disabled={isSaving}
+          >
             {isSaving ? i18nService.t('saving') : i18nService.t('save')}
           </Button>
         </div>

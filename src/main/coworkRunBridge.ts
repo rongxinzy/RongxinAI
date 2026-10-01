@@ -1,7 +1,11 @@
 import type Database from 'better-sqlite3';
 import { BrowserWindow, ipcMain } from 'electron';
 import { CoworkSessionIpc, CoworkStreamIpc } from '../shared/ipc/channels';
-import { CoworkRunPhase, CoworkRunPolicy } from '../shared/cowork/runState';
+import {
+  CoworkRunPhase,
+  CoworkRunPolicy,
+  type CoworkContentPatch,
+} from '../shared/cowork/runState';
 import { PiRunStateTracker } from './libs/agentEngine/piRunState';
 import type { PiRuntimeAdapter } from './libs/agentEngine/piRuntimeAdapter';
 import { CoworkContentProjection } from './coworkContentProjection';
@@ -9,6 +13,7 @@ import { CoworkContentProjection } from './coworkContentProjection';
 export function bindCoworkRunBridge(
   runtime: PiRuntimeAdapter,
   getDatabase: () => Database.Database,
+  publishPatch: (patch: CoworkContentPatch) => void,
 ): CoworkContentProjection {
   const projection = new CoworkContentProjection();
   const tracker = new PiRunStateTracker(snapshot => {
@@ -38,11 +43,7 @@ export function bindCoworkRunBridge(
       void projection
         .project(sessionId, message.id, message.content, message.metadata, true)
         .then(patches => {
-          for (const window of BrowserWindow.getAllWindows()) {
-            if (window.isDestroyed()) continue;
-            for (const patch of patches)
-              window.webContents.send(CoworkStreamIpc.ContentPatch, patch);
-          }
+          for (const patch of patches) publishPatch(patch);
         })
         .catch(error => console.error('[CoworkRunBridge] message projection failed:', error));
     });

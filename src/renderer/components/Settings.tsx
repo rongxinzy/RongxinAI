@@ -16,14 +16,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/t
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
 import {
-  Building2,
   ExternalLink,
   Eye,
   EyeOff,
   Key,
   PlusCircle,
   RefreshCw,
-  ServerCog,
   ShieldCheck,
   X,
   XCircle,
@@ -66,7 +64,6 @@ import {
 import { shouldAutoDetectProviderModels } from './settings/providerModelAutoDetection';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
-import { apiService } from '../services/api';
 import { apiFetch } from '../services/visibleApiTransport';
 import { LLAMACPP_RUNNING_MODELS_CHANGED_EVENT } from '../services/availableModels';
 import { configService } from '../services/config';
@@ -142,10 +139,12 @@ import {
 } from './settings/ProviderModelRow';
 import { resolveOllamaModelEditorContext } from './settings/providerModelEditorContext';
 import { formatTokenK, TOKENS_PER_K } from './settings/tokenFormat';
+import { useIsEnterpriseBuild } from './settings/useIsEnterpriseBuild';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
 import { EnterpriseSettingsPage } from './enterprise/EnterpriseSettingsPage';
+import { useEnterpriseSettingsNavigationIcons } from './enterprise/useEnterpriseSettingsNavigationIcons';
 import {
   filterManagedModelSettingsTabs,
   resolveManagedModelSettingsTab,
@@ -720,6 +719,7 @@ const Settings: React.FC<SettingsProps> = ({
   const imIconRef = useRef<SettingsAnimatedMessageCircleMoreIconHandle>(null);
   const appearanceIconRef = useRef<SettingsAnimatedSunMediumIconHandle>(null);
   const modelIconRef = useRef<SettingsAnimatedBoxIconHandle>(null);
+  const enterpriseNavigationIcons = useEnterpriseSettingsNavigationIcons(toEnterpriseTab);
   const prefersReducedMotion = useReducedMotion();
   const settingsIconRefs: Partial<Record<SettingsTabType, { current: AnimatedIconHandle | null }>> =
     {
@@ -731,6 +731,7 @@ const Settings: React.FC<SettingsProps> = ({
       coworkMemory: memoryIconRef,
       shortcuts: shortcutsIconRef,
       about: aboutIconRef,
+      ...enterpriseNavigationIcons.refs,
     };
 
   useEffect(() => {
@@ -738,7 +739,7 @@ const Settings: React.FC<SettingsProps> = ({
     void window.electron.enterprise.renderer
       .settingsPages()
       .then(pages => {
-        if (active) setEnterpriseSettingsPages(pages);
+        if (active) setEnterpriseSettingsPages(Array.isArray(pages) ? pages : []);
       })
       .catch(() => {
         if (active) setEnterpriseSettingsPages([]);
@@ -874,9 +875,18 @@ const Settings: React.FC<SettingsProps> = ({
 
   // About tab
   const [appVersion, setAppVersion] = useState('');
+  const [isDevBuild, setIsDevBuild] = useState(false);
+  const isEnterpriseBuild = useIsEnterpriseBuild();
   const [isExportingLogs, setIsExportingLogs] = useState(false);
   useEffect(() => {
-    window.electron.appInfo.getVersion().then(setAppVersion);
+    void window.electron.appInfo.getVersion().then(setAppVersion);
+    // Preload may lag behind Vite HMR after adding appInfo.isDev; never crash Settings on mount.
+    const isDev = window.electron.appInfo.isDev;
+    if (typeof isDev === 'function') {
+      void isDev()
+        .then(setIsDevBuild)
+        .catch(() => setIsDevBuild(false));
+    }
   }, []);
 
   useEffect(() => {
@@ -2091,15 +2101,6 @@ const Settings: React.FC<SettingsProps> = ({
       // 应用语言
       i18nService.setLanguage(language, { persist: false });
 
-      // Set API with the primary provider - handle Qwen OAuth
-      let apiKeyToUse = primaryProvider.apiKey;
-      let baseUrlToUse = primaryProvider.baseUrl;
-
-      apiService.setConfig({
-        apiKey: apiKeyToUse,
-        baseUrl: baseUrlToUse,
-      });
-
       if (hasCoworkConfigChanges) {
         const updated = await coworkService.updateConfig({
           embeddingEnabled,
@@ -2803,11 +2804,16 @@ const Settings: React.FC<SettingsProps> = ({
       // 一次 app:showToast 就覆盖文案并重置自动关闭计时器，所以最后留在屏幕上的是这条结果，
       // 进度提示会被原地替换而不是挂在顶部（调度上 finally 是 microtask，interval 是 macrotask，
       // 不可能插在两者之间多刷一条进度）。这条顺序由 modelConnectionTestToast.test.ts 锁住。
+      const firstFailed = results.find(({ result }) => !result.success);
+      const firstFailureMessage =
+        firstFailed && !firstFailed.result.success ? firstFailed.result.message : undefined;
+
       window.dispatchEvent(
         new CustomEvent('app:showToast', {
           detail: buildProviderModelConnectionTestNotification({
             total: results.length,
             successCount,
+            firstFailureMessage,
           }),
         }),
       );
@@ -3236,12 +3242,7 @@ const Settings: React.FC<SettingsProps> = ({
         ...enterpriseSettingsPages.map(page => ({
           key: toEnterpriseTab(page.id),
           label: page.labels[language],
-          icon:
-            page.id === 'models' ? (
-              <ServerCog aria-hidden="true" />
-            ) : (
-              <Building2 aria-hidden="true" />
-            ),
+          icon: enterpriseNavigationIcons.iconForPage(page.id),
         })),
       );
     }
@@ -5121,144 +5122,148 @@ const Settings: React.FC<SettingsProps> = ({
                   <span className="text-sm text-muted-foreground">{appVersion}</span>
                 </div>
               </div>
-              <div className="px-4 py-3 border-b border-border space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-foreground">
-                    {i18nService.t('updateSectionTitle')}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {update?.status === AppUpdateStatus.Checking
-                      ? i18nService.t('updateChecking')
-                      : update?.status === AppUpdateStatus.UpToDate
-                        ? i18nService.t('updateUpToDate')
-                        : update?.status === AppUpdateStatus.Error
-                          ? i18nService.t('updateCheckFailed')
-                          : update?.info?.latestVersion
-                            ? `v${update.info.latestVersion}`
-                            : i18nService.t('updateNotChecked')}
-                  </span>
-                </div>
-                {isDownloading ? (
-                  <>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full bg-primary transition-[width] duration-200 ${progress?.percent === undefined ? 'w-1/3 animate-pulse' : ''}`}
-                        style={{
-                          width:
-                            progress?.percent === undefined
-                              ? undefined
-                              : `${Math.min(100, Math.max(0, progress.percent * 100))}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>
-                        {progress
-                          ? `${formatBytes(progress.received)}${progress.total ? ` / ${formatBytes(progress.total)}` : ''}`
-                          : i18nService.t('updateDownloading')}
+              {!isEnterpriseBuild && (
+                <>
+                  <div className="px-4 py-3 border-b border-border space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-foreground">
+                        {i18nService.t('updateSectionTitle')}
                       </span>
-                      <span>
-                        {progress?.percent !== undefined
-                          ? `${Math.round(progress.percent * 100)}%`
-                          : ''}
-                        {progress?.speed ? ` · ${formatBytes(progress.speed)}/s` : ''}
+                      <span className="text-sm text-muted-foreground">
+                        {update?.status === AppUpdateStatus.Checking
+                          ? i18nService.t('updateChecking')
+                          : update?.status === AppUpdateStatus.UpToDate
+                            ? i18nService.t('updateUpToDate')
+                            : update?.status === AppUpdateStatus.Error
+                              ? i18nService.t('updateCheckFailed')
+                              : update?.info?.latestVersion
+                                ? `v${update.info.latestVersion}`
+                                : i18nService.t('updateNotChecked')}
                       </span>
                     </div>
-                    <div className="flex gap-2">
+                    {isDownloading ? (
+                      <>
+                        <div className="h-2 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={`h-full bg-primary transition-[width] duration-200 ${progress?.percent === undefined ? 'w-1/3 animate-pulse' : ''}`}
+                            style={{
+                              width:
+                                progress?.percent === undefined
+                                  ? undefined
+                                  : `${Math.min(100, Math.max(0, progress.percent * 100))}%`,
+                            }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>
+                            {progress
+                              ? `${formatBytes(progress.received)}${progress.total ? ` / ${formatBytes(progress.total)}` : ''}`
+                              : i18nService.t('updateDownloading')}
+                          </span>
+                          <span>
+                            {progress?.percent !== undefined
+                              ? `${Math.round(progress.percent * 100)}%`
+                              : ''}
+                            {progress?.speed ? ` · ${formatBytes(progress.speed)}/s` : ''}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void window.electron.appUpdate.cancelDownload()}
+                          >
+                            {i18nService.t('updateDownloadCancel')}
+                          </Button>
+                        </div>
+                      </>
+                    ) : update?.status === AppUpdateStatus.Ready ? (
                       <Button
                         size="sm"
-                        variant="ghost"
-                        onClick={() => void window.electron.appUpdate.cancelDownload()}
+                        onClick={() => {
+                          void window.electron.appUpdate.installReady().then(result => {
+                            if (!result.success) {
+                              window.dispatchEvent(
+                                new CustomEvent('app:showToast', {
+                                  detail: {
+                                    message: normalizeError(
+                                      result.error || i18nService.t('updateInstallFailed'),
+                                    ),
+                                    isError: true,
+                                  },
+                                }),
+                              );
+                            }
+                          });
+                        }}
                       >
-                        {i18nService.t('updateDownloadCancel')}
+                        {i18nService.t('updateReadyConfirm')}
                       </Button>
-                    </div>
-                  </>
-                ) : update?.status === AppUpdateStatus.Ready ? (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      void window.electron.appUpdate.installReady().then(result => {
-                        if (!result.success) {
-                          window.dispatchEvent(
-                            new CustomEvent('app:showToast', {
-                              detail: {
-                                message: normalizeError(
-                                  result.error || i18nService.t('updateInstallFailed'),
-                                ),
-                                isError: true,
-                              },
-                            }),
-                          );
-                        }
-                      });
-                    }}
-                  >
-                    {i18nService.t('updateReadyConfirm')}
-                  </Button>
-                ) : update?.status === AppUpdateStatus.Error && update.info ? (
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-destructive">
-                      {update.errorMessage || i18nService.t('updateDownloadFailed')}
-                    </span>
-                    <Button
-                      size="sm"
-                      onClick={() => void window.electron.appUpdate.retryDownload()}
-                    >
-                      {i18nService.t('updateRetry')}
-                    </Button>
-                  </div>
-                ) : update?.status === AppUpdateStatus.Available ? (
-                  <div className="space-y-2">
-                    {update.info?.manualDownloadOnly ? (
-                      <div className="text-xs text-muted-foreground">
-                        {i18nService.t('updateManualOnly')}
+                    ) : update?.status === AppUpdateStatus.Error && update.info ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-destructive">
+                          {update.errorMessage || i18nService.t('updateDownloadFailed')}
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => void window.electron.appUpdate.retryDownload()}
+                        >
+                          {i18nService.t('updateRetry')}
+                        </Button>
+                      </div>
+                    ) : update?.status === AppUpdateStatus.Available ? (
+                      <div className="space-y-2">
+                        {update.info?.manualDownloadOnly ? (
+                          <div className="text-xs text-muted-foreground">
+                            {i18nService.t('updateManualOnly')}
+                          </div>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          onClick={() => void window.electron.appUpdate.retryDownload()}
+                        >
+                          {i18nService.t(
+                            update.info?.manualDownloadOnly
+                              ? 'updateOpenDownloadPage'
+                              : 'updateDownloadNow',
+                          )}
+                        </Button>
+                      </div>
+                    ) : update?.status !== AppUpdateStatus.Checking &&
+                      update?.status !== AppUpdateStatus.UpToDate ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void window.electron.appUpdate.checkNow({ manual: true })}
+                      >
+                        {i18nService.t('updateCheckNow')}
+                      </Button>
+                    ) : null}
+                    {update?.status === AppUpdateStatus.Error && !update.info ? (
+                      <div className="text-xs text-destructive">
+                        {update.errorMessage || i18nService.t('updateCheckFailed')}
                       </div>
                     ) : null}
-                    <Button
-                      size="sm"
-                      onClick={() => void window.electron.appUpdate.retryDownload()}
+                    {update?.lastCheckedAt ? (
+                      <div className="text-xs text-muted-foreground">
+                        {i18nService.t('updateLastChecked')}
+                        {new Date(update.lastCheckedAt).toLocaleString()}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                    <span className="text-sm text-foreground">GitHub</span>
+                    <a
+                      href="https://github.com/rongxinzy/RongxinAI"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="theme-surface-settings-link"
                     >
-                      {i18nService.t(
-                        update.info?.manualDownloadOnly
-                          ? 'updateOpenDownloadPage'
-                          : 'updateDownloadNow',
-                      )}
-                    </Button>
+                      {i18nService.t('mcpViewOnGithub')}
+                    </a>
                   </div>
-                ) : update?.status !== AppUpdateStatus.Checking &&
-                  update?.status !== AppUpdateStatus.UpToDate ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void window.electron.appUpdate.checkNow({ manual: true })}
-                  >
-                    {i18nService.t('updateCheckNow')}
-                  </Button>
-                ) : null}
-                {update?.status === AppUpdateStatus.Error && !update.info ? (
-                  <div className="text-xs text-destructive">
-                    {update.errorMessage || i18nService.t('updateCheckFailed')}
-                  </div>
-                ) : null}
-                {update?.lastCheckedAt ? (
-                  <div className="text-xs text-muted-foreground">
-                    {i18nService.t('updateLastChecked')}
-                    {new Date(update.lastCheckedAt).toLocaleString()}
-                  </div>
-                ) : null}
-              </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                <span className="text-sm text-foreground">GitHub</span>
-                <a
-                  href="https://github.com/rongxinzy/RongxinAI"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="theme-surface-settings-link"
-                >
-                  {i18nService.t('mcpViewOnGithub')}
-                </a>
-              </div>
+                </>
+              )}
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="text-sm text-foreground">
                   {i18nService.t('aboutOfficialWebsite')}
@@ -5287,26 +5292,28 @@ const Settings: React.FC<SettingsProps> = ({
                 </a>
               </div>
             </div>
-
-            {/* Footer */}
-            <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center">
-              <div className="flex items-center justify-center text-sm text-muted-foreground">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={e => {
-                    e.stopPropagation();
-                    void handleExportLogs();
-                  }}
-                  disabled={isExportingLogs}
-                  className="theme-action-muted-accent"
-                >
-                  {isExportingLogs
-                    ? i18nService.t('aboutExportingLogs')
-                    : i18nService.t('aboutExportLogs')}
-                </Button>
-              </div>
+            <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center gap-2">
+              {isDevBuild && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={e => {
+                      e.stopPropagation();
+                      void window.electron.window.openDevTools?.();
+                    }}
+                  >
+                    {i18nService.t('aboutOpenDevTools')}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    {i18nService.t('aboutDevToolsHint')}
+                  </span>
+                </>
+              )}
+              <Button type="button" variant="ghost" size="sm" onClick={e => { e.stopPropagation(); void handleExportLogs(); }} disabled={isExportingLogs}>
+                {isExportingLogs ? i18nService.t('aboutExportingLogs') : i18nService.t('aboutExportLogs')}
+              </Button>
             </div>
           </div>
         );
@@ -5349,7 +5356,12 @@ const Settings: React.FC<SettingsProps> = ({
                     : 'theme-page-settings-button-variant-9',
                 )}
               >
-                {tab.icon}
+                <span
+                  className="theme-settings-navigation-icon inline-flex shrink-0 items-start justify-start"
+                  aria-hidden="true"
+                >
+                  {tab.icon}
+                </span>
                 <span className="min-w-0 truncate">{tab.label}</span>
               </Button>
             ))}

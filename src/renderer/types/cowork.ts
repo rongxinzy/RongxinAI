@@ -1,5 +1,6 @@
 // Cowork image attachment for vision-capable models
 import type {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkPermissionOrigin,
   CoworkSessionMode,
@@ -11,7 +12,6 @@ import type {
   CoworkSessionExpertSnapshot,
 } from '../../shared/cowork/sessionExperts';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
-import type { ProductionLoopMode } from '../../shared/productionLoop';
 
 export interface CoworkImageAttachment {
   name: string;
@@ -44,7 +44,7 @@ export type CoworkSessionStatus =
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
 
 // Cowork execution mode
-export type CoworkExecutionMode = 'auto' | 'local' | 'sandbox';
+export type { CoworkExecutionMode } from '../../shared/cowork/constants';
 
 // Cowork message metadata
 export interface CoworkMessageMetadata {
@@ -76,6 +76,11 @@ export interface CoworkMessageMetadata {
     requestStartedAt?: number;
     firstVisibleTextAt?: number;
     completedAt?: number;
+    sessionCreatedAt?: number;
+    agentStartedAt?: number;
+    sessionCreateToAgentStartMs?: number;
+    agentStartToFirstTokenMs?: number;
+    sessionCreateToFirstTokenMs?: number;
     toolDurationMs?: number;
   };
   contextPercent?: number;
@@ -102,6 +107,8 @@ export interface CoworkMessage {
   type: CoworkMessageType;
   content: string;
   timestamp: number;
+  /** Monotonic persisted order within a session. */
+  sequence?: number;
   metadata?: CoworkMessageMetadata;
 }
 
@@ -109,9 +116,8 @@ export interface CoworkMessage {
 export interface CoworkSession {
   id: string;
   title: string;
-  claudeSessionId: string | null;
   status: CoworkSessionStatus;
-  /** Session mode: 'work' (Pi) or 'chat' (direct LLM via apiService) */
+  /** Work and Chat share the same agent runtime. */
   mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
@@ -234,7 +240,6 @@ export interface CoworkStartOptions {
   title?: string;
   mode?: CoworkSessionMode;
   goalMode?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   activeSkillIds?: string[];
   workspaceId?: string;
   agentId?: string;
@@ -252,7 +257,6 @@ export interface CoworkContinueOptions {
   systemPrompt?: string;
   activeSkillIds?: string[];
   goalMode?: boolean;
-  productionLoopMode?: ProductionLoopMode;
   expertIds?: string[];
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
@@ -288,24 +292,4 @@ export interface CoworkConfigResult {
   success: boolean;
   config?: CoworkConfig;
   error?: string;
-}
-
-// Stream event types for IPC communication
-export type CoworkStreamEventType =
-  | 'message'
-  | 'tool_use'
-  | 'tool_result'
-  | 'permission_request'
-  | 'complete'
-  | 'error';
-
-export interface CoworkStreamEvent {
-  type: CoworkStreamEventType;
-  sessionId: string;
-  data: {
-    message?: CoworkMessage;
-    permission?: CoworkPermissionRequest;
-    error?: string;
-    claudeSessionId?: string;
-  };
 }

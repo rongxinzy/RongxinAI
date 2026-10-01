@@ -150,7 +150,6 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS cowork_sessions (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
-  claude_session_id TEXT,
   status TEXT NOT NULL DEFAULT 'idle',
   pinned INTEGER NOT NULL DEFAULT 0,
   cwd TEXT NOT NULL,
@@ -225,12 +224,11 @@ function main() {
       sqlLines.push(
         `
 INSERT INTO cowork_sessions (
-  id, title, claude_session_id, status, pinned, cwd, system_prompt, model_override,
+  id, title, status, pinned, cwd, system_prompt, model_override,
   execution_mode, created_at, updated_at, active_skill_ids, agent_id
 ) VALUES (
   ${sqlString(sessionId)},
   ${sqlString(`SQLite backup perf session ${sessionIndex + 1}`)},
-  '',
   'idle',
   0,
   ${sqlString(options.cwd)},

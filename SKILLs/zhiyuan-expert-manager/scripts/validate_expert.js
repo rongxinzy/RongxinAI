@@ -214,30 +214,6 @@ function extractSection(body, headingKeyword) {
   return result.join('\n');
 }
 
-/**
- * Headings (##-level) under which checkbox lines appear. Only headings that
- * denote progress ownership count: 进度/SOP (zh) and Progress/Status (en).
- * Plain "清单" headings (交付清单/质量检查清单/上线检查清单) are delivery
- * checklists — output content, not a second task state machine — and stay
- * allowed.
- */
-function findChecklistSections(body) {
-  const lines = body.split('\n');
-  const offenders = [];
-  let currentHeading = '';
-  for (const line of lines) {
-    const heading = line.match(/^##{1,3}\s+(.+)$/);
-    if (heading) {
-      currentHeading = heading[1].trim();
-      continue;
-    }
-    if (/^\s*-\s+\[[ xX]\]\s+/.test(line) && /进度|SOP|Progress|Status/i.test(currentHeading)) {
-      if (!offenders.includes(currentHeading)) offenders.push(currentHeading);
-    }
-  }
-  return offenders;
-}
-
 function validatePluginJson(pluginJson, expertDir, result) {
   for (const field of ['name', 'version', 'description']) {
     if (!pluginJson[field] || hasTodo(pluginJson[field])) {
@@ -426,17 +402,6 @@ function validateAgentMd(mdPath, result, options = {}) {
     }
   }
 
-  // Hard architectural gates: progress ownership belongs to the runtime.
-  // Only checklists inside progress-ownership headings (进度/SOP/清单) are
-  // rejected; checkboxes in delivery templates or domain QA sections are
-  // output content, not a second task state machine.
-  const progressSections = findChecklistSections(body);
-  if (progressSections.length > 0) {
-    result.error(
-      `${basename}: Markdown progress checklists conflict with runtime-owned production progress (${progressSections.join('、')})`,
-    );
-  }
-
   const productionToolNames = [
     'production_loop',
     'commit_plan',
@@ -448,7 +413,7 @@ function validateAgentMd(mdPath, result, options = {}) {
   );
   if (referencedProductionTools.length > 0) {
     result.error(
-      `${basename}: production workflow tools are runtime-owned (${referencedProductionTools.join(', ')})`,
+      `${basename}: removed production workflow tools are unavailable (${referencedProductionTools.join(', ')})`,
     );
   }
 

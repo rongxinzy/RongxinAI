@@ -28,15 +28,11 @@ import {
   type WorkbenchTaskChangedEvent,
   type WorkbenchTaskContract,
   type WorkbenchTaskDetail,
-  type WorkbenchProductionPlan,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { HarnessActivationType } from '../../shared/harness';
-import { ProductionLoopRecoveryReason } from '../../shared/productionLoop';
 import { HarnessMeasurementService } from '../harness/measurementService';
 import { t } from '../i18n';
-import { ProductionLoopRepository } from '../productionLoop/repository';
-import { ProductionLoopService } from '../productionLoop/service';
 import { collectWorkbenchArtifactsAsync } from './artifactWorkerPool';
 import { applyWorkbenchDeliveryGate } from './deliveryGate';
 import { getCurrentDeclaredArtifacts } from './artifactCompletion';
@@ -52,6 +48,12 @@ export interface WorkbenchApprovalRequestedEvent {
 export interface WorkbenchToolAuthorizationResult {
   allow: boolean;
   reason?: string;
+  /**
+   * The run cannot continue. The runtime must end the turn instead of handing
+   * the model another ordinary tool error, otherwise it keeps requesting tools
+   * against a run that is already over.
+   */
+  terminateRun?: boolean;
 }
 
 export interface VerifiedWorkbenchRunEvent {
@@ -77,12 +79,17 @@ const MAX_RESULT_NODES = 500;
 const MAX_RESULT_COLLECTION_ENTRIES = 50;
 const MAX_RESULT_STRING_LENGTH = 4_000;
 const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
+/** Consecutive output-contract denials before a run is stopped instead of spinning. */
+const MAX_OUTPUT_CONTRACT_DENIALS = 4;
 
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
   readonly measurement: HarnessMeasurementService;
-  readonly productionLoop: ProductionLoopService;
   private readonly pendingApprovals = new Map<string, PendingApproval>();
+  /** Last set_task_output failure per run, so the gate can explain what to fix. */
+  private readonly lastOutputContractErrors = new Map<string, string>();
+  /** Consecutive output-contract denials per run, so a stuck run can be stopped. */
+  private readonly outputContractDenials = new Map<string, number>();
 
   constructor(
     db: Database.Database,
@@ -91,23 +98,15 @@ export class WorkbenchTaskService extends EventEmitter {
     super();
     this.repository = new WorkbenchTaskRepository(db);
     this.measurement = new HarnessMeasurementService(this.repository);
-    this.productionLoop = new ProductionLoopService(
-      new ProductionLoopRepository(db),
-      this.measurement,
-      state => {
-        const task = this.repository.getTask(state.taskId);
-        if (task) this.emitChanged(task);
-      },
-    );
   }
 
   getCurrent(sessionId: string): WorkbenchTaskDetail | null {
     const task = this.repository.getLatestTaskForSession(sessionId);
-    return task ? this.withProductionPlan(this.repository.getDetail(task.id)) : null;
+    return task ? this.repository.getDetail(task.id) : null;
   }
 
   getDetail(taskId: string): WorkbenchTaskDetail | null {
-    return this.withProductionPlan(this.repository.getDetail(taskId));
+    return this.repository.getDetail(taskId);
   }
 
   listForSession(sessionId: string): WorkbenchTask[] {
@@ -156,21 +155,6 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     this.emitChanged(task);
     return registered;
-  }
-
-  private withProductionPlan(detail: WorkbenchTaskDetail | null): WorkbenchTaskDetail | null {
-    if (!detail) return null;
-    const state = detail.task.activeRunId
-      ? this.productionLoop.repository.get(detail.task.activeRunId)
-      : this.productionLoop.repository.getLatestForTask(detail.task.id);
-    const productionPlan: WorkbenchProductionPlan | null = state
-      ? {
-          runId: state.runId,
-          progressVersion: state.progressVersion,
-          items: state.planItems,
-        }
-      : null;
-    return { ...detail, productionPlan };
   }
 
   beginRun(input: {
@@ -362,11 +346,7 @@ export class WorkbenchTaskService extends EventEmitter {
       const artifacts = this.repository
         .getDetail(task.id)!
         .artifacts.filter(artifact => artifact.runId === run.id);
-      finalResult = applyWorkbenchDeliveryGate(
-        finalResult,
-        artifacts,
-        task.contract,
-      );
+      finalResult = applyWorkbenchDeliveryGate(finalResult, artifacts, task.contract);
       if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
           verificationResult: finalResult,
@@ -391,7 +371,6 @@ export class WorkbenchTaskService extends EventEmitter {
         outcome: finalResult.outcome,
         checks: finalResult.checks.map(check => ({ name: check.name, status: check.status })),
       });
-      this.productionLoop.recordVerificationResult(run.id, finalResult.outcome, finalResult.summary);
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
@@ -414,6 +393,7 @@ export class WorkbenchTaskService extends EventEmitter {
       }
     }
     this.emitChanged(detail.task);
+    this.forgetRunScopedState(run.id);
     return detail;
   }
 
@@ -457,17 +437,16 @@ export class WorkbenchTaskService extends EventEmitter {
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
       // Acceptance attests final deliverables, never intermediate execution evidence.
-      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id, detail.task.contract, runArtifacts);
+      const verifiedArtifacts = this.repository.markArtifactsVerified(
+        run.id,
+        detail.task.contract,
+        runArtifacts,
+      );
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
         verifiedArtifacts,
       });
-      this.productionLoop.recordVerificationResult(
-        run.id,
-        WorkbenchVerificationOutcome.Passed,
-        acceptedResult.summary,
-      );
     });
     const accepted = this.repository.getDetail(taskId);
     if (!accepted) throw new Error('Workbench task not found after acceptance.');
@@ -510,6 +489,7 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     this.resolvePendingApprovals(expiredApprovals, reason);
     this.emitChanged(this.requireTask(task.id));
+    this.forgetRunScopedState(run.id);
   }
 
   failRun(sessionId: string, failure: WorkbenchJsonObject): void {
@@ -529,6 +509,7 @@ export class WorkbenchTaskService extends EventEmitter {
       });
     });
     this.emitChanged(this.requireTask(task.id));
+    this.forgetRunScopedState(run.id);
   }
 
   cancelRun(sessionId: string, runId: string): void {
@@ -543,6 +524,37 @@ export class WorkbenchTaskService extends EventEmitter {
       });
     });
     this.emitChanged(this.requireTask(task.id));
+    this.forgetRunScopedState(run.id);
+  }
+
+  /**
+   * Records why the last set_task_output call failed for a run. The gate below
+   * reports this back, so a model that already tried to commit the contract
+   * learns what to fix instead of retrying other tools forever.
+   */
+  recordOutputContractFailure(runId: string, message: string): void {
+    const trimmed = message.trim();
+    if (trimmed) this.lastOutputContractErrors.set(runId, trimmed);
+  }
+
+  private forgetRunScopedState(runId: string): void {
+    this.lastOutputContractErrors.delete(runId);
+    this.outputContractDenials.delete(runId);
+  }
+
+  /**
+   * Counts one output-contract denial and returns the reason for it: the exact
+   * failure of the previous commit attempt when there was one, otherwise the
+   * instruction with a copyable example.
+   */
+  private recordOutputContractDenial(runId: string): string {
+    const denials = (this.outputContractDenials.get(runId) ?? 0) + 1;
+    this.outputContractDenials.set(runId, denials);
+    const example = '{"requirements":[{"mode":"text","formats":[]}]}';
+    const lastError = this.lastOutputContractErrors.get(runId);
+    return lastError
+      ? `The output contract is not committed: the previous set_task_output call failed with "${lastError}". Fix that call, then continue — for example ${example} for a written answer.`
+      : `Before executing tools, call set_task_output to declare what this task must deliver — for example ${example} for a written answer.`;
   }
 
   async authorizeToolCall(input: {
@@ -559,7 +571,14 @@ export class WorkbenchTaskService extends EventEmitter {
       return { allow: false, reason: 'The tool call does not belong to this session.' };
     }
     if (task.activeRunId !== run.id || run.status !== WorkbenchRunStatus.Running) {
-      return { allow: false, reason: 'The tool call does not belong to the active run.' };
+      // The run is already over (failed, paused, cancelled or superseded), so
+      // every further tool call fails. End the turn instead of letting the model
+      // keep asking.
+      return {
+        allow: false,
+        reason: 'The tool call does not belong to the active run.',
+        terminateRun: true,
+      };
     }
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
     if (
@@ -567,7 +586,17 @@ export class WorkbenchTaskService extends EventEmitter {
       !task.contract.outputRequirements?.length &&
       riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
     ) {
-      return { allow: false, reason: 'Commit the requested outputs with set_task_output before executing this task.' };
+      const reason = this.recordOutputContractDenial(run.id);
+      if ((this.outputContractDenials.get(run.id) ?? 0) >= MAX_OUTPUT_CONTRACT_DENIALS) {
+        this.failRun(input.sessionId, {
+          code: 'output_contract_uncommitted',
+          stage: 'contract',
+          message:
+            'Stopped the run: the output contract was never committed, so no tool call could execute.',
+        });
+        return { allow: false, reason, terminateRun: true };
+      }
+      return { allow: false, reason };
     }
     if (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly) {
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ToolRead, {
@@ -584,13 +613,6 @@ export class WorkbenchTaskService extends EventEmitter {
         mechanism: 'tool_effect_idempotency',
         evidence: { toolCallId: input.toolCallId, toolName: input.toolName },
       });
-      if (this.productionLoop.repository.get(run.id)) {
-        this.productionLoop.recordRecovery(
-          run.id,
-          ProductionLoopRecoveryReason.RepeatedToolCall,
-          `Blocked duplicate side effect for ${input.toolName}.`,
-        );
-      }
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
     // Ask prompts for every side effect; Auto auto-approves only reversible
@@ -777,7 +799,6 @@ export class WorkbenchTaskService extends EventEmitter {
   deleteSession(sessionId: string): void {
     const pendingApprovals = this.repository.listPendingApprovalsForSession(sessionId);
     this.repository.transaction(() => {
-      this.productionLoop.deleteSession(sessionId);
       this.repository.deleteSessionDomainData(sessionId);
     });
     this.resolvePendingApprovals(pendingApprovals, 'The session was deleted.');

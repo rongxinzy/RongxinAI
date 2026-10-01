@@ -81,15 +81,15 @@ export function parseOllamaRuntimeCapabilities(payload: unknown): Partial<ModelC
   return {
     toolCalling: capabilityStatus(declared.includes('tools')),
     imageInput: capabilityStatus(declared.includes('vision')),
-    ...(declared.includes('thinking')
-      ? { reasoning: ModelCapabilityStatus.Supported }
-      : {}),
+    ...(declared.includes('thinking') ? { reasoning: ModelCapabilityStatus.Supported } : {}),
   };
 }
 
 export function parseLlamaCppRuntimeCapabilities(payload: unknown): Partial<ModelCapabilities> {
   if (!isRecord(payload)) return {};
-  const capabilities = {} as { -readonly [Key in keyof ModelCapabilities]?: ModelCapabilities[Key] };
+  const capabilities = {} as {
+    -readonly [Key in keyof ModelCapabilities]?: ModelCapabilities[Key];
+  };
   const templateCapabilities = isRecord(payload.chat_template_caps)
     ? payload.chat_template_caps
     : undefined;
@@ -107,6 +107,12 @@ export function parseLlamaCppRuntimeCapabilities(payload: unknown): Partial<Mode
   const modalities = isRecord(payload.modalities) ? payload.modalities : undefined;
   if (typeof modalities?.vision === 'boolean') {
     capabilities.imageInput = capabilityStatus(modalities.vision);
+  }
+  if (typeof modalities?.video === 'boolean') {
+    capabilities.videoInput = capabilityStatus(modalities.video);
+  }
+  if (typeof modalities?.audio === 'boolean') {
+    capabilities.audioInput = capabilityStatus(modalities.audio);
   }
   return capabilities;
 }

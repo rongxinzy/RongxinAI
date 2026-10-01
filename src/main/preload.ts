@@ -1,10 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { CoworkError } from '../common/coworkError';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
+import type { ApiRequestPurpose } from '../shared/ipc/apiRequest';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
-import type { ProductionLoopMode } from '../shared/productionLoop';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { ActivityIpc } from '../shared/activity/constants';
@@ -13,6 +12,7 @@ import {
   ApiIpc,
   AppConfigIpc,
   AppIpc,
+  CommunityAuthIpc,
   ContextMenuIpc,
   CoworkBootstrapIpc,
   CoworkConfigIpc,
@@ -31,6 +31,7 @@ import {
   LogIpc,
   ManagedProviderIpc,
   McpIpc,
+  ModelPoolIpc,
   NetworkIpc,
   DevNetworkIpc,
   OpenAICodexOAuthIpc,
@@ -43,13 +44,12 @@ import {
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import type {
+  CoworkExecutionMode,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../shared/cowork/constants';
-import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
 import type { CoworkRunSnapshot, CoworkContentPatch } from '../shared/cowork/runState';
-import type { CoworkPendingMessage } from '../shared/cowork/pendingMessageQueue';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
@@ -70,6 +70,7 @@ import {
   type WorkbenchTaskChangedEvent,
 } from '../shared/workbenchTask';
 import { CodingAgentIpc } from '../shared/codingAgent';
+import { RuntimeNoticeIpc } from '../shared/ipc/channels';
 
 // Helper: typed main→renderer push listener with automatic cleanup
 const onPush = <T>(channel: string, callback: (data: T) => void): (() => void) => {
@@ -321,41 +322,17 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   api: {
-    webSearch: (input: { query: string; maxResults?: number; requestId?: string }) =>
-      ipcRenderer.invoke(ApiIpc.WebSearch, input),
-
     fetch: (options: {
       url: string;
       method: string;
       headers: Record<string, string>;
       body?: string;
       timeoutMs?: number;
+      purpose?: ApiRequestPurpose;
     }) => ipcRenderer.invoke(ApiIpc.Fetch, options),
 
     fetchModels: (input: ProviderModelDiscoveryRequest): Promise<ProviderModelDiscoveryResult> =>
       ipcRenderer.invoke(ApiIpc.FetchModels, input),
-
-    stream: (options: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body?: string;
-      requestId: string;
-    }) => ipcRenderer.invoke(ApiIpc.Stream, options),
-
-    cancelStream: (requestId: string) => ipcRenderer.invoke(ApiIpc.CancelStream, requestId),
-
-    onStreamData: (requestId: string, callback: (chunk: string) => void) =>
-      onPush<string>(ApiIpc.streamData(requestId), callback),
-
-    onStreamDone: (requestId: string, callback: () => void) =>
-      onPushVoid(ApiIpc.streamDone(requestId), callback),
-
-    onStreamError: (requestId: string, callback: (error: CoworkError) => void) =>
-      onPush<CoworkError>(ApiIpc.streamError(requestId), callback),
-
-    onStreamAbort: (requestId: string, callback: () => void) =>
-      onPushVoid(ApiIpc.streamAbort(requestId), callback),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -377,6 +354,8 @@ contextBridge.exposeInMainWorld('electron', {
     isMaximized: () => ipcRenderer.invoke(WindowIpc.IsMaximized),
     showSystemMenu: (position: { x: number; y: number }) =>
       ipcRenderer.send(WindowIpc.ShowSystemMenu, position),
+    toggleDevTools: () => ipcRenderer.invoke(WindowIpc.ToggleDevTools), // 切换调试面板
+    openDevTools: () => ipcRenderer.invoke(WindowIpc.OpenDevTools),
     onStateChanged: (
       callback: (state: {
         isMaximized: boolean;
@@ -473,7 +452,6 @@ contextBridge.exposeInMainWorld('electron', {
       title?: string;
       mode?: CoworkSessionMode;
       goalMode?: boolean;
-      productionLoopMode?: ProductionLoopMode;
       activeSkillIds?: string[];
       workspaceId?: string;
       agentId?: string;
@@ -495,7 +473,6 @@ contextBridge.exposeInMainWorld('electron', {
       systemPrompt?: string;
       activeSkillIds?: string[];
       goalMode?: boolean;
-      productionLoopMode?: ProductionLoopMode;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{
@@ -519,8 +496,6 @@ contextBridge.exposeInMainWorld('electron', {
       }>;
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       skillIds?: string[];
-      skillPrompt?: string;
-      productionLoopMode?: import('../shared/productionLoop').ProductionLoopMode;
     }) => ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
     updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Update, options),
@@ -545,6 +520,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkSessionIpc.UpdateModel, options),
     getSession: (sessionId: string, options?: { messageLimit?: number | null }) =>
       ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId, options),
+    getRuntimeSnapshots: (sessionId?: string) =>
+      ipcRenderer.invoke(CoworkStreamIpc.RuntimeSnapshots, sessionId),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
     listSessions: (options?: {
@@ -578,7 +555,7 @@ contextBridge.exposeInMainWorld('electron', {
     getConfig: () => ipcRenderer.invoke(CoworkConfigIpc.Get),
     setConfig: (config: {
       workingDirectory?: string;
-      executionMode?: 'auto' | 'local' | 'sandbox';
+      executionMode?: CoworkExecutionMode;
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       embeddingEnabled?: boolean;
@@ -594,34 +571,9 @@ contextBridge.exposeInMainWorld('electron', {
     writeBootstrapFile: (filename: string, content: string) =>
       ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
 
-    onStreamMessage: (callback: (data: { sessionId: string; message: unknown }) => void) =>
-      onPush(CoworkStreamIpc.Message, callback),
-    onStreamMessageUpdate: (
-      callback: (data: {
-        sessionId: string;
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }) => void,
-    ) => onPush(CoworkStreamIpc.MessageUpdate, callback),
-    onStreamToolActivity: (
-      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
-    ) => onPush(CoworkStreamIpc.ToolActivity, callback),
-    onStreamPermission: (callback: (data: { sessionId: string; request: unknown }) => void) =>
-      onPush(CoworkStreamIpc.Permission, callback),
-    onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) =>
-      onPush(CoworkStreamIpc.PermissionDismiss, callback),
-    onStreamInterrupted: (
-      callback: (data: import('../shared/cowork/interruption').CoworkSessionInterruption) => void,
-    ) => onPush(CoworkStreamIpc.Interrupted, callback),
-    onStreamComplete: (
-      callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
-    ) => onPush(CoworkStreamIpc.Complete, callback),
-    onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) =>
-      onPush(CoworkStreamIpc.Error, callback),
-    onStreamQueueUpdated: (
-      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
-    ) => onPush(CoworkStreamIpc.QueueUpdated, callback),
+    onStreamUiEvent: (
+      callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void,
+    ) => onPush(CoworkStreamIpc.UiEvent, callback),
     onSessionsChanged: (
       callback: (data: {
         sessionId?: string;
@@ -691,6 +643,11 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.StartSession, input),
     bootstrap: (workspaceRoot: string) =>
       ipcRenderer.invoke(CodingAgentIpc.Bootstrap, workspaceRoot),
+    loadEventPage: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      beforeSequence: number | null;
+    }) => ipcRenderer.invoke(CodingAgentIpc.LoadEventPage, input),
     prepareLane: (input: { workspaceRoot: string; laneId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.PrepareLane, input),
     createMission: (input: import('../shared/codingAgent').CreateCodingMissionInput) =>
@@ -765,9 +722,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.UnstageGitPaths, input),
     commitGitChanges: (input: import('../shared/codingAgent').CodingGitCommitInput) =>
       ipcRenderer.invoke(CodingAgentIpc.CommitGitChanges, input),
-    commitAndPushGitChanges: (
-      input: import('../shared/codingAgent').CodingGitCommitAndPushInput,
-    ) => ipcRenderer.invoke(CodingAgentIpc.CommitAndPushGitChanges, input),
+    commitAndPushGitChanges: (input: import('../shared/codingAgent').CodingGitCommitAndPushInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.CommitAndPushGitChanges, input),
     pushGitBranch: (input: import('../shared/codingAgent').CodingGitTargetInput) =>
       ipcRenderer.invoke(CodingAgentIpc.PushGitBranch, input),
     switchGitBranch: (input: import('../shared/codingAgent').CodingGitBranchInput) =>
@@ -807,6 +763,9 @@ contextBridge.exposeInMainWorld('electron', {
     }) => ipcRenderer.invoke(CodingAgentIpc.RespondPermission, input),
     onChanged: (callback: (snapshot: import('../shared/codingAgent').CodingRoomSnapshot) => void) =>
       onPush(CodingAgentIpc.Changed, callback),
+    onEventDelta: (
+      callback: (delta: import('../shared/codingAgent').CodingRoomEventDelta) => void,
+    ) => onPush(CodingAgentIpc.EventDelta, callback),
     onPendingMessagesChanged: (
       callback: (event: import('../shared/codingAgent').CodingPendingMessagesChangedEvent) => void,
     ) => onPush(CodingAgentIpc.PendingMessagesChanged, callback),
@@ -842,6 +801,8 @@ contextBridge.exposeInMainWorld('electron', {
     }) => ipcRenderer.invoke(DialogIpc.SaveInlineFile, options),
     readFileAsDataUrl: (filePath: string) =>
       ipcRenderer.invoke(DialogIpc.ReadFileAsDataUrl, filePath),
+    checkArtifactFile: (filePath: string) =>
+      ipcRenderer.invoke(DialogIpc.CheckArtifactFile, filePath),
     generateThumbnail: (filePath: string) =>
       ipcRenderer.invoke(DialogIpc.GenerateThumbnail, filePath),
     showMessageBox: (options: {
@@ -865,6 +826,7 @@ contextBridge.exposeInMainWorld('electron', {
     openExternal: (url: string) => ipcRenderer.invoke(ShellIpc.OpenExternal, url),
     openHtmlInBrowser: (htmlContent: string) =>
       ipcRenderer.invoke(ShellIpc.OpenHtmlInBrowser, htmlContent),
+    pathExists: (filePath: string) => ipcRenderer.invoke(ShellIpc.PathExists, filePath),
   },
 
   autoLaunch: {
@@ -879,6 +841,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   appInfo: {
     getVersion: () => ipcRenderer.invoke(AppIpc.GetVersion),
+    isDev: () => ipcRenderer.invoke(AppIpc.IsDev),
+    isEnterprise: () => ipcRenderer.invoke(AppIpc.IsEnterprise),
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
     consumePendingLocalInferenceInstall: () =>
       ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
@@ -904,6 +868,11 @@ contextBridge.exposeInMainWorld('electron', {
     exportZip: () => ipcRenderer.invoke(LogIpc.ExportZip),
     fromRenderer: (level: string, tag: string, message: string) =>
       ipcRenderer.send(LogIpc.FromRenderer, level, tag, message),
+  },
+
+  runtimeNotices: {
+    onNotice: (callback: (notice: import('../common/runtimeNotice').RuntimeRetryNotice) => void) =>
+      onPush(RuntimeNoticeIpc.Notice, callback),
   },
 
   im: {
@@ -1047,6 +1016,34 @@ contextBridge.exposeInMainWorld('electron', {
   devNetwork: {
     onEntry: (callback: (entry: import('../shared/devNetworkLog').DevNetworkLogEntry) => void) =>
       onPush(DevNetworkIpc.Entry, callback),
+  },
+
+  auth: {
+    communityLogin: () => ipcRenderer.invoke(CommunityAuthIpc.Login),
+    getCommunityUser: () => ipcRenderer.invoke(CommunityAuthIpc.GetCommunityUser),
+    communityLogout: () => ipcRenderer.invoke(CommunityAuthIpc.Logout),
+    onCommunityCallback: (
+      callback: (data: {
+        success: boolean;
+        user?: { id: string; email: string; name: string };
+        error?: string;
+      }) => void,
+    ) => onPush(CommunityAuthIpc.Callback, callback),
+  },
+
+  modelPool: {
+    listModels: () => ipcRenderer.invoke(ModelPoolIpc.ListModels),
+    stream: (input: { requestId: string; conversationId: string; body: Record<string, unknown> }) =>
+      ipcRenderer.invoke(ModelPoolIpc.Stream, input),
+    cancelStream: (requestId: string) => ipcRenderer.invoke(ModelPoolIpc.CancelStream, requestId),
+    onStreamData: (requestId: string, callback: (data: string) => void) =>
+      onPush(ModelPoolIpc.streamData(requestId), callback),
+    onStreamDone: (requestId: string, callback: () => void) =>
+      onPushVoid(ModelPoolIpc.streamDone(requestId), callback),
+    onStreamError: (requestId: string, callback: (error: string) => void) =>
+      onPush(ModelPoolIpc.streamError(requestId), callback),
+    onStreamAbort: (requestId: string, callback: () => void) =>
+      onPushVoid(ModelPoolIpc.streamAbort(requestId), callback),
   },
 
   feishu: {

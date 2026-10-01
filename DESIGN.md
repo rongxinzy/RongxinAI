@@ -66,7 +66,7 @@ Tailwind 的语义颜色、字体、圆角和阴影映射到插件变量。页�
 | 边框     | `border` / `border-subtle`                    | 分隔线、控件描边                                       |
 | 强调     | `primary` / `primary-hover` / `primary-muted` / `primary-strong` | 唯一的品牌强调色（品牌蓝），用于主按钮、激活态、链接、focus ring；`primary-strong` 为按钮实色档，深色主题下保证白字 AA 对比度 |
 | 状态     | `destructive` / `success` / `warning`         | 仅用于语义状态，不作装饰                               |
-| 技能着色 | `skill-blue`（`--zy-skill-blue-foreground/background`） | 已挂载技能胶囊（ActiveSkillBadge）的文字与 hover 底色；唯一的功能性蓝色例外，不推广到其他元素 |
+| 技能着色 | `skill-blue`（`--zy-skill-blue-foreground/background`） | 输入框内已挂载技能 token（`surface-skill-token` / `surface-skill-remove`）与目标模式胶囊的文字/底色；唯一的功能性蓝色例外，不推广到其他元素 |
 
 ### 当前色值参考（Light）
 
@@ -221,6 +221,12 @@ Tailwind 的语义颜色、字体、圆角和阴影映射到插件变量。页�
 | 其余一切"让颜色变浅"的需求 | **禁止用 opacity 实现**，改用对应的弱档 token（`text-secondary`、`border-subtle`、`primary-muted`） |
 
 原因：opacity 会让元素与背后的内容混色，在明暗两套主题下表现不一致；token 才能在两套主题中各自取到正确的值。
+
+### 内容区 Logo 加载态
+
+工作空间、编程工作区及类似整页初始化场景使用共享 `LogoLoadingState`：内容区居中显示 128px 宽的知远字标，字标和圆点统一采用当前主题 `primary` 色，下方以正文小字号显示本地化状态文字。字标静止，仅圆点在 1.2s 单程内以 ease-out 在 1 和 0.35 透明度间往返，表示持续等待；较长周期用于避免高频闪烁。一屏仅一处，减少动效时显示完整静态 Logo。
+
+此范式属于内容区初始化，不用于应用启动，也不替代会话、列表等原地内容加载的骨架屏。侧栏保持可操作，加载完成立即呈现内容，不设置最短播放时间；错误状态显示原因及重试操作。复用品牌原图轮廓生成单色标识，颜色、尺寸、文字外观和呼吸动效由主题 recipe 定义，禁止页面局部覆写。
 
 ## 动效
 
@@ -431,6 +437,7 @@ src/shared/components/ui/page-tabs.tsx
 
 - 侧栏搜索复用 `SidebarSearchTrigger` 与居中 `TaskSearchDialog`：按参考图采用无边框输入栏、单行任务、右侧归属与快捷键、底部快捷操作。宽度使用 `max-w-lg`，行高 32px，按用户提供的 Codex 截图使用 `rounded-2xl` 弹层与 `rounded-full` 结果高亮（仅限任务搜索弹层）。查询与跳转留在 `CoworkSearchModal` 控制层，侧栏树不随搜索过滤或重建。方向键 / Enter 与 Cmd/Ctrl+1–9 可选任务，Escape 关闭并恢复焦点；快捷操作只呈现已有功能。
 - 侧栏收起时内容保持挂载并设置 `inert`，同时退出键盘顺序和可访问树；展开后恢复原有控件及树状态。
+- 编程工作区文件夹点击只控制展开与折叠，不切换当前会话；默认展开只在首次非空列表加载时执行，后台刷新保留全部折叠状态。会话行优先保证标题可读，Agent 名称列不超过行按钮宽度的 30% 和 6.5rem，超出截断并提供完整名称提示，悬停时保持可见；删除按钮使用独立固定槽位，支持键盘焦点，不覆盖名称或状态点。
 
 - 侧栏导航使用共享 `SidebarNavigationView` / `SidebarNavigationItem`：32px 行高、8px 圆角、统一图标槽和文字省略；选中态使用 `card`、`border` 与正文色，悬停使用同一语义表面。状态、可见性策略、预加载与新任务回调由原控制组件提供。
 - `Button` 的 `navigation` variant / size 负责导航视觉；`toolbar` variant 配合 `icon` size 负责侧栏及顶栏的 32px 图标按钮。页面不再覆盖这些按钮的颜色、圆角和高度。

@@ -249,7 +249,8 @@ export function classicConditionalControls(dark: boolean) {
       base: {
         'border-color': 'var(--zy-border)',
         'background-color': 'var(--card)',
-        'font-weight': 'var(--zy-component-font-weight-medium)',
+        // 2026/09/22 lixiang  选中快捷技能加粗，与侧栏导航选中态一致
+        'font-weight': 'var(--zy-component-font-weight-semibold)',
         color: 'var(--zy-foreground)',
       },
       hover: {
@@ -259,7 +260,22 @@ export function classicConditionalControls(dark: boolean) {
       },
     }),
     'page-chat-skill-shortcuts-button-variant-3': recipe({
-      base: { color: 'var(--muted-foreground)' },
+      // 2026/09/22 lixiang  快捷技能未选中项文字用正文色，与侧栏导航一致
+      base: { color: 'var(--foreground)' },
+    }),
+    // Same selected surface as chat skill shortcuts: card on surface-raised sidebar.
+    'page-sidebar-navigation-button-selected': recipe({
+      base: {
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--card)',
+        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        color: 'var(--zy-foreground)',
+      },
+      hover: {
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--card)',
+        color: 'var(--zy-foreground)',
+      },
     }),
     'page-coding-workspace-sidebar-button-variant-1': recipe({
       base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
@@ -269,7 +285,7 @@ export function classicConditionalControls(dark: boolean) {
     'page-coding-workspace-sidebar-button-variant-3': recipe({
       base: {
         height: '2rem',
-        width: 'calc(100% + 12px)',
+        width: '100%',
         gap: '0.5rem',
         'border-radius': 'var(--zy-style-radius-md)',
         'padding-block': '0rem',
@@ -578,23 +594,24 @@ export function classicConditionalControls(dark: boolean) {
       base: { 'background-color': 'color-mix(in oklab, var(--muted) 30%, transparent)' },
     }),
     'page-models-panel-card-variant-4': recipe({ base: { opacity: '0.5' } }),
-    // Case tiles carry a thumbnail and a caption, nothing else: the frame would fight the
-    // artwork inside it. The tile is transparent at rest and paints a rounded surface on
-    // hover or selection, so the preview stays the only solid block in the cell.
+    // The tile is artwork with the caption underneath, so nothing overlays the image and the card is
+    // no longer a fixed-aspect box. Hover is a text-tier step on the caption (DESIGN.md's sanctioned
+    // hover form); selection stays an outline around the whole tile, and there is no pressed state:
+    // the tile opens a dialog and the engine's pressed selector excludes [aria-haspopup].
     'page-case-gallery-card': recipe({
       base: {
-        padding: '0.75rem',
+        padding: '0',
         gap: '0.5rem',
         'border-style': 'none',
         'background-color': 'transparent',
         'border-radius': 'var(--zy-style-radius-lg)',
-        'transition-property': 'background-color',
-        'transition-duration': '200ms',
-        'transition-timing-function': 'ease-out',
       },
-      hover: { 'background-color': 'var(--zy-surface-raised)' },
-      selected: { 'background-color': 'var(--zy-primary-muted)' },
-      pressed: { translate: '0 1px' },
+      selected: {
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-color': 'var(--zy-primary)',
+        'outline-offset': '2px',
+      },
       focus: {
         'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
       },
@@ -605,8 +622,18 @@ export function classicConditionalControls(dark: boolean) {
         'border-radius': 'var(--zy-style-radius-md)',
       },
     }),
+    // The caption sits on the page ground below the artwork, so it needs no scrim: it is plain
+    // secondary text that steps up to full contrast while the tile is hovered.
     'page-case-gallery-body': recipe({
-      base: { gap: '0.25rem' },
+      base: {
+        color: 'var(--muted-foreground)',
+        'font-size': 'var(--zy-component-text-sm)',
+        'font-weight': '500',
+        'transition-property': 'color',
+        'transition-duration': '200ms',
+        'transition-timing-function': 'ease-out',
+      },
+      parentHover: { color: 'var(--foreground)' },
     }),
     'page-date-input-button-variant-1': recipe({
       base: {

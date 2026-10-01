@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron';
 
 import {
   CodingAgentIpc,
+  CodingEventWindowPageSize,
   type AddCodingAgentProfileInput,
   type CodingGitCommitInput,
   type CodingGitCommitAndPushInput,
@@ -27,10 +28,37 @@ import {
 } from '../../shared/codingAgent';
 import type { CodingRoomService } from '../codingAgent/codingRoomService';
 import { GitWorktreeConflictError } from '../codingAgent/gitWorktreeService';
+import { agentResourceDiagnostics } from '../agentResourceDiagnostics';
+
+type CodingHandler<T> = () => T | Promise<T>;
+
+/**
+ * Single entry point for every coding IPC handler: a failure is logged with its
+ * channel and normalised into the `{ success: false, error }` shape the
+ * renderer already understands. `describeFailure` adds channel-specific fields
+ * on top of that shape (e.g. the Git worktree conflict flag).
+ */
+async function runCodingHandler<T>(
+  channel: string,
+  run: CodingHandler<T>,
+  describeFailure?: (error: unknown) => Record<string, unknown>,
+): Promise<T | { success: false; error: string }> {
+  try {
+    return await run();
+  } catch (error) {
+    console.error(`[CodingAgentIpc] ${channel} failed:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      ...describeFailure?.(error),
+    };
+  }
+}
 
 export function registerCodingAgentIpcHandlers(getService: () => CodingRoomService): void {
   const service = getService();
   service.on('changed', snapshot => {
+    agentResourceDiagnostics.recordRoomSnapshot(snapshot.events.length, snapshot.lanes.length);
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.Changed, snapshot);
     }
@@ -51,126 +79,117 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
     }
   });
   ipcMain.handle(CodingAgentIpc.ListProfiles, () => {
-    try {
+    return runCodingHandler(CodingAgentIpc.ListProfiles, () => {
       return { success: true, profiles: service.listProfiles() };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.ListWorkspaces, () => {
-    try {
+    return runCodingHandler(CodingAgentIpc.ListWorkspaces, () => {
       return { success: true, workspaces: service.listWorkspaces() };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.CreateWorkspace, (_event, input: CreateCodingWorkspaceInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CreateWorkspace, () => {
       return { success: true, workspaces: service.createWorkspace(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.UpdateWorkspace, (_event, input: UpdateCodingWorkspaceInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.UpdateWorkspace, () => {
       return { success: true, workspaces: service.updateWorkspace(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.DeleteWorkspace, (_event, workspaceId: string) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.DeleteWorkspace, () => {
       return { success: true, workspaces: service.deleteWorkspace(workspaceId) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(
     CodingAgentIpc.DeleteSession,
     (_event, input: { workspaceRoot: string; laneId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.DeleteSession, () => {
         return {
           success: true,
           workspaces: service.deleteSession(input.workspaceRoot, input.laneId),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(CodingAgentIpc.GetProfileConfigOptions, (_event, profileId: string) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.GetProfileConfigOptions, () => {
       return { success: true, configOptions: service.getProfileConfigOptions(profileId) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.GetProfileAvailableCommands, (_event, profileId: string) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.GetProfileAvailableCommands, () => {
       return { success: true, commands: service.getProfileAvailableCommands(profileId) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.CreateSession, async (_event, input: CreateCodingSessionInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CreateSession, async () => {
       return { success: true, snapshot: await service.createSession(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.StartSession, async (_event, input: StartCodingSessionInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.StartSession, async () => {
       return { success: true, snapshot: await service.startSession(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.Bootstrap, (_event, workspaceRoot: string) => {
-    try {
-      return { success: true, snapshot: service.bootstrap(workspaceRoot) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    return runCodingHandler(CodingAgentIpc.Bootstrap, () => {
+      return {
+        success: true,
+        snapshot: service.bootstrap(workspaceRoot, {
+          eventLimitPerLane: CodingEventWindowPageSize,
+        }),
+      };
+    });
+  });
+  service.on('eventDelta', (delta: import('../../shared/codingAgent').CodingRoomEventDelta) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.EventDelta, delta);
     }
   });
   ipcMain.handle(
+    CodingAgentIpc.LoadEventPage,
+    (_event, input: { workspaceRoot: string; laneId: string; beforeSequence: number | null }) => {
+      return runCodingHandler(CodingAgentIpc.LoadEventPage, () => {
+        return {
+          success: true,
+          page: service.loadEventPage(input.workspaceRoot, input.laneId, input.beforeSequence),
+        };
+      });
+    },
+  );
+  ipcMain.handle(
     CodingAgentIpc.PrepareLane,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.PrepareLane, async () => {
         return {
           success: true,
           snapshot: await service.prepareLane(input.workspaceRoot, input.laneId),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(CodingAgentIpc.CreateMission, async (_event, input: CreateCodingMissionInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CreateMission, async () => {
       return { success: true, snapshot: await service.createMission(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(
     CodingAgentIpc.SelectLane,
     (_event, input: { workspaceRoot: string; laneId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.SelectLane, () => {
         return { success: true, snapshot: service.selectLane(input.workspaceRoot, input.laneId) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.Prompt,
     async (_event, input: { workspaceRoot: string; prompt: CodingPromptInput }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.Prompt, async () => {
         return { success: true, snapshot: await service.prompt(input.workspaceRoot, input.prompt) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(CodingAgentIpc.ListPendingMessages, (_event, laneId: string) => ({
@@ -189,20 +208,18 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   ipcMain.handle(
     CodingAgentIpc.SteerPendingMessage,
     async (_event, input: { workspaceRoot: string; laneId: string; itemId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.SteerPendingMessage, async () => {
         return {
           success: true,
           snapshot: await service.steerPendingMessage(input.workspaceRoot, input.laneId, input.itemId),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.FollowUpPendingMessage,
     async (_event, input: { workspaceRoot: string; laneId: string; itemId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.FollowUpPendingMessage, async () => {
         return {
           success: true,
           snapshot: await service.followUpPendingMessage(
@@ -211,9 +228,7 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.itemId,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
@@ -222,7 +237,7 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       _event,
       input: { workspaceRoot: string; laneId: string; includeRecoveryContext: boolean },
     ) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.ConfirmSessionRecovery, async () => {
         return {
           success: true,
           snapshot: await service.confirmSessionRecovery(
@@ -231,19 +246,15 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.includeRecoveryContext,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.Cancel,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.Cancel, async () => {
         return { success: true, snapshot: await service.cancel(input.workspaceRoot, input.laneId) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
@@ -252,7 +263,7 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       _event,
       input: { workspaceRoot: string; sourceLaneId: string; targetLaneId: string },
     ) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.PreviewHandoff, async () => {
         return {
           success: true,
           content: await service.previewHandoff(
@@ -261,9 +272,7 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.targetLaneId,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
@@ -272,7 +281,7 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       _event,
       input: { workspaceRoot: string; sourceLaneId: string; targetLaneId: string },
     ) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.Handoff, async () => {
         return {
           success: true,
           snapshot: await service.handoff(
@@ -281,196 +290,150 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.targetLaneId,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.CreateCollaborationPreset,
     async (_event, input: CreateCodingCollaborationPresetInput) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.CreateCollaborationPreset, async () => {
         return {
           success: true,
           snapshot: await service.createImplementationReviewVerificationPreset(input),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.AddLane,
     async (_event, input: { workspaceRoot: string; missionId: string; profileId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.AddLane, async () => {
         return {
           success: true,
           snapshot: await service.addLane(input.workspaceRoot, input.missionId, input.profileId),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.SaveLaneView,
     (_event, input: { workspaceRoot: string; view: CodingLaneViewStateInput }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.SaveLaneView, () => {
         return { success: true, snapshot: service.saveLaneView(input.workspaceRoot, input.view) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.PreviewLaneChanges,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.PreviewLaneChanges, async () => {
         return {
           success: true,
           preview: await service.previewLaneChanges(input.workspaceRoot, input.laneId),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.ApplyLaneChanges,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.ApplyLaneChanges, async () => {
         return {
           success: true,
           snapshot: await service.applyLaneChanges(input.workspaceRoot, input.laneId),
         };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-          conflict: error instanceof GitWorktreeConflictError,
-        };
-      }
+      }, error => ({ conflict: error instanceof GitWorktreeConflictError }));
     },
   );
   ipcMain.handle(CodingAgentIpc.GetGitStatus, async (_event, input: CodingGitTargetInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.GetGitStatus, async () => {
       return { success: true, status: await service.getGitStatus(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.GetGitDiff, async (_event, input: CodingGitDiffInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.GetGitDiff, async () => {
       return { success: true, diff: await service.getGitDiff(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.StageGitPaths, async (_event, input: CodingGitPathActionInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.StageGitPaths, async () => {
       return { success: true, status: await service.stageGitPaths(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(
     CodingAgentIpc.UnstageGitPaths,
     async (_event, input: CodingGitPathActionInput) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.UnstageGitPaths, async () => {
         return { success: true, status: await service.unstageGitPaths(input) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(CodingAgentIpc.CommitGitChanges, async (_event, input: CodingGitCommitInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CommitGitChanges, async () => {
       console.debug(
         `[CodingGit] received a commit request with ${input.paths.length} selected path(s)`,
       );
       return { success: true, status: await service.commitGitChanges(input) };
-    } catch (error) {
-      console.error('[CodingGit] commit request failed:', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(
     CodingAgentIpc.CommitAndPushGitChanges,
     async (_event, input: CodingGitCommitAndPushInput) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.CommitAndPushGitChanges, async () => {
         console.debug(
           `[CodingGit] received a commit and push request with ${input.paths.length} selected path(s)`,
         );
         return { success: true, result: await service.commitAndPushGitChanges(input) };
-      } catch (error) {
-        console.error('[CodingGit] commit and push request failed:', error);
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(CodingAgentIpc.PushGitBranch, async (_event, input: CodingGitTargetInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.PushGitBranch, async () => {
       return { success: true, status: await service.pushGitBranch(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.SwitchGitBranch, async (_event, input: CodingGitBranchInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.SwitchGitBranch, async () => {
       return { success: true, status: await service.switchGitBranch(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.CreateGitBranch, async (_event, input: CodingGitBranchInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CreateGitBranch, async () => {
       return { success: true, status: await service.createGitBranch(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.CreateGitPullRequest, async (_event, input: CodingGitPullRequestInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CreateGitPullRequest, async () => {
       return { success: true, url: await service.createGitPullRequest(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.ListWorkspaceFiles, async (_event, input: CodingWorkspaceFileInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.ListWorkspaceFiles, async () => {
       return { success: true, entries: await service.listWorkspaceFiles(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(CodingAgentIpc.ReadWorkspaceFile, async (_event, input: CodingWorkspaceFileInput) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.ReadWorkspaceFile, async () => {
       return { success: true, file: await service.readWorkspaceFile(input) };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(
     CodingAgentIpc.WriteWorkspaceFile,
     async (_event, input: CodingWorkspaceFileWriteInput) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.WriteWorkspaceFile, async () => {
         return { success: true, file: await service.writeWorkspaceFile(input) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.SetLaneConfigOption,
     async (_event, input: { workspaceRoot: string; option: CodingLaneConfigOptionInput }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.SetLaneConfigOption, async () => {
         return {
           success: true,
           snapshot: await service.setLaneConfigOption(input.workspaceRoot, input.option),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
@@ -479,7 +442,7 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       _event,
       input: { workspaceRoot: string; laneId: string; modelOverride: string | null },
     ) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.SetLaneModelOverride, async () => {
         return {
           success: true,
           snapshot: await service.setLaneModelOverride(
@@ -488,64 +451,61 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.modelOverride,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.DiscoverAgents,
     async (_event, input: { workspaceRoot: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.DiscoverAgents, async () => {
         return {
           success: true,
-          snapshot: await service.discoverAgents(input.workspaceRoot),
+          snapshot: (await service.discoverAgents(input.workspaceRoot)) ?? undefined,
+          profiles: service.listProfiles(),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.ProbeAgent,
     async (_event, input: { workspaceRoot: string; profileId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.ProbeAgent, async () => {
         return {
           success: true,
-          snapshot: await service.probeAgent(input.workspaceRoot, input.profileId),
+          snapshot: (await service.probeAgent(input.workspaceRoot, input.profileId)) ?? undefined,
+          profiles: service.listProfiles(),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.AddProfile,
     (_event, input: { workspaceRoot: string; profile: AddCodingAgentProfileInput }) => {
-      try {
-        return { success: true, snapshot: service.addProfile(input.workspaceRoot, input.profile) };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      return runCodingHandler(CodingAgentIpc.AddProfile, () => {
+        return {
+          success: true,
+          snapshot: service.addProfile(input.workspaceRoot, input.profile) ?? undefined,
+          profiles: service.listProfiles(),
+        };
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.TrustProfile,
     (_event, input: { workspaceRoot: string; profileId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.TrustProfile, () => {
         return {
           success: true,
-          snapshot: service.trustProfile(input.workspaceRoot, input.profileId),
+          snapshot: service.trustProfile(input.workspaceRoot, input.profileId) ?? undefined,
+          profiles: service.listProfiles(),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.AuthenticateProfile,
     async (_event, input: { workspaceRoot: string; profileId: string; methodId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.AuthenticateProfile, async () => {
         return {
           success: true,
           snapshot: await service.authenticateProfile(
@@ -554,15 +514,13 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.methodId,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.StartAuthTerminal,
     (_event, input: { workspaceRoot: string; profileId: string; methodId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.StartAuthTerminal, () => {
         return {
           success: true,
           terminal: service.startTerminalAuthentication(
@@ -571,78 +529,64 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
             input.methodId,
           ),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.WriteAuthTerminal,
     (_event, input: { id: string; data: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.WriteAuthTerminal, () => {
         service.writeAuthTerminal(input.id, input.data);
         return { success: true };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.ResizeAuthTerminal,
     (_event, input: { id: string; columns: number; rows: number }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.ResizeAuthTerminal, () => {
         service.resizeAuthTerminal(input.id, input.columns, input.rows);
         return { success: true };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(CodingAgentIpc.CancelAuthTerminal, (_event, id: string) => {
-    try {
+    return runCodingHandler(CodingAgentIpc.CancelAuthTerminal, () => {
       service.cancelAuthTerminal(id);
       return { success: true };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    });
   });
   ipcMain.handle(
     CodingAgentIpc.RespondPermission,
     async (_event, input: { workspaceRoot: string; response: CodingPermissionResponse }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.RespondPermission, async () => {
         return {
           success: true,
           snapshot: await service.respondToPermission(input.workspaceRoot, input.response),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.RespondElicitation,
     async (_event, input: { workspaceRoot: string; response: CodingElicitationResponse }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.RespondElicitation, async () => {
         return {
           success: true,
           snapshot: await service.respondElicitation(input.workspaceRoot, input.response),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
   ipcMain.handle(
     CodingAgentIpc.CancelElicitation,
     async (_event, input: { workspaceRoot: string; requestId: string }) => {
-      try {
+      return runCodingHandler(CodingAgentIpc.CancelElicitation, async () => {
         return {
           success: true,
           snapshot: await service.cancelElicitation(input.workspaceRoot, input.requestId),
         };
-      } catch (error) {
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
-      }
+      });
     },
   );
 }

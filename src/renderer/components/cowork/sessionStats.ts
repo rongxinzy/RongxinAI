@@ -1,3 +1,4 @@
+import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../types/cowork';
 
 export interface SessionStats {
@@ -91,7 +92,11 @@ export function getSessionStats(messages: CoworkMessage[]): SessionStats {
       continue;
     }
 
-    const usage = message.metadata?.usage;
+    const recordedUsage = message.metadata?.usage;
+    // Pi reports an all-zero record when the provider sent no usage at all; that
+    // is a missing sample, not a zero reading (see hasReportedTokenUsage).
+    const usage =
+      recordedUsage && hasReportedTokenUsage(recordedUsage) ? recordedUsage : undefined;
     if (usage !== undefined && (
       !isFiniteNonNegative(usage.inputTokens) ||
       !isFiniteNonNegative(usage.cacheReadTokens) ||

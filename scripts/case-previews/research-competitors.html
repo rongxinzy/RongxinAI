@@ -1,65 +1,128 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><title>research-competitors</title><style>*{box-sizing:border-box;margin:0}
-html,body{width:1100px;height:688px;overflow:hidden}
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;background:#f2f2ef;color:#16171a;-webkit-font-smoothing:antialiased}
+<html lang="zh-CN"><head><meta charset="utf-8"><title>research-competitors</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f2f2ef;font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;color:#16171a;display:grid;gap:26px;padding:30px;justify-content:start;-webkit-font-smoothing:antialiased}
+.page{--accent:#0F766E;width:1100px;height:688px;overflow:hidden;position:relative;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column}
+.n{font-variant-numeric:tabular-nums}
 .mono{font-family:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;font-variant-numeric:tabular-nums}
-.serif{font-family:Georgia,"Songti SC","SimSun",serif}
-
-body{padding:30px}
-.sheet{width:100%;height:100%;background:#fff;border:1px solid #e4e4e0;display:flex;flex-direction:column;overflow:hidden}
-.sheet-top{padding:26px 34px 22px;border-bottom:1px solid #edede9}
-.kicker{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase}
-h1{margin-top:12px;font-size:30px;letter-spacing:-.02em}
-.meta{margin-top:10px;font-size:12px;color:#8b8f97;display:flex;gap:18px}
-.body{flex:1;min-height:0;padding:22px 34px;display:grid;gap:18px}
-h3{font-size:12px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase}
-.abstract{background:#fafaf8;border-left:3px solid var(--accent);padding:14px 18px;font-size:13.5px;line-height:1.85;color:#3d4046}
-.cols2{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;min-height:0}
-.bars{display:grid;gap:10px;margin-top:12px}
-.bar{display:grid;grid-template-columns:64px 1fr 52px;align-items:center;gap:12px;font-size:12px;color:#6f737b}
-.bar i{display:block;height:9px;background:var(--accent);opacity:.88}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
-th,td{border:1px solid #edede9;padding:8px 12px;text-align:left;color:#3d4046}
-th{background:#f6f6f3;color:#6f737b;font-size:11.5px;letter-spacing:.06em;font-weight:500}
-td.mono{font-variant-numeric:tabular-nums}
-ul{list-style:none;margin-top:10px;display:grid;gap:8px}
-li{position:relative;padding-left:16px;font-size:13px;color:#4c5058;line-height:1.75}
-li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;background:var(--accent)}
-.timeline{display:grid;gap:0;margin-top:12px}
-.tl{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:9px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058}
-.tl:first-child{border-top:0}
-.tl b{color:var(--accent);font-weight:600}
-.sheet-foot{border-top:1px solid #edede9;padding:10px 34px;font-size:11px;color:#9a9ea6;display:flex;justify-content:space-between}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;padding:20px 32px 13px;border-bottom:1px solid #edede9}
+.kk{font-size:11px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;font-weight:500}
+.ph h2{margin-top:7px;font-size:23px;letter-spacing:-.02em;font-weight:600}
+.pn{font-size:11px;color:#8b8f97;text-align:right;line-height:1.75;max-width:340px;flex:0 0 auto}
+.pf{display:flex;justify-content:space-between;gap:20px;padding:8px 32px;border-top:1px solid #edede9;font-size:11px;color:#9a9ea6}
+.pc{flex:1;min-height:0;padding:15px 32px 10px;display:grid;gap:11px;align-content:start}
+.page.cover .ph{padding:24px 34px 16px}
+.page.cover .ph h2{font-size:29px}
+.page.cover .kicker,.page.cover .ph h2{margin-top:8px}
+h3{font-size:11px;letter-spacing:.16em;color:#8b8f97;text-transform:uppercase;font-weight:500}
+h4{font-size:13.5px;letter-spacing:-.01em;font-weight:600;color:#16171a}
+p{font-size:12.5px;line-height:1.8;color:#3d4046}
+b,strong{font-weight:600}
+.hl{background:color-mix(in srgb,var(--accent) 8%,#fff)}
+.abs{background:#fafaf8;border-left:3px solid var(--accent);padding:11px 16px;font-size:13.5px;line-height:1.85;color:#3d4046}
+.kpi{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi.c4{grid-template-columns:repeat(4,1fr)}
+.kpi.c2{grid-template-columns:repeat(2,1fr)}
+.kc{border:1px solid #edede9;background:#fafaf8;padding:8px 12px}
+.kc .k{font-size:11px;letter-spacing:.12em;color:#8b8f97}
+.kc b{display:block;margin-top:4px;font-size:26px;letter-spacing:-.02em}
+.kc b.sm{font-size:16px;line-height:1.5}
+.kc i{display:block;font-style:normal;font-size:11px;color:#9a9ea6;margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{border:1px solid #edede9;padding:6px 10px;text-align:left;color:#3d4046;vertical-align:top}
+th{background:#f6f6f3;color:#6f737b;font-size:11px;letter-spacing:.06em;font-weight:500;white-space:nowrap}
+tr.tot td{background:color-mix(in srgb,var(--accent) 8%,#fff);font-weight:600}
+td.n,th.n{text-align:right}
+ul{list-style:none;display:grid;gap:6px}
+li{position:relative;padding-left:15px;font-size:12.5px;line-height:1.7;color:#4c5058}
+li::before{content:"";position:absolute;left:1px;top:8px;width:5px;height:5px;background:var(--accent)}
+li.k::before{display:none}
+li.k{padding-left:0;color:#6f737b}
+li b{color:#16171a}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:112px 1fr 60px;align-items:center;gap:10px;font-size:12.5px;color:#6f737b}
+.bar i{display:block;height:8px;background:var(--accent);opacity:.9}
+.bar i.g{background:#9a9ea6;opacity:.45}
+.bar .v{font-variant-numeric:tabular-nums;text-align:right;color:#3d4046}
+.axis{display:grid;grid-template-columns:112px 1fr 60px;gap:10px;font-size:11px;color:#9a9ea6}
+.axis .t{display:flex;justify-content:space-between;border-top:1px solid #e4e4e0;padding-top:3px}
+.cols2{display:grid;grid-template-columns:1.15fr 1fr;gap:20px;align-items:start}
+.cols2.eq{grid-template-columns:1fr 1fr}
+.cols2.wide{grid-template-columns:1.5fr 1fr}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start}
+.tl{display:grid}
+.tl .r{display:grid;grid-template-columns:82px 1fr;gap:12px;padding:6px 0;border-top:1px solid #edede9;font-size:12.5px;color:#4c5058;line-height:1.65}
+.tl .r:first-child{border-top:0}
+.tl .r b{color:var(--accent);font-weight:600}
+.mx{display:grid;grid-template-columns:1fr 1fr;border:1px solid #e4e4e0;background:#edede9;gap:1px}
+.mx>div{background:#fff;padding:9px 12px;min-height:96px}
+.mx>div.hd{background:#fafaf8}
+.mx .t{font-size:11px;letter-spacing:.14em;color:#6f737b;margin-bottom:5px}
+.card{border:1px solid #edede9;padding:9px 12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{border:1px solid #e4e4e0;padding:2px 7px;font-size:11px;color:#6f737b}
+.mut{color:#8b8f97}
+.sm{font-size:11px;color:#9a9ea6}
+.dist{display:flex;height:16px;border:1px solid #e4e4e0}
+.dist i{display:block;height:100%;background:var(--accent);opacity:.9;font-size:0}
+.dist i.g{background:#9a9ea6;opacity:.5}
+.dist i.w{background:#fff}
+.distlab{display:flex;justify-content:space-between;font-size:11px;color:#8b8f97}
+.legend{display:flex;gap:14px;font-size:11px;color:#8b8f97}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);opacity:.9;margin-right:5px}
+.legend span.g::before{background:#9a9ea6;opacity:.5}
+.legend span.w::before{background:#fff;border:1px solid #e4e4e0}
+.sep{border-top:1px solid #edede9}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head><body>
-<div class="sheet" style="--accent:#0F766E">
-  <div class="sheet-top">
-    <div class="kicker">Competitive Analysis</div>
-    <h1>竞品能力与市场定位对比</h1>
-    <div class="meta"><span>覆盖 6 家主要厂商</span><span>评估维度：部署 / 数据 / 生态 / 价格</span></div>
-  </div>
-  <div class="body">
-    <table>
-      <tr><th>厂商</th><th>部署方式</th><th>数据可控性</th><th>价格带</th><th>典型客户</th><th>定位判断</th></tr>
-      <tr><td>竞品 A</td><td>纯云端</td><td>黑盒</td><td>¥299/人/月</td><td>互联网中小团队</td><td>体验优先</td></tr>
-      <tr><td>竞品 B</td><td>私有化为主</td><td>可导出</td><td>按项目</td><td>金融、政企</td><td>合规优先</td></tr>
-      <tr><td>竞品 C</td><td>云端 + 本地插件</td><td>部分可控</td><td>¥199 起</td><td>开发者</td><td>生态优先</td></tr>
-      <tr><td>竞品 D</td><td>本地优先</td><td>完全可控</td><td>按坐席</td><td>制造业</td><td>数据优先</td></tr>
-      <tr><td>竞品 E</td><td>纯云端</td><td>黑盒</td><td>免费 + 增值</td><td>个人用户</td><td>流量优先</td></tr>
-    </table>
-    <div class="cols2" style="grid-template-columns:1fr 1fr">
-      <div><h3>结构性缺口</h3>
-        <ul>
-          <li>没有厂商把"离线可用 + 数据留在本机"做成默认而不是选项</li>
-          <li>跨工具的数据流转仍需人工搬运，缺少统一出口</li>
-        </ul>
-      </div>
-      <div><h3>我方可切入的位置</h3>
-        <ul>
-          <li>以本地优先为默认形态，用数据可控性换采购决策权重</li>
-          <li>在中型团队价位段提供可量化的合规说明</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  <div class="sheet-foot"><span>评分口径：功能覆盖 × 使用成本</span><span>第 3 / 12 页</span></div>
-</div></body></html>
+<section class="page cover" data-page="1">
+  <div class="ph"><div><div class="kk">Competitive Analysis</div><h2>竞品能力与市场定位对比</h2></div><div class="pn">覆盖 6 家厂商（A–F，含 1 家海外参照）<br>评估维度：部署 / 数据 / 生态 / 价格</div></div>
+  <div class="pc"><div><h3>摘要</h3><p>市场呈现「三方不可兼得」：数据可控性、生态集成与单位成本三者中，没有一家厂商能同时做到两项以上。国内 5 家厂商里，C 以综合加权 <b>82.1 分</b>居首（生态 9 分 / 数据可控仅 6 分），D 数据可控 10 分但生态只有 5 分；B 合规能力最强却把 50 坐席年成本推到 <b>26.4 万元</b>，成为其最大获客障碍。</p></div><div class="kpi"><div class="kc"><div class="k">覆盖厂商</div><b class="n">6 家</b><i>国内 5 家 + 海外参照 1 家</i></div><div class="kc"><div class="k">综合加权最高</div><b class="n">82.1</b><i>厂商 C，权重：功能 40 / 成本 25 / 数据 20 / 生态 15</i></div><div class="kc"><div class="k">付费厂商年成本带</div><b class="n class="sm"">12.6–26.4 万</b><i>最高为最低的 2.1 倍；E 为免费层不参与比较</i></div></div><table><thead><tr><th>厂商</th><th>部署方式</th><th>数据可控性</th><th>价格带</th><th>典型客户</th><th>定位判断</th></tr></thead><tbody><tr class=""><td>竞品 A</td><td>纯云端</td><td>黑盒（3 分）</td><td>¥299/人/月</td><td>互联网中小团队</td><td>体验优先</td></tr><tr class=""><td>竞品 B</td><td>私有化为主</td><td>可导出（8 分）</td><td>按项目，26.4 万/年</td><td>金融、政企</td><td>合规优先</td></tr><tr class=""><td>竞品 C</td><td>云端 + 本地插件</td><td>部分可控（6 分）</td><td>¥199 起，12.6 万/年</td><td>开发者</td><td>生态优先</td></tr><tr class=""><td>竞品 D</td><td>本地优先</td><td>完全可控（10 分）</td><td>按坐席，21.3 万/年</td><td>制造业</td><td>数据优先</td></tr><tr class=""><td>竞品 E</td><td>纯云端</td><td>黑盒（2 分）</td><td>免费 + 增值</td><td>个人用户</td><td>流量优先</td></tr></tbody></table><div class="cols2 eq"><div><h3>结构性缺口</h3><ul class=""><li>没有厂商把「离线可用 + 数据留在本机」做成默认而不是选项</li><li>跨工具的数据流转仍需人工搬运，6 家中仅 C 提供统一出口，且不覆盖本地环境</li></ul></div><div><h3>我方可切入的位置</h3><ul class=""><li>以本地优先为默认形态，用数据可控性换采购决策权重，直接对标 D 但补齐生态短板</li><li>把 50 坐席年成本压到 19 万以内，低于 B 的 26.4 万与 D 的 21.3 万</li></ul></div></div><div><h3>口径与来源</h3><p>评分 0–10 分制、加权总分百分制；价格采集窗 2026-07-01 – 2026-09-15，不含私有折扣与渠道返点，实际成交价通常低 10%–18%；功能快照日 2026-08-31。</p></div></div>
+  <div class="pf"><span>评分口径：功能覆盖 × 使用成本 × 数据可控 × 生态集成 · 结论见第 9 页</span><span>第 1 / 10 页</span></div>
+</section>
+<section class="page" data-page="2">
+  <div class="ph"><div><div class="kk">Contents</div><h2>阅读指引与章节导航</h2></div><div class="pn">全篇 10 页 · 评分矩阵见第 4 页<br>评分均为 0–10 分制，权重见第 3 页</div></div>
+  <div class="pc"><table><thead><tr><th>章节</th><th>一句话说明</th><th>关键交付</th><th class="n">页</th></tr></thead><tbody><tr class=""><td>1 研究问题与口径</td><td>竞品集合、维度权重与评分方法</td><td>4 个问题 · 4 项权重 · 评分规则</td><td class="n n">3</td></tr><tr class=""><td>2 能力全景</td><td>四维评分矩阵与成本对比</td><td>6×4 评分表 + 2 组条形图</td><td class="n n">4</td></tr><tr class=""><td>3 定位拆解</td><td>象限图与价格带分布</td><td>2×2 象限 + 价格带分布图</td><td class="n n">5</td></tr><tr class=""><td>4 关键洞察与证据</td><td>洞察逐条附评分与价格证据</td><td>5 条洞察</td><td class="n n">6</td></tr><tr class=""><td>5 情景推演</td><td>竞品动作后的位置变化</td><td>3 情景 + 敏感度</td><td class="n n">7</td></tr><tr class=""><td>6 风险与信息缺口</td><td>公开资料的时效与口径限制</td><td>5 项风险 · 4 项缺口</td><td class="n n">8</td></tr><tr class=""><td>7 结论与建议动作</td><td>产品、定价与打法</td><td>3 条结论 · 3 阶段动作</td><td class="n n">9</td></tr><tr class=""><td>8 参考来源与附录</td><td>来源清单与评分细则</td><td>7 组来源 · 术语表</td><td class="n n">10</td></tr></tbody></table><div class="cols2 eq"><div><h3>评分的读法</h3><ul class=""><li>功能覆盖：按 32 项功能清单打分，每项 0.3125 分</li><li>使用成本：取公开报价折算到 50 坐席 / 年的总价</li><li>数据可控：按部署形态、导出能力、日志留存三项合成</li><li>生态集成：按官方连接器数量与开放接口成熟度合成</li></ul></div><div><h3>评分的时间点</h3><ul class=""><li>功能快照日：2026-08-31</li><li>价格采集窗：2026-07-01 – 2026-09-15</li><li>不含私有折扣与渠道返点，实际成交价通常低 10%–18%</li></ul></div></div></div>
+  <div class="pf"><span>所有分值可回溯到第 10 页来源编号，评分细则同步附录</span><span>第 2 / 10 页</span></div>
+</section>
+<section class="page" data-page="3">
+  <div class="ph"><div><div class="kk">Scope & Method</div><h2>竞品集合、权重与评分方法</h2></div><div class="pn">评分 0–10 分制，加权总分百分制<br>权重来自 31 位采购决策人的排序</div></div>
+  <div class="pc"><div><h3>四个研究问题</h3><ul class=""><li>在功能覆盖、成本、数据可控与生态四个维度上，6 家竞品各自强在哪、弱在哪？</li><li>是否存在无人占据的定位空档，空档是否被客户真实需要？</li><li>同价位段里我方需要在哪个维度做到显著领先才有胜算？</li><li>竞品降价或补齐短板后，我方位置会如何变化？</li></ul></div><div><h3>维度权重与数据来源</h3><table><thead><tr><th>维度</th><th>权重</th><th>衡量方式</th><th>数据来源</th></tr></thead><tbody><tr class=""><td>功能覆盖</td><td>40%</td><td>32 项功能清单逐项核对，每项 0.3125 分</td><td>公开文档 + 试用环境实测</td></tr><tr class=""><td>使用成本</td><td>25%</td><td>50 坐席 / 年总价，含订阅与基础实施</td><td>公开报价页（2026-07 – 2026-09）</td></tr><tr class=""><td>数据可控性</td><td>20%</td><td>部署形态 40% + 导出能力 35% + 日志留存 25%</td><td>部署文档 + 合同条款摘要</td></tr><tr class=""><td>生态集成</td><td>15%</td><td>官方连接器数量 60% + 开放接口成熟度 40%</td><td>开发者站点 + 连接器目录</td></tr></tbody></table></div><div class="cols2 eq"><div><h3>评分规则</h3><ul class=""><li>打分人为 3 名产品与 2 名交付成员，独立打分后取中位数，分歧 > 2 分的项回到实测复核</li><li>成本分做区间归一：13.8 万元价差映射为 9 分落差，最低价保底 1 分</li><li>免费层产品（E）成本项按满分计，但单独标注不可比</li></ul></div><div><h3>本次不评估</h3><ul class=""><li>不评估模型能力本身，各厂商均调用同类基础模型</li><li>不评估销售渠道与客户关系，这部分无法用公开资料量化</li><li>不纳入尚未商业化的预发布产品，仅记录其路线图信号</li></ul></div></div><div><h3>评分复核与分歧处理</h3><p>5 名评估者独立打分后取中位数。本轮 3 项分歧超过 2 分（C 的数据可控性、D 的生态集成、F 的接口成熟度），均回到试用环境实测后定稿，实测记录随来源 S3 归档。</p></div></div>
+  <div class="pf"><span>权重排序来自第 1 页所述 31 位决策人，与行业报告口径一致</span><span>第 3 / 10 页</span></div>
+</section>
+<section class="page" data-page="4">
+  <div class="ph"><div><div class="kk">Capability Matrix</div><h2>四维评分矩阵与成本对比</h2></div><div class="pn">快照日 2026-08-31 · 价格窗 2026-07 – 2026-09<br>加权总分 = 四维加权，百分制</div></div>
+  <div class="pc"><table><thead><tr><th>厂商</th><th class="n">功能覆盖 /10</th><th class="n">使用成本 /10</th><th class="n">数据可控 /10</th><th class="n">生态集成 /10</th><th class="n">加权总分</th><th class="n">单位覆盖成本（万元/分）</th></tr></thead><tbody><tr class=""><td>竞品 A</td><td class="n">8.2</td><td class="n">6.5</td><td class="n">3</td><td class="n">7</td><td class="n">65.7</td><td class="n">2.18</td></tr><tr class=""><td>竞品 B</td><td class="n">7.6</td><td class="n">1.0</td><td class="n">8</td><td class="n">5</td><td class="n">56.4</td><td class="n">3.47</td></tr><tr class=""><td>竞品 C</td><td class="n">7.9</td><td class="n">10.0</td><td class="n">6</td><td class="n">9</td><td class="n hl">82.1</td><td class="n">1.59</td></tr><tr class=""><td>竞品 D</td><td class="n">8.6</td><td class="n">4.3</td><td class="n">10</td><td class="n">5</td><td class="n">72.7</td><td class="n">2.48</td></tr><tr class=""><td>竞品 E</td><td class="n">6.4</td><td class="n">10.0</td><td class="n">2</td><td class="n">6</td><td class="n">63.6</td><td class="n">0.50（免费层，不可比）</td></tr><tr class=""><td>竞品 F（海外参照）</td><td class="n">8.9</td><td class="n">2.7</td><td class="n">4</td><td class="n">8</td><td class="n">62.4</td><td class="n">2.67</td></tr></tbody></table><div class="cols2 wide"><div><h3>功能覆盖得分</h3><div class="bars"><div class="bar"><span>竞品 F</span><span class=""><i class="" style="width:89%"></i></span><span class="v">8.9</span></div><div class="bar"><span>竞品 D</span><span class=""><i class="" style="width:86%"></i></span><span class="v">8.6</span></div><div class="bar"><span>竞品 A</span><span class=""><i class="" style="width:82%"></i></span><span class="v">8.2</span></div><div class="bar"><span>竞品 C</span><span class=""><i class="" style="width:79%"></i></span><span class="v">7.9</span></div><div class="bar"><span>竞品 B</span><span class=""><i class="" style="width:76%"></i></span><span class="v">7.6</span></div><div class="bar"><span>竞品 E</span><span class=""><i class="" style="width:64%"></i></span><span class="v">6.4</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>2</span><span>4</span><span>6</span><span>8</span><span>10</span></span><span></span></div></div></div><div><h3>50 坐席 / 年成本（万元）</h3><div class="bars"><div class="bar"><span>竞品 B</span><span class=""><i class="" style="width:100%"></i></span><span class="v">26.4</span></div><div class="bar"><span>竞品 F</span><span class=""><i class="" style="width:90%"></i></span><span class="v">23.8</span></div><div class="bar"><span>竞品 D</span><span class=""><i class="" style="width:81%"></i></span><span class="v">21.3</span></div><div class="bar"><span>竞品 A</span><span class=""><i class="" style="width:68%"></i></span><span class="v">17.9</span></div><div class="bar"><span>竞品 C</span><span class=""><i class="" style="width:48%"></i></span><span class="v">12.6</span></div><div class="bar"><span>竞品 E</span><span class=""><i class="" style="width:12%"></i></span><span class="v">0 起</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>7</span><span>14</span><span>21</span><span>28</span></span><span></span></div></div></div></div><div><h3>矩阵的读法</h3><p>成本分采用区间归一：同一档内 1 分约等于 1.5 万元年成本差异。因此 C 的 10 分与 B 的 1 分之间是 13.8 万元价差，而不是能力差距；比较不同厂商时先比数据可控与生态，再比成本。</p></div></div>
+  <div class="pf"><span>C 的加权领先主要来自生态 9 分与成本 10 分，数据可控仅 6 分是其主要短板</span><span>第 4 / 10 页</span></div>
+</section>
+<section class="page" data-page="5">
+  <div class="ph"><div><div class="kk">Positioning</div><h2>定位象限与价格带分布</h2></div><div class="pn">行：生态集成（阈值 8 分）；列：数据可控性（阈值 8 分）<br>行末数字为该厂商加权总分，6 家各自只落一格</div></div>
+  <div class="pc"><div><h3>定位象限（按数据可控性 × 生态集成）</h3><div class="mx"><div><div class="t">高生态 · 低数据可控：C、F</div><p>C <b>82.1</b> 分 · 生态 9 / 数据 6；F <b>62.4</b> 分 · 生态 8 / 数据 4。</p><ul class=""><li>C 生态最强但数据仅部分可控</li><li>F 为海外产品，数据须经其云侧网关中转</li></ul></div><div><div class="t">高生态 · 高数据可控</div><p><b>当前空白</b> —— 6 家中无一家同时满足数据 ≥ 8 且生态 ≥ 8</p><ul class=""><li>D 数据 10 但生态 5</li><li>C 生态 9 但数据 6</li></ul></div><div><div class="t">低生态 · 低数据可控：A、E</div><p>A <b>65.7</b> 分 · 生态 7 / 数据 3；E <b>63.6</b> 分 · 生态 6 / 数据 2。</p><ul class=""><li>A 体验优先，数据黑盒</li><li>E 免费层驱动，无导出能力</li></ul></div><div><div class="t">低生态 · 高数据可控：B、D</div><p>B <b>56.4</b> 分 · 数据 8 / 生态 5；D <b>72.7</b> 分 · 数据 10 / 生态 5。</p><ul class=""><li>B 靠合规换溢价，成本 26.4 万</li><li>D 已占住制造业，生态是短板</li></ul></div></div></div><div><h3>价格带分布（6 家）</h3><div class="dist"><i class="g" style="width:17%"></i><i class="w" style="width:17%"></i><i class="" style="width:33%"></i><i class="g" style="width:33%"></i></div><div class="distlab"><span>免费层 1 家</span><span>5–15 万 1 家</span><span>[15,22) 万 2 家</span><span>[22,∞) 万 2 家</span></div></div><div class="cols2 eq" style="margin-top:12px"><div><h3>空档的成立条件</h3><ul class=""><li>客户确实同时要求离线可用与跨工具打通：31 位决策人中有 24 位（77%）同时勾选这两项</li><li>19 万元以内的年成本落在多数中型团队预算区间（预算中位数 22 万元）</li></ul></div><div><h3>我方目标位</h3><ul class=""><li>数据可控 9 分、生态 8 分、功能覆盖 8.4 分</li><li>50 坐席年成本 18.5 万元，单位覆盖成本 2.20 万元/分</li><li>以此进入「高生态 · 高数据可控」象限，成为 6 家之外的第七个点</li></ul></div></div><div><h3>象限阈值的敏感性</h3><p>若把「高」的阈值从 8 分下调到 7 分，C 与 F 会同时进入高生态一侧，空档收窄为仅剩数据可控一项；阈值下调不改变「6 家中无一家双高」的结论，我方双高目标仍然成立。</p></div></div>
+  <div class="pf"><span>象限判定的阈值：数据可控 ≥ 8 且生态 ≥ 8 记为「高」</span><span>第 5 / 10 页</span></div>
+</section>
+<section class="page" data-page="6">
+  <div class="ph"><div><div class="kk">Insights & Evidence</div><h2>关键洞察与证据</h2></div><div class="pn">每条洞察至少一个评分或价格证据<br>证据均可回溯第 4 页矩阵</div></div>
+  <div class="pc"><table><thead><tr><th>#</th><th>洞察</th><th>支撑证据</th><th>对我方的含义</th></tr></thead><tbody><tr class=""><td>1</td><td>生态强与数据可控难以兼得</td><td>C 生态 9 / 数据 6；D 数据 10 / 生态 5；无一家双高</td><td>同时补齐两项即可独占象限</td></tr><tr class=""><td>2</td><td>合规溢价有明确天花板</td><td>B 数据可控 8 分但成本 26.4 万，加权总分仅 56.4，排末位</td><td>不能只卖合规，需要把成本压到 19 万内</td></tr><tr class=""><td>3</td><td>免费层产品不构成直接威胁</td><td>E 成本 0 起但功能覆盖 6.4、数据 2 分，付费转化不足</td><td>不必用免费层应对 E</td></tr><tr class=""><td>4</td><td>功能覆盖已不是差异化来源</td><td>六家得分区间 6.4–8.9，前四家差距 ≤ 1.3 分</td><td>功能做到 8.4 分即可，不必追 8.9</td></tr><tr class=""><td>5</td><td>生态缺口是可量化的效率损失</td><td>62% 受访者每周人均 1 次人工搬运，50 人团队年损耗约 2600 工时</td><td>连接器是最省力的差异化</td></tr></tbody></table><div class="cols2 eq"><div><h3>洞察的量化含义</h3><ul class=""><li>把数据可控从 6 分推到 9 分并保持成本 18.5 万，按当前权重重算加权总分为 <b>77.5</b> 分，可超过 D 的 72.7 分</li><li>对标价位段（15–22 万）由 A 与 D 覆盖，两家在生态项分别只有 7 分与 5 分，我方 8 分即可形成可见差距</li></ul></div><div><h3>反例与边界</h3><ul class=""><li>B 的低分含口径因素：按项目报价的厂商在「50 坐席年成本」折算上系统性吃亏</li><li>F 为海外参照，其生态分含大量非本地化连接器，实际可用度需再打折</li></ul></div></div><div><h3>洞察到动作的映射</h3><table><thead><tr><th>洞察</th><th>建议动作</th><th>责任角色</th><th>验证指标</th></tr></thead><tbody><tr class=""><td>1 生态与数据难以兼得</td><td>同时补齐两项，独占双高象限</td><td>产品 + 工程</td><td>数据可控 ≥ 9 且生态 ≥ 8</td></tr><tr class=""><td>2 合规溢价有天花板</td><td>把 50 坐席年成本公开为 18.5 万元</td><td>定价 + 财务</td><td>成交价落入 15–22 万区间</td></tr><tr class=""><td>3 免费层不构成威胁</td><td>不使用免费层应对竞品 E</td><td>产品</td><td>免费转化率不作为考核项</td></tr><tr class=""><td>4 功能覆盖收益递减</td><td>功能覆盖做到 8.4 分即停止追加</td><td>产品</td><td>功能项投入占比 ≤ 15%</td></tr><tr class=""><td>5 生态缺口可量化</td><td>连接器补齐到 8 个并测成功率</td><td>工程</td><td>链接成功率 ≥ 95%</td></tr></tbody></table></div></div>
+  <div class="pf"><span>第四条洞察说明功能军备竞赛收益递减，与第 9 页动作取舍一致</span><span>第 6 / 10 页</span></div>
+</section>
+<section class="page" data-page="7">
+  <div class="ph"><div><div class="kk">Scenarios</div><h2>竞品动作后的位置推演</h2></div><div class="pn">三个情景均假设我方在 2026 Q4 发布本地优先版本<br>概率为 5 位评估者的共识值</div></div>
+  <div class="pc"><table><thead><tr><th>情景</th><th>触发事件</th><th>竞品得分变化</th><th class="n">我方加权总分</th><th>应对要点</th><th class="n">概率</th></tr></thead><tbody><tr class=""><td>基准</td><td>竞品维持现价与节奏</td><td>C 82.1 / D 72.7 不变</td><td class="n">77.5（第 4 位）</td><td>按既定节奏补连接器</td><td class="n n">55%</td></tr><tr class=""><td>竞品降价</td><td>B 或 D 年成本下调 20%</td><td>B 成本分 1.0→4.4，总分 56.4→65.0；D 72.7→79.6</td><td class="n">77.5（第 3 位）</td><td>把成本降到 17.5 万保住价格带</td><td class="n n">30%</td></tr><tr class=""><td>竞品补短板</td><td>C 上线本地部署包并补齐导出</td><td>C 数据 6→8，总分 82.1→86.1</td><td class="n">77.5（落后 8.6 分）</td><td>转向制造业与金融的行业化交付</td><td class="n n">15%</td></tr></tbody></table><div><h3>敏感度：各单点变化对加权总分的贡献（分）</h3><div class="bars"><div class="bar"><span>成本 21→18.5 万</span><span class=""><i class="" style="width:100%"></i></span><span class="v">+6.9</span></div><div class="bar"><span>数据可控 6→9</span><span class=""><i class="" style="width:87%"></i></span><span class="v">+6.0</span></div><div class="bar"><span>生态 5→8</span><span class=""><i class="" style="width:65%"></i></span><span class="v">+4.5</span></div><div class="bar"><span>功能 7.6→8.4</span><span class=""><i class="" style="width:46%"></i></span><span class="v">+3.2</span></div><div class="axis"><span></span><span class="t"><span>0</span><span>+2</span><span>+4</span><span>+6</span></span><span></span></div></div></div><p><span class="sm">注：四项变化合计 20.6 分。以「功能 7.6 / 成本 21 万 / 数据 6 / 生态 5」的基线产品为参照，四项补到目标值即得 77.5 分。成本杠杆最大（6.9 分）但最容易被竞品跟随，数据可控与生态合计 10.5 分才是难以快速复制的部分。</span></p><div><h3>情景触发后的处置预案</h3><table><thead><tr><th>情景</th><th>触发判定</th><th>第一周动作</th><th>第一月动作</th></tr></thead><tbody><tr class=""><td>基准</td><td>竞品价格与节奏无变化</td><td>按既定节奏补连接器</td><td>完成 3 家客户验证</td></tr><tr class=""><td>竞品降价</td><td>B 或 D 公开报价下调 ≥ 15%</td><td>复核成本结构，准备 17.5 万档</td><td>对 5 家管道客户重新报价</td></tr><tr class=""><td>竞品补短板</td><td>C 发布本地部署包或导出能力</td><td>启动制造业行业化方案包装</td><td>锁定 5 家制造业标杆客户</td></tr><tr class=""><td>新进入者</td><td>出现数据 + 生态双高的新产品</td><td>重做第 4 页矩阵评分</td><td>评估合作或提速自研</td></tr></tbody></table></div></div>
+  <div class="pf"><span>竞品补短板情景概率虽低（15%），但对总分冲击最大，需提前准备行业化交付</span><span>第 7 / 10 页</span></div>
+</section>
+<section class="page" data-page="8">
+  <div class="ph"><div><div class="kk">Risks & Gaps</div><h2>风险、时效与信息缺口</h2></div><div class="pn">竞品资料全部来自公开渠道<br>私有折扣、渠道返点不可见</div></div>
+  <div class="pc"><table><thead><tr><th>风险</th><th>对结论的影响</th><th>概率</th><th>缓释动作</th></tr></thead><tbody><tr class=""><td>公开报价与实际成交价存在 10%–18% 差距</td><td>成本维度评分可能整体偏高或偏低</td><td>高</td><td>每季度向 3 家渠道商核对一次成交区间</td></tr><tr class=""><td>功能清单按公开文档核对</td><td>隐藏能力或未文档化功能被漏记</td><td>中</td><td>对前两名竞品做 2 周试用复核</td></tr><tr class=""><td>生态连接器数量不等于可用度</td><td>C 的生态 9 分可能被高估</td><td>中</td><td>抽样实测 10 个连接器的真实成功率</td></tr><tr class=""><td>免费层产品策略可能突变</td><td>E 若收费将改变低价段格局</td><td>低</td><td>订阅其产品公告，季度复核</td></tr><tr class=""><td>评分者主观性</td><td>分歧项集中在中位区间</td><td>中</td><td>保留 5 人独立打分记录，分歧 > 2 分复盘</td></tr></tbody></table><div class="cols2 eq"><div><h3>信息缺口</h3><ul class=""><li>B 的按项目报价无法折算为严格可比的坐席成本，该分项置信度低</li><li>无一家竞品披露制造业客户数，无法验证 D 的行业集中度</li><li>缺少竞品续费率与流失率，无法判断其能力优势是否转化为留存</li><li>未获取渠道返点结构，价格战底线不可见</li></ul></div><div><h3>下一次更新触发条件</h3><ul class=""><li>任一竞品发布本地部署能力或调整公开报价</li><li>我方本地优先版本进入 20 家客户验证阶段</li><li>距上次快照满一个季度（2026-12-01）</li></ul></div></div><div><h3>来源校准与检查频率</h3><table><thead><tr><th>信息来源</th><th>偏差方向</th><th>校准方式</th><th>频率</th></tr></thead><tbody><tr class=""><td>公开报价页</td><td>低于实际成交 10%–18%</td><td>渠道商书面核对</td><td>每季度</td></tr><tr class=""><td>功能文档</td><td>遗漏未文档化能力</td><td>试用实测复核前两名</td><td>每半年</td></tr><tr class=""><td>连接器目录</td><td>高估可用度</td><td>抽样实测 10 个连接器成功率</td><td>每季度</td></tr></tbody></table></div></div>
+  <div class="pf"><span>风险 1 与风险 3 合计影响成本与生态两维共 45% 权重，需优先缓释</span><span>第 8 / 10 页</span></div>
+</section>
+<section class="page" data-page="9">
+  <div class="ph"><div><div class="kk">Recommendations</div><h2>结论与建议动作</h2></div><div class="pn">结论对应第 6 页洞察<br>动作覆盖产品、定价与打法三条线</div></div>
+  <div class="pc"><div class="kpi"><div class="kc"><div class="k">产品结论</div><b class="n">双高象限可独占</b><i>数据可控 9 分 + 生态 8 分，无竞品同时做到</i></div><div class="kc"><div class="k">定价结论</div><b class="n class="sm"">18.5 万元是决胜点</b><i>低于 B 的 26.4 万与 D 的 21.3 万，高于 C 的 12.6 万</i></div><div class="kc"><div class="k">打法结论</div><b class="n">以制造业为切入行业</b><i>D 在制造业占优但生态 5 分，是最薄弱的领先者</i></div></div><div><h3>分阶段动作</h3><div class="tl"><div class="r"><b>0–3 月</b><span>发布本地优先版本，把数据可控推到 9 分（默认离线、原生导出、日志留存 6 个月）；上线 3 个高频连接器</span></div><div class="r"><b>3–6 月</b><span>在制造业与金融各落地 5 家对标客户，与 D 做同场景对照；把 50 坐席年成本公开为 18.5 万元</span></div><div class="r"><b>6–12 月</b><span>连接器补齐到 8 个，生态分推到 8 分；完成一次全量评分复核并对前两名竞品做试用实测</span></div></div></div><div class="cols2 eq"><div><h3>责任与交付物</h3><table><thead><tr><th>动作</th><th>负责角色</th><th>交付物</th></tr></thead><tbody><tr class=""><td>本地优先版本</td><td>产品 + 工程</td><td>默认离线开关 + 导出格式文档</td></tr><tr class=""><td>对标客户验证</td><td>销售 + 交付</td><td>10 份对照场景记录</td></tr><tr class=""><td>连接器补齐</td><td>工程</td><td>8 个连接器 + 成功率看板</td></tr></tbody></table></div><div><h3>放弃项与理由</h3><ul class=""><li>不追功能覆盖第一：从 7.6 提到 8.9 只值 0.8 分，投入产出比最低</li><li>不做免费层：E 的免费策略未带来付费转化，低价段不构成利润池</li></ul></div></div><div><h3>动作与结论的对应关系</h3><p>产品线对应结论一（独占双高象限），定价线对应结论二（50 坐席年成本 18.5 万元），打法线对应结论三（以制造业为切入行业）。</p></div></div>
+  <div class="pf"><span>动作与第 7 页基准情景一致；若竞品补短板情景发生，优先执行行业化交付</span><span>第 9 / 10 页</span></div>
+</section>
+<section class="page" data-page="10">
+  <div class="ph"><div><div class="kk">Sources & Appendix</div><h2>参考来源与评分细则</h2></div><div class="pn">来源编号与正文引用一致<br>快照日 2026-08-31，价格窗 2026-07 – 2026-09</div></div>
+  <div class="pc"><table><thead><tr><th>编号</th><th>来源类型</th><th>数量 / 规模</th><th>采集方式</th><th>用于正文</th></tr></thead><tbody><tr class=""><td>S1</td><td>竞品公开定价页</td><td>6 家产品线</td><td>网站抓取 + 人工核对</td><td>第 4、5、7 页成本项</td></tr><tr class=""><td>S2</td><td>竞品产品文档与更新日志</td><td>6 套文档</td><td>人工阅读 2 轮</td><td>第 4 页功能覆盖</td></tr><tr class=""><td>S3</td><td>试用环境实测</td><td>前两名竞品各 2 周</td><td>按 32 项清单逐项验证</td><td>第 4、8 页</td></tr><tr class=""><td>S4</td><td>开发者站点与连接器目录</td><td>6 个目录</td><td>计数 + 可用度抽样</td><td>第 4、6 页生态项</td></tr><tr class=""><td>S5</td><td>部署与合规文档摘要</td><td>12 份</td><td>条款摘要比对</td><td>第 4、5 页数据可控项</td></tr><tr class=""><td>S6</td><td>采购决策人问卷</td><td>31 份</td><td>2026-07 – 2026-09</td><td>第 3 页权重与第 5 页空档验证</td></tr><tr class=""><td>S7</td><td>渠道商价格核对</td><td>3 家</td><td>书面问询</td><td>第 8 页价格偏差缓释</td></tr></tbody></table><div class="cols2 eq"><div><h3>评分细则</h3><ul class=""><li>功能覆盖：32 项清单，每项 0.3125 分，部分支持记半项</li><li>成本归一：13.8 万元价差映射 9 分，最低价保底 1 分</li><li>数据可控：部署形态 40% + 导出 35% + 日志留存 25%</li><li>生态集成：连接器数量 60% + 接口成熟度 40%</li><li>分歧处理：5 人独立打分取中位数，分歧 > 2 分回实测复核</li></ul></div><div><h3>术语表</h3><ul class=""><li><b>单位覆盖成本</b>：50 坐席年成本 ÷ 功能覆盖得分</li><li><b>双高象限</b>：数据可控 ≥ 8 且生态 ≥ 8</li><li><b>加权总分</b>：四维加权后的百分制得分</li><li><b>免费层</b>：以免费基础版获客、靠增值付费的产品策略</li></ul></div></div><div><h3>来源可得性与更新频率</h3><p>S1 与 S2 为公开可得来源，每月可复核；S3 试用实测建议每半年重做一次；S7 渠道价格核对每季度一次，是成本项的主要校准来源，缺失时成本分整体置信度下降一档。</p></div></div>
+  <div class="pf"><span>来源版本 v2026.09 · 下次复核触发条件见第 8 页</span><span>第 10 / 10 页</span></div>
+</section>
+</body></html>

@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
+import { PiWebSearchToolName } from './constants';
 
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,16 +22,15 @@ import {
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { ProductionLoopAction } from '../../../shared/productionLoop';
 import {
   WorkbenchApprovalMode,
+  WorkbenchRunTrigger,
+  WorkbenchOutputToolName,
   WorkbenchContractKind,
   WorkbenchOutputMode,
-  WorkbenchRunTrigger,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
-import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
@@ -56,6 +56,7 @@ const hoisted = vi.hoisted(() => {
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
+    getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
   };
@@ -259,9 +260,11 @@ vi.mock('../coworkUtil', async importOriginal => {
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { PiDocumentReaderSystemPrompt, PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
+import { PiSubagentToolName } from './piSubagentTool';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import type { CoworkStore } from '../../coworkStore';
@@ -269,7 +272,6 @@ import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
-import { initializeProductionLoopSchema } from '../../productionLoop/schema';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
@@ -309,6 +311,19 @@ describe('PiRuntimeAdapter', () => {
       expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledWith(process.env);
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
+    });
+
+    it('publishes a started lifecycle event from Pi agent_start', async () => {
+      const started = vi.fn();
+      adapter.on('started', started);
+      await adapter.startSession('started-session', 'Hello Pi');
+
+      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+        type: string;
+      }) => void;
+      listener({ type: 'agent_start' });
+
+      expect(started).toHaveBeenCalledWith('started-session');
     });
 
     it('uses an in-memory Pi session manager so SQLite remains the only restore source', async () => {
@@ -479,199 +494,85 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('keeps final acceptance out of model tools for production work', async () => {
+    it('uses native completion for ordinary Work, including resume and expert turns', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
-      const onPermissionRequest = vi.fn();
-      const onComplete = vi.fn();
-      adapter.on('permissionRequest', onPermissionRequest);
-      adapter.on('complete', onComplete);
-
+      const workspaceRoot = createTemporaryWorkspace();
       try {
-        await adapter.startSession(
-          'generic-work-skill',
-          'Analyze this codebase, write a review report, and verify the findings',
-          {
-            skillIds: ['code-review'],
-            sessionMode: 'work',
-            workspaceRoot: createTemporaryWorkspace(),
-          },
-        );
-
-        expect(mockSession.prompt).toHaveBeenCalledWith(
-          expect.not.stringContaining('## Production workflow decision'),
-        );
-        expect(
-          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 0 });
-
-        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{
-            name: string;
-            execute(
-              toolCallId: string,
-              params: Record<string, unknown>,
-            ): Promise<{ content: Array<{ text: string }> }>;
-          }>;
-        };
-        const toolNames = sessionOptions.customTools.map(tool => tool.name);
-        const loopTool = sessionOptions.customTools.find(tool => tool.name === 'agent_loop');
-        const productionTool = sessionOptions.customTools.find(
-          tool => tool.name === 'production_loop',
-        );
-        expect(toolNames).toContain('production_loop');
-        expect(toolNames).toContain('run_skill_script');
-        expect(toolNames).not.toContain('work_acceptance');
-
-        await productionTool!.execute('start-production', {
-          action: ProductionLoopAction.CommitPlan,
-          items: [{ title: 'Analyze and report' }],
-          constraints: [],
-          acceptanceCriteria: ['Report findings are verified'],
-          expectedArtifacts: [{ kind: 'report', description: 'Review report' }],
-          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
+        await adapter.startSession('native-work', 'Write and verify a report', {
+          sessionMode: 'work',
+          workspaceRoot,
+          expertIds: ['report-expert'],
         });
-        const runId = service.getCurrent('generic-work-skill')?.runs[0]?.id;
-        expect(runId).toBeDefined();
-        expect(service.productionLoop.getState(runId!).planItems).toHaveLength(1);
-
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-          type: string;
-        }) => void;
-        await loopTool!.execute('done-too-early', {
-          action: 'done',
-          reason: 'I think it is complete',
+        await adapter.continueSession('native-work', 'Check the calculations', {
+          sessionMode: 'work',
+          workspaceRoot,
         });
+        const task = service.getCurrent('native-work')!.task;
+        adapter.stopSession('native-work');
+        const prepared = service.prepareRun(task.id, WorkbenchRunTrigger.Resume);
+        await adapter.continueSession('native-work', 'Continue', {
+          sessionMode: 'work',
+          workspaceRoot,
+          _workbenchRunId: prepared.run.id,
+        });
+        for (const [options] of mockCreateAgentSession.mock.calls) {
+          const names = (options.customTools as Array<{ name: string }>).map(tool => tool.name);
+          expect(names).not.toContain('production_loop');
+          expect(names).not.toContain(PiAgentLoopToolName);
+          expect(names).toContain(WorkbenchOutputToolName);
+        }
+        const promptCount = mockSession.prompt.mock.calls.length;
+        const onComplete = vi.fn();
+        adapter.on('complete', onComplete);
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0];
         listener({ type: 'agent_end' });
-        await Promise.resolve();
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Production workflow continuation'),
-          { streamingBehavior: 'followUp' },
-        );
-        expect(onPermissionRequest).not.toHaveBeenCalled();
-        expect(onComplete).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
+        expect(adapter.isSessionRunning('native-work')).toBe(false);
+        expect(mockSession.prompt).toHaveBeenCalledTimes(promptCount);
+        expect(service.getCurrent('native-work')!.task.id).toBe(task.id);
+        expect(
+          db
+            .prepare("SELECT name FROM sqlite_master WHERE name = 'workbench_production_loops'")
+            .get(),
+        ).toBeUndefined();
       } finally {
-        db.close();
-      }
-    });
-    it('keeps production controls available but dormant for ordinary Work turns', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('production-work', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('production-simple', '为什么天空是蓝色的？', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('production-light', '你好', {
-          sessionMode: 'work',
-          skillIds: ['presentation-studio'],
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('production-chat', 'Create and validate a release report', {
-          sessionMode: 'chat',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-
-        const workOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const simpleOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const lightOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const chatOptions = mockCreateAgentSession.mock.calls[3]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(workOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(simpleOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(lightOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
-        expect(mockSession.prompt.mock.calls[0]?.[0]).not.toContain(
-          '## Production workflow decision',
-        );
-        expect(mockSession.prompt.mock.calls[1]?.[0]).not.toContain(
-          '## Production workflow decision',
-        );
-        expect(
-          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 0 });
-        expect(
-          service.getCurrent('production-work')?.task.contract.metadata
-            ?.productionControlsAvailable,
-        ).toBe(true);
-        expect(
-          service.getCurrent('production-simple')?.task.contract.metadata
-            ?.productionControlsAvailable,
-        ).toBe(true);
-      } finally {
+        await adapter.stopAllSessions();
         db.close();
       }
     });
 
-    it('lets the model activate expert production only for substantive requests', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('expert-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          expertIds: ['release-expert'],
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        await adapter.startSession('expert-direct', '为什么天空是蓝色的？', {
-          sessionMode: 'work',
-          expertIds: ['science-expert'],
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-
-        const productionPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-        const directPrompt = mockSession.prompt.mock.calls[1]?.[0] as string;
-        const directOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-
-        expect(productionPrompt).toContain(ExpertProductionWorkflowHeading);
-        expect(productionPrompt).toContain('expert workflow only as the domain method');
-        expect(directPrompt).toContain(ExpertProductionWorkflowHeading);
-        expect(directPrompt).toContain('answer normally without calling production_loop');
-        expect(directOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(
-          service.getCurrent('expert-direct')?.task.contract.metadata?.productionControlsAvailable,
-        ).toBe(true);
-      } finally {
-        db.close();
-      }
+    it('changes loop tools only when Goal mode is explicitly toggled', async () => {
+      await adapter.startSession('goal-toggle', 'First', { sessionMode: 'work' });
+      await adapter.continueSession('goal-toggle', 'Keep working', {
+        sessionMode: 'work',
+        goalMode: true,
+      });
+      await adapter.continueSession('goal-toggle', 'Answer directly', {
+        sessionMode: 'work',
+        goalMode: false,
+      });
+      const toolNames = mockCreateAgentSession.mock.calls.map(([options]) =>
+        (options.customTools as Array<{ name: string }>).map(tool => tool.name),
+      );
+      expect(toolNames).toHaveLength(3);
+      expect(toolNames[0]).not.toContain(PiAgentLoopToolName);
+      expect(toolNames[1]).toContain(PiAgentLoopToolName);
+      expect(toolNames[2]).not.toContain(PiAgentLoopToolName);
     });
 
     it('records non-sensitive runtime context on initial and reused workbench runs', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const workspaceRoot = createTemporaryWorkspace();
 
       try {
         await adapter.startSession('audited-runtime', 'Summarize the report', {
-          sessionMode: 'chat',
+          sessionMode: 'work',
           workspaceRoot,
           skillIds: ['documents'],
         });
@@ -686,7 +587,7 @@ describe('PiRuntimeAdapter', () => {
 
         service.pauseRun('audited-runtime', 'Paused for the next turn.');
         await adapter.continueSession('audited-runtime', 'Summarize the appendix', {
-          sessionMode: 'chat',
+          sessionMode: 'work',
           skillIds: ['documents'],
         });
 
@@ -706,140 +607,9 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('restores the production gate from the owning task on an explicit resume', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = createTemporaryWorkspace();
-
-      try {
-        await adapter.startSession('resume-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot,
-        });
-        const originalTask = service.getCurrent('resume-production')!.task;
-        const originalOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{
-            name: string;
-            execute(
-              toolCallId: string,
-              params: Record<string, unknown>,
-            ): Promise<{ content: Array<{ text: string }> }>;
-          }>;
-        };
-        const productionTool = originalOptions.customTools.find(
-          tool => tool.name === 'production_loop',
-        );
-        await productionTool!.execute('start-production', {
-          action: ProductionLoopAction.CommitPlan,
-          items: [{ title: 'Create release report' }],
-          constraints: [],
-          acceptanceCriteria: ['Release report is verified'],
-          expectedArtifacts: [{ kind: 'report', description: 'Release report' }],
-          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
-        });
-        await adapter.stopSession('resume-production');
-        const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
-
-        await adapter.continueSession('resume-production', 'Continue', {
-          sessionMode: 'work',
-          workspaceRoot,
-          _workbenchRunId: prepared.run.id,
-          _productionWorkflowRequired: true,
-          _skipUserMessage: true,
-        });
-
-        const resumedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(service.getCurrent('resume-production')?.task.id).toBe(originalTask.id);
-        expect(service.productionLoop.getState(prepared.run.id).goal).toBe(originalTask.goal);
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Persistent phase: execute'),
-        );
-      } finally {
-        db.close();
-      }
-    });
-
-    it('keeps production optional when resuming a task that never activated it', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = createTemporaryWorkspace();
-
-      try {
-        await adapter.startSession('resume-dormant', '你好', {
-          sessionMode: 'work',
-          workspaceRoot,
-        });
-        const originalTask = service.getCurrent('resume-dormant')!.task;
-        await adapter.stopSession('resume-dormant');
-        const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
-
-        await adapter.continueSession('resume-dormant', 'Please expand this into a report', {
-          sessionMode: 'work',
-          workspaceRoot,
-          _workbenchRunId: prepared.run.id,
-          _productionWorkflowRequired: false,
-          _skipUserMessage: true,
-        });
-
-        const resumedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(
-          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 0 });
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.not.stringContaining('## Production workflow decision'),
-        );
-      } finally {
-        db.close();
-      }
-    });
-
-    it('keeps production dormant when a reused runtime starts a new task', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = createTemporaryWorkspace();
-
-      try {
-        await adapter.startSession('reused-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot,
-        });
-        await adapter.continueSession(
-          'reused-production',
-          'Create and validate a second release report',
-          {
-            sessionMode: 'work',
-            workspaceRoot,
-          },
-        );
-
-        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          'Create and validate a second release report',
-        );
-      } finally {
-        db.close();
-      }
-    });
-
     it('does not continue after the owning workbench run is paused', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
@@ -866,116 +636,6 @@ describe('PiRuntimeAdapter', () => {
             recoverable: true,
           }),
         ]);
-      } finally {
-        db.close();
-      }
-    });
-
-    it('pauses production after three stale continuations', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('stale-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-          type: string;
-        }) => void;
-        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{
-            name: string;
-            execute(
-              toolCallId: string,
-              params: Record<string, unknown>,
-            ): Promise<{ content: Array<{ text: string }> }>;
-          }>;
-        };
-        const productionTool = sessionOptions.customTools.find(
-          tool => tool.name === 'production_loop',
-        );
-        await productionTool!.execute('start-production', {
-          action: ProductionLoopAction.CommitPlan,
-          items: [{ title: 'Create report' }],
-          constraints: [],
-          acceptanceCriteria: ['Report is verified'],
-          expectedArtifacts: [{ kind: 'report', description: 'Release report' }],
-          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
-        });
-
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_end' });
-
-        expect(mockSession.prompt).toHaveBeenCalledTimes(4);
-        expect(mockSession.abort).toHaveBeenCalledOnce();
-        expect(service.getCurrent('stale-production')?.runs[0].status).toBe(
-          WorkbenchRunStatus.Paused,
-        );
-        expect(adapter.isSessionRunning('stale-production')).toBe(false);
-      } finally {
-        db.close();
-      }
-    });
-
-    it('keeps a stable production tool topology across Work follow-ups', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-
-      try {
-        await adapter.startSession('adaptive-gate', '你好', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-
-        const greetingPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-        expect(greetingPrompt).toBe('你好');
-        expect(greetingPrompt).not.toContain('## Production workflow decision');
-        const greetingRunId = service.getCurrent('adaptive-gate')?.runs[0]?.id;
-        expect(greetingRunId).toBeDefined();
-        setWorkbenchOutputRequirements(service.repository, 'adaptive-gate', greetingRunId!, [{ mode: WorkbenchOutputMode.Text, formats: [] }]);
-        expect(service.productionLoop.repository.get(greetingRunId!)).toBeNull();
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: unknown) => void;
-        listener({
-          type: 'message_end',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: '你好，有什么可以帮你？' }],
-            stopReason: 'stop',
-          },
-        });
-        listener({ type: 'agent_end' });
-        await Promise.resolve();
-        expect(mockSession.prompt).toHaveBeenCalledOnce();
-        expect(service.getCurrent('adaptive-gate')?.runs[0].status).toBe(
-          WorkbenchRunStatus.Succeeded,
-        );
-
-        await adapter.continueSession('adaptive-gate', '修复登录流程中的刷新问题', {
-          sessionMode: 'work',
-        });
-        await adapter.continueSession('adaptive-gate', '解释一下事件循环', {
-          sessionMode: 'work',
-        });
-
-        const simpleStart = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(simpleStart.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-        expect(mockSession.abort).not.toHaveBeenCalled();
-        expect(mockSession.prompt).toHaveBeenCalledTimes(3);
-        for (const [sentPrompt] of mockSession.prompt.mock.calls) {
-          expect(sentPrompt).not.toContain('## Production workflow decision');
-        }
       } finally {
         db.close();
       }
@@ -1048,6 +708,83 @@ describe('PiRuntimeAdapter', () => {
         }),
       );
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('systemPrompt');
+    });
+
+    it('keeps Chat on Pi while skipping Work prompt, default Skill, and MCP resources', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [{ name: 'list_projects', description: 'List projects' }],
+        serverStatuses: [{ name: 'Supabase', connected: true, toolCount: 1 }],
+      } as never);
+      adapter.setProjectMemoryService({} as never);
+      adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
+      const beginRun = vi.fn();
+      adapter.setWorkbenchTaskService({
+        on: vi.fn(),
+        off: vi.fn(),
+        beginRun,
+      } as unknown as WorkbenchTaskService);
+
+      await adapter.startSession('chat-resources', 'Hello', {
+        sessionMode: 'chat',
+        systemPrompt: 'Only the explicitly selected chat prompt.',
+      });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        additionalSkillPaths?: string[];
+        systemPromptOverride: (base: string | undefined) => string | undefined;
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.additionalSkillPaths).toEqual([]);
+      expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBeUndefined();
+      expect(loaderOptions.appendSystemPromptOverride()).toContain(
+        'Only the explicitly selected chat prompt.',
+      );
+      expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain('知远智能体');
+      expect(loaderOptions.appendSystemPromptOverride().join('\n')).not.toContain('Supabase');
+      expect(loaderOptions.appendSystemPromptOverride()).not.toContain(
+        PiDocumentReaderSystemPrompt,
+      );
+      expect(loaderOptions.appendSystemPromptOverride()).not.toContain(DeclareArtifactSystemPrompt);
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name?: string }>;
+      };
+      const customToolNames = sessionOptions.customTools?.map(tool => tool.name) ?? [];
+      expect(customToolNames).toContain(PiWebSearchToolName);
+      expect(customToolNames).not.toContain(PiMcpTool.Name);
+      expect(customToolNames).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
+      expect(customToolNames).not.toContain(PiDocumentReaderToolName);
+      expect(customToolNames).not.toContain(PiSubagentToolName);
+      expect(beginRun).not.toHaveBeenCalled();
+    });
+
+    it('reuses one Pi AgentSession across Chat continuations', async () => {
+      await adapter.startSession('chat-continuation', 'First', {
+        sessionMode: 'chat',
+      });
+      await adapter.continueSession('chat-continuation', 'Second', {
+        sessionMode: 'chat',
+      });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(mockSession.reload).not.toHaveBeenCalled();
+      expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('caps Chat compaction for models with a larger context window', async () => {
+      await adapter.startSession('chat-context-limit', 'First', {
+        sessionMode: 'chat',
+        modelOverride: 'openai/gpt-5.2',
+      });
+
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        compaction: {
+          enabled: true,
+          reserveTokens: 8_192,
+          keepRecentTokens: 16_384,
+        },
+      });
     });
 
     it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
@@ -1562,13 +1299,11 @@ describe('PiRuntimeAdapter', () => {
       const action = vi.fn(async () => undefined);
       expect(adapter.enqueueControlAction('failed-session', action)).toEqual({ success: true });
 
-      const sessions = (
-        adapter as unknown as {
-          activeSessions: Map<string, { turnFailed: boolean }>;
-          flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
-          queuedControlActions: Map<string, Array<() => Promise<void>>>;
-        }
-      );
+      const sessions = adapter as unknown as {
+        activeSessions: Map<string, { turnFailed: boolean }>;
+        flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
+        queuedControlActions: Map<string, Array<() => Promise<void>>>;
+      };
       const active = sessions.activeSessions.get('failed-session');
       if (!active) throw new Error('The test session was not registered.');
       // Pi sets turnFailed when a settled run surfaces a deferred error.
@@ -1587,6 +1322,43 @@ describe('PiRuntimeAdapter', () => {
       await adapter.continueSession('test', 'Second');
       // prompt() called twice total (once for start, once for continue)
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('persists only the skills the user attached to the turn, not the execution set', async () => {
+      const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      // Only the members this path reads; getSession backs both the transcript
+      // lookup and the experts/turn snapshot.
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => {
+          added.push(message as { content: string; metadata?: Record<string, unknown> });
+          return message;
+        },
+        getSession: () => ({ messages: [], experts: [] }),
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('attached-skills', 'First', {
+        skipInitialUserMessage: true,
+        skillIds: ['expert-preset'],
+      });
+      // Expert/turn execution set kept, nothing attached by the user this turn.
+      await adapter.continueSession('attached-skills', 'Second', {
+        skillIds: ['expert-preset'],
+        attachedSkillIds: [],
+      });
+      await adapter.continueSession('attached-skills', 'Third', {
+        skillIds: ['expert-preset'],
+        attachedSkillIds: ['marketing-copy'],
+      });
+      // A caller with no per-input selection (IM channel turn, scheduled run,
+      // workbench resume) records no attachment, so its turn shows no chips even
+      // though the session keeps running with its skills.
+      await adapter.continueSession('attached-skills', 'Fourth', { skillIds: ['queue-skill'] });
+
+      expect(added.map(message => message.metadata?.skillIds)).toEqual([
+        undefined,
+        ['marketing-copy'],
+        undefined,
+      ]);
     });
 
     it('recreates the session after MCP discovery refreshes its tool topology', async () => {
@@ -1720,6 +1492,18 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(3);
     });
 
+    it('resolves the newly selected model before continuing a cached session', async () => {
+      await adapter.startSession('test', 'First', { modelOverride: 'openai/gpt-5.2' });
+      mockResolveRawApiConfigForModelRef.mockClear();
+      await adapter.continueSession('test', 'Second', { modelOverride: 'zhipu/glm-5.3-flash' });
+
+      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('zhipu/glm-5.3-flash');
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      await adapter.continueSession('test', 'Third', { modelOverride: 'zhipu/glm-5.3-flash' });
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+    });
+
     it('should recreate the session when skill tool topology changes', async () => {
       await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
       await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
@@ -1820,6 +1604,69 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
+    it('ends the turn with a visible error when the workbench run can no longer execute tools', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const message =
+        'Stopped the run: the output contract was never committed, so no tool call could execute.';
+      const authorizeToolCall = vi
+        .fn()
+        .mockResolvedValue({ allow: false, reason: message, terminateRun: true });
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'terminated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      expect(result).toMatchObject({ block: true });
+      // The model must not be asked again, and the user must see why.
+      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
+      expect(onError).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ message: expect.stringContaining('output contract') }),
+      );
+    });
+
     it('starts the Goal loop only when Work explicitly enables goal mode', async () => {
       await adapter.startSession('goal-work', 'Finish the requested task', {
         sessionMode: 'work',
@@ -1889,9 +1736,7 @@ describe('PiRuntimeAdapter', () => {
       });
       expect(published).toEqual([
         {
-          entries: [
-            { content: 'Extract the auth module', status: 'pending', priority: 'high' },
-          ],
+          entries: [{ content: 'Extract the auth module', status: 'pending', priority: 'high' }],
         },
       ]);
 
@@ -2025,7 +1870,6 @@ describe('PiRuntimeAdapter', () => {
     it('starts a fresh model-decided task after a shortcut approval is denied', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const workspaceRoot = createTemporaryWorkspace();
@@ -2037,7 +1881,12 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot,
         });
         const first = service.getCurrent('denied-shortcut')!;
-        setWorkbenchOutputRequirements(service.repository, 'denied-shortcut', first.task.activeRunId!, [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }]);
+        setWorkbenchOutputRequirements(
+          service.repository,
+          'denied-shortcut',
+          first.task.activeRunId!,
+          [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }],
+        );
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-shortcut',
           runId: first.task.activeRunId!,
@@ -2064,7 +1913,9 @@ describe('PiRuntimeAdapter', () => {
         const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
-        expect(greetingOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(greetingOptions.customTools?.map(tool => tool.name)).not.toContain(
+          'production_loop',
+        );
       } finally {
         db.close();
       }
@@ -2084,7 +1935,6 @@ describe('PiRuntimeAdapter', () => {
     it('keeps agent-backed chat interruptions on the normal continuation path', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const interruptions: Array<{ taskId: string | null; recoverable: boolean }> = [];
@@ -2196,14 +2046,20 @@ describe('PiRuntimeAdapter', () => {
           id: 'tool-use-1',
           type: 'tool_use',
           content: 'Using tool: bash',
-          metadata: { toolName: 'bash', toolUseId: 'call-bash-1', toolInput: { command: 'npm test' } },
+          metadata: {
+            toolName: 'bash',
+            toolUseId: 'call-bash-1',
+            toolInput: { command: 'npm test' },
+          },
         },
       ];
-      const addMessage = vi.fn((_sessionId: string, message: { type: string; metadata?: unknown }) => {
-        const persisted = { ...message, id: `persisted-${message.type}`, timestamp: Date.now() };
-        messages.push(persisted as (typeof messages)[number]);
-        return persisted;
-      });
+      const addMessage = vi.fn(
+        (_sessionId: string, message: { type: string; metadata?: unknown }) => {
+          const persisted = { ...message, id: `persisted-${message.type}`, timestamp: Date.now() };
+          messages.push(persisted as (typeof messages)[number]);
+          return persisted;
+        },
+      );
       adapter.setCoworkStore({
         getSession: () => ({ messages }),
         addMessage,
@@ -2359,7 +2215,6 @@ describe('PiRuntimeAdapter', () => {
     it('aborts the active Pi turn when a workbench approval is denied', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
-      initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const requests: string[] = [];
@@ -2377,7 +2232,12 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot: createTemporaryWorkspace(),
         });
         const detail = service.getCurrent('denied-workbench');
-        setWorkbenchOutputRequirements(service.repository, 'denied-workbench', detail!.task.activeRunId!, [{ mode: WorkbenchOutputMode.File, formats: ['md'] }]);
+        setWorkbenchOutputRequirements(
+          service.repository,
+          'denied-workbench',
+          detail!.task.activeRunId!,
+          [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
+        );
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-workbench',
           runId: detail!.task.activeRunId!,
@@ -2768,7 +2628,7 @@ describe('PiRuntimeAdapter', () => {
         result: 'file1.txt\nfile2.txt',
         isError: false,
       });
-
+      await vi.waitFor(() => expect(messages.some(m => m.type === 'tool_result')).toBe(true));
       const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult).toBeDefined();
       expect(toolResult!.metadata?.toolUseId).toBe('call-1');
@@ -2812,6 +2672,26 @@ describe('PiRuntimeAdapter', () => {
       const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult!.metadata?.isError).toBe(true);
     });
+
+    it('should flag tool_result as error when result details contain isError', async () => {
+      const messages: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      await adapter.startSession('test', 'Do something');
+
+      listener!({
+        type: 'tool_execution_end',
+        toolCallId: 'call-details-err',
+        toolName: 'declare_artifact',
+        result: {
+          content: [{ type: 'text', text: 'file does not exist' }],
+          details: { isError: true, error: 'file does not exist' },
+        },
+        isError: false,
+      });
+      await vi.waitFor(() => expect(messages.some(m => m.type === 'tool_result')).toBe(true));
+      const toolResult = messages.find(m => m.type === 'tool_result');
+      expect(toolResult!.metadata?.isError).toBe(true);
+    });
   });
 
   // ── Event mapping: assistant streaming (duplicate-render regression) ──
@@ -2825,6 +2705,12 @@ describe('PiRuntimeAdapter', () => {
         listener = cb;
         return () => {};
       });
+    });
+
+    afterEach(() => {
+      // Only the usage-persistence test stubs a context snapshot; reset it so no
+      // sibling test starts persisting contextUsage it did not ask for.
+      mockSession.getContextUsage.mockReset();
     });
 
     /**
@@ -2863,6 +2749,26 @@ describe('PiRuntimeAdapter', () => {
       const finalUpdate = updates[updates.length - 1];
       expect(finalUpdate.messageId).toBe(assistantMessages[0].id);
       expect(finalUpdate.content).toBe('Hello world');
+    });
+
+    it('records Pi startup latency from AgentSession creation to first token', async () => {
+      const logSpy = vi.spyOn(console, 'log');
+      await adapter.startSession('startup-latency', 'Hi');
+
+      listener!({ type: 'agent_start' });
+      listener!({ type: 'turn_start' });
+      listener!({ type: 'message_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Hello' }] },
+      });
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\[PiRuntime\] startup latency for startup-latency: create-to-agent_start=\d+ms, agent_start-to-first_token=\d+ms, create-to-first_token=\d+ms/,
+        ),
+      );
+      logSpy.mockRestore();
     });
 
     it('should keep the same message id across stream and finalize', async () => {
@@ -2936,6 +2842,76 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('2048 characters'));
     });
 
+    it('persists a token reading only when the provider reported usage', async () => {
+      const seededMessageIds: string[] = [];
+      adapter.on('message', (_sid, msg) => {
+        if ((msg as { type: string }).type === 'assistant') {
+          seededMessageIds.push((msg as { id: string }).id);
+        }
+      });
+      const updateMessage = vi.fn();
+      // Only the members this metadata path reads.
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => message,
+        getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
+        updateMessage,
+      } as unknown as CoworkStore);
+      mockSession.getContextUsage.mockReturnValue({ tokens: 1_200, contextWindow: 262_144 });
+
+      await adapter.startSession('usage-session', 'Hi');
+
+      const driveTurn = (usage: Record<string, number>): void => {
+        listener!({ type: 'turn_start' });
+        listener!({
+          type: 'message_update',
+          message: { role: 'assistant', content: [{ type: 'text', text: 'Answer' }] },
+        });
+        listener!({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Answer' }],
+            stopReason: 'stop',
+            usage,
+          },
+        });
+      };
+
+      // The deferred context-usage sync is the last writer per turn; select its
+      // writes by the contextUsage it stamps.
+      const usageWrites = (): Array<Record<string, unknown>> =>
+        updateMessage.mock.calls
+          .map(call => (call[2] as { metadata?: Record<string, unknown> }).metadata)
+          .filter(
+            (metadata): metadata is Record<string, unknown> =>
+              metadata !== undefined && 'contextUsage' in metadata,
+          );
+
+      // The provider reported nothing: Pi's zero-seeded default must not be
+      // persisted, or the stats line renders "0 tok" as a real reading.
+      driveTurn({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 });
+      await vi.waitFor(() => expect(usageWrites()).toHaveLength(1));
+      expect(usageWrites()[0]).not.toHaveProperty('usage');
+
+      driveTurn({
+        input: 900,
+        output: 120,
+        cacheRead: 300,
+        cacheWrite: 0,
+        reasoning: 60,
+        totalTokens: 1_320,
+      });
+      await vi.waitFor(() => expect(usageWrites()).toHaveLength(2));
+      expect(usageWrites()[1]?.usage).toEqual({
+        inputTokens: 900,
+        outputTokens: 120,
+        cacheReadTokens: 300,
+        cacheWriteTokens: 0,
+        reasoningTokens: 60,
+        totalTokens: 1_320,
+      });
+    });
+
     it('should mark an answer as final only after the agent run ends', async () => {
       const updates: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
       adapter.on('messageUpdate', (_sid, _id, content, metadata) =>
@@ -2969,7 +2945,10 @@ describe('PiRuntimeAdapter', () => {
         updates.push({ messageId, content, metadata }),
       );
 
-      await adapter.startSession('test', 'Produce two iterations');
+      await adapter.startSession('test', 'Produce two iterations', {
+        goalMode: true,
+        sessionMode: 'work',
+      });
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{
           name: string;
@@ -3148,6 +3127,85 @@ describe('PiRuntimeAdapter', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('closes a whitespace-only placeholder when the turn ends without an answer', async () => {
+      const messages: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
+      const stored: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      const updateMessage = vi.fn(
+        (_sessionId: string, messageId: string, patch: { metadata?: Record<string, unknown> }) => {
+          const target = stored.find(message => message.id === messageId);
+          if (target && patch.metadata) target.metadata = { ...target.metadata, ...patch.metadata };
+        },
+      );
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: Record<string, unknown>) => {
+          const created = { ...message, id: `placeholder-${stored.length + 1}` };
+          stored.push(created as never);
+          return created;
+        },
+        getSession: () => ({ messages: stored }),
+        updateMessage,
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('test', 'Use a tool without writing an answer');
+      listener!({ type: 'turn_start' });
+      // Models routinely emit bare newlines before a tool call: the bubble is
+      // created with isStreaming and must not survive the turn.
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'text_delta', delta: '\n\n' },
+        message: { role: 'assistant', content: [{ type: 'text', text: '\n\n' }] },
+      });
+      const placeholder = messages.find(message => message.type === 'assistant');
+      expect(placeholder?.metadata?.isStreaming).toBe(true);
+
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '\n\n' }],
+          stopReason: 'toolUse',
+        },
+      });
+
+      expect(
+        updates.some(
+          update =>
+            update.messageId === placeholder?.id &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
+      expect(updateMessage).toHaveBeenCalledWith(
+        'test',
+        placeholder?.id,
+        expect.objectContaining({
+          metadata: expect.objectContaining({ isStreaming: false, isFinal: true }),
+        }),
+      );
+      // The persisted row is what any later session load reads.
+      const persisted = stored.find(message => message.id === placeholder?.id);
+      expect(persisted?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
     });
 
     it('should stream the answer when text starts without a thinking_end event', async () => {
@@ -3471,6 +3529,106 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
+    it('cancels a non-retryable SDK retry and reports failure only after it settles', async () => {
+      const notices: Array<{ kind: string; attempt: number }> = [];
+      adapter.on('retryNotice', (_sid, notice) =>
+        notices.push({ kind: notice.kind, attempt: notice.attempt }),
+      );
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('502 invalid api key');
+
+      expect(errors).toHaveLength(0);
+      expect(adapter.isSessionRunning('test')).toBe(true);
+      expect(systemErrorMessages()).toHaveLength(0);
+      expect(completes).toHaveLength(0);
+      expect(mockSession.abort).not.toHaveBeenCalled();
+
+      // Cancelling the SDK retry must retain the original error until idle.
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      await Promise.resolve();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      listener!({
+        type: 'auto_retry_end',
+        success: false,
+        attempt: 1,
+        finalError: 'Retry cancelled',
+      });
+      expect(errors).toHaveLength(0);
+      expect(adapter.isSessionRunning('test')).toBe(true);
+      listener!({ type: 'agent_settled' });
+
+      expect(notices).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(completes).toHaveLength(0);
+    });
+
+    it('announces a retryable failure once while Pi keeps retrying', async () => {
+      const notices: Array<{ kind: string; attempt: number }> = [];
+      adapter.on('retryNotice', (_sid, notice) =>
+        notices.push({ kind: notice.kind, attempt: notice.attempt }),
+      );
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('429 Too Many Requests: overloaded');
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      listener!({ type: 'auto_retry_start', attempt: 2 });
+
+      expect(notices).toEqual([{ kind: CoworkErrorKind.RateLimited, attempt: 1 }]);
+      // A retryable failure keeps retrying: the runtime must not end the turn.
+      expect(errors).toHaveLength(0);
+      expect(mockSession.abort).not.toHaveBeenCalled();
+    });
+
+    it('retains a non-retryable failure if the SDK emits a successful-looking cancellation', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('401 Unauthorized: invalid api key');
+      expect(errors).toHaveLength(0);
+      expect(completes).toEqual([]);
+
+      listener!({ type: 'auto_retry_end', success: true, attempt: 1 });
+      listener!({ type: 'agent_settled' });
+
+      expect(completes).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
+    });
+
+    it('runs the next turn in the same session after a non-retryable failure', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('502 invalid api key');
+      let finishAbort: (() => void) | undefined;
+      mockSession.abort.mockImplementationOnce(
+        () => new Promise<void>(resolve => { finishAbort = resolve; }),
+      );
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      await Promise.resolve();
+      const continuation = adapter.continueSession('test', 'Next message');
+      await Promise.resolve();
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+      listener!({ type: 'auto_retry_end', success: false, finalError: 'Retry cancelled' });
+      listener!({ type: 'agent_settled' });
+      finishAbort!();
+      await continuation;
+      expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+
+      // The user sends another message: this turn must run and complete.
+      listener!({ type: 'turn_start' });
+      successfulTurn('Second answer');
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(1);
+      expect(completes).toEqual(['test']);
+    });
+
     it('finalizes a partial answer before surfacing the terminal error', async () => {
       const updates: Array<{
         messageId: string;
@@ -3502,7 +3660,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('does not complete or continue the agent loop on a failed turn', async () => {
-      await adapter.startSession('test', 'Hi');
+      await adapter.startSession('test', 'Hi', { goalMode: true, sessionMode: 'work' });
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{
           name: string;
@@ -3657,6 +3815,90 @@ describe('PiRuntimeAdapter', () => {
       await initialRun;
 
       expect(adapter.isSessionActive('queue-session')).toBe(true);
+    });
+
+    it('merges a queued turn picks into the session skills without losing the session own', async () => {
+      const added: Array<{ content: string; metadata?: Record<string, unknown> }> = [];
+      adapter.setCoworkStore({
+        addMessage: (_sessionId: string, message: unknown) => {
+          added.push(message as { content: string; metadata?: Record<string, unknown> });
+          return message;
+        },
+        getSession: () => ({ messages: [], experts: [] }),
+      } as unknown as CoworkStore);
+
+      let listener: ((event: { type: string }) => void) | null = null;
+      mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
+        listener = callback;
+        return () => {};
+      });
+
+      await adapter.startSession('queued-skills', 'Start work', {
+        sessionMode: 'work',
+        skillIds: ['alpha-skill'],
+      });
+      const queued = adapter.enqueuePendingMessage(
+        'queued-skills',
+        'Second',
+        undefined,
+        undefined,
+        ['beta-skill'],
+      );
+      expect(queued.success).toBe(true);
+
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(2));
+
+      // The queued turn records only its own pick as the input attachment…
+      expect(added.map(message => message.metadata?.skillIds)).toEqual([undefined, ['beta-skill']]);
+
+      // …while the session keeps running with both skills loaded for the model.
+      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      const visible = loader.skillsOverride({
+        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
+        diagnostics: [],
+      });
+      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
+    });
+
+    it('loads a steered turn picks into the running session before sending', async () => {
+      await adapter.startSession('steer-skills', 'Start work', {
+        sessionMode: 'work',
+        skillIds: ['alpha-skill'],
+      });
+      const queued = adapter.enqueuePendingMessage(
+        'steer-skills',
+        'Change direction',
+        undefined,
+        undefined,
+        ['beta-skill'],
+      );
+      expect(queued.success).toBe(true);
+
+      const result = await adapter.steerPendingMessage('steer-skills', queued.item!.id);
+
+      expect(result.success).toBe(true);
+      // The steer text goes in raw — no inlined skill body — and the session's
+      // resources were reloaded so the model can see the newly attached skill.
+      expect(mockSession.reload).toHaveBeenCalled();
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Change direction', {
+        streamingBehavior: 'steer',
+      });
+      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      const visible = loader.skillsOverride({
+        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
+        diagnostics: [],
+      });
+      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
     });
 
     it('rejects queue controls for Chat sessions', async () => {

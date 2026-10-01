@@ -73,7 +73,8 @@ export class TodoRepository {
     if (input.view === TodoView.Completed) {
       conditions.push('t.status = ?');
       params.push(TodoStatus.Completed);
-    } else {
+    } else if (input.view !== TodoView.Important) {
+      // 重要视图需同时展示已完成的重要任务（带完成标记），其余视图只列未完成
       conditions.push('t.status = ?');
       params.push(TodoStatus.Active);
     }
@@ -103,7 +104,9 @@ export class TodoRepository {
     const orderBy =
       input.view === TodoView.Completed
         ? 't.completed_at DESC, t.updated_at DESC'
-        : 't.due_at IS NULL, t.due_at ASC, t.created_at DESC';
+        : input.view === TodoView.Important
+          ? `CASE WHEN t.status = '${TodoStatus.Completed}' THEN 1 ELSE 0 END, t.due_at IS NULL, t.due_at ASC, t.created_at DESC`
+          : 't.due_at IS NULL, t.due_at ASC, t.created_at DESC';
     const rows = this.db
       .prepare(
         `SELECT t.*, l.name AS list_name

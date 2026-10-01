@@ -6,10 +6,10 @@ import { expect, test } from 'vitest';
 const source = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
 
 test('sends structured errors from asynchronous Cowork fallbacks', () => {
-  const fallbackCalls = source.match(/error: classifyCoworkError\(errorMessage\)/g);
+  const fallbackCalls = source.match(/reportPiSessionFailure\(/g);
 
   expect(fallbackCalls).toHaveLength(2);
-  expect(source).not.toMatch(/CoworkStreamIpc\.Error,[\s\S]{0,160}error: errorMessage/);
+  expect(source).not.toContain('CoworkStreamIpc.Error');
 });
 
 test('persists terminal errors before forwarding the error event', () => {
@@ -21,6 +21,6 @@ test('persists terminal errors before forwarding the error event', () => {
   expect(errorListener).toContain('persistCoworkTerminalError(');
   expect(errorListener).toContain("runtime.emit('message', sessionId, message)");
   expect(errorListener.indexOf('persistCoworkTerminalError(')).toBeLessThan(
-    errorListener.indexOf('CoworkStreamIpc.Error'),
+    errorListener.indexOf('emitUiEvent({ type: PiUiEventType.Error'),
   );
 });

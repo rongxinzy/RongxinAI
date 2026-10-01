@@ -1,4 +1,7 @@
-﻿import { i18nService } from './i18n';
+﻿import { CoworkErrorKind, getUserErrorI18nKey } from '../../common/coworkError';
+import { CodingErrorTranslationKeys } from '../../shared/codingAgent';
+import { WorkbenchErrorI18nKey } from '../../shared/workbenchTask';
+import { i18nService } from './i18n';
 
 export const TOAST_DEFAULT_DURATION_MS = 2200;
 export const TOAST_MAX_DURATION_MS = 3000;
@@ -27,8 +30,51 @@ const patterns: Array<[keyof typeof CATEGORY_KEYS, RegExp]> = [
   ['network', /network error|failed to fetch|fetch failed|econnrefused|enotfound|offline/i],
 ];
 
-function rawMessage(error: unknown): string {
-  return error instanceof Error ? error.message : typeof error === 'string' ? error : String(error);
+/** Extract the raw message from anything that was thrown or returned. */
+export function readErrorMessage(error: unknown): string {
+  if (error === null || error === undefined) return '';
+  if (error instanceof Error) return error.message;
+  return typeof error === 'string' ? error : String(error);
+}
+
+const APP_COPY_KEYS = [
+  ...new Set([
+    ...CodingErrorTranslationKeys,
+    ...Object.values(WorkbenchErrorI18nKey),
+    ...Object.values(CoworkErrorKind).map(getUserErrorI18nKey),
+    ...Object.values(CATEGORY_KEYS),
+    // Copy `appErrorText` returns when the caller has no error to translate:
+    // the isError toast consumer would otherwise prefix 操作失败 a second time.
+    'operationFailed',
+    'runtimeRetryNotice',
+    'codingAgentActionFailed',
+    'codingAgentTurnFailed',
+    'codingAgentTurnCancelled',
+    'codingGitActionFailed',
+    'codingSessionCreateFailed',
+    'codingAgentFilesPreviewUnavailable',
+    'coworkQueueUpdateFailed',
+    'coworkQueueDeleteFailed',
+    'coworkQueueSteerFailed',
+    'coworkQueueRetryFailed',
+  ]),
+];
+
+/**
+ * Whether the text is error copy this app produced, in the active language.
+ *
+ * Toasts dispatch through {@link normalizeError} a second time, so our own
+ * sentences — already translated by the catalog — must survive unchanged
+ * instead of being wrapped a second time ("操作失败：加载待发送消息失败。").
+ * Templates with a `{detail}` placeholder are compared on their fixed head.
+ */
+export function isLocalizedAppErrorText(message: string): boolean {
+  const trimmed = message.trim();
+  if (!trimmed) return false;
+  return APP_COPY_KEYS.some(key => {
+    const [head] = i18nService.t(key).split('{');
+    return head.trim().length > 1 && trimmed.startsWith(head.trim());
+  });
 }
 
 export function cleanErrorReason(input: string): string {
@@ -43,11 +89,12 @@ export function cleanErrorReason(input: string): string {
 }
 
 export function normalizeError(error: unknown): string {
-  const message = rawMessage(error);
+  const message = readErrorMessage(error);
   const operationPrefix = i18nService.t('operationFailed');
   if (message === operationPrefix || message.startsWith(`${operationPrefix}：`) || message.startsWith(`${operationPrefix}:`)) {
     return message;
   }
+  if (isLocalizedAppErrorText(message)) return message;
   
   const category = patterns.find(([, pattern]) => pattern.test(message))?.[0];
   if (category) {

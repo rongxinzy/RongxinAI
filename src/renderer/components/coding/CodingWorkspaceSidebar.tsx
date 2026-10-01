@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { Ellipsis, Folder, Trash2 } from 'lucide-react';
+import { Ellipsis, Folder, Settings2, Trash2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -17,6 +17,8 @@ import {
   type CodingSessionSummary,
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
+import { reportAppError } from '../../services/appErrorText';
+import { showAppError, showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import { getWorkspaceDisplayName } from '../../utils/path';
 import {
@@ -33,6 +35,7 @@ import {
 } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { CodingUiEvent, type CodingCreateSessionEventDetail } from './constants';
 import { CodingWorkspaceDialog } from './CodingWorkspaceDialog';
+import { resolveReadyDefaultProfileId } from './codingSessionDraft';
 
 export interface CodingSessionDraft {
   id: string;
@@ -75,6 +78,7 @@ export const CodingWorkspaceSidebar = ({
   const [workspaces, setWorkspaces] = useState<CodingWorkspaceSummary[]>([]);
   const [profiles, setProfiles] = useState<CodingAgentProfile[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const expansionInitialized = useRef(false);
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<CodingWorkspaceSummary | null>(null);
   const [removingWorkspace, setRemovingWorkspace] = useState<CodingWorkspaceSummary | null>(null);
@@ -86,14 +90,19 @@ export const CodingWorkspaceSidebar = ({
   const [error, setError] = useState<string | null>(null);
   const addWorkspaceIconRef = useRef<AnimatedFolderPlusIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
 
   const applyWorkspaces = useCallback(
     (next: CodingWorkspaceSummary[]) => {
+      // Mutation responses can arrive after the user selects another workspace.
+      const selection = selectionRef.current;
       setWorkspaces(next);
-      setExpandedIds(current => {
-        if (current.size) return current;
-        return new Set(next.map(workspace => workspace.id));
-      });
+      // An empty set also means the user deliberately collapsed every folder.
+      if (!expansionInitialized.current && next.length > 0) {
+        expansionInitialized.current = true;
+        setExpandedIds(new Set(next.map(workspace => workspace.id)));
+      }
       const selected = next.find(workspace => workspace.id === selection.workspaceId);
       if (selected) {
         if (selection.draft?.workspaceId === selected.id) return;
@@ -122,16 +131,13 @@ export const CodingWorkspaceSidebar = ({
           : { workspaceId: null, workspaceRoot: '', laneId: null, draft: null },
       );
     },
-    [
-      onSelectionChange,
-      selection.draft,
-      selection.laneId,
-      selection.workspaceId,
-      selection.workspaceRoot,
-    ],
+    [onSelectionChange],
   );
 
   const refreshSequence = useRef(0);
+  const invalidateRefresh = useCallback(() => {
+    ++refreshSequence.current;
+  }, []);
   const refresh = useCallback(async () => {
     const request = ++refreshSequence.current;
     const [workspaceResult, profileResult] = await Promise.all([
@@ -142,28 +148,32 @@ export const CodingWorkspaceSidebar = ({
     if (workspaceResult.success && workspaceResult.workspaces) {
       applyWorkspaces(workspaceResult.workspaces);
     } else {
-      setError(workspaceResult.error ?? i18nService.t('codingAgentActionFailed'));
+      showAppError(workspaceResult.error, 'codingAgentActionFailed');
     }
     if (profileResult.success && profileResult.profiles) setProfiles(profileResult.profiles);
   }, [applyWorkspaces]);
 
   useEffect(() => {
     void refresh();
-    return window.electron.codingAgent.onChanged(snapshot => {
+    const unsubscribe = window.electron.codingAgent.onChanged(snapshot => {
       if (snapshot.room.workspaceRoot === selection.workspaceRoot) {
         setProfiles(snapshot.profiles);
       }
       void refresh();
     });
-  }, [refresh, selection.workspaceRoot]);
+    return () => {
+      invalidateRefresh();
+      unsubscribe();
+    };
+  }, [invalidateRefresh, refresh, selection.workspaceRoot]);
 
-  const openSessionSetup = (workspace: CodingWorkspaceSummary) => {
-    setError(null);
+  const startSession = (workspace: CodingWorkspaceSummary, profileId?: string) => {
     setExpandedIds(current => new Set(current).add(workspace.id));
+    const detail: CodingCreateSessionEventDetail = profileId
+      ? { workspace, profileId }
+      : { workspace };
     window.dispatchEvent(
-      new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, {
-        detail: { workspace },
-      }),
+      new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, { detail }),
     );
   };
 
@@ -180,10 +190,11 @@ export const CodingWorkspaceSidebar = ({
         })
       : await window.electron.codingAgent.createWorkspace(input);
     if (!result.success || !result.workspaces) {
-      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      setError(reportAppError(result.error, 'codingAgentActionFailed'));
       return false;
     }
     applyWorkspaces(result.workspaces);
+    const wasCreate = !editingWorkspace;
     const saved = editingWorkspace
       ? result.workspaces.find(workspace => workspace.id === editingWorkspace.id)
       : result.workspaces.find(workspace => workspace.primaryRoot === input.sourceFolders[0]);
@@ -195,6 +206,17 @@ export const CodingWorkspaceSidebar = ({
         laneId: saved.activeSessionId,
         draft: null,
       });
+      // 新建工作区时默认 Agent 已在对话框里选定：可用就直接进入会话草稿；
+      // 不可用则提示并退回选择框。等 selection 落稳再执行，避免被 selectionKey 变化打断。
+      if (wasCreate) {
+        const readyProfileId = resolveReadyDefaultProfileId(profiles, saved.defaultProfileId);
+        window.setTimeout(() => {
+          startSession(saved, readyProfileId ?? undefined);
+          if (!readyProfileId) {
+            showAppToast(i18nService.t('codingWorkspaceDefaultAgentUnavailable'), { isError: true });
+          }
+        }, 0);
+      }
     }
     setEditingWorkspace(null);
     return true;
@@ -206,13 +228,13 @@ export const CodingWorkspaceSidebar = ({
     try {
       const result = await window.electron.codingAgent.deleteWorkspace(removingWorkspace.id);
       if (!result.success || !result.workspaces) {
-        setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        showAppError(result.error, 'codingAgentActionFailed');
         return;
       }
       setRemovingWorkspace(null);
       applyWorkspaces(result.workspaces);
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     } finally {
       setIsRemoving(false);
     }
@@ -227,13 +249,13 @@ export const CodingWorkspaceSidebar = ({
         laneId: removingSession.session.id,
       });
       if (!result.success || !result.workspaces) {
-        setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+        showAppError(result.error, 'codingAgentActionFailed');
         return;
       }
       setRemovingSession(null);
       applyWorkspaces(result.workspaces);
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+      showAppError(error, 'codingAgentActionFailed');
     } finally {
       setIsRemoving(false);
     }
@@ -246,6 +268,17 @@ export const CodingWorkspaceSidebar = ({
           {i18nService.t('codingWorkspaceSection')}
         </h2>
         <div className="flex items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="theme-action-faint"
+            aria-label={i18nService.t('codingAgentManageAgents')}
+            title={i18nService.t('codingAgentManageAgents')}
+            onClick={() => window.dispatchEvent(new CustomEvent(CodingUiEvent.ManageAgents))}
+          >
+            <Settings2 />
+          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -294,7 +327,7 @@ export const CodingWorkspaceSidebar = ({
                   })
                 }
                 onSelectionChange={onSelectionChange}
-                onCreateSession={openSessionSetup}
+                onCreateSession={startSession}
                 onEditWorkspace={target => {
                   setEditingWorkspace(target);
                   setWorkspaceDialogOpen(true);
@@ -307,7 +340,6 @@ export const CodingWorkspaceSidebar = ({
             ))}
           </div>
         )}
-        {error ? <p className="px-2 pt-2 text-xs text-destructive">{error}</p> : null}
       </div>
       <CodingWorkspaceDialog
         open={workspaceDialogOpen}
@@ -381,11 +413,14 @@ const WorkspaceNode = ({
   const createSessionIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(expanded);
+  const previousReducedMotionRef = useRef(prefersReducedMotion);
 
   useEffect(() => {
     const wasExpanded = previousExpandedRef.current;
+    const wasReducedMotion = previousReducedMotionRef.current;
     previousExpandedRef.current = expanded;
-    if (wasExpanded === expanded) return;
+    previousReducedMotionRef.current = prefersReducedMotion;
+    if (wasExpanded === expanded && wasReducedMotion === prefersReducedMotion) return;
     if (prefersReducedMotion) {
       setShouldRenderSessions(expanded);
       setIsSessionGroupVisible(expanded);
@@ -396,9 +431,15 @@ const WorkspaceNode = ({
     if (expanded) {
       setShouldRenderSessions(true);
       setIsSessionGroupVisible(false);
+      const reveal = () => {
+        if (timeout) window.clearTimeout(timeout);
+        setIsSessionGroupVisible(true);
+      };
       frame = requestAnimationFrame(() => {
-        frame = requestAnimationFrame(() => setIsSessionGroupVisible(true));
+        frame = requestAnimationFrame(reveal);
       });
+      // Hidden/background windows may suspend animation frames indefinitely.
+      timeout = window.setTimeout(reveal, 60);
     } else {
       setIsSessionGroupVisible(false);
       timeout = window.setTimeout(() => setShouldRenderSessions(false), SESSIONS_TRANSITION_MS);
@@ -423,12 +464,6 @@ const WorkspaceNode = ({
           className="theme-page-coding-workspace-sidebar-button-1 h-full min-w-0 flex-1 justify-start text-left"
           onClick={() => {
             onToggleExpanded(workspace.id, !expanded);
-            onSelectionChange({
-              workspaceId: workspace.id,
-              workspaceRoot: workspace.primaryRoot,
-              laneId: workspace.activeSessionId,
-              draft: null,
-            });
           }}
           onMouseEnter={() => {
             if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
@@ -509,8 +544,8 @@ const WorkspaceNode = ({
         >
           <div
             className={cn(
-              'min-h-0 min-w-0 max-w-full',
-              !isSessionGroupVisible && 'pointer-events-none overflow-hidden',
+              'min-h-0 min-w-0 max-w-full overflow-hidden',
+              !isSessionGroupVisible && 'pointer-events-none',
             )}
             role="group"
             aria-hidden={!expanded}
@@ -610,12 +645,12 @@ const SessionRow = ({
   onClick: () => void;
   onDelete?: () => void;
 }) => (
-  <div className="group relative">
+  <div className="group relative ml-[-6px] flex w-[calc(100%+12px)] min-w-0 items-center">
     <Button
       type="button"
       variant="ghost"
       className={cn(
-        'theme-page-coding-workspace-sidebar-button-variant-3 ml-[-6px] w-[calc(100%+12px)] min-w-0 justify-start text-left',
+        'theme-page-coding-workspace-sidebar-button-variant-3 min-w-0 flex-1 justify-start text-left',
         nested
           ? 'theme-page-coding-workspace-sidebar-button-variant-4'
           : 'theme-page-coding-workspace-sidebar-button-variant-5',
@@ -631,23 +666,18 @@ const SessionRow = ({
       <span className="min-w-0 flex-1 truncate">{name}</span>
       <span className={cn('size-1.5 shrink-0 rounded-full', statusClassName[status])} />
       {agentName ? (
-        <span
-          className={cn(
-            'shrink-0 truncate text-xs font-normal text-foreground opacity-[0.28] transition-opacity',
-            onDelete && 'group-hover:pointer-events-none group-hover:opacity-0',
-          )}
-        >
+        <span className="theme-coding-session-agent shrink-0 truncate" title={agentName}>
           {agentName}
         </span>
       ) : null}
     </Button>
     {onDelete ? (
-      <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center">
+      <div className="flex shrink-0 items-center pr-1">
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="theme-page-coding-workspace-sidebar-button-3 group-hover:pointer-events-auto"
+          className="theme-page-coding-workspace-sidebar-button-3"
           aria-label={i18nService.t('codingSessionRemove')}
           onClick={onDelete}
         >

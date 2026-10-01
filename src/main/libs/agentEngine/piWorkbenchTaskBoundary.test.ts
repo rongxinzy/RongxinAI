@@ -1,7 +1,6 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 import { WorkbenchContractKind, WorkbenchOutputMode } from '../../../shared/workbenchTask';
-import { initializeProductionLoopSchema } from '../../productionLoop/schema';
 import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -16,7 +15,6 @@ vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
 test('user acceptance is persisted and injected into reused and restored conversation prompts', async () => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
-  initializeProductionLoopSchema(db);
   const service = new WorkbenchTaskService(db);
   try {
     const { task, run } = service.beginRun({

@@ -21,15 +21,8 @@ import {
   WorkbenchTaskStatus,
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
-import {
-  ProductionLoopAction,
-  ProductionLoopPhase,
-  ProductionLoopStatus,
-  ProductionLoopToolName,
-  ProductionPlanItemStatus,
-} from '../../shared/productionLoop';
 import { initializeWorkbenchTaskSchema } from './schema';
-import { initializeProductionLoopSchema } from '../productionLoop/schema';
+import { setWorkbenchOutputRequirements } from './outputContract';
 import { WorkbenchTaskService } from './taskService';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import type { WorkbenchTaskServiceOptions } from './taskService';
@@ -42,7 +35,6 @@ vi.mock('./artifactWorkerPool', () => ({
 const createService = (options: WorkbenchTaskServiceOptions = {}) => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
-  initializeProductionLoopSchema(db);
   return { db, service: new WorkbenchTaskService(db, options) };
 };
 
@@ -50,82 +42,6 @@ const chatContract = {
   kind: WorkbenchContractKind.Chat,
   requiresUserAcceptance: false,
 };
-
-const prepareProductionDelivery = (
-  service: WorkbenchTaskService,
-  taskId: string,
-  runId: string,
-  workflowKind: WorkbenchContractKind,
-) => {
-  const task = service.repository.getTask(taskId);
-  if (!task) throw new Error('Task missing in test setup.');
-  service.productionLoop.beginRun({
-    taskId,
-    runId,
-    workflowKind,
-    goal: task.goal,
-    prototypeRequired: false,
-  });
-  const planned = service.productionLoop.commitPlan(runId, {
-    items: [{ title: 'Produce the result' }],
-    constraints: ['Keep the result complete'],
-    acceptanceCriteria: ['The result passes its completion contract'],
-    expectedArtifacts: [{ kind: 'result', description: 'Final result', required: true }],
-    expectedVerifiers: [{ name: 'completion_contract', deterministic: true }],
-  });
-  service.productionLoop.updatePlanItem(
-    runId,
-    planned.planItems[0].id,
-    ProductionPlanItemStatus.Completed,
-  );
-  service.productionLoop.recordToolResult(runId, {
-    toolCallId: 'completion-contract-check',
-    toolName: 'bash',
-    output: 'Completion contract passed.',
-    isError: false,
-  });
-  const evidenceRef = service.productionLoop.getAvailableVerifierEvidence(runId)[0]?.evidenceRef;
-  if (!evidenceRef) throw new Error('Verifier evidence missing in test setup.');
-  service.productionLoop.startInspection(runId, {
-    artifacts: [{ kind: 'result', reference: 'final-answer' }],
-    verifiers: [{ name: 'completion_contract', evidenceRef }],
-  });
-  service.productionLoop.requestCritique(runId);
-  service.productionLoop.recordCriticStart(runId, 'critic');
-  service.productionLoop.recordCriticResult(
-    runId,
-    'critic',
-    JSON.stringify({ verdict: 'pass', findings: [] }),
-    false,
-  );
-  service.productionLoop.recordDeliveryRequest(runId, 'Critic approved delivery.');
-};
-
-test('completes the production loop only after deterministic verification passes', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'answer',
-      contract: chatContract,
-    });
-    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Chat);
-
-    const detail = await service.completeRun({
-      sessionId: 'session',
-      runId: run.id,
-      workspaceRoot: process.cwd(),
-      finalAnswer: 'done',
-    });
-
-    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
-    expect(service.productionLoop.repository.get(run.id)?.status).toBe(
-      ProductionLoopStatus.Completed,
-    );
-  } finally {
-    db.close();
-  }
-});
 
 test('emits a verified run source only after deterministic verification passes', async () => {
   const onVerifiedRun = vi.fn();
@@ -136,7 +52,6 @@ test('emits a verified run source only after deterministic verification passes',
       goal: 'record a verified outcome',
       contract: chatContract,
     });
-    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Chat);
     await service.completeRun({
       sessionId: 'session',
       runId: run.id,
@@ -159,7 +74,7 @@ test('emits a verified run source only after deterministic verification passes',
   }
 });
 
-test('registers a declared artifact before production workflow completion', async () => {
+test('registers a declared artifact before task completion', async () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-ledger-'));
   const filePath = path.join(workspace, 'report.md');
@@ -230,7 +145,7 @@ test('promotes a declared artifact when reviewed evidence is projected at comple
           path: filePath,
           kind: 'report',
           role: 'report',
-          source: WorkbenchArtifactCandidateSource.ProductionInspection,
+          source: WorkbenchArtifactCandidateSource.DomainWorkflow,
           verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
         },
       ],
@@ -242,7 +157,7 @@ test('promotes a declared artifact when reviewed evidence is projected at comple
       provenance: WorkbenchArtifactProvenance.Controller,
       verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
       metadata: {
-        source: WorkbenchArtifactCandidateSource.ProductionInspection,
+        source: WorkbenchArtifactCandidateSource.Declaration,
         declaredKind: 'report',
       },
     });
@@ -252,7 +167,7 @@ test('promotes a declared artifact when reviewed evidence is projected at comple
   }
 });
 
-test('returns critic-approved work to revision when deterministic verification fails', async () => {
+test('rejects completion when deterministic domain verification fails', async () => {
   const onVerifiedRun = vi.fn();
   const { db, service } = createService({ onVerifiedRun });
   try {
@@ -261,12 +176,11 @@ test('returns critic-approved work to revision when deterministic verification f
       outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
-    const { task, run } = service.beginRun({
+    const { run } = service.beginRun({
       sessionId: 'session',
       goal: 'build a document',
       contract,
     });
-    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Shortcut);
 
     const detail = await service.completeRun({
       sessionId: 'session',
@@ -276,22 +190,16 @@ test('returns critic-approved work to revision when deterministic verification f
       workflowCompleted: false,
       workflowSnapshot: { completionFailures: ['Deliverable missing'] },
     });
-    const loop = service.productionLoop.repository.get(run.id);
 
     expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
     expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Failed);
-    expect(loop).toMatchObject({
-      phase: ProductionLoopPhase.Revise,
-      status: ProductionLoopStatus.NeedsRevision,
-      deliveryReason: null,
-    });
     expect(onVerifiedRun).not.toHaveBeenCalled();
   } finally {
     db.close();
   }
 });
 
-test('keeps acceptance-required production work ready until explicit user acceptance', async () => {
+test('keeps acceptance-required work pending until explicit user acceptance', async () => {
   const { db, service } = createService();
   try {
     const contract = {
@@ -304,7 +212,6 @@ test('keeps acceptance-required production work ready until explicit user accept
       goal: 'complete generic work',
       contract,
     });
-    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
 
     const pending = await service.completeRun({
       sessionId: 'session',
@@ -317,15 +224,9 @@ test('keeps acceptance-required production work ready until explicit user accept
     expect(pending.runs[0].verificationResult?.outcome).toBe(
       WorkbenchVerificationOutcome.AcceptanceRequired,
     );
-    expect(service.productionLoop.repository.get(run.id)?.status).toBe(
-      ProductionLoopStatus.ReadyToDeliver,
-    );
 
     const accepted = service.acceptTask(task.id);
     expect(accepted.task.status).toBe(WorkbenchTaskStatus.Completed);
-    expect(service.productionLoop.repository.get(run.id)?.status).toBe(
-      ProductionLoopStatus.Completed,
-    );
   } finally {
     db.close();
   }
@@ -347,7 +248,6 @@ test('user acceptance promotes pending workspace artifacts to verified', async (
       goal: 'complete generic work',
       contract,
     });
-    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
     await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
@@ -503,7 +403,6 @@ test('user acceptance dispatches the verified-run memory promotion', async () =>
       workspaceRoot: workspace,
       skillIds: [],
     });
-    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
     await service.registerArtifact({
       sessionId: 'session',
       runId: run.id,
@@ -576,7 +475,7 @@ test('lightweight inspected artifacts enter pending and are elevated by acceptan
           path: filePath,
           kind: 'report',
           role: 'report',
-          source: WorkbenchArtifactCandidateSource.ProductionInspection,
+          source: WorkbenchArtifactCandidateSource.DomainWorkflow,
           verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
         },
       ],
@@ -746,38 +645,6 @@ test('successful side effects are not authorized twice', async () => {
     const duplicate = await service.authorizeToolCall(input);
     expect(duplicate.allow).toBe(false);
     expect(duplicate.reason).toContain('Reuse the persisted result: {"ok":true}');
-  } finally {
-    db.close();
-  }
-});
-
-test('skip_workflow executes without creating a user approval', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'Explain the current state',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
-        requiresUserAcceptance: true,
-      },
-    });
-
-    await expect(
-      service.authorizeToolCall({
-        sessionId: 'session',
-        runId: run.id,
-        toolCallId: 'skip-call',
-        toolName: ProductionLoopToolName,
-        toolInput: {
-          action: ProductionLoopAction.SkipWorkflow,
-          reason: 'Simple information request',
-        },
-        approvalMode: WorkbenchApprovalMode.Ask,
-      }),
-    ).resolves.toEqual({ allow: true });
-    expect(service.getDetail(task.id)?.approvals).toEqual([]);
   } finally {
     db.close();
   }
@@ -1239,6 +1106,90 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
     expect(nextCompleted.artifacts).toHaveLength(0);
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
+test('a work run can look around and commit a text contract', async () => {
+  const { db, service } = createService();
+  try {
+    const { run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'sort the downloaded files into folders',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+        outputRequirements: [],
+      },
+    });
+    const authorize = (toolCallId: string, command: string) =>
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: run.id,
+        toolCallId,
+        toolName: 'bash',
+        toolInput: { command },
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
+
+    // Looking around must not require the contract.
+    expect(await authorize('peek', 'ls -lt | head -20')).toEqual({ allow: true });
+
+    // The contract shape a model submits for a written answer is accepted.
+    setWorkbenchOutputRequirements(service.repository, 'session', run.id, [
+      { mode: WorkbenchOutputMode.Text, formats: ['markdown'] },
+    ]);
+    expect(await authorize('work', 'python move_files.py')).toEqual({ allow: true });
+    const committed = service.getDetail(service.getCurrent('session')!.task.id);
+    expect(committed?.task.contract.outputRequirements).toEqual([
+      { mode: WorkbenchOutputMode.Text, formats: [] },
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
+test('the contract gate explains the previous failure and stops a spinning run', async () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'sort the downloaded files into folders',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+        outputRequirements: [],
+      },
+    });
+    const authorize = (toolCallId: string) =>
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: run.id,
+        toolCallId,
+        toolName: 'bash',
+        toolInput: { command: 'python move_files.py' },
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
+
+    const first = await authorize('call-1');
+    expect(first.allow).toBe(false);
+    expect(first.reason).toContain('call set_task_output');
+
+    // A model that already tried to commit learns why the attempt failed.
+    service.recordOutputContractFailure(run.id, 'Text output does not take file formats.');
+    const second = await authorize('call-2');
+    expect(second.reason).toContain('Text output does not take file formats.');
+
+    await authorize('call-3');
+    const fourth = await authorize('call-4');
+    // The breaker must tell the runtime to end the turn, not just flip the run
+    // status in the database.
+    expect(fourth.terminateRun).toBe(true);
+    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Failed);
+    const afterFailure = await authorize('call-5');
+    expect(afterFailure.terminateRun).toBe(true);
+    expect(afterFailure.reason).toContain('does not belong to the active run');
+  } finally {
     db.close();
   }
 });

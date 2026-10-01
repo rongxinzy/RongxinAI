@@ -28,12 +28,22 @@ import {
 } from '../shared/agent/avatar';
 import {
   COWORK_MESSAGE_PAGE_SIZE,
+  CoworkExecutionMode,
+  CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
 } from '../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import { CoworkStore } from './coworkStore';
+
+test('defaults to allow-all while retaining an explicit permission choice', () => {
+  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.AllowAll);
+  db.prepare('INSERT OR REPLACE INTO cowork_config (key, value) VALUES (?, ?)').run(
+    'permissionMode', CoworkPermissionMode.Ask,
+  );
+  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.Ask);
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,7 +61,6 @@ function setupDb(): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       title_user_renamed INTEGER NOT NULL DEFAULT 0,
-      claude_session_id TEXT,
       status TEXT NOT NULL DEFAULT 'idle',
       mode TEXT NOT NULL DEFAULT 'work',
       pinned INTEGER NOT NULL DEFAULT 0,
@@ -162,8 +171,8 @@ function setupDb(): void {
 function insertSession(id: string): void {
   const now = Date.now();
   db.prepare(
-    `INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at)
-     VALUES (?, 'test', NULL, 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', NULL, 'main', ?, ?)`,
+    `INSERT INTO cowork_sessions (id, title, status, mode, pinned, pin_order, cwd, system_prompt, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at)
+     VALUES (?, 'test', 'idle', 'work', 0, NULL, '/tmp', '', 'local', '[]', NULL, 'main', ?, ?)`,
   ).run(id, now, now);
 }
 
@@ -291,6 +300,20 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(
     store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
   ).toEqual(expect.arrayContaining([first.id, second.id]));
+});
+
+test('round-trips sessions using only the product session identity', () => {
+  const session = store.createSession('contract', '/tmp/contract', '', CoworkExecutionMode.Local);
+  store.updateSession(session.id, { systemPrompt: 'updated prompt' });
+  const restored = store.getSession(session.id);
+  expect(restored).toMatchObject({
+    id: session.id,
+    systemPrompt: 'updated prompt',
+    executionMode: CoworkExecutionMode.Local,
+  });
+  expect(restored).not.toHaveProperty('claudeSessionId');
+  const columns = db.prepare('PRAGMA table_info(cowork_sessions)').all() as Array<{ name: string }>;
+  expect(columns.map(column => column.name)).not.toContain('claude_session_id');
 });
 
 test('creates independent workspaces for the same directory', () => {
@@ -593,6 +616,24 @@ test('updateMessage refreshes the session updated time', () => {
   const session = store.getSession(sid);
   expect(session?.updatedAt).toBeGreaterThanOrEqual(beforeUpdate);
   expect(session?.messages[0]?.content).toBe('final');
+});
+
+test('updateMessage can skip refreshing the session updated time', () => {
+  const sid = 'sess-update-time-skipped';
+  insertSession(sid);
+  insertMessage('msg-edit-skipped', sid, 'assistant', 'draft', null, 1);
+  db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(1000, sid);
+
+  store.updateMessage(
+    sid,
+    'msg-edit-skipped',
+    { content: 'streaming update' },
+    { touchUpdatedAt: false },
+  );
+
+  const session = store.getSession(sid);
+  expect(session?.updatedAt).toBe(1000);
+  expect(session?.messages[0]?.content).toBe('streaming update');
 });
 
 test('upsertMessage preserves the caller message id and replaces streaming content', () => {
