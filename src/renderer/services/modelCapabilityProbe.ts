@@ -1,6 +1,7 @@
 import {
   type ModelCapabilities,
   ModelCapabilityStatus,
+  parseLlamaCppRuntimeCapabilities,
   ProviderName,
 } from '../../shared/providers';
 import { apiFetch } from './visibleApiTransport';
@@ -70,32 +71,10 @@ export function parseOllamaModelCapabilities(payload: unknown): Partial<ModelCap
   };
 }
 
-export function parseLlamaCppModelCapabilities(payload: unknown): Partial<ModelCapabilities> {
-  if (!isRecord(payload)) return {};
-  const capabilities: MutableModelCapabilities = {};
-  const templateCapabilities = isRecord(payload.chat_template_caps)
-    ? payload.chat_template_caps
-    : undefined;
-  const toolCapabilityKeys = ['supports_tools', 'supports_tool_calls', 'tools', 'tool_use'];
-  const declaredToolCapabilities = toolCapabilityKeys
-    .map(key => templateCapabilities?.[key])
-    .filter((value): value is boolean => typeof value === 'boolean');
-  const toolTemplate = payload.chat_template_tool_use;
-
-  if (typeof toolTemplate === 'string' && toolTemplate.trim()) {
-    capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  } else if (declaredToolCapabilities.some(Boolean)) {
-    capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  } else if (declaredToolCapabilities.length > 0) {
-    capabilities.toolCalling = ModelCapabilityStatus.Unsupported;
-  }
-
-  const modalities = isRecord(payload.modalities) ? payload.modalities : undefined;
-  if (typeof modalities?.vision === 'boolean') {
-    capabilities.imageInput = capabilityStatus(modalities.vision);
-  }
-  return capabilities;
-}
+// llama.cpp capability parsing lives in the shared provider layer so the
+// local-runtime probe and remote model discovery cannot drift apart; this
+// alias keeps the historical import sites stable.
+export const parseLlamaCppModelCapabilities = parseLlamaCppRuntimeCapabilities;
 
 export function buildOpenRouterModelsUrl(baseUrl: string): string {
   const normalized = baseUrl

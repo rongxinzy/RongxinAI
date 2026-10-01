@@ -5,6 +5,7 @@ import {
   createLlamaCppRuntimeSnapshot,
   createOllamaRuntimeSnapshot,
   ModelCapabilityStatus,
+  parseLlamaCppRuntimeCapabilities,
   ProviderName,
   resolveModelEndpoint,
 } from './index';
@@ -195,6 +196,24 @@ test('derived supportsImage false preserves an unstated image capability', () =>
   });
 
   expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Unknown);
+});
+
+test('llama.cpp runtime capabilities map declared modalities', () => {
+  expect(
+    parseLlamaCppRuntimeCapabilities({
+      modalities: { vision: true, video: true, audio: false },
+      chat_template_caps: { supports_tools: true },
+    }),
+  ).toEqual({
+    toolCalling: ModelCapabilityStatus.Supported,
+    imageInput: ModelCapabilityStatus.Supported,
+    videoInput: ModelCapabilityStatus.Supported,
+    audioInput: ModelCapabilityStatus.Unsupported,
+  });
+
+  expect(parseLlamaCppRuntimeCapabilities({ modalities: { vision: false } })).toEqual({
+    imageInput: ModelCapabilityStatus.Unsupported,
+  });
 });
 
 test('runtime context never exceeds trained context', () => {
