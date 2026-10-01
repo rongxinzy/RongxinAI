@@ -167,4 +167,30 @@ describe('UserBubble', () => {
     expect(screen.queryByText('DOCX')).not.toBeInTheDocument();
     expect(screen.queryByText(/Input Files:/)).not.toBeInTheDocument();
   });
+
+  test('renders a pasted image once when its path also appears in the prompt line', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content:
+            '输入文件: C:\\Users\\whz\\AppData\\cowork-images\\abc123.png\n\n这张图里是什么',
+          metadata: {
+            imageAttachments: [
+              {
+                name: 'abc123.png',
+                mimeType: 'image/png',
+                path: 'C:\\Users\\whz\\AppData\\cowork-images\\abc123.png',
+              },
+            ],
+          },
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getAllByAltText('abc123.png')).toHaveLength(1);
+    expect(screen.getByText('这张图里是什么')).toBeInTheDocument();
+    expect(screen.queryByText(/输入文件:/)).not.toBeInTheDocument();
+  });
 });

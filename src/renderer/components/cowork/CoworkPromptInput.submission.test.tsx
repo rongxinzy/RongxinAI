@@ -186,6 +186,41 @@ test('prevents another submit while an image is being read asynchronously', asyn
   }
 });
 
+test('forwards the disk path alongside base64 for path-based image submissions', async () => {
+  fixture.state.cowork.draftAttachments.__home__ = [
+    { path: 'D:/example.png', name: 'example.png', isImage: true },
+  ];
+  const read = vi.fn(async () => ({
+    success: true,
+    dataUrl: 'data:image/png;base64,aW1hZ2U=',
+  }));
+  const original = Object.getOwnPropertyDescriptor(window, 'electron');
+  Object.defineProperty(window, 'electron', {
+    configurable: true,
+    value: { dialog: { readFileAsDataUrl: read } },
+  });
+  try {
+    const onSubmit = vi.fn();
+    const view = render(<CoworkPromptInput onSubmit={onSubmit} />);
+    await submit(view.container.querySelector('form')!);
+    expect(onSubmit).toHaveBeenCalledOnce();
+    // 模型仍通过正文拿到文件路径(seedream 等 --image 场景),base64 走附件通道,
+    // 同时携带 path 供气泡侧把两处识别为同一张图。
+    expect(onSubmit.mock.calls[0]?.[0]).toContain('D:/example.png');
+    expect(onSubmit.mock.calls[0]?.[1]).toEqual([
+      {
+        name: 'example.png',
+        mimeType: 'image/png',
+        base64Data: 'aW1hZ2U=',
+        path: 'D:/example.png',
+      },
+    ]);
+  } finally {
+    if (original) Object.defineProperty(window, 'electron', original);
+    else Reflect.deleteProperty(window, 'electron');
+  }
+});
+
 test('preserves attachment-only file submissions as file-path prompts', async () => {
   fixture.state.cowork.draftAttachments.__home__ = [
     { path: 'D:/notes.txt', name: 'notes.txt', isImage: false },
