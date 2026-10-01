@@ -1,3 +1,4 @@
+import { CoworkContentNotice } from './CoworkContentNotice';
 import { Button } from '@shared/components/ui/button';
 import {
   Terminal,
@@ -235,6 +236,7 @@ export const ToolCard: React.FC<{
               )}
             </>
           )}
+          <CoworkContentNotice truncated={toolResult?.metadata?.contentTruncated} />
           {!isBashTool && permissionBar}
         </ToolContent>
       </Tool>

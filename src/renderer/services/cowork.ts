@@ -1,3 +1,4 @@
+import { expectRunStart } from '../store/slices/coworkRunSlice';
 import {
   type CoworkError,
   CoworkErrorKind,
@@ -61,6 +62,8 @@ import {
 } from './coworkTerminalError';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
+import { CoworkContentBuffer } from './coworkContentBuffer';
+import { CoworkRunSync } from './coworkRunSync';
 
 const classifyError = (error: string | CoworkError): string => {
   if (typeof error === 'object' && 'kind' in error) {
@@ -74,12 +77,15 @@ const classifyError = (error: string | CoworkError): string => {
 class CoworkService {
   private streamListenerCleanups: Array<() => void> = [];
   private initialized = false;
+  private runSync?: CoworkRunSync;
   private latestLoadSessionsRequestId = 0;
   private latestLoadChatSessionsRequestId = 0;
   private latestLoadSessionRequestId = 0;
 
   async init(): Promise<void> {
     if (this.initialized) return;
+
+    this.setupStreamListeners();
 
     // Load initial config
     await this.loadConfig();
@@ -91,8 +97,6 @@ class CoworkService {
       this.loadChatSessions(),
     ]);
 
-    // Set up stream listeners
-    this.setupStreamListeners();
 
     this.initialized = true;
   }
@@ -103,6 +107,19 @@ class CoworkService {
 
     // Clean up any existing listeners
     this.cleanupListeners();
+    const updateBatcher = new RafMessageUpdateBatcher(updates => {
+      store.dispatch(updateMessageContents(updates));
+    });
+    const runSync = new CoworkRunSync(() => updateBatcher.flush());
+    this.runSync = runSync;
+    const contentBuffer = new CoworkContentBuffer(sessionId => runSync.requestRecovery(sessionId));
+    this.streamListenerCleanups.push(runSync.start());
+    if (cowork.onStreamContentPatch) {
+      this.streamListenerCleanups.push(cowork.onStreamContentPatch(patch => {
+        const update = contentBuffer.apply(patch);
+        if (update) updateBatcher.enqueue(update);
+      }));
+    }
 
     // Message listener - also check if session exists (for IM-created sessions)
     const messageCleanup = cowork.onStreamMessage(async ({ sessionId, message }) => {
@@ -163,14 +180,13 @@ class CoworkService {
       // Do not force status back to "running" on arbitrary messages.
       // Late stream chunks can arrive after an error/complete event.
       store.dispatch(addMessage({ sessionId, message }));
+      const content = contentBuffer.latest(message.id);
+      if (content !== undefined) updateBatcher.enqueue({ sessionId, messageId: message.id, content });
     });
     this.streamListenerCleanups.push(messageCleanup);
 
     // Keep the latest update per message for the next frame. Thinking and answer
     // messages can be finalized back-to-back, so a single pending slot loses one.
-    const updateBatcher = new RafMessageUpdateBatcher(updates => {
-      store.dispatch(updateMessageContents(updates));
-    });
     const messageUpdateCleanup = cowork.onStreamMessageUpdate(update => {
       updateBatcher.enqueue(update);
     });
@@ -207,6 +223,7 @@ class CoworkService {
     this.streamListenerCleanups.push(permissionDismissCleanup);
 
     const interruptedCleanup = cowork.onStreamInterrupted(({ sessionId }) => {
+      updateBatcher.flush();
       store.dispatch(clearPendingPermissionsForSession(sessionId));
       store.dispatch(updateSessionStatus({ sessionId, status: 'idle' }));
     });
@@ -214,12 +231,14 @@ class CoworkService {
 
     // Complete listener
     const completeCleanup = cowork.onStreamComplete(({ sessionId }) => {
+      updateBatcher.flush();
       store.dispatch(updateSessionStatus({ sessionId, status: 'completed' }));
     });
     this.streamListenerCleanups.push(completeCleanup);
 
     // Error listener
     const errorCleanup = cowork.onStreamError(({ sessionId, error }) => {
+      updateBatcher.flush();
       const stateBeforeStatusUpdate = store.getState().cowork;
       const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
         [
@@ -441,6 +460,7 @@ class CoworkService {
       return false;
     }
 
+    store.dispatch(expectRunStart({ sessionId: options.sessionId, startedAt: Date.now() }));
     store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'running' }));
 
     const result = await cowork.continueSession({
@@ -687,6 +707,7 @@ class CoworkService {
       }
       const wasCurrentSession = store.getState().cowork.currentSessionId === sessionId;
       store.dispatch(setCurrentSession(result.session));
+      this.runSync?.requestRecovery(sessionId);
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.
       // loadSession can be called reactively (onSessionsChanged) while a task

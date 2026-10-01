@@ -25,6 +25,7 @@ import { pathToFileURL } from 'url';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import { classifyCoworkError } from '../common/coworkError';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
+import { bindCoworkRunBridge } from './coworkRunBridge';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
@@ -362,7 +363,6 @@ protocol.registerSchemesAsPrivileged([
 
 const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
 const IPC_MESSAGE_CONTENT_MAX_CHARS = 120_000;
-const IPC_UPDATE_CONTENT_MAX_CHARS = 120_000;
 const IPC_STRING_MAX_CHARS = 4_000;
 const IPC_MAX_DEPTH = 5;
 const IPC_MAX_KEYS = 80;
@@ -2013,6 +2013,7 @@ const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
 
 /** Project Pi Work/Chat events to renderer-owned cowork streams. */
 const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
+  const contentProjection = bindCoworkRunBridge(runtime, () => getStore().getDatabase());
   runtime.on('message', (sessionId: string, message: unknown) => {
     const safeMessage = sanitizeCoworkMessageForIpc(message);
     const windows = BrowserWindow.getAllWindows();
@@ -2029,21 +2030,20 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   runtime.on(
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
-      const safeContent = truncateIpcString(content, IPC_UPDATE_CONTENT_MAX_CHARS);
-      const windows = BrowserWindow.getAllWindows();
-      windows.forEach(win => {
-        if (win.isDestroyed()) return;
-        try {
-          win.webContents.send(CoworkStreamIpc.MessageUpdate, {
-            sessionId,
-            messageId,
-            content: safeContent,
-            metadata,
+      void contentProjection
+        .project(sessionId, messageId, content, metadata)
+        .then(patches => {
+          const windows = BrowserWindow.getAllWindows();
+          windows.forEach(win => {
+            if (win.isDestroyed()) return;
+            try {
+              for (const patch of patches) win.webContents.send(CoworkStreamIpc.ContentPatch, patch);
+            } catch (error) {
+              console.error('[PiWorkbenchForwarder] failed to forward a message update:', error);
+            }
           });
-        } catch (error) {
-          console.error('[PiWorkbenchForwarder] failed to forward a message update:', error);
-        }
-      });
+        })
+        .catch(error => console.error('[PiWorkbenchForwarder] content projection failed:', error));
     },
   );
 

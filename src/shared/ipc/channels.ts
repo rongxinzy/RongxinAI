@@ -156,6 +156,7 @@ export const CoworkSessionIpc = {
   Rename: 'cowork:session:rename',
   UpdateModel: 'cowork:session:updateModel',
   Get: 'cowork:session:get',
+  RunSnapshot: 'cowork:session:runSnapshot',
   RemoteManaged: 'cowork:session:remoteManaged',
   List: 'cowork:session:list',
   GetMessages: 'cowork:session:getMessages',
@@ -199,6 +200,8 @@ export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof Cowork
 
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {
+  RunState: 'cowork:stream:runState',
+  ContentPatch: 'cowork:stream:contentPatch',
   Message: 'cowork:stream:message',
   MessageUpdate: 'cowork:stream:messageUpdate',
   ToolActivity: 'cowork:stream:toolActivity',
