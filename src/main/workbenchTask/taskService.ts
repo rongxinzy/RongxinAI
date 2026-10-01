@@ -695,10 +695,14 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     this.emitChanged(task);
     if (canAutoApprove) return { allow: true };
-    this.emit('approvalRequested', { sessionId: input.sessionId, approval });
-    return new Promise(resolve => {
+    // Register the pending approval before notifying listeners: a listener may
+    // respond synchronously (in-process auto-approval), and respondToApproval
+    // rejects responses whose pending entry does not exist yet.
+    const decision = new Promise<WorkbenchToolAuthorizationResult>(resolve => {
       this.pendingApprovals.set(approval.id, { resolve });
     });
+    this.emit('approvalRequested', { sessionId: input.sessionId, approval });
+    return decision;
   }
 
   respondToApproval(input: WorkbenchApprovalResponseInput): WorkbenchApproval {

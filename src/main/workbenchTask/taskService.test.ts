@@ -596,6 +596,33 @@ test('expires pending approvals when a new message supersedes the task', async (
   }
 });
 
+test('accepts a synchronous approval response from an approvalRequested listener', async () => {
+  const { db, service } = createService();
+  try {
+    const run = service.beginRun({
+      sessionId: 'session',
+      goal: 'write',
+      contract: chatContract,
+    });
+    // In-process auto-approval answers inside the emit stack, before
+    // authorizeToolCall returns — the pending entry must already exist.
+    service.on('approvalRequested', ({ approval }) => {
+      service.respondToApproval({ approvalId: approval.id, approved: true });
+    });
+    const authorization = await service.authorizeToolCall({
+      sessionId: 'session',
+      runId: run.run.id,
+      toolCallId: 'write-call',
+      toolName: 'write',
+      toolInput: { path: 'result.txt', content: 'draft' },
+      approvalMode: WorkbenchApprovalMode.Ask,
+    });
+    expect(authorization).toEqual({ allow: true });
+  } finally {
+    db.close();
+  }
+});
+
 test('explicit retry creates an incremented run under the same completed task', async () => {
   const { db, service } = createService();
   try {
