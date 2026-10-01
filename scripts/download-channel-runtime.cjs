@@ -178,7 +178,9 @@ async function ensureChannelRuntime(rootDir, targetId, options = {}) {
       fs.existsSync(currentBinary) &&
       sha256(currentBinary) === currentBuildInfo.sha256
     ) {
-      console.log('[ChannelRuntime] Preserving the verified host-built channel runtime for development.');
+      console.log(
+        '[ChannelRuntime] Preserving the verified host-built channel runtime for development.',
+      );
       return currentDirectory;
     }
   }

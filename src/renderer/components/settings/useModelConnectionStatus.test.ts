@@ -3,10 +3,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
-import {
-  ModelConnectionStatus,
-  useModelConnectionStatus,
-} from './useModelConnectionStatus';
+import { ModelConnectionStatus, useModelConnectionStatus } from './useModelConnectionStatus';
 
 test('reads unknown for models that were never tested', () => {
   const { result } = renderHook(() => useModelConnectionStatus());
@@ -21,7 +18,9 @@ test('merges batched progress without dropping statuses written earlier', () => 
 
   act(() => {
     result.current.setModelConnectionStatus('qwen', 'glm-4.5', ModelConnectionStatus.Success);
-    result.current.mergeProviderModelConnectionStatuses('qwen', { 'qwen3-max': ModelConnectionStatus.Failure });
+    result.current.mergeProviderModelConnectionStatuses('qwen', {
+      'qwen3-max': ModelConnectionStatus.Failure,
+    });
   });
 
   expect(result.current.getModelConnectionStatus('qwen', 'glm-4.5')).toBe(

@@ -40,10 +40,7 @@ function ButtonGroupText({ className, render, ...props }: useRender.ComponentPro
     defaultTagName: 'div',
     props: mergeProps<'div'>(
       {
-        className: cn(
-          "flex items-center gap-2 [&_svg]:pointer-events-none",
-          className,
-        ),
+        className: cn('flex items-center gap-2 [&_svg]:pointer-events-none', className),
       },
       props,
     ),

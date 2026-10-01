@@ -84,7 +84,9 @@ export function isInstallTerminalPhase(phase: LlamaCppInstallProgress['phase']):
 }
 
 export function isSuccessfulMarketplaceInstallProgress(
-  progress: Pick<LlamaCppInstallProgress, 'phase' | 'modelId' | 'modelName' | 'targetPath'> | Record<string, unknown>,
+  progress:
+    | Pick<LlamaCppInstallProgress, 'phase' | 'modelId' | 'modelName' | 'targetPath'>
+    | Record<string, unknown>,
   localModels: Array<{
     name?: string;
     id?: string;
@@ -96,15 +98,21 @@ export function isSuccessfulMarketplaceInstallProgress(
   const phase = typeof progress.phase === 'string' ? progress.phase : readProgressStatus(progress);
   if (phase !== 'done') return false;
 
-  const normalizedTargetPath = typeof progress.targetPath === 'string' ? progress.targetPath.trim() : '';
+  const normalizedTargetPath =
+    typeof progress.targetPath === 'string' ? progress.targetPath.trim() : '';
   const targetFileName = normalizedTargetPath
-    ? normalizedTargetPath.split(/[\\/]+/).pop()?.toLowerCase() ?? ''
+    ? (normalizedTargetPath
+        .split(/[\\/]+/)
+        .pop()
+        ?.toLowerCase() ?? '')
     : '';
 
   const progressNames = [
     typeof progress.modelId === 'string' ? progress.modelId.trim() : '',
     typeof progress.modelName === 'string' ? progress.modelName.trim() : '',
-  ].filter(Boolean).map(value => value.toLowerCase());
+  ]
+    .filter(Boolean)
+    .map(value => value.toLowerCase());
 
   return localModels.some(model => {
     const candidateNames = [model.name, model.id, model.model, model.repoId]
@@ -115,7 +123,8 @@ export function isSuccessfulMarketplaceInstallProgress(
     if (normalizedTargetPath) {
       const samePath = candidatePath === normalizedTargetPath.toLowerCase();
       const sameFileName = targetFileName
-        ? candidatePath.endsWith(`/${targetFileName}`) || candidatePath.endsWith(`\\${targetFileName}`)
+        ? candidatePath.endsWith(`/${targetFileName}`) ||
+          candidatePath.endsWith(`\\${targetFileName}`)
         : false;
       if (samePath || sameFileName) return true;
     }
@@ -133,12 +142,14 @@ export function isSuccessfulMarketplaceInstallProgress(
           candidate.split('/').at(-1) ?? '',
           ...Array.from(progressVariants),
         ]);
-        return Array.from(candidateVariants).some(value => value && (
-          value === normalizedProgressName ||
-          value === normalizedProgressName.split('/').at(-1) ||
-          normalizedProgressName.endsWith(`/${value}`) ||
-          normalizedProgressName.includes(`/${value}`)
-        ));
+        return Array.from(candidateVariants).some(
+          value =>
+            value &&
+            (value === normalizedProgressName ||
+              value === normalizedProgressName.split('/').at(-1) ||
+              normalizedProgressName.endsWith(`/${value}`) ||
+              normalizedProgressName.includes(`/${value}`)),
+        );
       });
     });
   });

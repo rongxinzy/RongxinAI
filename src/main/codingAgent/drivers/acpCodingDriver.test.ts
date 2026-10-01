@@ -41,7 +41,10 @@ test('surfaces an agent refusal instead of a clean turn end', async () => {
 });
 
 test('surfaces an output limit instead of a clean turn end', async () => {
-  const { failure } = await runTurn(promptScript(answerWithStopReason('max_tokens')), TEST_TIMEOUTS);
+  const { failure } = await runTurn(
+    promptScript(answerWithStopReason('max_tokens')),
+    TEST_TIMEOUTS,
+  );
   expect(failure).toBe(t('codingAgentStopMaxTokens'));
 });
 
@@ -219,7 +222,9 @@ test('sends supported images and text files as ACP prompt content blocks', async
     expect(events).toEqual([
       expect.objectContaining({
         kind: CodingEventKind.MessageDelta,
-        payload: expect.objectContaining({ content: 'text,image,resource:image/png:c2hvdA==:note' }),
+        payload: expect.objectContaining({
+          content: 'text,image,resource:image/png:c2hvdA==:note',
+        }),
       }),
     ]);
   } finally {
@@ -653,13 +658,13 @@ test('flattens ACP content blocks into markdown instead of dropping them', async
     "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
     "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n');",
     "if (request.method === 'session/prompt') {",
-    "const blocks = [",
+    'const blocks = [',
     "{ type: 'text', text: 'First part.' },",
     "{ type: 'text', text: ' second part.' },",
     "{ type: 'resource_link', name: 'spec.md', title: 'Spec', uri: 'file:///workspace/spec.md' },",
     "{ type: 'image', uri: 'file:///workspace/shot.png', data: 'a'.repeat(300000), mimeType: 'image/png' },",
     "{ type: 'resource', resource: { uri: 'file:///workspace/notes.txt', text: 'embedded notes' } },",
-    "];",
+    '];',
     "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: 'agent_message_chunk', content: blocks } } }) + '\\n');",
     "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'image', data: 'YWJj', mimeType: 'image/png' } } } }) + '\\n');",
     "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n'); }",

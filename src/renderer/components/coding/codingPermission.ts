@@ -143,9 +143,7 @@ export const parseCodingPermission = (event: CodingEvent): CodingPermissionPrese
   return { toolName, toolKind, toolInput, options };
 };
 
-export const getCodingPermissionResolution = (
-  event: CodingEvent,
-): CodingPermissionResolution => {
+export const getCodingPermissionResolution = (event: CodingEvent): CodingPermissionResolution => {
   const outcome = event.payload.permissionOutcome;
   if (outcome === CodingPermissionOutcome.Cancelled) {
     return CodingPermissionResolution.Rejected;

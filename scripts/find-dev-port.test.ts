@@ -2,11 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:net';
 import { test } from 'vitest';
 
-import {
-  DEFAULT_DEV_PORT,
-  findAvailablePort,
-  isPortAvailable,
-} from '../scripts/find-dev-port.mjs';
+import { DEFAULT_DEV_PORT, findAvailablePort, isPortAvailable } from '../scripts/find-dev-port.mjs';
 
 function listen(port) {
   return new Promise((resolve, reject) => {

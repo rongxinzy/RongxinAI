@@ -17,8 +17,7 @@ function walk(dir, entries = []) {
     if (entry.isDirectory()) {
       if (['node_modules', '.git', '.venv', '__pycache__'].includes(entry.name)) continue;
       walk(target, entries);
-    }
-    else if (entry.name === 'SKILL.md') entries.push(target);
+    } else if (entry.name === 'SKILL.md') entries.push(target);
   }
   return entries;
 }
@@ -46,11 +45,16 @@ for (const file of walk(skillsRoot).sort()) {
     if (typeof data.description !== 'string' || !data.description.trim()) {
       throw new Error('description is required');
     }
-    if (data.metadata !== undefined && (typeof data.metadata !== 'object' || Array.isArray(data.metadata))) {
+    if (
+      data.metadata !== undefined &&
+      (typeof data.metadata !== 'object' || Array.isArray(data.metadata))
+    ) {
       throw new Error('metadata must be a YAML object');
     }
   } catch (error) {
-    failures.push(`${path.relative(projectRoot, file)}: ${error instanceof Error ? error.message : String(error)}`);
+    failures.push(
+      `${path.relative(projectRoot, file)}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

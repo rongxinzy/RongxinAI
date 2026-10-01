@@ -53,7 +53,10 @@ export const ModelSelectorDialog = (props: ModelSelectorDialogProps) => (
 export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>;
 
 export const ModelSelectorInput = ({ className, ...props }: ModelSelectorInputProps) => (
-  <CommandInput className={cn('theme-control-sizing-31 theme-control-content-height', className)} {...props} />
+  <CommandInput
+    className={cn('theme-control-sizing-31 theme-control-content-height', className)}
+    {...props}
+  />
 );
 
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;

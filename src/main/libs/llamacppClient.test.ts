@@ -173,13 +173,17 @@ describe('LlamaCppClient', () => {
         throw new DOMException('Aborted', 'AbortError');
       }
       return await new Promise<Response>((_resolve, reject) => {
-        options.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        options.signal?.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError')),
+        );
       });
     });
     vi.stubGlobal('fetch', fetchMock);
     const client = new LlamaCppClient();
 
-    await expect(client.loadModel({ model: 'qwen3:8b' }, { signal: controller.signal })).rejects.toThrow();
+    await expect(
+      client.loadModel({ model: 'qwen3:8b' }, { signal: controller.signal }),
+    ).rejects.toThrow();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

@@ -296,7 +296,9 @@ test('merges an upgraded registry agent into the profile used by existing sessio
       environment: { [CodingAgentEnvironmentKey.RegistryAgentId]: 'cursor-agent' },
     });
     expect(registry.get('cursor-stale-profile')).toBeUndefined();
-    expect(repository.listExternal().map(profile => profile.id)).toEqual(['cursor-session-profile']);
+    expect(repository.listExternal().map(profile => profile.id)).toEqual([
+      'cursor-session-profile',
+    ]);
     expect(
       db
         .prepare('SELECT default_profile_id FROM coding_rooms WHERE id = ?')

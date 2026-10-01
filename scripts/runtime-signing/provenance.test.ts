@@ -136,7 +136,9 @@ test('central signing must be a successful dispatch from the signing authority m
 
 test('validates source and hashes without requiring a public signer configuration', () => {
   expect(() => validateManifest(manifest, build, '456')).not.toThrow();
-  expect(() => validateManifest({ ...manifest, signerThumbprint: undefined }, build, '456')).not.toThrow();
+  expect(() =>
+    validateManifest({ ...manifest, signerThumbprint: undefined }, build, '456'),
+  ).not.toThrow();
   for (const override of [
     { schemaVersion: 2 },
     { key: 'sidecar' },
@@ -181,7 +183,9 @@ test('workflow validates inputs before authenticating and signs only the manifes
   const signing = readFileSync(new URL('./sign-runtime.ps1', import.meta.url), 'utf8');
   expect(signing).toContain('& $signTool sign /v /fd sha256');
   expect(signing).toContain('SignTool failed with exit code');
-  expect(signing).not.toMatch(/\$signTool verify|Get-AuthenticodeSignature|Assert-WindowsRuntimeSignature/);
+  expect(signing).not.toMatch(
+    /\$signTool verify|Get-AuthenticodeSignature|Assert-WindowsRuntimeSignature/,
+  );
 });
 
 test('manifest CLI rejects extra executables before signing and records both byte hashes', () => {

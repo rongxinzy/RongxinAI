@@ -991,9 +991,10 @@ export class CoworkStore {
       cwd: row.cwd,
       systemPrompt: row.system_prompt,
       modelOverride: row.model_override || '',
-      executionMode: row.execution_mode === CoworkExecutionMode.Auto
-        ? CoworkExecutionMode.Auto
-        : CoworkExecutionMode.Local,
+      executionMode:
+        row.execution_mode === CoworkExecutionMode.Auto
+          ? CoworkExecutionMode.Auto
+          : CoworkExecutionMode.Local,
       activeSkillIds,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',

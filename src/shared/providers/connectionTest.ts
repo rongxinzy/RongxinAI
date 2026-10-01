@@ -61,12 +61,9 @@ export async function createProviderConnectionTestSignature(input: {
     input.provider.authType ?? '',
     input.provider.oauthAccessToken ?? '',
   ].join('\u0000');
-  const payload = [
-    input.providerId,
-    resolved.baseUrl,
-    resolved.effectiveFormat,
-    credential,
-  ].join('\u0000');
+  const payload = [input.providerId, resolved.baseUrl, resolved.effectiveFormat, credential].join(
+    '\u0000',
+  );
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
 
   return Array.from(new Uint8Array(digest))
@@ -115,9 +112,7 @@ export function applyProviderModelConnectionTestResults<
             : ProviderModelConnectionTestStatus.Failure,
           signature,
           testedAt,
-          ...(outcome.success || !outcome.failureKind
-            ? {}
-            : { failureKind: outcome.failureKind }),
+          ...(outcome.success || !outcome.failureKind ? {} : { failureKind: outcome.failureKind }),
         },
       };
     }),

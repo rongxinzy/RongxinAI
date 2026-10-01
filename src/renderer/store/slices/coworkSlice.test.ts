@@ -54,7 +54,9 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
 });
 
 test('initial permission mode allows all tools', () => {
-  expect(coworkReducer(undefined, { type: 'init' }).config.permissionMode).toBe(CoworkPermissionMode.AllowAll);
+  expect(coworkReducer(undefined, { type: 'init' }).config.permissionMode).toBe(
+    CoworkPermissionMode.AllowAll,
+  );
 });
 
 test('setConfig loads Pi-owned cowork configuration', () => {
@@ -450,7 +452,7 @@ test('merges complete loaded history into a tracked streaming session', () => {
 test('reloading a recent page keeps the initial prompt before replies and preserves its offset', () => {
   const messages = Array.from({ length: 65 }, (_, index) => ({
     id: `message-${index}`,
-    type: index === 0 ? 'user' as const : 'assistant' as const,
+    type: index === 0 ? ('user' as const) : ('assistant' as const),
     content: `content-${index}`,
     timestamp: 1,
   }));
@@ -464,11 +466,17 @@ test('reloading a recent page keeps the initial prompt before replies and preser
     updateSessionStatus({ sessionId: running.id, status: CoworkSessionStatusValue.Running }),
   );
   state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
-  state = coworkReducer(state, setCurrentSession({
-    ...running, messages: messages.slice(15), messagesOffset: 15,
-  }));
-  expect(state.currentSession?.messages.map(message => message.id))
-    .toEqual(messages.map(message => message.id));
+  state = coworkReducer(
+    state,
+    setCurrentSession({
+      ...running,
+      messages: messages.slice(15),
+      messagesOffset: 15,
+    }),
+  );
+  expect(state.currentSession?.messages.map(message => message.id)).toEqual(
+    messages.map(message => message.id),
+  );
   expect(state.currentSession?.messagesOffset).toBe(0);
   expect(state.currentSession?.totalMessages).toBe(65);
   expect(state.streamingSessions[running.id].messages[0].type).toBe('user');
@@ -479,15 +487,22 @@ test('loaded older pages survive switching away from a running session', () => {
   const recent = { id: 'reply', type: 'assistant' as const, content: 'reply', timestamp: 2 };
   const running = makeSession({
     status: CoworkSessionStatusValue.Running,
-    messages: [recent], messagesOffset: 1, totalMessages: 2,
+    messages: [recent],
+    messagesOffset: 1,
+    totalMessages: 2,
   });
   let state = coworkReducer(
     coworkReducer(undefined, addSession(running)),
     updateSessionStatus({ sessionId: running.id, status: CoworkSessionStatusValue.Running }),
   );
-  state = coworkReducer(state, prependMessages({
-    sessionId: running.id, messages: [older], newOffset: 0,
-  }));
+  state = coworkReducer(
+    state,
+    prependMessages({
+      sessionId: running.id,
+      messages: [older],
+      newOffset: 0,
+    }),
+  );
   state = coworkReducer(state, setCurrentSession(makeSession({ id: 'other' })));
   state = coworkReducer(state, setCurrentSession(running));
   expect(state.currentSession?.messages).toEqual([older, recent]);

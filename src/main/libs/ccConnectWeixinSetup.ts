@@ -38,8 +38,12 @@ export async function runCcConnectWeixinSetup(
     }, 45_000);
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stdout.on('data', chunk => { stdout += String(chunk); });
-    child.stderr.on('data', chunk => { stderr += String(chunk); });
+    child.stdout.on('data', chunk => {
+      stdout += String(chunk);
+    });
+    child.stderr.on('data', chunk => {
+      stderr += String(chunk);
+    });
     child.once('error', error => {
       clearTimeout(timeout);
       reject(error);

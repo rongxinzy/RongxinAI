@@ -13,7 +13,9 @@ describe('error normalization', () => {
   });
 
   test('preserves a safe reason for unknown errors', () => {
-    expect(normalizeError('Widget could not be loaded')).toBe('操作失败：Widget could not be loaded');
+    expect(normalizeError('Widget could not be loaded')).toBe(
+      '操作失败：Widget could not be loaded',
+    );
   });
 
   test('leaves the app copy it already produced untouched', () => {
@@ -43,7 +45,9 @@ describe('error normalization', () => {
   });
 
   test('removes markup, payloads, urls, paths and stacks', () => {
-    const cleaned = cleanErrorReason('<b>Failed</b> https://secret.test/x {"token":"x"} C:\\Users\\me\\a.txt\n at internal.js');
+    const cleaned = cleanErrorReason(
+      '<b>Failed</b> https://secret.test/x {"token":"x"} C:\\Users\\me\\a.txt\n at internal.js',
+    );
     expect(cleaned).not.toContain('secret.test');
     expect(cleaned).not.toContain('token');
     expect(cleaned).not.toContain('internal.js');

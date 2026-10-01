@@ -21,6 +21,11 @@ test('does not write the default model back to app config in exclusive managed m
     'if (!isInitialized || managedModelsOnly || !defaultSelectedModel?.id) return;',
   );
   expect(appSource).toContain(
-    '[isInitialized, managedModelsOnly, defaultSelectedModel?.id, defaultSelectedModel?.providerKey]',
+    `[
+    isInitialized,
+    managedModelsOnly,
+    defaultSelectedModel?.id,
+    defaultSelectedModel?.providerKey,
+  ]`,
   );
 });

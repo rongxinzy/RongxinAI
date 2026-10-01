@@ -101,7 +101,9 @@ const createDetail = (overrides: Partial<WorkbenchTaskDetail> = {}): WorkbenchTa
 });
 
 test('orders chapters by run attempt ascending', () => {
-  const detail = createDetail({ runs: [createRun('run-3', 3), createRun('run-1', 1), createRun('run-2', 2)] });
+  const detail = createDetail({
+    runs: [createRun('run-3', 3), createRun('run-1', 1), createRun('run-2', 2)],
+  });
 
   const chapters = buildTimelineChapters(detail);
 

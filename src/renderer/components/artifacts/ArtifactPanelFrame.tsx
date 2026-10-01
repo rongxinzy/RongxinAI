@@ -2,11 +2,7 @@ import { cn } from '@shared/lib/utils';
 import React, { memo, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import {
-  selectPanelWidth,
-  setPanelWidth,
-  ArtifactLayoutMode,
-} from '@/store/slices/artifactSlice';
+import { selectPanelWidth, setPanelWidth, ArtifactLayoutMode } from '@/store/slices/artifactSlice';
 import type { Artifact } from '@/types/artifact';
 
 import ArtifactPanel from './ArtifactPanel';

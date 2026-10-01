@@ -148,9 +148,7 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
     return (
       <div className="h-full overflow-auto">
         <pre
-          className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre ${
-            'bg-editor-background text-editor-foreground'
-          }`}
+          className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre ${'bg-editor-background text-editor-foreground'}`}
         >
           {artifact.content}
         </pre>

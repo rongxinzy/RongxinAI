@@ -145,9 +145,8 @@ export function ModelInspectorSidebar({
         }
       : null,
   );
-  const activeSnapshot = open && model
-    ? { model, runningModel, preference, serviceConfig }
-    : snapshot;
+  const activeSnapshot =
+    open && model ? { model, runningModel, preference, serviceConfig } : snapshot;
   const inspectedModel = activeSnapshot?.model;
 
   useEffect(() => {
@@ -230,20 +229,20 @@ export function ModelInspectorSidebar({
   const contextPresets = getContextPresets(trainedContextLimit);
   const baseContextSize = getInitialContextValue(
     activeSnapshot.preference?.ctxSize,
-    activeSnapshot.runningModel?.runtime_context_length ?? activeSnapshot.runningModel?.context_length,
+    activeSnapshot.runningModel?.runtime_context_length ??
+      activeSnapshot.runningModel?.context_length,
     contextPresets,
     trainedContextLimit,
   );
-  const contextEditorState =
-    contextDraft ?? {
-      contextSize: baseContextSize,
-      mode: contextPresets.includes(baseContextSize)
-        ? ModelContextEditorMode.Preset
-        : ModelContextEditorMode.Custom,
-      customContextValue: contextPresets.includes(baseContextSize)
-        ? ''
-        : formatContextKInput(baseContextSize),
-    };
+  const contextEditorState = contextDraft ?? {
+    contextSize: baseContextSize,
+    mode: contextPresets.includes(baseContextSize)
+      ? ModelContextEditorMode.Preset
+      : ModelContextEditorMode.Custom,
+    customContextValue: contextPresets.includes(baseContextSize)
+      ? ''
+      : formatContextKInput(baseContextSize),
+  };
   const contextError =
     contextEditorState.mode === ModelContextEditorMode.Custom
       ? getCustomContextError(
@@ -286,21 +285,20 @@ export function ModelInspectorSidebar({
                 onEditorStateChange={setContextDraft}
                 className="w-28 max-w-full"
               />
-              {contextError ? <span className="text-xs text-destructive">{contextError}</span> : null}
+              {contextError ? (
+                <span className="text-xs text-destructive">{contextError}</span>
+              ) : null}
             </div>
           ),
         }
       : row.id === InspectorRowId.KeepAlive
-      ? {
-          ...row,
-          control: (
-            <ModelResidencySelect
-              preference={preferenceWithDraft}
-              onChange={setResidencyDraft}
-            />
-          ),
-        }
-      : row,
+        ? {
+            ...row,
+            control: (
+              <ModelResidencySelect preference={preferenceWithDraft} onChange={setResidencyDraft} />
+            ),
+          }
+        : row,
   );
   const completeCloseTransition = () => {
     if (!isClosing || open) return;
@@ -428,8 +426,14 @@ export function ModelInspectorSidebar({
             value={activeTab}
             onValueChange={setActiveTab}
             items={[
-              { value: ModelInspectorTab.Overview, label: i18nService.t('localInferenceInspectorOverview') },
-              { value: ModelInspectorTab.Logs, label: i18nService.t('localInferenceInspectorLogs') },
+              {
+                value: ModelInspectorTab.Overview,
+                label: i18nService.t('localInferenceInspectorOverview'),
+              },
+              {
+                value: ModelInspectorTab.Logs,
+                label: i18nService.t('localInferenceInspectorLogs'),
+              },
             ]}
           />
 
@@ -534,7 +538,10 @@ function InspectorRuntimeConfig({ rows }: { rows: InspectorRow[] }) {
             <dt className="truncate text-sm text-muted-foreground" title={row.label}>
               {row.label}
             </dt>
-            <dd className="max-w-full truncate text-right text-sm font-medium text-foreground" title={row.value}>
+            <dd
+              className="max-w-full truncate text-right text-sm font-medium text-foreground"
+              title={row.value}
+            >
               {row.control ?? row.value}
             </dd>
           </div>
@@ -552,18 +559,23 @@ function getOverviewRows(
   return [
     {
       label: i18nService.t('localInferenceQuantization'),
-      value: model.details?.quantization_level || i18nService.t('localInferenceInspectorUnavailable'),
+      value:
+        model.details?.quantization_level || i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
       label: i18nService.t('localInferenceStorageUsage'),
-      value: model.size ? formatBytes(model.size) : i18nService.t('localInferenceInspectorUnavailable'),
+      value: model.size
+        ? formatBytes(model.size)
+        : i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
       id: InspectorRowId.ConfiguredContext,
       label: i18nService.t('localInferenceInspectorConfiguredContext'),
       value:
         formatModelInspectorContext(preference?.ctxSize) ??
-        formatModelInspectorContext(serviceConfig.ctxSize ? Number(serviceConfig.ctxSize) : undefined) ??
+        formatModelInspectorContext(
+          serviceConfig.ctxSize ? Number(serviceConfig.ctxSize) : undefined,
+        ) ??
         i18nService.t('localInferenceInspectorDefault'),
     },
   ];
@@ -599,17 +611,13 @@ function getFixedParameterRows(
         actualVramBytes && actualVramBytes > 0
           ? formatMemoryValue(actualVramBytes)
           : estimatedMemory
-            ? formatMemoryValue(
-                estimatedMemory.estimatedVramMiB * LLAMACPP_MEMORY_ESTIMATE_MIB,
-              )
+            ? formatMemoryValue(estimatedMemory.estimatedVramMiB * LLAMACPP_MEMORY_ESTIMATE_MIB)
             : i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
       label: i18nService.t('localInferenceInspectorEstimatedMemory'),
       value: estimatedMemory
-        ? formatMemoryValue(
-            estimatedMemory.estimatedSystemMemoryMiB * LLAMACPP_MEMORY_ESTIMATE_MIB,
-          )
+        ? formatMemoryValue(estimatedMemory.estimatedSystemMemoryMiB * LLAMACPP_MEMORY_ESTIMATE_MIB)
         : i18nService.t('localInferenceInspectorUnavailable'),
     },
     {
@@ -665,9 +673,7 @@ function ModelResidencySelect({
         aria-label={i18nService.t('localInferenceInspectorKeepAlive')}
         className="w-28 max-w-full"
       >
-        <SelectValue>
-          {() => formatResidencyValue(preference)}
-        </SelectValue>
+        <SelectValue>{() => formatResidencyValue(preference)}</SelectValue>
       </SelectTrigger>
       <SelectContent align="end">
         <SelectGroup>
@@ -692,7 +698,9 @@ function ModelResidencySelect({
 function getModelResidencySelectItems(): Record<ModelResidencySelectValue, string> {
   return {
     [ModelResidencySelectValue.FiveMinutes]: i18nService.t('localInferenceResidencyFiveMinutes'),
-    [ModelResidencySelectValue.ThirtyMinutes]: i18nService.t('localInferenceResidencyThirtyMinutes'),
+    [ModelResidencySelectValue.ThirtyMinutes]: i18nService.t(
+      'localInferenceResidencyThirtyMinutes',
+    ),
     [ModelResidencySelectValue.OneHour]: i18nService.t('localInferenceResidencyOneHour'),
     [ModelResidencySelectValue.Forever]: i18nService.t('localInferenceResidencyForever'),
   };
@@ -753,7 +761,9 @@ function getServiceConfigValue(value?: string): string {
 
 function getMmapValue(noMmap?: boolean): string {
   if (noMmap === undefined) return i18nService.t('localInferenceInspectorDefault');
-  return noMmap ? i18nService.t('localInferenceInspectorDisabled') : i18nService.t('localInferenceInspectorEnabled');
+  return noMmap
+    ? i18nService.t('localInferenceInspectorDisabled')
+    : i18nService.t('localInferenceInspectorEnabled');
 }
 
 function getCapabilityValue(value?: ModelCapabilityStatus): string {

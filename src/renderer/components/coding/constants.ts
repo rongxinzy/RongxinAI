@@ -108,5 +108,4 @@ export const CodingComposerStatus = {
   Submitted: 'submitted',
   Streaming: 'streaming',
 } as const;
-export type CodingComposerStatus =
-  (typeof CodingComposerStatus)[keyof typeof CodingComposerStatus];
+export type CodingComposerStatus = (typeof CodingComposerStatus)[keyof typeof CodingComposerStatus];

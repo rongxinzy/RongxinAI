@@ -33,7 +33,7 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            "theme-piece-size-popover-1 theme-popover-content z-50 flex origin-(--transform-origin) flex-col",
+            'theme-piece-size-popover-1 theme-popover-content z-50 flex origin-(--transform-origin) flex-col',
             className,
           )}
           {...props}

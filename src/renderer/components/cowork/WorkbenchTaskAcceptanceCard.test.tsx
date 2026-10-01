@@ -80,9 +80,7 @@ test('renders the acceptance card when the task awaits manual acceptance', async
   });
   expect(screen.getByText(i18nService.t('workbenchTaskAccept'))).toBeTruthy();
   expect(screen.getByText(i18nService.t('workbenchTaskRetry'))).toBeTruthy();
-  expect(
-    screen.getByText('The result requires explicit user acceptance.'),
-  ).toBeTruthy();
+  expect(screen.getByText('The result requires explicit user acceptance.')).toBeTruthy();
 });
 
 test('accept calls the workbench accept action', async () => {

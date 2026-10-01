@@ -77,7 +77,9 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
         {embeddingEnabled && (
           <div className="space-y-3 pt-2">
             <div>
-              <Label className="theme-control-caption">{i18nService.t('coworkMemoryEmbeddingProvider')}</Label>
+              <Label className="theme-control-caption">
+                {i18nService.t('coworkMemoryEmbeddingProvider')}
+              </Label>
               <Select
                 value={embeddingProvider}
                 onValueChange={v => onEmbeddingProviderChange(v ?? 'openai')}
@@ -99,7 +101,9 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
             </div>
 
             <div>
-              <Label className="theme-control-caption">{i18nService.t('coworkMemoryEmbeddingModel')}</Label>
+              <Label className="theme-control-caption">
+                {i18nService.t('coworkMemoryEmbeddingModel')}
+              </Label>
               <Input
                 value={embeddingModel}
                 onChange={e => onEmbeddingModelChange(e.target.value)}

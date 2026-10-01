@@ -87,7 +87,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
     setNote(current => (dirty.has('note') ? current : todo.note));
     setDueDate(current => (dirty.has('dueDate') ? current : toDateInputValue(todo.dueAt)));
     setRemindAt(current => (dirty.has('remindAt') ? current : toDateTimeInputValue(todo.remindAt)));
-    setListId(current => (dirty.has('listId') ? current : todo.listId ?? NO_LIST_VALUE));
+    setListId(current => (dirty.has('listId') ? current : (todo.listId ?? NO_LIST_VALUE)));
   }, [todo]);
 
   const markDirty = (field: string): void => {
@@ -236,9 +236,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
         <div className="flex flex-wrap gap-2 border-b border-border-subtle pb-4">
           <Button type="button" variant={inMyDay ? 'secondary' : 'outline'} onClick={toggleMyDay}>
             <CalendarDays />
-            {inMyDay
-              ? i18nService.t('todoRemoveFromMyDay')
-              : i18nService.t('todoAddToMyDay')}
+            {inMyDay ? i18nService.t('todoRemoveFromMyDay') : i18nService.t('todoAddToMyDay')}
           </Button>
           <Button
             type="button"

@@ -33,9 +33,7 @@ describe('coding turn failure prompt', () => {
     const toasts = captureToasts();
     try {
       renderHook(() =>
-        useTurnFailureToast([
-          makeEvent('e1', 1, CodingEventKind.TurnFailed, { error: 'boom' }),
-        ]),
+        useTurnFailureToast([makeEvent('e1', 1, CodingEventKind.TurnFailed, { error: 'boom' })]),
       );
       expect(toasts.seen).toEqual([]);
     } finally {
@@ -78,10 +76,9 @@ describe('coding turn failure prompt', () => {
     const toasts = captureToasts();
     const history = [makeEvent('e1', 1, CodingEventKind.Message, { content: 'hi' })];
     try {
-      const { rerender } = renderHook(
-        (events: CodingEvent[]) => useTurnFailureToast(events),
-        { initialProps: history },
-      );
+      const { rerender } = renderHook((events: CodingEvent[]) => useTurnFailureToast(events), {
+        initialProps: history,
+      });
       const failure = makeEvent('e2', 2, CodingEventKind.TurnFailed, {
         error: CodingErrorMessage.AgentNoOutput,
       });

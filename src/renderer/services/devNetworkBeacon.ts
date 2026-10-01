@@ -13,9 +13,7 @@ export function startDevNetworkBeacon(): () => void {
   if (import.meta.env.DEV !== true) return () => {};
   if (!window.electron?.devNetwork?.onEntry) return () => {};
 
-  console.info(
-    '[devNetwork] beacon active — click xr-net://log entries → Response 查看接口预览',
-  );
+  console.info('[devNetwork] beacon active — click xr-net://log entries → Response 查看接口预览');
 
   return window.electron.devNetwork.onEntry((entry: DevNetworkLogEntry) => {
     const beaconUrl = buildDevNetworkBeaconUrl(entry);

@@ -117,7 +117,9 @@ export class CodingAgentProfileRepository {
           'UPDATE coding_rooms SET default_profile_id = ?, updated_at = ? WHERE default_profile_id = ?',
         )
         .run(replacementProfileId, now, profileId);
-      return this.db.prepare('DELETE FROM coding_agent_profiles WHERE id = ?').run(profileId).changes > 0;
+      return (
+        this.db.prepare('DELETE FROM coding_agent_profiles WHERE id = ?').run(profileId).changes > 0
+      );
     })();
   }
 }

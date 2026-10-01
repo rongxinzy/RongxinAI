@@ -31,9 +31,7 @@ const getEditableText = (node: Node): string => {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
   if (node instanceof HTMLBRElement) return '\n';
 
-  const text = Array.from(node.childNodes)
-    .map(getEditableText)
-    .join('');
+  const text = Array.from(node.childNodes).map(getEditableText).join('');
   return node instanceof HTMLElement && (node.tagName === 'DIV' || node.tagName === 'P')
     ? `${text}\n`
     : text;
@@ -49,8 +47,8 @@ const getAdjacentSkillToken = (
 
   if (range.startContainer === editor) {
     node = isPrevious
-      ? editor.childNodes[range.startOffset - 1] ?? null
-      : editor.childNodes[range.startOffset] ?? null;
+      ? (editor.childNodes[range.startOffset - 1] ?? null)
+      : (editor.childNodes[range.startOffset] ?? null);
   } else if (range.startContainer.nodeType === Node.TEXT_NODE) {
     const text = range.startContainer.textContent ?? '';
     if ((isPrevious && range.startOffset > 0) || (!isPrevious && range.startOffset < text.length)) {
@@ -146,7 +144,9 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
       () =>
         activeSkillIds.length > 0
           ? activeSkillIds
-          : selectedQuickActionSkillIds.filter(skillId => skills.some(skill => skill.id === skillId)),
+          : selectedQuickActionSkillIds.filter(skillId =>
+              skills.some(skill => skill.id === skillId),
+            ),
       [activeSkillIds, selectedQuickActionSkillIds, skills],
     );
 

@@ -2543,7 +2543,11 @@ const Settings: React.FC<SettingsProps> = ({
     }
 
     const testingApiFormat = getEffectiveApiFormat(testingProvider, providerConfig.apiFormat);
-    const testingBaseUrl = resolveBaseUrl(testingProvider, providerConfig.baseUrl, testingApiFormat);
+    const testingBaseUrl = resolveBaseUrl(
+      testingProvider,
+      providerConfig.baseUrl,
+      testingApiFormat,
+    );
     const connectionSignature = await createProviderConnectionTestSignature({
       providerId: testingProvider,
       baseUrl: testingBaseUrl,
@@ -2568,11 +2572,13 @@ const Settings: React.FC<SettingsProps> = ({
     );
     const testedProviderConfig = applyProviderModelConnectionTestResults(
       providerConfig,
-      [{
-        modelId: firstModel.id,
-        success: result.success,
-        failureKind: result.success ? undefined : result.failureKind,
-      }],
+      [
+        {
+          modelId: firstModel.id,
+          success: result.success,
+          failureKind: result.success ? undefined : result.failureKind,
+        },
+      ],
       connectionSignature,
     );
     setProviders(previous => ({
@@ -5311,8 +5317,19 @@ const Settings: React.FC<SettingsProps> = ({
                   </span>
                 </>
               )}
-              <Button type="button" variant="ghost" size="sm" onClick={e => { e.stopPropagation(); void handleExportLogs(); }} disabled={isExportingLogs}>
-                {isExportingLogs ? i18nService.t('aboutExportingLogs') : i18nService.t('aboutExportLogs')}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={e => {
+                  e.stopPropagation();
+                  void handleExportLogs();
+                }}
+                disabled={isExportingLogs}
+              >
+                {isExportingLogs
+                  ? i18nService.t('aboutExportingLogs')
+                  : i18nService.t('aboutExportLogs')}
               </Button>
             </div>
           </div>

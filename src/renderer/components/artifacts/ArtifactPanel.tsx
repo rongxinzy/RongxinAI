@@ -340,11 +340,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     if (!selectedArtifact?.filePath) return;
     invalidateArtifactFile(selectedArtifact.filePath);
     try {
-      const loaded = await loadArtifactFileWithRetry(
-        { ...selectedArtifact, content: '' },
-        cwd,
-        { forceRefresh: true },
-      );
+      const loaded = await loadArtifactFileWithRetry({ ...selectedArtifact, content: '' }, cwd, {
+        forceRefresh: true,
+      });
       if (loaded) {
         dispatch(
           addArtifact({

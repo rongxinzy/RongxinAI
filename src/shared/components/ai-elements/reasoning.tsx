@@ -225,7 +225,11 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const { committed, tail } = useStreamingTextSegments(text, isStreaming);
   const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
   const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
-  const base = <Streamdown plugins={basePlugins} linkSafety={linkSafety}>{text}</Streamdown>;
+  const base = (
+    <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
+      {text}
+    </Streamdown>
+  );
   const streamingContent = (
     <>
       {committed && (

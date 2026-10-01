@@ -54,8 +54,7 @@ export function resolveToastNotification(
   // 也代表调用方已经表过态（这是中性汇报，不是失败），不该再被文案启发式反向升级成红色错误。
   // 两者都没写时才允许文案启发式兜底。
   const isError =
-    detail.isError ??
-    (detail.isSuccess === undefined && isLikelyErrorNotification(detail.message));
+    detail.isError ?? (detail.isSuccess === undefined && isLikelyErrorNotification(detail.message));
   const { message, ...options } = detail;
   return { message, options: isError ? { ...options, isError: true } : options };
 }
@@ -69,10 +68,7 @@ export function showAppToast(detail: ToastNotificationDetail): void {
 }
 
 /** 决定最终展示给用户的文案：只有声明为错误且没有跳过归一化时才走 normalizeError。 */
-export function resolveToastMessage(
-  message: string,
-  options: ToastNotificationOptions,
-): string {
+export function resolveToastMessage(message: string, options: ToastNotificationOptions): string {
   return options.isError && !options.skipErrorNormalization ? normalizeError(message) : message;
 }
 

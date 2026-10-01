@@ -45,9 +45,7 @@ export function installStdioErrorGuards(
  * Wrap a fatal error reporter so a failure raised while reporting is skipped
  * instead of re-entering the reporter.
  */
-export function createUncaughtReporter(
-  report: (error: unknown) => void,
-): (error: unknown) => void {
+export function createUncaughtReporter(report: (error: unknown) => void): (error: unknown) => void {
   let reporting = false;
   return error => {
     if (reporting) return;

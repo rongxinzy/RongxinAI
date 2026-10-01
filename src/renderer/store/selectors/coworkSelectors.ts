@@ -12,8 +12,7 @@ export const selectChatSessionsLoaded = (state: RootState) => state.cowork.chatS
 export const selectCurrentSessionId = (state: RootState) => state.cowork.currentSessionId;
 export const selectCurrentSession = (state: RootState) => state.cowork.currentSession;
 export const selectLoadingSessionId = (state: RootState) => state.cowork.loadingSessionId;
-export const selectStreamingSessionIds = (state: RootState) =>
-  state.cowork.streamingSessionIds;
+export const selectStreamingSessionIds = (state: RootState) => state.cowork.streamingSessionIds;
 export const selectToolActivitiesBySession = (state: RootState) =>
   state.cowork.toolActivitiesBySession;
 
@@ -29,7 +28,9 @@ export const selectDraftPrompts = (state: RootState) => state.cowork.draftPrompt
 export const selectPendingPermissions = (state: RootState) => state.cowork.pendingPermissions;
 export const selectPendingPermissionForSession = (state: RootState, sessionId: string | null) => {
   if (!sessionId) return null;
-  return state.cowork.pendingPermissions.find(permission => permission.sessionId === sessionId) ?? null;
+  return (
+    state.cowork.pendingPermissions.find(permission => permission.sessionId === sessionId) ?? null
+  );
 };
 export const selectHasPendingPermissionForSession = (state: RootState, sessionId: string) =>
   selectPendingPermissionForSession(state, sessionId) !== null;

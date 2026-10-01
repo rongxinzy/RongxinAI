@@ -81,11 +81,7 @@ test('quick skill selection requires an exact skill set', () => {
     ]),
   ).toBe(true);
   expect(
-    isChatSkillShortcutActive(deepResearch!, [
-      'deli-autoresearch',
-      'deep-research',
-      'web-search',
-    ]),
+    isChatSkillShortcutActive(deepResearch!, ['deli-autoresearch', 'deep-research', 'web-search']),
   ).toBe(false);
 });
 
@@ -99,7 +95,10 @@ test('quick skill selections automatically allow tools for their chat session on
     ).toBe(CoworkPermissionMode.AllowAll);
   }
   expect(
-    resolveChatSkillShortcutPermissionMode(['presentation-studio', 'web-search'], CoworkPermissionMode.Ask),
+    resolveChatSkillShortcutPermissionMode(
+      ['presentation-studio', 'web-search'],
+      CoworkPermissionMode.Ask,
+    ),
   ).toBe(CoworkPermissionMode.Ask);
   expect(resolveChatSkillShortcutPermissionMode([], CoworkPermissionMode.AllowAll)).toBe(
     CoworkPermissionMode.AllowAll,

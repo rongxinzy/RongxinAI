@@ -126,20 +126,21 @@ test('showAppInfoToast stays neutral even when the wording looks like an error',
   window.removeEventListener('app:showToast', listener);
   expect(details).toEqual([{ message: '无法获取模型列表', isError: false, isSuccess: false }]);
   // 走一遍 App 的判定：显式声明压住文案启发式，最终仍是中性提示。
-  expect(resolveToastNotification({ message: '无法获取模型列表', isError: false, isSuccess: false }))
-    .toEqual({
-      message: '无法获取模型列表',
-      options: { isError: false, isSuccess: false },
-    });
+  expect(
+    resolveToastNotification({ message: '无法获取模型列表', isError: false, isSuccess: false }),
+  ).toEqual({
+    message: '无法获取模型列表',
+    options: { isError: false, isSuccess: false },
+  });
 });
 
 test('resolveToastMessage only normalizes errors that did not opt out', () => {
   expect(resolveToastMessage('Widget could not be loaded', { isError: true })).toBe(
     '操作失败：Widget could not be loaded',
   );
-  expect(
-    resolveToastMessage('保存记忆失败', { isError: true, skipErrorNormalization: true }),
-  ).toBe('保存记忆失败');
+  expect(resolveToastMessage('保存记忆失败', { isError: true, skipErrorNormalization: true })).toBe(
+    '保存记忆失败',
+  );
   expect(resolveToastMessage('保存记忆失败', { isSuccess: true })).toBe('保存记忆失败');
 });
 

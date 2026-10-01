@@ -109,9 +109,7 @@ export function stripMediaMarkers(text: string, markers: readonly MediaMarker[])
 }
 
 function cleanLocalPath(value: string): string {
-  const decoded = value.startsWith('file:///')
-    ? fileURLToPath(value)
-    : value.replace(/\\ /g, ' ');
+  const decoded = value.startsWith('file:///') ? fileURLToPath(value) : value.replace(/\\ /g, ' ');
   return decoded.startsWith('~/')
     ? path.join(process.env.USERPROFILE || process.env.HOME || '', decoded.slice(2))
     : decoded;

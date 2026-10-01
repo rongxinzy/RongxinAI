@@ -9,10 +9,7 @@ import type {
   LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
 import { LlamaCppRuntimeBackend, LlamaCppServiceConfigFieldKey } from '../../shared/llamacpp';
-import {
-  prependEnvPathEntry,
-  resolveExecutableDir,
-} from './llamacppProcessRuntimePaths';
+import { prependEnvPathEntry, resolveExecutableDir } from './llamacppProcessRuntimePaths';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_HOST = '127.0.0.1';

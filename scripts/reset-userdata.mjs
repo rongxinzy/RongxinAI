@@ -47,8 +47,8 @@ function removePath(target) {
 }
 
 const targets = [
-  ...roamingAppDataRoots().map((root) => path.join(root, APP_DATA_DIR_NAME)),
-  ...localAppDataRoots().map((root) => path.join(root, APP_DATA_DIR_NAME)),
+  ...roamingAppDataRoots().map(root => path.join(root, APP_DATA_DIR_NAME)),
+  ...localAppDataRoots().map(root => path.join(root, APP_DATA_DIR_NAME)),
 ];
 
 let removed = 0;

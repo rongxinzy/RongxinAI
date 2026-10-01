@@ -21,9 +21,7 @@ test('runtime snapshots survive listener absence and reflect actual lifecycle ev
   const detached = snapshots.read('A')[0];
   detached.status = CoworkSessionStatus.Error;
   expect(snapshots.read('A')[0].status).toBe(CoworkSessionStatus.Running);
-  snapshots.observe(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
-  );
+  snapshots.observe(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }));
   expect(snapshots.read('A')[0].status).toBe(CoworkSessionStatus.Completed);
   snapshots.observe(sequencer.next({ type: PiUiEventType.Started, sessionId: 'B' }));
   snapshots.observe(sequencer.next({ type: PiUiEventType.Stopped, sessionId: 'B' }));
@@ -42,9 +40,7 @@ test('messages cannot manufacture live execution before Started or after complet
     });
   snapshots.observe(message());
   expect(snapshots.read('A')[0].status).toBe(CoworkSessionStatus.Idle);
-  snapshots.observe(
-    sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }),
-  );
+  snapshots.observe(sequencer.next({ type: PiUiEventType.Completed, sessionId: 'A' }));
   snapshots.observe(message());
   expect(snapshots.read('A')[0].status).toBe(CoworkSessionStatus.Completed);
 });

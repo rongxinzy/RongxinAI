@@ -468,7 +468,12 @@ const App: React.FC = () => {
         defaultModelProvider: defaultSelectedModel.providerKey,
       },
     });
-  }, [isInitialized, managedModelsOnly, defaultSelectedModel?.id, defaultSelectedModel?.providerKey]);
+  }, [
+    isInitialized,
+    managedModelsOnly,
+    defaultSelectedModel?.id,
+    defaultSelectedModel?.providerKey,
+  ]);
 
   const handleShowSettings = useCallback((options?: SettingsOpenOptions) => {
     setSettingsOptions({
@@ -484,10 +489,7 @@ const App: React.FC = () => {
       const config = await configService.reload();
       const providers = config.providers ?? defaultConfig.providers;
       const localProvider = providers?.[ProviderName.LlamaCpp];
-      if (
-        localProvider &&
-        (localProvider.enabled !== true || localProvider.userEnabled !== true)
-      ) {
+      if (localProvider && (localProvider.enabled !== true || localProvider.userEnabled !== true)) {
         await configService.updateConfig({
           providers: {
             ...providers,
@@ -500,7 +502,10 @@ const App: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('[App] failed to enable the local model provider before opening settings:', error);
+      console.error(
+        '[App] failed to enable the local model provider before opening settings:',
+        error,
+      );
     } finally {
       handleShowSettings({
         initialTab: 'model',
@@ -804,9 +809,7 @@ const App: React.FC = () => {
   // Listen for toast events from child components
   useEffect(() => {
     const handler = (e: Event) => {
-      const resolved = resolveToastNotification(
-        (e as CustomEvent<ToastNotificationDetail>).detail,
-      );
+      const resolved = resolveToastNotification((e as CustomEvent<ToastNotificationDetail>).detail);
       if (!resolved) return;
       showToast(resolved.message, resolved.options);
     };

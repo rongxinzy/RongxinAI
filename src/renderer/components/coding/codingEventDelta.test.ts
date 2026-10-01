@@ -26,9 +26,7 @@ const snapshot = (): CodingRoomSnapshot => ({
       createdAt: 1,
     },
   ],
-  eventWindows: [
-    { laneId: 'lane', oldestSequence: 1, newestSequence: 1, hasMore: false },
-  ],
+  eventWindows: [{ laneId: 'lane', oldestSequence: 1, newestSequence: 1, hasMore: false }],
   elicitations: [],
 });
 

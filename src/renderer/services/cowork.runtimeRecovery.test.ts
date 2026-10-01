@@ -195,7 +195,10 @@ test('reattaching clears previously tracked execution when runtime already compl
 });
 
 test('canonical bounded patches rebuild long content without reviving a completed run', async () => {
-  vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn(() => 1),
+  );
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   await coworkService.init();
   state.dispatch(addSession(session('A')));

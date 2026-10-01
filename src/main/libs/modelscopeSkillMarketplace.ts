@@ -134,9 +134,7 @@ export async function fetchModelScopeSkillMarketplace(
   });
 }
 
-export async function resolveModelScopeSkillInstallSource(
-  source: string,
-): Promise<string | null> {
+export async function resolveModelScopeSkillInstallSource(source: string): Promise<string | null> {
   const parsed = parseModelScopeSkillUrl(source);
   if (!parsed) {
     return null;
@@ -191,7 +189,8 @@ function toGitHubSkillMdUrl(source: string): string | null {
     const ref = segments[markerIndex + 1];
     const path = segments.slice(markerIndex + 2);
     if (!owner || !repository || !ref || path.length === 0) return null;
-    const filePath = path[path.length - 1].toLowerCase() === 'skill.md' ? path : [...path, 'SKILL.md'];
+    const filePath =
+      path[path.length - 1].toLowerCase() === 'skill.md' ? path : [...path, 'SKILL.md'];
     return `https://raw.githubusercontent.com/${owner}/${repository}/${ref}/${filePath.join('/')}`;
   } catch {
     return null;

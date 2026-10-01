@@ -75,7 +75,10 @@ test('the auto-test report reaches the toast host as a neutral notification', ()
 });
 
 test('reports batch progress as a neutral notification that replaces itself', () => {
-  const notification = buildProviderModelConnectionTestProgressNotification({ tested: 12, total: 120 });
+  const notification = buildProviderModelConnectionTestProgressNotification({
+    tested: 12,
+    total: 120,
+  });
 
   expect(notification.message).toBe('正在测试模型 12/120…');
   expect(notification.isError).toBe(false);
@@ -86,7 +89,10 @@ test('reports batch progress as a neutral notification that replaces itself', ()
 });
 
 test('the progress report also reaches the toast host as a neutral notification', () => {
-  const notification = buildProviderModelConnectionTestProgressNotification({ tested: 0, total: 120 });
+  const notification = buildProviderModelConnectionTestProgressNotification({
+    tested: 0,
+    total: 120,
+  });
 
   expect(resolveToastNotification(notification)).toEqual({
     message: '正在测试模型 0/120…',

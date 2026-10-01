@@ -28,13 +28,7 @@ test('filters commands by name or description and prioritizes command-name match
   expect(filterSlashCommands(commands, 'configured')).toEqual([commands[0]]);
   expect(filterSlashCommands(commands, '')).toEqual(commands);
   expect(
-    filterSlashCommands(
-      [
-        { name: 'plan', description: 'Turn plan mode on.' },
-        ...commands,
-      ],
-      'm',
-    )[0],
+    filterSlashCommands([{ name: 'plan', description: 'Turn plan mode on.' }, ...commands], 'm')[0],
   ).toEqual(commands[0]);
 });
 

@@ -104,9 +104,7 @@ export const ToolHeader = ({
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {statusAtEnd && statusBadge}
-        <ChevronDownIcon
-          className="size-4 rotate-0 text-muted-foreground transition-transform group-data-[panel-open]/trigger:rotate-180"
-        />
+        <ChevronDownIcon className="size-4 rotate-0 text-muted-foreground transition-transform group-data-[panel-open]/trigger:rotate-180" />
       </div>
     </CollapsibleTrigger>
   );

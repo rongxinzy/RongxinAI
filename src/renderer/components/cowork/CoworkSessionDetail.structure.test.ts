@@ -30,9 +30,7 @@ test('reserves conversation viewport above the absolutely positioned composer', 
     'className="pointer-events-none absolute inset-x-0 z-[1] h-16 bg-gradient-to-t from-background to-transparent"',
   );
   expect(source).toContain('style={{ bottom: COWORK_COMPOSER_INSET_VALUE }}');
-  expect(source).not.toContain(
-    'style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}',
-  );
+  expect(source).not.toContain('style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
   expect(inputArea).toBeGreaterThanOrEqual(0);
   expect(overlay).toBeGreaterThan(inputArea);
   // The floating composer must live in the conversation column's coordinate
@@ -52,7 +50,7 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   2026/09/16 lixiang  
   1、工具授权和提问卡片放在对话流（思考/工具执行）里，不要叠在底部输入框上
   2、能匹配到工具卡片时，拒绝/允许画在卡片内部，不再单独出一张授权卡
-  */ 
+  */
   expect(askUserQuestion).toBeGreaterThan(scrollContainer);
   expect(askUserQuestion).toBeLessThan(inputArea);
   expect(permission).toBeGreaterThan(scrollContainer);

@@ -219,7 +219,12 @@ export function ModelContextSettingsModal({
   if (!model) return null;
 
   const content = (
-    <div className={cn('flex flex-col gap-5', presentation === ModelContextSettingsPresentation.Modal && 'p-6')}>
+    <div
+      className={cn(
+        'flex flex-col gap-5',
+        presentation === ModelContextSettingsPresentation.Modal && 'p-6',
+      )}
+    >
       {presentation === ModelContextSettingsPresentation.Modal ? (
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="shrink-0 text-base font-semibold text-foreground">
@@ -231,7 +236,8 @@ export function ModelContextSettingsModal({
         </div>
       ) : null}
 
-        {!hideContextEditor ? <div className="flex flex-col gap-3">
+      {!hideContextEditor ? (
+        <div className="flex flex-col gap-3">
           <div className="flex min-h-7 items-center gap-0">
             <span className="text-sm font-medium text-muted-foreground">
               {i18nService.t('localInferenceServiceConfigCtxSizeLabel')}：
@@ -245,47 +251,45 @@ export function ModelContextSettingsModal({
           {editorState.mode === ModelContextEditorMode.Custom && customContextError ? (
             <p className="text-xs text-destructive">{customContextError}</p>
           ) : null}
-        </div> : null}
-
-        {runningContextSize ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-subtle pt-3 text-xs">
-            <span>
-              <span className="text-muted-foreground">
-                {i18nService.t('localInferenceContextRunning').replace('{value}', '')}
-              </span>
-              {formatContextPreset(runningContextSize)}
-            </span>
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button type="button" variant="ghost" className="min-w-16" onClick={onClose}>
-            {i18nService.t('cancel')}
-          </Button>
-          <Button
-            type="button"
-            variant="default"
-            className="min-w-16"
-            onClick={() => {
-              if (editorState.mode === ModelContextEditorMode.Custom) {
-                if (!editorState.customContextValue.trim()) {
-                  onValidationError?.(i18nService.t('localInferenceContextInvalid'));
-                  return;
-                }
-                if (customContextError) {
-                  onValidationError?.(customContextError);
-                  return;
-                }
-              }
-              onSave(
-                editorState.contextSize,
-                editorState.contextSize !== initialContextSize,
-              );
-            }}
-          >
-            {i18nService.t('save')}
-          </Button>
         </div>
+      ) : null}
+
+      {runningContextSize ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-subtle pt-3 text-xs">
+          <span>
+            <span className="text-muted-foreground">
+              {i18nService.t('localInferenceContextRunning').replace('{value}', '')}
+            </span>
+            {formatContextPreset(runningContextSize)}
+          </span>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button type="button" variant="ghost" className="min-w-16" onClick={onClose}>
+          {i18nService.t('cancel')}
+        </Button>
+        <Button
+          type="button"
+          variant="default"
+          className="min-w-16"
+          onClick={() => {
+            if (editorState.mode === ModelContextEditorMode.Custom) {
+              if (!editorState.customContextValue.trim()) {
+                onValidationError?.(i18nService.t('localInferenceContextInvalid'));
+                return;
+              }
+              if (customContextError) {
+                onValidationError?.(customContextError);
+                return;
+              }
+            }
+            onSave(editorState.contextSize, editorState.contextSize !== initialContextSize);
+          }}
+        >
+          {i18nService.t('save')}
+        </Button>
+      </div>
     </div>
   );
 

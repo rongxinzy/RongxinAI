@@ -110,9 +110,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
       } flex h-[30px] cursor-pointer items-center gap-2 ${
         isBatchMode ? 'pl-4' : 'pl-3'
       } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} ${
-        isSelected
-          ? 'theme-surface-agent-selected'
-          : 'theme-surface-agent-idle'
+        isSelected ? 'theme-surface-agent-selected' : 'theme-surface-agent-idle'
       }`}
       onClick={handleRowClick}
       onKeyDown={e => {
@@ -230,10 +228,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                 <DropdownMenuItem className="hidden" onClick={() => void onShare()}>
                   <Share className="h-3.5 w-3.5" /> {i18nService.t('coworkShareSession')}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onClick={() => setShowConfirmDelete(true)}
-                >
+                <DropdownMenuItem variant="destructive" onClick={() => setShowConfirmDelete(true)}>
                   <Trash2 className="h-3.5 w-3.5" /> {i18nService.t('deleteSession')}
                 </DropdownMenuItem>
               </DropdownMenuContent>

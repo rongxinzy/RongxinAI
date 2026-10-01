@@ -141,9 +141,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
           <FluidTabs
             aria-label={i18nService.t('scheduledTasksFilterStatus')}
             value={filter.status ?? ''}
-            onValueChange={status =>
-              handleFilterChange({ ...filter, status: status || undefined })
-            }
+            onValueChange={status => handleFilterChange({ ...filter, status: status || undefined })}
             items={(['success', 'error', 'skipped', 'running'] as const)
               .filter(s => showRunning || s !== 'running')
               .map(s => ({ value: s as string, label: i18nService.t(statusLabelKeys[s]) }))}
@@ -215,7 +213,11 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
                 return (
                   <TableRow
                     key={run.id}
-                    className={isClickable ? 'theme-scene-history-row cursor-pointer' : 'theme-scene-history-row'}
+                    className={
+                      isClickable
+                        ? 'theme-scene-history-row cursor-pointer'
+                        : 'theme-scene-history-row'
+                    }
                     onClick={() => handleRowClick(run)}
                   >
                     <TableCell className="w-1/3 min-w-0">
@@ -252,7 +254,12 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
         )}
 
         {hasMore && (
-          <Button type="button" variant="ghost" onClick={handleLoadMore} className="theme-control-sizing-27 w-full">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleLoadMore}
+            className="theme-control-sizing-27 w-full"
+          >
             {i18nService.t('scheduledTasksLoadMore')}
           </Button>
         )}
