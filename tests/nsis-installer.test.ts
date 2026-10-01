@@ -40,10 +40,13 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(
       installerScript.match(/-File "\$PLUGINSDIR\\validate-offline-components\.ps1"/g),
     ).toHaveLength(2);
+    expect(
+      installerScript.match(/-TimingLogPath "\$APPDATA\\ZhiYuanAgent\\install-timing\.log"/g),
+    ).toHaveLength(2);
     expect(installerScript).toContain('-Mode cache');
     expect(installerScript).toContain('-Mode expand');
     expect(installerScript).toContain('component-${KEY}.cache-valid');
-    expect(installerScript).toContain('ComponentBatchHashFailed:');
+    expect(installerScript).not.toContain('ComponentBatchHashFailed');
     expect(installerScript).not.toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).not.toContain('validate-component-archive.ps1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
@@ -63,7 +66,11 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(validatorScript).toContain("$value -and $value -ne '-'");
     expect(validatorScript).toContain("[ValidateSet('cache', 'expand')]");
     expect(validatorScript).toContain('Get-FileHash -LiteralPath $sentinel');
-    expect(validatorScript).toContain('Stop-WithCode 2 "hash-mismatch:$($component.Key)"');
+    // Full-archive hashing was removed: staged archives come from the
+    // installer payload and 7z verifies per-entry CRCs during extraction,
+    // while the sentinel hash plus manifest binding pin the content.
+    expect(validatorScript).not.toContain('Get-FileHash -LiteralPath $archivePath');
+    expect(validatorScript).not.toContain('hash-mismatch:');
   });
 
   test('measures component trees with long-path-safe enumeration', () => {
@@ -86,6 +93,13 @@ describe('NSIS offline resource and local inference flow', () => {
     // The completion record must stay excluded from the measurement.
     expect(validatorScript).toContain('if ($file.FullName -eq $completeFull) { continue }');
     expect(validatorScript.match(/Measure-ComponentTree \$target/g)).toHaveLength(2);
+    // The full audit is opt-in: re-walking every cached file on each upgrade
+    // costs minutes under real-time scanners, while the cheap checks already
+    // reject anything an interrupted install can produce.
+    expect(validatorScript).toContain('[switch]$DeepAudit');
+    expect(validatorScript).toContain(
+      '$measured = Measure-ComponentTree $target\n          if ($measured.FileCount',
+    );
     // NSIS relays stdout into a single-line dialog and log field.
     expect(validatorScript).toContain("Write-Output ($Message -replace '[\\r\\n]+', ' ')");
   });
@@ -193,7 +207,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(11);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(13);
   });
 
   test('records optional local inference intent via an options checkbox instead of a popup', () => {
@@ -279,7 +293,28 @@ describe('NSIS offline resource and local inference flow', () => {
       installerScript.indexOf('!macro customInit'),
       installerScript.indexOf('!macroend', installerScript.indexOf('!macro customInit')),
     );
-    expect(customInitBlock).toContain('!insertmacro StopAppProcesses');
+    expect(customInitBlock).not.toContain('!insertmacro StopAppProcesses');
+    const prepareMacroStart = installerScript.indexOf('!macro PrepareExistingInstallForExtraction');
+    const prepareMacroBlock = installerScript.slice(
+      prepareMacroStart,
+      installerScript.indexOf('!macroend', prepareMacroStart),
+    );
+    expect(prepareMacroBlock).toContain('!insertmacro StopAppProcesses');
+    // Silent installs never show pages, so the committed-work macro must run
+    // straight from .onInit; interactive installs defer it to the page leave.
+    expect(customInitBlock).toContain('${If} ${Silent}');
+    expect(customInitBlock).toContain('!insertmacro PrepareExistingInstallForExtraction SILENT');
+    const pageLeaveStart = installerScript.indexOf('Function LocalInferencePageLeave');
+    const pageLeaveBlock = installerScript.slice(
+      pageLeaveStart,
+      installerScript.indexOf('FunctionEnd', pageLeaveStart),
+    );
+    expect(pageLeaveBlock).toContain(
+      '!insertmacro PrepareExistingInstallForExtraction INTERACTIVE',
+    );
+    // Re-preparing only when the directory changed keeps the guard useful when
+    // the user goes back, changes $INSTDIR and leaves again.
+    expect(prepareMacroBlock).toContain('${If} $preparedInstallRoot != $INSTDIR');
     const customUnInitBlock = installerScript.slice(
       installerScript.indexOf('!macro customUnInit'),
       installerScript.indexOf('!macroend', installerScript.indexOf('!macro customUnInit')),
@@ -288,6 +323,39 @@ describe('NSIS offline resource and local inference flow', () => {
 
     expect(installerScript).not.toContain('Stop-Process -Name 知远');
     expect(installerScript).not.toContain('Get-Process node');
+  });
+
+  test('keeps every destructive pre-flight step out of the interactive init path', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const customInitBlock = installerScript.slice(
+      installerScript.indexOf('!macro customInit'),
+      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customInit')),
+    );
+
+    // Cancelling at any wizard page must leave the running application and
+    // its installation directory untouched; those steps only run once the
+    // user commits (see PrepareExistingInstallForExtraction).
+    for (const destructive of ['StopAppProcesses', 'Detaching previous application version']) {
+      expect(customInitBlock).not.toContain(destructive);
+    }
+    expect(customInitBlock).not.toContain('skill-migration-complete');
+
+    // The timing log appends across runs with an explicit run marker, and the
+    // previously uninstrumented application-files span gets its own marker.
+    expect(customInitBlock).toContain('phase=run-start');
+    expect(customInitBlock).toContain('!insertmacro OpenTimingLogForAppend $8');
+    expect(installerScript).not.toMatch(
+      /FileOpen \$8 "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" w/,
+    );
+    const customInstallBlock = installerScript.slice(
+      installerScript.indexOf('!macro customInstall'),
+      installerScript.indexOf('CustomInstallStartMarked:'),
+    );
+    expect(customInstallBlock).toContain('phase=custom-install-start app_files_ms=$R6');
+    // Long nsExec spans must stay visible to the user instead of freezing
+    // the progress page.
+    expect(installerScript).toContain('ShowInstDetails show');
+    expect(installerScript).not.toContain('ShowInstDetails nevershow');
   });
 
   test('detaches expanded runtime caches before deleting them asynchronously', () => {

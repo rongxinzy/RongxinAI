@@ -40,6 +40,7 @@ Var /GLOBAL installLocalInference
 Var /GLOBAL localInferenceDialog
 Var /GLOBAL localInferenceCheckbox
 Var /GLOBAL localInferenceLabel
+Var /GLOBAL preparedInstallRoot
 
 !macro OpenTimingLogForAppend HANDLE
   ; NSIS append mode preserves existing data but starts at offset zero.
@@ -50,6 +51,81 @@ Var /GLOBAL localInferenceLabel
 !macro ExtractElevatedActionScript
   SetOutPath "$PLUGINSDIR"
   File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
+!macroend
+
+; Destructive pre-extraction steps: stop the running application, migrate
+; user-created Skills, detach the previous installation. They must NOT run
+; from .onInit — the wizard has not been shown yet, and a cancel on any page
+; would leave the user with a killed app and a renamed install directory.
+; Interactive installs run this when the options page is left (the user has
+; committed to installing); silent installs (/S, e.g. the auto-updater) skip
+; pages entirely, so .onInit invokes it directly. The prepared root is
+; remembered so returning to the directory page and leaving again only
+; re-runs the steps when the target directory actually changed.
+!macro PrepareExistingInstallForExtraction TOKEN
+  ${If} $preparedInstallRoot != $INSTDIR
+    StrCpy $preparedInstallRoot $INSTDIR
+
+    DetailPrint "[Installer] Stopping running 知远 processes"
+    System::Call 'kernel32::GetTickCount()i .r7'
+    !insertmacro StopAppProcesses
+    System::Call 'kernel32::GetTickCount()i .r6'
+    IntOp $5 $6 - $7
+    !insertmacro OpenTimingLogForAppend $8
+    FileWrite $8 "phase=process-stop-complete elapsed_ms=$5 exit=$0$\r$\n"
+    FileClose $8
+
+    DetailPrint "[Installer] Migrating user-created Skills"
+    System::Call 'kernel32::GetTickCount()i .r7'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+      $$source = \"$INSTDIR\resources\SKILLs\";\
+      $$destination = \"$APPDATA\ZhiYuanAgent\SKILLs\";\
+      $$config = Join-Path $$source \"skills.config.json\";\
+      if (Test-Path $$source) {\
+        New-Item -ItemType Directory -Path $$destination -Force | Out-Null;\
+        $$bundled = @(try {\
+          if (Test-Path $$config) {\
+            (Get-Content $$config -Raw | ConvertFrom-Json).defaults.PSObject.Properties.Name\
+          }\
+        } catch { });\
+        Get-ChildItem -Path $$source -Directory | Where-Object { $$bundled -notcontains $$_.Name } | ForEach-Object {\
+          $$target = Join-Path $$destination $$_.Name;\
+          if (-not (Test-Path $$target)) { Copy-Item -Path $$_.FullName -Destination $$target -Recurse -Force }\
+        };\
+      }"'
+    Pop $0
+    Pop $1
+    System::Call 'kernel32::GetTickCount()i .r6'
+    IntOp $5 $6 - $7
+    !insertmacro OpenTimingLogForAppend $8
+    FileWrite $8 "phase=skill-migration-complete elapsed_ms=$5 exit=$0 output=$1$\r$\n"
+    FileClose $8
+
+    ; Rename the old application quickly. Its directory junctions do not copy the
+    ; shared resource pack, and physical cleanup is delayed until installation ends.
+    DetailPrint "[Installer] Detaching previous application version"
+    System::Call 'kernel32::GetTickCount()i .r7'
+    StrCpy $3 "result=no-previous-install"
+    ${If} ${FileExists} "$INSTDIR\*.*"
+      System::Call 'kernel32::GetTickCount()i .r4'
+      StrCpy $3 "$INSTDIR.old.$4"
+      ClearErrors
+      Rename "$INSTDIR" "$3"
+      ${If} ${Errors}
+        StrCpy $3 "result=rename-failed"
+      ${Else}
+        FileOpen $8 "$APPDATA\ZhiYuanAgent\old-install-path.txt" w
+        FileWrite $8 "$3"
+        FileClose $8
+        StrCpy $3 "result=detached path=$3"
+      ${EndIf}
+    ${EndIf}
+    System::Call 'kernel32::GetTickCount()i .r6'
+    IntOp $5 $6 - $7
+    !insertmacro OpenTimingLogForAppend $8
+    FileWrite $8 "phase=old-install-detached elapsed_ms=$5 $3$\r$\n"
+    FileClose $8
+  ${EndIf}
 !macroend
 
 !macro RunElevatedAction TOKEN ACTION TARGET
@@ -71,10 +147,13 @@ Var /GLOBAL localInferenceLabel
   ; The application and immutable runtime cache are per-user. Elevated helper
   ; processes are used only for the VC++ runtime installer below.
   RequestExecutionLevel user
-  ShowInstDetails nevershow
+  ; Long spans of this installer run inside nsExec helpers (process stop,
+  ; component validation and expansion). Hiding the details view leaves the
+  ; progress page motionless for minutes, which users read as a hang.
+  ShowInstDetails show
   ; NSIS startup CRC check reads the entire installer before the UI appears.
-  ; Every payload is already covered by per-component SHA-256 and 7z CRC, so
-  ; the extra full-file scan is redundant and slow for a multi-gigabyte exe.
+  ; Payload integrity is covered by per-entry 7z CRCs during extraction plus
+  ; sentinel SHA-256 verification, so the extra full-file scan is redundant.
   CRCCheck off
 !macroend
 
@@ -114,6 +193,9 @@ FunctionEnd
 
 Function LocalInferencePageLeave
   ${NSD_GetState} $localInferenceCheckbox $installLocalInference
+  ; Leaving the options page commits the user to installing, so the
+  ; destructive pre-extraction steps run here rather than in .onInit.
+  !insertmacro PrepareExistingInstallForExtraction INTERACTIVE
 FunctionEnd
 
 !macro customPageAfterChangeDir
@@ -128,63 +210,22 @@ FunctionEnd
   FileOpen $8 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" w
   FileWrite $8 "$9"
   FileClose $8
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" w
-  FileWrite $8 "phase=custom-init-start tick_ms=$9 instdir=$INSTDIR$\r$\n"
+  ; The timing log appends across runs (bounded by the run-start markers) so
+  ; repeated install attempts on a user machine stay diagnosable.
+  StrCpy $5 "interactive"
+  ${If} ${Silent}
+    StrCpy $5 "silent"
+  ${EndIf}
+  !insertmacro OpenTimingLogForAppend $8
+  FileWrite $8 "phase=run-start tick_ms=$9 mode=$5 instdir=$INSTDIR$\r$\n"
   FileClose $8
 
-  DetailPrint "[Installer] Stopping running 知远 processes"
-  System::Call 'kernel32::GetTickCount()i .r7'
-  !insertmacro StopAppProcesses
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  !insertmacro OpenTimingLogForAppend $8
-  FileWrite $8 "phase=process-stop-complete elapsed_ms=$5 exit=$0$\r$\n"
-  FileClose $8
-
-  DetailPrint "[Installer] Migrating user-created Skills"
-  System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$source = \"$INSTDIR\resources\SKILLs\";\
-    $$destination = \"$APPDATA\ZhiYuanAgent\SKILLs\";\
-    $$config = Join-Path $$source \"skills.config.json\";\
-    if (Test-Path $$source) {\
-      New-Item -ItemType Directory -Path $$destination -Force | Out-Null;\
-      $$bundled = @(try {\
-        if (Test-Path $$config) {\
-          (Get-Content $$config -Raw | ConvertFrom-Json).defaults.PSObject.Properties.Name\
-        }\
-      } catch { });\
-      Get-ChildItem -Path $$source -Directory | Where-Object { $$bundled -notcontains $$_.Name } | ForEach-Object {\
-        $$target = Join-Path $$destination $$_.Name;\
-        if (-not (Test-Path $$target)) { Copy-Item -Path $$_.FullName -Destination $$target -Recurse -Force }\
-      };\
-    }"'
-  Pop $0
-  Pop $1
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  !insertmacro OpenTimingLogForAppend $8
-  FileWrite $8 "phase=skill-migration-complete elapsed_ms=$5 exit=$0 output=$1$\r$\n"
-  FileClose $8
-
-  ; Rename the old application quickly. Its directory junctions do not copy the
-  ; shared resource pack, and physical cleanup is delayed until installation ends.
-  DetailPrint "[Installer] Detaching previous application version"
-  System::Call 'kernel32::GetTickCount()i .r7'
-  IfFileExists "$INSTDIR\*.*" 0 OldInstallDetachDone
-    System::Call 'kernel32::GetTickCount()i .r4'
-    StrCpy $3 "$INSTDIR.old.$4"
-    Rename "$INSTDIR" "$3"
-    IfErrors OldInstallDetachDone
-    FileOpen $8 "$APPDATA\ZhiYuanAgent\old-install-path.txt" w
-    FileWrite $8 "$3"
-    FileClose $8
-  OldInstallDetachDone:
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  !insertmacro OpenTimingLogForAppend $8
-  FileWrite $8 "phase=old-install-detached elapsed_ms=$5 path=$3$\r$\n"
-  FileClose $8
+  ; Silent installs never show pages, so no leave callback will fire; prepare
+  ; for extraction right here. Interactive installs defer the same steps to
+  ; the options-page leave, after the user has committed to installing.
+  ${If} ${Silent}
+    !insertmacro PrepareExistingInstallForExtraction SILENT
+  ${EndIf}
 !macroend
 
 !macro StageOfflineComponentMetadata KEY
@@ -231,6 +272,19 @@ FunctionEnd
 !macro customInstall
   CreateDirectory "$APPDATA\ZhiYuanAgent"
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+  ; Marks the end of the application file extraction span (customInit up to
+  ; here is otherwise uninstrumented, which hid the slowest phase on user
+  ; machines behind a motionless progress page).
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
+  IfErrors CustomInstallStartMarked
+  FileRead $2 $R5
+  FileClose $2
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $R6 $6 - $R5
+  !insertmacro OpenTimingLogForAppend $2
+  FileWrite $2 "phase=custom-install-start app_files_ms=$R6$\r$\n"
+  FileClose $2
+  CustomInstallStartMarked:
   SetOutPath "$PLUGINSDIR"
   !insertmacro ExtractElevatedActionScript
   File /oname=7za.exe "${PROJECT_DIR}\node_modules\7zip-bin\win\x64\7za.exe"
@@ -269,7 +323,7 @@ FunctionEnd
 
   ; Verify all reusable cache entries in one PowerShell process before deciding
   ; which archives NSIS needs to unpack from the installer.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode cache -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode cache -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe" -TimingLogPath "$APPDATA\ZhiYuanAgent\install-timing.log"'
   Pop $0
   Pop $1
   StrCmp $0 "0" ComponentCacheValidated
@@ -285,24 +339,21 @@ FunctionEnd
   !insertmacro QueueOfflineComponent SKILL_PYTHON "skill-python" "Skill Python dependency layer"
   !insertmacro QueueOfflineComponent UV "uv" "uv 离线运行环境"
 
-  ; The changed archives are now present in $PLUGINSDIR. Validate their hashes,
-  ; entries and sentinels, then extract them in one PowerShell batch. This keeps
-  ; cache hits fast while eliminating a PowerShell startup per component.
+  ; The changed archives are now present in $PLUGINSDIR. Validate their entries
+  ; and sentinels, then extract them in one PowerShell batch. This keeps cache
+  ; hits fast while eliminating a PowerShell startup per component; the
+  ; per-component phases land in the timing log via -TimingLogPath.
   DetailPrint "[Installer] Validating and expanding offline components"
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode expand -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode expand -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe" -TimingLogPath "$APPDATA\ZhiYuanAgent\install-timing.log"'
   Pop $0
   Pop $1
   StrCmp $0 "0" ComponentBatchExpanded
-  StrCmp $0 "2" ComponentBatchHashFailed
   StrCmp $0 "3" ComponentBatchArchiveUnsafe
   StrCmp $0 "4" ComponentBatchExtractFailed
   StrCmp $0 "5" ComponentBatchVerificationFailed
     StrCpy $R9 "离线组件批处理失败：$1"
     Goto OfflineComponentInstallFailed
 
-  ComponentBatchHashFailed:
-    StrCpy $R9 "离线组件归档 SHA-256 校验失败，安装包可能不完整。"
-    Goto OfflineComponentInstallFailed
   ComponentBatchArchiveUnsafe:
     StrCpy $R9 "离线组件归档包含不安全路径或链接元数据。"
     Goto OfflineComponentInstallFailed
