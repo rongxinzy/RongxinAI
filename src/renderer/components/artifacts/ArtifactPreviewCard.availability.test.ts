@@ -18,7 +18,7 @@ vi.mock('react-redux', () => ({
   useDispatch: () => mocks.dispatch,
   useSelector: (selector: (state: RootState) => unknown) => selector(mocks.state.current),
 }));
-vi.mock('sonner', () => ({ toast: { error: mocks.error } }));
+vi.mock('@/services/toastNotification', () => ({ showAppErrorToast: mocks.error }));
 vi.mock('@/services/i18n', () => ({ i18nService: { t: (key: string) => key } }));
 
 const cardState = (sessionId = 'session') =>
@@ -68,7 +68,7 @@ const pendingCheck = () => {
 test('does not open a deleted file even if its preview content was cached', async () => {
   vi.stubGlobal('electron', { dialog: { checkArtifactFile: async () => ({ success: false }) } });
   render(createElement(ArtifactPreviewCard, { artifact: { ...artifact, content: 'cached' } }));
-  fireEvent.click(screen.getByRole('button'));
+  fireEvent.click(screen.getByRole('button', { name: /report.pptx/ }));
   await waitFor(() => expect(mocks.error).toHaveBeenCalledWith('fileNotFound'));
   expect(mocks.dispatch).not.toHaveBeenCalled();
 });
@@ -76,12 +76,12 @@ test('does not open a deleted file even if its preview content was cached', asyn
 test('keeps preview disabled until the availability check finishes', async () => {
   const finishCheck = pendingCheck();
   render(createElement(ArtifactPreviewCard, { artifact }));
-  fireEvent.click(screen.getByRole('button'));
-  expect(screen.getByRole('button')).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: /report.pptx/ }));
+  expect(screen.getByRole('button', { name: /report.pptx/ })).toBeDisabled();
   expect(mocks.dispatch).not.toHaveBeenCalled();
   await act(async () => finishCheck({ success: true }));
   expect(mocks.dispatch).toHaveBeenCalledWith(selectArtifact(artifact.id));
-  expect(screen.getByRole('button')).toBeEnabled();
+  expect(screen.getByRole('button', { name: /report.pptx/ })).toBeEnabled();
 });
 
 test('does not call the shell for a missing file', async () => {
@@ -91,7 +91,7 @@ test('does not call the shell for a missing file', async () => {
     shell: { showItemInFolder },
   });
   render(createElement(ArtifactPreviewCard, { artifact }));
-  fireEvent.click(screen.getByRole('link'));
+  fireEvent.click(screen.getByRole('button', { name: 'artifactOpenFolder' }));
   await waitFor(() => expect(mocks.error).toHaveBeenCalledWith('fileNotFound'));
   expect(showItemInFolder).not.toHaveBeenCalled();
 });
@@ -99,7 +99,7 @@ test('does not call the shell for a missing file', async () => {
 test('ignores a probe that answers after the card unmounts', async () => {
   const finishCheck = pendingCheck();
   const { unmount } = render(createElement(ArtifactPreviewCard, { artifact }));
-  fireEvent.click(screen.getByRole('button'));
+  fireEvent.click(screen.getByRole('button', { name: /report.pptx/ }));
   unmount();
   await act(async () => finishCheck({ success: true }));
   expect(mocks.dispatch).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ test('ignores a probe that answers after the card unmounts', async () => {
 test('ignores a probe that answers after the session changed', async () => {
   const finishCheck = pendingCheck();
   const { rerender } = render(createElement(ArtifactPreviewCard, { artifact }));
-  fireEvent.click(screen.getByRole('button'));
+  fireEvent.click(screen.getByRole('button', { name: /report.pptx/ }));
   mocks.state.current = cardState('other-session');
   rerender(createElement(ArtifactPreviewCard, { artifact }));
   await act(async () => finishCheck({ success: true }));
@@ -118,7 +118,7 @@ test('ignores a probe that answers after the session changed', async () => {
 test('ignores a probe that answers after the card switched artifact', async () => {
   const finishCheck = pendingCheck();
   const { rerender } = render(createElement(ArtifactPreviewCard, { artifact }));
-  fireEvent.click(screen.getByRole('button'));
+  fireEvent.click(screen.getByRole('button', { name: /report.pptx/ }));
   rerender(createElement(ArtifactPreviewCard, { artifact: { ...artifact, id: 'other-file' } }));
   await act(async () => finishCheck({ success: true }));
   expect(mocks.dispatch).not.toHaveBeenCalled();

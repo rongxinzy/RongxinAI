@@ -174,6 +174,7 @@ test('opens duplicate-titled tasks by stable id and preserves cross-agent naviga
   render(createElement(Sidebar, handlers));
   await user.click(screen.getByRole('button', { name: 'search' }));
   await screen.findByRole('option', { name: /Same title specialist/ });
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
   await user.keyboard('{ArrowDown}{Enter}');
   await waitFor(() => expect(mocks.loadSession).toHaveBeenCalledWith('second'));
   expect(mocks.switchAgent).toHaveBeenCalledWith('specialist');
@@ -212,6 +213,7 @@ test('filters chat mode and supports number shortcuts without agent switching', 
   render(createElement(Sidebar, props()));
   await user.click(screen.getByRole('button', { name: 'searchChats' }));
   await screen.findByRole('option', { name: /Chat result/ });
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
   expect(screen.queryByText('Same title')).toBeNull();
   await user.keyboard('{Meta>}1{/Meta}');
   await waitFor(() => expect(mocks.loadSession).toHaveBeenCalledWith('chat'));
@@ -285,6 +287,7 @@ test('honors the configured new-task shortcut and consumes it before the app han
   render(createElement(Sidebar, handlers));
   await user.click(screen.getByRole('button', { name: 'search' }));
   await screen.findByRole('option', { name: /Same title Project/ });
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
   const appKeyDown = vi.fn();
   window.addEventListener('keydown', appKeyDown);
   try {

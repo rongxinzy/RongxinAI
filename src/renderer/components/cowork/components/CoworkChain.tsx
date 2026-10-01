@@ -175,11 +175,7 @@ export const CoworkChain: React.FC<{
                       ))}
                     </ChainOfThoughtSearchResults>
                   )}
-                  <ToolCard
-                    group={item.group}
-                    isLastInSequence={true}
-                    mapDisplayText={mapDisplayText}
-                  />
+                  <ToolCard group={item.group} mapDisplayText={mapDisplayText} />
                 </React.Fragment>
               );
             }

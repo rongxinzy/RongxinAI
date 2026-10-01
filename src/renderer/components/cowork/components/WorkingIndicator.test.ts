@@ -40,9 +40,9 @@ test('escalates the copy after a long silence', () => {
   );
 });
 
-test('keeps expert-only waiting rows compact and avoids competing loops', () => {
-  expect(source).toContain("showCompanion ? 'min-h-9' : 'min-h-6'");
+test('leaves message-level waiting static while the session run bar owns animation', () => {
   expect(source).toContain('<span className="text-sm text-muted-foreground">{statusText}</span>');
-  expect(source).toContain('{!animateText ? (');
-  expect(source).toContain('<Shimmer duration={1.5} className="text-sm">');
+  expect(source).not.toContain('Shimmer');
+  expect(source).not.toContain('AgentCompanion');
+  expect(source).not.toContain('animate-');
 });
