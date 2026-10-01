@@ -164,7 +164,9 @@ export class LlamaCppModelProcessManager extends EventEmitter {
         throw new Error(`Model process exited before becoming ready: ${snapshot.modelName}.`);
       }
       try {
-        const response = await fetch(`${snapshot.baseUrl}/health`, { signal: AbortSignal.timeout(500) });
+        const response = await fetch(`${snapshot.baseUrl}/health`, {
+          signal: AbortSignal.timeout(500),
+        });
         if (response.ok) return snapshot;
       } catch {
         // The process has not bound its local port yet.

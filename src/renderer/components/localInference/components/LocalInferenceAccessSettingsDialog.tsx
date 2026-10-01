@@ -59,7 +59,8 @@ export function LocalInferenceAccessSettingsDialog({
     ? `http://<LAN-IP>:${resolvedPort}/v1`
     : `http://${listenHost}:${resolvedPort}/v1`;
   const modelName = exampleModelName?.trim() || '<model-name>';
-  const requestAuthorization = allowLanAccess && lanToken ? `Authorization: Bearer ${lanToken}\n` : '';
+  const requestAuthorization =
+    allowLanAccess && lanToken ? `Authorization: Bearer ${lanToken}\n` : '';
   const copyLanToken = () => {
     void navigator.clipboard.writeText(lanToken).catch(() => undefined);
   };
@@ -150,12 +151,7 @@ export function LocalInferenceAccessSettingsDialog({
                 <Label htmlFor="llamacpp-lan-token" className="theme-control-label-strong">
                   {i18nService.t('localInferenceAccessLanToken')}
                 </Label>
-                <Input
-                  id="llamacpp-lan-token"
-                  value={lanToken}
-                  readOnly
-                  className="mt-2"
-                />
+                <Input id="llamacpp-lan-token" value={lanToken} readOnly className="mt-2" />
               </div>
               <div className="flex shrink-0 self-end items-center gap-1">
                 <Button

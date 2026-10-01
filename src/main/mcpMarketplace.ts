@@ -59,7 +59,10 @@ function loadPresentation(root: string, metadataPath: unknown): McpPresentation 
   }
 }
 
-export function loadBundledMcpMarketplace(appPath: string, resourcesPath: string): BundledMcpMarketplace {
+export function loadBundledMcpMarketplace(
+  appPath: string,
+  resourcesPath: string,
+): BundledMcpMarketplace {
   const candidates = [
     path.join(resourcesPath, MCP_DIRECTORY_NAME, MCP_REGISTRY_FILE_NAME),
     path.join(appPath, MCP_DIRECTORY_NAME, MCP_REGISTRY_FILE_NAME),

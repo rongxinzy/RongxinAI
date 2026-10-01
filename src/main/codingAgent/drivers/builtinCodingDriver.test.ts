@@ -259,9 +259,9 @@ test('restores a persisted thinking level and rejects invalid persisted values',
       },
     ],
   });
-  expect(
-    findOption(invalid.configOptions, BuiltinCodingConfigId.ThinkingLevel)?.currentValue,
-  ).toBe(PiThinkingLevel.Medium);
+  expect(findOption(invalid.configOptions, BuiltinCodingConfigId.ThinkingLevel)?.currentValue).toBe(
+    PiThinkingLevel.Medium,
+  );
 });
 
 test('setConfigOption updates the selection and patches the live session', async () => {
@@ -430,9 +430,7 @@ test('createSession advertises the built-in prompt and control commands', async 
   // Only commands that take a body carry a hint; /mcp is the one control
   // command with an argument, the rest run locally on the bare name.
   expect(
-    session.availableCommands
-      .filter(command => command.input?.hint)
-      .map(command => command.name),
+    session.availableCommands.filter(command => command.input?.hint).map(command => command.name),
   ).toEqual(['plan', 'goal', 'mcp']);
   expect(driver.getSessionAvailableCommands('s1')).toEqual(session.availableCommands);
 });

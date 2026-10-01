@@ -6,7 +6,6 @@ export const modalOverlayBlur: AppearanceStyle = {
 };
 
 export const modalOverlayScrim: AppearanceStyle = {
-  'background-color':
-    'color-mix(in oklab, var(--zy-component-palette-black) 20%, transparent)',
+  'background-color': 'color-mix(in oklab, var(--zy-component-palette-black) 20%, transparent)',
   ...modalOverlayBlur,
 };

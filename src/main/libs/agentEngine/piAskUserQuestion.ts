@@ -57,11 +57,7 @@ export const createPiAskUserQuestionTool = (
   promptSnippet: 'Ask the user a structured question before destructive actions',
   parameters: PiAskUserQuestionParameters,
   executionMode: 'sequential',
-  execute: async (
-    toolCallId: string,
-    params: PiAskUserQuestionInput,
-    signal?: AbortSignal,
-  ) => {
+  execute: async (toolCallId: string, params: PiAskUserQuestionInput, signal?: AbortSignal) => {
     const response = await request(toolCallId, params, signal);
     if (response.behavior === 'deny') {
       return {

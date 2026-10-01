@@ -993,12 +993,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         }
       });
     },
-    [
-      runAction,
-      showToast,
-      unloadingModelName,
-      waitForUnloadSettle,
-    ],
+    [runAction, showToast, unloadingModelName, waitForUnloadSettle],
   );
 
   const handleDelete = useCallback(
@@ -1105,14 +1100,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       } catch (error) {
         setModelPreferences(current => {
           const { [modelName]: _discarded, ...remaining } = current;
-          return previousPreference
-            ? { ...remaining, [modelName]: previousPreference }
-            : remaining;
+          return previousPreference ? { ...remaining, [modelName]: previousPreference } : remaining;
         });
-        showToast(
-          getLocalInferenceUserFacingErrorMessage(error),
-          LocalInferenceToastKind.Error,
-        );
+        showToast(getLocalInferenceUserFacingErrorMessage(error), LocalInferenceToastKind.Error);
         return false;
       } finally {
         setLoading(false);

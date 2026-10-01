@@ -27,9 +27,7 @@ vi.mock('electron', () => ({
 import { findSharedSkillPythonExecutable } from './skillPythonRuntime';
 
 const sharedExecutableRelPath =
-  process.platform === 'win32'
-    ? path.join('Scripts', 'python.exe')
-    : path.join('bin', 'python3');
+  process.platform === 'win32' ? path.join('Scripts', 'python.exe') : path.join('bin', 'python3');
 
 const createSharedExecutable = (runtimeRoot: string): string => {
   const executable = path.join(runtimeRoot, 'layers', 'shared', sharedExecutableRelPath);
@@ -51,8 +49,6 @@ test('returns null when no shared layer exists', () => {
 });
 
 test('resolves the shared layer interpreter under the userData runtime root', () => {
-  const expected = createSharedExecutable(
-    path.join(userDataRoot, 'runtimes', 'skill-python'),
-  );
+  const expected = createSharedExecutable(path.join(userDataRoot, 'runtimes', 'skill-python'));
   expect(findSharedSkillPythonExecutable()).toBe(expected);
 });

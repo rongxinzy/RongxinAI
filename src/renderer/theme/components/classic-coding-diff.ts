@@ -48,8 +48,12 @@ export function classicCodingDiff(): CodingDiffAppearances {
         color: 'var(--muted-foreground)',
       },
     }),
-    'coding-diff-gutter-added': recipe({ base: { ...gutter, color: 'var(--zy-component-diff-added)' } }),
-    'coding-diff-gutter-removed': recipe({ base: { ...gutter, color: 'var(--zy-component-diff-removed)' } }),
+    'coding-diff-gutter-added': recipe({
+      base: { ...gutter, color: 'var(--zy-component-diff-added)' },
+    }),
+    'coding-diff-gutter-removed': recipe({
+      base: { ...gutter, color: 'var(--zy-component-diff-removed)' },
+    }),
     'coding-diff-gutter-context': recipe({ base: { ...gutter, color: 'var(--muted-foreground)' } }),
     'coding-diff-gutter-header': recipe({ base: { ...gutter, color: 'var(--muted-foreground)' } }),
     'coding-diff-prefix': recipe({ base: { 'text-align': 'center', padding: '0 0.25rem' } }),

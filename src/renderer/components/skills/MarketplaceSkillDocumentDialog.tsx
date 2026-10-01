@@ -78,16 +78,26 @@ export function MarketplaceSkillDocumentDialog({
         <header className="flex h-14 shrink-0 items-center justify-between px-5">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="theme-scene-skill-document-avatar">
-              {skill.iconUrl && <AvatarImage src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="object-contain" />}
+              {skill.iconUrl && (
+                <AvatarImage
+                  src={resolveSkillIconUrl(skill.iconUrl)}
+                  alt=""
+                  className="object-contain"
+                />
+              )}
               <AvatarFallback className="theme-scene-skill-document-fallback">
                 {getSkillInitial(skill.name)}
               </AvatarFallback>
             </Avatar>
-            <h2 className="truncate text-base font-semibold text-foreground">
-              {skill.name}
-            </h2>
+            <h2 className="truncate text-base font-semibold text-foreground">{skill.name}</h2>
           </div>
-          <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('close')} onClick={onClose}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={i18nService.t('close')}
+            onClick={onClose}
+          >
             <X />
           </Button>
         </header>
@@ -155,11 +165,14 @@ export function MarketplaceSkillDocumentDialog({
               {i18nService.t('skillAlreadyInstalled')}
             </div>
           ) : !readOnly && skill.installSource ? (
-            <Button type="button" size="sm" onClick={() => onInstall(skill)} disabled={isInstalling}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => onInstall(skill)}
+              disabled={isInstalling}
+            >
               <Plus data-icon="inline-start" />
-              {isInstalling
-                ? i18nService.t('skillInstalling')
-                : i18nService.t('skillInstallSkill')}
+              {isInstalling ? i18nService.t('skillInstalling') : i18nService.t('skillInstallSkill')}
             </Button>
           ) : null}
         </div>

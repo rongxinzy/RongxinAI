@@ -16,10 +16,7 @@ import { useMemo } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { toLocalfileUrl } from '../../utils/localfileUrl';
-import {
-  CoworkAttachmentMediaType,
-  CoworkAttachmentMediaTypeByExtension,
-} from './constants';
+import { CoworkAttachmentMediaType, CoworkAttachmentMediaTypeByExtension } from './constants';
 
 export interface CoworkInlineAttachment {
   path: string;
@@ -168,9 +165,7 @@ const CoworkInlineAttachmentItem = ({
             </div>
             <div className="flex min-w-0 flex-1 items-center text-sm text-muted-foreground">
               <span className="min-w-0 truncate">{filenameParts.leading}</span>
-              {filenameParts.trailing && (
-                <span className="shrink-0">{filenameParts.trailing}</span>
-              )}
+              {filenameParts.trailing && <span className="shrink-0">{filenameParts.trailing}</span>}
             </div>
           </Attachment>
         }

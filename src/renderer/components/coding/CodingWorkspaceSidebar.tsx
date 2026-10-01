@@ -213,7 +213,9 @@ export const CodingWorkspaceSidebar = ({
         window.setTimeout(() => {
           startSession(saved, readyProfileId ?? undefined);
           if (!readyProfileId) {
-            showAppToast(i18nService.t('codingWorkspaceDefaultAgentUnavailable'), { isError: true });
+            showAppToast(i18nService.t('codingWorkspaceDefaultAgentUnavailable'), {
+              isError: true,
+            });
           }
         }, 0);
       }

@@ -150,7 +150,12 @@ export function ContextTrigger({ children, ...props }: ContextTriggerProps) {
 export type ContextContentProps = ComponentProps<typeof HoverCardContent>;
 
 export function ContextContent({ className, ...props }: ContextContentProps) {
-  return <HoverCardContent className={cn("theme-control-sizing-4 min-w-60 divide-y overflow-hidden", className)} {...props} />;
+  return (
+    <HoverCardContent
+      className={cn('theme-control-sizing-4 min-w-60 divide-y overflow-hidden', className)}
+      {...props}
+    />
+  );
 }
 
 export type ContextContentHeaderProps = ComponentProps<'div'>;
@@ -219,7 +224,10 @@ export function ContextOutputUsage({ label = 'Output', ...props }: ContextOutput
 
 export type ContextReasoningUsageProps = Omit<ContextUsageRowProps, 'tokens'>;
 
-export function ContextReasoningUsage({ label = 'Reasoning', ...props }: ContextReasoningUsageProps) {
+export function ContextReasoningUsage({
+  label = 'Reasoning',
+  ...props
+}: ContextReasoningUsageProps) {
   const { usage } = useContextValue();
   return <ContextUsageRow label={label} tokens={usage?.reasoningTokens} {...props} />;
 }
@@ -228,20 +236,24 @@ export type ContextCacheUsageProps = Omit<ContextUsageRowProps, 'tokens'>;
 
 export function ContextCacheUsage({ label = 'Cache', ...props }: ContextCacheUsageProps) {
   const { usage } = useContextValue();
-  return (
-    <ContextUsageRow
-      label={label}
-      tokens={usage?.cachedInputTokens}
-      {...props}
-    />
-  );
+  return <ContextUsageRow label={label} tokens={usage?.cachedInputTokens} {...props} />;
 }
 
 export type ContextContentFooterProps = ComponentProps<'div'>;
 
 export function ContextContentFooter({ children, className, ...props }: ContextContentFooterProps) {
   if (children) {
-    return <div className={cn('flex w-full items-center justify-between gap-3 bg-secondary p-3 text-xs', className)} {...props}>{children}</div>;
+    return (
+      <div
+        className={cn(
+          'flex w-full items-center justify-between gap-3 bg-secondary p-3 text-xs',
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
   }
   return null;
 }

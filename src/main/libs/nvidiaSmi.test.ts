@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-  getNvidiaSmiExecutableCandidates,
-  getNvidiaSmiSnapshot,
-} from './nvidiaSmi';
+import { getNvidiaSmiExecutableCandidates, getNvidiaSmiSnapshot } from './nvidiaSmi';
 
 test('nvidia-smi candidates include the packaged Windows NVIDIA utility paths', () => {
   const candidates = getNvidiaSmiExecutableCandidates('win32', {
@@ -21,13 +18,14 @@ test('nvidia-smi candidates include the packaged Windows NVIDIA utility paths', 
 test('nvidia-smi falls back to an explicit Windows path when PATH lookup fails', async () => {
   const attempted: string[] = [];
   const snapshot = await getNvidiaSmiSnapshot(
-    async (file) => {
+    async file => {
       attempted.push(file);
       if (file === 'nvidia-smi.exe') {
         throw Object.assign(new Error('not found'), { code: 'ENOENT' });
       }
       return {
-        stdout: '0, NVIDIA GeForce RTX 4090, 24576, 23000\n1, NVIDIA GeForce RTX 4090, 24576, 23000',
+        stdout:
+          '0, NVIDIA GeForce RTX 4090, 24576, 23000\n1, NVIDIA GeForce RTX 4090, 24576, 23000',
         stderr: '',
       };
     },

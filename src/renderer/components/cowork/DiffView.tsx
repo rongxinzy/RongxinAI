@@ -235,9 +235,7 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
             </span>
           )}
           <span className="flex items-center gap-1.5 text-xs shrink-0">
-            {stats.added > 0 && (
-              <span className="text-diff-added font-medium">+{stats.added}</span>
-            )}
+            {stats.added > 0 && <span className="text-diff-added font-medium">+{stats.added}</span>}
             {stats.removed > 0 && (
               <span className="text-diff-removed font-medium">-{stats.removed}</span>
             )}

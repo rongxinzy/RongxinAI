@@ -140,20 +140,17 @@ export function useLocalInferenceAccessSettings(
     setAccessSettingsOpen(false);
   }, []);
 
-  const updateDraftAllowLanAccess = useCallback(
-    (value: boolean) => {
-      setDraftAllowLanAccess(value);
-      if (!value) {
-        setDraftLanToken('');
-        return;
-      }
-      void window.electron.llamacpp
-        .getGatewayLanToken()
-        .then(result => setDraftLanToken(result.token))
-        .catch(() => setDraftLanToken(''));
-    },
-    [],
-  );
+  const updateDraftAllowLanAccess = useCallback((value: boolean) => {
+    setDraftAllowLanAccess(value);
+    if (!value) {
+      setDraftLanToken('');
+      return;
+    }
+    void window.electron.llamacpp
+      .getGatewayLanToken()
+      .then(result => setDraftLanToken(result.token))
+      .catch(() => setDraftLanToken(''));
+  }, []);
 
   const regenerateLanToken = useCallback(() => {
     void runAction(async () => {

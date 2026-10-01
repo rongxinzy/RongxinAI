@@ -46,7 +46,9 @@ export function McpOfficialConnectDialog({
   const title = isFeishu
     ? i18nService.t(isFeishuCliReady ? 'mcpFeishuLoginTitle' : 'mcpFeishuInstallTitle')
     : i18nService.t('mcpConnectTitle').replace('{name}', displayName);
-  const subtitle = isFeishu ? i18nService.t('mcpFeishuSubtitle') : i18nService.t('mcpConnectSubtitle');
+  const subtitle = isFeishu
+    ? i18nService.t('mcpFeishuSubtitle')
+    : i18nService.t('mcpConnectSubtitle');
   const actionLabel = isFeishu
     ? isPreparing
       ? i18nService.t('mcpFeishuInstalling')
@@ -71,33 +73,61 @@ export function McpOfficialConnectDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="theme-control-sizing-4 max-w-[26rem] gap-0 overflow-hidden sm:max-w-[26rem]" showCloseButton>
+      <DialogContent
+        className="theme-control-sizing-4 max-w-[26rem] gap-0 overflow-hidden sm:max-w-[26rem]"
+        showCloseButton
+      >
         {entry && (
           <>
             <DialogHeader className="theme-control-sizing-25 items-center text-center">
               <div className="flex items-center">
                 <div className="flex size-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
-                  {iconSrc ? <img src={iconSrc} alt="" className="size-full object-contain" /> : <Cable className="size-8 text-foreground" />}
+                  {iconSrc ? (
+                    <img src={iconSrc} alt="" className="size-full object-contain" />
+                  ) : (
+                    <Cable className="size-8 text-foreground" />
+                  )}
                 </div>
               </div>
-              <DialogTitle className="mt-4">
-                {title}
-              </DialogTitle>
-              <DialogDescription className="mt-2 text-center">
-                {subtitle}
-              </DialogDescription>
+              <DialogTitle className="mt-4">{title}</DialogTitle>
+              <DialogDescription className="mt-2 text-center">{subtitle}</DialogDescription>
             </DialogHeader>
 
             <div className="mx-4 overflow-hidden rounded-xl border border-border bg-muted/40">
-              <ConnectInfo icon={Plug} titleKey="mcpConnectUsageTitle" bodyKey="mcpConnectUsageBody" section={locale?.connect?.usage} />
-              <ConnectInfo icon={Database} titleKey="mcpConnectDataTitle" bodyKey="mcpConnectDataBody" section={locale?.connect?.data} />
-              <ConnectInfo icon={Unplug} titleKey="mcpConnectControlTitle" bodyKey="mcpConnectControlBody" section={locale?.connect?.control} />
-              <ConnectInfo icon={ShieldCheck} titleKey="mcpConnectAuthTitle" bodyKey="mcpConnectAuthBody" section={locale?.connect?.authorization} last />
+              <ConnectInfo
+                icon={Plug}
+                titleKey="mcpConnectUsageTitle"
+                bodyKey="mcpConnectUsageBody"
+                section={locale?.connect?.usage}
+              />
+              <ConnectInfo
+                icon={Database}
+                titleKey="mcpConnectDataTitle"
+                bodyKey="mcpConnectDataBody"
+                section={locale?.connect?.data}
+              />
+              <ConnectInfo
+                icon={Unplug}
+                titleKey="mcpConnectControlTitle"
+                bodyKey="mcpConnectControlBody"
+                section={locale?.connect?.control}
+              />
+              <ConnectInfo
+                icon={ShieldCheck}
+                titleKey="mcpConnectAuthTitle"
+                bodyKey="mcpConnectAuthBody"
+                section={locale?.connect?.authorization}
+                last
+              />
             </div>
 
             <div className="p-4 pt-4">
               {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
-              <Button className="w-full" onClick={handleAction} disabled={isActionBusy || requiresExternalAccess}>
+              <Button
+                className="w-full"
+                onClick={handleAction}
+                disabled={isActionBusy || requiresExternalAccess}
+              >
                 {isActionBusy && <LoaderCircle className="size-4 animate-spin" />}
                 {actionLabel}
               </Button>
@@ -127,8 +157,12 @@ function ConnectInfo({
       <div className="flex gap-3">
         <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div>
-          <p className="text-sm font-medium text-foreground">{section?.title || i18nService.t(titleKey)}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{section?.description || i18nService.t(bodyKey)}</p>
+          <p className="text-sm font-medium text-foreground">
+            {section?.title || i18nService.t(titleKey)}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {section?.description || i18nService.t(bodyKey)}
+          </p>
         </div>
       </div>
     </div>

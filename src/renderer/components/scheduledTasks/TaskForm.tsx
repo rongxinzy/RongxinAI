@@ -154,7 +154,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
         // then append any saved channel that is not in the list (e.g. disabled platform).
         const next = [...channels];
         for (const saved of current) {
-          const sameValue = next.some(item => channelOptionValue(item) === channelOptionValue(saved));
+          const sameValue = next.some(
+            item => channelOptionValue(item) === channelOptionValue(saved),
+          );
           const samePlatformHasAccount = next.some(
             item => item.value === saved.value && Boolean(item.accountId),
           );
@@ -164,7 +166,8 @@ const TaskForm: React.FC<TaskFormProps> = ({
         }
         const deduplicated = next.filter(
           (option, index, all) =>
-            all.findIndex(item => channelOptionValue(item) === channelOptionValue(option)) === index,
+            all.findIndex(item => channelOptionValue(item) === channelOptionValue(option)) ===
+            index,
         );
         // A singleton channel can arrive both with and without an account ID
         // (for example after upgrading an existing task). Prefer the routable
@@ -304,27 +307,24 @@ const TaskForm: React.FC<TaskFormProps> = ({
       })),
     [availableModels],
   );
-  const workspaceOptions = useMemo(
-    () => {
-      const visible = workspaces.filter(workspace => !workspace.isHidden);
-      const counts = new Map<string, number>();
-      for (const workspace of visible) {
-        const folderName = getWorkspaceFolderName(workspace);
-        counts.set(folderName, (counts.get(folderName) ?? 0) + 1);
-      }
-      return visible.map(workspace => {
-        const folderName = getWorkspaceFolderName(workspace);
-        return {
-          value: workspace.id,
-          label:
-            !isScratchWorkspacePath(workspace.path) && (counts.get(folderName) ?? 0) > 1
-              ? `${folderName} (${workspace.name})`
-              : folderName,
-        };
-      });
-    },
-    [workspaces],
-  );
+  const workspaceOptions = useMemo(() => {
+    const visible = workspaces.filter(workspace => !workspace.isHidden);
+    const counts = new Map<string, number>();
+    for (const workspace of visible) {
+      const folderName = getWorkspaceFolderName(workspace);
+      counts.set(folderName, (counts.get(folderName) ?? 0) + 1);
+    }
+    return visible.map(workspace => {
+      const folderName = getWorkspaceFolderName(workspace);
+      return {
+        value: workspace.id,
+        label:
+          !isScratchWorkspacePath(workspace.path) && (counts.get(folderName) ?? 0) > 1
+            ? `${folderName} (${workspace.name})`
+            : folderName,
+      };
+    });
+  }, [workspaces]);
 
   const validate = (): boolean => {
     const nextErrors: Record<string, string> = {};
@@ -708,7 +708,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
               <SelectValue
                 placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
               >
-                {selectedConversation ? getNotifyConversationLabel(selectedConversation) : undefined}
+                {selectedConversation
+                  ? getNotifyConversationLabel(selectedConversation)
+                  : undefined}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>

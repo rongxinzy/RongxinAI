@@ -332,9 +332,9 @@ export class CodingRoomRepository {
     return row ? rowAssignment(row) : null;
   }
   getLaneById(laneId: string): CodingAgentLane | null {
-    const row = this.db
-      .prepare('SELECT * FROM coding_agent_lanes WHERE id = ?')
-      .get(laneId) as Record<string, unknown> | undefined;
+    const row = this.db.prepare('SELECT * FROM coding_agent_lanes WHERE id = ?').get(laneId) as
+      | Record<string, unknown>
+      | undefined;
     return row ? rowLane(row) : null;
   }
   getRoomByLaneId(laneId: string): CodingRoom | null {
@@ -392,7 +392,9 @@ export class CodingRoomRepository {
     const marks = laneIds.map(() => '?').join(',');
     return (
       this.db
-        .prepare(`SELECT * FROM coding_elicitations WHERE lane_id IN (${marks}) ORDER BY created_at`)
+        .prepare(
+          `SELECT * FROM coding_elicitations WHERE lane_id IN (${marks}) ORDER BY created_at`,
+        )
         .all(...laneIds) as Record<string, unknown>[]
     ).map(rowElicitation);
   }
@@ -430,9 +432,10 @@ export class CodingRoomRepository {
     if (result.changes !== 1) {
       throw new Error('The coding elicitation is no longer awaiting a response.');
     }
-    const row = this.db
-      .prepare('SELECT * FROM coding_elicitations WHERE id = ?')
-      .get(id) as Record<string, unknown>;
+    const row = this.db.prepare('SELECT * FROM coding_elicitations WHERE id = ?').get(id) as Record<
+      string,
+      unknown
+    >;
     return rowElicitation(row);
   }
   cancelElicitation(id: string, reason: string): CodingElicitation {
@@ -444,9 +447,10 @@ export class CodingRoomRepository {
     if (result.changes !== 1) {
       throw new Error('The coding elicitation is no longer awaiting a response.');
     }
-    const row = this.db
-      .prepare('SELECT * FROM coding_elicitations WHERE id = ?')
-      .get(id) as Record<string, unknown>;
+    const row = this.db.prepare('SELECT * FROM coding_elicitations WHERE id = ?').get(id) as Record<
+      string,
+      unknown
+    >;
     return rowElicitation(row);
   }
   /**
@@ -809,8 +813,8 @@ export class CodingRoomRepository {
         // streamed content is lost, and retry with backoff.
         console.warn('[CodingRoom] Deferred flushing a stream write:', error);
         const backoff = Math.min(
-          (this.streamFlushBackoffMs.get(entry.laneId) ?? CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS) *
-            2,
+          (this.streamFlushBackoffMs.get(entry.laneId) ??
+            CodingRoomRepository.STREAM_FLUSH_THROTTLE_MS) * 2,
           CodingRoomRepository.STREAM_FLUSH_MAX_BACKOFF_MS,
         );
         this.streamFlushBackoffMs.set(entry.laneId, backoff);

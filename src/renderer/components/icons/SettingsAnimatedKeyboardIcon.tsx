@@ -76,15 +76,21 @@ export const SettingsAnimatedKeyboardIcon = forwardRef<
       >
         <rect height="16" rx="2" width="20" x="2" y="4" />
         {KEYBOARD_PATHS.map((path, index) => (
-            <motion.path
-              animate={controls}
-              custom={index}
-              d={path.d}
-              initial={{ opacity: 1 }}
-              key={path.id}
-              variants={{ normal: { opacity: 1 }, animate: { opacity: [1, 0.25, 1], transition: { duration: 0.38, delay: index * 0.02, ease: 'easeOut' } } }}
-            />
-          ))}
+          <motion.path
+            animate={controls}
+            custom={index}
+            d={path.d}
+            initial={{ opacity: 1 }}
+            key={path.id}
+            variants={{
+              normal: { opacity: 1 },
+              animate: {
+                opacity: [1, 0.25, 1],
+                transition: { duration: 0.38, delay: index * 0.02, ease: 'easeOut' },
+              },
+            }}
+          />
+        ))}
       </svg>
     </div>
   );

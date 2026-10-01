@@ -11,7 +11,12 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.test.ts', 'scripts/**/*.test.ts'],
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'tests/**/*.test.ts',
+      'scripts/**/*.test.ts',
+    ],
     environment: 'node',
     environmentMatchGlobs: [['src/**/*.test.tsx', 'jsdom']],
     setupFiles: ['./tests/setup/jsdom.ts'],

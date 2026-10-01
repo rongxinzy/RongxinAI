@@ -100,7 +100,9 @@ async function main() {
   const runtimeRoot = path.join(rootDir, 'vendor', 'channel-runtime', 'current');
   let publishedBinary = binaryName;
   try {
-    const buildInfo = JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'runtime-build-info.json'), 'utf8'));
+    const buildInfo = JSON.parse(
+      fs.readFileSync(path.join(runtimeRoot, 'runtime-build-info.json'), 'utf8'),
+    );
     if (typeof buildInfo.binary === 'string') publishedBinary = buildInfo.binary;
   } catch {}
   const executable = path.join(runtimeRoot, publishedBinary);
@@ -189,7 +191,10 @@ async function main() {
 
   try {
     const baseUrl = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Channel runtime did not announce its control URL')), 5_000);
+      const timer = setTimeout(
+        () => reject(new Error('Channel runtime did not announce its control URL')),
+        5_000,
+      );
       const inspect = chunk => {
         const match = String(chunk).match(/\burl=(http:\/\/[^\s]+)/);
         if (!match) return;
@@ -312,7 +317,9 @@ async function main() {
 
 if (require.main === module) {
   main().catch(error => {
-    console.error(`[ChannelRuntimeSmoke] ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `[ChannelRuntimeSmoke] ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exit(1);
   });
 }

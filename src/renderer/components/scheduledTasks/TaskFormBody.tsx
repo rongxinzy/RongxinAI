@@ -163,9 +163,13 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
           </FieldLabel>
           <Select
             items={{
-              [SessionBindingStrategy.PerRun]: i18nService.t('scheduledTasksFormSessionBindingPerRun'),
+              [SessionBindingStrategy.PerRun]: i18nService.t(
+                'scheduledTasksFormSessionBindingPerRun',
+              ),
               [SessionBindingStrategy.Task]: i18nService.t('scheduledTasksFormSessionBindingTask'),
-              [SessionBindingStrategy.Existing]: i18nService.t('scheduledTasksFormSessionBindingExisting'),
+              [SessionBindingStrategy.Existing]: i18nService.t(
+                'scheduledTasksFormSessionBindingExisting',
+              ),
             }}
             value={sessionBinding}
             onValueChange={value => onSessionBindingChange(value as SessionBindingStrategyType)}

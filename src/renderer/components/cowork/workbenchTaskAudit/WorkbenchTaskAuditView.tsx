@@ -64,9 +64,7 @@ export function WorkbenchTaskAuditView({
       }
     } catch (error) {
       showAppErrorToast(
-        i18nService
-          .t('workbenchTaskExportFailed')
-          .replace('{error}', normalizeError(error)),
+        i18nService.t('workbenchTaskExportFailed').replace('{error}', normalizeError(error)),
       );
     } finally {
       setExporting(false);
@@ -129,11 +127,7 @@ export function WorkbenchTaskAuditView({
           <TaskDetailsDisclosure task={task} />
         </header>
 
-        <WorkbenchTimeline
-          detail={detail}
-          busy={busy}
-          onRespondToApproval={onRespondToApproval}
-        />
+        <WorkbenchTimeline detail={detail} busy={busy} onRespondToApproval={onRespondToApproval} />
       </div>
     </ScrollArea>
   );

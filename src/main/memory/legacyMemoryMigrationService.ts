@@ -26,10 +26,7 @@ import {
 } from './constants';
 import type { ProjectMemoryService } from './projectMemoryService';
 import type { MemoryMigrationRecord } from './repository';
-import {
-  buildSessionMemorySource,
-  type SessionMemoryCompletion,
-} from './sessionMemoryExtractor';
+import { buildSessionMemorySource, type SessionMemoryCompletion } from './sessionMemoryExtractor';
 
 export interface LegacyMemoryMigrationResult {
   migrated: number;
@@ -147,13 +144,7 @@ export class LegacyMemoryMigrationService {
         ...extracted.metadataFor(memory),
         semanticMigration: migrationMetadata(record),
       };
-      const replacementId = await this.persistReplacement(
-        record,
-        memory,
-        metadata,
-        index,
-        input,
-      );
+      const replacementId = await this.persistReplacement(record, memory, metadata, index, input);
       replacementIds.push(replacementId);
     }
     if (record.storageKind === MemoryRecordStorageKind.Candidate) {
@@ -313,9 +304,7 @@ export class LegacyMemoryMigrationService {
       metadata,
       supersedesLinkId: index === 0 ? record.memory.id : undefined,
     });
-    return memoryId === null
-      ? SemanticMemoryMigrationStatus.DeliveryPending
-      : String(memoryId);
+    return memoryId === null ? SemanticMemoryMigrationStatus.DeliveryPending : String(memoryId);
   }
 
   private handleNoReplacement(
@@ -369,11 +358,10 @@ function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
     metadata.extractorKind === MemoryExtractorKind.Atomic ? metadata : metadata.extraction;
   return Boolean(
     candidate &&
-      typeof candidate === 'object' &&
-      !Array.isArray(candidate) &&
-      (candidate as Record<string, unknown>).extractorKind === MemoryExtractorKind.Atomic &&
-      (candidate as Record<string, unknown>).extractorVersion ===
-        ATOMIC_MEMORY_EXTRACTOR_VERSION,
+    typeof candidate === 'object' &&
+    !Array.isArray(candidate) &&
+    (candidate as Record<string, unknown>).extractorKind === MemoryExtractorKind.Atomic &&
+    (candidate as Record<string, unknown>).extractorVersion === ATOMIC_MEMORY_EXTRACTOR_VERSION,
   );
 }
 

@@ -83,7 +83,10 @@ export function cleanErrorReason(input: string): string {
   value = value.replace(/[A-Za-z]:\\[^\s)]+|\/(?:[^\s/]+\/)+[^\s)]+/g, '[path]');
   value = value.replace(/\{[\s\S]*\}|\[[\s\S]*\]/g, ' ');
   value = value.split(/\n\s*at\s|\nTraceback|\nError:/i)[0];
-  value = value.replace(/\s+/g, ' ').replace(/[\s.;:,]+$/, '').trim();
+  value = value
+    .replace(/\s+/g, ' ')
+    .replace(/[\s.;:,]+$/, '')
+    .trim();
   if (!value || value.length < 2 || /^(error|exception|failed)$/i.test(value)) return '';
   return value.slice(0, 140);
 }
@@ -91,24 +94,27 @@ export function cleanErrorReason(input: string): string {
 export function normalizeError(error: unknown): string {
   const message = readErrorMessage(error);
   const operationPrefix = i18nService.t('operationFailed');
-  if (message === operationPrefix || message.startsWith(`${operationPrefix}：`) || message.startsWith(`${operationPrefix}:`)) {
+  if (
+    message === operationPrefix ||
+    message.startsWith(`${operationPrefix}：`) ||
+    message.startsWith(`${operationPrefix}:`)
+  ) {
     return message;
   }
   if (isLocalizedAppErrorText(message)) return message;
-  
+
   const category = patterns.find(([, pattern]) => pattern.test(message))?.[0];
   if (category) {
     return i18nService.t(CATEGORY_KEYS[category]);
   }
   const reason = cleanErrorReason(message);
   if (!reason) return i18nService.t('operationFailed');
-  return i18nService.getLanguage() === 'zh' ? `${i18nService.t('operationFailed')}：${reason}` : `${i18nService.t('operationFailed')}: ${reason}`;
+  return i18nService.getLanguage() === 'zh'
+    ? `${i18nService.t('operationFailed')}：${reason}`
+    : `${i18nService.t('operationFailed')}: ${reason}`;
 }
 
 export function reportError(error: unknown): string {
   console.error('[ErrorNormalization] operation failed:', error);
   return normalizeError(error);
 }
-
-
-

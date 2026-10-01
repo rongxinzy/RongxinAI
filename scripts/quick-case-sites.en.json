@@ -9,18 +9,9 @@
       "Use the first-value rate to decide whether to expand"
     ],
     "metrics": [
-      [
-        "¥84.2M",
-        "Quarterly net revenue"
-      ],
-      [
-        "112%",
-        "Target attainment"
-      ],
-      [
-        "76.4%",
-        "Renewal rate"
-      ]
+      ["¥84.2M", "Quarterly net revenue"],
+      ["112%", "Target attainment"],
+      ["76.4%", "Renewal rate"]
     ]
   },
   "pptx-education": {
@@ -33,18 +24,9 @@
       "Design a small cooling retrofit for the campus"
     ],
     "metrics": [
-      [
-        "45 min",
-        "Lesson length"
-      ],
-      [
-        "3 groups",
-        "Observation sites"
-      ],
-      [
-        "1",
-        "Action map"
-      ]
+      ["45 min", "Lesson length"],
+      ["3 groups", "Observation sites"],
+      ["1", "Action map"]
     ]
   },
   "pptx-ai-intro": {
@@ -57,18 +39,9 @@
       "Enter through high-frequency support scenarios"
     ],
     "metrics": [
-      [
-        "3",
-        "Target team types"
-      ],
-      [
-        "4 weeks",
-        "Pilot length"
-      ],
-      [
-        "2",
-        "Validation metrics"
-      ]
+      ["3", "Target team types"],
+      ["4 weeks", "Pilot length"],
+      ["2", "Validation metrics"]
     ]
   },
   "pptx-training": {
@@ -81,18 +54,9 @@
       "Offer remedies the store can actually keep"
     ],
     "metrics": [
-      [
-        "4 h",
-        "Training length"
-      ],
-      [
-        "6",
-        "Role-play stations"
-      ],
-      [
-        "1",
-        "Supervisor checklist"
-      ]
+      ["4 h", "Training length"],
+      ["6", "Role-play stations"],
+      ["1", "Supervisor checklist"]
     ]
   },
   "pptx-product-plan": {
@@ -105,18 +69,9 @@
       "Repeat purchase: lens and course bundles"
     ],
     "metrics": [
-      [
-        "90 days",
-        "Launch window"
-      ],
-      [
-        "3 cities",
-        "Launch demos"
-      ],
-      [
-        "2",
-        "Core audience segments"
-      ]
+      ["90 days", "Launch window"],
+      ["3 cities", "Launch demos"],
+      ["2", "Core audience segments"]
     ]
   },
   "pptx-content-research": {
@@ -129,18 +84,9 @@
       "Turn the gap into two validation experiments"
     ],
     "metrics": [
-      [
-        "6",
-        "Candidate products"
-      ],
-      [
-        "4",
-        "Evaluation dimensions"
-      ],
-      [
-        "2",
-        "Hypotheses to test"
-      ]
+      ["6", "Candidate products"],
+      ["4", "Evaluation dimensions"],
+      ["2", "Hypotheses to test"]
     ]
   },
   "pptx-annual-review": {
@@ -153,18 +99,9 @@
       "Extend long-term monitoring and open days"
     ],
     "metrics": [
-      [
-        "3",
-        "Restoration plots"
-      ],
-      [
-        "28",
-        "Public patrols"
-      ],
-      [
-        "2 years",
-        "Monitoring period"
-      ]
+      ["3", "Restoration plots"],
+      ["28", "Public patrols"],
+      ["2 years", "Monitoring period"]
     ]
   },
   "pptx-fundraising": {
@@ -177,18 +114,9 @@
       "Publish fund flows and ecological indicators"
     ],
     "metrics": [
-      [
-        "12 months",
-        "Pilot period"
-      ],
-      [
-        "3",
-        "Published indicators"
-      ],
-      [
-        "1",
-        "Annual audit"
-      ]
+      ["12 months", "Pilot period"],
+      ["3", "Published indicators"],
+      ["1", "Annual audit"]
     ]
   },
   "excel-budget": {
@@ -201,18 +129,9 @@
       "Trigger alerts by burn-rate multiple"
     ],
     "metrics": [
-      [
-        "¥10.92M",
-        "Approved budget"
-      ],
-      [
-        "68.3%",
-        "Committed"
-      ],
-      [
-        "99.1%",
-        "Quarter-end forecast"
-      ]
+      ["¥10.92M", "Approved budget"],
+      ["68.3%", "Committed"],
+      ["99.1%", "Quarter-end forecast"]
     ]
   },
   "image-to-excel": {
@@ -225,18 +144,9 @@
       "Export the list of differences awaiting review"
     ],
     "metrics": [
-      [
-        "120",
-        "Input invoices"
-      ],
-      [
-        "8",
-        "Core fields"
-      ],
-      [
-        "17",
-        "Items for manual review"
-      ]
+      ["120", "Input invoices"],
+      ["8", "Core fields"],
+      ["17", "Items for manual review"]
     ]
   },
   "excel-summary": {
@@ -249,18 +159,9 @@
       "Produce next week's store action list"
     ],
     "metrics": [
-      [
-        "28",
-        "Stores sampled"
-      ],
-      [
-        "+12.4%",
-        "Revenue change"
-      ],
-      [
-        "−2.1 pt",
-        "Gross margin change"
-      ]
+      ["28", "Stores sampled"],
+      ["+12.4%", "Revenue change"],
+      ["−2.1 pt", "Gross margin change"]
     ]
   },
   "multi-excel-merge": {
@@ -273,18 +174,9 @@
       "Output the merged table plus a conflict log"
     ],
     "metrics": [
-      [
-        "12",
-        "Source files"
-      ],
-      [
-        "846",
-        "SKU records"
-      ],
-      [
-        "23",
-        "Definition conflicts"
-      ]
+      ["12", "Source files"],
+      ["846", "SKU records"],
+      ["23", "Definition conflicts"]
     ]
   },
   "excel-reconcile": {
@@ -297,18 +189,9 @@
       "Output difference categories and an owner queue"
     ],
     "metrics": [
-      [
-        "3",
-        "Streams reconciled"
-      ],
-      [
-        "2,460",
-        "Transactions sampled"
-      ],
-      [
-        "31",
-        "Items to confirm"
-      ]
+      ["3", "Streams reconciled"],
+      ["2,460", "Transactions sampled"],
+      ["31", "Items to confirm"]
     ]
   },
   "excel-pivot": {
@@ -321,18 +204,9 @@
       "Compare retention rather than clicks alone"
     ],
     "metrics": [
-      [
-        "6",
-        "Acquisition channels"
-      ],
-      [
-        "4",
-        "Funnel stages"
-      ],
-      [
-        "30 days",
-        "Retention window"
-      ]
+      ["6", "Acquisition channels"],
+      ["4", "Funnel stages"],
+      ["30 days", "Retention window"]
     ]
   },
   "excel-anomaly": {
@@ -345,18 +219,9 @@
       "Create inspection tasks for anomalous hours"
     ],
     "metrics": [
-      [
-        "18",
-        "Buildings analyzed"
-      ],
-      [
-        "7 nights",
-        "Anomalous periods"
-      ],
-      [
-        "4",
-        "Units for priority inspection"
-      ]
+      ["18", "Buildings analyzed"],
+      ["7 nights", "Anomalous periods"],
+      ["4", "Units for priority inspection"]
     ]
   },
   "excel-forecast": {
@@ -369,18 +234,9 @@
       "Output a safety-stock range"
     ],
     "metrics": [
-      [
-        "14 days",
-        "Forecast window"
-      ],
-      [
-        "42 SKU",
-        "Items tested"
-      ],
-      [
-        "±12%",
-        "Error range"
-      ]
+      ["14 days", "Forecast window"],
+      ["42 SKU", "Items tested"],
+      ["±12%", "Error range"]
     ]
   },
   "web-learning-lab": {
@@ -393,18 +249,9 @@
       "Finish the classroom reasoning quiz"
     ],
     "metrics": [
-      [
-        "01",
-        "Earth and Moon"
-      ],
-      [
-        "03",
-        "Inquiry tasks"
-      ],
-      [
-        "40 min",
-        "Lesson path"
-      ]
+      ["01", "Earth and Moon"],
+      ["03", "Inquiry tasks"],
+      ["40 min", "Lesson path"]
     ]
   },
   "web-resume": {
@@ -417,18 +264,9 @@
       "Submit a cancellable booking request"
     ],
     "metrics": [
-      [
-        "6",
-        "Guest rooms"
-      ],
-      [
-        "2",
-        "Coastal routes"
-      ],
-      [
-        "14:00",
-        "Check-in time"
-      ]
+      ["6", "Guest rooms"],
+      ["2", "Coastal routes"],
+      ["14:00", "Check-in time"]
     ]
   },
   "web-store": {
@@ -441,18 +279,9 @@
       "Add to bag and open the brew card"
     ],
     "metrics": [
-      [
-        "3",
-        "Origin lots"
-      ],
-      [
-        "12 days",
-        "Recommended rest"
-      ],
-      [
-        "2",
-        "Roast levels"
-      ]
+      ["3", "Origin lots"],
+      ["12 days", "Recommended rest"],
+      ["2", "Roast levels"]
     ]
   },
   "web-event": {
@@ -465,18 +294,9 @@
       "Save the route from metro exit to gate"
     ],
     "metrics": [
-      [
-        "2 nights",
-        "Festival length"
-      ],
-      [
-        "4",
-        "Stage locations"
-      ],
-      [
-        "21:30",
-        "Last set ends"
-      ]
+      ["2 nights", "Festival length"],
+      ["4", "Stage locations"],
+      ["21:30", "Last set ends"]
     ]
   },
   "web-product-launch": {
@@ -489,18 +309,9 @@
       "Book an in-store demo"
     ],
     "metrics": [
-      [
-        "24 MP",
-        "Effective pixels"
-      ],
-      [
-        "429 g",
-        "Body weight"
-      ],
-      [
-        "July 18",
-        "Launch demo day"
-      ]
+      ["24 MP", "Effective pixels"],
+      ["429 g", "Body weight"],
+      ["July 18", "Launch demo day"]
     ]
   },
   "web-ops-console": {
@@ -513,18 +324,9 @@
       "Assign an inspection and record the result"
     ],
     "metrics": [
-      [
-        "18",
-        "Sites online"
-      ],
-      [
-        "94.2%",
-        "Device availability"
-      ],
-      [
-        "3",
-        "Alarms awaiting inspection"
-      ]
+      ["18", "Sites online"],
+      ["94.2%", "Device availability"],
+      ["3", "Alarms awaiting inspection"]
     ]
   },
   "web-survey": {
@@ -537,18 +339,9 @@
       "See the current spread of opinions"
     ],
     "metrics": [
-      [
-        "4",
-        "Proposal topics"
-      ],
-      [
-        "3 min",
-        "Completion time"
-      ],
-      [
-        "Anonymous",
-        "Default submission"
-      ]
+      ["4", "Proposal topics"],
+      ["3 min", "Completion time"],
+      ["Anonymous", "Default submission"]
     ]
   },
   "web-game-2048": {
@@ -561,18 +354,9 @@
       "Log the words learned this round"
     ],
     "metrics": [
-      [
-        "4 × 4",
-        "Game board"
-      ],
-      [
-        "12",
-        "Root combinations"
-      ],
-      [
-        "Offline",
-        "No-account practice"
-      ]
+      ["4 × 4", "Game board"],
+      ["12", "Root combinations"],
+      ["Offline", "No-account practice"]
     ]
   },
   "research-industry": {
@@ -585,18 +369,9 @@
       "Flag grid-connection and equipment lead-time uncertainty"
     ],
     "metrics": [
-      [
-        "4 links",
-        "Industry chain"
-      ],
-      [
-        "3 layers",
-        "Constraint framework"
-      ],
-      [
-        "2025",
-        "Data baseline"
-      ]
+      ["4 links", "Industry chain"],
+      ["3 layers", "Constraint framework"],
+      ["2025", "Data baseline"]
     ]
   },
   "research-competitors": {
@@ -609,18 +384,9 @@
       "Compare the shortlist on three-year total cost"
     ],
     "metrics": [
-      [
-        "6 options",
-        "Candidates"
-      ],
-      [
-        "4 axes",
-        "Decision framework"
-      ],
-      [
-        "0 pts",
-        "Unverified scores"
-      ]
+      ["6 options", "Candidates"],
+      ["4 axes", "Decision framework"],
+      ["0 pts", "Unverified scores"]
     ]
   },
   "research-policy": {
@@ -633,18 +399,9 @@
       "Map evidence requirements to launch controls"
     ],
     "metrics": [
-      [
-        "1 text",
-        "Regulation"
-      ],
-      [
-        "4 categories",
-        "Checklist items"
-      ],
-      [
-        "1",
-        "Legal review"
-      ]
+      ["1 text", "Regulation"],
+      ["4 categories", "Checklist items"],
+      ["1", "Legal review"]
     ]
   },
   "research-literature": {
@@ -657,18 +414,9 @@
       "Separate lab results from commercial-scale results"
     ],
     "metrics": [
-      [
-        "4 stages",
-        "Recycling chain"
-      ],
-      [
-        "3 tiers",
-        "Evidence strength"
-      ],
-      [
-        "2026",
-        "Source snapshot"
-      ]
+      ["4 stages", "Recycling chain"],
+      ["3 tiers", "Evidence strength"],
+      ["2026", "Source snapshot"]
     ]
   },
   "research-user": {
@@ -681,18 +429,9 @@
       "Map demand onto testable service hypotheses"
     ],
     "metrics": [
-      [
-        "3 types",
-        "Trip contexts"
-      ],
-      [
-        "4 sources",
-        "Evidence set"
-      ],
-      [
-        "2 rounds",
-        "Interview design"
-      ]
+      ["3 types", "Trip contexts"],
+      ["4 sources", "Evidence set"],
+      ["2 rounds", "Interview design"]
     ]
   },
   "research-market-entry": {
@@ -705,18 +444,9 @@
       "Put channel-partner assumptions into the validation plan"
     ],
     "metrics": [
-      [
-        "3 segments",
-        "Market split"
-      ],
-      [
-        "4 groups",
-        "Entry variables"
-      ],
-      [
-        "1",
-        "Policy check sheet"
-      ]
+      ["3 segments", "Market split"],
+      ["4 groups", "Entry variables"],
+      ["1", "Policy check sheet"]
     ]
   },
   "research-supply-chain": {
@@ -729,18 +459,9 @@
       "Propose dual sourcing, inventory, and recycling actions"
     ],
     "metrics": [
-      [
-        "5 layers",
-        "Supply-chain structure"
-      ],
-      [
-        "3 drivers",
-        "Risk types"
-      ],
-      [
-        "4 actions",
-        "Mitigations"
-      ]
+      ["5 layers", "Supply-chain structure"],
+      ["3 drivers", "Risk types"],
+      ["4 actions", "Mitigations"]
     ]
   },
   "research-talent": {
@@ -753,18 +474,9 @@
       "Flag coverage gaps and representativeness limits"
     ],
     "metrics": [
-      [
-        "3 dimensions",
-        "Talent definition"
-      ],
-      [
-        "2010–25",
-        "Observation window"
-      ],
-      [
-        "4 types",
-        "Data limits"
-      ]
+      ["3 dimensions", "Talent definition"],
+      ["2010–25", "Observation window"],
+      ["4 types", "Data limits"]
     ]
   },
   "academic-outline": {
@@ -777,18 +489,9 @@
       "Introduce in phases and preregister the analysis"
     ],
     "metrics": [
-      [
-        "3",
-        "Research questions"
-      ],
-      [
-        "16 weeks",
-        "Planned duration"
-      ],
-      [
-        "0",
-        "Fabricated results"
-      ]
+      ["3", "Research questions"],
+      ["16 weeks", "Planned duration"],
+      ["0", "Fabricated results"]
     ]
   },
   "academic-polish": {
@@ -801,18 +504,9 @@
       "Keep the original meaning and log the reason for each rewrite"
     ],
     "metrics": [
-      [
-        "4 layers",
-        "Argument check"
-      ],
-      [
-        "2 rounds",
-        "Structure and language"
-      ],
-      [
-        "Per item",
-        "Edit trail"
-      ]
+      ["4 layers", "Argument check"],
+      ["2 rounds", "Structure and language"],
+      ["Per item", "Edit trail"]
     ]
   },
   "academic-review": {
@@ -825,18 +519,9 @@
       "Chart thematic gaps and evidence strength"
     ],
     "metrics": [
-      [
-        "4 clusters",
-        "Themes"
-      ],
-      [
-        "3 levels",
-        "Evidence quality"
-      ],
-      [
-        "1 set",
-        "Inclusion rules"
-      ]
+      ["4 clusters", "Themes"],
+      ["3 levels", "Evidence quality"],
+      ["1 set", "Inclusion rules"]
     ]
   },
   "academic-data-analysis": {
@@ -849,18 +534,9 @@
       "Report missingness and sensitivity results"
     ],
     "metrics": [
-      [
-        "26 weeks",
-        "Simulation window"
-      ],
-      [
-        "4 groups",
-        "Sample cohorts"
-      ],
-      [
-        "3 checks",
-        "Robustness tests"
-      ]
+      ["26 weeks", "Simulation window"],
+      ["4 groups", "Sample cohorts"],
+      ["3 checks", "Robustness tests"]
     ]
   },
   "academic-method": {
@@ -873,18 +549,9 @@
       "Write the choice rationale and its failure conditions"
     ],
     "metrics": [
-      [
-        "2 designs",
-        "Method options"
-      ],
-      [
-        "5 items",
-        "Decision criteria"
-      ],
-      [
-        "1",
-        "Choice tree"
-      ]
+      ["2 designs", "Method options"],
+      ["5 items", "Decision criteria"],
+      ["1", "Choice tree"]
     ]
   },
   "academic-defense": {
@@ -897,18 +564,9 @@
       "State the boundaries where the conclusion holds"
     ],
     "metrics": [
-      [
-        "12 min",
-        "Talk length"
-      ],
-      [
-        "4",
-        "Narrative sections"
-      ],
-      [
-        "3 questions",
-        "Prepared defenses"
-      ]
+      ["12 min", "Talk length"],
+      ["4", "Narrative sections"],
+      ["3 questions", "Prepared defenses"]
     ]
   },
   "academic-grant": {
@@ -921,18 +579,9 @@
       "Set out shared results and protection mechanisms"
     ],
     "metrics": [
-      [
-        "3 aims",
-        "Research objectives"
-      ],
-      [
-        "2 seasons",
-        "Collection period"
-      ],
-      [
-        "1",
-        "Ethics review"
-      ]
+      ["3 aims", "Research objectives"],
+      ["2 seasons", "Collection period"],
+      ["1", "Ethics review"]
     ]
   },
   "academic-ethics": {
@@ -945,18 +594,9 @@
       "Set access, retention, and destruction timelines"
     ],
     "metrics": [
-      [
-        "3 tiers",
-        "Data classes"
-      ],
-      [
-        "2 layers",
-        "Identity separation"
-      ],
-      [
-        "Withdrawable",
-        "Consent to participate"
-      ]
+      ["3 tiers", "Data classes"],
+      ["2 layers", "Identity separation"],
+      ["Withdrawable", "Consent to participate"]
     ]
   },
   "docs-meeting": {
@@ -969,18 +609,9 @@
       "Confirm owner and timing for each item"
     ],
     "metrics": [
-      [
-        "5",
-        "Decisions"
-      ],
-      [
-        "3",
-        "Actions"
-      ],
-      [
-        "2",
-        "Open questions"
-      ]
+      ["5", "Decisions"],
+      ["3", "Actions"],
+      ["2", "Open questions"]
     ]
   },
   "docs-report": {
@@ -993,18 +624,9 @@
       "Bind each fix to a verification signal"
     ],
     "metrics": [
-      [
-        "42 min",
-        "Impact duration"
-      ],
-      [
-        "3 stages",
-        "Incident timeline"
-      ],
-      [
-        "5",
-        "Follow-up actions"
-      ]
+      ["42 min", "Impact duration"],
+      ["3 stages", "Incident timeline"],
+      ["5", "Follow-up actions"]
     ]
   },
   "docs-summary": {
@@ -1017,18 +639,9 @@
       "State what needs leadership sign-off"
     ],
     "metrics": [
-      [
-        "3",
-        "Key conclusions"
-      ],
-      [
-        "2",
-        "Main risks"
-      ],
-      [
-        "1",
-        "Decision request"
-      ]
+      ["3", "Key conclusions"],
+      ["2", "Main risks"],
+      ["1", "Decision request"]
     ]
   },
   "docs-notice": {
@@ -1041,18 +654,9 @@
       "Give the rollback and contact path if it fails"
     ],
     "metrics": [
-      [
-        "30 min",
-        "Planned window"
-      ],
-      [
-        "2",
-        "Affected features"
-      ],
-      [
-        "All day",
-        "Support hours"
-      ]
+      ["30 min", "Planned window"],
+      ["2", "Affected features"],
+      ["All day", "Support hours"]
     ]
   },
   "docs-api": {
@@ -1065,18 +669,9 @@
       "Diagnose integration issues by error code"
     ],
     "metrics": [
-      [
-        "3 steps",
-        "Onboarding path"
-      ],
-      [
-        "4 types",
-        "Error responses"
-      ],
-      [
-        "1",
-        "Runnable example"
-      ]
+      ["3 steps", "Onboarding path"],
+      ["4 types", "Error responses"],
+      ["1", "Runnable example"]
     ]
   },
   "docs-polish": {
@@ -1089,18 +684,9 @@
       "Check them against before-and-after copy"
     ],
     "metrics": [
-      [
-        "4 types",
-        "Copy states"
-      ],
-      [
-        "6",
-        "Language principles"
-      ],
-      [
-        "2 rounds",
-        "Review process"
-      ]
+      ["4 types", "Copy states"],
+      ["6", "Language principles"],
+      ["2 rounds", "Review process"]
     ]
   },
   "docs-sop": {
@@ -1113,18 +699,9 @@
       "Verify doors, windows, temperature, and keys"
     ],
     "metrics": [
-      [
-        "18",
-        "Closing steps"
-      ],
-      [
-        "2 people",
-        "Double checks"
-      ],
-      [
-        "22:30",
-        "Target finish"
-      ]
+      ["18", "Closing steps"],
+      ["2 people", "Double checks"],
+      ["22:30", "Target finish"]
     ]
   },
   "docs-prd": {
@@ -1137,18 +714,9 @@
       "Let a human review before deciding to send"
     ],
     "metrics": [
-      [
-        "4 items",
-        "P0 requirements"
-      ],
-      [
-        "3 steps",
-        "Core flow"
-      ],
-      [
-        "Human",
-        "Send confirmation"
-      ]
+      ["4 items", "P0 requirements"],
+      ["3 steps", "Core flow"],
+      ["Human", "Send confirmation"]
     ]
   },
   "pptx-climate": {
@@ -1161,18 +729,9 @@
       "Propose district pilots and review indicators"
     ],
     "metrics": [
-      [
-        "11",
-        "High-risk road sections"
-      ],
-      [
-        "3 years",
-        "Implementation period"
-      ],
-      [
-        "4 h",
-        "Target recovery time"
-      ]
+      ["11", "High-risk road sections"],
+      ["3 years", "Implementation period"],
+      ["4 h", "Target recovery time"]
     ]
   },
   "pptx-hiring": {
@@ -1185,18 +744,9 @@
       "Agree scoring anchors and arrange onboarding coaching"
     ],
     "metrics": [
-      [
-        "4",
-        "Capability dimensions"
-      ],
-      [
-        "3",
-        "Interview rounds"
-      ],
-      [
-        "30 days",
-        "Onboarding period"
-      ]
+      ["4", "Capability dimensions"],
+      ["3", "Interview rounds"],
+      ["30 days", "Onboarding period"]
     ]
   },
   "pptx-exhibit": {
@@ -1209,18 +759,9 @@
       "Design a street route for after the exit"
     ],
     "metrics": [
-      [
-        "5",
-        "Night-route stops"
-      ],
-      [
-        "70 min",
-        "Visit length"
-      ],
-      [
-        "3",
-        "Sound archives"
-      ]
+      ["5", "Night-route stops"],
+      ["70 min", "Visit length"],
+      ["3", "Sound archives"]
     ]
   },
   "pptx-cyber": {
@@ -1233,18 +774,9 @@
       "Review decision delays and the notification chain"
     ],
     "metrics": [
-      [
-        "60 min",
-        "Exercise window"
-      ],
-      [
-        "4",
-        "Decision roles"
-      ],
-      [
-        "2",
-        "Recovery paths"
-      ]
+      ["60 min", "Exercise window"],
+      ["4", "Decision roles"],
+      ["2", "Recovery paths"]
     ]
   },
   "excel-carbon": {
@@ -1257,18 +789,9 @@
       "Prioritize high-emission, low-confidence categories"
     ],
     "metrics": [
-      [
-        "8",
-        "Procurement categories"
-      ],
-      [
-        "72",
-        "Suppliers"
-      ],
-      [
-        "B–D",
-        "Data quality"
-      ]
+      ["8", "Procurement categories"],
+      ["72", "Suppliers"],
+      ["B–D", "Data quality"]
     ]
   },
   "excel-staffing": {
@@ -1281,18 +804,9 @@
       "Compare night-shift distribution and collect confirmation"
     ],
     "metrics": [
-      [
-        "32",
-        "Nursing staff"
-      ],
-      [
-        "4 weeks",
-        "Roster cycle"
-      ],
-      [
-        "11 h",
-        "Minimum rest"
-      ]
+      ["32", "Nursing staff"],
+      ["4 weeks", "Roster cycle"],
+      ["11 h", "Minimum rest"]
     ]
   },
   "excel-energy": {
@@ -1305,18 +819,9 @@
       "Model the cost range after shifting peak load"
     ],
     "metrics": [
-      [
-        "12 months",
-        "Billing period"
-      ],
-      [
-        "3",
-        "Time-of-use bands"
-      ],
-      [
-        "18%",
-        "Shiftable load"
-      ]
+      ["12 months", "Billing period"],
+      ["3", "Time-of-use bands"],
+      ["18%", "Shiftable load"]
     ]
   },
   "excel-clinic": {
@@ -1329,18 +834,9 @@
       "Link peak periods to no-show rates"
     ],
     "metrics": [
-      [
-        "6",
-        "Departments"
-      ],
-      [
-        "P50 / P90",
-        "Percentile metrics"
-      ],
-      [
-        "15 min",
-        "Target wait"
-      ]
+      ["6", "Departments"],
+      ["P50 / P90", "Percentile metrics"],
+      ["15 min", "Target wait"]
     ]
   },
   "web-museum": {
@@ -1353,18 +849,9 @@
       "Save the offline map and opening hours"
     ],
     "metrics": [
-      [
-        "5",
-        "Exhibition stops"
-      ],
-      [
-        "2",
-        "Walking routes"
-      ],
-      [
-        "21:00",
-        "Last entry"
-      ]
+      ["5", "Exhibition stops"],
+      ["2", "Walking routes"],
+      ["21:00", "Last entry"]
     ]
   },
   "web-restaurant": {
@@ -1377,18 +864,9 @@
       "Note dietary limits and confirm the booking"
     ],
     "metrics": [
-      [
-        "18",
-        "Seasonal dishes"
-      ],
-      [
-        "24 seats",
-        "Daily capacity"
-      ],
-      [
-        "48 h",
-        "Cancellation deadline"
-      ]
+      ["18", "Seasonal dishes"],
+      ["24 seats", "Daily capacity"],
+      ["48 h", "Cancellation deadline"]
     ]
   },
   "web-climate-map": {
@@ -1401,18 +879,9 @@
       "Report a closed or missing point"
     ],
     "metrics": [
-      [
-        "26",
-        "Locations included"
-      ],
-      [
-        "5 min",
-        "Walk radius"
-      ],
-      [
-        "Weekly",
-        "Update frequency"
-      ]
+      ["26", "Locations included"],
+      ["5 min", "Walk radius"],
+      ["Weekly", "Update frequency"]
     ]
   },
   "web-language": {
@@ -1425,18 +894,9 @@
       "Submit your own place-name memory"
     ],
     "metrics": [
-      [
-        "42",
-        "Licensed recordings"
-      ],
-      [
-        "3 generations",
-        "Speaker age bands"
-      ],
-      [
-        "Bilingual",
-        "Term notes"
-      ]
+      ["42", "Licensed recordings"],
+      ["3 generations", "Speaker age bands"],
+      ["Bilingual", "Term notes"]
     ]
   },
   "research-water": {
@@ -1449,18 +909,9 @@
       "List data gaps and a sampling plan"
     ],
     "metrics": [
-      [
-        "3 layers",
-        "Monitoring points"
-      ],
-      [
-        "4 items",
-        "Core indicators"
-      ],
-      [
-        "2026",
-        "Data cutoff"
-      ]
+      ["3 layers", "Monitoring points"],
+      ["4 items", "Core indicators"],
+      ["2026", "Data cutoff"]
     ]
   },
   "research-heat": {
@@ -1473,18 +924,9 @@
       "Compare enforcement evidence with complaint channels"
     ],
     "metrics": [
-      [
-        "5 types",
-        "Outdoor occupations"
-      ],
-      [
-        "3 layers",
-        "Protection mechanisms"
-      ],
-      [
-        "4",
-        "Evidence gaps"
-      ]
+      ["5 types", "Outdoor occupations"],
+      ["3 layers", "Protection mechanisms"],
+      ["4", "Evidence gaps"]
     ]
   },
   "research-reuse": {
@@ -1497,18 +939,9 @@
       "Map buyer acceptance and logistics costs"
     ],
     "metrics": [
-      [
-        "4 types",
-        "Material flows"
-      ],
-      [
-        "3 steps",
-        "Market stages"
-      ],
-      [
-        "2 cities",
-        "Comparison scope"
-      ]
+      ["4 types", "Material flows"],
+      ["3 steps", "Market stages"],
+      ["2 cities", "Comparison scope"]
     ]
   },
   "research-childcare": {
@@ -1521,18 +954,9 @@
       "Interview families that did not use the service"
     ],
     "metrics": [
-      [
-        "5 dimensions",
-        "Access framework"
-      ],
-      [
-        "15 min",
-        "Travel band"
-      ],
-      [
-        "3 types",
-        "Family samples"
-      ]
+      ["5 dimensions", "Access framework"],
+      ["15 min", "Travel band"],
+      ["3 types", "Family samples"]
     ]
   },
   "academic-replication": {
@@ -1545,18 +969,9 @@
       "Predefine robustness checks and deviation notes"
     ],
     "metrics": [
-      [
-        "1",
-        "Original study"
-      ],
-      [
-        "3 levels",
-        "Replication aims"
-      ],
-      [
-        "0",
-        "Result peeks"
-      ]
+      ["1", "Original study"],
+      ["3 levels", "Replication aims"],
+      ["0", "Result peeks"]
     ]
   },
   "academic-interview": {
@@ -1569,18 +984,9 @@
       "Keep an audit trail and counterexamples"
     ],
     "metrics": [
-      [
-        "2 rounds",
-        "Trial coding"
-      ],
-      [
-        "12",
-        "Initial codes"
-      ],
-      [
-        "1",
-        "Versioned codebook"
-      ]
+      ["2 rounds", "Trial coding"],
+      ["12", "Initial codes"],
+      ["1", "Versioned codebook"]
     ]
   },
   "academic-survey": {
@@ -1593,18 +999,9 @@
       "Test structure and equivalence given sample conditions"
     ],
     "metrics": [
-      [
-        "2 teams",
-        "Translation groups"
-      ],
-      [
-        "3 stages",
-        "Pretest process"
-      ],
-      [
-        "4 checks",
-        "Measurement tests"
-      ]
+      ["2 teams", "Translation groups"],
+      ["3 stages", "Pretest process"],
+      ["4 checks", "Measurement tests"]
     ]
   },
   "academic-open-data": {
@@ -1617,18 +1014,9 @@
       "Set application review, retention, and destruction rules"
     ],
     "metrics": [
-      [
-        "3 tiers",
-        "Access classes"
-      ],
-      [
-        "2 layers",
-        "Identity separation"
-      ],
-      [
-        "5 years",
-        "Retention cap"
-      ]
+      ["3 tiers", "Access classes"],
+      ["2 layers", "Identity separation"],
+      ["5 years", "Retention cap"]
     ]
   },
   "docs-board": {
@@ -1641,18 +1029,9 @@
       "List stage gates and exit thresholds"
     ],
     "metrics": [
-      [
-        "2 paths",
-        "Entry routes"
-      ],
-      [
-        "3",
-        "Stage gates"
-      ],
-      [
-        "1",
-        "Board resolution"
-      ]
+      ["2 paths", "Entry routes"],
+      ["3", "Stage gates"],
+      ["1", "Board resolution"]
     ]
   },
   "docs-grant": {
@@ -1665,18 +1044,9 @@
       "Detail the budget, risks, and evaluation plan"
     ],
     "metrics": [
-      [
-        "12 months",
-        "Project duration"
-      ],
-      [
-        "4",
-        "Outcome indicators"
-      ],
-      [
-        "¥360K",
-        "Requested budget"
-      ]
+      ["12 months", "Project duration"],
+      ["4", "Outcome indicators"],
+      ["¥360K", "Requested budget"]
     ]
   },
   "docs-research-protocol": {
@@ -1689,18 +1059,9 @@
       "Track deviations and training status by site"
     ],
     "metrics": [
-      [
-        "6",
-        "Research sites"
-      ],
-      [
-        "5",
-        "Execution forms"
-      ],
-      [
-        "48 h",
-        "Deviation reporting"
-      ]
+      ["6", "Research sites"],
+      ["5", "Execution forms"],
+      ["48 h", "Deviation reporting"]
     ]
   },
   "docs-incident-comms": {
@@ -1713,18 +1074,9 @@
       "Arrange joint legal, security, and support review"
     ],
     "metrics": [
-      [
-        "4 types",
-        "Audience materials"
-      ],
-      [
-        "2 h",
-        "First update"
-      ],
-      [
-        "1",
-        "Fact source"
-      ]
+      ["4 types", "Audience materials"],
+      ["2 h", "First update"],
+      ["1", "Fact source"]
     ]
   }
 }

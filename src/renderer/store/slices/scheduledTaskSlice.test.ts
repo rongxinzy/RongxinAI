@@ -1,11 +1,7 @@
 import { expect, test } from 'vitest';
 
 import type { ScheduledTaskRunWithName } from '../../../scheduledTask/types';
-import scheduledTaskReducer, {
-  addOrUpdateRun,
-  setListError,
-  setTasks,
-} from './scheduledTaskSlice';
+import scheduledTaskReducer, { addOrUpdateRun, setListError, setTasks } from './scheduledTaskSlice';
 
 test('keeps task-list errors separate from operation errors', () => {
   const failedState = scheduledTaskReducer(undefined, setListError('gateway unavailable'));

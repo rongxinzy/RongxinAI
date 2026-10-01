@@ -156,7 +156,14 @@ export const CodingEventStream = ({
           });
         });
     }
-  }, [artifactSessionKey, artifactBaseDir, isStreaming, detectableMessages, fileArtifacts, dispatch]);
+  }, [
+    artifactSessionKey,
+    artifactBaseDir,
+    isStreaming,
+    detectableMessages,
+    fileArtifacts,
+    dispatch,
+  ]);
 
   // Anchor preview cards to the tool call that wrote the file. Store artifacts
   // win over collector output because they may carry disk-loaded content.
@@ -172,10 +179,7 @@ export const CodingEventStream = ({
     return grouped;
   }, [fileArtifacts, artifacts]);
 
-  const artifactsByMessageId = useMemo(
-    () => groupArtifactsByMessage(artifacts ?? []),
-    [artifacts],
-  );
+  const artifactsByMessageId = useMemo(() => groupArtifactsByMessage(artifacts ?? []), [artifacts]);
 
   return (
     <div

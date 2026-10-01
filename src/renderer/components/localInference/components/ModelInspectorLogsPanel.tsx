@@ -21,11 +21,11 @@ export function ModelInspectorLogsPanel({ modelName }: { modelName: string }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }, [modelName, state.content]);
 
-  const logOutput = state.content || (
-    state.loading
+  const logOutput =
+    state.content ||
+    (state.loading
       ? i18nService.t('localInferenceModelLaunchLogsWaiting')
-      : i18nService.t('localInferenceModelLaunchLogWindowEmpty')
-  );
+      : i18nService.t('localInferenceModelLaunchLogWindowEmpty'));
   return (
     <div className="mt-5 flex min-h-0 flex-1 flex-col gap-3">
       {state.error ? <p className="shrink-0 text-sm text-destructive">{state.error}</p> : null}

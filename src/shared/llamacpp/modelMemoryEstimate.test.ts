@@ -1,9 +1,6 @@
 import { expect, test } from 'vitest';
 
-import {
-  estimateLlamaCppModelMemory,
-  LLAMACPP_MEMORY_ESTIMATE_MIB,
-} from './modelMemoryEstimate';
+import { estimateLlamaCppModelMemory, LLAMACPP_MEMORY_ESTIMATE_MIB } from './modelMemoryEstimate';
 
 test('estimates GGUF weight, context, and runtime buffer memory', () => {
   expect(

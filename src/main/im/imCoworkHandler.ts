@@ -159,11 +159,7 @@ export class IMCoworkHandler extends EventEmitter {
     const defaultTitle = t('channelConversationFallback', { channel: platformName });
     if (title === defaultTitle) return;
 
-    this.coworkStore.updateSession(
-      sessionId,
-      { title: defaultTitle },
-      { touchUpdatedAt: false },
-    );
+    this.coworkStore.updateSession(sessionId, { title: defaultTitle }, { touchUpdatedAt: false });
   }
 
   private trackSessionMapping(mapping: IMSessionMapping): void {
@@ -411,11 +407,7 @@ export class IMCoworkHandler extends EventEmitter {
     }
 
     // Create new Cowork session
-    return this.createCoworkSessionForConversation(
-      imConversationId,
-      platform,
-      workspaceId,
-    );
+    return this.createCoworkSessionForConversation(imConversationId, platform, workspaceId);
   }
 
   private async createCoworkSessionForConversation(

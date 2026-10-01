@@ -1,10 +1,7 @@
 import { ipcMain, net } from 'electron';
 import path from 'path';
 
-import {
-  MarketplaceIpcChannel,
-  type MarketplaceSearchRequest,
-} from '../../shared/marketplace';
+import { MarketplaceIpcChannel, type MarketplaceSearchRequest } from '../../shared/marketplace';
 import { MarketplaceService } from '../libs/marketplaceService';
 
 function searchKey(senderId: number, requestId: string): string {

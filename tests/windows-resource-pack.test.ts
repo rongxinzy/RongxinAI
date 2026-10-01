@@ -73,9 +73,7 @@ describe('Windows offline component identity', () => {
     expect(shouldExclude('feishu/runtime/node_modules/.bin/lark-cli.cmd')).toBe(true);
     expect(shouldExclude('feishu/runtime/win32-x64/lark-cli.exe')).toBe(true);
     expect(shouldExclude('SKILLs/example/node_modules/.bin/example.cmd')).toBe(true);
-    expect(
-      shouldExclude('feishu/skills/document/SKILL.md'),
-    ).toBe(false);
+    expect(shouldExclude('feishu/skills/document/SKILL.md')).toBe(false);
   });
 
   test('is stable when only source mtimes change', () => {

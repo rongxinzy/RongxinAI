@@ -9,7 +9,7 @@ test('builds the GitHub comparison URL from main to the current branch', () => {
 });
 
 test('encodes branch names that contain a slash', () => {
-  expect(buildGitHubComparisonUrl('https://github.com/example/repository/', 'feature/git-panel')).toBe(
-    'https://github.com/example/repository/compare/main...feature%2Fgit-panel',
-  );
+  expect(
+    buildGitHubComparisonUrl('https://github.com/example/repository/', 'feature/git-panel'),
+  ).toBe('https://github.com/example/repository/compare/main...feature%2Fgit-panel');
 });

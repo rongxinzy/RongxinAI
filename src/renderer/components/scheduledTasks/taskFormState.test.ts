@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { PayloadKind, SessionBindingStrategy, SessionTarget } from '../../../scheduledTask/constants';
+import {
+  PayloadKind,
+  SessionBindingStrategy,
+  SessionTarget,
+} from '../../../scheduledTask/constants';
 import type { ScheduledTask } from '../../../scheduledTask/types';
 import { buildScheduleInput, buildTaskInput, createFormState } from './taskFormState';
 import type { TaskTemplateValues } from './TaskTemplateGallery';
@@ -77,7 +81,10 @@ describe('buildTaskInput', () => {
   });
 
   test('detaches an existing session when the binding is not session-based', () => {
-    const task = taskFixture({ sessionKey: 'zhiyuan:session-1', sessionTarget: SessionTarget.Main });
+    const task = taskFixture({
+      sessionKey: 'zhiyuan:session-1',
+      sessionTarget: SessionTarget.Main,
+    });
     const form = {
       ...createFormState(task),
       sessionBinding: SessionBindingStrategy.PerRun,

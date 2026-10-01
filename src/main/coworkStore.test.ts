@@ -40,7 +40,8 @@ import { CoworkStore } from './coworkStore';
 test('defaults to allow-all while retaining an explicit permission choice', () => {
   expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.AllowAll);
   db.prepare('INSERT OR REPLACE INTO cowork_config (key, value) VALUES (?, ?)').run(
-    'permissionMode', CoworkPermissionMode.Ask,
+    'permissionMode',
+    CoworkPermissionMode.Ask,
   );
   expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.Ask);
 });

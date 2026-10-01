@@ -268,7 +268,7 @@ Use Tailwind `className` for structural composition and `cn()` from `@shared/lib
 
 ## 验证纪律
 
-- 代码改动（非文档）后运行 `npm run lint`，看完整输出，清零所有警告再提交。
+- 代码改动（非文档）后运行 `npm run lint`，看完整输出，清零所有警告再提交。提交前运行 `bun run format:check`，CI 会拦截未过 oxfmt 的改动。
 - 新建或修改测试文件后，必须运行该测试并迭代到通过。
 - 全量测试存在少量环境相关的存量失败（skill smoke、release manifest 等）。遇到失败先用 `git stash` 对照 HEAD 判断是否由你的改动引入：既不把存量失败算到自己头上，也不拿它为自己的回归开脱。
 

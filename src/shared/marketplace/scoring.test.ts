@@ -9,15 +9,27 @@ import {
 import type { MarketplaceModel } from './types';
 
 const model: MarketplaceModel = {
-  source: 'modelscope-gguf', id: 'demo/Qwen-7B-GGUF', repoId: 'demo/Qwen-7B-GGUF', name: 'Qwen 7B',
-  description: '', tags: ['chat'], sizes: ['desktop'], recommendedTag: 'Q4_K_M', capability: 'chat',
-  filePath: 'qwen-7b-q4_k_m.gguf', installed: false,
-  files: [{ path: 'qwen-7b-q4_k_m.gguf', sizeBytes: 4 * 1024 ** 3, sha256: 'abc', isRecommended: true }],
+  source: 'modelscope-gguf',
+  id: 'demo/Qwen-7B-GGUF',
+  repoId: 'demo/Qwen-7B-GGUF',
+  name: 'Qwen 7B',
+  description: '',
+  tags: ['chat'],
+  sizes: ['desktop'],
+  recommendedTag: 'Q4_K_M',
+  capability: 'chat',
+  filePath: 'qwen-7b-q4_k_m.gguf',
+  installed: false,
+  files: [
+    { path: 'qwen-7b-q4_k_m.gguf', sizeBytes: 4 * 1024 ** 3, sha256: 'abc', isRecommended: true },
+  ],
   evidence: [{ source: 'ModelScope', kind: 'modelscope', label: 'files', confidence: 'A' }],
 };
 
 const gpuSnapshot: NvidiaSmiSnapshot = {
-  source: 'nvidia-smi', available: true, checkedAt: new Date().toISOString(),
+  source: 'nvidia-smi',
+  available: true,
+  checkedAt: new Date().toISOString(),
   gpus: [
     { index: 0, name: 'RTX 4060', memoryTotalMiB: 8192, memoryFreeMiB: 7000 },
     { index: 1, name: 'RTX 4060', memoryTotalMiB: 8192, memoryFreeMiB: 7000 },
@@ -25,7 +37,11 @@ const gpuSnapshot: NvidiaSmiSnapshot = {
 };
 
 const memorySnapshot: SystemMemorySnapshot = {
-  source: 'system', available: true, checkedAt: new Date().toISOString(), totalMemoryMiB: 65536, freeMemoryMiB: 48000,
+  source: 'system',
+  available: true,
+  checkedAt: new Date().toISOString(),
+  totalMemoryMiB: 65536,
+  freeMemoryMiB: 48000,
 };
 
 describe('marketplace device scoring', () => {
@@ -72,7 +88,13 @@ describe('marketplace device scoring', () => {
   it('sums split GGUF shards before deciding CPU fit', () => {
     const profile = createMarketplaceHardwareProfile(
       { source: 'nvidia-smi', available: false, checkedAt: new Date().toISOString(), gpus: [] },
-      { source: 'system', available: true, checkedAt: new Date().toISOString(), totalMemoryMiB: 16 * 1024, freeMemoryMiB: 16 * 1024 },
+      {
+        source: 'system',
+        available: true,
+        checkedAt: new Date().toISOString(),
+        totalMemoryMiB: 16 * 1024,
+        freeMemoryMiB: 16 * 1024,
+      },
     );
     const splitModel: MarketplaceModel = {
       ...model,
@@ -111,7 +133,10 @@ describe('marketplace device scoring', () => {
 
   it('does not guess fit when catalog file size is unknown', () => {
     const profile = createMarketplaceHardwareProfile(gpuSnapshot, memorySnapshot);
-    const result = scoreMarketplaceModel({ ...model, files: [], filePath: undefined }, { hardware: profile });
+    const result = scoreMarketplaceModel(
+      { ...model, files: [], filePath: undefined },
+      { hardware: profile },
+    );
     expect(result.fit.status).toBe('unknown');
   });
 });

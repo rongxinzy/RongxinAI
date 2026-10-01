@@ -1,4 +1,8 @@
-import type { LlamaCppModel, LlamaCppModelPreference, LlamaCppRunningModel } from '../../../../shared/llamacpp';
+import type {
+  LlamaCppModel,
+  LlamaCppModelPreference,
+  LlamaCppRunningModel,
+} from '../../../../shared/llamacpp';
 
 export const MODEL_INSPECTOR_CONTEXT_MIN = 4 * 1024;
 export const MODEL_INSPECTOR_CONTEXT_MAX = 128 * 1024;
@@ -62,7 +66,10 @@ export function getModelInspectorMemoryProjection(input: {
   };
 }
 
-export function parseModelInspectorContextK(value: string, contextLimit: number): number | undefined {
+export function parseModelInspectorContextK(
+  value: string,
+  contextLimit: number,
+): number | undefined {
   const parsedK = Number(value.trim());
   if (!Number.isFinite(parsedK) || !Number.isInteger(parsedK)) return undefined;
 

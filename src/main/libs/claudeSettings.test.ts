@@ -644,22 +644,22 @@ test('resolves custom providers without an API key for anonymous compatible endp
     `${CustomProviderKey.OpenAI}/openai-model`,
   );
   expect(openAIResolution.config).toEqual({
-      apiKey: AnonymousApiKeyPlaceholder,
-      baseURL: 'http://127.0.0.1:8081/v1',
-      model: 'openai-model',
-      apiType: 'openai',
-    });
+    apiKey: AnonymousApiKeyPlaceholder,
+    baseURL: 'http://127.0.0.1:8081/v1',
+    model: 'openai-model',
+    apiType: 'openai',
+  });
   expect(openAIResolution.providerMetadata?.usesAnonymousAccess).toBe(true);
 
   const anthropicResolution = resolveRawApiConfigForModelRef(
     `${CustomProviderKey.Anthropic}/anthropic-model`,
   );
   expect(anthropicResolution.config).toEqual({
-      apiKey: AnonymousApiKeyPlaceholder,
-      baseURL: 'http://127.0.0.1:8082',
-      model: 'anthropic-model',
-      apiType: 'anthropic',
-    });
+    apiKey: AnonymousApiKeyPlaceholder,
+    baseURL: 'http://127.0.0.1:8082',
+    model: 'anthropic-model',
+    apiType: 'anthropic',
+  });
   expect(anthropicResolution.providerMetadata?.usesAnonymousAccess).toBe(true);
   expect(resolveAllEnabledProviderConfigs()).toEqual(
     expect.arrayContaining([

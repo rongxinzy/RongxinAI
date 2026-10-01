@@ -81,10 +81,9 @@ test('normalizeAppWindowState rounds stored values before later fitting', () => 
 });
 
 test('resolveInitialAppWindowState raises older saved bounds to the minimum size', () => {
-  const state = resolveInitialAppWindowState(
-    { x: 10, y: 20, width: 960, height: 640 },
-    [{ x: 0, y: 0, width: 1920, height: 1080 }],
-  );
+  const state = resolveInitialAppWindowState({ x: 10, y: 20, width: 960, height: 640 }, [
+    { x: 0, y: 0, width: 1920, height: 1080 },
+  ]);
 
   expect(state.width).toBe(MIN_APP_WINDOW_WIDTH);
   expect(state.height).toBe(MIN_APP_WINDOW_HEIGHT);

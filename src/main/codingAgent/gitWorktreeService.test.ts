@@ -71,7 +71,11 @@ test('previews and applies an untracked collaborator file without staging it', a
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
   const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({ repositoryRoot: root, baseline: 'HEAD', laneId: 'lane-new' });
+  const worktree = await service.create({
+    repositoryRoot: root,
+    baseline: 'HEAD',
+    laneId: 'lane-new',
+  });
   await writeFile(path.join(worktree, 'new-module.ts'), 'export const created = true;\n');
 
   await expect(service.getWorktreeDiff(worktree)).resolves.toContain('new-module.ts');
@@ -91,7 +95,11 @@ test('applies a mixed tracked and untracked collaborator patch', async () => {
   await git(root, ['add', '.']);
   await git(root, ['commit', '-m', 'baseline']);
   const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
-  const worktree = await service.create({ repositoryRoot: root, baseline: 'HEAD', laneId: 'lane-mixed' });
+  const worktree = await service.create({
+    repositoryRoot: root,
+    baseline: 'HEAD',
+    laneId: 'lane-mixed',
+  });
   await writeFile(path.join(worktree, 'state.txt'), 'updated');
   await writeFile(path.join(worktree, 'new-file.ts'), 'export {};\n');
 
@@ -120,9 +128,9 @@ test('reports a conflict and preserves the primary workspace when a patch no lon
   await writeFile(path.join(worktree, 'state.txt'), 'collaborator change');
   await writeFile(path.join(root, 'state.txt'), 'primary change');
 
-  await expect(service.applyWorktreeDiff({ repositoryRoot: root, worktreeRoot: worktree })).rejects.toBeInstanceOf(
-    GitWorktreeConflictError,
-  );
+  await expect(
+    service.applyWorktreeDiff({ repositoryRoot: root, worktreeRoot: worktree }),
+  ).rejects.toBeInstanceOf(GitWorktreeConflictError);
   expect(await readFile(path.join(root, 'state.txt'), 'utf8')).toBe('primary change');
   await service.remove(root, worktree);
 });

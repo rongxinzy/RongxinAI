@@ -22,11 +22,7 @@ function SettingsToggleRow({
       <h4 className="mb-3 text-sm font-medium text-foreground">{label}</h4>
       <label className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">{description}</span>
-        <Switch
-          checked={checked}
-          onCheckedChange={onCheckedChange}
-          disabled={disabled}
-        />
+        <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
       </label>
     </div>
   );

@@ -15,8 +15,8 @@ export const isSectionWorkspaceActive = (
 ): boolean =>
   Boolean(
     session &&
-      session.workspaceId === workspaceId &&
-      (session.source === CoworkSessionSource.Scheduled) === scheduled,
+    session.workspaceId === workspaceId &&
+    (session.source === CoworkSessionSource.Scheduled) === scheduled,
   );
 
 /**

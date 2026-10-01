@@ -41,9 +41,7 @@ test('each desktop target keeps the private document and Python toolchain resour
     const mcpResource = target.extraResources?.find(resource => resource.from === 'MCPs');
     assert.ok(mcpResource);
     assert.deepEqual(
-      (mcpResource as { filter?: string[] }).filter?.includes(
-        '!feishu/runtime/**',
-      ),
+      (mcpResource as { filter?: string[] }).filter?.includes('!feishu/runtime/**'),
       true,
     );
   }

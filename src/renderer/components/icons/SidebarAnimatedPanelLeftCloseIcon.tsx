@@ -1,4 +1,10 @@
-import { motion, useAnimation, useReducedMotion, type Transition, type Variants } from 'motion/react';
+import {
+  motion,
+  useAnimation,
+  useReducedMotion,
+  type Transition,
+  type Variants,
+} from 'motion/react';
 import type { HTMLAttributes, MouseEvent } from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 

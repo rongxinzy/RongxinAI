@@ -6,7 +6,10 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const projectRoot = path.resolve(__dirname, '..');
-const inputPath = path.resolve(projectRoot, process.argv[2] || 'public/zhiyuan-logo-light-1600.png');
+const inputPath = path.resolve(
+  projectRoot,
+  process.argv[2] || 'public/zhiyuan-logo-light-1600.png',
+);
 const outputDir = path.resolve(projectRoot, 'resources/tray');
 
 function run(cmd, args) {

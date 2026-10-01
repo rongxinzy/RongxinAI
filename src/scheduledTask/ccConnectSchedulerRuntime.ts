@@ -29,7 +29,10 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   constructor(
     private readonly store: SqliteScheduledTaskStore,
     private readonly client: TriggerClient,
-    private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<{ sessionId?: string | null; output?: string | null }>,
+    private readonly execute: (
+      task: ScheduledTask,
+      run: ScheduledTaskRun,
+    ) => Promise<{ sessionId?: string | null; output?: string | null }>,
     private readonly deliveryDispatcher?: ScheduledTaskDeliveryDispatcher,
     private readonly activityService?: ActivityService,
     private readonly events?: SchedulerEventSink,
@@ -46,7 +49,12 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     }
     const scheduleVersion = task.scheduleVersion;
     if (!scheduleVersion) throw new Error(`Scheduled task ${task.id} has no scheduleVersion`);
-    await this.client.upsert({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion, schedule: task.schedule });
+    await this.client.upsert({
+      accountId: SchedulerClockAccount,
+      taskId: task.id,
+      scheduleVersion,
+      schedule: task.schedule,
+    });
   }
 
   async remove(taskId: string): Promise<void> {
@@ -79,24 +87,49 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     await this.executeAndFinish(task, run);
   }
 
-  async handleTrigger(input: { accountId: string; taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void> {
+  async handleTrigger(input: {
+    accountId: string;
+    taskId: string;
+    scheduleVersion: string;
+    scheduledAt: string;
+  }): Promise<void> {
     const task = this.store.get(input.taskId);
     if (!task || input.accountId !== SchedulerClockAccount) return;
     const scheduledAtMs = Date.parse(input.scheduledAt);
     if (!Number.isFinite(scheduledAtMs)) return;
-    const run = this.store.claimTrigger({ ...input, scheduledAt: new Date(scheduledAtMs).toISOString() });
+    const run = this.store.claimTrigger({
+      ...input,
+      scheduledAt: new Date(scheduledAtMs).toISOString(),
+    });
     if (!run) return; // disabled/stale/duplicate triggers are intentionally harmless.
     await this.executeAndFinish(task, run);
   }
 
   private async executeAndFinish(task: ScheduledTask, run: ScheduledTaskRun): Promise<void> {
-    this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Running, startedAt: Date.parse(run.startedAt), taskName: task.name, inputPreview: task.payload.kind === 'agentTurn' ? task.payload.message : task.payload.text });
+    this.activityService?.upsertBestEffort({
+      id: run.id,
+      source: ActivitySource.ScheduledTask,
+      status: ActivityStatus.Running,
+      startedAt: Date.parse(run.startedAt),
+      taskName: task.name,
+      inputPreview: task.payload.kind === 'agentTurn' ? task.payload.message : task.payload.text,
+    });
     this.publishRun(run, task.name);
     try {
       const result = await this.execute(task, run);
-      const completedRun = this.store.finishRun(run.id, { status: TaskStatus.Success, sessionId: result.sessionId ?? null });
+      const completedRun = this.store.finishRun(run.id, {
+        status: TaskStatus.Success,
+        sessionId: result.sessionId ?? null,
+      });
       this.publishRun(completedRun, task.name);
-      this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Completed, taskName: task.name, sessionId: result.sessionId ?? undefined, replyPreview: result.output ?? undefined });
+      this.activityService?.upsertBestEffort({
+        id: run.id,
+        source: ActivitySource.ScheduledTask,
+        status: ActivityStatus.Completed,
+        taskName: task.name,
+        sessionId: result.sessionId ?? undefined,
+        replyPreview: result.output ?? undefined,
+      });
       // Delivery is independently durable and best effort: a channel failure
       // must not turn a Pi-successful Run into an execution failure.
       try {
@@ -111,7 +144,13 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
         error: message,
       });
       this.publishRun(failedRun, task.name);
-      this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Failed, taskName: task.name, errorMessage: message });
+      this.activityService?.upsertBestEffort({
+        id: run.id,
+        source: ActivitySource.ScheduledTask,
+        status: ActivityStatus.Failed,
+        taskName: task.name,
+        errorMessage: message,
+      });
       throw error;
     }
   }
@@ -129,8 +168,9 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   }
 
   private async removeProjectionTask(task: ScheduledTask): Promise<void> {
-    try { await this.client.remove({ accountId: SchedulerClockAccount, taskId: task.id }); }
-    catch (error) {
+    try {
+      await this.client.remove({ accountId: SchedulerClockAccount, taskId: task.id });
+    } catch (error) {
       // A restarted sidecar has no in-memory registration; its 404 is already
       // the desired state and must not prevent the canonical mutation.
       if (!String(error).includes('HTTP 404')) throw error;

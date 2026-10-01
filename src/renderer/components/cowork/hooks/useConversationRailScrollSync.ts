@@ -74,9 +74,7 @@ export function useConversationRailScrollSync({
   const syncRailIndexToScrollPosition = useCallback(() => {
     if (isNavigatingRef.current) return;
 
-    const scrollElement = rootRef.current?.querySelector<HTMLElement>(
-      CONVERSATION_SCROLL_SELECTOR,
-    );
+    const scrollElement = rootRef.current?.querySelector<HTMLElement>(CONVERSATION_SCROLL_SELECTOR);
     const contentElement = scrollContainerRef.current;
     if (!scrollElement || !contentElement) return;
 
@@ -106,13 +104,7 @@ export function useConversationRailScrollSync({
 
     currentRailIndexRef.current = nextRailIndex;
     setCurrentRailIndex(nextRailIndex);
-  }, [
-    currentRailIndexRef,
-    isNavigatingRef,
-    rootRef,
-    scrollContainerRef,
-    setCurrentRailIndex,
-  ]);
+  }, [currentRailIndexRef, isNavigatingRef, rootRef, scrollContainerRef, setCurrentRailIndex]);
 
   // 2026/09/16 lixiang  滚动/内容尺寸变化时防抖同步轨道索引
   const scheduleSync = useMemo(
@@ -123,9 +115,7 @@ export function useConversationRailScrollSync({
   useEffect(() => {
     if (!sessionId) return undefined;
 
-    const scrollElement = rootRef.current?.querySelector<HTMLElement>(
-      CONVERSATION_SCROLL_SELECTOR,
-    );
+    const scrollElement = rootRef.current?.querySelector<HTMLElement>(CONVERSATION_SCROLL_SELECTOR);
     if (!scrollElement) return undefined;
 
     scrollElement.addEventListener('scroll', scheduleSync, { passive: true });

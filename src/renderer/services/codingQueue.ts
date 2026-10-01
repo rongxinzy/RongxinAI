@@ -26,34 +26,39 @@ class CodingQueueService {
   }
   async load(sessionId: string): Promise<CoworkPendingMessage[]> {
     const result = await window.electron.codingAgent.listPendingMessages(sessionId);
-    if (!result.success)
-      throw new Error(result.error || CodingErrorMessage.QueueLoadFailed);
+    if (!result.success) throw new Error(result.error || CodingErrorMessage.QueueLoadFailed);
     const items = result.items ?? [];
     this.publish(sessionId, items);
     return items;
   }
   update(sessionId: string, itemId: string, text: string) {
-    return window.electron.codingAgent.updatePendingMessage({ laneId: sessionId, itemId, text }).then(result => {
-      if (result.success) void this.load(sessionId);
-      return result;
-    });
+    return window.electron.codingAgent
+      .updatePendingMessage({ laneId: sessionId, itemId, text })
+      .then(result => {
+        if (result.success) void this.load(sessionId);
+        return result;
+      });
   }
   remove(sessionId: string, itemId: string) {
-    return window.electron.codingAgent.deletePendingMessage({ laneId: sessionId, itemId }).then(result => {
-      if (result.success) void this.load(sessionId);
-      return result;
-    });
+    return window.electron.codingAgent
+      .deletePendingMessage({ laneId: sessionId, itemId })
+      .then(result => {
+        if (result.success) void this.load(sessionId);
+        return result;
+      });
   }
   steer(sessionId: string, itemId: string) {
     const laneId = sessionId;
-    return window.electron.codingAgent.steerPendingMessage({
-      workspaceRoot: this.workspaceRoot,
-      laneId,
-      itemId,
-    }).then(result => {
-      if (result.success) void this.load(sessionId);
-      return result;
-    });
+    return window.electron.codingAgent
+      .steerPendingMessage({
+        workspaceRoot: this.workspaceRoot,
+        laneId,
+        itemId,
+      })
+      .then(result => {
+        if (result.success) void this.load(sessionId);
+        return result;
+      });
   }
   followUp(sessionId: string, itemId: string) {
     return window.electron.codingAgent
@@ -76,4 +81,5 @@ class CodingQueueService {
   }
 }
 
-export const createCodingQueueService = (workspaceRoot: string) => new CodingQueueService(workspaceRoot);
+export const createCodingQueueService = (workspaceRoot: string) =>
+  new CodingQueueService(workspaceRoot);

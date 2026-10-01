@@ -3,23 +3,27 @@ import path from 'node:path';
 import { expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { parseGitWorktreeList, publishRuntimeBinary, resolveSourceRoot } = require('./channel-runtime-host.cjs') as {
-  parseGitWorktreeList: (output: string) => string[];
-  resolveSourceRoot: (
-    rootDir: string,
-    options: {
-      environment: Record<string, string | undefined>;
-      fileSystem: { existsSync(filePath: string): boolean };
-      runCommand: () => { status: number; stdout: string };
-    },
-  ) => string;
-  publishRuntimeBinary: (
-    fileSystem: { rmSync(path: string, options: { force: boolean }): void; renameSync(from: string, to: string): void },
-    stagedBinary: string,
-    binaryPath: string,
-    revision: string,
-  ) => string;
-};
+const { parseGitWorktreeList, publishRuntimeBinary, resolveSourceRoot } =
+  require('./channel-runtime-host.cjs') as {
+    parseGitWorktreeList: (output: string) => string[];
+    resolveSourceRoot: (
+      rootDir: string,
+      options: {
+        environment: Record<string, string | undefined>;
+        fileSystem: { existsSync(filePath: string): boolean };
+        runCommand: () => { status: number; stdout: string };
+      },
+    ) => string;
+    publishRuntimeBinary: (
+      fileSystem: {
+        rmSync(path: string, options: { force: boolean }): void;
+        renameSync(from: string, to: string): void;
+      },
+      stagedBinary: string,
+      binaryPath: string,
+      revision: string,
+    ) => string;
+  };
 
 test('parses Git worktree porcelain output', () => {
   expect(
@@ -76,14 +80,18 @@ test('publishes a revision binary when the running executable is locked', () => 
         throw error;
       }
     },
-    renameSync(from: string, to: string) { renames.push([from, to]); },
+    renameSync(from: string, to: string) {
+      renames.push([from, to]);
+    },
   };
-  expect(publishRuntimeBinary(
-    fileSystem,
-    'cc-connect-sidecar.exe.staging',
-    'cc-connect-sidecar.exe',
-    'f9e3063123456789',
-  )).toBe('cc-connect-sidecar-f9e306312345.exe');
+  expect(
+    publishRuntimeBinary(
+      fileSystem,
+      'cc-connect-sidecar.exe.staging',
+      'cc-connect-sidecar.exe',
+      'f9e3063123456789',
+    ),
+  ).toBe('cc-connect-sidecar-f9e306312345.exe');
   expect(renames).toEqual([
     ['cc-connect-sidecar.exe.staging', 'cc-connect-sidecar-f9e306312345.exe'],
   ]);

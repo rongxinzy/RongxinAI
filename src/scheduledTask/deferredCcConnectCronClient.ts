@@ -18,12 +18,18 @@ export class DeferredCcConnectCronClient implements TriggerClient {
     this.desired.delete(`${task.accountId}:${task.taskId}`);
     const client = this.clients.get(task.accountId);
     if (!client) return;
-    try { await client.remove(task); }
-    catch (error) { if (!String(error).includes('HTTP 404')) throw error; }
+    try {
+      await client.remove(task);
+    } catch (error) {
+      if (!String(error).includes('HTTP 404')) throw error;
+    }
   }
   async attach(accountId: string, client: TriggerClient): Promise<void> {
     this.clients.set(accountId, client);
-    for (const task of this.desired.values()) if (task.accountId === accountId) await client.upsert(task);
+    for (const task of this.desired.values())
+      if (task.accountId === accountId) await client.upsert(task);
   }
-  detach(accountId: string): void { this.clients.delete(accountId); }
+  detach(accountId: string): void {
+    this.clients.delete(accountId);
+  }
 }

@@ -20,9 +20,7 @@ describe('parseUserMessageForDisplay', () => {
       '- 类型: image, 路径: C:\\media\\image.jpg, MIME: image/jpeg',
     ].join('\n');
 
-    expect(parseUserMessageForDisplay(input)).toBe(
-      '请看这张图\nhttps://example.com/image.jpg',
-    );
+    expect(parseUserMessageForDisplay(input)).toBe('请看这张图\nhttps://example.com/image.jpg');
   });
 
   test('removes standalone media placeholders without URLs', () => {
@@ -32,11 +30,7 @@ describe('parseUserMessageForDisplay', () => {
   });
 
   test('removes channel timestamp metadata and preserves user content', () => {
-    const input = [
-      'System: [2026-04-28 11:53:11 GMT+8] From user889589',
-      '',
-      'hello',
-    ].join('\n');
+    const input = ['System: [2026-04-28 11:53:11 GMT+8] From user889589', '', 'hello'].join('\n');
 
     expect(parseUserMessageForDisplay(input)).toBe('hello');
   });
