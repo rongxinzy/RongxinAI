@@ -12,7 +12,11 @@ interface Event {
   displayResultText?: string;
 }
 
-/** Preserves SDK event order while pure tool display transforms run in the shared worker pool. */
+/**
+ * Preserves SDK event order while pure tool display transforms run in the shared worker pool.
+ * A failed transform degrades to passing the raw event through; `failure` is reserved for
+ * unrecoverable stream errors (consumer threw, queue limit exceeded) and stops the queue.
+ */
 export class PiEventProjectionQueue<T extends Event> {
   private tail: Promise<void> | undefined;
   private queued = 0;
@@ -63,11 +67,18 @@ export class PiEventProjectionQueue<T extends Event> {
         if (this.signal.aborted || this.failure) return;
         let projected = event;
         if (event.type === PiRunEvent.ToolEnd) {
-          const result = await this.transform(
-            { kind: TextWorkerKind.Tool, result: event.result },
-            this.signal,
-          );
-          projected = { ...event, displayResultText: result.content };
+          try {
+            const result = await this.transform(
+              { kind: TextWorkerKind.Tool, result: event.result },
+              this.signal,
+            );
+            projected = { ...event, displayResultText: result.content };
+          } catch (error) {
+            if (this.signal.aborted) return;
+            // A failed display transform must not stall the session stream:
+            // report it and pass the event through without displayResultText.
+            this.onError(error);
+          }
         }
         if (!this.signal.aborted) this.consume(projected);
       })

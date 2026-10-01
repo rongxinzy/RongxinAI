@@ -37,8 +37,12 @@ import type { PiExtensionFactory } from './piExtensionTypes';
 
 export { PiSubagentToolName } from './piSubagentConstants';
 
-/** Per-subagent run timeout. */
-export const SUBAGENT_TIMEOUT_MS = 600_000;
+/**
+ * Per-subagent run timeout. Long-running delegation (research sweeps, multi-file
+ * recon on slow local models) routinely exceeds ten minutes, so the budget
+ * matches a long Work turn rather than a single tool call.
+ */
+export const SUBAGENT_TIMEOUT_MS = 1_800_000;
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
@@ -493,7 +497,8 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       '\n\nModes (mutually exclusive):\n' +
       '- Single: {agent, task} — delegate one task to one agent.\n' +
       `- Parallel: {parallel: [{agent, task}, ...]} — run agents concurrently (max ${SUBAGENT_PARALLEL_LIMIT} at once).\n` +
-      `- Chain: {chain: [{agent, task}, ...]} — run agents sequentially; use ${CHAIN_PREVIOUS_PLACEHOLDER} in a task to inject the previous step's output.`,
+      `- Chain: {chain: [{agent, task}, ...]} — run agents sequentially; use ${CHAIN_PREVIOUS_PLACEHOLDER} in a task to inject the previous step's output.\n` +
+      `Each subagent run times out after ${Math.round(SUBAGENT_TIMEOUT_MS / 1000)} seconds.`,
 
     parameters: {
       type: 'object',

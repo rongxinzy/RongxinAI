@@ -1149,7 +1149,7 @@ test('a work run can look around and commit a text contract', async () => {
   }
 });
 
-test('the contract gate explains the previous failure and stops a spinning run', async () => {
+test('the contract gate explains the previous failure and forces a correction at the ceiling', async () => {
   const { db, service } = createService();
   try {
     const { task, run } = service.beginRun({
@@ -1182,11 +1182,64 @@ test('the contract gate explains the previous failure and stops a spinning run',
 
     await authorize('call-3');
     const fourth = await authorize('call-4');
-    // The breaker must tell the runtime to end the turn, not just flip the run
-    // status in the database.
-    expect(fourth.terminateRun).toBe(true);
+    // The first ceiling hit asks the runtime to force a set_task_output
+    // correction instead of killing the run.
+    expect(fourth.allow).toBe(false);
+    expect(fourth.forceContractCorrection).toBe(true);
+    expect(fourth.terminateRun).toBeUndefined();
+    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Running);
+  } finally {
+    db.close();
+  }
+});
+
+test('the contract gate stops a spinning run only after the correction grace is spent', async () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'sort the downloaded files into folders',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+        outputRequirements: [],
+      },
+    });
+    const authorize = (toolCallId: string) =>
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: run.id,
+        toolCallId,
+        toolName: 'bash',
+        toolInput: { command: 'python move_files.py' },
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
+
+    await authorize('call-1');
+    await authorize('call-2');
+    await authorize('call-3');
+    const fourth = await authorize('call-4');
+    expect(fourth.forceContractCorrection).toBe(true);
+
+    // The runtime grants the grace exactly once per run.
+    expect(service.grantOutputContractCorrectionGrace(run.id)).toBe(true);
+    expect(service.grantOutputContractCorrectionGrace(run.id)).toBe(false);
+
+    // The grace window tolerates further denials without stopping the run.
+    const fifth = await authorize('call-5');
+    expect(fifth.allow).toBe(false);
+    expect(fifth.terminateRun).toBeUndefined();
+    expect(fifth.forceContractCorrection).toBeUndefined();
+    const sixth = await authorize('call-6');
+    expect(sixth.terminateRun).toBeUndefined();
+    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Running);
+
+    // With the grace spent, the breaker fails the run and tells the runtime to
+    // end the turn instead of flipping only the database status.
+    const seventh = await authorize('call-7');
+    expect(seventh.terminateRun).toBe(true);
     expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Failed);
-    const afterFailure = await authorize('call-5');
+    const afterFailure = await authorize('call-8');
     expect(afterFailure.terminateRun).toBe(true);
     expect(afterFailure.reason).toContain('does not belong to the active run');
   } finally {

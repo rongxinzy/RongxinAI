@@ -4,6 +4,7 @@ import type {
   ProviderModelDiscoveryResult,
 } from '@shared/providers';
 import {
+  DiscoveryCapabilitiesSource,
   ModelCapabilityStatus,
   ProviderModelOrigin,
   type ModelCapabilities,
@@ -57,15 +58,24 @@ function applyDiscoveredMetadata(
 
   const discoveredCapabilities = discovered.capabilities;
   if (discoveredCapabilities) {
+    // A runtime probe (llama.cpp /props) measures the loaded model directly, so
+    // its verdicts may overwrite a stale stored one — including a downgrade
+    // from Supported to Unsupported. Unmarked discovery payloads keep the
+    // conservative fill-only-missing behavior. Entries the user edited by hand
+    // (origin "user") are never overwritten by a probe.
+    const probeSourced =
+      discovered.capabilitiesSource === DiscoveryCapabilitiesSource.RuntimeProbe &&
+      current.origin !== ProviderModelOrigin.User;
     const currentCapabilities: MutableModelCapabilities = { ...next.capabilities };
     let capabilitiesChanged = false;
     for (const key of MODEL_CAPABILITY_KEYS) {
       const discoveredStatus = discoveredCapabilities[key];
       const currentStatus = currentCapabilities[key];
+      if (!discoveredStatus || discoveredStatus === ModelCapabilityStatus.Unknown) continue;
       if (
-        discoveredStatus &&
-        discoveredStatus !== ModelCapabilityStatus.Unknown &&
-        (!currentStatus || currentStatus === ModelCapabilityStatus.Unknown)
+        !currentStatus ||
+        currentStatus === ModelCapabilityStatus.Unknown ||
+        (probeSourced && currentStatus !== discoveredStatus)
       ) {
         currentCapabilities[key] = discoveredStatus;
         changed = true;
@@ -75,13 +85,13 @@ function applyDiscoveredMetadata(
     if (capabilitiesChanged) {
       next.capabilities = currentCapabilities;
     }
-    if (
-      next.supportsImage === undefined &&
-      discoveredCapabilities.imageInput &&
-      discoveredCapabilities.imageInput !== ModelCapabilityStatus.Unknown
-    ) {
-      next.supportsImage = discoveredCapabilities.imageInput === ModelCapabilityStatus.Supported;
-      changed = true;
+    const discoveredImageInput = discoveredCapabilities.imageInput;
+    if (discoveredImageInput && discoveredImageInput !== ModelCapabilityStatus.Unknown) {
+      const supportsImage = discoveredImageInput === ModelCapabilityStatus.Supported;
+      if (probeSourced ? next.supportsImage !== supportsImage : next.supportsImage === undefined) {
+        next.supportsImage = supportsImage;
+        changed = true;
+      }
     }
   }
 

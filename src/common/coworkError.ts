@@ -24,6 +24,14 @@ export const CoworkErrorKind = {
   InputTooLong: 'input_too_long',
   /** Model not found / not available */
   ModelNotFound: 'model_not_found',
+  /**
+   * The server rejected a modality the client sent — deterministic, retrying
+   * with the same payload always fails (e.g. llama.cpp without an mmproj
+   * vision projector answering "image input is not supported").
+   */
+  ModelCapabilityUnsupported: 'model_capability_unsupported',
+  /** The provider/model this session uses is disabled or no longer configured */
+  ProviderUnavailable: 'provider_unavailable',
   /** Content filtered by moderation */
   ContentFiltered: 'content_filtered',
   /** Gateway disconnected unexpectedly */
@@ -130,6 +138,12 @@ const RULES: ErrorRule[] = [
     pattern: /model.*not.*(?:found|exist)/i,
   },
 
+  // ── Provider unavailable (disabled or model removed since the session ran) ──
+  {
+    kind: CoworkErrorKind.ProviderUnavailable,
+    pattern: /provider\s+\S.*\bis not enabled\b|no enabled provider found/i,
+  },
+
   // ── Content filtered ────────────────────────────────────────────────────
   {
     kind: CoworkErrorKind.ContentFiltered,
@@ -161,6 +175,21 @@ const RULES: ErrorRule[] = [
     kind: CoworkErrorKind.NetworkError,
     pattern:
       /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|could not connect|connection.*refused|network.*error/i,
+  },
+
+  // ── Model capability mismatch (must precede ServerError: llama.cpp without a
+  // vision projector answers 500 "image input is not supported … mmproj", which
+  // /50[023]/ would otherwise classify as a transient server error) ────────────
+  {
+    kind: CoworkErrorKind.ModelCapabilityUnsupported,
+    // A bare "mmproj" mention is not a capability verdict (logs mention the
+    // projector when loading it, too) — only failure wording after it counts.
+    pattern:
+      /image input is not supported|mmproj[^"\n]*(?:missing|not\s+\w+|fail\w*|unsupported)|does not support (?:image|vision|audio|video)(?: input)?|modality not supported/i,
+    extract: (error: string) => {
+      const m = error.match(/\b([45]\d{2})\b/);
+      return m ? { statusCode: parseInt(m[1], 10) } : {};
+    },
   },
 
   // ── Server ──────────────────────────────────────────────────────────────
@@ -292,6 +321,8 @@ export function getErrorLogLevel(kind: CoworkErrorKind): ErrorLogLevel {
     case CoworkErrorKind.BudgetExceeded:
     case CoworkErrorKind.InputTooLong:
     case CoworkErrorKind.ModelNotFound:
+    case CoworkErrorKind.ModelCapabilityUnsupported:
+    case CoworkErrorKind.ProviderUnavailable:
     case CoworkErrorKind.ContentFiltered:
     case CoworkErrorKind.CouldNotProcessPdf:
       return 'error';
@@ -355,6 +386,10 @@ export function getUserErrorI18nKey(kind: CoworkErrorKind): string {
       return 'coworkErrorInputTooLong';
     case CoworkErrorKind.ModelNotFound:
       return 'coworkErrorModelNotFound';
+    case CoworkErrorKind.ModelCapabilityUnsupported:
+      return 'coworkErrorModelCapabilityUnsupported';
+    case CoworkErrorKind.ProviderUnavailable:
+      return 'coworkErrorProviderUnavailable';
     case CoworkErrorKind.ContentFiltered:
       return 'coworkErrorContentFiltered';
     case CoworkErrorKind.GatewayDisconnected:

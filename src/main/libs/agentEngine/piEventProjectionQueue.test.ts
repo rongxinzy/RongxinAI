@@ -35,6 +35,36 @@ test('tool transformation preserves event order through finalization', async () 
   expect(error).not.toHaveBeenCalled();
 });
 
+test('a failed transform degrades to raw passthrough without stalling later events', async () => {
+  let transformCalls = 0;
+  const transform = vi.fn((): Promise<TextWorkerOutput> => {
+    transformCalls += 1;
+    return transformCalls === 1
+      ? Promise.reject(new Error('worker exploded'))
+      : Promise.resolve({ content: 'ok', offset: 0, truncated: false });
+  });
+  const consumed: Array<{ type: string; displayResultText?: string }> = [];
+  const error = vi.fn();
+  const controller = new AbortController();
+  const queue = new PiEventProjectionQueue<{
+    type: string;
+    result?: unknown;
+    displayResultText?: string;
+  }>(event => consumed.push(event), controller.signal, error, transform);
+  queue.push({ type: PiRunEvent.ToolEnd, result: { text: 'x'.repeat(70_000) } });
+  queue.push({ type: PiRunEvent.ToolEnd, result: { text: 'y'.repeat(70_000) } });
+  queue.push({ type: PiRunEvent.AgentEnd });
+  await queue.drain();
+  expect(consumed.map(event => event.type)).toEqual([
+    PiRunEvent.ToolEnd,
+    PiRunEvent.ToolEnd,
+    PiRunEvent.AgentEnd,
+  ]);
+  expect(consumed[0].displayResultText).toBeUndefined();
+  expect(consumed[1].displayResultText).toBe('ok');
+  expect(error).toHaveBeenCalledOnce();
+});
+
 test('abort prevents delayed worker output from resurrecting a stopped run', async () => {
   let finish: (value: TextWorkerOutput) => void = () => {};
   const transform = () =>
