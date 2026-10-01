@@ -95,25 +95,37 @@ export const UserBubble: React.FC<{
         []) as CoworkImageAttachment[],
     [message.metadata],
   );
+  const imageAttachmentPaths = useMemo(
+    () =>
+      new Set(
+        imageAttachments.map(image => image.path).filter((path): path is string => Boolean(path)),
+      ),
+    [imageAttachments],
+  );
   const fileAttachments = useMemo(() => {
     const persisted = ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
       []) as CoworkFileAttachment[];
-    const knownPaths = new Set(persisted.map(file => file.path));
+    // 正文里的「输入文件: 路径」行只作为旧消息的回退来源;路径已由图片或文件
+    // 附件元数据承载时跳过,否则同一张图会同时出现在两类附件里渲染两次。
+    const knownPaths = new Set([...persisted.map(file => file.path), ...imageAttachmentPaths]);
     const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
       file => !knownPaths.has(file.path),
     );
     return [...persisted, ...fallbacks];
-  }, [message.content, message.metadata]);
+  }, [imageAttachmentPaths, message.content, message.metadata]);
   const textContent = useMemo(() => {
     const contentWithoutFallbacks = removePromptAttachmentFallbacks(displayContent);
-    if (fileAttachments.length === 0) return contentWithoutFallbacks;
-    const filePaths = new Set(fileAttachments.map(file => file.path));
+    const attachmentPaths = new Set([
+      ...fileAttachments.map(file => file.path),
+      ...imageAttachmentPaths,
+    ]);
+    if (attachmentPaths.size === 0) return contentWithoutFallbacks;
     return contentWithoutFallbacks
       .split(/\r?\n/)
-      .filter(line => !Array.from(filePaths).some(path => line.includes(path)))
+      .filter(line => !Array.from(attachmentPaths).some(path => line.includes(path)))
       .join('\n')
       .replace(/^\n+|\n+$/g, '');
-  }, [displayContent, fileAttachments]);
+  }, [displayContent, fileAttachments, imageAttachmentPaths]);
   const inlineAttachments = useMemo<CoworkInlineAttachment[]>(
     () => [
       ...imageAttachments.map((image, index) => ({
