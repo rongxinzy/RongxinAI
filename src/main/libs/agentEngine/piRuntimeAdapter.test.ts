@@ -111,6 +111,7 @@ const hoisted = vi.hoisted(() => {
     ),
     mockRegisterPiOpenAICompatTokenRefresher: vi.fn(),
     mockGetCommunityAuthAccessToken: vi.fn(async () => 'community-access-token'),
+    mockDisableModelImageInputCapability: vi.fn(() => ({ changed: true })),
     mockResolveRawApiConfig: vi.fn(() => ({
       config: {
         apiKey: 'sk-test',
@@ -249,6 +250,10 @@ vi.mock('../../communityAuthSession', () => ({
   getModelPoolAccessToken: hoisted.mockGetCommunityAuthAccessToken,
 }));
 
+vi.mock('./piCapabilityCorrection', () => ({
+  disableModelImageInputCapability: hoisted.mockDisableModelImageInputCapability,
+}));
+
 vi.mock('../coworkUtil', async importOriginal => {
   const actual = await importOriginal<typeof import('../coworkUtil')>();
   return {
@@ -259,7 +264,9 @@ vi.mock('../coworkUtil', async importOriginal => {
 });
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { AGENT_SETTLE_FALLBACK_MS } from './piAgentSettleFallback';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { t } from '../../i18n';
 import { PiDocumentReaderSystemPrompt, PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
@@ -349,6 +356,7 @@ describe('PiRuntimeAdapter', () => {
         type: string;
       }) => void;
       listener({ type: 'agent_end' });
+      listener({ type: 'agent_settled' });
 
       expect(rollup).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -529,6 +537,7 @@ describe('PiRuntimeAdapter', () => {
         adapter.on('complete', onComplete);
         const listener = mockSession.subscribe.mock.calls.at(-1)![0];
         listener({ type: 'agent_end' });
+        listener({ type: 'agent_settled' });
         await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
         expect(adapter.isSessionRunning('native-work')).toBe(false);
         expect(mockSession.prompt).toHaveBeenCalledTimes(promptCount);
@@ -1260,6 +1269,7 @@ describe('PiRuntimeAdapter', () => {
       await expect(adapter.compactSession('compact-session')).rejects.toThrow(/still running/);
 
       subscribeListener()({ type: 'agent_end' });
+      subscribeListener()({ type: 'agent_settled' });
 
       await expect(adapter.compactSession('compact-session')).resolves.toEqual({
         cancelled: false,
@@ -1275,6 +1285,7 @@ describe('PiRuntimeAdapter', () => {
       expect(action).not.toHaveBeenCalled();
 
       subscribeListener()({ type: 'agent_end' });
+      subscribeListener()({ type: 'agent_settled' });
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(action).toHaveBeenCalledTimes(1);
@@ -1664,6 +1675,143 @@ describe('PiRuntimeAdapter', () => {
       expect(onError).toHaveBeenCalledWith(
         'test',
         expect.objectContaining({ message: expect.stringContaining('output contract') }),
+      );
+    });
+
+    it('steers the model back to set_task_output when the gate asks for a forced correction', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const authorizeToolCall = vi.fn().mockResolvedValue({
+        allow: false,
+        reason: 'Before executing tools, call set_task_output to declare deliverables.',
+        forceContractCorrection: true,
+      });
+      const grantOutputContractCorrectionGrace = vi.fn().mockReturnValue(true);
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        grantOutputContractCorrectionGrace,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'gated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      // The tool call stays blocked, but the run survives: the live session is
+      // steered into exactly one set_task_output call instead of being aborted.
+      expect(result).toMatchObject({ block: true });
+      expect(grantOutputContractCorrectionGrace).toHaveBeenCalledWith('run-1');
+      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('set_task_output'));
+      expect(mockSession.abort.mock.calls.length).toBe(abortsBeforeCall);
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    it('terminates the run when the forced correction cannot be delivered', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const authorizeToolCall = vi.fn().mockResolvedValue({
+        allow: false,
+        reason: 'Before executing tools, call set_task_output to declare deliverables.',
+        forceContractCorrection: true,
+      });
+      // The grace was already spent: the runtime must fall back to killing the run.
+      const grantOutputContractCorrectionGrace = vi.fn().mockReturnValue(false);
+      const failRun = vi.fn();
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        grantOutputContractCorrectionGrace,
+        failRun,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'gated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      expect(result).toMatchObject({ block: true });
+      expect(mockSession.steer).not.toHaveBeenCalled();
+      expect(failRun).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ code: 'output_contract_uncommitted' }),
+      );
+      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
+      expect(onError).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ message: expect.stringContaining('set_task_output') }),
       );
     });
 
@@ -2924,6 +3072,7 @@ describe('PiRuntimeAdapter', () => {
       expect(updates.some(update => update.metadata?.isFinalAnswer === true)).toBe(false);
 
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
 
       expect(updates[updates.length - 1]).toEqual({
         content: 'Intermediate or final answer',
@@ -2982,6 +3131,7 @@ describe('PiRuntimeAdapter', () => {
         summary: 'Second iteration complete',
       });
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
 
       const finalAnswers = updates.filter(update => update.metadata?.isFinalAnswer === true);
       expect(finalAnswers).toHaveLength(1);
@@ -3024,6 +3174,7 @@ describe('PiRuntimeAdapter', () => {
         },
       });
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
 
       expect(
         updates.some(
@@ -3529,6 +3680,45 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
+    it('downgrades image capability and cancels the retry for a capability mismatch', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt(
+        '500 {"code":500,"message":"image input is not supported - hint: the mmproj file is missing","type":"server_error"}',
+      );
+
+      // The stored capability verdict gets corrected before the run settles.
+      expect(hoisted.mockDisableModelImageInputCapability).toHaveBeenCalledWith(
+        'llamacpp',
+        'qwen-local',
+      );
+      expect(errors).toHaveLength(0);
+
+      // The deterministic failure is sticky: the SDK retry is cancelled and the
+      // original error surfaces once when the run settles.
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      await Promise.resolve();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.ModelCapabilityUnsupported);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(completes).toHaveLength(0);
+    });
+
+    it('does not touch the image capability verdict for non-image capability errors', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('500 {"code":500,"message":"this model does not support audio input"}');
+
+      expect(hoisted.mockDisableModelImageInputCapability).not.toHaveBeenCalled();
+      listener!({ type: 'agent_settled' });
+      expect(errors[0]?.kind).toBe(CoworkErrorKind.ModelCapabilityUnsupported);
+    });
+
     it('cancels a non-retryable SDK retry and reports failure only after it settles', async () => {
       const notices: Array<{ kind: string; attempt: number }> = [];
       adapter.on('retryNotice', (_sid, notice) =>
@@ -3745,6 +3935,15 @@ describe('PiRuntimeAdapter', () => {
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
       await vi.waitFor(() => {
+        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
+          streamingBehavior: 'followUp',
+        });
+      });
+      // Each follow-up turn ends with its own agent_end + agent_settled pair,
+      // which releases the next queued item.
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => {
         expect(mockSession.prompt).toHaveBeenCalledTimes(3);
       });
       expect(mockSession.prompt.mock.calls.slice(1)).toEqual([
@@ -3774,15 +3973,17 @@ describe('PiRuntimeAdapter', () => {
       adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
 
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
       await vi.waitFor(() => {
         expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
           streamingBehavior: 'followUp',
         });
       });
 
-      // The first queued turn ends while the first queue flush still awaits
+      // The first queued turn settles while the first queue flush still awaits
       // prompt(). The second item must be picked up once that flush completes.
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
       resolveFirstFollowUp();
 
       await vi.waitFor(() => {
@@ -3828,6 +4029,9 @@ describe('PiRuntimeAdapter', () => {
           return message;
         },
         getSession: () => ({ messages: [], experts: [] }),
+        updateSession: vi.fn(),
+        updateMessage: vi.fn(),
+        refreshSessionArtifacts: vi.fn(),
       } as unknown as CoworkStore);
 
       let listener: ((event: { type: string }) => void) | null = null;
@@ -3910,6 +4114,458 @@ describe('PiRuntimeAdapter', () => {
       expect(adapter.enqueuePendingMessage('chat-session', 'Not allowed')).toMatchObject({
         success: false,
       });
+    });
+  });
+
+  describe('run completion on agent_settled', () => {
+    const assistantTurn = (
+      listener: (event: {
+        type: string;
+        message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+      }) => void,
+      text: string,
+    ) => {
+      listener({ type: 'turn_start' });
+      listener({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+      });
+      listener({
+        type: 'message_end',
+        message: { role: 'assistant', content: [{ type: 'text', text }], stopReason: 'stop' },
+      });
+    };
+
+    it('keeps the run alive through an SDK compaction continuation and completes it at agent_settled', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const completes: string[] = [];
+      adapter.on('complete', sessionId => completes.push(sessionId));
+      const errors: CoworkError[] = [];
+      adapter.on('error', (_sessionId, error) => errors.push(error));
+      try {
+        await adapter.startSession('compaction-resume', 'Write a long report', {
+          sessionMode: 'work',
+        });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
+          type: string;
+          message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+          reason?: string;
+          aborted?: boolean;
+        }) => void;
+        const runId = service.getCurrent('compaction-resume')!.task.activeRunId!;
+
+        listener({ type: 'agent_start' });
+        assistantTurn(listener, 'Draft before compaction');
+        listener({ type: 'agent_end' });
+
+        // agent_end is not terminal: the SDK compacts and continues on its own,
+        // so the run must stay alive and no completion may fire yet.
+        expect(service.isRunRunning(runId)).toBe(true);
+        expect(completes).toHaveLength(0);
+
+        listener({ type: 'compaction_start', reason: 'threshold' });
+        listener({ type: 'compaction_end', reason: 'threshold', aborted: false });
+        listener({ type: 'turn_start' });
+
+        // The continuation turn's tool calls still see a running run: the gate
+        // must not answer terminateRun the way it does for a completed one.
+        const authorization = await service.authorizeToolCall({
+          sessionId: 'compaction-resume',
+          runId,
+          toolCallId: 'post-compaction-call',
+          toolName: 'bash',
+          toolInput: { command: 'ls -la' },
+          approvalMode: WorkbenchApprovalMode.AllowAll,
+        });
+        expect(authorization.allow).toBe(true);
+        expect(authorization.terminateRun).toBeUndefined();
+
+        assistantTurn(listener, 'Final report after compaction');
+        listener({ type: 'agent_end' });
+        expect(service.isRunRunning(runId)).toBe(true);
+        expect(completes).toHaveLength(0);
+
+        listener({ type: 'agent_settled' });
+        await vi.waitFor(() => expect(completes).toHaveLength(1));
+        expect(service.isRunRunning(runId)).toBe(false);
+        expect(errors).toHaveLength(0);
+      } finally {
+        adapter.stopAllSessions();
+        db.close();
+      }
+    });
+
+    it('settles the run via the fallback timer when agent_settled never arrives', async () => {
+      vi.useFakeTimers();
+      try {
+        const completes: string[] = [];
+        adapter.on('complete', sessionId => completes.push(sessionId));
+
+        await adapter.startSession('missing-settle', 'Hi', { sessionMode: 'work' });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
+          type: string;
+          message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+        }) => void;
+        listener({ type: 'agent_start' });
+        assistantTurn(listener, 'Done but never settled');
+        listener({ type: 'agent_end' });
+        expect(completes).toHaveLength(0);
+
+        await vi.advanceTimersByTimeAsync(AGENT_SETTLE_FALLBACK_MS);
+        expect(completes).toHaveLength(1);
+        expect(adapter.isSessionRunning('missing-settle')).toBe(false);
+        adapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('cancels the settle fallback when the run continues after agent_end', async () => {
+      vi.useFakeTimers();
+      try {
+        const completes: string[] = [];
+        adapter.on('complete', sessionId => completes.push(sessionId));
+
+        await adapter.startSession('settle-cancelled', 'Hi', { sessionMode: 'work' });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
+          type: string;
+          message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+          reason?: string;
+          aborted?: boolean;
+        }) => void;
+        listener({ type: 'agent_start' });
+        assistantTurn(listener, 'Intermediate');
+        listener({ type: 'agent_end' });
+
+        // A compaction continuation cancels the fallback: no completion may
+        // fire even after the fallback window elapses.
+        listener({ type: 'compaction_start', reason: 'threshold' });
+        await vi.advanceTimersByTimeAsync(AGENT_SETTLE_FALLBACK_MS * 2);
+        expect(completes).toHaveLength(0);
+
+        listener({ type: 'compaction_end', reason: 'threshold', aborted: false });
+        assistantTurn(listener, 'Final');
+        listener({ type: 'agent_end' });
+        listener({ type: 'agent_settled' });
+        await vi.advanceTimersByTimeAsync(1);
+        expect(completes).toHaveLength(1);
+        adapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('stream stall watchdog', () => {
+    const latestListener = () =>
+      mockSession.subscribe.mock.calls.at(-1)?.[0] as (event: {
+        type: string;
+        message?: { id?: string; role: string; content: string | Array<Record<string, unknown>> };
+      }) => void;
+
+    it('aborts a silent stream, surfaces the error once, and auto-resumes exactly once', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const errors: CoworkError[] = [];
+        stallAdapter.on('error', (_sessionId, error) => errors.push(error));
+        const retryNotices: Array<{ kind: CoworkErrorKind; attempt: number }> = [];
+        stallAdapter.on('retryNotice', (_sessionId, notice) => retryNotices.push(notice));
+        const completed: string[] = [];
+        stallAdapter.on('complete', sessionId => completed.push(sessionId));
+
+        await stallAdapter.startSession('stall-session', 'Hello Pi');
+        const firstListener = latestListener();
+        firstListener({ type: 'agent_start' });
+        firstListener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        // The stream then dies silently: no delta, no error, no timeout.
+
+        const abortsBefore = mockSession.abort.mock.calls.length;
+        const createsBefore = mockCreateAgentSession.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(1000);
+        // Flush the asynchronous rebuild triggered by the automatic resume.
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBefore);
+        expect(mockSession.abortBash).toHaveBeenCalled();
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        expect(retryNotices).toHaveLength(1);
+        expect(retryNotices[0]).toMatchObject({
+          kind: CoworkErrorKind.StreamInterrupted,
+          attempt: 1,
+        });
+        // The aborted Pi session is not reusable: the resume rebuilt it from SQLite.
+        expect(mockCreateAgentSession.mock.calls.length).toBe(createsBefore + 1);
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('stream stalled'),
+        );
+
+        // Late events from the aborted turn must not double-report or complete it.
+        firstListener({
+          type: 'message_end',
+          message: { role: 'assistant', content: [], stopReason: 'aborted' },
+        });
+        firstListener({ type: 'agent_end' });
+        firstListener({ type: 'agent_settled' });
+        expect(errors).toHaveLength(1);
+        expect(completed).toHaveLength(0);
+
+        // A second consecutive stall stays terminal: the error surfaces, but no
+        // further automatic resume is attempted.
+        const resumedListener = latestListener();
+        resumedListener({ type: 'agent_start' });
+        resumedListener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(errors).toHaveLength(2);
+        expect(errors[1].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        expect(retryNotices).toHaveLength(1);
+        expect(mockCreateAgentSession.mock.calls.length).toBe(createsBefore + 1);
+
+        // Without a rebuild the aborted session stays in the map; late events
+        // must still be dropped before they touch session state.
+        resumedListener({
+          type: 'message_end',
+          message: { role: 'assistant', content: [], stopReason: 'aborted' },
+        });
+        resumedListener({ type: 'agent_end' });
+        resumedListener({ type: 'agent_settled' });
+        expect(errors).toHaveLength(2);
+        expect(completed).toHaveLength(0);
+      } finally {
+        stallAdapter.stopAllSessions();
+        vi.useRealTimers();
+      }
+    });
+
+    it('stands down while the session waits on a tool approval', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const db = new Database(':memory:');
+        initializeWorkbenchTaskSchema(db);
+        const service = new RealWorkbenchTaskService(db);
+        stallAdapter.setWorkbenchTaskService(service);
+        const errors: CoworkError[] = [];
+        stallAdapter.on('error', (_sessionId, error) => errors.push(error));
+
+        await stallAdapter.startSession('approval-session', 'Move files');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        // A pending approval means the session waits on the user, not the model.
+        const runId = service.getCurrent('approval-session')!.task.activeRunId!;
+        setWorkbenchOutputRequirements(service.repository, 'approval-session', runId, [
+          { mode: WorkbenchOutputMode.Text, formats: [] },
+        ]);
+        const authorization = service.authorizeToolCall({
+          sessionId: 'approval-session',
+          runId,
+          toolCallId: 'approval-call',
+          toolName: 'write',
+          toolInput: { path: 'result.txt', content: 'ok' },
+          approvalMode: WorkbenchApprovalMode.Ask,
+        });
+
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(errors).toHaveLength(0);
+
+        const approval = service.getCurrent('approval-session')!.approvals[0];
+        service.respondToApproval({ approvalId: approval.id, approved: true });
+        await authorization;
+        stallAdapter.stopAllSessions();
+        db.close();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('uses a wider stall window for local providers', async () => {
+      vi.useFakeTimers();
+      // No timeout override: the default mock resolves a llamacpp local model.
+      const localAdapter = new PiRuntimeAdapter();
+      try {
+        const errors: CoworkError[] = [];
+        localAdapter.on('error', (_sessionId, error) => errors.push(error));
+
+        await localAdapter.startSession('local-stall', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+
+        // Prompt evaluation on a slow local server is silent well past the
+        // default two-minute window; that must not kill a healthy turn.
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(errors).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(480_000);
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        localAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the default stall window for hosted providers', async () => {
+      vi.useFakeTimers();
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-openai',
+          baseURL: 'https://api.openai.com/v1',
+          model: 'gpt-5',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'openai',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          modelName: 'gpt-5',
+          contextWindow: 272000,
+          contextTokens: 272000,
+          maxTokens: 16384,
+        },
+      });
+      const hostedAdapter = new PiRuntimeAdapter();
+      try {
+        const errors: CoworkError[] = [];
+        hostedAdapter.on('error', (_sessionId, error) => errors.push(error));
+
+        await hostedAdapter.startSession('hosted-stall', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+
+        await vi.advanceTimersByTimeAsync(119_000);
+        expect(errors).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        hostedAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the original error classification when the stream stalls mid-retry', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const errors: CoworkError[] = [];
+        stallAdapter.on('error', (_sessionId, error) => errors.push(error));
+        const persisted: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+        stallAdapter.setCoworkStore({
+          getSession: vi.fn(() => ({ messages: [], experts: [], mode: undefined })),
+          addMessage: vi.fn((_sessionId: string, message: { type: string }) => {
+            persisted.push(message as { type: string; metadata?: Record<string, unknown> });
+            return message;
+          }),
+          updateSession: vi.fn(),
+          updateMessage: vi.fn(),
+        } as unknown as CoworkStore);
+
+        await stallAdapter.startSession('retry-stall', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        // A transient failure Pi is about to retry, then silence.
+        listener({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [],
+            stopReason: 'error',
+            errorMessage: '429 Too Many Requests: overloaded',
+          },
+        });
+        listener({ type: 'auto_retry_start', attempt: 1 });
+
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        // The user must see the rate limit they can act on, not a generic
+        // stream-interrupted error replacing it.
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.RateLimited);
+        // The persisted error bubble keeps the original text plus the stall fact.
+        const errorBubble = persisted.find(
+          message => message.type === 'system' && message.metadata?.error,
+        );
+        expect(errorBubble?.metadata?.error).toContain('429 Too Many Requests');
+        expect(errorBubble?.metadata?.error as string).toContain('stream stalled');
+        stallAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('rebuilds a stalled session from the full persisted history', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const getSession = vi.fn(() => ({
+          messages: [],
+          experts: [],
+          mode: undefined,
+        }));
+        stallAdapter.setCoworkStore({
+          getSession,
+          addMessage: vi.fn((_sessionId: string, message: unknown) => message),
+          updateSession: vi.fn(),
+          updateMessage: vi.fn(),
+        } as unknown as CoworkStore);
+        stallAdapter.on('error', () => {});
+
+        await stallAdapter.startSession('stall-history', 'Hello Pi');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        // The rebuild must not silently page the transcript down to the last
+        // 30 messages; null asks the store for the full history.
+        expect(getSession).toHaveBeenCalledWith('stall-history', null);
+        stallAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('labels the automatic resume run with a localized goal', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+          run: { id: `run-${beginRun.mock.calls.length}` },
+        }));
+        stallAdapter.setWorkbenchTaskService({
+          beginRun,
+          updateRunContext: vi.fn(),
+          hasPendingApprovalForSession: vi.fn(() => false),
+          on: vi.fn(),
+          off: vi.fn(),
+        } as unknown as WorkbenchTaskService);
+        stallAdapter.on('error', () => {});
+
+        await stallAdapter.startSession('stall-goal', 'Move files');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(beginRun).toHaveBeenCalledTimes(2);
+        const resumeGoal = beginRun.mock.calls[1][0].goal as string;
+        expect(resumeGoal).toBe(t('workbenchStreamStallResumeGoal'));
+        expect(resumeGoal).not.toContain('stream stalled');
+        stallAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

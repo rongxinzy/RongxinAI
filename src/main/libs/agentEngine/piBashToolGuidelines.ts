@@ -20,12 +20,14 @@ export const PiBashToolSystemPrompt = [
   '- Invoke powershell.exe -NoProfile -Command explicitly when PowerShell syntax is required.',
 ].join('\n');
 
+const BASH_TIMEOUT_POLICY = `- Bash commands have a ${PI_BASH_DEFAULT_TIMEOUT_SECONDS}-second default timeout and a ${PI_BASH_MAX_TIMEOUT_SECONDS}-second maximum; requests above the maximum are clamped to ${PI_BASH_MAX_TIMEOUT_SECONDS} seconds, and a command killed at the limit reports the effective timeout.`;
+
 export const createPiBashToolSystemPrompt = (
   platform: NodeJS.Platform = process.platform,
 ): string =>
   platform === WINDOWS_PLATFORM
-    ? `${PiBashToolSystemPrompt}\n- Bash commands have a ${PI_BASH_DEFAULT_TIMEOUT_SECONDS}-second default timeout; use a shorter timeout for bounded operations.`
-    : `- Bash commands have a ${PI_BASH_DEFAULT_TIMEOUT_SECONDS}-second default timeout; use a shorter timeout for bounded operations.`;
+    ? `${PiBashToolSystemPrompt}\n${BASH_TIMEOUT_POLICY}`
+    : BASH_TIMEOUT_POLICY;
 
 /**
  * Normalize model-provided timeouts before Pi executes the command. Pi's

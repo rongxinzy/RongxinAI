@@ -4,6 +4,7 @@ import EventEmitter from 'node:events';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { CoworkErrorKind } from '../../common/coworkError';
+import { t } from '../i18n';
 import { ActivityStatus } from '../../shared/activity/constants';
 import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { IMCoworkHandler } from './imCoworkHandler';
@@ -739,6 +740,34 @@ test('requires an explicit workspace when creating a channel conversation', asyn
     'Channel account workspace is not configured',
   );
   handler.destroy();
+});
+
+test('maps newly classified error kinds to dedicated IM replies', async () => {
+  const cases = [
+    { kind: CoworkErrorKind.ModelCapabilityUnsupported, key: 'imErrorModelCapabilityUnsupported' },
+    { kind: CoworkErrorKind.ProviderUnavailable, key: 'imErrorProviderUnavailable' },
+    { kind: CoworkErrorKind.StreamInterrupted, key: 'imErrorStreamInterrupted' },
+  ] as const;
+  for (const { kind, key } of cases) {
+    const runtime = new FakeRuntime();
+    const handler = new IMCoworkHandler({
+      coworkRuntime: runtime,
+      coworkStore: new FakeCoworkStore(),
+      imStore: new FakeIMStore(),
+    });
+    try {
+      const response = handler.processMessage(
+        createMessage({ content: '处理一下' }),
+        undefined,
+        'workspace-1',
+      );
+      await new Promise(resolve => setImmediate(resolve));
+      runtime.emit('error', 'session-1', { kind, message: 'upstream detail' });
+      await expect(response).rejects.toThrow(t(key));
+    } finally {
+      handler.destroy();
+    }
+  }
 });
 
 test('emits a matching terminal run event when a session fails while waiting for permission', async () => {
