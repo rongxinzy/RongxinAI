@@ -38,6 +38,7 @@ import {
   type DiscoveredProviderModel,
   type ProviderModelConnectionFailureKind,
   type ProviderModelPiRuntimeConfig,
+  ProviderModelOrigin,
   ProviderName,
   ProviderRegistry,
 } from '../../shared/providers';
@@ -2329,6 +2330,8 @@ const Settings: React.FC<SettingsProps> = ({
         modelId,
         newModelCapabilities.imageInput === ModelCapabilityStatus.Supported,
       ),
+      // 表单保存过的条目视为人工维护,镜像端点的刷新不自动清理。
+      origin: ProviderModelOrigin.User,
       ...(contextWindow ? { contextWindow } : {}),
       ...(maxTokens ? { maxTokens } : {}),
       ...(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama
@@ -2662,7 +2665,13 @@ const Settings: React.FC<SettingsProps> = ({
   ): Promise<void> => {
     const provider = providerId as ProviderType;
     const providerConfig = providers[provider];
-    const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels);
+    // 自定义 provider 与 Ollama 的模型列表语义是镜像当前端点:端点不再返回、且非手动
+    // 添加(origin "user")的条目随刷新移除,避免历史 URL 遗留的失效模型持续累积。
+    // 内置 provider 的列表是官方目录加端点补充,保持只增不减的合并语义。
+    const mirrorEndpoint = isCustomProvider(provider) || provider === ProviderName.Ollama;
+    const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels, {
+      pruneMissing: mirrorEndpoint,
+    });
     const nextProviderConfig: ProviderConfig = {
       ...providerConfig,
       models: merged.models,
@@ -2683,8 +2692,9 @@ const Settings: React.FC<SettingsProps> = ({
       ...current,
       [provider]: {
         ...current[provider],
-        models: mergeDiscoveredProviderModels(current[provider].models ?? [], discoveredModels)
-          .models,
+        models: mergeDiscoveredProviderModels(current[provider].models ?? [], discoveredModels, {
+          pruneMissing: mirrorEndpoint,
+        }).models,
       },
     }));
 

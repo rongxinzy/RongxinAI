@@ -3,14 +3,28 @@ import type {
   ProviderConfig,
   ProviderModelDiscoveryResult,
 } from '@shared/providers';
-import { ModelCapabilityStatus, type ModelCapabilities } from '@shared/providers';
+import {
+  ModelCapabilityStatus,
+  ProviderModelOrigin,
+  type ModelCapabilities,
+} from '@shared/providers';
 
 export type ProviderModel = NonNullable<ProviderConfig['models']>[number];
 
 export interface AppliedProviderModelDiscovery {
   models: ProviderModel[];
   addedCount: number;
+  removedCount: number;
   changed: boolean;
+}
+
+export interface ProviderModelMergeOptions {
+  /**
+   * Make the result mirror the discovery response: current entries that the
+   * response no longer lists are dropped, except entries the user added or
+   * edited through the model form (origin "user").
+   */
+  pruneMissing?: boolean;
 }
 
 const MODEL_CAPABILITY_KEYS = [
@@ -98,21 +112,31 @@ function createDiscoveredProviderModel(discovered: DiscoveredProviderModel): Pro
 export function mergeDiscoveredProviderModels(
   currentModels: ProviderModel[],
   discoveredModels: readonly DiscoveredProviderModel[],
+  options: ProviderModelMergeOptions = {},
 ): AppliedProviderModelDiscovery {
+  const pruneMissing = options.pruneMissing === true;
+  const discoveredById = new Map(discoveredModels.map(model => [model.id, model]));
   const knownIds = new Set(currentModels.map(model => model.id));
-  const nextModels = [...currentModels];
+  const nextModels: ProviderModel[] = [];
   let addedCount = 0;
+  let removedCount = 0;
   let changed = false;
-  for (const discovered of discoveredModels) {
-    const existingIndex = nextModels.findIndex(model => model.id === discovered.id);
-    if (existingIndex >= 0) {
-      const merged = applyDiscoveredMetadata(nextModels[existingIndex], discovered);
-      if (merged !== nextModels[existingIndex]) {
-        nextModels[existingIndex] = merged;
-        changed = true;
-      }
+
+  for (const current of currentModels) {
+    const discovered = discoveredById.get(current.id);
+    if (pruneMissing && !discovered && current.origin !== ProviderModelOrigin.User) {
+      removedCount += 1;
+      changed = true;
       continue;
     }
+    nextModels.push(discovered ? applyDiscoveredMetadata(current, discovered) : current);
+    if (discovered && nextModels[nextModels.length - 1] !== current) {
+      changed = true;
+    }
+  }
+
+  for (const discovered of discoveredModels) {
+    if (knownIds.has(discovered.id)) continue;
     knownIds.add(discovered.id);
     nextModels.push(createDiscoveredProviderModel(discovered));
     addedCount += 1;
@@ -120,11 +144,12 @@ export function mergeDiscoveredProviderModels(
   }
 
   if (!changed) {
-    return { models: currentModels, addedCount: 0, changed: false };
+    return { models: currentModels, addedCount: 0, removedCount: 0, changed: false };
   }
   return {
     models: nextModels,
     addedCount,
+    removedCount,
     changed: true,
   };
 }
@@ -134,7 +159,7 @@ export function applyProviderModelDiscoveryResult(
   result: ProviderModelDiscoveryResult,
 ): AppliedProviderModelDiscovery {
   if (!result.success || result.models.length === 0) {
-    return { models: currentModels, addedCount: 0, changed: false };
+    return { models: currentModels, addedCount: 0, removedCount: 0, changed: false };
   }
   return mergeDiscoveredProviderModels(currentModels, result.models);
 }

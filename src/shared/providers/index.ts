@@ -16,6 +16,7 @@ export {
   ModelCapabilityStatus,
   AgentApi,
   AgentProviderId,
+  ProviderModelOrigin,
   ProviderName,
   ProviderRegistry,
 } from './constants';
