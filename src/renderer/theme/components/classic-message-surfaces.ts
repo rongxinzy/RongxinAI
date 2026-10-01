@@ -1,5 +1,5 @@
 import { recipe } from './recipe';
-export function classicMessageSurfaces(dark: boolean) {
+export function classicMessageSurfaces() {
   const bubble = {
     'padding-inline': '1rem',
     'padding-block': '0.75rem',
@@ -74,7 +74,7 @@ export function classicMessageSurfaces(dark: boolean) {
         ...bubble,
         'border-radius': 'var(--zy-style-radius-2xl)',
         'border-bottom-right-radius': 'var(--zy-style-radius-md)',
-        'background-color': `color-mix(in oklab, var(--primary) ${dark ? 15 : 10}%, transparent)`,
+        'background-color': 'var(--secondary)',
         'font-size': 'var(--zy-component-text-sm)',
         color: 'var(--foreground)',
       },

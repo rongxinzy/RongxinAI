@@ -60,7 +60,7 @@ test('reserves conversation viewport above the absolutely positioned composer', 
     'className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4"',
   );
   expect(turnBlockSource).toContain('className="mx-auto w-full max-w-6xl min-w-[320px] pl-4"');
-  expect(turnBlockSource).toContain('className="flex min-w-0 flex-1 flex-col gap-3 py-3"');
+  expect(turnBlockSource).toContain('className="flex min-w-0 flex-col gap-3 py-3"');
   expect(userBubbleSource).toContain(
     'className="mx-auto flex w-full max-w-6xl min-w-[320px] flex-col items-end pl-4"',
   );

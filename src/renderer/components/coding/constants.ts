@@ -1,4 +1,5 @@
 import { CodingAgentProfileStatus, type CodingWorkspaceSummary } from '../../../shared/codingAgent';
+import { ToolState } from '../../../shared/components/ai-elements/constants';
 
 export const CodingUiEvent = {
   CreateSession: 'coding:create-session',
@@ -93,15 +94,7 @@ export const CodingExternalActivityStatus = {
   Pending: 'pending',
 } as const;
 
-export const CodingToolPartState = {
-  ApprovalRequested: 'approval-requested',
-  ApprovalResponded: 'approval-responded',
-  InputAvailable: 'input-available',
-  InputStreaming: 'input-streaming',
-  OutputAvailable: 'output-available',
-  OutputDenied: 'output-denied',
-  OutputError: 'output-error',
-} as const;
+export const CodingToolPartState = ToolState;
 export type CodingToolPartState = (typeof CodingToolPartState)[keyof typeof CodingToolPartState];
 
 export const CodingComposerStatus = {

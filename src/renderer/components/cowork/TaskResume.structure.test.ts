@@ -44,8 +44,7 @@ test('binds the recoverable message action to the persistent prompt input', () =
 });
 
 test('interruption resume control sits inline as a theme button', () => {
-  expect(turnSource).toContain('flex flex-wrap items-center gap-x-2');
-  expect(turnSource).toContain('variant="default"');
+  expect(turnSource).toContain('<AlertDescription className="flex flex-wrap items-center gap-2">');
   expect(turnSource).toContain('size="sm"');
   expect(turnSource).toContain("i18nService.t('coworkResumeTaskAction')");
   expect(turnSource).not.toContain('RotateCcw');
