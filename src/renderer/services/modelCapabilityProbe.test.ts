@@ -78,6 +78,13 @@ describe('model capability metadata parsers', () => {
       }).toolCalling,
     ).toBe(ModelCapabilityStatus.Unsupported);
     expect(parseLlamaCppModelCapabilities({ chat_template_caps: {} }).toolCalling).toBeUndefined();
+    expect(
+      parseLlamaCppModelCapabilities({ modalities: { vision: true, video: true, audio: true } }),
+    ).toEqual({
+      imageInput: ModelCapabilityStatus.Supported,
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Supported,
+    });
   });
 
   test('normalizes OpenRouter Anthropic and OpenAI base URLs to the models endpoint', () => {

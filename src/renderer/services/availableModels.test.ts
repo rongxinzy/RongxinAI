@@ -52,7 +52,8 @@ async function markProviderModelTestSuccess(
 ): Promise<void> {
   const providerConfig = config.providers?.[providerKey];
   const model = providerConfig?.models?.find(item => item.id === modelId);
-  if (!providerConfig || !model) throw new Error(`Model ${providerKey}::${modelId} is not configured`);
+  if (!providerConfig || !model)
+    throw new Error(`Model ${providerKey}::${modelId} is not configured`);
   const signature = await createProviderConnectionTestSignature({
     providerId: providerKey,
     baseUrl: providerConfig.baseUrl,
@@ -314,6 +315,31 @@ test('preserves contextTokens for custom cloud models', () => {
   );
 
   expect(model?.contextWindow).toBe(131_072);
+});
+
+test('a discovered imageInput capability opens the attach gate despite a stale toggle', () => {
+  const config = createConfig();
+  config.providers = {
+    custom_usage: {
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'http://llama.local:8000',
+      apiFormat: 'openai',
+      models: [
+        {
+          id: 'qwen3.6-35b-a3b',
+          name: 'Qwen3.6',
+          supportsImage: false,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      ],
+    },
+  };
+
+  const model = buildConfiguredAvailableModels(config)[0];
+
+  expect(model.supportsImage).toBe(true);
+  expect(model.capabilities?.imageInput).toBe(ModelCapabilityStatus.Supported);
 });
 
 test('uses repaired provider metadata consistently for image flags and capabilities', () => {
