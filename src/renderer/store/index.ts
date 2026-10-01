@@ -4,6 +4,7 @@ import agentReducer from './slices/agentSlice';
 import artifactReducer from './slices/artifactSlice';
 import activityReducer from './slices/activitySlice';
 import coworkReducer from './slices/coworkSlice';
+import coworkRunReducer from './slices/coworkRunSlice';
 import imReducer from './slices/imSlice';
 import mcpReducer from './slices/mcpSlice';
 import modelReducer from './slices/modelSlice';
@@ -17,6 +18,7 @@ export const store = configureStore({
   reducer: {
     model: modelReducer,
     cowork: coworkReducer,
+    coworkRun: coworkRunReducer,
     skill: skillReducer,
     mcp: mcpReducer,
     im: imReducer,

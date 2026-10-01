@@ -1,3 +1,4 @@
+import { mergeRecoveredSession } from '../../services/coworkSessionRecovery';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import {
@@ -563,6 +564,17 @@ const coworkSlice = createSlice({
       }
     },
 
+    recoverSession(state, action: PayloadAction<CoworkSession>) {
+      const session = action.payload;
+      if (state.currentSession?.id === session.id) {
+        state.currentSession = mergeRecoveredSession(state.currentSession, session);
+      }
+      if (state.streamingSessionIds.includes(session.id)) {
+        const existing = state.streamingSessions[session.id];
+        state.streamingSessions[session.id] = existing ? mergeRecoveredSession(existing, session) : session;
+      }
+    },
+
     updateToolActivity(
       state,
       action: PayloadAction<{ sessionId: string; event: CoworkToolActivityEvent }>,
@@ -733,6 +745,7 @@ export const {
   prependMessages,
   updateMessageContent,
   updateMessageContents,
+  recoverSession,
   updateToolActivity,
   setRemoteManaged,
   updateSessionPinned,

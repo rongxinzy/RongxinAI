@@ -146,6 +146,7 @@ interface ApiStreamResponse {
 
 // Cowork types for IPC
 interface CoworkSession {
+  mode?: import('../../shared/cowork/constants').CoworkSessionMode;
   id: string;
   title: string;
   claudeSessionId: string | null;
@@ -752,6 +753,9 @@ interface IElectronAPI {
     drainOutbox: () => Promise<import('../../shared/memory').MemoryIpcResult<number>>;
   };
   cowork: {
+    getRunSnapshot: (sessionId: string, replayContent?: boolean) => Promise<{ success: boolean; snapshot: import('../../shared/cowork/runState').CoworkRunSnapshot | null; running: boolean }>;
+    onStreamRunState: (callback: (snapshot: import('../../shared/cowork/runState').CoworkRunSnapshot) => void) => () => void;
+    onStreamContentPatch: (callback: (patch: import('../../shared/cowork/runState').CoworkContentPatch) => void) => () => void;
     listWorkspaces: () => Promise<{
       success: boolean;
       workspaces?: import('../../shared/workspace').Workspace[];
