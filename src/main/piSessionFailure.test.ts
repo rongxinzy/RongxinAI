@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { expect, test, vi } from 'vitest';
-import { classifyCoworkError } from '../common/coworkError';
+import { classifyCoworkError, CoworkErrorKind } from '../common/coworkError';
 import { CoworkSessionStatus } from '../shared/cowork/constants';
 import { PiUiEventSequencer, PiUiEventType, type PiUiEvent } from '../shared/cowork/piUiEvent';
 import { reportPiSessionFailure } from './piSessionFailure';
@@ -46,4 +46,34 @@ test('classifies non-Error rejections too', () => {
   runtime.on('error', listener);
   reportPiSessionFailure(runtime, 'session', 'Request timed out', CoworkSessionStatus.Running);
   expect(listener).toHaveBeenCalledWith('session', classifyCoworkError('Request timed out'));
+});
+
+test('a disabled provider rejection classifies as provider_unavailable', () => {
+  const runtime = new EventEmitter();
+  const listener = vi.fn();
+  runtime.on('error', listener);
+  reportPiSessionFailure(
+    runtime,
+    'session',
+    new Error('Provider custom_0 is not enabled.'),
+    CoworkSessionStatus.Idle,
+  );
+  expect(listener).toHaveBeenCalledWith(
+    'session',
+    classifyCoworkError('Provider custom_0 is not enabled.'),
+  );
+  expect(listener.mock.calls[0][1].kind).toBe(CoworkErrorKind.ProviderUnavailable);
+});
+
+test('a removed model rejection classifies as provider_unavailable', () => {
+  const runtime = new EventEmitter();
+  const listener = vi.fn();
+  runtime.on('error', listener);
+  reportPiSessionFailure(
+    runtime,
+    'session',
+    new Error('No enabled provider found for model: qwen-local'),
+    CoworkSessionStatus.Idle,
+  );
+  expect(listener.mock.calls[0][1].kind).toBe(CoworkErrorKind.ProviderUnavailable);
 });

@@ -111,6 +111,7 @@ const hoisted = vi.hoisted(() => {
     ),
     mockRegisterPiOpenAICompatTokenRefresher: vi.fn(),
     mockGetCommunityAuthAccessToken: vi.fn(async () => 'community-access-token'),
+    mockDisableModelImageInputCapability: vi.fn(() => ({ changed: true })),
     mockResolveRawApiConfig: vi.fn(() => ({
       config: {
         apiKey: 'sk-test',
@@ -247,6 +248,10 @@ vi.mock('./piOpenAICompatProxy', () => ({
 
 vi.mock('../../communityAuthSession', () => ({
   getModelPoolAccessToken: hoisted.mockGetCommunityAuthAccessToken,
+}));
+
+vi.mock('./piCapabilityCorrection', () => ({
+  disableModelImageInputCapability: hoisted.mockDisableModelImageInputCapability,
 }));
 
 vi.mock('../coworkUtil', async importOriginal => {
@@ -1664,6 +1669,143 @@ describe('PiRuntimeAdapter', () => {
       expect(onError).toHaveBeenCalledWith(
         'test',
         expect.objectContaining({ message: expect.stringContaining('output contract') }),
+      );
+    });
+
+    it('steers the model back to set_task_output when the gate asks for a forced correction', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const authorizeToolCall = vi.fn().mockResolvedValue({
+        allow: false,
+        reason: 'Before executing tools, call set_task_output to declare deliverables.',
+        forceContractCorrection: true,
+      });
+      const grantOutputContractCorrectionGrace = vi.fn().mockReturnValue(true);
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        grantOutputContractCorrectionGrace,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'gated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      // The tool call stays blocked, but the run survives: the live session is
+      // steered into exactly one set_task_output call instead of being aborted.
+      expect(result).toMatchObject({ block: true });
+      expect(grantOutputContractCorrectionGrace).toHaveBeenCalledWith('run-1');
+      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('set_task_output'));
+      expect(mockSession.abort.mock.calls.length).toBe(abortsBeforeCall);
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    it('terminates the run when the forced correction cannot be delivered', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const authorizeToolCall = vi.fn().mockResolvedValue({
+        allow: false,
+        reason: 'Before executing tools, call set_task_output to declare deliverables.',
+        forceContractCorrection: true,
+      });
+      // The grace was already spent: the runtime must fall back to killing the run.
+      const grantOutputContractCorrectionGrace = vi.fn().mockReturnValue(false);
+      const failRun = vi.fn();
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        grantOutputContractCorrectionGrace,
+        failRun,
+        updateRunContext: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+      const onError = vi.fn();
+      adapter.on('error', onError);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      const abortsBeforeCall = mockSession.abort.mock.calls.length;
+      const result = await handleToolCall?.({
+        toolCallId: 'gated-call',
+        toolName: 'bash',
+        input: { command: 'python move_files.py' },
+      });
+
+      expect(result).toMatchObject({ block: true });
+      expect(mockSession.steer).not.toHaveBeenCalled();
+      expect(failRun).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ code: 'output_contract_uncommitted' }),
+      );
+      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
+      expect(onError).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ message: expect.stringContaining('set_task_output') }),
       );
     });
 
@@ -3529,6 +3671,34 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
+    it('downgrades image capability and cancels the retry for a capability mismatch', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt(
+        '500 {"code":500,"message":"image input is not supported - hint: the mmproj file is missing","type":"server_error"}',
+      );
+
+      // The stored capability verdict gets corrected before the run settles.
+      expect(hoisted.mockDisableModelImageInputCapability).toHaveBeenCalledWith(
+        'llamacpp',
+        'qwen-local',
+      );
+      expect(errors).toHaveLength(0);
+
+      // The deterministic failure is sticky: the SDK retry is cancelled and the
+      // original error surfaces once when the run settles.
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      await Promise.resolve();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.ModelCapabilityUnsupported);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(completes).toHaveLength(0);
+    });
+
     it('cancels a non-retryable SDK retry and reports failure only after it settles', async () => {
       const notices: Array<{ kind: string; attempt: number }> = [];
       adapter.on('retryNotice', (_sid, notice) =>
@@ -3910,6 +4080,132 @@ describe('PiRuntimeAdapter', () => {
       expect(adapter.enqueuePendingMessage('chat-session', 'Not allowed')).toMatchObject({
         success: false,
       });
+    });
+  });
+
+  describe('stream stall watchdog', () => {
+    const latestListener = () =>
+      mockSession.subscribe.mock.calls.at(-1)?.[0] as (event: {
+        type: string;
+        message?: { id?: string; role: string; content: string | Array<Record<string, unknown>> };
+      }) => void;
+
+    it('aborts a silent stream, surfaces the error once, and auto-resumes exactly once', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const errors: CoworkError[] = [];
+        stallAdapter.on('error', (_sessionId, error) => errors.push(error));
+        const retryNotices: Array<{ kind: CoworkErrorKind; attempt: number }> = [];
+        stallAdapter.on('retryNotice', (_sessionId, notice) => retryNotices.push(notice));
+        const completed: string[] = [];
+        stallAdapter.on('complete', sessionId => completed.push(sessionId));
+
+        await stallAdapter.startSession('stall-session', 'Hello Pi');
+        const firstListener = latestListener();
+        firstListener({ type: 'agent_start' });
+        firstListener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        // The stream then dies silently: no delta, no error, no timeout.
+
+        const abortsBefore = mockSession.abort.mock.calls.length;
+        const createsBefore = mockCreateAgentSession.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(1000);
+        // Flush the asynchronous rebuild triggered by the automatic resume.
+        await vi.advanceTimersByTimeAsync(1);
+
+        expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBefore);
+        expect(mockSession.abortBash).toHaveBeenCalled();
+        expect(errors).toHaveLength(1);
+        expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        expect(retryNotices).toHaveLength(1);
+        expect(retryNotices[0]).toMatchObject({
+          kind: CoworkErrorKind.StreamInterrupted,
+          attempt: 1,
+        });
+        // The aborted Pi session is not reusable: the resume rebuilt it from SQLite.
+        expect(mockCreateAgentSession.mock.calls.length).toBe(createsBefore + 1);
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('stream stalled'),
+        );
+
+        // Late events from the aborted turn must not double-report or complete it.
+        firstListener({
+          type: 'message_end',
+          message: { role: 'assistant', content: [], stopReason: 'aborted' },
+        });
+        firstListener({ type: 'agent_end' });
+        firstListener({ type: 'agent_settled' });
+        expect(errors).toHaveLength(1);
+        expect(completed).toHaveLength(0);
+
+        // A second consecutive stall stays terminal: the error surfaces, but no
+        // further automatic resume is attempted.
+        const resumedListener = latestListener();
+        resumedListener({ type: 'agent_start' });
+        resumedListener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(errors).toHaveLength(2);
+        expect(errors[1].kind).toBe(CoworkErrorKind.StreamInterrupted);
+        expect(retryNotices).toHaveLength(1);
+        expect(mockCreateAgentSession.mock.calls.length).toBe(createsBefore + 1);
+
+        // Without a rebuild the aborted session stays in the map; late events
+        // must still be dropped before they touch session state.
+        resumedListener({
+          type: 'message_end',
+          message: { role: 'assistant', content: [], stopReason: 'aborted' },
+        });
+        resumedListener({ type: 'agent_end' });
+        resumedListener({ type: 'agent_settled' });
+        expect(errors).toHaveLength(2);
+        expect(completed).toHaveLength(0);
+      } finally {
+        stallAdapter.stopAllSessions();
+        vi.useRealTimers();
+      }
+    });
+
+    it('stands down while the session waits on a tool approval', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        const db = new Database(':memory:');
+        initializeWorkbenchTaskSchema(db);
+        const service = new RealWorkbenchTaskService(db);
+        stallAdapter.setWorkbenchTaskService(service);
+        const errors: CoworkError[] = [];
+        stallAdapter.on('error', (_sessionId, error) => errors.push(error));
+
+        await stallAdapter.startSession('approval-session', 'Move files');
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+        // A pending approval means the session waits on the user, not the model.
+        const runId = service.getCurrent('approval-session')!.task.activeRunId!;
+        setWorkbenchOutputRequirements(service.repository, 'approval-session', runId, [
+          { mode: WorkbenchOutputMode.Text, formats: [] },
+        ]);
+        const authorization = service.authorizeToolCall({
+          sessionId: 'approval-session',
+          runId,
+          toolCallId: 'approval-call',
+          toolName: 'write',
+          toolInput: { path: 'result.txt', content: 'ok' },
+          approvalMode: WorkbenchApprovalMode.Ask,
+        });
+
+        await vi.advanceTimersByTimeAsync(5000);
+        expect(errors).toHaveLength(0);
+
+        const approval = service.getCurrent('approval-session')!.approvals[0];
+        service.respondToApproval({ approvalId: approval.id, approved: true });
+        await authorization;
+        stallAdapter.stopAllSessions();
+        db.close();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

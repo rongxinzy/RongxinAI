@@ -1,5 +1,6 @@
 import {
   ApiFormat,
+  DiscoveryCapabilitiesSource,
   ModelCapabilityStatus,
   type ModelCapabilities,
   type DiscoveredProviderModel,
@@ -433,9 +434,13 @@ async function enrichWithLlamaCppProps(
   }
   const detected = parseLlamaCppRuntimeCapabilities(payload);
   if (Object.keys(detected).length === 0) return entries;
+  // A successful /props probe is ground truth: the server just told us what
+  // the loaded model can do, so it overrides stale /v1/models claims (e.g. a
+  // sibling section declaring "multimodal" while no mmproj is loaded).
   return entries.map(entry => ({
     ...entry,
-    capabilities: { ...detected, ...(entry.capabilities ?? {}) },
+    capabilities: { ...(entry.capabilities ?? {}), ...detected },
+    capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
   }));
 }
 

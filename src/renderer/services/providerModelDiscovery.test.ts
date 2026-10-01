@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  DiscoveryCapabilitiesSource,
   ModelCapabilityStatus,
   ProviderModelDiscoveryErrorCode,
   ProviderModelOrigin,
@@ -89,6 +90,56 @@ describe('mergeDiscoveredProviderModels', () => {
         },
       },
     ]);
+  });
+
+  test('lets a runtime-probe verdict override a stale supported capability', () => {
+    const existing = [
+      {
+        id: 'qwen3-vl',
+        name: 'Qwen3 VL',
+        supportsImage: true,
+        capabilities: { imageInput: ModelCapabilityStatus.Supported },
+      },
+    ];
+
+    const result = mergeDiscoveredProviderModels(existing, [
+      {
+        id: 'qwen3-vl',
+        capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
+        capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
+      },
+    ]);
+
+    expect(result.changed).toBe(true);
+    expect(result.models).toEqual([
+      {
+        id: 'qwen3-vl',
+        name: 'Qwen3 VL',
+        supportsImage: false,
+        capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
+      },
+    ]);
+  });
+
+  test('does not overwrite a stored capability verdict without a probe marker', () => {
+    const existing = [
+      {
+        id: 'qwen3-vl',
+        name: 'Qwen3 VL',
+        supportsImage: true,
+        capabilities: { imageInput: ModelCapabilityStatus.Supported },
+      },
+    ];
+
+    const result = mergeDiscoveredProviderModels(existing, [
+      {
+        id: 'qwen3-vl',
+        capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
+      },
+    ]);
+
+    expect(result.changed).toBe(false);
+    expect(result.models[0]).toBe(existing[0]);
   });
 
   test('leaves the draft unchanged after a failed or empty discovery', () => {

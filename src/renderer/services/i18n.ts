@@ -2213,6 +2213,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkErrorInputTooLong: '输入内容过长，超出模型上下文限制，请缩短对话内容后重试。',
     coworkErrorCouldNotProcessPdf: '无法处理 PDF 文件。请尝试将 PDF 转换为文本格式后重新发送。',
     coworkErrorModelNotFound: '请求的模型不存在或不可用，请在设置中检查模型配置。',
+    coworkErrorModelCapabilityUnsupported:
+      '当前模型实际不支持图像输入（服务器缺少视觉组件）。已自动关闭该模型的图像输入能力，请重新发送消息。',
+    coworkErrorProviderUnavailable:
+      '该会话使用的模型供应商已停用或模型已被移除。请到设置中重新启用供应商或切换其他模型后重试。',
     coworkErrorGatewayDisconnected: 'AI 引擎连接中断，请重试。如果问题持续，请尝试重启应用。',
     coworkErrorServiceRestart: 'AI 引擎正在重启，请稍后重试。',
     coworkErrorGatewayDraining: 'AI 引擎正在重启中，请稍等片刻后重试。',
@@ -6006,6 +6010,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Unable to process the PDF file. Please try converting the PDF to text format and resend.',
     coworkErrorModelNotFound:
       'The requested model does not exist or is unavailable. Please check the model configuration in settings.',
+    coworkErrorModelCapabilityUnsupported:
+      'The current model does not actually support image input (the server is missing the vision component). Image input has been disabled for this model automatically — please resend your message.',
+    coworkErrorProviderUnavailable:
+      'The model provider used by this session is disabled or the model has been removed. Re-enable the provider or switch to another model in Settings, then try again.',
     coworkErrorGatewayDisconnected:
       'AI engine connection lost. Please retry. If the issue persists, try restarting the app.',
     coworkErrorServiceRestart: 'AI engine is restarting. Please try again later.',

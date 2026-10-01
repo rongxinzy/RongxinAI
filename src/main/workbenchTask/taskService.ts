@@ -54,6 +54,13 @@ export interface WorkbenchToolAuthorizationResult {
    * against a run that is already over.
    */
   terminateRun?: boolean;
+  /**
+   * The output-contract gate hit its first denial ceiling. Instead of failing
+   * the run outright, the runtime must steer the model into exactly one
+   * set_task_output call; the run is only terminated when it keeps violating
+   * the gate after that forced correction.
+   */
+  forceContractCorrection?: boolean;
 }
 
 export interface VerifiedWorkbenchRunEvent {
@@ -79,8 +86,10 @@ const MAX_RESULT_NODES = 500;
 const MAX_RESULT_COLLECTION_ENTRIES = 50;
 const MAX_RESULT_STRING_LENGTH = 4_000;
 const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
-/** Consecutive output-contract denials before a run is stopped instead of spinning. */
+/** Consecutive output-contract denials before the runtime is asked to force a correction. */
 const MAX_OUTPUT_CONTRACT_DENIALS = 4;
+/** Extra denials granted once per run after the forced set_task_output correction. */
+const OUTPUT_CONTRACT_CORRECTION_GRACE_DENIALS = 3;
 
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
@@ -90,6 +99,8 @@ export class WorkbenchTaskService extends EventEmitter {
   private readonly lastOutputContractErrors = new Map<string, string>();
   /** Consecutive output-contract denials per run, so a stuck run can be stopped. */
   private readonly outputContractDenials = new Map<string, number>();
+  /** Runs that already received their one forced-correction grace window. */
+  private readonly outputContractCorrectionGraceRuns = new Set<string>();
 
   constructor(
     db: Database.Database,
@@ -540,6 +551,24 @@ export class WorkbenchTaskService extends EventEmitter {
   private forgetRunScopedState(runId: string): void {
     this.lastOutputContractErrors.delete(runId);
     this.outputContractDenials.delete(runId);
+    this.outputContractCorrectionGraceRuns.delete(runId);
+  }
+
+  /**
+   * Grants a run its one grace window of extra output-contract denials after
+   * the runtime steered the model back to set_task_output. Returns false when
+   * the run already used its grace, so the caller falls back to terminating
+   * the run.
+   */
+  grantOutputContractCorrectionGrace(runId: string): boolean {
+    if (this.outputContractCorrectionGraceRuns.has(runId)) return false;
+    this.outputContractCorrectionGraceRuns.add(runId);
+    return true;
+  }
+
+  /** True while the session has a tool approval waiting for the user. */
+  hasPendingApprovalForSession(sessionId: string): boolean {
+    return this.repository.listPendingApprovalsForSession(sessionId).length > 0;
   }
 
   /**
@@ -587,7 +616,17 @@ export class WorkbenchTaskService extends EventEmitter {
       riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
     ) {
       const reason = this.recordOutputContractDenial(run.id);
-      if ((this.outputContractDenials.get(run.id) ?? 0) >= MAX_OUTPUT_CONTRACT_DENIALS) {
+      const graceGranted = this.outputContractCorrectionGraceRuns.has(run.id);
+      const denialLimit = graceGranted
+        ? MAX_OUTPUT_CONTRACT_DENIALS + OUTPUT_CONTRACT_CORRECTION_GRACE_DENIALS
+        : MAX_OUTPUT_CONTRACT_DENIALS;
+      if ((this.outputContractDenials.get(run.id) ?? 0) >= denialLimit) {
+        if (!graceGranted) {
+          // First time at the ceiling: the runtime steers the model into one
+          // set_task_output call and grants extra denials. Only a run that
+          // keeps violating the gate after that correction is stopped.
+          return { allow: false, reason, forceContractCorrection: true };
+        }
         this.failRun(input.sessionId, {
           code: 'output_contract_uncommitted',
           stage: 'contract',
