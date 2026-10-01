@@ -18,22 +18,23 @@ import {
 } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { isValidElement } from 'react';
+import { i18nService } from '../../../renderer/services/i18n';
+import { ToolState } from './constants';
 
 import { CodeBlock } from './code-block';
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
-  <Collapsible
-    className={cn('group not-prose mb-4 w-full rounded-md border', className)}
-    {...props}
-  />
+  <Collapsible className={cn('theme-chat-tool group not-prose w-full', className)} {...props} />
 );
 
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
 export type ToolHeaderProps = {
   title?: string;
+  /** A command, path or query that remains readable while details are folded. */
+  summary?: string;
   className?: string;
   statusLabel?: string;
   /** Places the execution status beside the collapse control. */
@@ -49,28 +50,31 @@ export type ToolHeaderProps = {
     }
 );
 
-const statusLabels: Record<ToolPart['state'], string> = {
-  'approval-requested': 'Awaiting Approval',
-  'approval-responded': 'Responded',
-  'input-available': 'Running',
-  'input-streaming': 'Pending',
-  'output-available': 'Completed',
-  'output-denied': 'Denied',
-  'output-error': 'Error',
+const statusLabelKeys: Record<ToolPart['state'], string> = {
+  [ToolState.ApprovalRequested]: 'codingAgentPermissionEvent',
+  [ToolState.ApprovalResponded]: 'codingAgentPermissionApproved',
+  [ToolState.InputAvailable]: 'codingAgentToolRunning',
+  [ToolState.InputStreaming]: 'codingAgentToolPending',
+  [ToolState.OutputAvailable]: 'codingAgentToolCompleted',
+  [ToolState.OutputDenied]: 'codingAgentPermissionRejected',
+  [ToolState.OutputError]: 'codingAgentToolFailed',
 };
 
 const statusIcons: Record<ToolPart['state'], ReactNode> = {
-  'approval-requested': <ClockIcon className="size-4 text-warning" />,
-  'approval-responded': <CheckCircleIcon className="size-4 text-primary" />,
-  'input-available': <ClockIcon className="size-4 animate-pulse text-primary" />,
-  'input-streaming': <CircleIcon className="size-4 text-muted-foreground" />,
-  'output-available': <CheckCircleIcon className="size-4 text-success" />,
-  'output-denied': <XCircleIcon className="size-4 text-warning" />,
-  'output-error': <XCircleIcon className="size-4 text-destructive" />,
+  [ToolState.ApprovalRequested]: <ClockIcon />,
+  [ToolState.ApprovalResponded]: <CheckCircleIcon />,
+  [ToolState.InputAvailable]: <ClockIcon />,
+  [ToolState.InputStreaming]: <CircleIcon />,
+  [ToolState.OutputAvailable]: <CheckCircleIcon />,
+  [ToolState.OutputDenied]: <XCircleIcon />,
+  [ToolState.OutputError]: <XCircleIcon />,
 };
 
-export const getStatusBadge = (status: ToolPart['state'], label = statusLabels[status]) => (
-  <Badge className="theme-page-tool-badge-1" variant="secondary">
+export const getStatusBadge = (
+  status: ToolPart['state'],
+  label = i18nService.t(statusLabelKeys[status]),
+) => (
+  <Badge className="theme-chat-tool-status" variant="secondary" data-tool-state={status}>
     {statusIcons[status]}
     {label}
   </Badge>
@@ -79,6 +83,7 @@ export const getStatusBadge = (status: ToolPart['state'], label = statusLabels[s
 export const ToolHeader = ({
   className,
   title,
+  summary,
   type,
   state,
   statusLabel,
@@ -92,19 +97,27 @@ export const ToolHeader = ({
 
   return (
     <CollapsibleTrigger
-      className={cn('group/trigger flex w-full items-center gap-4 p-3', className)}
+      className={cn(
+        'theme-chat-tool-trigger group/trigger flex w-full items-center gap-2',
+        className,
+      )}
       {...props}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="flex size-4 shrink-0 items-center justify-center">
-          {icon ?? <WrenchIcon className="size-4 text-muted-foreground" />}
+        <span className="theme-chat-tool-icon flex shrink-0 items-center justify-center">
+          {icon ?? <WrenchIcon className="theme-chat-tool-icon" />}
         </span>
-        <span className="min-w-0 truncate font-medium text-sm">{title ?? derivedName}</span>
+        <span className="theme-chat-tool-title min-w-0 truncate">{title ?? derivedName}</span>
+        {summary && (
+          <span className="theme-chat-tool-summary min-w-0 flex-1 truncate" title={summary}>
+            {summary}
+          </span>
+        )}
         {!statusAtEnd && statusBadge}
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {statusAtEnd && statusBadge}
-        <ChevronDownIcon className="size-4 rotate-0 text-muted-foreground transition-transform group-data-[panel-open]/trigger:rotate-180" />
+        <ChevronDownIcon className="theme-chat-tool-chevron" />
       </div>
     </CollapsibleTrigger>
   );
@@ -114,26 +127,21 @@ export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
-    className={cn(
-      'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 space-y-4 p-4 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
-      className,
-    )}
+    className={cn('theme-chat-tool-content ml-4 flex min-w-0 flex-col gap-3', className)}
     {...props}
   />
 );
 
 export type ToolInputProps = ComponentProps<'div'> & {
   input: ToolPart['input'];
+  /** Redacted serialized input for display; the original input stays intact. */
+  displayText?: string;
 };
 
-export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-  <div className={cn('space-y-2 overflow-hidden', className)} {...props}>
-    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-      Parameters
-    </h4>
-    <div className="rounded-md bg-muted/50">
-      <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
-    </div>
+export const ToolInput = ({ className, input, displayText, ...props }: ToolInputProps) => (
+  <div className={cn('flex min-w-0 flex-col gap-2 overflow-hidden', className)} {...props}>
+    <h4 className="theme-chat-tool-label">{i18nService.t('coworkToolInput')}</h4>
+    <CodeBlock code={displayText ?? JSON.stringify(input, null, 2)} language="json" />
   </div>
 );
 
@@ -152,18 +160,18 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
   if (typeof output === 'object' && !isValidElement(output)) {
     Output = <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
   } else if (typeof output === 'string') {
-    Output = <CodeBlock code={output} language="json" />;
+    Output = <CodeBlock code={output} language="text" />;
   }
 
   return (
-    <div className={cn('space-y-2', className)} {...props}>
-      <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-        {errorText ? 'Error' : 'Result'}
+    <div className={cn('flex min-w-0 flex-col gap-2', className)} {...props}>
+      <h4 className="theme-chat-tool-label">
+        {i18nService.t(errorText ? 'codingAgentToolFailed' : 'coworkToolResult')}
       </h4>
       <div
         className={cn(
-          'overflow-x-auto rounded-md text-xs [&_table]:w-full',
-          errorText ? 'bg-destructive/10 text-destructive' : 'bg-muted/50 text-foreground',
+          'overflow-x-auto whitespace-pre-wrap [&_table]:w-full',
+          errorText && 'theme-chat-tool-output-error',
         )}
       >
         {errorText && <div>{errorText}</div>}

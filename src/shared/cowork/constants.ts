@@ -22,6 +22,11 @@ export const CoworkMessageType = {
   System: 'system',
 } as const;
 
+export const CoworkDisplayItemType = {
+  Message: 'message',
+  ToolGroup: 'tool_group',
+} as const;
+
 export const CoworkSessionStatus = {
   Idle: 'idle',
   Running: 'running',

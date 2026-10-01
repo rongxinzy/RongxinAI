@@ -107,22 +107,9 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
       className={`theme-surface-agent-row sidebar-session-row group relative ${
         // 2026/09/22 lixiang  文件夹下任务整体左缩进 15px（与 padding-left 15px 等效需求）
         isNested ? 'ml-[15px] w-[calc(100%-15px)]' : 'ml-0 w-full'
-      } flex h-[30px] cursor-pointer items-center gap-2 ${
-        isBatchMode ? 'pl-4' : 'pl-3'
-      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} ${
+      } flex items-center ${
         isSelected ? 'theme-surface-agent-selected' : 'theme-surface-agent-idle'
       }`}
-      onClick={handleRowClick}
-      onKeyDown={e => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        e.preventDefault();
-        handleRowClick();
-      }}
-      role="treeitem"
-      aria-level={2}
-      aria-selected={isSelected}
-      tabIndex={0}
     >
       {isBatchMode && (
         <BatchSelectionCheckbox checked={isSelected} onToggleSelection={onToggleSelection} />
@@ -143,21 +130,30 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
           className="theme-page-agent-task-row-input-1 min-w-0 flex-1"
         />
       ) : (
-        <>
+        <Button
+          type="button"
+          variant="ghost"
+          size="navigation"
+          className="theme-sidebar-task-main min-w-0 flex-1 justify-start"
+          role="treeitem"
+          aria-level={isNested ? 2 : 1}
+          aria-selected={isSelected}
+          onClick={handleRowClick}
+        >
           <OverflowingSessionTitle title={task.title} />
           {hasPendingPermission && (
-            <span className="inline-flex shrink-0 items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+            <span className="theme-sidebar-approval shrink-0">
               {i18nService.t('workbenchTaskStatusWaitingApproval')}
             </span>
           )}
-        </>
+        </Button>
       )}
 
       {!isBatchMode && !isRenaming && (
         <div className="absolute right-1 top-1/2 flex h-6 w-[52px] -translate-y-1/2 items-center justify-end">
           {showRelativeTime && (
             <span
-              className="absolute inset-y-0 right-0 flex items-center whitespace-nowrap text-xs font-normal text-foreground opacity-[0.28] transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
+              className="theme-sidebar-caption absolute inset-y-0 right-0 flex items-center whitespace-nowrap transition-opacity group-hover:pointer-events-none group-hover:opacity-0 group-focus-within:pointer-events-none group-focus-within:opacity-0"
               title={relativeTime.full}
             >
               {relativeTime.compact}
@@ -189,7 +185,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                 void onTogglePin(!task.pinned);
               }}
               className={cn(
-                'theme-page-agent-task-row-button-variant-1 pointer-events-none group-hover:pointer-events-auto',
+                'theme-sidebar-row-action pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
                 task.pinned && 'theme-page-agent-task-row-button-variant-2',
               )}
               aria-label={pinLabel}
@@ -204,8 +200,8 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                     variant="ghost"
                     size="icon-xs"
                     className={cn(
-                      'theme-page-agent-task-row-button-variant-3 pointer-events-none group-hover:pointer-events-auto',
-                      menuOpen && 'theme-page-agent-task-row-button-variant-4 pointer-events-auto',
+                      'theme-sidebar-row-action pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
+                      menuOpen && 'pointer-events-auto',
                     )}
                     aria-label={i18nService.t('coworkSessionActions')}
                   >

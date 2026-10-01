@@ -1,6 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import { cn } from '@shared/lib/utils';
-import { MotionConfig, useReducedMotion } from 'motion/react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -11,37 +9,11 @@ import { clearCurrentSession } from '../../store/slices/coworkSlice';
 import { selectAction } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import {
-  AnimatedFileTextIcon,
-  type AnimatedFileTextIconHandle,
-} from '../icons/AnimatedFileTextIcon';
-import { AnimatedBlocksIcon, type AnimatedBlocksIconHandle } from '../icons/AnimatedBlocksIcon';
-import {
-  AnimatedLaptopMinimalCheckIcon,
-  type AnimatedLaptopMinimalCheckIconHandle,
-} from '../icons/AnimatedLaptopMinimalCheckIcon';
-import {
-  AnimatedGraduationCapIcon,
-  type AnimatedGraduationCapIconHandle,
-} from '../icons/AnimatedGraduationCapIcon';
-import {
-  AnimatedMonitorCheckIcon,
-  type AnimatedMonitorCheckIconHandle,
-} from '../icons/AnimatedMonitorCheckIcon';
-import {
-  AnimatedTelescopeIcon,
-  type AnimatedTelescopeIconHandle,
-} from '../icons/AnimatedTelescopeIcon';
-import {
   CHAT_SKILL_SHORTCUTS,
   ChatSkillShortcut,
   getChatSkillShortcutIds,
   isChatSkillShortcutActive,
 } from './constants';
-
-type AnimatedIconHandle = {
-  startAnimation: () => void;
-  stopAnimation: () => void;
-};
 
 const ChatSkillShortcuts: React.FC = () => {
   const dispatch = useDispatch();
@@ -49,32 +21,6 @@ const ChatSkillShortcuts: React.FC = () => {
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const quickActions = useSelector((state: RootState) => state.quickAction.actions);
   const isStreaming = useSelector(selectIsStreaming);
-  const documentIconRef = React.useRef<AnimatedFileTextIconHandle>(null);
-  const academicIconRef = React.useRef<AnimatedGraduationCapIconHandle>(null);
-  const pptIconRef = React.useRef<AnimatedMonitorCheckIconHandle>(null);
-  const telescopeIconRef = React.useRef<AnimatedTelescopeIconHandle>(null);
-  const blocksIconRef = React.useRef<AnimatedBlocksIconHandle>(null);
-  const laptopIconRef = React.useRef<AnimatedLaptopMinimalCheckIconHandle>(null);
-  const prefersReducedMotion = useReducedMotion();
-  const animatedShortcutIcons: Partial<
-    Record<
-      ChatSkillShortcut['id'],
-      { icon: React.ReactNode; ref: React.RefObject<AnimatedIconHandle | null> }
-    >
-  > = {
-    docs: { icon: <AnimatedFileTextIcon ref={documentIconRef} />, ref: documentIconRef },
-    'academic-research': {
-      icon: <AnimatedGraduationCapIcon ref={academicIconRef} />,
-      ref: academicIconRef,
-    },
-    ppt: { icon: <AnimatedMonitorCheckIcon ref={pptIconRef} />, ref: pptIconRef },
-    'deep-research': {
-      icon: <AnimatedTelescopeIcon ref={telescopeIconRef} />,
-      ref: telescopeIconRef,
-    },
-    sheets: { icon: <AnimatedBlocksIcon ref={blocksIconRef} />, ref: blocksIconRef },
-    website: { icon: <AnimatedLaptopMinimalCheckIcon ref={laptopIconRef} />, ref: laptopIconRef },
-  };
 
   const handleSelect = (entry: ChatSkillShortcut) => {
     if (isStreaming) return;
@@ -111,50 +57,37 @@ const ChatSkillShortcuts: React.FC = () => {
   };
 
   return (
-    <MotionConfig reducedMotion="user">
-      <div className="mb-2">
-        <div className="flex h-9 items-center px-1.5">
-          {/* 2026/09/22 lixiang  快捷技能标题与侧栏导航一致，用正文色 */}
-          <h2 className="min-w-0 truncate text-sm font-normal text-foreground">
-            {i18nService.t('chatQuickSkillsTitle')}
-          </h2>
-        </div>
-        <div className="space-y-0.5">
-          {CHAT_SKILL_SHORTCUTS.map(entry => {
-            const Icon = entry.icon;
-            const animatedIcon = animatedShortcutIcons[entry.id];
-            const isActive = isChatSkillShortcutActive(entry, activeSkillIds);
-            return (
-              <Button
-                key={entry.id}
-                type="button"
-                variant="ghost"
-                data-chat-skill-shortcut={entry.id}
-                disabled={isStreaming}
-                onMouseEnter={() => {
-                  if (!prefersReducedMotion) animatedIcon?.ref.current?.startAnimation();
-                }}
-                onMouseLeave={() => {
-                  animatedIcon?.ref.current?.stopAnimation();
-                }}
-                onClick={() => handleSelect(entry)}
-                className={cn(
-                  'theme-page-chat-skill-shortcuts-button-variant-1 chat-skill-shortcut w-full justify-start text-left',
-                  isActive
-                    ? 'theme-page-chat-skill-shortcuts-button-variant-2'
-                    : 'theme-page-chat-skill-shortcuts-button-variant-3',
-                )}
-              >
-                {animatedIcon?.icon ?? (
-                  <Icon aria-hidden="true" className="chat-skill-shortcut-icon size-4 shrink-0" />
-                )}
-                <span className="min-w-0 truncate">{i18nService.t(entry.labelKey)}</span>
-              </Button>
-            );
-          })}
-        </div>
+    <div className="mb-2">
+      <div className="theme-sidebar-section flex items-center">
+        <h2 className="min-w-0 truncate">{i18nService.t('chatQuickSkillsTitle')}</h2>
       </div>
-    </MotionConfig>
+      <div className="space-y-0.5">
+        {CHAT_SKILL_SHORTCUTS.map(entry => {
+          const Icon = entry.icon;
+          const isActive = isChatSkillShortcutActive(entry, activeSkillIds);
+          return (
+            <Button
+              key={entry.id}
+              type="button"
+              variant="navigation"
+              size="navigation"
+              data-chat-skill-shortcut={entry.id}
+              data-active={isActive || undefined}
+              disabled={isStreaming}
+              onClick={() => handleSelect(entry)}
+              className="chat-skill-shortcut w-full justify-start"
+            >
+              <Icon
+                aria-hidden="true"
+                className="chat-skill-shortcut-icon size-4 shrink-0"
+                strokeWidth={1.75}
+              />
+              <span className="min-w-0 truncate">{i18nService.t(entry.labelKey)}</span>
+            </Button>
+          );
+        })}
+      </div>
+    </div>
   );
 };
 

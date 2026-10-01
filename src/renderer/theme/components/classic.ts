@@ -36,6 +36,8 @@ import { classicSelect } from './classic-select';
 import { classicButtons } from './classic-buttons';
 import { classicCodingDiff } from './classic-coding-diff';
 import { runIndicatorAppearances } from './run-indicator';
+import { chatToolAppearances } from './chat-tool';
+import { shellSidebarAppearances } from './shell-sidebar';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
 
 /** Codex appearance recipes are package data, never imported by React controls. */
@@ -173,7 +175,7 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...classicControlSizing(),
     ...classicControlPieces(),
     ...classicPromptActions(),
-    ...classicMessageSurfaces(dark),
+    ...classicMessageSurfaces(),
     ...classicTabs(dark),
     ...classicSupplementaryControls(dark),
     ...classicChoiceControls(dark),
@@ -182,6 +184,8 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...classicFields(dark),
     ...classicSidebar(),
     ...classicScenes(),
+    ...chatToolAppearances(),
+    ...shellSidebarAppearances(),
     ...classicAppearancePreview(),
   };
 }
