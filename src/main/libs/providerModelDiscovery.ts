@@ -150,7 +150,7 @@ function capabilitiesFromDeclaredList(item: Record<string, unknown>): Partial<Mo
       .filter((value): value is string => typeof value === 'string')
       .map(value => value.trim().toLowerCase()),
   );
-  const verdicts: Partial<ModelCapabilities> = {};
+  const verdicts: { -readonly [Key in keyof ModelCapabilities]?: ModelCapabilities[Key] } = {};
   for (const { token, capability } of CAPABILITY_LIST_TOKENS) {
     if (declared.has(token)) verdicts[capability] = ModelCapabilityStatus.Supported;
   }
