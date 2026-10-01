@@ -574,6 +574,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               name: attachment.name,
               mimeType: extracted.mimeType,
               base64Data: extracted.base64Data,
+              // 保留真实磁盘路径,气泡侧才能把正文里的「输入文件: 路径」行与
+              // 该图片识别为同一附件,避免一张图渲染成两张(inline: 伪路径除外)。
+              ...(attachment.path && !attachment.path.startsWith('inline:')
+                ? { path: attachment.path }
+                : {}),
             });
           } else {
             console.warn(
@@ -599,6 +604,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               name: attachment.name,
               mimeType: extracted.mimeType,
               base64Data: extracted.base64Data,
+              path: attachment.path,
             });
           } else {
             const dotIndex = attachment.name.lastIndexOf('.');
