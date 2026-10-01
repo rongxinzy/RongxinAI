@@ -112,6 +112,14 @@ export const ModelCapabilityStatus = {
 export type ModelCapabilityStatus =
   (typeof ModelCapabilityStatus)[keyof typeof ModelCapabilityStatus];
 
+export const ProviderModelOrigin = {
+  /** Entry added or saved through the settings model form; kept when the list mirrors the endpoint. */
+  User: 'user',
+  /** Entry owned by model discovery; removed by refresh once the endpoint stops listing it. */
+  Discovered: 'discovered',
+} as const;
+export type ProviderModelOrigin = (typeof ProviderModelOrigin)[keyof typeof ProviderModelOrigin];
+
 export interface ModelCapabilities {
   readonly toolCalling: ModelCapabilityStatus;
   readonly imageInput: ModelCapabilityStatus;
