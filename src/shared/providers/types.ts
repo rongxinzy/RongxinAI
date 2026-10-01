@@ -1,4 +1,4 @@
-import type { ApiFormat, ModelCapabilities } from './constants';
+import type { ApiFormat, ModelCapabilities, ProviderModelOrigin } from './constants';
 import type { ProviderModelConnectionTest } from './connectionTest';
 import type { ProviderModelPiRuntimeConfig } from './piRuntime';
 import { ProviderName } from './constants';
@@ -20,6 +20,8 @@ export interface ProviderConfig {
     maxTokens?: number;
     /** Latest explicit connection-test metadata; only current successful tests make models visible. */
     connectionTest?: ProviderModelConnectionTest;
+    /** How the entry got here; omitted (legacy) is treated as discovered. */
+    origin?: ProviderModelOrigin;
     /** Pi Runtime-specific model routing and compatibility options for agent workflows. */
     piRuntime?: ProviderModelPiRuntimeConfig;
   }>;
