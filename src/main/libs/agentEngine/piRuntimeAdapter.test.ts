@@ -264,6 +264,7 @@ vi.mock('../coworkUtil', async importOriginal => {
 });
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { AGENT_SETTLE_FALLBACK_MS } from './piAgentSettleFallback';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { t } from '../../i18n';
 import { PiDocumentReaderSystemPrompt, PiDocumentReaderToolName } from './piDocumentReaderTool';
@@ -355,6 +356,7 @@ describe('PiRuntimeAdapter', () => {
         type: string;
       }) => void;
       listener({ type: 'agent_end' });
+      listener({ type: 'agent_settled' });
 
       expect(rollup).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -535,6 +537,7 @@ describe('PiRuntimeAdapter', () => {
         adapter.on('complete', onComplete);
         const listener = mockSession.subscribe.mock.calls.at(-1)![0];
         listener({ type: 'agent_end' });
+        listener({ type: 'agent_settled' });
         await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
         expect(adapter.isSessionRunning('native-work')).toBe(false);
         expect(mockSession.prompt).toHaveBeenCalledTimes(promptCount);
@@ -1266,6 +1269,7 @@ describe('PiRuntimeAdapter', () => {
       await expect(adapter.compactSession('compact-session')).rejects.toThrow(/still running/);
 
       subscribeListener()({ type: 'agent_end' });
+      subscribeListener()({ type: 'agent_settled' });
 
       await expect(adapter.compactSession('compact-session')).resolves.toEqual({
         cancelled: false,
@@ -1281,6 +1285,7 @@ describe('PiRuntimeAdapter', () => {
       expect(action).not.toHaveBeenCalled();
 
       subscribeListener()({ type: 'agent_end' });
+      subscribeListener()({ type: 'agent_settled' });
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(action).toHaveBeenCalledTimes(1);
@@ -3067,6 +3072,7 @@ describe('PiRuntimeAdapter', () => {
       expect(updates.some(update => update.metadata?.isFinalAnswer === true)).toBe(false);
 
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
 
       expect(updates[updates.length - 1]).toEqual({
         content: 'Intermediate or final answer',
@@ -3125,6 +3131,7 @@ describe('PiRuntimeAdapter', () => {
         summary: 'Second iteration complete',
       });
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
 
       const finalAnswers = updates.filter(update => update.metadata?.isFinalAnswer === true);
       expect(finalAnswers).toHaveLength(1);
@@ -3167,6 +3174,7 @@ describe('PiRuntimeAdapter', () => {
         },
       });
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
 
       expect(
         updates.some(
@@ -3927,6 +3935,15 @@ describe('PiRuntimeAdapter', () => {
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
       await vi.waitFor(() => {
+        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
+          streamingBehavior: 'followUp',
+        });
+      });
+      // Each follow-up turn ends with its own agent_end + agent_settled pair,
+      // which releases the next queued item.
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => {
         expect(mockSession.prompt).toHaveBeenCalledTimes(3);
       });
       expect(mockSession.prompt.mock.calls.slice(1)).toEqual([
@@ -3956,15 +3973,17 @@ describe('PiRuntimeAdapter', () => {
       adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
 
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
       await vi.waitFor(() => {
         expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
           streamingBehavior: 'followUp',
         });
       });
 
-      // The first queued turn ends while the first queue flush still awaits
+      // The first queued turn settles while the first queue flush still awaits
       // prompt(). The second item must be picked up once that flush completes.
       listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
       resolveFirstFollowUp();
 
       await vi.waitFor(() => {
@@ -4010,6 +4029,9 @@ describe('PiRuntimeAdapter', () => {
           return message;
         },
         getSession: () => ({ messages: [], experts: [] }),
+        updateSession: vi.fn(),
+        updateMessage: vi.fn(),
+        refreshSessionArtifacts: vi.fn(),
       } as unknown as CoworkStore);
 
       let listener: ((event: { type: string }) => void) | null = null;
@@ -4092,6 +4114,148 @@ describe('PiRuntimeAdapter', () => {
       expect(adapter.enqueuePendingMessage('chat-session', 'Not allowed')).toMatchObject({
         success: false,
       });
+    });
+  });
+
+  describe('run completion on agent_settled', () => {
+    const assistantTurn = (
+      listener: (event: {
+        type: string;
+        message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+      }) => void,
+      text: string,
+    ) => {
+      listener({ type: 'turn_start' });
+      listener({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+      });
+      listener({
+        type: 'message_end',
+        message: { role: 'assistant', content: [{ type: 'text', text }], stopReason: 'stop' },
+      });
+    };
+
+    it('keeps the run alive through an SDK compaction continuation and completes it at agent_settled', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const completes: string[] = [];
+      adapter.on('complete', sessionId => completes.push(sessionId));
+      const errors: CoworkError[] = [];
+      adapter.on('error', (_sessionId, error) => errors.push(error));
+      try {
+        await adapter.startSession('compaction-resume', 'Write a long report', {
+          sessionMode: 'work',
+        });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
+          type: string;
+          message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+          reason?: string;
+          aborted?: boolean;
+        }) => void;
+        const runId = service.getCurrent('compaction-resume')!.task.activeRunId!;
+
+        listener({ type: 'agent_start' });
+        assistantTurn(listener, 'Draft before compaction');
+        listener({ type: 'agent_end' });
+
+        // agent_end is not terminal: the SDK compacts and continues on its own,
+        // so the run must stay alive and no completion may fire yet.
+        expect(service.isRunRunning(runId)).toBe(true);
+        expect(completes).toHaveLength(0);
+
+        listener({ type: 'compaction_start', reason: 'threshold' });
+        listener({ type: 'compaction_end', reason: 'threshold', aborted: false });
+        listener({ type: 'turn_start' });
+
+        // The continuation turn's tool calls still see a running run: the gate
+        // must not answer terminateRun the way it does for a completed one.
+        const authorization = await service.authorizeToolCall({
+          sessionId: 'compaction-resume',
+          runId,
+          toolCallId: 'post-compaction-call',
+          toolName: 'bash',
+          toolInput: { command: 'ls -la' },
+          approvalMode: WorkbenchApprovalMode.AllowAll,
+        });
+        expect(authorization.allow).toBe(true);
+        expect(authorization.terminateRun).toBeUndefined();
+
+        assistantTurn(listener, 'Final report after compaction');
+        listener({ type: 'agent_end' });
+        expect(service.isRunRunning(runId)).toBe(true);
+        expect(completes).toHaveLength(0);
+
+        listener({ type: 'agent_settled' });
+        await vi.waitFor(() => expect(completes).toHaveLength(1));
+        expect(service.isRunRunning(runId)).toBe(false);
+        expect(errors).toHaveLength(0);
+      } finally {
+        adapter.stopAllSessions();
+        db.close();
+      }
+    });
+
+    it('settles the run via the fallback timer when agent_settled never arrives', async () => {
+      vi.useFakeTimers();
+      try {
+        const completes: string[] = [];
+        adapter.on('complete', sessionId => completes.push(sessionId));
+
+        await adapter.startSession('missing-settle', 'Hi', { sessionMode: 'work' });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
+          type: string;
+          message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+        }) => void;
+        listener({ type: 'agent_start' });
+        assistantTurn(listener, 'Done but never settled');
+        listener({ type: 'agent_end' });
+        expect(completes).toHaveLength(0);
+
+        await vi.advanceTimersByTimeAsync(AGENT_SETTLE_FALLBACK_MS);
+        expect(completes).toHaveLength(1);
+        expect(adapter.isSessionRunning('missing-settle')).toBe(false);
+        adapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('cancels the settle fallback when the run continues after agent_end', async () => {
+      vi.useFakeTimers();
+      try {
+        const completes: string[] = [];
+        adapter.on('complete', sessionId => completes.push(sessionId));
+
+        await adapter.startSession('settle-cancelled', 'Hi', { sessionMode: 'work' });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
+          type: string;
+          message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
+          reason?: string;
+          aborted?: boolean;
+        }) => void;
+        listener({ type: 'agent_start' });
+        assistantTurn(listener, 'Intermediate');
+        listener({ type: 'agent_end' });
+
+        // A compaction continuation cancels the fallback: no completion may
+        // fire even after the fallback window elapses.
+        listener({ type: 'compaction_start', reason: 'threshold' });
+        await vi.advanceTimersByTimeAsync(AGENT_SETTLE_FALLBACK_MS * 2);
+        expect(completes).toHaveLength(0);
+
+        listener({ type: 'compaction_end', reason: 'threshold', aborted: false });
+        assistantTurn(listener, 'Final');
+        listener({ type: 'agent_end' });
+        listener({ type: 'agent_settled' });
+        await vi.advanceTimersByTimeAsync(1);
+        expect(completes).toHaveLength(1);
+        adapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

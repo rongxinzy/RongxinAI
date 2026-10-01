@@ -13,6 +13,9 @@ describe('piBashToolGuidelines', () => {
   it('adds the shell contract and timeout policy for every platform', () => {
     expect(createPiBashToolSystemPrompt('win32')).toContain(PiBashToolSystemPrompt);
     expect(createPiBashToolSystemPrompt('linux')).toContain('default timeout');
+    expect(createPiBashToolSystemPrompt('linux')).toContain(
+      `clamped to ${PI_BASH_MAX_TIMEOUT_SECONDS} seconds`,
+    );
   });
 
   it('blocks high-confidence Windows command dialects on Git Bash', () => {
