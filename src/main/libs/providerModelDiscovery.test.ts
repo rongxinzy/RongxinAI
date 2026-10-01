@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   ApiFormat,
+  DiscoveryCapabilitiesSource,
   ModelCapabilityStatus,
   ProviderModelDiscoveryErrorCode,
 } from '../../shared/providers';
@@ -224,11 +225,39 @@ describe('discoverProviderModels', () => {
           videoInput: ModelCapabilityStatus.Supported,
           audioInput: ModelCapabilityStatus.Unsupported,
         },
+        capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
       },
     ]);
     expect(requests).toEqual([
       'http://llama.local:8000/v1/models',
       'http://llama.local:8000/props',
+    ]);
+  });
+
+  test('lets the /props probe override a stale /v1/models vision claim', async () => {
+    const fetchImpl: typeof fetch = async input =>
+      String(input).endsWith('/v1/models')
+        ? Response.json({
+            data: [{ id: 'qwen3-vl' }],
+            models: [{ name: 'qwen3-vl', capabilities: ['completion', 'multimodal'] }],
+          })
+        : Response.json({ modalities: { vision: false } });
+
+    await expect(
+      discoverProviderModels(
+        { baseUrl: 'http://llama.local:8000', apiFormat: ApiFormat.OpenAI },
+        fetchImpl,
+      ),
+    ).resolves.toEqual([
+      {
+        id: 'qwen3-vl',
+        capabilities: {
+          imageInput: ModelCapabilityStatus.Unsupported,
+          // The probe only measured vision; the entry's remaining claims survive.
+          videoInput: ModelCapabilityStatus.Supported,
+        },
+        capabilitiesSource: DiscoveryCapabilitiesSource.RuntimeProbe,
+      },
     ]);
   });
 
