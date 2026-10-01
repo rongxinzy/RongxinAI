@@ -11,10 +11,7 @@ export function clampArtifactPanelWidth(value: number, minWidth: number, maxWidt
 
 /** Panel drag maximum: never consume more than half the row, and always keep
  * the chat column's reserved minimum when the row is especially narrow. */
-export function resolveArtifactPanelMaxWidth(
-  contentWidth: number,
-  minPanelWidth: number,
-): number {
+export function resolveArtifactPanelMaxWidth(contentWidth: number, minPanelWidth: number): number {
   const chatReserveMaximum = contentWidth - ARTIFACT_PANEL_CHAT_RESERVE;
   const halfContentMaximum = contentWidth * ARTIFACT_PANEL_MAX_CONTENT_RATIO;
   return Math.max(minPanelWidth, Math.min(chatReserveMaximum, halfContentMaximum));

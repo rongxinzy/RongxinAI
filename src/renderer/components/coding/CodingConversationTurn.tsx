@@ -53,14 +53,22 @@ const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
     return (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <CircleStop className="size-3.5" />
-        <span>{turn.statusDetail ? appErrorText(turn.statusDetail, 'codingAgentTurnCancelled') : i18nService.t('codingAgentTurnCancelled')}</span>
+        <span>
+          {turn.statusDetail
+            ? appErrorText(turn.statusDetail, 'codingAgentTurnCancelled')
+            : i18nService.t('codingAgentTurnCancelled')}
+        </span>
       </div>
     );
   }
   return (
     <div className="flex items-center gap-1.5 text-xs text-destructive">
       <TriangleAlert className="size-3.5" />
-      <span>{turn.statusDetail ? appErrorText(turn.statusDetail, 'codingAgentTurnFailed') : i18nService.t('codingAgentTurnFailed')}</span>
+      <span>
+        {turn.statusDetail
+          ? appErrorText(turn.statusDetail, 'codingAgentTurnFailed')
+          : i18nService.t('codingAgentTurnFailed')}
+      </span>
     </div>
   );
 };
@@ -217,8 +225,7 @@ const CodingConversationTurnComponent = ({
           >
             <ReasoningTrigger
               getThinkingMessage={streaming => {
-                const label =
-                turn.reasoning ? (
+                const label = turn.reasoning ? (
                   streaming ? (
                     <Shimmer duration={1}>{i18nService.t('codingAgentReasoningActive')}</Shimmer>
                   ) : (
@@ -288,12 +295,20 @@ const CodingConversationTurnComponent = ({
 };
 
 const messageContentsEqual = (
-  a:
-    | { id: string; content: string; createdAt: number; role: string; isFinalAnswer: boolean }
-    | null,
-  b:
-    | { id: string; content: string; createdAt: number; role: string; isFinalAnswer: boolean }
-    | null,
+  a: {
+    id: string;
+    content: string;
+    createdAt: number;
+    role: string;
+    isFinalAnswer: boolean;
+  } | null,
+  b: {
+    id: string;
+    content: string;
+    createdAt: number;
+    role: string;
+    isFinalAnswer: boolean;
+  } | null,
 ): boolean =>
   a === b ||
   (a !== null &&
@@ -334,7 +349,10 @@ const segmentContentsEqual = (
   return false;
 };
 
-const turnContentsEqual = (a: CodingConversationTurnModel, b: CodingConversationTurnModel): boolean =>
+const turnContentsEqual = (
+  a: CodingConversationTurnModel,
+  b: CodingConversationTurnModel,
+): boolean =>
   a === b ||
   (a.id === b.id &&
     a.startedAt === b.startedAt &&

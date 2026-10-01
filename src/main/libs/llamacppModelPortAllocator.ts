@@ -19,7 +19,11 @@ export class LlamaCppModelPortAllocator {
     const existing = this.leasesByModel.get(normalizedModelName);
     if (existing) return existing;
 
-    for (let port = LLAMACPP_MODEL_PORT_RANGE.First; port <= LLAMACPP_MODEL_PORT_RANGE.Last; port += 1) {
+    for (
+      let port = LLAMACPP_MODEL_PORT_RANGE.First;
+      port <= LLAMACPP_MODEL_PORT_RANGE.Last;
+      port += 1
+    ) {
       if (this.leasedPorts.has(port) || !(await isLoopbackPortAvailable(port))) continue;
       const lease = { modelName: normalizedModelName, port };
       this.leasesByModel.set(normalizedModelName, lease);

@@ -138,7 +138,10 @@ export class LlamaCppClient {
     });
   }
 
-  private async listModelsWithTimeout(timeoutMs: number, signal?: AbortSignal): Promise<LlamaCppModel[]> {
+  private async listModelsWithTimeout(
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<LlamaCppModel[]> {
     const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models', {
       method: 'GET',
       timeoutMs: timeoutMs || this.loadTimeoutMs || 30_000,
@@ -267,7 +270,10 @@ function toLlamaCppModel(
   const statusValue = model.status?.failed ? LlamaCppModelStatus.Error : model.status?.value;
   const status = isLlamaCppModelStatus(statusValue) ? statusValue : LlamaCppModelStatus.Unloaded;
   const trainedContextLength = model.meta?.n_ctx_train;
-  const runtimeContextLength = resolveRuntimeContextLength(model.status, fallbackRuntimeContextLength);
+  const runtimeContextLength = resolveRuntimeContextLength(
+    model.status,
+    fallbackRuntimeContextLength,
+  );
   return {
     name,
     id: name,
@@ -305,8 +311,14 @@ function resolveRuntimeContextLength(
   const unifiedKv = status?.kv_unified !== false && !args.includes('--no-kv-unified');
 
   return unifiedKv
-    ? totalContextLength ?? slotContextLength ?? parseRuntimeContextLength(args) ?? fallbackRuntimeContextLength
-    : slotContextLength ?? totalContextLength ?? parseRuntimeContextLength(args) ?? fallbackRuntimeContextLength;
+    ? (totalContextLength ??
+        slotContextLength ??
+        parseRuntimeContextLength(args) ??
+        fallbackRuntimeContextLength)
+    : (slotContextLength ??
+        totalContextLength ??
+        parseRuntimeContextLength(args) ??
+        fallbackRuntimeContextLength);
 }
 
 function parseRuntimeContextLength(args: string[] | undefined): number | undefined {
@@ -360,7 +372,8 @@ function matchesModelName(model: LlamaCppModel, modelName: string): boolean {
 }
 
 function waitFor(delayMs: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  if (signal?.aborted)
+    return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
   return new Promise((resolve, reject) => {
     const complete = () => {
       signal?.removeEventListener('abort', onAbort);

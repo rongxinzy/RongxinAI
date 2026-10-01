@@ -39,9 +39,21 @@ test('retries two transient polling failures before showing a unified error', as
   vi.useFakeTimers();
   const pollLogin = vi
     .fn()
-    .mockResolvedValueOnce({ success: false, status: 'wait', errorCode: WeixinLoginErrorCode.Transport })
-    .mockResolvedValueOnce({ success: false, status: 'wait', errorCode: WeixinLoginErrorCode.Transport })
-    .mockResolvedValueOnce({ success: false, status: 'wait', errorCode: WeixinLoginErrorCode.Transport });
+    .mockResolvedValueOnce({
+      success: false,
+      status: 'wait',
+      errorCode: WeixinLoginErrorCode.Transport,
+    })
+    .mockResolvedValueOnce({
+      success: false,
+      status: 'wait',
+      errorCode: WeixinLoginErrorCode.Transport,
+    })
+    .mockResolvedValueOnce({
+      success: false,
+      status: 'wait',
+      errorCode: WeixinLoginErrorCode.Transport,
+    });
   window.electron = {
     im: {
       weixinLoginStart: vi.fn().mockResolvedValue({

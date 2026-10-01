@@ -205,12 +205,15 @@ export class LlamaCppModelResidencyManager {
       .sort((left, right) => left - right)[0];
     if (!nextExpiry) return;
 
-    this.expiryTimer = this.timer.setTimeout(() => {
-      this.expiryTimer = null;
-      void this.handleExpiry().catch(error => {
-        console.warn('[LlamaCppResidency] automatic model unload failed:', error);
-      });
-    }, Math.max(0, nextExpiry - now));
+    this.expiryTimer = this.timer.setTimeout(
+      () => {
+        this.expiryTimer = null;
+        void this.handleExpiry().catch(error => {
+          console.warn('[LlamaCppResidency] automatic model unload failed:', error);
+        });
+      },
+      Math.max(0, nextExpiry - now),
+    );
   }
 
   private async handleExpiry(): Promise<void> {

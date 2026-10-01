@@ -630,17 +630,18 @@ test('waits for runtime install cleanup before confirming cancellation', async (
   const manager = {} as LlamaCppManager;
   Object.assign(manager, {
     on: vi.fn(() => manager),
-    installRuntime: vi.fn(({ signal }: { signal: AbortSignal }) =>
-      new Promise<{ success: false; cancelled: true }>(resolve => {
-        resolveInstall = resolve;
-        signal.addEventListener(
-          'abort',
-          () => {
-            aborted = true;
-          },
-          { once: true },
-        );
-      }),
+    installRuntime: vi.fn(
+      ({ signal }: { signal: AbortSignal }) =>
+        new Promise<{ success: false; cancelled: true }>(resolve => {
+          resolveInstall = resolve;
+          signal.addEventListener(
+            'abort',
+            () => {
+              aborted = true;
+            },
+            { once: true },
+          );
+        }),
     ),
   });
   const store = {

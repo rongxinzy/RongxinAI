@@ -5,7 +5,10 @@ import { expect, test } from 'vitest';
 
 import { AgentCompanionState, resolveAgentCompanionState } from './constants';
 
-const source = readFileSync(fileURLToPath(new URL('./AgentCompanion.tsx', import.meta.url)), 'utf8');
+const source = readFileSync(
+  fileURLToPath(new URL('./AgentCompanion.tsx', import.meta.url)),
+  'utf8',
+);
 
 test('defines stable companion state constants', () => {
   expect(AgentCompanionState).toEqual({

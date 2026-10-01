@@ -4,7 +4,10 @@ import {
   type ChannelInboxStore,
 } from './channelInboxStore';
 
-type ChannelInbox = Pick<ChannelInboxStore, 'claim' | 'markProcessing' | 'complete' | 'fail' | 'recoverInterrupted'>;
+type ChannelInbox = Pick<
+  ChannelInboxStore,
+  'claim' | 'markProcessing' | 'complete' | 'fail' | 'recoverInterrupted'
+>;
 
 export class ChannelTurnCoordinator {
   private readonly activeEvents = new Map<string, Promise<string>>();
@@ -12,7 +15,10 @@ export class ChannelTurnCoordinator {
   private activeCount = 0;
   private readonly permits: Array<() => void> = [];
 
-  constructor(private readonly store: ChannelInbox, private readonly maxConcurrency = 4) {
+  constructor(
+    private readonly store: ChannelInbox,
+    private readonly maxConcurrency = 4,
+  ) {
     if (!Number.isInteger(maxConcurrency) || maxConcurrency < 1) {
       throw new Error('Channel turn concurrency must be a positive integer');
     }
@@ -28,36 +34,43 @@ export class ChannelTurnCoordinator {
     const existing = this.activeEvents.get(eventKey);
     if (existing) return existing;
     const claimed = this.store.claim(event);
-    if (claimed.status === ChannelInboxStatus.Completed && claimed.result) return Promise.resolve(claimed.result);
+    if (claimed.status === ChannelInboxStatus.Completed && claimed.result)
+      return Promise.resolve(claimed.result);
 
     const conversationKey = JSON.stringify([event.platform, event.accountId, event.conversationId]);
     const previous = this.conversationTails.get(conversationKey) ?? Promise.resolve();
-    const operation = previous.catch((): undefined => undefined).then(async (): Promise<string> => {
-      if (signal?.aborted) throw new Error('Channel turn was cancelled before execution');
-      await this.acquire();
-      if (signal?.aborted) {
-        this.release();
-        throw new Error('Channel turn was cancelled before execution');
-      }
-      this.store.markProcessing(event);
-      try {
-        const result = await execute();
-        if (!result.trim()) throw new Error('Channel Pi turn returned an empty result');
-        this.store.complete(event, result);
-        return result;
-      } catch (error) {
-        this.store.fail(event, error instanceof Error ? error.message : String(error));
-        throw error;
-      } finally {
-        this.release();
-      }
-    });
-    const tail = operation.then((): undefined => undefined, (): undefined => undefined);
+    const operation = previous
+      .catch((): undefined => undefined)
+      .then(async (): Promise<string> => {
+        if (signal?.aborted) throw new Error('Channel turn was cancelled before execution');
+        await this.acquire();
+        if (signal?.aborted) {
+          this.release();
+          throw new Error('Channel turn was cancelled before execution');
+        }
+        this.store.markProcessing(event);
+        try {
+          const result = await execute();
+          if (!result.trim()) throw new Error('Channel Pi turn returned an empty result');
+          this.store.complete(event, result);
+          return result;
+        } catch (error) {
+          this.store.fail(event, error instanceof Error ? error.message : String(error));
+          throw error;
+        } finally {
+          this.release();
+        }
+      });
+    const tail = operation.then(
+      (): undefined => undefined,
+      (): undefined => undefined,
+    );
     this.conversationTails.set(conversationKey, tail);
     this.activeEvents.set(eventKey, operation);
     void tail.finally(() => {
       if (this.activeEvents.get(eventKey) === operation) this.activeEvents.delete(eventKey);
-      if (this.conversationTails.get(conversationKey) === tail) this.conversationTails.delete(conversationKey);
+      if (this.conversationTails.get(conversationKey) === tail)
+        this.conversationTails.delete(conversationKey);
     });
     return operation;
   }

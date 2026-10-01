@@ -19,13 +19,7 @@ const SkillsButton: React.FC<SkillsButtonProps> = ({
 }) => {
   return (
     <SkillsPopover onSelectSkill={onSelectSkill} onManageSkills={onManageSkills}>
-      <PromptInputButton
-        className={cn(
-          'theme-prompt-skills-action',
-          className,
-        )}
-        title="Skills"
-      >
+      <PromptInputButton className={cn('theme-prompt-skills-action', className)} title="Skills">
         <PlusMenuSkillsIcon className="h-4 w-4" />
       </PromptInputButton>
     </SkillsPopover>

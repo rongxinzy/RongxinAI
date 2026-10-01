@@ -1,4 +1,7 @@
-import type { LlamaCppInstallProgress, LlamaCppRuntimeInstallSnapshot } from '../../../../shared/llamacpp';
+import type {
+  LlamaCppInstallProgress,
+  LlamaCppRuntimeInstallSnapshot,
+} from '../../../../shared/llamacpp';
 import { LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID } from '../../../../shared/llamacpp';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -8,8 +11,7 @@ const idleRuntimeInstallSnapshot: LlamaCppRuntimeInstallSnapshot = { active: fal
 
 export function isRuntimeInstallActive(snapshot: LlamaCppRuntimeInstallSnapshot): boolean {
   return Boolean(
-    snapshot.active &&
-      (!snapshot.progress || !isInstallTerminalPhase(snapshot.progress.phase)),
+    snapshot.active && (!snapshot.progress || !isInstallTerminalPhase(snapshot.progress.phase)),
   );
 }
 

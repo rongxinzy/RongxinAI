@@ -20,13 +20,22 @@ function getWeixinLoginErrorMessage(errorCode?: WeixinLoginErrorCode): string {
   );
 }
 
-export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<void> }): React.JSX.Element {
+export function WeixinLoginPanel({
+  onConfirmed,
+}: {
+  onConfirmed: () => Promise<void>;
+}): React.JSX.Element {
   const [state, setState] = useState<LoginState>('idle');
   const [qrcodeUrl, setQrcodeUrl] = useState('');
   const [error, setError] = useState('');
   const pollingRef = useRef(false);
 
-  useEffect(() => () => { pollingRef.current = false; }, []);
+  useEffect(
+    () => () => {
+      pollingRef.current = false;
+    },
+    [],
+  );
 
   const startLogin = async (): Promise<void> => {
     pollingRef.current = false;
@@ -51,8 +60,8 @@ export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<v
       if (!pollingRef.current) return;
       if (!result.success) {
         if (
-          result.errorCode === WeixinLoginErrorCode.Transport
-          && transportRetryCount < WEIXIN_QR_POLL_RETRY_LIMIT
+          result.errorCode === WeixinLoginErrorCode.Transport &&
+          transportRetryCount < WEIXIN_QR_POLL_RETRY_LIMIT
         ) {
           transportRetryCount += 1;
           await new Promise(resolve => setTimeout(resolve, WEIXIN_QR_POLL_INTERVAL_MS));
@@ -86,7 +95,9 @@ export function WeixinLoginPanel({ onConfirmed }: { onConfirmed: () => Promise<v
         <>
           <Button type="button" onClick={() => void startLogin()}>
             <QrCode data-icon="inline-start" />
-            {state === 'error' ? i18nService.t('imWeixinQrRefresh') : i18nService.t('imWeixinScanBtn')}
+            {state === 'error'
+              ? i18nService.t('imWeixinQrRefresh')
+              : i18nService.t('imWeixinScanBtn')}
           </Button>
           <p className="text-xs text-muted-foreground">{i18nService.t('imWeixinScanHint')}</p>
         </>

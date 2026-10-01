@@ -44,9 +44,7 @@ function add(sum: Sum, value: unknown): Sum {
   }
 
   const nextValue = sum.value + value;
-  return Number.isFinite(nextValue)
-    ? { value: nextValue, samples: sum.samples + 1 }
-    : sum;
+  return Number.isFinite(nextValue) ? { value: nextValue, samples: sum.samples + 1 } : sum;
 }
 
 function valueOrNull(sum: Sum): number | null {
@@ -95,13 +93,13 @@ export function getSessionStats(messages: CoworkMessage[]): SessionStats {
     const recordedUsage = message.metadata?.usage;
     // Pi reports an all-zero record when the provider sent no usage at all; that
     // is a missing sample, not a zero reading (see hasReportedTokenUsage).
-    const usage =
-      recordedUsage && hasReportedTokenUsage(recordedUsage) ? recordedUsage : undefined;
-    if (usage !== undefined && (
-      !isFiniteNonNegative(usage.inputTokens) ||
-      !isFiniteNonNegative(usage.cacheReadTokens) ||
-      !isFiniteNonNegative(usage.cacheWriteTokens)
-    )) {
+    const usage = recordedUsage && hasReportedTokenUsage(recordedUsage) ? recordedUsage : undefined;
+    if (
+      usage !== undefined &&
+      (!isFiniteNonNegative(usage.inputTokens) ||
+        !isFiniteNonNegative(usage.cacheReadTokens) ||
+        !isFiniteNonNegative(usage.cacheWriteTokens))
+    ) {
       hasIncompleteBilledInput = true;
     }
     inputTokens = add(inputTokens, usage?.inputTokens);
@@ -133,8 +131,8 @@ export function getSessionStats(messages: CoworkMessage[]): SessionStats {
   const input = valueOrNull(inputTokens);
   const cacheRead = valueOrNull(cacheReadTokens);
   const cacheWrite = valueOrNull(cacheWriteTokens);
-  const hasVerifiedBilledInput = !hasIncompleteBilledInput
-    && input !== null && cacheRead !== null && cacheWrite !== null;
+  const hasVerifiedBilledInput =
+    !hasIncompleteBilledInput && input !== null && cacheRead !== null && cacheWrite !== null;
   const billedInput = hasVerifiedBilledInput ? input + cacheRead + cacheWrite : null;
   const decodedTokens = valueOrNull(decodedOutputTokens);
   const decodeDuration = valueOrNull(decodeDurationMs);

@@ -129,10 +129,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     }
   }, []);
 
-  const { searchPool, isLoadingSearchPool } = useMarketplaceSearchPool(
-    activeTab,
-    skillSearchQuery,
-  );
+  const { searchPool, isLoadingSearchPool } = useMarketplaceSearchPool(activeTab, skillSearchQuery);
 
   const loadMarketplacePage = useCallback(
     async (pageNumber: number) => {
@@ -458,9 +455,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       // Keep the pending list actionable, otherwise retrying would try to
       // delete skills that are already gone and fail on the first one.
       if (deletedSkillIds.size > 0) {
-        setSkillsPendingDelete(current =>
-          current.filter(skill => !deletedSkillIds.has(skill.id)),
-        );
+        setSkillsPendingDelete(current => current.filter(skill => !deletedSkillIds.has(skill.id)));
         setSelectedInstalledIds(
           current => new Set([...current].filter(id => !deletedSkillIds.has(id))),
         );

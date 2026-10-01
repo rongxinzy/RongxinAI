@@ -23,7 +23,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workbenchTaskOutputToolLabel: '输出要求',
     workbenchDeliveryHashFailed: '最终交付物内容校验失败。',
     workbenchOutputContractMissing: '尚未确认任务输出要求，结果暂不能验收。',
-    workbenchDeliveryMissing: '缺少符合任务输出要求的最终交付物；临时文件和普通回复片段不能替代交付。',
+    workbenchDeliveryMissing:
+      '缺少符合任务输出要求的最终交付物；临时文件和普通回复片段不能替代交付。',
     workbenchDeliveryNotReady: '结果尚未达到交付条件，不能人工验收。',
     workbenchDeliverablesRequireAcceptance: '有 {count} 个最终交付物需要人工验收。',
     workbenchArtifactCollectionFailed: '交付物采集失败，结果暂不能验收。',
@@ -400,7 +401,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     webSearchRequestFailed: 'Search request failed (HTTP {status}).',
     workbenchTaskOutputToolLabel: 'Output Requirements',
     workbenchDeliveryHashFailed: 'Final deliverable content verification failed.',
-    workbenchOutputContractMissing: 'The task output requirements have not been committed; the result cannot be accepted yet.',
+    workbenchOutputContractMissing:
+      'The task output requirements have not been committed; the result cannot be accepted yet.',
     workbenchDeliveryMissing:
       'No final deliverable satisfies the task output requirements. Temporary files and ordinary response fragments cannot replace delivery.',
     workbenchDeliveryNotReady: 'The result is not ready for delivery and cannot be accepted.',
@@ -428,7 +430,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentConfigThinkingLevel: 'Thinking level',
     codingAgentConfigPermissionMode: 'Permission mode',
     codingAgentConfigPlanMode: 'Plan mode',
-    mcpIntegrationOperationBusy: 'This MCP integration is busy with another operation. Try again shortly.',
+    mcpIntegrationOperationBusy:
+      'This MCP integration is busy with another operation. Try again shortly.',
     codingAgentPlanModeExecute: 'Execute directly',
     codingAgentPlanModePlan: 'Plan only (read-only)',
     codingAgentPermissionModeAsk: 'Ask every time',

@@ -90,9 +90,7 @@ test('truncates long artifact references and keeps the copy-hash action', () => 
   );
 
   expect(screen.getByText(reference)).toHaveClass('truncate');
-  expect(
-    screen.getByRole('button', { name: i18nService.t('workbenchTaskCopyHash') }),
-  ).toBeTruthy();
+  expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskCopyHash') })).toBeTruthy();
 });
 
 test('approving a pending approval responds with the approval id', () => {

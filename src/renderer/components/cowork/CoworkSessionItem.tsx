@@ -236,9 +236,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         onSelect();
       }}
       className={`theme-surface-session-row group relative p-3 cursor-pointer ${
-        isSelected || isActive
-          ? 'theme-surface-session-selected'
-          : 'theme-surface-session-idle'
+        isSelected || isActive ? 'theme-surface-session-selected' : 'theme-surface-session-idle'
       }`}
     >
       {/* Content area */}

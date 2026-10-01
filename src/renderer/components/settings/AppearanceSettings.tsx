@@ -106,7 +106,10 @@ export function AppearanceSettings({
                 </span>
                 {/* 2026/09/17 lixiang  设置中显示加载转圈，完成后显示勾选 */}
                 {isPending ? (
-                  <Spinner className="size-3.5 shrink-0" aria-label={i18nService.t('themeStyleApplying')} />
+                  <Spinner
+                    className="size-3.5 shrink-0"
+                    aria-label={i18nService.t('themeStyleApplying')}
+                  />
                 ) : (
                   <Check
                     aria-hidden="true"

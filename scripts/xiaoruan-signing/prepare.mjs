@@ -87,9 +87,7 @@ export async function prepareXiaoruanSigning(env = process.env) {
     'Verify Windows package runtimes with a clean PATH',
     'Run actions/upload-artifact@v6',
   ]) {
-    const ok = (job.steps || []).some(
-      step => step.name === name && step.conclusion === 'success',
-    );
+    const ok = (job.steps || []).some(step => step.name === name && step.conclusion === 'success');
     if (!ok) throw new Error(`Required Xiaoruan build step did not succeed: ${name}`);
   }
 

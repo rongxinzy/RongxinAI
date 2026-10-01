@@ -42,10 +42,7 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
   }, [load, sessionId]);
 
   const runAction = useCallback(
-    async (
-      action: () => Promise<WorkbenchTaskActionResult>,
-      confirmAcceptance = false,
-    ) => {
+    async (action: () => Promise<WorkbenchTaskActionResult>, confirmAcceptance = false) => {
       setBusy(true);
       try {
         const result = await action();
@@ -72,8 +69,7 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
   if (!requiresAcceptance) return null;
 
   const verificationSummary =
-    activeRun?.verificationResult?.summary ??
-    i18nService.t('workbenchTaskAcceptanceCardNoSummary');
+    activeRun?.verificationResult?.summary ?? i18nService.t('workbenchTaskAcceptanceCardNoSummary');
 
   // 2026/09/20 lixiang  与对话列同宽，避免验收卡显得过窄（issue #805）
   // 2026/09/20 lixiang  与上方文件卡留出间隙（TurnBlock 段内 gap-1 专为文件↔复制收紧）

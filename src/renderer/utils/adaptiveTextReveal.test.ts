@@ -19,6 +19,8 @@ test('accelerates for backlog and synchronizes exceptionally large backlogs', ()
 });
 
 test('resets the reveal when a committed segment replaces the streaming tail', () => {
-  expect(shouldResetTextReveal('First paragraph\n\nSecond paragraph', 'Second paragraph')).toBe(true);
+  expect(shouldResetTextReveal('First paragraph\n\nSecond paragraph', 'Second paragraph')).toBe(
+    true,
+  );
   expect(shouldResetTextReveal('Second paragraph', 'Second paragraph continues')).toBe(false);
 });

@@ -7,14 +7,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 const validatorPath = path.join(__dirname, 'validate-component-archive.ps1');
-const sevenZipPath = path.join(
-  projectRoot,
-  'node_modules',
-  '7zip-bin',
-  'win',
-  'x64',
-  '7za.exe',
-);
+const sevenZipPath = path.join(projectRoot, 'node_modules', '7zip-bin', 'win', 'x64', '7za.exe');
 const temporaryDirectories: string[] = [];
 
 function runValidator(
@@ -59,11 +52,10 @@ describe.skipIf(process.platform !== 'win32')('component archive validator', () 
     fs.writeFileSync(path.join(componentRoot, 'cc-connect-sidecar.exe'), 'runtime');
     fs.writeFileSync(path.join(componentRoot, 'runtime-build-info.json'), '{}');
 
-    const archive = spawnSync(
-      sevenZipPath,
-      ['a', '-t7z', archivePath, 'channel-runtime'],
-      { cwd: root, encoding: 'utf8' },
-    );
+    const archive = spawnSync(sevenZipPath, ['a', '-t7z', archivePath, 'channel-runtime'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
     expect(archive.status, archive.stderr || archive.stdout).toBe(0);
 
     const accepted = runValidator(archivePath, 'channel-runtime');
@@ -74,18 +66,21 @@ describe.skipIf(process.platform !== 'win32')('component archive validator', () 
     expect(rejected.status).not.toBe(0);
     expect(rejected.stderr).toContain('Unexpected archive entry: channel-runtime');
 
-    const expectedHash =
-      'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    const expectedHash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
     const hashMismatch = runValidator(archivePath, 'channel-runtime', sevenZipPath, expectedHash);
     expect(hashMismatch.status).toBe(2);
     expect(hashMismatch.stdout).toContain('hash-mismatch');
 
-    const actualHash = spawnSync('powershell.exe', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      `(Get-FileHash -LiteralPath "${archivePath}" -Algorithm SHA256).Hash.ToLowerInvariant()`,
-    ], { encoding: 'utf8' }).stdout.trim();
+    const actualHash = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `(Get-FileHash -LiteralPath "${archivePath}" -Algorithm SHA256).Hash.ToLowerInvariant()`,
+      ],
+      { encoding: 'utf8' },
+    ).stdout.trim();
     const hashMatch = runValidator(archivePath, 'channel-runtime', sevenZipPath, actualHash);
     expect(hashMatch.status, hashMatch.stderr || hashMatch.stdout).toBe(0);
     expect(hashMatch.stdout).toContain('Component archive validation passed');

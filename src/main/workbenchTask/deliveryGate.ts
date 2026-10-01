@@ -44,7 +44,7 @@ export function applyWorkbenchDeliveryGate(
           status: WorkbenchVerificationCheckStatus.Failed,
           detail: failed
             ? t('workbenchDeliveryHashFailed')
-              : !requirements?.length
+            : !requirements?.length
               ? t('workbenchOutputContractMissing')
               : t('workbenchDeliveryMissing'),
         },

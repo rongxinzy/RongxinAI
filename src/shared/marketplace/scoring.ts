@@ -1,4 +1,9 @@
-import type { MarketplaceFit, MarketplaceModel, MarketplaceScore, MarketplaceTaskFilter } from './types';
+import type {
+  MarketplaceFit,
+  MarketplaceModel,
+  MarketplaceScore,
+  MarketplaceTaskFilter,
+} from './types';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../hardware/types';
 import { estimateLlamaCppModelMemory } from '../llamacpp/modelMemoryEstimate';
 
@@ -29,12 +34,15 @@ export function createMarketplaceHardwareProfile(
   if (!gpuSnapshot?.available && !memorySnapshot?.available) return undefined;
   const gpus = gpuSnapshot?.gpus ?? [];
   const totalVramMiB = gpus.reduce((total, gpu) => total + gpu.memoryTotalMiB, 0);
-  const freeVramMiB = gpus.reduce((total, gpu) => total + (gpu.memoryFreeMiB ?? gpu.memoryTotalMiB), 0);
+  const freeVramMiB = gpus.reduce(
+    (total, gpu) => total + (gpu.memoryFreeMiB ?? gpu.memoryTotalMiB),
+    0,
+  );
   return {
     totalVramMiB,
     freeVramMiB,
     gpuCount: gpus.length,
-    gpuNames: gpus.map((gpu) => gpu.name),
+    gpuNames: gpus.map(gpu => gpu.name),
     systemMemoryMiB: memorySnapshot?.totalMemoryMiB ?? 0,
     freeSystemMemoryMiB: memorySnapshot?.freeMemoryMiB ?? 0,
     isDualGpu: gpus.length >= 2,
@@ -42,12 +50,14 @@ export function createMarketplaceHardwareProfile(
 }
 
 function modelFileSizeMiB(model: MarketplaceModel): number | undefined {
-  const file = model.files?.find((candidate) => candidate.isRecommended) ?? model.files?.[0];
+  const file = model.files?.find(candidate => candidate.isRecommended) ?? model.files?.[0];
   if (file?.sizeBytes && file.sizeBytes > 0) {
     const shardGroup = file.path.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i)?.[1];
     if (shardGroup) {
       const totalSizeBytes = model.files
-        ?.filter((candidate) => candidate.path.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i)?.[1] === shardGroup)
+        ?.filter(
+          candidate => candidate.path.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i)?.[1] === shardGroup,
+        )
         .reduce((total, candidate) => total + (candidate.sizeBytes ?? 0), 0);
       if (totalSizeBytes && totalSizeBytes > 0) return totalSizeBytes / 1024 / 1024;
     }
@@ -57,7 +67,10 @@ function modelFileSizeMiB(model: MarketplaceModel): number | undefined {
   return undefined;
 }
 
-function modelRequiredMemory(model: MarketplaceModel, contextSize: number): { vramMiB?: number; systemMiB?: number } {
+function modelRequiredMemory(
+  model: MarketplaceModel,
+  contextSize: number,
+): { vramMiB?: number; systemMiB?: number } {
   const fileMiB = modelFileSizeMiB(model);
   if (!fileMiB) return {};
   const estimate = estimateLlamaCppModelMemory({
@@ -72,10 +85,19 @@ function modelRequiredMemory(model: MarketplaceModel, contextSize: number): { vr
     : {};
 }
 
-function fitModel(model: MarketplaceModel, hardware: MarketplaceHardwareProfile | undefined, contextSize: number): { fit: MarketplaceFit; score: number } {
+function fitModel(
+  model: MarketplaceModel,
+  hardware: MarketplaceHardwareProfile | undefined,
+  contextSize: number,
+): { fit: MarketplaceFit; score: number } {
   const required = modelRequiredMemory(model, contextSize);
-  if (!hardware) return { fit: { status: 'unknown', reason: '检测设备后可给出更准确的适配建议。' }, score: 55 };
-  if (!required.vramMiB && !required.systemMiB) return { fit: { status: 'unknown', reason: '目录尚未提供 GGUF 文件大小，暂不猜测是否适配。' }, score: 48 };
+  if (!hardware)
+    return { fit: { status: 'unknown', reason: '检测设备后可给出更准确的适配建议。' }, score: 55 };
+  if (!required.vramMiB && !required.systemMiB)
+    return {
+      fit: { status: 'unknown', reason: '目录尚未提供 GGUF 文件大小，暂不猜测是否适配。' },
+      score: 48,
+    };
   // Fit is based on the machine's maximum GPU and system-memory capacity.
   // Current free memory fluctuates with unrelated applications and must not
   // change the catalogue recommendation for the same device.
@@ -91,26 +113,37 @@ function fitModel(model: MarketplaceModel, hardware: MarketplaceHardwareProfile 
         estimatedVramMiB: required.vramMiB,
         estimatedSystemMemoryMiB: Math.round(cpuRequiredMiB),
         recommendedContext: status === 'limited' ? Math.min(contextSize, 4096) : 2048,
-        reason: status === 'limited'
-          ? '未检测到 NVIDIA GPU；系统内存可容纳，预计使用 CPU 或其他本地后端，速度需实测。'
-          : '未检测到 NVIDIA GPU，且当前系统内存余量不足以稳妥加载该量化。',
+        reason:
+          status === 'limited'
+            ? '未检测到 NVIDIA GPU；系统内存可容纳，预计使用 CPU 或其他本地后端，速度需实测。'
+            : '未检测到 NVIDIA GPU，且当前系统内存余量不足以稳妥加载该量化。',
       },
-      score: status === 'limited' ? clamp(52 + Math.min(cpuRatio, 1.5) * 12) : clamp(35 + cpuRatio * 15),
+      score:
+        status === 'limited' ? clamp(52 + Math.min(cpuRatio, 1.5) * 12) : clamp(35 + cpuRatio * 15),
     };
   }
   const vramRatio = required.vramMiB ? availableVram / required.vramMiB : 1;
   const systemRatio = required.systemMiB ? availableSystem / required.systemMiB : 1;
   const ratio = Math.min(vramRatio, systemRatio);
-  const status: MarketplaceFit['status'] = ratio >= 1.35 ? 'excellent' : ratio >= 1.05 ? 'good' : ratio >= 0.8 ? 'limited' : 'unsupported';
-  const reason = status === 'excellent'
-    ? '按当前显存与内存余量，适合直接运行。'
-    : status === 'good'
-      ? '可以运行，建议使用推荐上下文长度。'
-      : status === 'limited'
-        ? '可以尝试，可能需要降低上下文或使用混合卸载。'
-        : '当前设备余量不足，建议选择更小量化。';
+  const status: MarketplaceFit['status'] =
+    ratio >= 1.35 ? 'excellent' : ratio >= 1.05 ? 'good' : ratio >= 0.8 ? 'limited' : 'unsupported';
+  const reason =
+    status === 'excellent'
+      ? '按当前显存与内存余量，适合直接运行。'
+      : status === 'good'
+        ? '可以运行，建议使用推荐上下文长度。'
+        : status === 'limited'
+          ? '可以尝试，可能需要降低上下文或使用混合卸载。'
+          : '当前设备余量不足，建议选择更小量化。';
   return {
-    fit: { status, estimatedVramMiB: required.vramMiB, estimatedSystemMemoryMiB: required.systemMiB, recommendedContext: ratio >= 1.05 ? contextSize : Math.max(2048, Math.floor(contextSize * ratio)), reason },
+    fit: {
+      status,
+      estimatedVramMiB: required.vramMiB,
+      estimatedSystemMemoryMiB: required.systemMiB,
+      recommendedContext:
+        ratio >= 1.05 ? contextSize : Math.max(2048, Math.floor(contextSize * ratio)),
+      reason,
+    },
     score: clamp(50 + ratio * 40),
   };
 }
@@ -120,14 +153,14 @@ function taskScore(model: MarketplaceModel, task: MarketplaceTaskFilter): number
   if (task === 'all') return capabilities.length ? 76 : 54;
   return capabilities.includes(task as MarketplaceModel['capability'])
     ? 96
-    : model.tags.some((tag) => tag.toLowerCase() === task)
+    : model.tags.some(tag => tag.toLowerCase() === task)
       ? 72
       : 42;
 }
 
 function confidence(model: MarketplaceModel): MarketplaceScore['confidence'] {
   const evidenceCount = model.evidence?.length ?? 0;
-  const hasFileHash = Boolean(model.files?.some((file) => file.sha256));
+  const hasFileHash = Boolean(model.files?.some(file => file.sha256));
   if (model.runtime?.status === 'verified' && evidenceCount >= 3 && hasFileHash) return 'A';
   if (evidenceCount >= 2 || hasFileHash) return 'B';
   if (evidenceCount >= 1) return 'C';
@@ -142,16 +175,35 @@ function runtimeScore(model: MarketplaceModel): number {
   return 35;
 }
 
-export function scoreMarketplaceModel(model: MarketplaceModel, context: MarketplaceScoringContext = {}): { score: MarketplaceScore; fit: MarketplaceFit } {
+export function scoreMarketplaceModel(
+  model: MarketplaceModel,
+  context: MarketplaceScoringContext = {},
+): { score: MarketplaceScore; fit: MarketplaceFit } {
   const taskQuality = taskScore(model, context.task ?? 'all');
   const fitResult = fitModel(model, context.hardware, context.contextSize ?? 8192);
   const runtimeCompatibility = clamp(runtimeScore(model));
-  const trust = clamp(model.trustScore ?? (model.licenseStatus === 'permissive' ? 78 : model.licenseStatus === 'restricted' ? 58 : 45));
-  const community = clamp(model.communityScore ?? (model.downloads ? 50 + Math.min(45, Math.log10(model.downloads + 1) * 12) : 44));
-  const value = clamp(taskQuality * 0.35 + fitResult.score * 0.30 + runtimeCompatibility * 0.15 + trust * 0.10 + community * 0.10);
+  const trust = clamp(
+    model.trustScore ??
+      (model.licenseStatus === 'permissive' ? 78 : model.licenseStatus === 'restricted' ? 58 : 45),
+  );
+  const community = clamp(
+    model.communityScore ??
+      (model.downloads ? 50 + Math.min(45, Math.log10(model.downloads + 1) * 12) : 44),
+  );
+  const value = clamp(
+    taskQuality * 0.35 +
+      fitResult.score * 0.3 +
+      runtimeCompatibility * 0.15 +
+      trust * 0.1 +
+      community * 0.1,
+  );
   const stars = Math.round((value / 20) * 2) / 2;
   const reasons = [
-    context.task && context.task !== 'all' ? (taskQuality >= 80 ? `适合${context.task}任务` : '任务匹配度有限') : '综合任务表现',
+    context.task && context.task !== 'all'
+      ? taskQuality >= 80
+        ? `适合${context.task}任务`
+        : '任务匹配度有限'
+      : '综合任务表现',
     fitResult.fit.reason ?? '设备适配信息待补充',
     model.runtime?.status === 'verified'
       ? '端侧加载与最小推理探针已通过'
@@ -162,14 +214,24 @@ export function scoreMarketplaceModel(model: MarketplaceModel, context: Marketpl
   return {
     fit: fitResult.fit,
     score: {
-      stars, value: Math.round(value * 10) / 10, confidence: confidence(model), taskQuality: Math.round(taskQuality),
-      deviceFit: Math.round(fitResult.score), runtimeCompatibility: Math.round(runtimeCompatibility), trust: Math.round(trust),
-      community: Math.round(community), reasons, scoreVersion: MARKETPLACE_SCORE_VERSION,
+      stars,
+      value: Math.round(value * 10) / 10,
+      confidence: confidence(model),
+      taskQuality: Math.round(taskQuality),
+      deviceFit: Math.round(fitResult.score),
+      runtimeCompatibility: Math.round(runtimeCompatibility),
+      trust: Math.round(trust),
+      community: Math.round(community),
+      reasons,
+      scoreVersion: MARKETPLACE_SCORE_VERSION,
     },
   };
 }
 
-export function withMarketplaceScore(model: MarketplaceModel, context: MarketplaceScoringContext = {}): MarketplaceModel {
+export function withMarketplaceScore(
+  model: MarketplaceModel,
+  context: MarketplaceScoringContext = {},
+): MarketplaceModel {
   const result = scoreMarketplaceModel(model, context);
   return { ...model, score: result.score, fit: result.fit };
 }
@@ -192,18 +254,16 @@ export function formatMarketplaceHardwareSummaryParts(
       systemMemoryGiB: null,
     };
   }
-  const gpuNames = [...new Set(
-    hardware.gpuNames
-      .map(name => name.replace(/^NVIDIA\s+/i, '').trim())
-      .filter(Boolean),
-  )];
+  const gpuNames = [
+    ...new Set(
+      hardware.gpuNames.map(name => name.replace(/^NVIDIA\s+/i, '').trim()).filter(Boolean),
+    ),
+  ];
   return {
     gpuCount: hardware.gpuCount,
     totalVramGiB: Math.round(hardware.totalVramMiB / 1024),
     gpuNames,
-    systemMemoryGiB: hardware.systemMemoryMiB
-      ? Math.round(hardware.systemMemoryMiB / 1024)
-      : null,
+    systemMemoryGiB: hardware.systemMemoryMiB ? Math.round(hardware.systemMemoryMiB / 1024) : null,
   };
 }
 

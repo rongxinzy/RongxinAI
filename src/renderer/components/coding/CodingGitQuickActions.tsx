@@ -24,14 +24,29 @@ import { Separator } from '@shared/components/ui/separator';
 import { Spinner } from '@shared/components/ui/spinner';
 import { Textarea } from '@shared/components/ui/textarea';
 import { cn } from '@shared/lib/utils';
-import { Check, ChevronDown, CloudUpload, ExternalLink, FilePlus2, GitBranch, GitCommitHorizontal, GitCompareArrows, GitPullRequestCreate, Plus, SlidersHorizontal } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  CloudUpload,
+  ExternalLink,
+  FilePlus2,
+  GitBranch,
+  GitCommitHorizontal,
+  GitCompareArrows,
+  GitPullRequestCreate,
+  Plus,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { CodingGitStatus, CodingGitTargetInput } from '../../../shared/codingAgent';
 import { showAppError, showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import { appErrorText } from '../../services/appErrorText';
-import { CodingGitQuickActionMode, type CodingGitQuickActionMode as CodingGitQuickActionModeType } from './constants';
+import {
+  CodingGitQuickActionMode,
+  type CodingGitQuickActionMode as CodingGitQuickActionModeType,
+} from './constants';
 import { buildGitHubComparisonUrl } from './codingGitUrl';
 
 interface CodingGitQuickActionsProps {
@@ -114,11 +129,11 @@ export const CodingGitQuickActions = ({
     () => Boolean(status?.files.some(file => file.indexStatus !== null)),
     [status?.files],
   );
-  const hasCommitChanges = includeUnstaged
-    ? Boolean(status?.files.length)
-    : hasStagedChanges;
+  const hasCommitChanges = includeUnstaged ? Boolean(status?.files.length) : hasStagedChanges;
   const branches = useMemo(() => status?.localBranches ?? [], [status?.localBranches]);
-  const canPush = Boolean(status?.canMutate && status.hasOrigin && status.branch && !status.detached);
+  const canPush = Boolean(
+    status?.canMutate && status.hasOrigin && status.branch && !status.detached,
+  );
   const canCommit = Boolean(status?.canMutate && hasCommitChanges);
   const canCommitAndPush = canCommit && canPush;
 
@@ -159,7 +174,13 @@ export const CodingGitQuickActions = ({
         showAppError(i18nService.t('codingGitStateChanged'));
         return;
       }
-      const result = await window.electron.codingAgent.createGitPullRequest({ ...target, title: pullRequestTitle, body: pullRequestBody, base: pullRequestBase, draft });
+      const result = await window.electron.codingAgent.createGitPullRequest({
+        ...target,
+        title: pullRequestTitle,
+        body: pullRequestBody,
+        base: pullRequestBase,
+        draft,
+      });
       if (!result.success || !result.url) {
         showAppError(result.error, 'codingGitActionFailed');
         return;
@@ -227,10 +248,14 @@ export const CodingGitQuickActions = ({
         .filter(file => file.worktreeStatus !== null)
         .map(file => file.path);
       const latestHasStagedChanges = latestStatus.files.some(file => file.indexStatus !== null);
-      const latestCanCommit = latestStatus.canMutate && (
-        includeUnstaged ? latestStatus.files.length > 0 : latestHasStagedChanges
-      );
-      const latestCanPush = latestStatus.canMutate && latestStatus.hasOrigin && Boolean(latestStatus.branch) && !latestStatus.detached;
+      const latestCanCommit =
+        latestStatus.canMutate &&
+        (includeUnstaged ? latestStatus.files.length > 0 : latestHasStagedChanges);
+      const latestCanPush =
+        latestStatus.canMutate &&
+        latestStatus.hasOrigin &&
+        Boolean(latestStatus.branch) &&
+        !latestStatus.detached;
       if (!latestCanCommit || (pushAfterCommit && !latestCanPush)) {
         showAppError(i18nService.t('codingGitStateChanged'));
         return;
@@ -261,7 +286,8 @@ export const CodingGitQuickActions = ({
           message,
           paths: includeUnstaged ? latestUnstagedPaths : [],
         });
-        if (!committed.success) throw new Error(committed.error ?? i18nService.t('codingGitActionFailed'));
+        if (!committed.success)
+          throw new Error(committed.error ?? i18nService.t('codingGitActionFailed'));
         if (committed.status) setStatus(committed.status);
         setCommitMessage('');
         showAppToast(i18nService.t('codingGitCommitted'), { isSuccess: true });
@@ -279,9 +305,9 @@ export const CodingGitQuickActions = ({
       const latestStatus = await loadStatus();
       const latestCanPush = Boolean(
         latestStatus?.canMutate &&
-          latestStatus.hasOrigin &&
-          latestStatus.branch &&
-          !latestStatus.detached,
+        latestStatus.hasOrigin &&
+        latestStatus.branch &&
+        !latestStatus.detached,
       );
       if (!latestCanPush) {
         showAppError(i18nService.t('codingGitStateChanged'));
@@ -350,13 +376,30 @@ export const CodingGitQuickActions = ({
             </div>
           ) : status?.isRepository ? (
             <div className="space-y-1">
-              <GitMenuRow icon={FilePlus2} onClick={openReview} trailing={<span className="text-xs"><span className="text-success">+{status.additions}</span> <span className="text-destructive">−{status.deletions}</span></span>}>
+              <GitMenuRow
+                icon={FilePlus2}
+                onClick={openReview}
+                trailing={
+                  <span className="text-xs">
+                    <span className="text-success">+{status.additions}</span>{' '}
+                    <span className="text-destructive">−{status.deletions}</span>
+                  </span>
+                }
+              >
                 {i18nService.t('codingGitChanges')}
               </GitMenuRow>
               <Popover open={branchOpen} onOpenChange={setBranchOpen}>
-                <PopoverTrigger render={<Button type="button" variant="ghost" className="w-full justify-start gap-2" />}>
+                <PopoverTrigger
+                  render={
+                    <Button type="button" variant="ghost" className="w-full justify-start gap-2" />
+                  }
+                >
                   <GitBranch className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate text-left">{status.detached ? i18nService.t('codingGitDetached') : (status.branch ?? status.head ?? '—')}</span>
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {status.detached
+                      ? i18nService.t('codingGitDetached')
+                      : (status.branch ?? status.head ?? '—')}
+                  </span>
                   <span className="text-xs text-muted-foreground">{status.upstream ?? '—'}</span>
                   <ChevronDown />
                 </PopoverTrigger>
@@ -369,12 +412,18 @@ export const CodingGitQuickActions = ({
                         <CommandItem
                           key={branch}
                           value={branch}
-                          disabled={branch === status.branch || pendingBranch !== null || !status.canMutate}
+                          disabled={
+                            branch === status.branch || pendingBranch !== null || !status.canMutate
+                          }
                           onSelect={() => void switchBranch(branch)}
                         >
                           <GitBranch />
                           <span className="min-w-0 flex-1 truncate">{branch}</span>
-                          {pendingBranch === branch ? <Spinner /> : branch === status.branch ? <Check /> : null}
+                          {pendingBranch === branch ? (
+                            <Spinner />
+                          ) : branch === status.branch ? (
+                            <Check />
+                          ) : null}
                         </CommandItem>
                       ))}
                     </CommandList>
@@ -421,21 +470,66 @@ export const CodingGitQuickActions = ({
       <Dialog open={commitOpen} onOpenChange={setCommitOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><GitBranch />{status?.branch ?? i18nService.t('codingGitDetached')}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <GitBranch />
+              {status?.branch ?? i18nService.t('codingGitDetached')}
+            </DialogTitle>
           </DialogHeader>
           <FieldGroup>
-            <Textarea id="coding-git-quick-commit" value={commitMessage} onChange={event => setCommitMessage(event.target.value)} placeholder={i18nService.t('codingGitCommitPlaceholder')} className="min-h-24 resize-none" />
+            <Textarea
+              id="coding-git-quick-commit"
+              value={commitMessage}
+              onChange={event => setCommitMessage(event.target.value)}
+              placeholder={i18nService.t('codingGitCommitPlaceholder')}
+              className="min-h-24 resize-none"
+            />
             <Field orientation="horizontal">
-              <Checkbox id="coding-git-include-unstaged" checked={includeUnstaged} onCheckedChange={checked => setIncludeUnstaged(checked === true)} />
-              <FieldLabel htmlFor="coding-git-include-unstaged" className="font-normal">{i18nService.t('codingGitIncludeUnstaged')}</FieldLabel>
-              <span className={cn('ml-auto text-sm', 'text-muted-foreground')}><span className="text-success">+{status?.additions ?? 0}</span> <span className="text-destructive">−{status?.deletions ?? 0}</span></span>
+              <Checkbox
+                id="coding-git-include-unstaged"
+                checked={includeUnstaged}
+                onCheckedChange={checked => setIncludeUnstaged(checked === true)}
+              />
+              <FieldLabel htmlFor="coding-git-include-unstaged" className="font-normal">
+                {i18nService.t('codingGitIncludeUnstaged')}
+              </FieldLabel>
+              <span className={cn('ml-auto text-sm', 'text-muted-foreground')}>
+                <span className="text-success">+{status?.additions ?? 0}</span>{' '}
+                <span className="text-destructive">−{status?.deletions ?? 0}</span>
+              </span>
             </Field>
           </FieldGroup>
           <Separator />
           <div className="flex flex-col gap-1">
-            <Button type="button" variant="ghost" className="w-full justify-start gap-2" disabled={!canCommit || !commitMessage.trim() || pendingAction !== null} onClick={() => void runCommit(false)}>{pendingAction === 'commit' ? <Spinner /> : <GitCommitHorizontal />}{i18nService.t('codingGitCommit')}</Button>
-            <Button type="button" variant="ghost" className="w-full justify-start gap-2" disabled={!canCommitAndPush || !commitMessage.trim() || pendingAction !== null} onClick={() => void runCommit(true)}>{pendingAction === 'commitAndPush' ? <Spinner /> : <CloudUpload />}{i18nService.t('codingGitCommitAndPush')}</Button>
-            <Button type="button" variant="ghost" className="w-full justify-start gap-2" disabled={!canPush || pendingAction !== null} onClick={() => void push()}>{pendingAction === 'push' ? <Spinner /> : <CloudUpload />}{i18nService.t('codingGitPush')}</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              disabled={!canCommit || !commitMessage.trim() || pendingAction !== null}
+              onClick={() => void runCommit(false)}
+            >
+              {pendingAction === 'commit' ? <Spinner /> : <GitCommitHorizontal />}
+              {i18nService.t('codingGitCommit')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              disabled={!canCommitAndPush || !commitMessage.trim() || pendingAction !== null}
+              onClick={() => void runCommit(true)}
+            >
+              {pendingAction === 'commitAndPush' ? <Spinner /> : <CloudUpload />}
+              {i18nService.t('codingGitCommitAndPush')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              disabled={!canPush || pendingAction !== null}
+              onClick={() => void push()}
+            >
+              {pendingAction === 'push' ? <Spinner /> : <CloudUpload />}
+              {i18nService.t('codingGitPush')}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -447,14 +541,66 @@ export const CodingGitQuickActions = ({
             </DialogTitle>
           </DialogHeader>
           <FieldGroup>
-            <Input id="coding-git-pr-title" value={pullRequestTitle} onChange={event => setPullRequestTitle(event.target.value)} placeholder={i18nService.t('codingGitPullRequestTitle')} aria-label={i18nService.t('codingGitPullRequestTitle')} />
-            <Textarea id="coding-git-pr-body" value={pullRequestBody} onChange={event => setPullRequestBody(event.target.value)} placeholder={i18nService.t('codingGitPullRequestBodyPlaceholder')} aria-label={i18nService.t('codingGitPullRequestBody')} className="min-h-24 resize-none" />
+            <Input
+              id="coding-git-pr-title"
+              value={pullRequestTitle}
+              onChange={event => setPullRequestTitle(event.target.value)}
+              placeholder={i18nService.t('codingGitPullRequestTitle')}
+              aria-label={i18nService.t('codingGitPullRequestTitle')}
+            />
+            <Textarea
+              id="coding-git-pr-body"
+              value={pullRequestBody}
+              onChange={event => setPullRequestBody(event.target.value)}
+              placeholder={i18nService.t('codingGitPullRequestBodyPlaceholder')}
+              aria-label={i18nService.t('codingGitPullRequestBody')}
+              className="min-h-24 resize-none"
+            />
           </FieldGroup>
           <Separator />
           <div className="flex flex-col gap-1">
-            <Button type="button" variant="ghost" className="w-full justify-start gap-2" disabled={pendingAction !== null || !pullRequestTitle.trim() || pullRequestUrl !== null} onClick={() => void createPullRequest(true)}>{pendingAction === 'pullRequest' && isDraftPullRequest ? <Spinner /> : <GitPullRequestCreate />}{i18nService.t('codingGitCreateDraftPullRequest')}</Button>
-            <Button type="button" variant="ghost" className="w-full justify-start gap-2" disabled={pendingAction !== null || !pullRequestTitle.trim() || pullRequestUrl !== null} onClick={() => void createPullRequest(false)}>{pendingAction === 'pullRequest' && !isDraftPullRequest ? <Spinner /> : <GitPullRequestCreate />}{i18nService.t('codingGitCreatePullRequest')}</Button>
-            <Button type="button" variant="ghost" className="w-full justify-start gap-2" disabled={!pullRequestUrl} onClick={() => void openPullRequestInBrowser()}><ExternalLink />{i18nService.t('codingGitOpenPullRequest')}</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              disabled={
+                pendingAction !== null || !pullRequestTitle.trim() || pullRequestUrl !== null
+              }
+              onClick={() => void createPullRequest(true)}
+            >
+              {pendingAction === 'pullRequest' && isDraftPullRequest ? (
+                <Spinner />
+              ) : (
+                <GitPullRequestCreate />
+              )}
+              {i18nService.t('codingGitCreateDraftPullRequest')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              disabled={
+                pendingAction !== null || !pullRequestTitle.trim() || pullRequestUrl !== null
+              }
+              onClick={() => void createPullRequest(false)}
+            >
+              {pendingAction === 'pullRequest' && !isDraftPullRequest ? (
+                <Spinner />
+              ) : (
+                <GitPullRequestCreate />
+              )}
+              {i18nService.t('codingGitCreatePullRequest')}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              disabled={!pullRequestUrl}
+              onClick={() => void openPullRequestInBrowser()}
+            >
+              <ExternalLink />
+              {i18nService.t('codingGitOpenPullRequest')}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -462,7 +608,9 @@ export const CodingGitQuickActions = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{i18nService.t('codingGitCreateBranchTitle')}</DialogTitle>
-            <DialogDescription>{i18nService.t('codingGitCreateBranchDescription')}</DialogDescription>
+            <DialogDescription>
+              {i18nService.t('codingGitCreateBranchDescription')}
+            </DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>

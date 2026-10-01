@@ -22,9 +22,11 @@ describe('llamacppModelLoadPipeline', () => {
     const result = await loadLlamaCppModelThroughPipeline({
       launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
-      runtimeCapabilities: gpuCapabilities(1, ['cuda'], [
-        { id: 'CUDA0', name: 'GPU 0', backend: 'cuda' },
-      ]),
+      runtimeCapabilities: gpuCapabilities(
+        1,
+        ['cuda'],
+        [{ id: 'CUDA0', name: 'GPU 0', backend: 'cuda' }],
+      ),
       nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 24_000 }]),
       modelSizeBytes: gib(7),
       loadModel,

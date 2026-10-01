@@ -79,7 +79,10 @@ describe('Electron runtime dependency check', () => {
   test('rejects Electron-only dependencies in the llama.cpp daemon bundle', () => {
     expect(() =>
       checkElectronRuntimeDependencies(
-        createFixture("require('ajv')", "require('electron'); require('extract-zip'); require('tar');"),
+        createFixture(
+          "require('ajv')",
+          "require('electron'); require('extract-zip'); require('tar');",
+        ),
       ),
     ).toThrow('Electron-only dependencies: electron, extract-zip, tar');
   });

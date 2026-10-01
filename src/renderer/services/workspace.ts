@@ -221,9 +221,10 @@ class WorkspaceService {
         ...result.workspace,
         pinned: existingWorkspace?.pinned ?? false,
       };
-      const next = [...current.filter(item => item.id !== createdWorkspace.id), createdWorkspace].sort(
-        (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
-      );
+      const next = [
+        ...current.filter(item => item.id !== createdWorkspace.id),
+        createdWorkspace,
+      ].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
       store.dispatch(setWorkspaces(next));
       return createdWorkspace;
     } catch (error) {

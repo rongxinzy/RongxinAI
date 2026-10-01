@@ -133,12 +133,7 @@ describe('collectSessionArtifactCandidates', () => {
 
   test('marks ordinary assistant code blocks as intermediate, not deliverable', () => {
     const [candidate] = collectSessionArtifactCandidates([
-      message(
-        'assistant-1',
-        1,
-        'assistant',
-        '```html title="Preview"\n<h1>Hello</h1>\n```',
-      ),
+      message('assistant-1', 1, 'assistant', '```html title="Preview"\n<h1>Hello</h1>\n```'),
     ]);
 
     expect(candidate.artifact).toMatchObject({

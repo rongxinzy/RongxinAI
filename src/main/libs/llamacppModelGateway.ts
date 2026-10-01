@@ -31,7 +31,9 @@ export type LlamaCppModelGateway = {
   stop: () => Promise<void>;
 };
 
-export function createLlamaCppModelGateway(options: LlamaCppModelGatewayOptions): LlamaCppModelGateway {
+export function createLlamaCppModelGateway(
+  options: LlamaCppModelGatewayOptions,
+): LlamaCppModelGateway {
   let server: http.Server | null = null;
   let boundPort: number | null = null;
 
@@ -117,7 +119,8 @@ function isAuthorized(
   request: http.IncomingMessage,
   config: ReturnType<LlamaCppModelGatewayOptions['getConfig']>,
 ): boolean {
-  if (config.accessMode !== LlamaCppGatewayAccessMode.Lan || isLoopbackRequest(request)) return true;
+  if (config.accessMode !== LlamaCppGatewayAccessMode.Lan || isLoopbackRequest(request))
+    return true;
   const token = config.lanToken?.trim();
   return Boolean(token && request.headers.authorization === `Bearer ${token}`);
 }

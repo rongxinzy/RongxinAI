@@ -73,26 +73,28 @@ test('maps the local compatible fit filter to the catalogue runnable filter', as
 });
 
 test('resolveModel matches repo ids case-insensitively and aliases by model id', async () => {
-  const fetchMock = vi.fn(async () => Response.json({
-    models: [
-      {
-        id: 'qwen3-8b-gguf',
-        repoId: 'Qwen/Qwen3-8B-GGUF',
-        name: 'Qwen3 8B GGUF',
-        files: [
-          {
-            path: 'Qwen3-8B-Q4_K_M.gguf',
-            isRecommended: true,
-            sizeBytes: 100,
-            sha256: VERIFIED_SHA,
-          },
-        ],
-        metadataStatus: 'verified',
-        runtime: { format: 'gguf', ggufFilesVerified: true },
-      },
-    ],
-    totalCount: 1,
-  }));
+  const fetchMock = vi.fn(async () =>
+    Response.json({
+      models: [
+        {
+          id: 'qwen3-8b-gguf',
+          repoId: 'Qwen/Qwen3-8B-GGUF',
+          name: 'Qwen3 8B GGUF',
+          files: [
+            {
+              path: 'Qwen3-8B-Q4_K_M.gguf',
+              isRecommended: true,
+              sizeBytes: 100,
+              sha256: VERIFIED_SHA,
+            },
+          ],
+          metadataStatus: 'verified',
+          runtime: { format: 'gguf', ggufFilesVerified: true },
+        },
+      ],
+      totalCount: 1,
+    }),
+  );
 
   const client = new ModelCatalogClient('https://catalog.example.test', fetchMock);
 

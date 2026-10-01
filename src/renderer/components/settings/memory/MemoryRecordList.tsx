@@ -731,10 +731,7 @@ function sourceLabel(
       const sessionTitle = sessionTitles.get(record.promotionSourceSessionId)?.trim();
       return i18nService
         .t('managedMemoryPromotedFromSession')
-        .replace(
-          '{name}',
-          sessionTitle || i18nService.t('managedMemorySourceUnavailable'),
-        );
+        .replace('{name}', sessionTitle || i18nService.t('managedMemorySourceUnavailable'));
     }
     return i18nService.t('managedMemoryPromotedFromWorkspace');
   }

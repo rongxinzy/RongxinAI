@@ -373,7 +373,16 @@ test('discovers npx packages from nvm and fnm version directories', async () => 
     'installation',
     'bin',
   );
-  const nvmPackage = path.join(root, '.nvm', 'versions', 'node', 'v24.0.0', 'lib', 'node_modules', 'nvm-agent');
+  const nvmPackage = path.join(
+    root,
+    '.nvm',
+    'versions',
+    'node',
+    'v24.0.0',
+    'lib',
+    'node_modules',
+    'nvm-agent',
+  );
   const fnmPackage = path.join(
     root,
     '.local',
@@ -417,7 +426,10 @@ test('discovers npx packages from nvm and fnm version directories', async () => 
         }),
       ),
     ]);
-    await Promise.all([chmod(path.join(nvmBin, 'nvm-agent'), 0o755), chmod(path.join(fnmBin, 'fnm-agent'), 0o755)]);
+    await Promise.all([
+      chmod(path.join(nvmBin, 'nvm-agent'), 0o755),
+      chmod(path.join(fnmBin, 'fnm-agent'), 0o755),
+    ]);
 
     const profiles = await new AcpDiscoveryService(registryPath, {
       platform: 'darwin',

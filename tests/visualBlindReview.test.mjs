@@ -14,11 +14,27 @@ try {
     fs.mkdirSync(task, { recursive: true });
     fs.writeFileSync(path.join(task, 'baseline.png'), 'baseline');
     fs.writeFileSync(path.join(task, 'candidate.png'), 'candidate');
-    fs.writeFileSync(path.join(task, 'baseline.json'), JSON.stringify({ kind: taskId.startsWith('ppt') ? 'ppt' : 'website', preview: 'baseline.png' }));
-    fs.writeFileSync(path.join(task, 'candidate.json'), JSON.stringify({ kind: taskId.startsWith('ppt') ? 'ppt' : 'website', preview: 'candidate.png' }));
+    fs.writeFileSync(
+      path.join(task, 'baseline.json'),
+      JSON.stringify({
+        kind: taskId.startsWith('ppt') ? 'ppt' : 'website',
+        preview: 'baseline.png',
+      }),
+    );
+    fs.writeFileSync(
+      path.join(task, 'candidate.json'),
+      JSON.stringify({
+        kind: taskId.startsWith('ppt') ? 'ppt' : 'website',
+        preview: 'candidate.png',
+      }),
+    );
   }
   const output = path.join(root, 'review');
-  const result = spawnSync(process.execPath, [script, root, '--seed', 'test-seed', '--output', output], { encoding: 'utf8' });
+  const result = spawnSync(
+    process.execPath,
+    [script, root, '--seed', 'test-seed', '--output', output],
+    { encoding: 'utf8' },
+  );
   assert.equal(result.status, 0, result.stderr || result.stdout);
   const form = JSON.parse(fs.readFileSync(path.join(output, 'review-form.json'), 'utf8'));
   const key = JSON.parse(fs.readFileSync(path.join(output, 'blind-review-key.json'), 'utf8'));

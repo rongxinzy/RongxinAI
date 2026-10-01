@@ -6,7 +6,10 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { ApiFormat } from '@shared/providers';
 
 import { i18nService } from '../../services/i18n';
-import { resolveToastNotification, type ToastNotificationDetail } from '../../services/toastNotification';
+import {
+  resolveToastNotification,
+  type ToastNotificationDetail,
+} from '../../services/toastNotification';
 import { ProviderModelDiscoveryButton } from './ProviderModelDiscoveryButton';
 
 type ModelsDiscoveredHandler = (providerId: string, models: readonly unknown[]) => void;

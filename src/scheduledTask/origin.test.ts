@@ -80,9 +80,7 @@ test('infer: empty string sessionKey -> manual origin', () => {
 });
 
 test('infer: sessionKey with whitespace is trimmed before parsing', () => {
-  const result = inferOriginAndBinding(
-    makeTask({ sessionKey: '  zhiyuan:sess-trimmed  ' }),
-  );
+  const result = inferOriginAndBinding(makeTask({ sessionKey: '  zhiyuan:sess-trimmed  ' }));
   expect(result.origin.kind).toBe(OriginKind.Cowork);
   expect((result.origin as any).sessionId).toBe('sess-trimmed');
 });

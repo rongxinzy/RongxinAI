@@ -49,7 +49,9 @@ export function resolveLocalModelProvider(model: LlamaCppModel): LocalModelProvi
 }
 
 export function resolveModelProviderName(modelName: string): LocalModelProvider | null {
-  return MODEL_PROVIDER_MATCHERS.find(({ pattern }) => pattern.test(modelName.trim()))?.provider ?? null;
+  return (
+    MODEL_PROVIDER_MATCHERS.find(({ pattern }) => pattern.test(modelName.trim()))?.provider ?? null
+  );
 }
 
 function getModelProviderCandidates(model: LlamaCppModel): string[] {

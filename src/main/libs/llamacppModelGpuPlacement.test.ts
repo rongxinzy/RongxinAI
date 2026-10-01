@@ -92,7 +92,7 @@ describe('llamacppModelGpuPlacement', () => {
       reason: LlamaCppModelLoadFailureReason.SystemMemoryInsufficient,
     });
     expect(result.success === false && result.requiredMemoryMiB).toBeGreaterThan(
-      result.success === false ? result.availableMemoryMiB ?? 0 : 0,
+      result.success === false ? (result.availableMemoryMiB ?? 0) : 0,
     );
   });
 
@@ -110,9 +110,9 @@ describe('llamacppModelGpuPlacement', () => {
   });
 
   test('estimates model startup memory from model size and context buffer', () => {
-    expect(
-      estimateRequiredLlamaCppModelVramMiB({ modelSizeBytes: gib(10), ctxSize: 4096 }),
-    ).toBe(Math.ceil(10 * 1024 * LlamaCppModelGpuPlacementDefaults.ModelSizeMultiplier) + 4 * 256);
+    expect(estimateRequiredLlamaCppModelVramMiB({ modelSizeBytes: gib(10), ctxSize: 4096 })).toBe(
+      Math.ceil(10 * 1024 * LlamaCppModelGpuPlacementDefaults.ModelSizeMultiplier) + 4 * 256,
+    );
   });
 });
 

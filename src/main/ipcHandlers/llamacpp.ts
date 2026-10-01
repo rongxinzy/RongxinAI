@@ -351,7 +351,10 @@ export function registerLlamaCppIpcHandlers(
         return { changed: false, hasRunningModels: false };
       }
       // A transient runtime read failure must not erase persisted model settings.
-      console.warn('[LlamaCpp] skipped model binding refresh because running models could not be read:', error);
+      console.warn(
+        '[LlamaCpp] skipped model binding refresh because running models could not be read:',
+        error,
+      );
       return { changed: false, hasRunningModels: false };
     }
   };
@@ -689,10 +692,7 @@ export function registerLlamaCppIpcHandlers(
     const next = sanitizeUpdatedModelPreferences(current, input);
     store.set(LLAMACPP_MODEL_PREFERENCES_KEY, next);
     const modelName = getLlamaCppModelPreferenceInputName(input);
-    if (
-      modelName &&
-      shouldRefreshLlamaCppModelBindings(current[modelName], next[modelName])
-    ) {
+    if (modelName && shouldRefreshLlamaCppModelBindings(current[modelName], next[modelName])) {
       await refreshRunningModelBindings();
     }
     return next;
@@ -791,7 +791,11 @@ export function registerLlamaCppIpcHandlers(
               .catch((): null => null);
             const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((): null => null);
             const pipelineResult = await loadLlamaCppModelThroughPipeline({
-              launchInput: { ...inputWithPreferences, model: modelName, modelPath: targetModel.path },
+              launchInput: {
+                ...inputWithPreferences,
+                model: modelName,
+                modelPath: targetModel.path,
+              },
               runtimeBackend: serviceConfig.runtimeBackend,
               runtimeCapabilities,
               nvidiaSnapshot,
@@ -860,9 +864,12 @@ export function registerLlamaCppIpcHandlers(
       },
     );
   };
-  void daemon.reconnect().then(() => refreshRunningModelBindings()).catch(error => {
-    console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
-  });
+  void daemon
+    .reconnect()
+    .then(() => refreshRunningModelBindings())
+    .catch(error => {
+      console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
+    });
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     let result: LlamaCppModelLaunchResult | undefined;
     await residency.ensureReady(input.model, async () => {

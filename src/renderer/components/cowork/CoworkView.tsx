@@ -117,7 +117,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
   const quickActionActivationRef = useRef<string | null>(null);
 
-
   const currentSession = useSelector(selectCurrentSession);
   const taskResume = useTaskResumeContext(currentSession?.id);
   const displayedSessionId = useSelector(selectDisplayedSessionId);

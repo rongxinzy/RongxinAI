@@ -106,10 +106,7 @@ export const formatTimeOfDay = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString(undefined, { hour12: false });
 
 /** Compact duration label ('45s', '2:03', '1h 02m'); null when either end is missing. */
-export const formatDuration = (
-  startedAt: number | null,
-  endedAt: number | null,
-): string | null => {
+export const formatDuration = (startedAt: number | null, endedAt: number | null): string | null => {
   if (startedAt === null || endedAt === null) return null;
   const totalSeconds = Math.max(0, Math.round((endedAt - startedAt) / 1000));
   if (totalSeconds < 60) return `${totalSeconds}s`;

@@ -21,10 +21,7 @@ function Slider({ className, ...props }: SliderPrimitive.Root.Props<number>) {
             className="theme-range-fill absolute h-full"
           />
         </SliderPrimitive.Track>
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          className="theme-range-thumb"
-        />
+        <SliderPrimitive.Thumb data-slot="slider-thumb" className="theme-range-thumb" />
       </SliderPrimitive.Control>
     </SliderPrimitive.Root>
   );

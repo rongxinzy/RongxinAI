@@ -312,10 +312,7 @@ function applyMacIconFix(appPath) {
         : ['-insert', 'CFBundleIconFile', '-string', 'icon.icns', infoPlistPath];
     const fileResult = spawnSync('plutil', args, { encoding: 'utf-8' });
     if (fileResult.status !== 0) {
-      console.warn(
-        '[electron-builder-hooks] Failed to set CFBundleIconFile:',
-        fileResult.stderr,
-      );
+      console.warn('[electron-builder-hooks] Failed to set CFBundleIconFile:', fileResult.stderr);
     }
   }
 

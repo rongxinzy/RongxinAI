@@ -33,7 +33,12 @@ test('returns null for a missing preset', () => {
 });
 
 test('returns null for an unreadable preset directory', () => {
-  expect(resolveBundledPresetExpertSnapshot(path.resolve('SKILLs', '..', 'no-such-root'), 'data-analyst')).toBeNull();
+  expect(
+    resolveBundledPresetExpertSnapshot(
+      path.resolve('SKILLs', '..', 'no-such-root'),
+      'data-analyst',
+    ),
+  ).toBeNull();
 });
 
 const temporaryDirectories: string[] = [];
@@ -167,9 +172,7 @@ test('resolves live bundled member definitions for the subagent tool', () => {
   const members = resolveBundledPresetMembers(root, 'team-fixture');
   expect(members).not.toBeNull();
   expect(members?.map(member => member.id)).toEqual(['member-alpha', 'member-beta']);
-  expect(members?.find(member => member.id === 'member-alpha')?.systemPrompt).toContain(
-    '研究员',
-  );
+  expect(members?.find(member => member.id === 'member-alpha')?.systemPrompt).toContain('研究员');
 });
 
 test('does not resolve members for a single-agent or unknown preset', () => {

@@ -68,7 +68,9 @@ const stringExecutables = (value: unknown): string[] =>
 const childDirectories = async (directory: string): Promise<string[]> => {
   try {
     const entries = await readdir(directory, { withFileTypes: true });
-    return entries.filter(entry => entry.isDirectory()).map(entry => path.join(directory, entry.name));
+    return entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => path.join(directory, entry.name));
   } catch {
     return [];
   }
@@ -151,7 +153,12 @@ export const discoveryDirectories = (
           path.join(home, '.local', 'share', 'pnpm'),
           platform === 'darwin' ? path.join(home, 'Library', 'pnpm') : '',
         ];
-  return uniqueDirectories([...paths, ...packagePrefixes, ...environmentDirectories, ...userDirectories]);
+  return uniqueDirectories([
+    ...paths,
+    ...packagePrefixes,
+    ...environmentDirectories,
+    ...userDirectories,
+  ]);
 };
 
 /** Passive discovery only: it never starts a discovered executable. */
@@ -292,7 +299,9 @@ export class AcpDiscoveryService {
   private async registryLaunchCandidates(
     agent: RegistryAgent,
     binary: RegistryBinaryDistribution | undefined,
-  ): Promise<Array<{ executables: string[]; args: string[]; environment: Record<string, string> }>> {
+  ): Promise<
+    Array<{ executables: string[]; args: string[]; environment: Record<string, string> }>
+  > {
     if (typeof binary?.cmd === 'string') {
       return [
         {
@@ -392,7 +401,8 @@ export class AcpDiscoveryService {
     const pnpmHomes = uniqueDirectories(
       directories.filter(
         directory =>
-          directory === this.environment.PNPM_HOME || path.basename(directory).toLowerCase() === 'pnpm',
+          directory === this.environment.PNPM_HOME ||
+          path.basename(directory).toLowerCase() === 'pnpm',
       ),
     );
     const globalDirectories = (

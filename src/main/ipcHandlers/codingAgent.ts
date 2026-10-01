@@ -65,7 +65,8 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   });
   service.on('pendingMessagesChanged', (event: CodingPendingMessagesChangedEvent) => {
     for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.PendingMessagesChanged, event);
+      if (!window.isDestroyed())
+        window.webContents.send(CodingAgentIpc.PendingMessagesChanged, event);
     }
   });
   service.on('authTerminalData', event => {
@@ -196,14 +197,20 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
     success: true,
     items: service.listPendingMessages(laneId),
   }));
-  ipcMain.handle(CodingAgentIpc.EnqueuePendingMessage, (_event, input: { laneId: string; text: string }) =>
-    service.enqueuePendingMessage(input.laneId, input.text),
+  ipcMain.handle(
+    CodingAgentIpc.EnqueuePendingMessage,
+    (_event, input: { laneId: string; text: string }) =>
+      service.enqueuePendingMessage(input.laneId, input.text),
   );
-  ipcMain.handle(CodingAgentIpc.UpdatePendingMessage, (_event, input: { laneId: string; itemId: string; text: string }) =>
-    service.updatePendingMessage(input.laneId, input.itemId, input.text),
+  ipcMain.handle(
+    CodingAgentIpc.UpdatePendingMessage,
+    (_event, input: { laneId: string; itemId: string; text: string }) =>
+      service.updatePendingMessage(input.laneId, input.itemId, input.text),
   );
-  ipcMain.handle(CodingAgentIpc.DeletePendingMessage, (_event, input: { laneId: string; itemId: string }) =>
-    service.deletePendingMessage(input.laneId, input.itemId),
+  ipcMain.handle(
+    CodingAgentIpc.DeletePendingMessage,
+    (_event, input: { laneId: string; itemId: string }) =>
+      service.deletePendingMessage(input.laneId, input.itemId),
   );
   ipcMain.handle(
     CodingAgentIpc.SteerPendingMessage,
@@ -211,7 +218,11 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return runCodingHandler(CodingAgentIpc.SteerPendingMessage, async () => {
         return {
           success: true,
-          snapshot: await service.steerPendingMessage(input.workspaceRoot, input.laneId, input.itemId),
+          snapshot: await service.steerPendingMessage(
+            input.workspaceRoot,
+            input.laneId,
+            input.itemId,
+          ),
         };
       });
     },
@@ -337,12 +348,16 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   ipcMain.handle(
     CodingAgentIpc.ApplyLaneChanges,
     async (_event, input: { workspaceRoot: string; laneId: string }) => {
-      return runCodingHandler(CodingAgentIpc.ApplyLaneChanges, async () => {
-        return {
-          success: true,
-          snapshot: await service.applyLaneChanges(input.workspaceRoot, input.laneId),
-        };
-      }, error => ({ conflict: error instanceof GitWorktreeConflictError }));
+      return runCodingHandler(
+        CodingAgentIpc.ApplyLaneChanges,
+        async () => {
+          return {
+            success: true,
+            snapshot: await service.applyLaneChanges(input.workspaceRoot, input.laneId),
+          };
+        },
+        error => ({ conflict: error instanceof GitWorktreeConflictError }),
+      );
     },
   );
   ipcMain.handle(CodingAgentIpc.GetGitStatus, async (_event, input: CodingGitTargetInput) => {
@@ -402,21 +417,30 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return { success: true, status: await service.createGitBranch(input) };
     });
   });
-  ipcMain.handle(CodingAgentIpc.CreateGitPullRequest, async (_event, input: CodingGitPullRequestInput) => {
-    return runCodingHandler(CodingAgentIpc.CreateGitPullRequest, async () => {
-      return { success: true, url: await service.createGitPullRequest(input) };
-    });
-  });
-  ipcMain.handle(CodingAgentIpc.ListWorkspaceFiles, async (_event, input: CodingWorkspaceFileInput) => {
-    return runCodingHandler(CodingAgentIpc.ListWorkspaceFiles, async () => {
-      return { success: true, entries: await service.listWorkspaceFiles(input) };
-    });
-  });
-  ipcMain.handle(CodingAgentIpc.ReadWorkspaceFile, async (_event, input: CodingWorkspaceFileInput) => {
-    return runCodingHandler(CodingAgentIpc.ReadWorkspaceFile, async () => {
-      return { success: true, file: await service.readWorkspaceFile(input) };
-    });
-  });
+  ipcMain.handle(
+    CodingAgentIpc.CreateGitPullRequest,
+    async (_event, input: CodingGitPullRequestInput) => {
+      return runCodingHandler(CodingAgentIpc.CreateGitPullRequest, async () => {
+        return { success: true, url: await service.createGitPullRequest(input) };
+      });
+    },
+  );
+  ipcMain.handle(
+    CodingAgentIpc.ListWorkspaceFiles,
+    async (_event, input: CodingWorkspaceFileInput) => {
+      return runCodingHandler(CodingAgentIpc.ListWorkspaceFiles, async () => {
+        return { success: true, entries: await service.listWorkspaceFiles(input) };
+      });
+    },
+  );
+  ipcMain.handle(
+    CodingAgentIpc.ReadWorkspaceFile,
+    async (_event, input: CodingWorkspaceFileInput) => {
+      return runCodingHandler(CodingAgentIpc.ReadWorkspaceFile, async () => {
+        return { success: true, file: await service.readWorkspaceFile(input) };
+      });
+    },
+  );
   ipcMain.handle(
     CodingAgentIpc.WriteWorkspaceFile,
     async (_event, input: CodingWorkspaceFileWriteInput) => {

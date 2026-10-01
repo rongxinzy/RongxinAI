@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
-const source = readFileSync(fileURLToPath(new URL('./CodingEventStream.tsx', import.meta.url)), 'utf8');
+const source = readFileSync(
+  fileURLToPath(new URL('./CodingEventStream.tsx', import.meta.url)),
+  'utf8',
+);
 
 test('keeps coding tool expansion state keyed by activity id', () => {
   expect(source).toContain('useState<ReadonlySet<string>>');

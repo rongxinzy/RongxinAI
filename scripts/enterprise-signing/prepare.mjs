@@ -93,9 +93,7 @@ export async function prepareEnterpriseSigning(env = process.env) {
   }
   const job = matchingJobs[0];
   for (const name of REQUIRED_STEPS) {
-    const ok = (job.steps || []).some(
-      step => step.name === name && step.conclusion === 'success',
-    );
+    const ok = (job.steps || []).some(step => step.name === name && step.conclusion === 'success');
     if (!ok) throw new Error(`Required Zhiyuan Enterprise build step did not succeed: ${name}`);
   }
 

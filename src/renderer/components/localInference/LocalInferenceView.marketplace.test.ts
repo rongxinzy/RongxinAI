@@ -8,7 +8,12 @@ import {
   getMarketplaceGridColumnCount,
   getMarketplacePageSize,
 } from './utils/marketplace';
-import { LOCAL_INFERENCE_PROGRESS_DISMISS_MS, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS, MARKETPLACE_MAX_PAGE_ROWS, MARKETPLACE_PAGE_SIZE } from './constants';
+import {
+  LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
+  LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS,
+  MARKETPLACE_MAX_PAGE_ROWS,
+  MARKETPLACE_PAGE_SIZE,
+} from './constants';
 import {
   formatInstallProgressSummary,
   isInstallTerminalPhase,
@@ -26,7 +31,14 @@ test('done progress is only considered a successful install when the model actua
   expect(
     isSuccessfulMarketplaceInstallProgress(
       { phase: 'done', modelId: 'QuantFactory/Phi-3-mini-4k-instruct-GGUF-imatrix' },
-      [{ name: 'Phi-3-mini-4k-instruct-GGUF-imatrix', id: 'Phi-3-mini-4k-instruct-GGUF-imatrix', model: 'Phi-3-mini-4k-instruct-GGUF-imatrix', path: '/models/Phi-3-mini-4k-instruct-GGUF-imatrix.gguf' }],
+      [
+        {
+          name: 'Phi-3-mini-4k-instruct-GGUF-imatrix',
+          id: 'Phi-3-mini-4k-instruct-GGUF-imatrix',
+          model: 'Phi-3-mini-4k-instruct-GGUF-imatrix',
+          path: '/models/Phi-3-mini-4k-instruct-GGUF-imatrix.gguf',
+        },
+      ],
     ),
   ).toBe(true);
 
@@ -132,18 +144,24 @@ test('marketplace search params honour a caller-supplied page size', () => {
 });
 
 test('marketplace browse modes carry their result context into server pagination', () => {
-  expect(buildMarketplaceSearchParams({ query: '', pageNumber: 3, featuredOnly: false })).toMatchObject({
+  expect(
+    buildMarketplaceSearchParams({ query: '', pageNumber: 3, featuredOnly: false }),
+  ).toMatchObject({
     limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 3,
     featuredOnly: false,
   });
-  expect(buildMarketplaceSearchParams({ query: '', task: 'chat', pageNumber: 2, featuredOnly: false })).toMatchObject({
+  expect(
+    buildMarketplaceSearchParams({ query: '', task: 'chat', pageNumber: 2, featuredOnly: false }),
+  ).toMatchObject({
     limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 2,
     task: 'chat',
     featuredOnly: false,
   });
-  expect(buildMarketplaceSearchParams({ query: 'qwen', pageNumber: 2, task: 'code' })).toMatchObject({
+  expect(
+    buildMarketplaceSearchParams({ query: 'qwen', pageNumber: 2, task: 'code' }),
+  ).toMatchObject({
     query: 'qwen',
     limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 2,
@@ -169,10 +187,55 @@ test('marketplace only keeps installable models in the visible list', () => {
   expect(
     getInstallableMarketplaceModels(
       [
-        { source: 'modelscope-gguf', id: 'a', repoId: 'Qwen/A-GGUF', name: 'A', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: false },
-        { source: 'modelscope-gguf', id: 'b', repoId: 'Qwen/B-GGUF', name: 'B', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: true },
-        { source: 'modelscope-gguf', id: 'c', repoId: 'Qwen/C-GGUF', name: 'C', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: false, installedPath: '/models/Qwen/C.gguf' },
-        { source: 'modelscope-gguf', id: 'duplicate-a', repoId: 'Qwen/A-GGUF', name: 'A duplicate', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: false },
+        {
+          source: 'modelscope-gguf',
+          id: 'a',
+          repoId: 'Qwen/A-GGUF',
+          name: 'A',
+          description: '',
+          tags: [],
+          sizes: [],
+          recommendedTag: '',
+          capability: 'chat',
+          installed: false,
+        },
+        {
+          source: 'modelscope-gguf',
+          id: 'b',
+          repoId: 'Qwen/B-GGUF',
+          name: 'B',
+          description: '',
+          tags: [],
+          sizes: [],
+          recommendedTag: '',
+          capability: 'chat',
+          installed: true,
+        },
+        {
+          source: 'modelscope-gguf',
+          id: 'c',
+          repoId: 'Qwen/C-GGUF',
+          name: 'C',
+          description: '',
+          tags: [],
+          sizes: [],
+          recommendedTag: '',
+          capability: 'chat',
+          installed: false,
+          installedPath: '/models/Qwen/C.gguf',
+        },
+        {
+          source: 'modelscope-gguf',
+          id: 'duplicate-a',
+          repoId: 'Qwen/A-GGUF',
+          name: 'A duplicate',
+          description: '',
+          tags: [],
+          sizes: [],
+          recommendedTag: '',
+          capability: 'chat',
+          installed: false,
+        },
       ],
       new Map([['/models/Qwen/C.gguf', 'C']]),
     ).map(model => model.id),
@@ -181,9 +244,48 @@ test('marketplace only keeps installable models in the visible list', () => {
 
 test('device-fit filters are applied locally after scoring', () => {
   const models = [
-    { source: 'modelscope-gguf', id: 'excellent', repoId: 'Qwen/Excellent-GGUF', name: 'Excellent', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'excellent' }, score: { stars: 4.8 } },
-    { source: 'modelscope-gguf', id: 'limited', repoId: 'Qwen/Limited-GGUF', name: 'Limited', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'limited' }, score: { stars: 4.2 } },
-    { source: 'modelscope-gguf', id: 'unsupported', repoId: 'Qwen/Unsupported-GGUF', name: 'Unsupported', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'unsupported' }, score: { stars: 3.8 } },
+    {
+      source: 'modelscope-gguf',
+      id: 'excellent',
+      repoId: 'Qwen/Excellent-GGUF',
+      name: 'Excellent',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'excellent' },
+      score: { stars: 4.8 },
+    },
+    {
+      source: 'modelscope-gguf',
+      id: 'limited',
+      repoId: 'Qwen/Limited-GGUF',
+      name: 'Limited',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'limited' },
+      score: { stars: 4.2 },
+    },
+    {
+      source: 'modelscope-gguf',
+      id: 'unsupported',
+      repoId: 'Qwen/Unsupported-GGUF',
+      name: 'Unsupported',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'unsupported' },
+      score: { stars: 3.8 },
+    },
   ] as never[];
 
   expect(filterMarketplaceModelsForDevice(models, 'recommended').map(model => model.id)).toEqual([
@@ -201,10 +303,62 @@ test('device-fit filters are applied locally after scoring', () => {
 
 test('models the current device cannot run are only shown when fit is unrestricted', () => {
   const models = [
-    { source: 'modelscope-gguf', id: 'excellent', repoId: 'Qwen/Excellent-GGUF', name: 'Excellent', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'excellent' }, score: { stars: 4.8 } },
-    { source: 'modelscope-gguf', id: 'limited', repoId: 'Qwen/Limited-GGUF', name: 'Limited', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'limited' }, score: { stars: 4.2 } },
-    { source: 'modelscope-gguf', id: 'unsupported', repoId: 'Qwen/Unsupported-GGUF', name: 'Unsupported', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'unsupported' }, score: { stars: 3.8 } },
-    { source: 'modelscope-gguf', id: 'unknown', repoId: 'Qwen/Unknown-GGUF', name: 'Unknown', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'unknown' }, score: { stars: 4.0 } },
+    {
+      source: 'modelscope-gguf',
+      id: 'excellent',
+      repoId: 'Qwen/Excellent-GGUF',
+      name: 'Excellent',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'excellent' },
+      score: { stars: 4.8 },
+    },
+    {
+      source: 'modelscope-gguf',
+      id: 'limited',
+      repoId: 'Qwen/Limited-GGUF',
+      name: 'Limited',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'limited' },
+      score: { stars: 4.2 },
+    },
+    {
+      source: 'modelscope-gguf',
+      id: 'unsupported',
+      repoId: 'Qwen/Unsupported-GGUF',
+      name: 'Unsupported',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'unsupported' },
+      score: { stars: 3.8 },
+    },
+    {
+      source: 'modelscope-gguf',
+      id: 'unknown',
+      repoId: 'Qwen/Unknown-GGUF',
+      name: 'Unknown',
+      description: '',
+      tags: [],
+      sizes: [],
+      recommendedTag: 'Q4_K_M',
+      capability: 'chat',
+      installed: false,
+      fit: { status: 'unknown' },
+      score: { stars: 4.0 },
+    },
   ] as never[];
 
   // "不限" lists every GGUF model, unsupported included — the card flags them
@@ -216,7 +370,9 @@ test('models the current device cannot run are only shown when fit is unrestrict
     'unsupported',
     'unknown',
   ]);
-  expect(filterMarketplaceModelsForDevice(models, 'unsupported').map(model => model.id)).toEqual([]);
+  expect(filterMarketplaceModelsForDevice(models, 'unsupported').map(model => model.id)).toEqual(
+    [],
+  );
   expect(filterMarketplaceModelsForDevice(models, 'compatible').map(model => model.id)).toEqual([
     'excellent',
     'limited',

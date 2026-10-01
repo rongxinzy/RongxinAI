@@ -73,14 +73,18 @@ describe('NSIS offline resource and local inference flow', () => {
     // throws DirectoryNotFoundException on trees deeper than 260 characters,
     // so the measurement must go through .NET with an extended-length path.
     expect(validatorScript).not.toContain('Get-ChildItem -LiteralPath $Root -Recurse');
-    expect(validatorScript).toContain('[System.IO.DirectoryInfo]::new((ConvertTo-LongPath $rootFull))');
+    expect(validatorScript).toContain(
+      '[System.IO.DirectoryInfo]::new((ConvertTo-LongPath $rootFull))',
+    );
     expect(validatorScript).toContain(
       "EnumerateFiles('*', [System.IO.SearchOption]::AllDirectories)",
     );
-    expect(validatorScript).toContain("if ($Path.StartsWith('\\\\')) { return '\\\\?\\UNC\\' + $Path.Substring(2) }");
+    expect(validatorScript).toContain(
+      "if ($Path.StartsWith('\\\\')) { return '\\\\?\\UNC\\' + $Path.Substring(2) }",
+    );
     expect(validatorScript).toContain("return '\\\\?\\' + $Path");
     // The completion record must stay excluded from the measurement.
-    expect(validatorScript).toContain("if ($file.FullName -eq $completeFull) { continue }");
+    expect(validatorScript).toContain('if ($file.FullName -eq $completeFull) { continue }');
     expect(validatorScript.match(/Measure-ComponentTree \$target/g)).toHaveLength(2);
     // NSIS relays stdout into a single-line dialog and log field.
     expect(validatorScript).toContain("Write-Output ($Message -replace '[\\r\\n]+', ' ')");

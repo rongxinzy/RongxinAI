@@ -8,7 +8,10 @@ export function passiveAgentEnvironment(
 /** Ignore JSON-RPC content: an assistant quoting a login prompt is not a login flow. */
 export function isInteractiveAuthenticationPrompt(output: string): boolean {
   return output.split('\n').some(line => {
-    const text = line.slice(0, 2048).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').trim();
+    const text = line
+      .slice(0, 2048)
+      .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+      .trim();
     return (
       !text.startsWith('{') &&
       /opening (?:an? )?authentication page|please visit.*(?:authorize|authenticate)|enter (?:the )?(?:authorization|authentication) code|https:\/\/accounts\.google\.com\/o\/oauth2/i.test(

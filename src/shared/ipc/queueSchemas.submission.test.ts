@@ -17,6 +17,7 @@ test('accepts visible queued messages', () => {
     true,
   );
   expect(
-    CoworkQueueUpdateSchema.safeParse({ sessionId: 'session', itemId: 'item', text: '你好' }).success,
+    CoworkQueueUpdateSchema.safeParse({ sessionId: 'session', itemId: 'item', text: '你好' })
+      .success,
   ).toBe(true);
 });

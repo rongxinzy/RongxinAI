@@ -128,9 +128,9 @@ test('localizes generic option labels instead of echoing the agent wording', () 
       kind: CodingPermissionOptionKind.RejectOnce,
     }),
   ).toBe('拒绝本次');
-  expect(
-    codingPermissionOptionLabel({ optionId: 'reject', name: 'Deny', kind: null }),
-  ).toBe('拒绝本次');
+  expect(codingPermissionOptionLabel({ optionId: 'reject', name: 'Deny', kind: null })).toBe(
+    '拒绝本次',
+  );
   expect(
     codingPermissionOptionLabel({
       optionId: 'allow-command',
@@ -149,11 +149,11 @@ test('localizes generic option labels instead of echoing the agent wording', () 
   ).toBe('Allow for session');
 });
 
-const option = (
-  optionId: string,
-  name: string,
-  kind: string | null,
-): CodingPermissionOption => ({ optionId, name, kind });
+const option = (optionId: string, name: string, kind: string | null): CodingPermissionOption => ({
+  optionId,
+  name,
+  kind,
+});
 
 test('folds agent options into a primary action, a secondary action and a menu', () => {
   const actions = resolveCodingPermissionActions([

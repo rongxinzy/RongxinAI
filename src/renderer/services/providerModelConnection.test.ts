@@ -52,9 +52,8 @@ afterEach(() => {
 });
 
 test('tests models with bounded concurrency and preserves result order', async () => {
-  const fetchMock = vi.fn<
-    (request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>
-  >();
+  const fetchMock =
+    vi.fn<(request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>>();
   vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
 
   let activeRequests = 0;
@@ -65,7 +64,12 @@ test('tests models with bounded concurrency and preserves result order', async (
     activeRequests += 1;
     maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
     return new Promise<ProviderModelConnectionTestResponse>(resolve => {
-      pendingRequests.push({ resolve: response => { activeRequests -= 1; resolve(response); } });
+      pendingRequests.push({
+        resolve: response => {
+          activeRequests -= 1;
+          resolve(response);
+        },
+      });
     });
   });
 
@@ -74,9 +78,11 @@ test('tests models with bounded concurrency and preserves result order', async (
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
   expect(activeRequests).toBe(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY);
   expect(maxActiveRequests).toBe(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY);
-  expect(fetchMock.mock.calls.every(([request]) =>
-    request.purpose === ApiRequestPurpose.ConnectivityTest,
-  )).toBe(true);
+  expect(
+    fetchMock.mock.calls.every(
+      ([request]) => request.purpose === ApiRequestPurpose.ConnectivityTest,
+    ),
+  ).toBe(true);
 
   const resolvePendingRequests = (count: number) => {
     const requests = pendingRequests.slice(0, count);
@@ -182,9 +188,8 @@ test('classifies thrown connection test errors as network failures', async () =>
 });
 
 test('reports each finished model through onResult before the batch completes', async () => {
-  const fetchMock = vi.fn<
-    (request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>
-  >();
+  const fetchMock =
+    vi.fn<(request: ConnectionFetchRequest) => Promise<ProviderModelConnectionTestResponse>>();
   vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
 
   let pendingRequests: PendingConnectionRequest[] = [];

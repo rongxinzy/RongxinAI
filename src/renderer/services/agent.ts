@@ -159,9 +159,7 @@ class AgentService {
     }
   }
 
-  async importExpertPackage(
-    expertDir: string,
-  ): Promise<{
+  async importExpertPackage(expertDir: string): Promise<{
     success: boolean;
     agentIds?: string[];
     expertType?: string;

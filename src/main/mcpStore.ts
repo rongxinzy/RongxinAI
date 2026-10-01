@@ -90,7 +90,10 @@ export class McpStore {
       credentials = this.credentialStore?.get(row.id);
     } catch (error) {
       credentialsError = true;
-      console.warn('[McpStore] stored credentials could not be read; keeping the server entry:', error);
+      console.warn(
+        '[McpStore] stored credentials could not be read; keeping the server entry:',
+        error,
+      );
     }
     return {
       id: row.id,

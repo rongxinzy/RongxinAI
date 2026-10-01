@@ -70,9 +70,7 @@ describe('llamacppModelLoadErrors', () => {
 
   test('classifies daemon gateway port conflicts for a user-visible error', () => {
     expect(
-      classifyLlamaCppModelLoadError(
-        'listen EADDRINUSE: address already in use 127.0.0.1:8080',
-      ),
+      classifyLlamaCppModelLoadError('listen EADDRINUSE: address already in use 127.0.0.1:8080'),
     ).toBe(LlamaCppModelLoadFailureReason.PortInUse);
     expect(getLlamaCppModelLoadFailureI18nKey(LlamaCppModelLoadFailureReason.PortInUse)).toBe(
       'llamacppServiceStartupPortInUse',

@@ -36,6 +36,23 @@
     "SKILLs/**/dist/",
     "SKILLs/**/build/",
     "openclaw/",
-    "resources/python-win/"
+    "resources/python-win/",
+    "third_party/",
+    "docs/",
+    "research/",
+    "website/",
+    "public/",
+    "resources/",
+    "MCPs/",
+    "SKILLs/",
+    ".github/",
+    ".codex/",
+    ".claude/",
+    "scripts/case-previews/",
+    "src/renderer/theme/css/",
+    "*.md",
+    "*.html",
+    "*.yml",
+    "*.yaml"
   ]
 }

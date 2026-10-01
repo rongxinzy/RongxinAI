@@ -270,7 +270,7 @@ describe('parsePrimaryModelRef', () => {
 
 describe('resolveManagedSessionModelTarget', () => {
   const availableProviders = {
-    'deepseek': { models: [{ id: 'qwen3.5-plus' }, { id: 'deepseek-v3.2' }] },
+    deepseek: { models: [{ id: 'qwen3.5-plus' }, { id: 'deepseek-v3.2' }] },
     minimax: { models: [{ id: 'MiniMax-M2.7' }] },
   };
 
@@ -338,7 +338,7 @@ describe('resolveQualifiedAgentModelRef', () => {
       resolveQualifiedAgentModelRef({
         agentModel: 'deepseek-v3.2',
         availableProviders: {
-          'deepseek': { models: [{ id: 'deepseek-v3.2' }] },
+          deepseek: { models: [{ id: 'deepseek-v3.2' }] },
           minimax: { models: [{ id: 'MiniMax-M2.7' }] },
         },
       }),
@@ -354,7 +354,7 @@ describe('resolveQualifiedAgentModelRef', () => {
         agentModel: 'deepseek-v3.2',
         availableProviders: {
           anthropic: { models: [{ id: 'deepseek-v3.2' }] },
-          'deepseek': { models: [{ id: 'deepseek-v3.2' }] },
+          deepseek: { models: [{ id: 'deepseek-v3.2' }] },
         },
       }),
     ).toEqual({
@@ -383,7 +383,7 @@ describe('resolveQualifiedAgentModelRef', () => {
       resolveQualifiedAgentModelRef({
         agentModel: 'llamacpp/qwen-local',
         availableProviders: {
-          'deepseek': { models: [{ id: 'deepseek-v3.2' }] },
+          deepseek: { models: [{ id: 'deepseek-v3.2' }] },
         },
       }),
     ).toEqual({

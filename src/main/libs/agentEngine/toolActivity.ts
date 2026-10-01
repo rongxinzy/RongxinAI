@@ -73,7 +73,10 @@ const parseArguments = (value: unknown): Record<string, unknown> | undefined => 
   }
 };
 
-const readString = (record: Record<string, unknown>, keys: readonly string[]): string | undefined => {
+const readString = (
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): string | undefined => {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === 'string' && value.trim()) return value.trim();
@@ -110,9 +113,7 @@ export const getPiPreparingToolActivity = (
   return {
     toolCallId: readString(toolCall, ['id', 'toolCallId', 'tool_call_id']) ?? fallbackToolCallId,
     toolName: readString(toolCall, ['name', 'toolName']),
-    toolInput: toToolActivityInput(
-      toolCall.arguments ?? toolCall.args ?? toolCall.input,
-    ),
+    toolInput: toToolActivityInput(toolCall.arguments ?? toolCall.args ?? toolCall.input),
   };
 };
 
@@ -124,14 +125,16 @@ const isToolCallBlock = (record: Record<string, unknown>): boolean => {
   return type === 'toolcall' || type === 'tooluse' || type === 'functioncall';
 };
 
-const getAgentToolActivity = (
-  block: Record<string, unknown>,
-): PreparingToolActivity | null => {
+const getAgentToolActivity = (block: Record<string, unknown>): PreparingToolActivity | null => {
   const functionRecord = isRecord(block.function) ? block.function : undefined;
   const toolCallId = readString(block, ['id', 'toolCallId', 'tool_call_id', 'call_id']);
   if (!toolCallId) return null;
   const rawInput =
-    block.arguments ?? block.args ?? block.input ?? functionRecord?.arguments ?? functionRecord?.args;
+    block.arguments ??
+    block.args ??
+    block.input ??
+    functionRecord?.arguments ??
+    functionRecord?.args;
   return {
     toolCallId,
     toolName:
@@ -141,18 +144,9 @@ const getAgentToolActivity = (
   };
 };
 
-const AGENT_NESTED_KEYS = [
-  'content',
-  'data',
-  'message',
-  'partial',
-  'parts',
-  'response',
-] as const;
+const AGENT_NESTED_KEYS = ['content', 'data', 'message', 'partial', 'parts', 'response'] as const;
 
-export const extractAgentPreparingToolActivities = (
-  payload: unknown,
-): PreparingToolActivity[] => {
+export const extractAgentPreparingToolActivities = (payload: unknown): PreparingToolActivity[] => {
   const activities = new Map<string, PreparingToolActivity>();
   const visited = new Set<object>();
 

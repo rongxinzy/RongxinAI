@@ -169,9 +169,7 @@ export const ToolCard: React.FC<{
           type={`tool-${rawToolName}` as ToolUIPart['type']}
           state={toolState}
           title={displayName}
-          statusLabel={
-            awaitingPermission ? i18nService.t('codingAgentPermissionEvent') : undefined
-          }
+          statusLabel={awaitingPermission ? i18nService.t('codingAgentPermissionEvent') : undefined}
         />
         <ToolContent className="flex flex-col gap-4">
           {isBashTool ? (

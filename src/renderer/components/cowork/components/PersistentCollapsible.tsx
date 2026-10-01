@@ -22,9 +22,7 @@ export const PersistentReasoning: React.FC<PersistentProps<ReasoningProps>> = ({
   ...props
 }) => {
   const [open, setOpen] = usePersistentToggle(persistKey, defaultOpen);
-  return (
-    <Reasoning {...props} defaultOpen={defaultOpen} open={open} onOpenChange={setOpen} />
-  );
+  return <Reasoning {...props} defaultOpen={defaultOpen} open={open} onOpenChange={setOpen} />;
 };
 
 export const PersistentChainOfThought: React.FC<
@@ -42,12 +40,7 @@ export const PersistentChainOfThought: React.FC<
   const [open, setOpen] = usePersistentToggle(persistKey, defaultOpen);
   const isOpen = forceOpen || open;
   return (
-    <ChainOfThought
-      {...props}
-      defaultOpen={defaultOpen}
-      open={isOpen}
-      onOpenChange={setOpen}
-    >
+    <ChainOfThought {...props} defaultOpen={defaultOpen} open={isOpen} onOpenChange={setOpen}>
       {renderHeader ? renderHeader(isOpen) : null}
       {children}
     </ChainOfThought>

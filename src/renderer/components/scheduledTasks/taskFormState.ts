@@ -356,10 +356,13 @@ export function getNotifyChannelLabel(channel: ScheduledTaskChannelOption): stri
     : platformLabel;
 }
 
-export function getNotifyConversationLabel(conversation: Pick<ScheduledTaskConversationOption, 'conversationId'>): string {
+export function getNotifyConversationLabel(
+  conversation: Pick<ScheduledTaskConversationOption, 'conversationId'>,
+): string {
   const conversationId = conversation.conversationId.trim();
   if (conversationId === 'dm') return i18nService.t('scheduledTasksFormNotifyDirectMessage');
-  if (conversationId.startsWith('group:')) return `${i18nService.t('scheduledTasksFormNotifyGroup')} · ${conversationId.slice(6)}`;
+  if (conversationId.startsWith('group:'))
+    return `${i18nService.t('scheduledTasksFormNotifyGroup')} · ${conversationId.slice(6)}`;
   // Connectors may return opaque user/session IDs for direct chats. They are
   // routing keys, not human-facing names, so never expose them in the form.
   return conversationId

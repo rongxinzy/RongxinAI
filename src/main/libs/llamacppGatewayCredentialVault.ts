@@ -20,7 +20,10 @@ export class LlamaCppGatewayCredentialVault {
   }
 
   getLanToken(): string | null {
-    return this.vault.getValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY)?.lanToken ?? null;
+    return (
+      this.vault.getValue<LlamaCppGatewayCredentials>(LLAMACPP_GATEWAY_CREDENTIAL_KEY)?.lanToken ??
+      null
+    );
   }
 
   ensureLanToken(): string {

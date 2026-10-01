@@ -220,23 +220,17 @@ describe('resolveDraftAgentModelRef', () => {
 
 describe('resolveAgentModelSupportMessageKey', () => {
   test('maps reasons to precise i18n keys', () => {
+    expect(resolveAgentModelSupportMessageKey(AgentModelSupportReason.LocalModelNotRunning)).toBe(
+      'agentLlamaCppModelNotRunningHint',
+    );
     expect(
-      resolveAgentModelSupportMessageKey(AgentModelSupportReason.LocalModelNotRunning),
-    ).toBe('agentLlamaCppModelNotRunningHint');
-    expect(
-      resolveAgentModelSupportMessageKey(
-        AgentModelSupportReason.LocalModelRuntimeContextUnknown,
-      ),
+      resolveAgentModelSupportMessageKey(AgentModelSupportReason.LocalModelRuntimeContextUnknown),
     ).toBe('agentLlamaCppContextUnknownHint');
     expect(
-      resolveAgentModelSupportMessageKey(
-        AgentModelSupportReason.LocalModelRuntimeContextTooSmall,
-      ),
+      resolveAgentModelSupportMessageKey(AgentModelSupportReason.LocalModelRuntimeContextTooSmall),
     ).toBe('agentLlamaCppContextTooSmallHint');
     expect(
-      resolveAgentModelSupportMessageKey(
-        AgentModelSupportReason.LocalModelTrainedContextTooSmall,
-      ),
+      resolveAgentModelSupportMessageKey(AgentModelSupportReason.LocalModelTrainedContextTooSmall),
     ).toBe('agentLlamaCppTrainedContextTooSmallHint');
   });
 });

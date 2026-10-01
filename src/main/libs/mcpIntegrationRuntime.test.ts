@@ -68,9 +68,10 @@ test('reports a busy integration instead of reusing another operation', async ()
   const connector = createConnector();
   let releaseProvision!: () => void;
   vi.mocked(connector.provision).mockImplementation(
-    () => new Promise<void>(resolve => {
-      releaseProvision = resolve;
-    }),
+    () =>
+      new Promise<void>(resolve => {
+        releaseProvision = resolve;
+      }),
   );
   runtime.register(connector);
 
