@@ -1,10 +1,14 @@
 name: Author review gate
 
+# 说明:必须使用 pull_request_target(执行 main 上的本文件版本)。普通
+# pull_request / pull_request_review 会执行 PR 分支里的 workflow 版本,
+# 受管控作者可在自己分支中改写本文件使门禁失效,因此这里不使用这两种
+# 触发。本 workflow 不检出 PR 代码,仅调用 REST API,无注入面。
+# 评审人 approve 之后请对最新一次失败的 author-review-gate 运行点击
+# "Re-run all jobs"(重跑仍执行 main 上的版本)以刷新判定。
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened, ready_for_review]
-  pull_request_review:
-    types: [submitted, dismissed]
 
 permissions:
   contents: read
@@ -50,7 +54,7 @@ jobs:
             exit 0
           fi
 
-          echo "PR author '$PR_AUTHOR' is gated: approval from [$REQUIRED_REVIEWER_LOGINS] covers the latest commit."
+          echo "PR author '$PR_AUTHOR' is gated: approval from [$REQUIRED_REVIEWER_LOGINS] must cover the latest commit."
 
           head_sha=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.sha')
           head_ts=$(gh api "repos/$REPO/commits/$head_sha" --jq '.commit.committer.date')
@@ -89,7 +93,7 @@ jobs:
           done
 
           if [ "$approved" -ne 1 ]; then
-            echo "::error::此 PR 由 '$PR_AUTHOR' 发起,合并前必须获得 $REQUIRED_REVIEWER_LOGINS 的有效 approve。"
+            echo "::error::此 PR 由 '$PR_AUTHOR' 发起,合并前必须获得 $REQUIRED_REVIEWER_LOGINS 的有效 approve;approve 后请对最新的 author-review-gate 运行点击 Re-run all jobs 刷新判定。"
             exit 1
           fi
 
