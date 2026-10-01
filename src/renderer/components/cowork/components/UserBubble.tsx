@@ -98,9 +98,7 @@ export const UserBubble: React.FC<{
   const imageAttachmentPaths = useMemo(
     () =>
       new Set(
-        imageAttachments
-          .map(image => image.path)
-          .filter((path): path is string => Boolean(path)),
+        imageAttachments.map(image => image.path).filter((path): path is string => Boolean(path)),
       ),
     [imageAttachments],
   );

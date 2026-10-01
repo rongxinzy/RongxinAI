@@ -173,8 +173,7 @@ describe('UserBubble', () => {
       <UserBubble
         message={{
           ...message,
-          content:
-            '输入文件: C:\\Users\\whz\\AppData\\cowork-images\\abc123.png\n\n这张图里是什么',
+          content: '输入文件: C:\\Users\\whz\\AppData\\cowork-images\\abc123.png\n\n这张图里是什么',
           metadata: {
             imageAttachments: [
               {
