@@ -45,7 +45,10 @@ describe('setup-skill-python-runtime', () => {
       const nested = path.join(root, 'expert', 'presets', 'cad', 'skills', 'text-to-cad');
       fs.mkdirSync(nested, { recursive: true });
       fs.writeFileSync(path.join(nested, 'requirements.txt'), 'cadgen==0.4.28\n');
-      expect(listRequirementFiles(root).map(entry => entry.skillId)).toEqual(['text-to-cad', 'xlsx']);
+      expect(listRequirementFiles(root).map(entry => entry.skillId)).toEqual([
+        'text-to-cad',
+        'xlsx',
+      ]);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

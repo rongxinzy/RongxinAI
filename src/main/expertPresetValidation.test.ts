@@ -4,12 +4,13 @@ import path from 'node:path';
 import { expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { validateExpert } = require('../../SKILLs/zhiyuan-expert-manager/scripts/validate_expert.js') as {
-  validateExpert: (
-    expertPath: string,
-    options?: { strict?: boolean },
-  ) => { isValid: boolean; errors: string[]; warnings: string[] };
-};
+const { validateExpert } =
+  require('../../SKILLs/zhiyuan-expert-manager/scripts/validate_expert.js') as {
+    validateExpert: (
+      expertPath: string,
+      options?: { strict?: boolean },
+    ) => { isValid: boolean; errors: string[]; warnings: string[] };
+  };
 
 const presetsRoot = path.resolve('SKILLs/zhiyuan-expert-manager/presets');
 

@@ -11,9 +11,7 @@ const ActivityHero: React.FC = () => (
       <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
         <Activity className="size-6 text-primary" />
       </div>
-      <p className="min-w-0 text-sm text-muted-foreground">
-        {i18nService.t('activityHeroDesc')}
-      </p>
+      <p className="min-w-0 text-sm text-muted-foreground">{i18nService.t('activityHeroDesc')}</p>
     </div>
   </section>
 );

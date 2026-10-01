@@ -15,10 +15,7 @@ export function buildProviderModelIndex(
     readonly codingPlanModels?: readonly ProviderModelDefinition[];
   }[],
 ): ProviderModelIndex {
-  const providerIndex = new Map<
-    string,
-    ReadonlyMap<string, readonly ProviderModelDefinition[]>
-  >();
+  const providerIndex = new Map<string, ReadonlyMap<string, readonly ProviderModelDefinition[]>>();
 
   for (const definition of definitions) {
     const models = [...definition.defaultModels, ...(definition.codingPlanModels ?? [])];

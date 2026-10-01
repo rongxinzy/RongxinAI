@@ -98,9 +98,7 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <AlertCircle className="size-10 text-destructive" />
-        <p className="text-sm text-muted-foreground">
-          {i18nService.t('expertPresetsLoadFailed')}
-        </p>
+        <p className="text-sm text-muted-foreground">{i18nService.t('expertPresetsLoadFailed')}</p>
         <Button type="button" size="sm" variant="outline" onClick={() => void loadPresetExperts()}>
           {i18nService.t('expertPresetsRetry')}
         </Button>

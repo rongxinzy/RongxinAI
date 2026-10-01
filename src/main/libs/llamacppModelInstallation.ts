@@ -63,7 +63,9 @@ export async function prefillInstallInputFromMarketplace(
     !selectedFile.sha256 ||
     !selectedFile.downloadUrl
   ) {
-    throw new Error('The cloud catalogue has not verified an installable GGUF file for this model.');
+    throw new Error(
+      'The cloud catalogue has not verified an installable GGUF file for this model.',
+    );
   }
   const mmprojFile = model.files?.find(file => file.path === model.mmprojFilePath);
   return {
@@ -106,8 +108,7 @@ export async function installModelOnce(input: {
     targetPath: resolveModelScopeTargetPath(safeModelDir, extra.path),
   }));
 
-  const primaryPresent =
-    fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0;
+  const primaryPresent = fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0;
   const extrasPresent = extraFiles.every(extra => {
     if (!fs.existsSync(extra.targetPath)) return false;
     const actualSize = fs.statSync(extra.targetPath).size;
@@ -207,7 +208,9 @@ export async function installModelOnce(input: {
     if (request.mmprojFilePath?.trim()) {
       const mmprojFilePath = request.mmprojFilePath.trim();
       if (!request.mmprojSha256?.trim()) {
-        throw new Error('The cloud catalogue did not provide a SHA-256 checksum for the mmproj file.');
+        throw new Error(
+          'The cloud catalogue did not provide a SHA-256 checksum for the mmproj file.',
+        );
       }
       const mmprojUrl =
         request.mmprojDownloadUrl?.trim() ||
@@ -314,7 +317,8 @@ export function isSameInstallRequest(
     (previous.mmprojDownloadUrl?.trim() ?? '') === (next.mmprojDownloadUrl?.trim() ?? '') &&
     (previous.revision?.trim() ?? '') === (next.revision?.trim() ?? '') &&
     (previous.sha256?.trim().toLowerCase() ?? '') === (next.sha256?.trim().toLowerCase() ?? '') &&
-    (previous.mmprojSha256?.trim().toLowerCase() ?? '') === (next.mmprojSha256?.trim().toLowerCase() ?? '') &&
+    (previous.mmprojSha256?.trim().toLowerCase() ?? '') ===
+      (next.mmprojSha256?.trim().toLowerCase() ?? '') &&
     extraPaths(previous) === extraPaths(next)
   );
 }
@@ -549,7 +553,11 @@ async function downloadFile(
         if (!file.write(Buffer.from(value))) {
           await new Promise<void>(resolve => file.once('drain', resolve));
         }
-        onProgress(completed, Number.isFinite(total) ? total : undefined, calculateSpeed(completed));
+        onProgress(
+          completed,
+          Number.isFinite(total) ? total : undefined,
+          calculateSpeed(completed),
+        );
       }
       completedSuccessfully = true;
     } finally {
@@ -571,7 +579,9 @@ async function downloadFile(
       if (expectedSha256) {
         const actualSha256 = await sha256File(tempPath);
         if (actualSha256.toLowerCase() !== expectedSha256.trim().toLowerCase()) {
-          throw new Error('Model download failed: SHA-256 checksum mismatch. Please retry the download.');
+          throw new Error(
+            'Model download failed: SHA-256 checksum mismatch. Please retry the download.',
+          );
         }
       }
       assertValidGgufFile(tempPath);

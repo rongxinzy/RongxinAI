@@ -10,7 +10,10 @@ import {
   getWorkingIndicatorPhase,
 } from './WorkingIndicator';
 
-const source = readFileSync(fileURLToPath(new URL('./WorkingIndicator.tsx', import.meta.url)), 'utf8');
+const source = readFileSync(
+  fileURLToPath(new URL('./WorkingIndicator.tsx', import.meta.url)),
+  'utf8',
+);
 
 test('stays in the initial phase before the elapsed threshold', () => {
   expect(getWorkingIndicatorPhase(0)).toBe(WorkingIndicatorPhase.Initial);
@@ -39,7 +42,7 @@ test('escalates the copy after a long silence', () => {
 
 test('keeps expert-only waiting rows compact and avoids competing loops', () => {
   expect(source).toContain("showCompanion ? 'min-h-9' : 'min-h-6'");
-  expect(source).toContain("<span className=\"text-sm text-muted-foreground\">{statusText}</span>");
+  expect(source).toContain('<span className="text-sm text-muted-foreground">{statusText}</span>');
   expect(source).toContain('{!animateText ? (');
   expect(source).toContain('<Shimmer duration={1.5} className="text-sm">');
 });

@@ -31,10 +31,7 @@ import {
   hasToolCallDetails,
   type CodingToolCallLocation,
 } from './codingToolCall';
-import {
-  CodingPermissionResolution,
-  getCodingPermissionResolution,
-} from './codingPermission';
+import { CodingPermissionResolution, getCodingPermissionResolution } from './codingPermission';
 import {
   CodingConversationActivityKind,
   CodingExternalActivityStatus,
@@ -269,12 +266,7 @@ const CodingActivityComponent = ({
   const isTool = activity.kind === CodingConversationActivityKind.Tool;
   return (
     <div className="flex flex-col gap-2">
-      <Tool
-        className="mb-0"
-        open={open}
-        onOpenChange={onOpenChange}
-        defaultOpen={false}
-      >
+      <Tool className="mb-0" open={open} onOpenChange={onOpenChange} defaultOpen={false}>
         <ToolHeader
           className="px-3 py-2"
           type="dynamic-tool"

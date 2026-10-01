@@ -155,7 +155,10 @@ export function updateOllamaRuntimeModels(
         ? { runtimeContextWindow: model.context_length }
         : {}),
       ...(ollamaRuntimeModelCache.get(modelId.toLowerCase())?.detectedCapabilities
-        ? { detectedCapabilities: ollamaRuntimeModelCache.get(modelId.toLowerCase())?.detectedCapabilities }
+        ? {
+            detectedCapabilities: ollamaRuntimeModelCache.get(modelId.toLowerCase())
+              ?.detectedCapabilities,
+          }
         : {}),
     });
   });
@@ -165,10 +168,7 @@ export function updateOllamaRuntimeModels(
   ollamaRuntimeModelCache = next;
 }
 
-export function updateOllamaRuntimeModelCapabilities(
-  modelId: string,
-  payload: unknown,
-): void {
+export function updateOllamaRuntimeModelCapabilities(modelId: string, payload: unknown): void {
   const normalizedId = modelId.trim().toLowerCase();
   if (!normalizedId) return;
   const previous = ollamaRuntimeModelCache.get(normalizedId);
@@ -207,7 +207,6 @@ export function getLlamaCppModelAgentEligibility(
   return eligibility ? { ...eligibility } : undefined;
 }
 
-
 function normalizeProviderModels(
   providerName: string,
   models?: readonly ProviderModelInputConfig[],
@@ -244,9 +243,7 @@ function normalizeProviderModels(
             ? model.maxTokens
             : registeredModel?.maxTokens,
         piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime),
-        agentEligibility: model.agentEligibility
-          ? { ...model.agentEligibility }
-          : undefined,
+        agentEligibility: model.agentEligibility ? { ...model.agentEligibility } : undefined,
       };
     });
 }
@@ -416,9 +413,9 @@ function buildLlamaCppRunningProviderConfig(
   modelId: string,
 ): LocalProviderConfig | null {
   const storedProviderConfig = appConfig.providers?.[ProviderName.LlamaCpp];
-  const hasConfiguredModel = (storedProviderConfig?.models ?? []).some(
-    model => model.id.trim() === modelId.trim(),
-  ) || Boolean(findLlamaCppRunningModel(modelId));
+  const hasConfiguredModel =
+    (storedProviderConfig?.models ?? []).some(model => model.id.trim() === modelId.trim()) ||
+    Boolean(findLlamaCppRunningModel(modelId));
   if (!hasConfiguredModel) return null;
   const providerDefinition = ProviderRegistry.get(ProviderName.LlamaCpp);
 
@@ -427,12 +424,11 @@ function buildLlamaCppRunningProviderConfig(
     enabled: true,
     userEnabled: true,
     apiKey: storedProviderConfig?.apiKey ?? '',
-    baseUrl:
-      storedProviderConfig?.baseUrl?.trim() || providerDefinition?.defaultBaseUrl || '',
+    baseUrl: storedProviderConfig?.baseUrl?.trim() || providerDefinition?.defaultBaseUrl || '',
     apiFormat:
       storedProviderConfig?.apiFormat === 'native'
-        ? providerDefinition?.defaultApiFormat ?? 'openai'
-        : storedProviderConfig?.apiFormat ?? providerDefinition?.defaultApiFormat ?? 'openai',
+        ? (providerDefinition?.defaultApiFormat ?? 'openai')
+        : (storedProviderConfig?.apiFormat ?? providerDefinition?.defaultApiFormat ?? 'openai'),
     models: storedProviderConfig?.models ?? [],
     codingPlanEnabled: false,
   };
@@ -566,11 +562,7 @@ function resolveMatchedProviderForModelRef(
     return { matched: null, error: `Provider ${requestedProviderName} is not enabled.` };
   }
 
-  return resolveMatchedProviderFromSelection(
-    configuredProviderName,
-    storedProviderConfig,
-    modelId,
-  );
+  return resolveMatchedProviderFromSelection(configuredProviderName, storedProviderConfig, modelId);
 }
 
 function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigResolution {
@@ -679,7 +671,11 @@ function resolveMatchedProvider(appConfig: AppConfig): {
   if (preferredProviderName === ProviderName.LlamaCpp) {
     const runningProviderConfig = buildLlamaCppRunningProviderConfig(appConfig, modelId);
     if (runningProviderConfig) {
-      return resolveMatchedProviderFromSelection(preferredProviderName, runningProviderConfig, modelId);
+      return resolveMatchedProviderFromSelection(
+        preferredProviderName,
+        runningProviderConfig,
+        modelId,
+      );
     }
   }
 

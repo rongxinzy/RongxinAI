@@ -9,7 +9,11 @@ import {
   type MarketplaceSearchResult,
 } from '../../shared/marketplace';
 import { resolveMarketplaceParameterCount } from './marketplaceModelOrder';
-import { ModelCatalogClient, type CatalogFetchLike, resolveModelCatalogUrl } from './modelCatalogClient';
+import {
+  ModelCatalogClient,
+  type CatalogFetchLike,
+  resolveModelCatalogUrl,
+} from './modelCatalogClient';
 
 type MarketplaceServiceOptions = {
   catalogApiUrl?: string | null;
@@ -81,7 +85,11 @@ export class MarketplaceService {
       const cached = this.cache?.read<MarketplaceSearchResult>(cacheKey);
       if (cached && Date.now() - cached.cachedAt < SEARCH_CACHE_TTL_MS) {
         const models = this.processCatalog(cached.response, searchParams);
-        return { ...cached.response, models, totalCount: cached.response.totalCount ?? models.length };
+        return {
+          ...cached.response,
+          models,
+          totalCount: cached.response.totalCount ?? models.length,
+        };
       }
       let catalog: MarketplaceSearchResult;
       try {
@@ -120,9 +128,10 @@ export class MarketplaceService {
     params: MarketplaceSearchParams,
   ): MarketplaceModel[] {
     const installed = scanInstalledModels(this.getModelsDir());
-    const models = params.fit === 'all'
-      ? catalog.models
-      : filterMarketplaceModels(catalog.models, { ...params, fit: undefined });
+    const models =
+      params.fit === 'all'
+        ? catalog.models
+        : filterMarketplaceModels(catalog.models, { ...params, fit: undefined });
     // The catalogue owns the global order and cursor boundary. Local metadata
     // annotation must preserve that order for every page.
     return annotateInstalledModels(models, installed);
@@ -141,7 +150,6 @@ export class MarketplaceService {
       signal,
     );
   }
-
 
   async resolveModel(repoId: string): Promise<MarketplaceModel | null> {
     const normalizedRepoId = repoId.trim();
@@ -300,7 +308,6 @@ function matchesSizeFilter(
 function tagsForTask(task?: MarketplaceSearchParams['task']): MarketplaceCapability[] {
   return task && task !== 'all' ? [task] : [];
 }
-
 
 function toMarketplaceWarning(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

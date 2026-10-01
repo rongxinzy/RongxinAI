@@ -35,11 +35,7 @@ describe('provider connection test metadata', () => {
       models?: Array<{ id: string; connectionTest?: ProviderModelConnectionTest }>;
     }>(
       {
-        models: [
-          { id: 'failed-model' },
-          { id: 'success-model' },
-          { id: 'untested-model' },
-        ],
+        models: [{ id: 'failed-model' }, { id: 'success-model' }, { id: 'untested-model' }],
       },
       [
         {

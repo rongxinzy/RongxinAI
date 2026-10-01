@@ -25,22 +25,23 @@ interface WorkbenchTimelineProps {
   onRespondToApproval: (input: WorkbenchApprovalResponseInput) => void;
 }
 
-export function WorkbenchTimeline({
-  detail,
-  busy,
-  onRespondToApproval,
-}: WorkbenchTimelineProps) {
+export function WorkbenchTimeline({ detail, busy, onRespondToApproval }: WorkbenchTimelineProps) {
   const reducedMotion = useReducedMotion();
   const chapters = useMemo(() => buildTimelineChapters(detail), [detail]);
   const defaultOpenRunId = useMemo(() => {
-    if (detail.task.activeRunId && chapters.some(chapter => chapter.run.id === detail.task.activeRunId)) {
+    if (
+      detail.task.activeRunId &&
+      chapters.some(chapter => chapter.run.id === detail.task.activeRunId)
+    ) {
       return detail.task.activeRunId;
     }
     return chapters[chapters.length - 1]?.run.id ?? null;
   }, [chapters, detail.task.activeRunId]);
 
   if (chapters.length === 0) {
-    return <p className="pb-10 text-sm text-muted-foreground">{i18nService.t('workbenchTaskNoRuns')}</p>;
+    return (
+      <p className="pb-10 text-sm text-muted-foreground">{i18nService.t('workbenchTaskNoRuns')}</p>
+    );
   }
 
   return (

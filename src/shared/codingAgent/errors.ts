@@ -47,8 +47,7 @@ export const CodingErrorMessage = {
   ProfileBuiltinNotFound: 'The built-in coding agent profile was not found.',
   ProfileNotReady: 'The selected coding agent is not ready to run.',
   ProfileNotTrustable: 'The coding agent profile cannot be trusted.',
-  ProfileNotAuthenticatable:
-    'The coding agent profile cannot require external authentication.',
+  ProfileNotAuthenticatable: 'The coding agent profile cannot require external authentication.',
   ProfileNotProbeable: 'The coding agent profile cannot be probed.',
   ProfileNameRequired: 'Coding agent name is required.',
   ProfileCommandAbsolute: 'Custom coding agent commands must use an absolute path.',
@@ -124,8 +123,7 @@ export const CodingErrorMessage = {
   RuntimeIsolatedDiffUnsupported: 'The coding runtime cannot inspect isolated workspace changes.',
   RuntimeIsolatedApplyUnsupported: 'The coding runtime cannot apply isolated workspace changes.',
   CollaboratorPatchUnsupported: 'The coding runtime cannot materialize a collaborator patch.',
-  WorkspaceWriterBusy:
-    'Wait for the active workspace writer before applying collaborator changes.',
+  WorkspaceWriterBusy: 'Wait for the active workspace writer before applying collaborator changes.',
 
   // Configuration
   ConfigOptionNotFound: 'The coding agent configuration option was not found.',
@@ -185,7 +183,7 @@ export type CodingErrorMessage = (typeof CodingErrorMessage)[keyof typeof Coding
 export const CodingErrorDetailMessage = {
   WorkspaceSourceMissing: 'Coding workspace source does not exist:',
   WorkspaceSourceNotDirectory: 'Coding workspace source is not a directory:',
-  AgentNotReadyDetail: 'The selected coding agent is not ready to run:',  // → codingErrorProfileNotReadyDetail
+  AgentNotReadyDetail: 'The selected coding agent is not ready to run:', // → codingErrorProfileNotReadyDetail
   AcpAgentExited: 'ACP agent exited',
   AcpProtocolUnsupported: 'ACP protocol version',
   AcpRequestUnsupported: 'Unsupported ACP agent request:',
@@ -279,8 +277,7 @@ export const CodingErrorI18nKey: Record<CodingErrorMessage | CodingErrorDetailMe
   [CodingErrorMessage.CollaboratorPreviewIsolatedOnly]:
     'codingErrorCollaboratorPreviewIsolatedOnly',
   [CodingErrorMessage.CollaboratorApplyIsolatedOnly]: 'codingErrorCollaboratorApplyIsolatedOnly',
-  [CodingErrorMessage.RuntimeIsolatedDiffUnsupported]:
-    'codingErrorRuntimeIsolatedDiffUnsupported',
+  [CodingErrorMessage.RuntimeIsolatedDiffUnsupported]: 'codingErrorRuntimeIsolatedDiffUnsupported',
   [CodingErrorMessage.RuntimeIsolatedApplyUnsupported]:
     'codingErrorRuntimeIsolatedApplyUnsupported',
   [CodingErrorMessage.CollaboratorPatchUnsupported]: 'codingErrorCollaboratorPatchUnsupported',

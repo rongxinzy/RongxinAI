@@ -22,7 +22,16 @@ type CatalogModelPayload = Omit<MarketplaceModel, 'capability' | 'sizes'> & {
   sizes?: string[];
 };
 
-type CatalogSearchPayload = { models?: CatalogModelPayload[]; totalCount?: number; nextCursor?: string | null; hasMore?: boolean; warning?: string; source?: MarketplaceSearchResult['source']; catalogUpdatedAt?: string; scoreVersion?: string };
+type CatalogSearchPayload = {
+  models?: CatalogModelPayload[];
+  totalCount?: number;
+  nextCursor?: string | null;
+  hasMore?: boolean;
+  warning?: string;
+  source?: MarketplaceSearchResult['source'];
+  catalogUpdatedAt?: string;
+  scoreVersion?: string;
+};
 
 const MARKETPLACE_CAPABILITIES = ['chat', 'reasoning', 'embedding', 'code', 'vision'] as const;
 
@@ -30,19 +39,24 @@ function isVerifiedGgufCatalogModel(model: MarketplaceModel): boolean {
   const recommended = model.files?.find(file => file.isRecommended);
   return Boolean(
     model.metadataStatus === 'verified' &&
-      model.runtime?.format === 'gguf' &&
-      model.runtime.ggufFilesVerified &&
-      recommended?.path.toLowerCase().endsWith('.gguf') &&
-      recommended.sizeBytes &&
-      recommended.sha256 &&
-      /^[a-f0-9]{64}$/i.test(recommended.sha256),
+    model.runtime?.format === 'gguf' &&
+    model.runtime.ggufFilesVerified &&
+    recommended?.path.toLowerCase().endsWith('.gguf') &&
+    recommended.sizeBytes &&
+    recommended.sha256 &&
+    /^[a-f0-9]{64}$/i.test(recommended.sha256),
   );
 }
 
 function normalizeModel(value: CatalogModelPayload): MarketplaceModel {
-  const capabilities = Array.isArray(value.capability) ? value.capability : value.capability ? [value.capability] : ['chat'];
-  const normalizedCapabilities = capabilities.filter((candidate): candidate is MarketplaceModel['capability'] =>
-    MARKETPLACE_CAPABILITIES.includes(candidate as MarketplaceModel['capability']),
+  const capabilities = Array.isArray(value.capability)
+    ? value.capability
+    : value.capability
+      ? [value.capability]
+      : ['chat'];
+  const normalizedCapabilities = capabilities.filter(
+    (candidate): candidate is MarketplaceModel['capability'] =>
+      MARKETPLACE_CAPABILITIES.includes(candidate as MarketplaceModel['capability']),
   );
   const capability = normalizedCapabilities[0] ?? 'chat';
   return {
@@ -73,8 +87,8 @@ function normalizeCursor(value: string | null | undefined): string | undefined {
 }
 
 function matchesCatalogLookup(model: MarketplaceModel, lookup: string): boolean {
-  return [model.repoId, model.id, model.name].some(value =>
-    typeof value === 'string' && value.toLowerCase() === lookup,
+  return [model.repoId, model.id, model.name].some(
+    value => typeof value === 'string' && value.toLowerCase() === lookup,
   );
 }
 
@@ -105,11 +119,13 @@ export class ModelCatalogClient {
     if (params.fit === 'recommended' || params.fit === 'compatible') {
       url.searchParams.set('fit', params.fit === 'compatible' ? 'runnable' : 'recommended');
     }
-    const payload = await this.fetchJson(url.toString(), signal) as CatalogSearchPayload;
+    const payload = (await this.fetchJson(url.toString(), signal)) as CatalogSearchPayload;
     const normalizedModels = (payload.models ?? []).map(normalizeModel);
     return {
       models:
-        params.fit === 'all' ? normalizedModels : normalizedModels.filter(isVerifiedGgufCatalogModel),
+        params.fit === 'all'
+          ? normalizedModels
+          : normalizedModels.filter(isVerifiedGgufCatalogModel),
       totalCount: payload.totalCount,
       nextCursor: normalizeCursor(payload.nextCursor),
       hasMore: payload.hasMore ?? Boolean(payload.nextCursor),

@@ -354,9 +354,7 @@ export class MemoryRepository {
   }
 
   hasImportRejection(id: string): boolean {
-    return Boolean(
-      this.db.prepare('SELECT 1 FROM memory_import_rejections WHERE id = ?').get(id),
-    );
+    return Boolean(this.db.prepare('SELECT 1 FROM memory_import_rejections WHERE id = ?').get(id));
   }
 
   enqueue(
@@ -568,11 +566,10 @@ export class MemoryRepository {
       .all(...parameters) as Array<{ memory_id: number; metadata_json: string }>;
     return new Set(
       rows
-        .filter(
-          row =>
-            input.scope === MemoryScope.Session
-              ? isCurrentSemanticSessionMetadata(parseMetadata(row.metadata_json))
-              : isCurrentAtomicMetadata(parseMetadata(row.metadata_json)),
+        .filter(row =>
+          input.scope === MemoryScope.Session
+            ? isCurrentSemanticSessionMetadata(parseMetadata(row.metadata_json))
+            : isCurrentAtomicMetadata(parseMetadata(row.metadata_json)),
         )
         .map(row => row.memory_id),
     );
@@ -929,11 +926,10 @@ function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
     metadata.extractorKind === MemoryExtractorKind.Atomic ? metadata : metadata.extraction;
   return Boolean(
     candidate &&
-      typeof candidate === 'object' &&
-      !Array.isArray(candidate) &&
-      (candidate as Record<string, unknown>).extractorKind === MemoryExtractorKind.Atomic &&
-      (candidate as Record<string, unknown>).extractorVersion ===
-        ATOMIC_MEMORY_EXTRACTOR_VERSION,
+    typeof candidate === 'object' &&
+    !Array.isArray(candidate) &&
+    (candidate as Record<string, unknown>).extractorKind === MemoryExtractorKind.Atomic &&
+    (candidate as Record<string, unknown>).extractorVersion === ATOMIC_MEMORY_EXTRACTOR_VERSION,
   );
 }
 

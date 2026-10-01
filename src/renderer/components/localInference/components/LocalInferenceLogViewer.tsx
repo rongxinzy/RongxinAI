@@ -18,7 +18,11 @@ type LogScrollMetrics = {
 const LOG_BOTTOM_TOLERANCE_PX = 4;
 const LOG_SCROLL_FRAME_ATTEMPTS = 8;
 
-export function LocalInferenceLogViewer({ text, className, toolbar }: LocalInferenceLogViewerProps) {
+export function LocalInferenceLogViewer({
+  text,
+  className,
+  toolbar,
+}: LocalInferenceLogViewerProps) {
   const logViewerRef = useRef<LazyLog | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const previousTextRef = useRef('');

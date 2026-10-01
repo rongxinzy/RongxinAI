@@ -117,12 +117,8 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
       const handle = event.currentTarget;
       const handleWindowPointerMove = (moveEvent: PointerEvent) => {
         if (!isResizingRef.current || moveEvent.pointerId !== pointerId) return;
-        const requestedWidth =
-          startWidthRef.current + startClientXRef.current - moveEvent.clientX;
-        if (
-          requestedWidth >= maxWidth + maxWidthOverflowThreshold &&
-          !reachedMaxWidthRef.current
-        ) {
+        const requestedWidth = startWidthRef.current + startClientXRef.current - moveEvent.clientX;
+        if (requestedWidth >= maxWidth + maxWidthOverflowThreshold && !reachedMaxWidthRef.current) {
           reachedMaxWidthRef.current = true;
           onReachMaxWidth?.();
         }

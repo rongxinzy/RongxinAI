@@ -300,7 +300,11 @@ describe('artifact reducer', () => {
       state,
       addArtifact({
         sessionId: 'session-1',
-        artifact: makeArtifact({ id: 'deliverable-1', role: ArtifactRole.Deliverable, declared: true }),
+        artifact: makeArtifact({
+          id: 'deliverable-1',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
         reveal: true,
       }),
     );
@@ -329,7 +333,11 @@ describe('artifact reducer', () => {
       artifactReducer(undefined, activateSessionArtifactView('session-2')),
       addArtifact({
         sessionId: 'session-1',
-        artifact: makeArtifact({ id: 'deliverable-1', role: ArtifactRole.Deliverable, declared: true }),
+        artifact: makeArtifact({
+          id: 'deliverable-1',
+          role: ArtifactRole.Deliverable,
+          declared: true,
+        }),
         reveal: true,
       }),
     );

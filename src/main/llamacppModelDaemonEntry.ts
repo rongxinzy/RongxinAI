@@ -7,7 +7,9 @@ if (!bootstrapText) {
   throw new Error('Local inference daemon bootstrap is missing.');
 }
 
-const bootstrap = JSON.parse(Buffer.from(bootstrapText, 'base64url').toString('utf8')) as LlamaCppModelDaemonBootstrap;
+const bootstrap = JSON.parse(
+  Buffer.from(bootstrapText, 'base64url').toString('utf8'),
+) as LlamaCppModelDaemonBootstrap;
 const daemon = new LlamaCppModelDaemonRuntime(bootstrap);
 
 void daemon.start().catch(error => {

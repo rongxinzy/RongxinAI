@@ -9,14 +9,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 const projectRoot = path.resolve(__dirname, '..', '..');
 const scriptPath = path.join(__dirname, 'validate-offline-components.ps1');
 const targetsPath = path.join(projectRoot, 'scripts', 'nsis-offline-components.json');
-const sevenZipPath = path.join(
-  projectRoot,
-  'node_modules',
-  '7zip-bin',
-  'win',
-  'x64',
-  '7za.exe',
-);
+const sevenZipPath = path.join(projectRoot, 'node_modules', '7zip-bin', 'win', 'x64', '7za.exe');
 const temporaryDirectories: string[] = [];
 
 type ComponentTarget = { key: string; prefix: string; sentinel: string };
@@ -61,9 +54,7 @@ function makeFixture() {
   const runtimeRoot = path.join(root, 'runtimes');
   fs.mkdirSync(pluginDir);
   fs.mkdirSync(runtimeRoot);
-  const targets = JSON.parse(
-    fs.readFileSync(targetsPath, 'utf8'),
-  ) as ComponentTarget[];
+  const targets = JSON.parse(fs.readFileSync(targetsPath, 'utf8')) as ComponentTarget[];
 
   for (const target of targets) {
     const id = componentId(target.key);
@@ -78,11 +69,10 @@ function makeFixture() {
     fs.writeFileSync(extraPath, `extra:${target.key}`);
 
     const archivePath = path.join(pluginDir, `component-${target.key}.7z`);
-    const archived = spawnSync(
-      sevenZipPath,
-      ['a', '-t7z', archivePath, target.prefix],
-      { cwd: staging, encoding: 'utf8' },
-    );
+    const archived = spawnSync(sevenZipPath, ['a', '-t7z', archivePath, target.prefix], {
+      cwd: staging,
+      encoding: 'utf8',
+    });
     expect(archived.status, archived.stderr || archived.stdout).toBe(0);
 
     fs.writeFileSync(path.join(pluginDir, `component-${target.key}.version`), id);
@@ -196,9 +186,9 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
     expect(cached.status).toBe(0);
     expect(cached.stdout).not.toContain(`cache-hit:${victim.key}`);
     expect(cached.stdout).toContain(`cache-hit:${fixture.targets[0].key}`);
-    expect(
-      fs.existsSync(path.join(fixture.pluginDir, `component-${victim.key}.cache-valid`)),
-    ).toBe(false);
+    expect(fs.existsSync(path.join(fixture.pluginDir, `component-${victim.key}.cache-valid`))).toBe(
+      false,
+    );
   });
 
   test('cache mode rejects a completion record without measured entries', () => {
@@ -251,11 +241,10 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
     fs.mkdirSync(path.dirname(sentinelPath), { recursive: true });
     fs.writeFileSync(sentinelPath, `sentinel:${victim.key}`);
     const archivePath = path.join(fixture.pluginDir, `component-${victim.key}.7z`);
-    const archived = spawnSync(
-      sevenZipPath,
-      ['a', '-t7z', archivePath, victim.prefix],
-      { cwd: staging, encoding: 'utf8' },
-    );
+    const archived = spawnSync(sevenZipPath, ['a', '-t7z', archivePath, victim.prefix], {
+      cwd: staging,
+      encoding: 'utf8',
+    });
     expect(archived.status, archived.stderr || archived.stdout).toBe(0);
     fs.writeFileSync(
       path.join(fixture.pluginDir, `component-${victim.key}.sha256`),
@@ -267,9 +256,7 @@ describe.skipIf(process.platform !== 'win32')('offline component cache validator
     expect(reexpanded.stdout).toContain(`expanded:${victim.key}`);
     expect(reexpanded.stdout).not.toContain(`expanded:${fixture.targets[4].key}`);
     expect(
-      fs.existsSync(
-        path.join(targetDir(fixture, victim.key), victim.sentinel.replace(/\\/g, '/')),
-      ),
+      fs.existsSync(path.join(targetDir(fixture, victim.key), victim.sentinel.replace(/\\/g, '/'))),
     ).toBe(true);
   });
 });

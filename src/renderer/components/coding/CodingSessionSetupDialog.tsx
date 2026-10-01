@@ -85,7 +85,10 @@ export const CodingSessionSetupDialog = ({
             <Field>
               <FieldLabel>{i18nService.t('codingAgentChooseAgent')}</FieldLabel>
               <Select value={profileId} onValueChange={value => value && setProfileId(value)}>
-                <SelectTrigger className="w-full" aria-label={i18nService.t('codingAgentChooseAgent')}>
+                <SelectTrigger
+                  className="w-full"
+                  aria-label={i18nService.t('codingAgentChooseAgent')}
+                >
                   <Bot className="size-4 shrink-0 text-muted-foreground" />
                   <SelectValue placeholder={i18nService.t('codingAgentChooseAgent')}>
                     {selectedProfile?.name}

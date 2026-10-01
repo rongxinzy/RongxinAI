@@ -79,7 +79,11 @@ export const isWorkspaceFileRef = (value: string): boolean => {
   // Too many spaces → likely a sentence, not a filename
   if ((normalized.match(/\s/g) ?? []).length > 2) return false;
 
-  if (parseLocalPathHref(trimmed) || FILE_URL_RE.test(trimmed) || WINDOWS_PATH_RE.test(normalized)) {
+  if (
+    parseLocalPathHref(trimmed) ||
+    FILE_URL_RE.test(trimmed) ||
+    WINDOWS_PATH_RE.test(normalized)
+  ) {
     return true;
   }
   if (normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('../')) {

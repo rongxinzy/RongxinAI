@@ -28,9 +28,13 @@ const Toast: React.FC<ToastProps> = ({ message, isError = false, isSuccess = fal
 
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-10000 w-fit max-w-[calc(100vw-2rem)] -translate-x-1/2">
-      <div className={`pointer-events-auto animate-fade-in-down rounded-lg border border-border px-4 py-3 shadow-xl ${toastClass}`}>
+      <div
+        className={`pointer-events-auto animate-fade-in-down rounded-lg border border-border px-4 py-3 shadow-xl ${toastClass}`}
+      >
         <div className="flex items-center gap-3">
-          <div className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full leading-none ${iconContainerClass}`}>
+          <div
+            className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full leading-none ${iconContainerClass}`}
+          >
             <Icon className={`${iconClass} shrink-0`} strokeWidth={isNeutral ? 2 : 2.5} />
           </div>
           <div className="flex-1 text-sm font-medium leading-snug">{message}</div>

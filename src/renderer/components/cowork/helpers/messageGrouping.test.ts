@@ -168,7 +168,9 @@ test('keeps only the latest session interruption message', () => {
   expect(filtered.map(item => item.id)).toEqual(['user-1', 'assistant-1', 'interruption-2']);
 
   const turn = buildTurns([message('user-1', 'user', 'run task'), older, newer])[0];
-  expect(getVisibleAssistantItems(turn.assistantItems)).toEqual([{ type: 'system', message: newer }]);
+  expect(getVisibleAssistantItems(turn.assistantItems)).toEqual([
+    { type: 'system', message: newer },
+  ]);
 });
 
 // ── Scale fixtures (issue #141: 20/200/1000-turn sessions) ──

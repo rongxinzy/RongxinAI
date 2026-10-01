@@ -83,9 +83,7 @@ test('MarketplaceService marks installed models from the configured local-model 
   fs.mkdirSync(path.dirname(installedPath), { recursive: true });
   fs.writeFileSync(installedPath, '');
 
-  const fetchMock = vi.fn(async () =>
-    Response.json({ models: [verifiedModel()], totalCount: 1 }),
-  );
+  const fetchMock = vi.fn(async () => Response.json({ models: [verifiedModel()], totalCount: 1 }));
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => modelsDir, {
     catalogApiUrl: 'https://catalog.example.test',
@@ -115,14 +113,15 @@ test('MarketplaceService returns an empty result with a warning when the catalog
 });
 
 test('MarketplaceService propagates external cancellation to the catalogue request', async () => {
-  const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
-    await new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener(
-        'abort',
-        () => reject(new DOMException('Aborted', 'AbortError')),
-        { once: true },
-      );
-    }),
+  const fetchMock = vi.fn(
+    async (_url: string, init?: RequestInit) =>
+      await new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        );
+      }),
   );
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => createTempDir(), {
@@ -202,10 +201,7 @@ test('MarketplaceService returns the current page when later pages remain', asyn
 test('MarketplaceService keeps the all-model cache separate from recommendations', async () => {
   const fetchMock = vi.fn(async (_url: string) => {
     return Response.json({
-      models: [
-        verifiedModel('Qwen/All-8B-GGUF'),
-        verifiedModel('Qwen/All-14B-GGUF'),
-      ],
+      models: [verifiedModel('Qwen/All-8B-GGUF'), verifiedModel('Qwen/All-14B-GGUF')],
       totalCount: 2,
     });
   });
@@ -263,7 +259,9 @@ test('MarketplaceService uses the search API for default recommendations', async
 
 test('MarketplaceService uses the search API for recommendation task tabs', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?task=vision&limit=20&fit=recommended');
+    expect(url).toBe(
+      'https://catalog.example.test/v1/catalog/search?task=vision&limit=20&fit=recommended',
+    );
     return Response.json({
       models: [
         verifiedModel('Qwen/Chat-GGUF'),
@@ -366,8 +364,16 @@ test('MarketplaceService preserves the catalogue order after local annotation', 
   const fetchMock = vi.fn(async () =>
     Response.json({
       models: [
-        { ...verifiedModel('Qwen/8B-GGUF'), parameterCount: 8, publishedAt: '2025-01-01T00:00:00.000Z' },
-        { ...verifiedModel('Qwen/0.5B-GGUF'), parameterCount: 0.5, publishedAt: '2026-01-01T00:00:00.000Z' },
+        {
+          ...verifiedModel('Qwen/8B-GGUF'),
+          parameterCount: 8,
+          publishedAt: '2025-01-01T00:00:00.000Z',
+        },
+        {
+          ...verifiedModel('Qwen/0.5B-GGUF'),
+          parameterCount: 0.5,
+          publishedAt: '2026-01-01T00:00:00.000Z',
+        },
       ],
       totalCount: 2,
     }),
@@ -403,7 +409,10 @@ test('MarketplaceService filters embedding records even if a malformed cloud res
 });
 
 test('MarketplaceService reports catalogue failures without leaking token details', async () => {
-  vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('not found', { status: 404 })),
+  );
   const service = new MarketplaceService(() => createTempDir(), {
     catalogApiUrl: 'https://catalog.example.test',
   });
@@ -460,9 +469,7 @@ test('MarketplaceService serves repeated searches from the disk cache', async ()
 test('MarketplaceService falls back to a stale cached search when the catalogue is down', async () => {
   const fetchMock = vi
     .fn()
-    .mockResolvedValueOnce(
-      Response.json({ models: [verifiedModel()], totalCount: 593 }),
-    )
+    .mockResolvedValueOnce(Response.json({ models: [verifiedModel()], totalCount: 593 }))
     .mockRejectedValueOnce(new Error('network unreachable'));
   vi.stubGlobal('fetch', fetchMock);
   const cacheDir = createTempDir();

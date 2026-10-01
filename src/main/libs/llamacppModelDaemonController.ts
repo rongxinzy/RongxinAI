@@ -9,7 +9,10 @@ import type {
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import { DEFAULT_LLAMACPP_SERVICE_CONFIG } from '../../shared/llamacpp/defaults';
-import { readLlamaCppModelDaemonRegistry, writeLlamaCppModelDaemonRegistry } from './llamacppModelDaemonRegistry';
+import {
+  readLlamaCppModelDaemonRegistry,
+  writeLlamaCppModelDaemonRegistry,
+} from './llamacppModelDaemonRegistry';
 import {
   LlamaCppModelDaemonCommand,
   type LlamaCppModelDaemonBootstrap,
@@ -61,8 +64,10 @@ export function resolveLlamaCppModelDaemonRequestTimeoutMs(
     return CONTROL_CONNECT_TIMEOUT_MS;
   }
   const configuredTimeoutSeconds =
-    Number.parseInt(serviceConfig.timeout ?? DEFAULT_LLAMACPP_SERVICE_CONFIG.timeout ?? '120', 10) ||
-    120;
+    Number.parseInt(
+      serviceConfig.timeout ?? DEFAULT_LLAMACPP_SERVICE_CONFIG.timeout ?? '120',
+      10,
+    ) || 120;
   return Math.max(1, configuredTimeoutSeconds) * 1000 + MODEL_STARTUP_CONTROL_REQUEST_GRACE_MS;
 }
 
@@ -241,8 +246,12 @@ export class LlamaCppModelDaemonController {
     }
 
     const controlPort = this.controlPort;
-    await this.request({ command: LlamaCppModelDaemonCommand.StopAll }).catch((): undefined => undefined);
-    await this.request({ command: LlamaCppModelDaemonCommand.Shutdown }).catch((): undefined => undefined);
+    await this.request({ command: LlamaCppModelDaemonCommand.StopAll }).catch(
+      (): undefined => undefined,
+    );
+    await this.request({ command: LlamaCppModelDaemonCommand.Shutdown }).catch(
+      (): undefined => undefined,
+    );
     await this.waitForControlPortToClose(controlPort);
     if (this.controlPort === controlPort) this.controlPort = null;
     this.lastStatus = null;
@@ -282,7 +291,9 @@ export class LlamaCppModelDaemonController {
       env: {
         ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
-        ZHIYUAN_LLAMACPP_DAEMON_BOOTSTRAP: Buffer.from(JSON.stringify(bootstrap)).toString('base64url'),
+        ZHIYUAN_LLAMACPP_DAEMON_BOOTSTRAP: Buffer.from(JSON.stringify(bootstrap)).toString(
+          'base64url',
+        ),
       },
     });
     let startupError: Error | null = null;
@@ -290,7 +301,9 @@ export class LlamaCppModelDaemonController {
     let exitSignal: NodeJS.Signals | null | undefined;
     let startupOutput = '';
     const captureStartupOutput = (chunk: Buffer) => {
-      startupOutput = `${startupOutput}${chunk.toString()}`.slice(-MAX_DAEMON_STARTUP_OUTPUT_LENGTH);
+      startupOutput = `${startupOutput}${chunk.toString()}`.slice(
+        -MAX_DAEMON_STARTUP_OUTPUT_LENGTH,
+      );
     };
     child.stdout?.on('data', captureStartupOutput);
     child.stderr?.on('data', captureStartupOutput);
@@ -323,7 +336,10 @@ export class LlamaCppModelDaemonController {
           );
         }
         try {
-          return await this.request({ command: LlamaCppModelDaemonCommand.Status }, registryIdentity);
+          return await this.request(
+            { command: LlamaCppModelDaemonCommand.Status },
+            registryIdentity,
+          );
         } catch (error) {
           latestError = toErrorMessage(error);
           await wait(DAEMON_START_POLL_INTERVAL_MS);
@@ -356,15 +372,14 @@ export class LlamaCppModelDaemonController {
       },
       body: JSON.stringify(input),
       signal: AbortSignal.timeout(
-        resolveLlamaCppModelDaemonRequestTimeoutMs(
-          input.command,
-          this.options.getServiceConfig(),
-        ),
+        resolveLlamaCppModelDaemonRequestTimeoutMs(input.command, this.options.getServiceConfig()),
       ),
     });
     const payload = (await response.json()) as LlamaCppModelDaemonResponse;
     if (!response.ok || payload.success === false) {
-      throw new Error(payload.success === false ? payload.error : 'Local inference daemon request failed.');
+      throw new Error(
+        payload.success === false ? payload.error : 'Local inference daemon request failed.',
+      );
     }
     this.lastStatus = payload.status;
     this.lastError = undefined;

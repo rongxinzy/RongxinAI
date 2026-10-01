@@ -1,4 +1,8 @@
-import { classifyCoworkError, CoworkErrorKind, getUserErrorI18nKey } from '../../common/coworkError';
+import {
+  classifyCoworkError,
+  CoworkErrorKind,
+  getUserErrorI18nKey,
+} from '../../common/coworkError';
 import { resolveCodingErrorTranslation } from '../../shared/codingAgent';
 import { resolveWorkbenchErrorTranslation } from '../../shared/workbenchTask';
 import { normalizeError, readErrorMessage } from './errorNormalization';

@@ -1474,15 +1474,18 @@ const getCodingRoomService = (): CodingRoomService => {
     runtime.on('error', (sessionId: string, error: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
     });
-    runtime.on('retryNotice', (sessionId: string, notice: Omit<RuntimeRetryNotice, 'sessionId'>) => {
-      // Transient status: the shared prompt tells the user the model answered
-      // with an error while Pi keeps retrying, instead of leaving the turn
-      // looking frozen until the retry cycle settles.
-      const payload: RuntimeRetryNotice = { sessionId, ...notice };
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(RuntimeNoticeIpc.Notice, payload);
-      }
-    });
+    runtime.on(
+      'retryNotice',
+      (sessionId: string, notice: Omit<RuntimeRetryNotice, 'sessionId'>) => {
+        // Transient status: the shared prompt tells the user the model answered
+        // with an error while Pi keeps retrying, instead of leaving the turn
+        // looking frozen until the retry cycle settles.
+        const payload: RuntimeRetryNotice = { sessionId, ...notice };
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) window.webContents.send(RuntimeNoticeIpc.Notice, payload);
+        }
+      },
+    );
     runtime.on('sessionInterrupted', interruption => {
       if (interruption.cause !== CoworkInterruptionCause.UserStop) {
         codingRoomService?.recordBuiltinInterruption(interruption);
@@ -2106,8 +2109,10 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     broadcastUiEvent(sequencer.next(payload));
   });
 
-  const contentProjection = bindCoworkRunBridge(runtime, () => getStore().getDatabase(), patch =>
-    emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
+  const contentProjection = bindCoworkRunBridge(
+    runtime,
+    () => getStore().getDatabase(),
+    patch => emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
   );
 
   runtime.on('started', (sessionId: string) => {
@@ -3486,7 +3491,8 @@ if (!gotTheLock) {
   };
   const toggleDevToolsForSender = (webContents?: WebContents | null) => {
     if (!canUseDevTools()) return false;
-    const target = webContents && !webContents.isDestroyed() ? webContents : mainWindow?.webContents;
+    const target =
+      webContents && !webContents.isDestroyed() ? webContents : mainWindow?.webContents;
     if (!target || target.isDestroyed()) return false;
     if (target.isDevToolsOpened()) target.closeDevTools();
     else openDevToolsWindow(target);
@@ -4484,7 +4490,7 @@ if (!gotTheLock) {
         // appending the same agent prompt again in the main process.
         const isChatSession = options.mode === CoworkSessionMode.Chat;
         const basePrompt = isChatSession
-          ? options.systemPrompt ?? ''
+          ? (options.systemPrompt ?? '')
           : (options.systemPrompt ?? selectedAgent?.systemPrompt ?? config.systemPrompt);
         const systemPrompt = isChatSession
           ? basePrompt.trim()
@@ -4746,7 +4752,12 @@ if (!gotTheLock) {
           console.error('[Cowork] continue error:', error);
           try {
             const existing = getCoworkStore().getSession(options.sessionId);
-            reportPiSessionFailure(getPiRuntimeAdapter(), options.sessionId, error, existing?.status);
+            reportPiSessionFailure(
+              getPiRuntimeAdapter(),
+              options.sessionId,
+              error,
+              existing?.status,
+            );
           } catch (handlerError) {
             console.error('[Cowork] failed to send error notification to renderer:', handlerError);
           }

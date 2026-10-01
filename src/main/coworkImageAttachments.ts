@@ -27,7 +27,10 @@ const sanitizeSessionId = (sessionId: string): string => {
 };
 
 const sanitizeFileName = (value: string): string => {
-  const base = path.basename(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ').trim();
+  const base = path
+    .basename(value)
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
+    .trim();
   return base || 'image';
 };
 
@@ -128,7 +131,9 @@ export function persistMessageImageMetadata(
   };
 }
 
-export function slimImageAttachmentsForIpc(attachments: unknown): PersistedCoworkImageAttachment[] | undefined {
+export function slimImageAttachmentsForIpc(
+  attachments: unknown,
+): PersistedCoworkImageAttachment[] | undefined {
   if (!Array.isArray(attachments) || attachments.length === 0) return undefined;
   const slim = attachments
     .filter(isRecord)
@@ -155,10 +160,7 @@ export function slimQueuedMessagesForIpc<T>(items: T[]): T[] {
   });
 }
 
-export function readCoworkImageBase64(attachment: {
-  base64Data?: string;
-  path?: string;
-}): string {
+export function readCoworkImageBase64(attachment: { base64Data?: string; path?: string }): string {
   if (attachment.base64Data) {
     const comma = attachment.base64Data.indexOf(',');
     return attachment.base64Data.startsWith('data:') && comma >= 0

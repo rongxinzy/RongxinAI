@@ -20,7 +20,9 @@ test('selectIsStreaming follows the active session stream registry', () => {
 });
 
 test('selectIsStreaming is false without an active current session', () => {
-  expect(selectIsStreaming({ cowork: { streamingSessionIds: [], currentSession: null } } as never)).toBe(false);
+  expect(
+    selectIsStreaming({ cowork: { streamingSessionIds: [], currentSession: null } } as never),
+  ).toBe(false);
   expect(
     selectIsStreaming({
       cowork: {
@@ -60,7 +62,9 @@ test('selects pending permissions only for the requested session', () => {
     },
   };
 
-  expect(selectPendingPermissionForSession(state as never, 'session-a')?.requestId).toBe('request-a');
+  expect(selectPendingPermissionForSession(state as never, 'session-a')?.requestId).toBe(
+    'request-a',
+  );
   expect(selectPendingPermissionForSession(state as never, 'session-c')).toBeNull();
   expect(selectHasPendingPermissionForSession(state as never, 'session-b')).toBe(true);
   expect(selectHasPendingPermissionForSession(state as never, 'session-c')).toBe(false);

@@ -609,7 +609,10 @@ const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined
  * keeps the session's implicit "no explicit skill set" state instead of
  * materializing an empty list, which would force a session rebuild.
  */
-const mergeSkillIds = (base: string[] | undefined, added: string[] | undefined): string[] | undefined =>
+const mergeSkillIds = (
+  base: string[] | undefined,
+  added: string[] | undefined,
+): string[] | undefined =>
   base === undefined && added === undefined
     ? undefined
     : [...new Set([...(base ?? []), ...(added ?? [])])];
@@ -2477,10 +2480,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         !session.completionPending &&
         !this.pendingMessageQueue.hasPendingFollowUp(session.sessionId),
     ).length;
-    const excessCount = Math.max(
-      0,
-      residentIdle - PiRuntimeAdapter.MAX_RESIDENT_IDLE_SESSIONS,
-    );
+    const excessCount = Math.max(0, residentIdle - PiRuntimeAdapter.MAX_RESIDENT_IDLE_SESSIONS);
     const expired = idle.filter(
       session => now - session.lastUsedAt >= PiRuntimeAdapter.IDLE_SESSION_TTL_MS,
     );
@@ -2647,10 +2647,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           platform: process.platform,
           unattended: resourceState.unattended,
           taskOutputEnabled: approvalContext?.taskOutputEnabled,
-          mcpToolManifest: resourceState.chatMode ? [] : this.mcpServerManager?.toolManifest ?? [],
+          mcpToolManifest: resourceState.chatMode
+            ? []
+            : (this.mcpServerManager?.toolManifest ?? []),
           mcpServerStatuses: resourceState.chatMode
             ? []
-            : this.mcpServerManager?.serverStatuses ?? [],
+            : (this.mcpServerManager?.serverStatuses ?? []),
         }),
       ),
       extensionFactories: [
@@ -2910,10 +2912,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionCreatedAt: active.piSessionCreatedAt,
       agentStartedAt: active.agentStartedAt,
       firstTokenAt,
-      sessionCreateToAgentStartMs: Math.max(
-        0,
-        active.agentStartedAt - active.piSessionCreatedAt,
-      ),
+      sessionCreateToAgentStartMs: Math.max(0, active.agentStartedAt - active.piSessionCreatedAt),
       agentStartToFirstTokenMs: Math.max(0, firstTokenAt - active.agentStartedAt),
       sessionCreateToFirstTokenMs: Math.max(0, firstTokenAt - active.piSessionCreatedAt),
     };
@@ -3195,11 +3194,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           );
         }
         if (event.toolName === PiSubagentToolName) {
-          active.researchRun?.recordSubagentResult(
-            event.toolCallId,
-            resultText,
-            resultIsError,
-          );
+          active.researchRun?.recordSubagentResult(event.toolCallId, resultText, resultIsError);
           active.shortcutWorkflow?.recordSubagentResult(
             event.toolCallId,
             resultText,
@@ -3673,11 +3668,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const contextUsage = active?.piSession.getContextUsage?.();
       const hasValidContextUsage = Boolean(
         contextUsage &&
-          contextUsage.tokens != null &&
-          Number.isFinite(contextUsage.tokens) &&
-          Number.isFinite(contextUsage.contextWindow) &&
-          contextUsage.tokens >= 0 &&
-          contextUsage.contextWindow > 0,
+        contextUsage.tokens != null &&
+        Number.isFinite(contextUsage.tokens) &&
+        Number.isFinite(contextUsage.contextWindow) &&
+        contextUsage.tokens >= 0 &&
+        contextUsage.contextWindow > 0,
       );
       if (!hasValidContextUsage && !piUsage && requestStartedAt === null && !startupLatency) {
         return;

@@ -142,7 +142,10 @@ class SkillService {
     }
   }
 
-  async downloadSkill(source: string, options: { iconUrl?: string; displayName?: string } = {}): Promise<{
+  async downloadSkill(
+    source: string,
+    options: { iconUrl?: string; displayName?: string } = {},
+  ): Promise<{
     success: boolean;
     skills?: Skill[];
     error?: string;

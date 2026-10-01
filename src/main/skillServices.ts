@@ -262,7 +262,9 @@ export class SkillServiceManager {
       !fs.existsSync(nodeModules) || !this.isWebSearchRuntimeHealthy(skillPath);
     if (shouldInstallDeps) {
       if (!npmRuntime) {
-        throw new Error('Web-search runtime is incomplete and the bundled npm runtime is unavailable');
+        throw new Error(
+          'Web-search runtime is incomplete and the bundled npm runtime is unavailable',
+        );
       }
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
       execFileSync(npmRuntime.command, [...npmRuntime.args, 'install'], {

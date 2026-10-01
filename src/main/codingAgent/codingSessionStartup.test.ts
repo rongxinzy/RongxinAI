@@ -101,13 +101,14 @@ test('marks profile as NeedsAuth when ACP createSession fails with authenticatio
     { start: async () => {}, cancel: async () => {} },
     {},
   );
-  driverFactory.create = () => ({
-    createSession: async () => {
-      throw new Error('Authentication required');
-    },
-    onSessionTitleChanged: () => () => {},
-    dispose: async () => {},
-  } as any);
+  driverFactory.create = () =>
+    ({
+      createSession: async () => {
+        throw new Error('Authentication required');
+      },
+      onSessionTitleChanged: () => () => {},
+      dispose: async () => {},
+    }) as any;
 
   await expect(
     prepareCodingSession({
@@ -155,13 +156,14 @@ test('does not mark profile as NeedsAuth for non-auth errors', async () => {
     { start: async () => {}, cancel: async () => {} },
     {},
   );
-  driverFactory.create = () => ({
-    createSession: async () => {
-      throw new Error('Some other error');
-    },
-    onSessionTitleChanged: () => () => {},
-    dispose: async () => {},
-  } as any);
+  driverFactory.create = () =>
+    ({
+      createSession: async () => {
+        throw new Error('Some other error');
+      },
+      onSessionTitleChanged: () => () => {},
+      dispose: async () => {},
+    }) as any;
 
   await expect(
     prepareCodingSession({

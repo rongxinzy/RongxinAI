@@ -22,7 +22,13 @@ interface McpTokenConnectDialogProps {
   onSave: (token: string) => void;
 }
 
-export function McpTokenConnectDialog({ entry, isSaving, error, onClose, onSave }: McpTokenConnectDialogProps) {
+export function McpTokenConnectDialog({
+  entry,
+  isSaving,
+  error,
+  onClose,
+  onSave,
+}: McpTokenConnectDialogProps) {
   const [token, setToken] = useState('');
   const [visible, setVisible] = useState(false);
   // This component stays mounted between providers, so a token typed for one
@@ -35,9 +41,13 @@ export function McpTokenConnectDialog({ entry, isSaving, error, onClose, onSave 
   const name = entry?.presentation?.name || entry?.name || '';
   const tokenInputId = `${entry?.id || 'mcp'}-access-token`;
   const isBaiduNetdisk = entry?.id === 'baidu-netdisk';
-  const descriptionKey = isBaiduNetdisk ? 'mcpBaiduConfigureSubtitle' : 'mcpGithubConfigureSubtitle';
+  const descriptionKey = isBaiduNetdisk
+    ? 'mcpBaiduConfigureSubtitle'
+    : 'mcpGithubConfigureSubtitle';
   const labelKey = isBaiduNetdisk ? 'mcpBaiduAccessToken' : 'mcpGithubPat';
-  const placeholderKey = isBaiduNetdisk ? 'mcpBaiduAccessTokenPlaceholder' : 'mcpGithubPatPlaceholder';
+  const placeholderKey = isBaiduNetdisk
+    ? 'mcpBaiduAccessTokenPlaceholder'
+    : 'mcpGithubPatPlaceholder';
   const hintKey = isBaiduNetdisk ? 'mcpBaiduAccessTokenHint' : 'mcpGithubPatHint';
   const linkKey = isBaiduNetdisk ? 'mcpBaiduAccessTokenLink' : 'mcpGithubPatLink';
   const documentationUrl = isBaiduNetdisk
@@ -54,17 +64,26 @@ export function McpTokenConnectDialog({ entry, isSaving, error, onClose, onSave 
         {entry && (
           <>
             <DialogHeader>
-              <DialogTitle>{i18nService.t('mcpConfigureTitle').replace('{name}', name)}</DialogTitle>
+              <DialogTitle>
+                {i18nService.t('mcpConfigureTitle').replace('{name}', name)}
+              </DialogTitle>
               <DialogDescription>{i18nService.t(descriptionKey)}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2">
               <label className="text-sm font-medium text-foreground" htmlFor={tokenInputId}>
-                {i18nService.t(labelKey)}<span className="text-destructive"> *</span>
+                {i18nService.t(labelKey)}
+                <span className="text-destructive"> *</span>
               </label>
               <p className="text-sm leading-5 text-muted-foreground">
                 {i18nService.t(hintKey)}{' '}
-                <a className="inline-flex items-center gap-1 text-primary hover:underline" href={documentationUrl} target="_blank" rel="noreferrer">
-                  {i18nService.t(linkKey)}<ExternalLink className="size-3" />
+                <a
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                  href={documentationUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {i18nService.t(linkKey)}
+                  <ExternalLink className="size-3" />
                 </a>
               </p>
               <div className="relative">
@@ -78,16 +97,30 @@ export function McpTokenConnectDialog({ entry, isSaving, error, onClose, onSave 
                   disabled={isSaving}
                   autoFocus
                 />
-                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2" onClick={() => setVisible(value => !value)} aria-label={i18nService.t(visible ? 'mcpHideAccessToken' : 'mcpShowAccessToken')}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 size-8 -translate-y-1/2"
+                  onClick={() => setVisible(value => !value)}
+                  aria-label={i18nService.t(visible ? 'mcpHideAccessToken' : 'mcpShowAccessToken')}
+                >
                   {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </Button>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>{i18nService.t('cancel')}</Button>
-              <Button type="button" onClick={() => onSave(token.trim())} disabled={!token.trim() || isSaving}>
-                {isSaving && <LoaderCircle className="size-4 animate-spin" />}{i18nService.t('mcpSaveAndEnable')}
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
+                {i18nService.t('cancel')}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => onSave(token.trim())}
+                disabled={!token.trim() || isSaving}
+              >
+                {isSaving && <LoaderCircle className="size-4 animate-spin" />}
+                {i18nService.t('mcpSaveAndEnable')}
               </Button>
             </DialogFooter>
           </>

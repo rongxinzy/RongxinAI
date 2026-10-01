@@ -120,10 +120,7 @@ export function ExpertAvatar({ name, label, className }: ExpertAvatarProps) {
   return (
     <Avatar
       aria-hidden="true"
-      className={cn(
-        'theme-scene-expert-avatar shrink-0 overflow-hidden after:hidden',
-        className,
-      )}
+      className={cn('theme-scene-expert-avatar shrink-0 overflow-hidden after:hidden', className)}
       style={{ background: style.background }}
     >
       <AvatarFallback className="theme-scene-expert-artwork">

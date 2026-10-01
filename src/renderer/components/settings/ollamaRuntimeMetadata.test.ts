@@ -25,8 +25,6 @@ test('ignores invalid or non-matching runtime context lengths', () => {
 
 test('uses the configured provider discovery context for a matching model', () => {
   expect(
-    resolveDiscoveredModelContext('qwen3:32b', [
-      { id: 'qwen3:32b', contextWindow: 262_144 },
-    ]),
+    resolveDiscoveredModelContext('qwen3:32b', [{ id: 'qwen3:32b', contextWindow: 262_144 }]),
   ).toBe(262_144);
 });

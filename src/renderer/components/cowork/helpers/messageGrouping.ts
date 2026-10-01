@@ -26,9 +26,7 @@ export type ConversationTurn = {
 // ── buildDisplayItems ──
 
 // 2026/09/17 lixiang  多次暂停只保留最新一条中断消息，避免列表堆多条「继续执行」
-export const omitSupersededSessionInterruptions = (
-  messages: CoworkMessage[],
-): CoworkMessage[] => {
+export const omitSupersededSessionInterruptions = (messages: CoworkMessage[]): CoworkMessage[] => {
   let latestInterruptionIndex = -1;
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     if (messages[i]?.metadata?.interruption) {

@@ -95,7 +95,9 @@ const TodoNavigationPanel: React.FC<TodoNavigationPanelProps> = ({
             aria-current={isActive ? 'page' : undefined}
           >
             <Icon />
-            <span className="min-w-0 flex-1 truncate text-left">{i18nService.t(item.labelKey)}</span>
+            <span className="min-w-0 flex-1 truncate text-left">
+              {i18nService.t(item.labelKey)}
+            </span>
             {hasUnseen ? (
               <span
                 className="size-2 shrink-0 rounded-full bg-primary"
@@ -138,7 +140,8 @@ const TodoNavigationPanel: React.FC<TodoNavigationPanelProps> = ({
                 onClick={() => onSelectList(list.id)}
                 className={cn(
                   'min-w-0 flex-1 justify-start gap-2',
-                  isActive && 'border border-border bg-card font-medium text-foreground shadow-subtle',
+                  isActive &&
+                    'border border-border bg-card font-medium text-foreground shadow-subtle',
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >

@@ -400,7 +400,13 @@ type SkillsConfig = {
 
 const SKILLS_DIR_NAME = 'SKILLs';
 const SKILL_FILE_NAME = 'SKILL.md';
-const SKILL_ICON_FILE_NAMES = ['icon.svg', 'icon.png', 'icon.webp', 'icon.jpg', 'icon.jpeg'] as const;
+const SKILL_ICON_FILE_NAMES = [
+  'icon.svg',
+  'icon.png',
+  'icon.webp',
+  'icon.jpg',
+  'icon.jpeg',
+] as const;
 const SKILL_ICON_MIME_TYPES: Record<(typeof SKILL_ICON_FILE_NAMES)[number], string> = {
   'icon.svg': 'image/svg+xml',
   'icon.png': 'image/png',
@@ -473,16 +479,16 @@ const getSkillNameFromDir = (skillDir: string): string => {
   const skillFile = path.join(skillDir, SKILL_FILE_NAME);
   const raw = fs.readFileSync(skillFile, 'utf8');
   const { frontmatter } = parseFrontmatter(raw);
-  return (String(frontmatter.name || '') || path.basename(skillDir)).trim() || path.basename(skillDir);
+  return (
+    (String(frontmatter.name || '') || path.basename(skillDir)).trim() || path.basename(skillDir)
+  );
 };
 
 const findDuplicateSkillName = (
   skillDirs: string[],
   installedSkillNames: Iterable<string>,
 ): string | null => {
-  const knownNames = new Set(
-    Array.from(installedSkillNames, normalizeSkillName).filter(Boolean),
-  );
+  const knownNames = new Set(Array.from(installedSkillNames, normalizeSkillName).filter(Boolean));
 
   for (const skillDir of skillDirs) {
     const name = getSkillNameFromDir(skillDir);
@@ -1073,8 +1079,14 @@ const isNpmPackageSpec = (source: string): boolean => {
  * The tarball is extracted into the managed plugin directory.
  */
 const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<string> => {
-  const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, ['pack', spec, '--ignore-scripts', '--json']);
-  if (!bundledNpm) throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
+  const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, [
+    'pack',
+    spec,
+    '--ignore-scripts',
+    '--json',
+  ]);
+  if (!bundledNpm)
+    throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
 
   const packResult = await new Promise<{ code: number; stdout: string; stderr: string }>(
     resolve => {
@@ -1195,7 +1207,9 @@ const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string>
     await extractZip(zipPath, { dir: extractRoot });
   } catch (error) {
     if (!zipUrl.includes('modelscope.cn/skills/')) throw error;
-    console.warn('[SkillManager] standard ZIP extraction failed, using ModelScope-compatible parser');
+    console.warn(
+      '[SkillManager] standard ZIP extraction failed, using ModelScope-compatible parser',
+    );
     await extractModelScopeZip(buffer, extractRoot);
   }
 
@@ -1649,7 +1663,9 @@ export class SkillManager {
         const tmpPath = targetPath + '.tmp';
         fs.writeFileSync(tmpPath, JSON.stringify(target, null, 2) + '\n', 'utf-8');
         fs.renameSync(tmpPath, targetPath);
-        console.log('[skills] mergeSkillsConfig: migrated user config without replacing existing defaults');
+        console.log(
+          '[skills] mergeSkillsConfig: migrated user config without replacing existing defaults',
+        );
       }
     } catch (e) {
       console.warn('[skills] Failed to merge skills config:', e);
@@ -1903,7 +1919,10 @@ export class SkillManager {
     return resolvedSource;
   }
 
-  async downloadSkill(source: string, options: SkillInstallOptions = {}): Promise<{
+  async downloadSkill(
+    source: string,
+    options: SkillInstallOptions = {},
+  ): Promise<{
     success: boolean;
     skills?: SkillRecord[];
     error?: string;
@@ -2756,9 +2775,7 @@ export class SkillManager {
     }
   }
 
-  private readRongxMetadata(
-    skillDir: string,
-  ): {
+  private readRongxMetadata(skillDir: string): {
     name?: string;
     description?: string;
     author?: string;
@@ -2810,7 +2827,9 @@ export class SkillManager {
 
   private getSkillIconDataUrl(iconPath: string): string | undefined {
     try {
-      const iconFileName = path.basename(iconPath).toLowerCase() as keyof typeof SKILL_ICON_MIME_TYPES;
+      const iconFileName = path
+        .basename(iconPath)
+        .toLowerCase() as keyof typeof SKILL_ICON_MIME_TYPES;
       const mimeType = SKILL_ICON_MIME_TYPES[iconFileName];
       if (!mimeType) return undefined;
       return `data:${mimeType};base64,${fs.readFileSync(iconPath).toString('base64')}`;

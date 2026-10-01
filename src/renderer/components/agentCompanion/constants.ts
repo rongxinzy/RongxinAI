@@ -4,8 +4,7 @@ export const AgentCompanionState = {
   Idle: 'idle',
 } as const;
 
-export type AgentCompanionState =
-  (typeof AgentCompanionState)[keyof typeof AgentCompanionState];
+export type AgentCompanionState = (typeof AgentCompanionState)[keyof typeof AgentCompanionState];
 
 interface ResolveAgentCompanionStateOptions {
   isTurnComplete: boolean;

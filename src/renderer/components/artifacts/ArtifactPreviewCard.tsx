@@ -183,7 +183,10 @@ interface ArtifactPreviewCardProps {
   disabled?: boolean;
 }
 
-const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact, disabled = false }) => {
+const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({
+  artifact,
+  disabled = false,
+}) => {
   const dispatch = useDispatch();
   const isPanelOpen = useSelector(selectIsPanelOpen);
   const selectedArtifact = useSelector(selectSelectedArtifact);

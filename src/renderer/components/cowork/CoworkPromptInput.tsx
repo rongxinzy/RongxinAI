@@ -21,7 +21,11 @@ import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { DEFAULT_COWORK_PERMISSION_MODE, CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import {
+  DEFAULT_COWORK_PERMISSION_MODE,
+  CoworkSessionMode,
+  type CoworkPermissionMode,
+} from '../../../shared/cowork/constants';
 import {
   hasCoworkSubmissionContent,
   hasVisiblePromptContent,
@@ -43,10 +47,7 @@ import {
   updateCurrentSessionModelOverride,
 } from '../../store/slices/coworkSlice';
 import { clearSelection } from '../../store/slices/quickActionSlice';
-import {
-  type Model,
-  setSelectedModel,
-} from '../../store/slices/modelSlice';
+import { type Model, setSelectedModel } from '../../store/slices/modelSlice';
 import { clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkFileAttachment, CoworkImageAttachment } from '../../types/cowork';
@@ -398,12 +399,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           currentAgentSource: currentAgent?.source,
         }),
       );
-    }, [
-      currentSession?.id,
-      currentAgentId,
-      currentAgent?.source,
-      persistedExpertIds,
-    ]);
+    }, [currentSession?.id, currentAgentId, currentAgent?.source, persistedExpertIds]);
 
     const syncSkills = useCallback(async () => {
       const loadedSkills = await skillService.loadSkills();
@@ -665,9 +661,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
             detail: {
-              message: i18nService.t(
-                unusableImage ? 'imageReadError' : 'coworkSubmitEmptyContent',
-              ),
+              message: i18nService.t(unusableImage ? 'imageReadError' : 'coworkSubmitEmptyContent'),
               isError: true,
             },
           }),
@@ -1284,45 +1278,44 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 </>
               )}
             </PromptInputTools>
-            {isPlusToolbar &&
-              (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
-                <div className="flex items-center gap-1.5">
-                  {showModelSelector && (
-                    <>
-                      {!isCompactToolbar && (
-                        <ContextUsageIndicator
-                          usage={contextUsage}
-                          messageUsage={contextMessage?.metadata?.usage}
-                          modelId={contextMessage?.metadata?.model}
-                          modelProviderKey={contextMessage?.metadata?.modelProviderKey}
-                          selectedModelId={effectiveSelectedModel?.id}
-                          selectedModelProviderKey={effectiveSelectedModel?.providerKey}
-                          messages={currentSession?.messages}
-                          systemPrompt={currentSession?.systemPrompt}
-                        />
-                      )}
-                      <CoworkModelPicker
-                        models={availableModels}
-                        selectedModel={effectiveSelectedModel}
-                        open={modelSelectorOpen}
-                        onOpenChange={setModelSelectorOpen}
-                        onSelect={model => {
-                          void handleModelSelect(model);
-                        }}
-                        compact={isCompactToolbar}
+            {isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
+              <div className="flex items-center gap-1.5">
+                {showModelSelector && (
+                  <>
+                    {!isCompactToolbar && (
+                      <ContextUsageIndicator
+                        usage={contextUsage}
+                        messageUsage={contextMessage?.metadata?.usage}
+                        modelId={contextMessage?.metadata?.model}
+                        modelProviderKey={contextMessage?.metadata?.modelProviderKey}
+                        selectedModelId={effectiveSelectedModel?.id}
+                        selectedModelProviderKey={effectiveSelectedModel?.providerKey}
+                        messages={currentSession?.messages}
+                        systemPrompt={currentSession?.systemPrompt}
                       />
-                    </>
-                  )}
-                  {isCompactToolbar && isWorkVariant && (
-                    <PermissionModeMenu
-                      value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
-                      onChange={mode => onPermissionModeChange?.(mode)}
-                      disabled={disabled}
-                      compact
+                    )}
+                    <CoworkModelPicker
+                      models={availableModels}
+                      selectedModel={effectiveSelectedModel}
+                      open={modelSelectorOpen}
+                      onOpenChange={setModelSelectorOpen}
+                      onSelect={model => {
+                        void handleModelSelect(model);
+                      }}
+                      compact={isCompactToolbar}
                     />
-                  )}
-                </div>
-              )}
+                  </>
+                )}
+                {isCompactToolbar && isWorkVariant && (
+                  <PermissionModeMenu
+                    value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
+                    onChange={mode => onPermissionModeChange?.(mode)}
+                    disabled={disabled}
+                    compact
+                  />
+                )}
+              </div>
+            )}
             {/* 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip */}
             {showEmptySubmitHint ? (
               <TooltipProvider delay={0}>

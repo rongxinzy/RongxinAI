@@ -107,7 +107,10 @@ export function createLlamaCppModelLaunchLogFileStore(input: { userDataPath: str
       );
     },
 
-    readSessionLog(sessionId: string, offset = 0): {
+    readSessionLog(
+      sessionId: string,
+      offset = 0,
+    ): {
       session: LlamaCppModelLaunchLogSession;
       content: string;
       startOffset: number;
@@ -120,7 +123,8 @@ export function createLlamaCppModelLaunchLogFileStore(input: { userDataPath: str
       }
       try {
         const size = fs.statSync(session.filePath).size;
-        const safeOffset = Number.isSafeInteger(offset) && offset > 0 && offset <= size ? offset : 0;
+        const safeOffset =
+          Number.isSafeInteger(offset) && offset > 0 && offset <= size ? offset : 0;
         const length = size - safeOffset;
         const buffer = Buffer.alloc(length);
         if (length > 0) {
@@ -369,7 +373,9 @@ function getProcessOutputText(event: LlamaCppModelLaunchLogEvent): string | null
 }
 
 function isProcessOutputLogMessage(message: string | undefined): boolean {
-  return message === LlamaCppProcessLogMessage.Stdout || message === LlamaCppProcessLogMessage.Stderr;
+  return (
+    message === LlamaCppProcessLogMessage.Stdout || message === LlamaCppProcessLogMessage.Stderr
+  );
 }
 
 function getProcessOutputLogModuleName(message: string | undefined): string {
