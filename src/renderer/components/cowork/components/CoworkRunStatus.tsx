@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
+import { Spinner } from '@shared/components/ui/spinner';
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import {
@@ -9,31 +9,12 @@ import {
 import { i18nService } from '../../../services/i18n';
 import type { RootState } from '../../../store';
 
-const phaseKeys: Record<CoworkRunPhase, string> = {
-  [CoworkRunPhase.Waiting]: 'coworkRunWaiting',
-  [CoworkRunPhase.Thinking]: 'coworkRunThinking',
-  [CoworkRunPhase.Writing]: 'coworkRunWriting',
-  [CoworkRunPhase.Tool]: 'coworkRunTool',
-  [CoworkRunPhase.Retry]: 'coworkRunRetry',
-  [CoworkRunPhase.Compacting]: 'coworkRunCompacting',
-  [CoworkRunPhase.Approval]: 'coworkRunApproval',
-  [CoworkRunPhase.Finishing]: 'coworkRunFinishing',
-  [CoworkRunPhase.Completed]: 'coworkRunCompleted',
-  [CoworkRunPhase.Error]: 'coworkRunError',
-  [CoworkRunPhase.Stopped]: 'coworkRunStopped',
-};
-
 export function getRunStatusText(snapshot: CoworkRunSnapshot | undefined, now: number): string {
-  if (!snapshot?.running) return i18nService.t('coworkRunStarting');
+  if (!snapshot?.running) return i18nService.t('coworkRunIndicatorStarting');
   if (now - snapshot.confirmedAt > CoworkRunPolicy.UnconfirmedMs)
-    return i18nService.t('coworkRunUnconfirmed');
-  let text = i18nService.t(phaseKeys[snapshot.phase]);
-  if (snapshot.phase === CoworkRunPhase.Tool && snapshot.toolName)
-    text += ` · ${snapshot.toolName}`;
-  if (snapshot.phase === CoworkRunPhase.Retry && snapshot.retryAttempt) {
-    text += ` · ${i18nService.t('coworkRunAttempt').replace('{attempt}', String(snapshot.retryAttempt))}`;
-  }
-  return text;
+    return i18nService.t('coworkRunIndicatorReconnecting');
+  if (snapshot.phase === CoworkRunPhase.Approval) return i18nService.t('coworkRunApproval');
+  return i18nService.t('coworkRunIndicatorRunning');
 }
 
 /** Owns its ticker so elapsed time never invalidates the transcript or composer. */
@@ -65,33 +46,27 @@ export function CoworkRunStatus({
     Math.floor((now - (live?.startedAt ?? awaitingSince ?? mountedAt)) / 1_000),
   );
   const status =
-    isDirectChat && !live ? i18nService.t('coworkRunWaiting') : getRunStatusText(live, now);
-  const preview = live?.phase === CoworkRunPhase.Tool ? live.preview : undefined;
-  const progressSeconds = live ? Math.max(0, Math.floor((now - live.lastProgressAt) / 1_000)) : 0;
+    isDirectChat && !live
+      ? i18nService.t('coworkRunIndicatorGenerating')
+      : getRunStatusText(live, now);
+  const clock = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
   return (
-    <Alert role="status" aria-live="off" data-cowork-run-status data-run-phase={live?.phase}>
-      <AlertTitle className="flex flex-wrap items-center justify-between gap-x-2">
-        <span>{status}</span>
-        <span>{i18nService.t('coworkWorkingElapsed').replace('{seconds}', String(elapsed))}</span>
-      </AlertTitle>
-      <AlertDescription className="min-w-0">
-        <div className="flex flex-col gap-1">
-          {preview ? (
-            <span className="line-clamp-2 break-all" title={preview}>
-              {preview}
-            </span>
-          ) : live?.phase === CoworkRunPhase.Tool ? (
-            <span>{i18nService.t('coworkRunNoOutput')}</span>
-          ) : null}
-          {live && (
-            <span>
-              {now - live.confirmedAt <= CoworkRunPolicy.UnconfirmedMs &&
-                `${i18nService.t('coworkRunAlive')} · `}
-              {i18nService.t('coworkRunLastProgress').replace('{seconds}', String(progressSeconds))}
-            </span>
-          )}
-        </div>
-      </AlertDescription>
-    </Alert>
+    <div
+      role="status"
+      aria-live="off"
+      data-cowork-run-status
+      data-run-phase={live?.phase}
+      className="theme-run-indicator flex shrink-0 items-center justify-center gap-2 overflow-hidden"
+    >
+      <Spinner aria-hidden="true" role="presentation" className="shrink-0" />
+      <span className="truncate">{status}</span>
+      <time
+        className="theme-run-indicator-elapsed shrink-0"
+        dateTime={`PT${elapsed}S`}
+        aria-label={i18nService.t('coworkWorkingElapsed').replace('{seconds}', String(elapsed))}
+      >
+        {clock}
+      </time>
+    </div>
   );
 }

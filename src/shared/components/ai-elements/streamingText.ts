@@ -62,8 +62,11 @@ export class StreamingTextSegmenter {
   private tail = '';
   private previousContent = '';
   private wasStreaming = false;
+  private segments: StreamingTextSegments = { committed: '', tail: '' };
 
   update(content: string, isStreaming: boolean): StreamingTextSegments {
+    // Reveal animation frames reuse the source text; do not rescan Markdown on each frame.
+    if (content === this.previousContent && isStreaming === this.wasStreaming) return this.segments;
     if (!isStreaming) {
       this.committed = content;
       this.tail = '';
@@ -92,7 +95,8 @@ export class StreamingTextSegmenter {
   }
 
   private snapshot(): StreamingTextSegments {
-    return { committed: this.committed, tail: this.tail };
+    this.segments = { committed: this.committed, tail: this.tail };
+    return this.segments;
   }
 }
 

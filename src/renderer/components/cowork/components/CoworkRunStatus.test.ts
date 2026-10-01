@@ -38,9 +38,12 @@ test('status is independent of transcript visibility and uses authoritative elap
       createElement(CoworkRunStatus, { sessionId: 'a', isStreaming: true }),
     ),
   );
-  expect(screen.getByRole('status').textContent).toContain('step 4 complete');
+  expect(screen.getByRole('status').textContent).toContain('coworkRunIndicatorRunning');
+  expect(screen.getByRole('status').textContent).not.toContain('step 4 complete');
+  expect(screen.getByRole('status').textContent).not.toContain('bash');
+  expect(screen.getByRole('status').textContent).toContain('00:00');
   act(() => vi.advanceTimersByTime(2_000));
-  expect(screen.getByRole('status')).toBeTruthy();
+  expect(screen.getByRole('status').textContent).toContain('00:02');
   act(() =>
     store.dispatch(
       receiveRunSnapshot({
@@ -62,6 +65,6 @@ test('status is independent of transcript visibility and uses authoritative elap
 });
 test('does not claim the background is alive when confirmations stop', () => {
   expect(getRunStatusText(snapshot, snapshot.confirmedAt + CoworkRunPolicy.UnconfirmedMs + 1)).toBe(
-    'coworkRunUnconfirmed',
+    'coworkRunIndicatorReconnecting',
   );
 });
