@@ -85,7 +85,9 @@ async function runTool(
     {
       model,
       convertToLlm: () => [],
-      shouldStopAfterTurn: () => true,
+      // pi 0.87 removed shouldStopAfterTurn; finishTurn with action "end"
+      // preserves this harness's single-turn semantics.
+      finishTurn: () => ({ action: 'end' }),
     },
     event => {
       events.push(event);
