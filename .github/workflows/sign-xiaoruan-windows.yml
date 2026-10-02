@@ -42,7 +42,7 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  actions: read
 
 concurrency:
   group: xiaoruan-certum-signing
