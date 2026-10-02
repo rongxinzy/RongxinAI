@@ -379,6 +379,7 @@ When adding or modifying log statements, verify:
 - **Never** use `.test.mjs` or any other extension — `.test.ts` is the only accepted format.
 - Run all tests: `npm test`. Filter by module: `npm test -- <name>` (e.g. `npm test -- logger`).
 - Avoid importing Electron-only APIs (e.g. `electron-log`) in tests — inline any logic that depends on them.
+- **Provider replay lane**: `tests/piLongTaskReplay.test.ts` runs a recorded 200-document long task against the full Pi adapter stack with no live model. `tests/replay/piProviderTape.ts` serves the tape (`tests/replay/tapes/longtask-200doc.jsonl.gz`) with strict seq+hash request matching, so prompt-assembly, tool-wiring, gating, or run-completion drift fails the test. Re-record intentionally with `AB_LONGTASK=record npx vitest run tests/abLongTask.harness.test.ts` (uses the live provider at `LONGTASK_LIVE_UPSTREAM` in `tests/replay/piLongTaskScenario.ts`) when prompts or the scenario change.
 - Validate UI changes manually by running `npm run electron:dev` and exercising key flows:
   - Cowork: start session, send prompts, approve/deny tool permissions, stop session
   - Artifacts: preview HTML, SVG, Mermaid diagrams, React components
