@@ -24,13 +24,15 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 export const WORK_DIR_PLACEHOLDER = '<PI_REPLAY_WORKDIR>';
+export const REPO_ROOT_PLACEHOLDER = '<PI_REPLAY_REPOROOT>';
 const REQUEST_SNIPPET_LENGTH = 4096;
 /**
- * Cap on stored request bodies: enough to diagnose drift without letting the
- * O(n²) growing transcript inflate the tape (hash always covers the full
- * normalized body; replay never reads requestBody).
+ * Stored body segments per entry: the head pins down request shape and the
+ * tail is where fresh transcript content (and drift) appears. The hash
+ * always covers the full normalized body; replay never reads the segments.
  */
-const REQUEST_BODY_STORAGE_LIMIT = 16_384;
+const REQUEST_HEAD_STORAGE_LENGTH = 8_192;
+const REQUEST_TAIL_STORAGE_LENGTH = 24_576;
 /** Per-SSE-event delay when replaying, mimicking live streaming pace. */
 const SSE_REPLAY_PACE_MS = 2;
 
@@ -39,7 +41,13 @@ export interface PiProviderTapeEntry {
   method: string;
   path: string;
   requestBodyHash: string;
-  /** Full normalized request body (self-diagnosing tapes; absent in v0 tapes). */
+  /** Full body length before truncation. */
+  requestBodyLength?: number;
+  /** First bytes of the normalized request body (request shape, system prompt). */
+  requestHead?: string;
+  /** Last bytes of the normalized request body (where fresh drift appears). */
+  requestTail?: string;
+  /** Legacy single-segment body (v0/v1 tapes). */
   requestBody?: string;
   requestSnippet: string;
   status: number;
@@ -54,6 +62,8 @@ export interface PiProviderTapeHeader {
   recordedAt: string;
   upstream: string;
   workDir: string;
+  /** Repo checkout root at record time; error text can embed it. */
+  repoRoot?: string;
   entryCount: number;
 }
 
@@ -75,8 +85,12 @@ export interface PiProviderTapeServerOptions {
   tapePath: string;
   /** Replay mode: 'strict' requires seq+hash match; 'sequential' ignores hashes. */
   matchMode?: 'strict' | 'sequential';
+  /** Repo checkout root at runtime; defaults to process.cwd(). */
+  repoRoot?: string;
   /** Replay mode: dump actual request bodies here when a miss occurs. */
   debugDumpDir?: string;
+  /** Replay mode: dump EVERY actual request body here (tape regeneration aid). */
+  dumpAllRequestsDir?: string;
 }
 
 const hashBody = (body: string): string => createHash('sha256').update(body, 'utf8').digest('hex');
@@ -106,6 +120,7 @@ export class PiProviderTapeServer {
       recordedAt: new Date().toISOString(),
       upstream: options.upstream ?? '',
       workDir: options.workDir,
+      repoRoot: process.cwd(),
       entryCount: 0,
     };
   }
@@ -163,10 +178,21 @@ export class PiProviderTapeServer {
   }
 
   private normalize(body: string): string {
-    return body
+    let normalized = body
       .split(this.options.workDir)
       .join(WORK_DIR_PLACEHOLDER)
       .replace(LS_METADATA_ROW_PATTERN, '$1<LS-META>');
+    // Error text (module resolution failures, stack traces) can embed the
+    // repo checkout path; it differs between record and replay machines.
+    const recordedRepoRoot = this.header.repoRoot;
+    if (recordedRepoRoot) {
+      normalized = normalized.split(recordedRepoRoot).join(REPO_ROOT_PLACEHOLDER);
+    }
+    const runtimeRepoRoot = this.options.repoRoot ?? process.cwd();
+    if (runtimeRepoRoot && runtimeRepoRoot !== recordedRepoRoot) {
+      normalized = normalized.split(runtimeRepoRoot).join(REPO_ROOT_PLACEHOLDER);
+    }
+    return normalized;
   }
 
   private loadTape(): void {
@@ -182,6 +208,7 @@ export class PiProviderTapeServer {
         this.header.workDir = parsed.workDir;
         this.header.scenario = parsed.scenario;
         this.header.recordedAt = parsed.recordedAt;
+        this.header.repoRoot = parsed.repoRoot;
         continue;
       }
       this.entries.push(parsed as PiProviderTapeEntry);
@@ -213,6 +240,48 @@ export class PiProviderTapeServer {
     }
   }
 
+  private dumpEveryBody(seq: number, body: string): void {
+    const dir = this.options.dumpAllRequestsDir;
+    if (!dir) return;
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, `seq-${seq}.json`), this.normalize(body), 'utf8');
+    } catch (error) {
+      console.warn(`[PiTape] failed to dump request body for seq ${seq}:`, error);
+    }
+  }
+
+  /**
+   * Logs the tail messages of an actual request so CI logs reveal what
+   * diverged even though the tape stores only truncated expected bodies.
+   */
+  private logRequestTail(seq: number, body: string): void {
+    try {
+      const parsed = JSON.parse(body) as { messages?: Array<Record<string, unknown>> };
+      const messages = parsed.messages ?? [];
+      console.error(
+        `[PiTape] seq ${seq} actual request: ${messages.length} messages, ${body.length} chars; tail:`,
+      );
+      for (const message of messages.slice(-6)) {
+        const content = message.content;
+        const textValue = Array.isArray(content)
+          ? content
+              .map(part =>
+                part && typeof part === 'object' && 'text' in part ? String(part.text) : '',
+              )
+              .join(' ')
+          : String(content ?? '');
+        console.error(
+          `[PiTape]   role=${String(message.role)} name=${String(message.name ?? '')} len=${textValue.length} :: ${textValue.slice(0, 300).replaceAll('\n', ' | ')}`,
+        );
+      }
+    } catch {
+      console.error(
+        `[PiTape] seq ${seq} actual request is not parseable JSON (${body.length} chars)`,
+      );
+    }
+  }
+
   private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const body = await new Promise<string>((resolve, reject) => {
       const chunks: Buffer[] = [];
@@ -241,13 +310,16 @@ export class PiProviderTapeServer {
     });
     const responseBody = await response.text();
     const contentType = response.headers.get('content-type') ?? 'application/json';
+    const normalizedBody = this.normalize(body);
     this.entries.push({
       seq: this.entries.length,
       method: req.method ?? 'POST',
       path: req.url ?? '/',
-      requestBodyHash: hashBody(this.normalize(body)),
-      requestBody: this.normalize(body).slice(0, REQUEST_BODY_STORAGE_LIMIT),
-      requestSnippet: this.normalize(body).slice(0, REQUEST_SNIPPET_LENGTH),
+      requestBodyHash: hashBody(normalizedBody),
+      requestBodyLength: normalizedBody.length,
+      requestHead: normalizedBody.slice(0, REQUEST_HEAD_STORAGE_LENGTH),
+      requestTail: normalizedBody.slice(-REQUEST_TAIL_STORAGE_LENGTH),
+      requestSnippet: normalizedBody.slice(0, REQUEST_SNIPPET_LENGTH),
       status: response.status,
       contentType,
       responseBody,
@@ -262,6 +334,7 @@ export class PiProviderTapeServer {
     body: string,
   ): Promise<void> {
     const seq = this.replayCursor;
+    this.dumpEveryBody(seq, body);
     const actualHash = hashBody(this.normalize(body));
     const entry = this.entries[seq];
     if (!entry) {
@@ -271,6 +344,7 @@ export class PiProviderTapeServer {
         expectedSnippet: '<none>',
         actualSnippet: this.normalize(body).slice(0, REQUEST_SNIPPET_LENGTH),
       });
+      this.logRequestTail(seq, body);
       res.writeHead(500, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: `replay tape exhausted at seq ${seq}` }));
       return;
@@ -285,10 +359,11 @@ export class PiProviderTapeServer {
         this.misses.push({
           seq,
           reason: 'hash_mismatch',
-          expectedSnippet: entry.requestSnippet,
+          expectedSnippet: entry.requestTail ?? entry.requestSnippet,
           actualSnippet: this.normalize(body).slice(0, REQUEST_SNIPPET_LENGTH),
         });
         this.dumpActualBody(seq, body);
+        this.logRequestTail(seq, body);
         res.writeHead(500, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ error: `replay request drifted at seq ${seq}` }));
         return;

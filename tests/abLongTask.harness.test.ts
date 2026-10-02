@@ -29,12 +29,14 @@ describe.skipIf(!MODE || MODE === '0')('A/B long-task manual driver', () => {
     `runs the 200-document long task in ${MODE ?? 'unknown'} mode`,
     { timeout: HARD_CAP_MS + 60_000 },
     async () => {
-      const mode = MODE === 'record' ? 'record' : MODE === 'replay-sequential' ? 'replay' : 'live';
+      const mode = MODE === 'record' ? 'record' : MODE?.startsWith('replay') ? 'replay' : 'live';
       const summary = await runLongTaskScenario({
         mode,
         workDir: WORK_DIR,
         tapePath: mode === 'live' ? undefined : TAPE_PATH,
         tapeMatchMode: MODE === 'replay-sequential' ? 'sequential' : 'strict',
+        tapeDumpAllRequestsDir:
+          MODE === 'replay-dump' ? path.join(os.tmpdir(), 'pi-longtask-request-dump') : undefined,
         hardCapMs: HARD_CAP_MS,
       });
       console.log('summary:', JSON.stringify(summary, null, 2).slice(0, 4000));
