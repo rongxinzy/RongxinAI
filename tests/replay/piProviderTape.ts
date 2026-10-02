@@ -25,6 +25,12 @@ import zlib from 'node:zlib';
 
 export const WORK_DIR_PLACEHOLDER = '<PI_REPLAY_WORKDIR>';
 const REQUEST_SNIPPET_LENGTH = 4096;
+/**
+ * Cap on stored request bodies: enough to diagnose drift without letting the
+ * O(n²) growing transcript inflate the tape (hash always covers the full
+ * normalized body; replay never reads requestBody).
+ */
+const REQUEST_BODY_STORAGE_LIMIT = 16_384;
 /** Per-SSE-event delay when replaying, mimicking live streaming pace. */
 const SSE_REPLAY_PACE_MS = 2;
 
@@ -240,7 +246,7 @@ export class PiProviderTapeServer {
       method: req.method ?? 'POST',
       path: req.url ?? '/',
       requestBodyHash: hashBody(this.normalize(body)),
-      requestBody: this.normalize(body),
+      requestBody: this.normalize(body).slice(0, REQUEST_BODY_STORAGE_LIMIT),
       requestSnippet: this.normalize(body).slice(0, REQUEST_SNIPPET_LENGTH),
       status: response.status,
       contentType,

@@ -42,15 +42,21 @@ describe.skipIf(process.platform === 'win32')('Pi long-task replay (recorded pro
       expect(summary.counts.byType['turn_start']).toBeGreaterThanOrEqual(LONGTASK_DOC_COUNT);
       expect(summary.workbenchTaskStatus).toBe('needs_review');
 
-      // The golden run's stack-level invariant is the full 200-document
-      // read/summarize loop plus a clean completion. Whether the model then
-      // also writes index.csv/report.md after the late compaction is model
-      // diligence, not stack behavior — the strict seq+hash tape match is
-      // what guards against regressions there.
-      const summariesSize = summary.artifacts['summaries.md'];
-      expect(summariesSize, 'summaries.md should exist').not.toBeNull();
+      // The golden run completed the full 200-document read/summarize loop
+      // plus index.csv and report.md; artifact assertions anchor the
+      // stack-level invariants, while the strict seq+hash tape match guards
+      // against any request-level regression.
+      for (const [name, size] of Object.entries(summary.artifacts)) {
+        expect(size, `${name} should exist`).not.toBeNull();
+      }
+
       const summaries = fs.readFileSync(path.join(WORK_DIR, 'summaries.md'), 'utf8');
       expect(summaries.match(/^## doc-/gm)?.length).toBe(LONGTASK_DOC_COUNT);
+      const csvLines = fs
+        .readFileSync(path.join(WORK_DIR, 'index.csv'), 'utf8')
+        .split('\n')
+        .filter(line => line.trim().length > 0);
+      expect(csvLines.length).toBe(LONGTASK_DOC_COUNT + 1);
     },
   );
 });

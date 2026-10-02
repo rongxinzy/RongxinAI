@@ -51,10 +51,11 @@ const ARTIFACT_NAMES = ['summaries.md', 'index.csv', 'report.md'] as const;
 const TASK_PROMPT = `工作目录下 data/ 子目录中有 200 个文本文档（doc-001.txt 到 doc-200.txt），是一份产品技术文档集的章节。请严格按以下步骤完成：
 
 1. 用 read 工具逐个读取每个文档，每次只读一个文件，按 doc-001 到 doc-200 的顺序处理，禁止跳读、禁止批量读取。**每一条助手回复最多只能调用 1 个工具**：调用一个工具后必须等待其结果，再在下一轮回复中继续下一步，严禁在同一回复中并行发起多个工具调用。
-2. 每读完一个文档，立即向 summaries.md 追加一节：二级标题为「## doc-XXX 章节名」，下面跟 3-5 句中文摘要，概括该章节的核心机制与工程建议。
+2. 每读完一个文档，立即向 summaries.md 追加一节：二级标题为「## doc-XXX 章节名」，下面跟 2-3 句中文摘要，概括该章节的核心机制与工程建议。
 3. 全部 200 个文档处理完后，生成 index.csv：每行一个文档，列为 文档编号,章节名,主题分类,一句话要点。
-4. 然后写一份 report.md：综合技术分析报告，至少 3000 字，涵盖全部章节的主题归类、共性工程原则、相互之间的矛盾点与取舍建议，最后给出结论。
-5. 全部完成后，用一句话告诉我 summaries.md、index.csv 和 report.md 已生成。
+4. 然后写一份 report.md：综合技术分析报告，至少 1500 字，涵盖全部章节的主题归类、共性工程原则、相互之间的矛盾点与取舍建议，最后给出结论。
+5. 宣布完成前必须自查：用 bash 执行 grep -c '^## doc-' summaries.md，结果必须恰好等于 200；不足 200 时必须回到第 1 步，继续处理尚未摘要的文档，直到自查通过。禁止以"剩余文档结构类似"等理由跳过。
+6. 自查通过后，用一句话告诉我 summaries.md、index.csv 和 report.md 已生成。
 
 注意：必须真实读写文件；不要在回复里直接输出全部内容代替写文件。`;
 
@@ -117,7 +118,10 @@ export function seedLongTaskWorkspace(workDir: string): void {
     const variant = VARIANTS[Math.floor(index / TOPICS.length)] ?? '综合';
     const id = String(index + 1).padStart(3, '0');
     const parts = [`# ${id} ${topic}（${variant}）`, ''];
-    for (let i = 0; i < PARAGRAPHS.length; i++) {
+    // Keep each doc small: the 200-doc transcript must peak far below the
+    // compaction threshold so the trigger point (which is usage-accounting
+    // dependent and not portable across runtimes) never fires mid-replay.
+    for (let i = 0; i < 3; i++) {
       parts.push(
         PARAGRAPHS[(i + index) % PARAGRAPHS.length]
           .replaceAll('{topic}', `${topic}的${variant}`)
@@ -224,11 +228,12 @@ export async function runLongTaskScenario(
               name: LONGTASK_MODEL_ID,
               supportsImage: false,
               capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
-              // Deliberately below the server's real 262k window: threshold
-              // compaction fires with ~78k headroom, so one large tool result
-              // cannot jump past the server limit between compaction checks —
-              // and the tape deterministically covers compaction cycles.
-              contextWindow: 200_000,
+              // The scenario is sized so total context peaks far below the
+              // compaction threshold (window minus reserve): the threshold
+              // trigger depends on provider usage accounting that is not
+              // portable across runtimes, and a mid-run compaction would
+              // slide off the tape's request sequence.
+              contextWindow: 262_144,
               maxTokens: 4096,
             },
           ],
