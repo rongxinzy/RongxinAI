@@ -99,9 +99,11 @@ const hashBody = (body: string): string => createHash('sha256').update(body, 'ut
  * Volatile metadata rows produced by the ls tool (permissions, link count,
  * owner, size, mtime) embedded in JSON-escaped form inside request bodies.
  * The file names that follow are the deterministic payload and stay intact.
+ * The row may also open a tool-result string directly (no preceding newline),
+ * so a JSON value boundary quotes in as an anchor too.
  */
 const LS_METADATA_ROW_PATTERN =
-  /((?:^|\\n))[dlbcdps-][rwxstST-]{9}\+?\s+\d+\s+\S+\s+\S+\s+\d+\s+\w{3}\s+\d{1,2}\s+[\d:]{4,5}/g;
+  /((?:^|\\n|"))[dlbcdps-][rwxstST-]{9}\+?\s+\d+\s+\S+\s+\S+\s+\d+\s+\w{3}\s+\d{1,2}\s+[\d:]{4,5}/g;
 
 const isGzipPath = (tapePath: string): boolean => tapePath.endsWith('.gz');
 
