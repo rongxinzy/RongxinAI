@@ -1,0 +1,10 @@
+--- a/node_modules/@earendil-works/pi-ai/dist/utils/overflow.js
++++ b/node_modules/@earendil-works/pi-ai/dist/utils/overflow.js
+@@ -46,6 +46,7 @@
+     /input \(\d+ tokens\) is longer than the model'?s context length \(\d+ tokens\)/i, // Together AI
+     /exceeds the limit of \d+/i, // GitHub Copilot
+     /exceeds the available context size/i, // llama.cpp server
++    /context size has been exceeded/i, // llama.cpp server (mid-stream SSE error frame variant)
+     /greater than the context length/i, // LM Studio
+     /context window exceeds limit/i, // MiniMax
+     /exceeded model token limit/i, // Kimi For Coding
