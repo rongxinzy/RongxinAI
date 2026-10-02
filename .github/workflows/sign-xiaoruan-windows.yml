@@ -143,10 +143,20 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot '${{ github.workspace }}/xiaoruan'
+      - name: Write signing receipt
+        working-directory: ${{ github.workspace }}
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ needs.prepare.outputs.source-run-id }}
+          SOURCE_SHA: ${{ needs.prepare.outputs.source-sha }}
+          PACKAGE_VERSION: ${{ needs.prepare.outputs.package-version }}
+        run: node zhiyuan/scripts/xiaoruan-signing/write-receipt.mjs xiaoruan/release
       - uses: actions/upload-artifact@v6
         with:
           name: signed-windows-build
-          path: xiaoruan/release/*.exe
+          path: |
+            xiaoruan/release/*.exe
+            xiaoruan/release/signing-receipt.json
           if-no-files-found: error
           retention-days: 3
       - name: Publish signed package summary
