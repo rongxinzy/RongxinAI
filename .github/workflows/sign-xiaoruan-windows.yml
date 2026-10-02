@@ -54,8 +54,8 @@ env:
 jobs:
   prepare:
     if: >-
-      (github.event_name == 'workflow_dispatch' && github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_call' && github.repository == 'rongxinzy/xiaoruan-ai-agent' && github.ref == 'refs/heads/main')
+      (github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/main') ||
+      (github.repository == 'rongxinzy/xiaoruan-ai-agent' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -65,14 +65,14 @@ jobs:
       package-version: ${{ steps.source.outputs.package-version || steps.source-call.outputs.package-version }}
     steps:
       - uses: actions/checkout@v6
-        if: github.event_name == 'workflow_dispatch'
+        if: github.repository == 'rongxinzy/RongxinAI'
       - uses: actions/setup-node@v6
-        if: github.event_name == 'workflow_dispatch'
+        if: github.repository == 'rongxinzy/RongxinAI'
         with:
           node-version: '24.x'
       - id: source
         name: Validate Xiaoruan unsigned package run
-        if: github.event_name == 'workflow_dispatch'
+        if: github.repository == 'rongxinzy/RongxinAI'
         env:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
           RELEASE_VERSION: ${{ inputs.release_version }}
@@ -80,7 +80,7 @@ jobs:
         run: node scripts/xiaoruan-signing/prepare.mjs
       - id: source-call
         name: Adopt caller build run identity
-        if: github.event_name == 'workflow_call'
+        if: github.repository == 'rongxinzy/xiaoruan-ai-agent'
         shell: bash
         env:
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
@@ -126,8 +126,8 @@ jobs:
   sign:
     needs: prepare
     if: >-
-      (github.event_name == 'workflow_dispatch' && github.repository == 'rongxinzy/RongxinAI') ||
-      (github.event_name == 'workflow_call' && github.repository == 'rongxinzy/xiaoruan-ai-agent')
+      github.repository == 'rongxinzy/RongxinAI' ||
+      github.repository == 'rongxinzy/xiaoruan-ai-agent'
     runs-on: windows-latest
     environment: release
     timeout-minutes: 90
