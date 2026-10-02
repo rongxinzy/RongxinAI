@@ -1,4 +1,4 @@
-import { createModels } from '@earendil-works/pi-ai';
+import { createModels, getCurrentSystemPrompt } from '@earendil-works/pi-ai';
 import {
   fauxAssistantMessage,
   fauxProvider,
@@ -40,8 +40,10 @@ test('uses a context accepted by the real Pi faux provider', async () => {
   models.setProvider(faux.provider);
   faux.setResponses([
     context => {
-      expect(context.systemPrompt).toBe('Extract semantic memory.');
-      expect(context.messages).toEqual([
+      // pi 1.0.0 carries the system prompt inside the transcript's system
+      // messages instead of a dedicated field.
+      expect(getCurrentSystemPrompt(context.messages)).toBe('Extract semantic memory.');
+      expect(context.messages.filter(m => m.role !== 'system')).toEqual([
         {
           role: SessionMemoryCompletionRole.User,
           content: 'Conversation evidence',
