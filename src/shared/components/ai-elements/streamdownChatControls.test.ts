@@ -7,7 +7,10 @@ const controlsSource = readFileSync(
   fileURLToPath(new URL('./streamdownChatControls.ts', import.meta.url)),
   'utf8',
 );
-const messageSource = readFileSync(fileURLToPath(new URL('./message.tsx', import.meta.url)), 'utf8');
+const messageSource = readFileSync(
+  fileURLToPath(new URL('./message.tsx', import.meta.url)),
+  'utf8',
+);
 const richSource = readFileSync(
   fileURLToPath(new URL('./richMessageResponse.tsx', import.meta.url)),
   'utf8',
