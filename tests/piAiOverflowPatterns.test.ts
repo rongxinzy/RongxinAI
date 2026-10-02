@@ -1,6 +1,6 @@
 /**
  * Regression guard for the pi-ai overflow-pattern patch
- * (patches/@earendil-works+pi-ai+0.84.2.patch).
+ * (patches/@earendil-works+pi-ai+1.0.0.patch).
  *
  * llama.cpp reports context overflow with (at least) two message variants.
  * pi-ai's OVERFLOW_PATTERNS only matched "exceeds the available context
