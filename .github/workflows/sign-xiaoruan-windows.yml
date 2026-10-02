@@ -23,14 +23,18 @@ on:
         required: true
         type: string
     secrets:
+      # In workflow_call mode the Certum credentials resolve from the caller
+      # repository's `release` environment (job-level environment secrets win
+      # over passed secrets per the workflow_call contract), so callers must
+      # not pass them; they stay required for direct dispatch from this repo.
       CERTUM_USER_ID:
-        required: true
+        required: false
       CERTUM_OTP_URI:
-        required: true
+        required: false
       CERTUM_CERT_THUMBPRINT:
-        required: true
+        required: false
       MODELSCOPE_TOKENS:
-        required: true
+        required: false
       XIAORUAN_ARTIFACT_READ_TOKEN:
         required: false
       RUNTIME_ARTIFACT_READ_TOKEN:
