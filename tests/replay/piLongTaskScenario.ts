@@ -142,6 +142,8 @@ export interface LongTaskScenarioOptions {
   tapeMatchMode?: 'strict' | 'sequential';
   /** Replay only: dump actual request bodies on strict misses. */
   tapeDebugDumpDir?: string;
+  /** Replay only: dump EVERY actual request body (tape regeneration aid). */
+  tapeDumpAllRequestsDir?: string;
   hardCapMs: number;
   onLifecycle?: (kind: string, detail?: string) => void;
 }
@@ -199,6 +201,7 @@ export async function runLongTaskScenario(
         tapePath: options.tapePath,
         matchMode: options.tapeMatchMode ?? 'strict',
         debugDumpDir: options.tapeDebugDumpDir,
+        dumpAllRequestsDir: options.tapeDumpAllRequestsDir,
       });
       emit('tapeServer', `${options.mode} ${tapeServer.baseUrl}`);
     }
