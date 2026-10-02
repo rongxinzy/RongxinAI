@@ -31,6 +31,10 @@ on:
         required: true
       MODELSCOPE_TOKENS:
         required: true
+      XIAORUAN_ARTIFACT_READ_TOKEN:
+        required: false
+      RUNTIME_ARTIFACT_READ_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -166,7 +170,10 @@ jobs:
           bun run engram:runtime:win-x64
       - name: Connect Certum SimplySign
         id: certum
-        uses: $/.github/actions/setup-certum-signing
+        # Use the copy vendored in the signed source tree: it is identical to
+        # the ZhiYuan one, works in both dispatch and workflow_call modes, and
+        # pins the signing action to the commit being released.
+        uses: ./xiaoruan/.github/actions/setup-certum-signing
         with:
           user-id: ${{ secrets.CERTUM_USER_ID }}
           otp-uri: ${{ secrets.CERTUM_OTP_URI }}
