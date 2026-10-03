@@ -1,7 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
+index 1da213f..a2dddfc 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -1111,6 +1111,9 @@ export class AgentSession {
+@@ -1816,6 +1816,9 @@ export class AgentSession {
          if (typeof content === "string") {
              text = content;
          }
@@ -11,7 +12,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
          else {
              const textParts = [];
              images = [];
-@@ -2648,12 +2651,14 @@ export class AgentSession {
+@@ -3497,12 +3500,14 @@ export class AgentSession {
                  return false;
              const msg = m;
              // Skip aborted messages with no content
@@ -28,9 +29,10 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
          for (const content of lastAssistant.content) {
              if (content.type === "text") {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
+index e4992e8..0dde47e 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-@@ -170,6 +170,9 @@ function estimateTextAndImageContentChars(content) {
+@@ -183,6 +183,9 @@ function estimateTextAndImageContentChars(content) {
      if (typeof content === "string") {
          return content.length;
      }
@@ -40,7 +42,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/c
      let chars = 0;
      for (const block of content) {
          if (block.type === "text" && block.text) {
-@@ -194,6 +197,8 @@ export function estimateTokens(message) {
+@@ -220,6 +223,8 @@ export function estimateTokens(message) {
          }
          case "assistant": {
              const assistant = message;
@@ -50,9 +52,10 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/c
                  if (block.type === "text") {
                      chars += block.text.length;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
+index 92ee18e..0c77592 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-@@ -100,6 +100,8 @@ export function serializeConversation(messages) {
+@@ -107,6 +107,8 @@ export function serializeConversation(messages) {
                  parts.push(`[User]: ${content}`);
          }
          else if (msg.role === "assistant") {
