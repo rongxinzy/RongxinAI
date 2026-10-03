@@ -79,9 +79,5 @@ export function classicMessageSurfaces() {
         color: 'var(--foreground)',
       },
     }),
-    'queue-question-content': recipe({ base: { color: 'var(--foreground)' } }),
-    'queue-acceptance-content': recipe({
-      base: { 'font-size': 'var(--zy-component-text-sm)', color: 'var(--muted-foreground)' },
-    }),
   };
 }

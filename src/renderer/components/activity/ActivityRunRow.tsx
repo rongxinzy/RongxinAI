@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
 import { PlatformRegistry, type Platform } from '../../../shared/platform';
+import { imPlatformLogo } from '../../assets/imLogos';
 import { i18nService } from '../../services/i18n';
 // 2026/09/23 活动失败行复用对话侧的 JSON message 提取，避免直接展示原始 payload
 import { extractUserFacingErrorMessage } from '../../services/coworkTerminalError';
@@ -138,7 +139,7 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
 
       {platform ? (
         <img
-          src={PlatformRegistry.logo(platform)}
+          src={imPlatformLogo(platform)}
           alt={i18nService.t(platform)}
           className="mt-0.5 size-4 shrink-0 rounded object-contain"
         />

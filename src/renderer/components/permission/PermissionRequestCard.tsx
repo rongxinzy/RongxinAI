@@ -1,25 +1,18 @@
 import { cn } from '@shared/lib/utils';
-import { TriangleAlert } from 'lucide-react';
+import { Terminal, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { PermissionDangerLevel } from './permissionDanger';
 
-const DANGER_BANNER_STYLES = {
-  destructive: {
-    surface: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-    icon: 'text-red-500',
-    title: 'text-red-700 dark:text-red-400',
-    reason: 'text-red-600 dark:text-red-500',
-    titleKey: 'coworkDestructiveOperation',
-  },
-  caution: {
-    surface: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
-    icon: 'text-yellow-500',
-    title: 'text-yellow-700 dark:text-yellow-400',
-    reason: 'text-yellow-600 dark:text-yellow-500',
-    titleKey: 'coworkCautionOperation',
-  },
+const DANGER_BANNER_LEVEL_CLASS = {
+  destructive: 'theme-permission-danger-banner-destructive',
+  caution: 'theme-permission-danger-banner-warning',
+} as const;
+
+const DANGER_BANNER_TITLE_KEY = {
+  destructive: 'coworkDestructiveOperation',
+  caution: 'coworkCautionOperation',
 } as const;
 
 interface PermissionDangerBannerProps {
@@ -28,19 +21,23 @@ interface PermissionDangerBannerProps {
 }
 
 /**
- * Shared risk banner for inline permission cards. The palette classes are the
- * ones the work-mode permission card has always used, so both surfaces stay
- * pixel-identical in every theme.
+ * Shared risk banner for inline permission cards. Geometry and colors come from
+ * the theme `permission-danger-banner*` hooks, so every theme and mode renders
+ * the same structure with its own palette.
  */
 export const PermissionDangerBanner = ({ level, reasonText }: PermissionDangerBannerProps) => {
   if (level === PermissionDangerLevel.Safe) return null;
-  const styles = DANGER_BANNER_STYLES[level];
   return (
-    <div className={cn('flex items-start gap-2 p-3 mx-6 my-4 rounded-lg border', styles.surface)}>
-      <TriangleAlert className={cn('h-5 w-5 shrink-0 mt-0.5', styles.icon)} />
+    <div
+      className={cn(
+        'theme-permission-danger-banner flex items-start gap-2 mx-5 my-4',
+        DANGER_BANNER_LEVEL_CLASS[level],
+      )}
+    >
+      <TriangleAlert className="size-4 shrink-0 mt-0.5" />
       <div>
-        <p className={cn('text-sm font-medium', styles.title)}>{i18nService.t(styles.titleKey)}</p>
-        {reasonText && <p className={cn('text-xs mt-0.5', styles.reason)}>{reasonText}</p>}
+        <p className="text-sm font-medium">{i18nService.t(DANGER_BANNER_TITLE_KEY[level])}</p>
+        {reasonText && <p className="text-xs mt-0.5">{reasonText}</p>}
       </div>
     </div>
   );
@@ -58,7 +55,7 @@ export const PermissionToolBody = ({ title, detail }: PermissionToolBodyProps) =
   <div className="space-y-3">
     <div className="flex items-center gap-2 text-sm text-muted-foreground">
       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-background border border-border">
-        <code className="text-xs">&gt;_</code>
+        <Terminal className="size-3.5" />
       </span>
       <span>{title}</span>
     </div>
@@ -73,25 +70,37 @@ export const PermissionToolBody = ({ title, detail }: PermissionToolBodyProps) =
 );
 
 interface PermissionRequestCardProps {
+  /** Optional header row: icon, title and trailing slot (e.g. a status badge). */
+  header?: ReactNode;
   /** Scrollable card body. */
   children: ReactNode;
   /** Actions rendered in the card footer, right aligned. */
   footer: ReactNode;
   dangerLevel?: PermissionDangerLevel;
   dangerReasonText?: string;
+  /** Layout-only classes (margin, width) for the card shell. */
+  className?: string;
 }
 
 /**
- * Inline permission surface shared by work mode and coding mode: a scrollable
- * body slot, the optional risk banner and a footer slot.
+ * Shared inline surface for cards that ask the user something inside the
+ * conversation flow: tool approvals, question prompts and task acceptance.
+ * Optional header slot, scrollable body, optional risk banner, footer slot.
  */
 export const PermissionRequestCard = ({
+  header,
   children,
   footer,
   dangerLevel = PermissionDangerLevel.Safe,
   dangerReasonText = '',
+  className,
 }: PermissionRequestCardProps) => (
-  <div className="theme-permission-inline-surface w-full overflow-hidden">
+  <div className={cn('theme-permission-inline-surface w-full overflow-hidden', className)}>
+    {header ? (
+      <div className="flex items-center gap-2 px-5 pt-4 text-sm font-medium text-foreground">
+        {header}
+      </div>
+    ) : null}
     <div className="px-5 py-4 space-y-4 max-h-[42vh] overflow-y-auto">{children}</div>
     <PermissionDangerBanner level={dangerLevel} reasonText={dangerReasonText} />
     <div className="flex items-center justify-end gap-3 px-5 py-3">{footer}</div>

@@ -18,12 +18,17 @@ function SettingsToggleRow({
   onCheckedChange,
 }: SettingsToggleRowProps) {
   return (
-    <div>
-      <h4 className="mb-3 text-sm font-medium text-foreground">{label}</h4>
-      <label className="flex items-center justify-between">
-        <span className="text-sm text-muted-foreground">{description}</span>
-        <Switch checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} />
-      </label>
+    <div className="flex items-center justify-between gap-6">
+      <div className="min-w-0 flex-1">
+        <h4 className="text-sm font-medium text-foreground">{label}</h4>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <Switch
+        className="shrink-0"
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+      />
     </div>
   );
 }

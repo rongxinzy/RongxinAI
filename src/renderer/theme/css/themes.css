@@ -350,7 +350,7 @@
   --zy-style-switch-motion-ms: 160;
   --zy-style-switch-thumb: #ffffff;
   --zy-style-work-chat-thumb-radius: var(--zy-style-radius-md);
-  --zy-style-work-chat-thumb: color-mix(in oklab, var(--zy-foreground) 8%, var(--zy-background));
+  --zy-style-work-chat-thumb: var(--zy-background);
   --zy-style-font-heading: var(--zy-style-font-sans);
   --zy-style-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter', system-ui, Roboto, sans-serif;
   --zy-style-font-mono: 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
@@ -3997,10 +3997,6 @@
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -4348,6 +4344,22 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 8%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 25%, transparent);
+  color: color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black));
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 10%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 30%, transparent);
+  color: color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black));
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -4713,14 +4725,6 @@
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -5059,7 +5063,7 @@
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -5075,7 +5079,7 @@
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -6339,7 +6343,7 @@
   background-color: var(--zy-surface-raised);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -6815,9 +6819,6 @@
   color: var(--muted-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-textarea)::placeholder {
-  color: var(--muted-foreground);
-}
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-question-field)::placeholder {
   color: var(--muted-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-select-content):where([data-starting-style]) {
@@ -7756,7 +7757,6 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-8),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-9),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-10),
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-11),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-12),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-13),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-control-sizing-14),
@@ -7828,7 +7828,6 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-activity-button),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-workspace-action),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-field),
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-question-field),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-rename-field),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-audit-link),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-native-audit-row),
@@ -7838,6 +7837,9 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.modal-backdrop),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.modal-content),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-inline-surface),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-danger-banner),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-danger-banner-destructive),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-permission-danger-banner-warning),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-settings-modal-frame),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-settings-modal-shell),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-local-context-modal),
@@ -7924,8 +7926,6 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-composer-drop-active),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-message-code-user),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-message-cowork-user),
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-queue-question-content),
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-queue-acceptance-content),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-composer-surface [data-slot="input-group"]),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.group.is-user .theme-message-body),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.group.is-assistant .theme-message-body),
@@ -8474,7 +8474,7 @@ to {
   --zy-style-switch-motion-ms: 160;
   --zy-style-switch-thumb: #ffffff;
   --zy-style-work-chat-thumb-radius: var(--zy-style-radius-md);
-  --zy-style-work-chat-thumb: color-mix(in oklab, var(--zy-foreground) 8%, var(--zy-background));
+  --zy-style-work-chat-thumb: color-mix(in oklab, var(--zy-foreground) 16%, var(--zy-background));
   --zy-style-font-heading: var(--zy-style-font-sans);
   --zy-style-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter', system-ui, Roboto, sans-serif;
   --zy-style-font-mono: 'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace;
@@ -12123,10 +12123,6 @@ to {
 [data-theme="classic-dark"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="classic-dark"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="classic-dark"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -12474,6 +12470,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="classic-dark"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="classic-dark"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 16%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 40%, transparent);
+  color: var(--zy-destructive);
+}
+[data-theme="classic-dark"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 14%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 35%, transparent);
+  color: var(--zy-warning);
 }
 [data-theme="classic-dark"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -12839,14 +12851,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="classic-dark"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="classic-dark"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="classic-dark"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -13185,7 +13189,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="classic-dark"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -13201,7 +13205,7 @@ to {
 [data-theme="classic-dark"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="classic-dark"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -14478,7 +14482,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="classic-dark"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="classic-dark"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -14955,9 +14959,6 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-textarea)::placeholder {
   color: var(--muted-foreground);
-}
-[data-theme="classic-dark"] :where(.theme-native-question-field)::placeholder {
-  color: var(--zy-text-secondary);
 }
 [data-theme="classic-dark"] :where(.theme-select-content):where([data-starting-style]) {
   opacity: 0;
@@ -15895,7 +15896,6 @@ to {
 [data-theme="classic-dark"] :where(.theme-control-sizing-8),
 [data-theme="classic-dark"] :where(.theme-control-sizing-9),
 [data-theme="classic-dark"] :where(.theme-control-sizing-10),
-[data-theme="classic-dark"] :where(.theme-control-sizing-11),
 [data-theme="classic-dark"] :where(.theme-control-sizing-12),
 [data-theme="classic-dark"] :where(.theme-control-sizing-13),
 [data-theme="classic-dark"] :where(.theme-control-sizing-14),
@@ -15967,7 +15967,6 @@ to {
 [data-theme="classic-dark"] :where(.theme-native-activity-button),
 [data-theme="classic-dark"] :where(.theme-native-workspace-action),
 [data-theme="classic-dark"] :where(.theme-native-field),
-[data-theme="classic-dark"] :where(.theme-native-question-field),
 [data-theme="classic-dark"] :where(.theme-native-rename-field),
 [data-theme="classic-dark"] :where(.theme-native-audit-link),
 [data-theme="classic-dark"] :where(.theme-native-audit-row),
@@ -15977,6 +15976,9 @@ to {
 [data-theme="classic-dark"] :where(.modal-backdrop),
 [data-theme="classic-dark"] :where(.modal-content),
 [data-theme="classic-dark"] :where(.theme-permission-inline-surface),
+[data-theme="classic-dark"] :where(.theme-permission-danger-banner),
+[data-theme="classic-dark"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="classic-dark"] :where(.theme-permission-danger-banner-warning),
 [data-theme="classic-dark"] :where(.theme-settings-modal-frame),
 [data-theme="classic-dark"] :where(.theme-settings-modal-shell),
 [data-theme="classic-dark"] :where(.theme-local-context-modal),
@@ -16063,8 +16065,6 @@ to {
 [data-theme="classic-dark"] :where(.theme-composer-drop-active),
 [data-theme="classic-dark"] :where(.theme-message-code-user),
 [data-theme="classic-dark"] :where(.theme-message-cowork-user),
-[data-theme="classic-dark"] :where(.theme-queue-question-content),
-[data-theme="classic-dark"] :where(.theme-queue-acceptance-content),
 [data-theme="classic-dark"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="classic-dark"] :where(.group.is-user .theme-message-body),
 [data-theme="classic-dark"] :where(.group.is-assistant .theme-message-body),
@@ -20260,10 +20260,6 @@ to {
 [data-theme="daming-light"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="daming-light"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="daming-light"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -20611,6 +20607,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="daming-light"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="daming-light"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 8%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 25%, transparent);
+  color: color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black));
+}
+[data-theme="daming-light"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 10%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 30%, transparent);
+  color: color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black));
 }
 [data-theme="daming-light"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -20976,14 +20988,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="daming-light"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="daming-light"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="daming-light"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -21322,7 +21326,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="daming-light"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -21338,7 +21342,7 @@ to {
 [data-theme="daming-light"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-light"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -22602,7 +22606,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="daming-light"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="daming-light"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -23078,9 +23082,6 @@ to {
   color: var(--muted-foreground);
 }
 [data-theme="daming-light"] :where(.theme-textarea)::placeholder {
-  color: var(--muted-foreground);
-}
-[data-theme="daming-light"] :where(.theme-native-question-field)::placeholder {
   color: var(--muted-foreground);
 }
 [data-theme="daming-light"] :where(.theme-select-content):where([data-starting-style]) {
@@ -24019,7 +24020,6 @@ to {
 [data-theme="daming-light"] :where(.theme-control-sizing-8),
 [data-theme="daming-light"] :where(.theme-control-sizing-9),
 [data-theme="daming-light"] :where(.theme-control-sizing-10),
-[data-theme="daming-light"] :where(.theme-control-sizing-11),
 [data-theme="daming-light"] :where(.theme-control-sizing-12),
 [data-theme="daming-light"] :where(.theme-control-sizing-13),
 [data-theme="daming-light"] :where(.theme-control-sizing-14),
@@ -24091,7 +24091,6 @@ to {
 [data-theme="daming-light"] :where(.theme-native-activity-button),
 [data-theme="daming-light"] :where(.theme-native-workspace-action),
 [data-theme="daming-light"] :where(.theme-native-field),
-[data-theme="daming-light"] :where(.theme-native-question-field),
 [data-theme="daming-light"] :where(.theme-native-rename-field),
 [data-theme="daming-light"] :where(.theme-native-audit-link),
 [data-theme="daming-light"] :where(.theme-native-audit-row),
@@ -24101,6 +24100,9 @@ to {
 [data-theme="daming-light"] :where(.modal-backdrop),
 [data-theme="daming-light"] :where(.modal-content),
 [data-theme="daming-light"] :where(.theme-permission-inline-surface),
+[data-theme="daming-light"] :where(.theme-permission-danger-banner),
+[data-theme="daming-light"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="daming-light"] :where(.theme-permission-danger-banner-warning),
 [data-theme="daming-light"] :where(.theme-settings-modal-frame),
 [data-theme="daming-light"] :where(.theme-settings-modal-shell),
 [data-theme="daming-light"] :where(.theme-local-context-modal),
@@ -24187,8 +24189,6 @@ to {
 [data-theme="daming-light"] :where(.theme-composer-drop-active),
 [data-theme="daming-light"] :where(.theme-message-code-user),
 [data-theme="daming-light"] :where(.theme-message-cowork-user),
-[data-theme="daming-light"] :where(.theme-queue-question-content),
-[data-theme="daming-light"] :where(.theme-queue-acceptance-content),
 [data-theme="daming-light"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="daming-light"] :where(.group.is-user .theme-message-body),
 [data-theme="daming-light"] :where(.group.is-assistant .theme-message-body),
@@ -28386,10 +28386,6 @@ to {
 [data-theme="daming-dark"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="daming-dark"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="daming-dark"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -28737,6 +28733,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="daming-dark"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="daming-dark"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 16%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 40%, transparent);
+  color: var(--zy-destructive);
+}
+[data-theme="daming-dark"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 14%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 35%, transparent);
+  color: var(--zy-warning);
 }
 [data-theme="daming-dark"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -29102,14 +29114,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="daming-dark"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="daming-dark"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="daming-dark"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -29448,7 +29452,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="daming-dark"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -29464,7 +29468,7 @@ to {
 [data-theme="daming-dark"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-dark"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -30741,7 +30745,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="daming-dark"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="daming-dark"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -31218,9 +31222,6 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-textarea)::placeholder {
   color: var(--muted-foreground);
-}
-[data-theme="daming-dark"] :where(.theme-native-question-field)::placeholder {
-  color: var(--zy-text-secondary);
 }
 [data-theme="daming-dark"] :where(.theme-select-content):where([data-starting-style]) {
   opacity: 0;
@@ -32158,7 +32159,6 @@ to {
 [data-theme="daming-dark"] :where(.theme-control-sizing-8),
 [data-theme="daming-dark"] :where(.theme-control-sizing-9),
 [data-theme="daming-dark"] :where(.theme-control-sizing-10),
-[data-theme="daming-dark"] :where(.theme-control-sizing-11),
 [data-theme="daming-dark"] :where(.theme-control-sizing-12),
 [data-theme="daming-dark"] :where(.theme-control-sizing-13),
 [data-theme="daming-dark"] :where(.theme-control-sizing-14),
@@ -32230,7 +32230,6 @@ to {
 [data-theme="daming-dark"] :where(.theme-native-activity-button),
 [data-theme="daming-dark"] :where(.theme-native-workspace-action),
 [data-theme="daming-dark"] :where(.theme-native-field),
-[data-theme="daming-dark"] :where(.theme-native-question-field),
 [data-theme="daming-dark"] :where(.theme-native-rename-field),
 [data-theme="daming-dark"] :where(.theme-native-audit-link),
 [data-theme="daming-dark"] :where(.theme-native-audit-row),
@@ -32240,6 +32239,9 @@ to {
 [data-theme="daming-dark"] :where(.modal-backdrop),
 [data-theme="daming-dark"] :where(.modal-content),
 [data-theme="daming-dark"] :where(.theme-permission-inline-surface),
+[data-theme="daming-dark"] :where(.theme-permission-danger-banner),
+[data-theme="daming-dark"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="daming-dark"] :where(.theme-permission-danger-banner-warning),
 [data-theme="daming-dark"] :where(.theme-settings-modal-frame),
 [data-theme="daming-dark"] :where(.theme-settings-modal-shell),
 [data-theme="daming-dark"] :where(.theme-local-context-modal),
@@ -32326,8 +32328,6 @@ to {
 [data-theme="daming-dark"] :where(.theme-composer-drop-active),
 [data-theme="daming-dark"] :where(.theme-message-code-user),
 [data-theme="daming-dark"] :where(.theme-message-cowork-user),
-[data-theme="daming-dark"] :where(.theme-queue-question-content),
-[data-theme="daming-dark"] :where(.theme-queue-acceptance-content),
 [data-theme="daming-dark"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="daming-dark"] :where(.group.is-user .theme-message-body),
 [data-theme="daming-dark"] :where(.group.is-assistant .theme-message-body),
@@ -36525,10 +36525,6 @@ to {
 [data-theme="changan-light"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="changan-light"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="changan-light"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -36876,6 +36872,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="changan-light"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="changan-light"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 8%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 25%, transparent);
+  color: color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black));
+}
+[data-theme="changan-light"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 10%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 30%, transparent);
+  color: color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black));
 }
 [data-theme="changan-light"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -37241,14 +37253,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="changan-light"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="changan-light"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="changan-light"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -37587,7 +37591,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="changan-light"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -37603,7 +37607,7 @@ to {
 [data-theme="changan-light"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-light"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -38870,7 +38874,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="changan-light"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="changan-light"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -39346,9 +39350,6 @@ to {
   color: var(--muted-foreground);
 }
 [data-theme="changan-light"] :where(.theme-textarea)::placeholder {
-  color: var(--muted-foreground);
-}
-[data-theme="changan-light"] :where(.theme-native-question-field)::placeholder {
   color: var(--muted-foreground);
 }
 [data-theme="changan-light"] :where(.theme-select-content):where([data-starting-style]) {
@@ -40287,7 +40288,6 @@ to {
 [data-theme="changan-light"] :where(.theme-control-sizing-8),
 [data-theme="changan-light"] :where(.theme-control-sizing-9),
 [data-theme="changan-light"] :where(.theme-control-sizing-10),
-[data-theme="changan-light"] :where(.theme-control-sizing-11),
 [data-theme="changan-light"] :where(.theme-control-sizing-12),
 [data-theme="changan-light"] :where(.theme-control-sizing-13),
 [data-theme="changan-light"] :where(.theme-control-sizing-14),
@@ -40359,7 +40359,6 @@ to {
 [data-theme="changan-light"] :where(.theme-native-activity-button),
 [data-theme="changan-light"] :where(.theme-native-workspace-action),
 [data-theme="changan-light"] :where(.theme-native-field),
-[data-theme="changan-light"] :where(.theme-native-question-field),
 [data-theme="changan-light"] :where(.theme-native-rename-field),
 [data-theme="changan-light"] :where(.theme-native-audit-link),
 [data-theme="changan-light"] :where(.theme-native-audit-row),
@@ -40369,6 +40368,9 @@ to {
 [data-theme="changan-light"] :where(.modal-backdrop),
 [data-theme="changan-light"] :where(.modal-content),
 [data-theme="changan-light"] :where(.theme-permission-inline-surface),
+[data-theme="changan-light"] :where(.theme-permission-danger-banner),
+[data-theme="changan-light"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="changan-light"] :where(.theme-permission-danger-banner-warning),
 [data-theme="changan-light"] :where(.theme-settings-modal-frame),
 [data-theme="changan-light"] :where(.theme-settings-modal-shell),
 [data-theme="changan-light"] :where(.theme-local-context-modal),
@@ -40455,8 +40457,6 @@ to {
 [data-theme="changan-light"] :where(.theme-composer-drop-active),
 [data-theme="changan-light"] :where(.theme-message-code-user),
 [data-theme="changan-light"] :where(.theme-message-cowork-user),
-[data-theme="changan-light"] :where(.theme-queue-question-content),
-[data-theme="changan-light"] :where(.theme-queue-acceptance-content),
 [data-theme="changan-light"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="changan-light"] :where(.group.is-user .theme-message-body),
 [data-theme="changan-light"] :where(.group.is-assistant .theme-message-body),
@@ -44656,10 +44656,6 @@ to {
 [data-theme="changan-dark"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="changan-dark"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="changan-dark"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -45007,6 +45003,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="changan-dark"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="changan-dark"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 16%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 40%, transparent);
+  color: var(--zy-destructive);
+}
+[data-theme="changan-dark"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 14%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 35%, transparent);
+  color: var(--zy-warning);
 }
 [data-theme="changan-dark"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -45372,14 +45384,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="changan-dark"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="changan-dark"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="changan-dark"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -45718,7 +45722,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="changan-dark"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -45734,7 +45738,7 @@ to {
 [data-theme="changan-dark"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-dark"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -47014,7 +47018,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="changan-dark"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="changan-dark"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -47491,9 +47495,6 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-textarea)::placeholder {
   color: var(--muted-foreground);
-}
-[data-theme="changan-dark"] :where(.theme-native-question-field)::placeholder {
-  color: var(--zy-text-secondary);
 }
 [data-theme="changan-dark"] :where(.theme-select-content):where([data-starting-style]) {
   opacity: 0;
@@ -48431,7 +48432,6 @@ to {
 [data-theme="changan-dark"] :where(.theme-control-sizing-8),
 [data-theme="changan-dark"] :where(.theme-control-sizing-9),
 [data-theme="changan-dark"] :where(.theme-control-sizing-10),
-[data-theme="changan-dark"] :where(.theme-control-sizing-11),
 [data-theme="changan-dark"] :where(.theme-control-sizing-12),
 [data-theme="changan-dark"] :where(.theme-control-sizing-13),
 [data-theme="changan-dark"] :where(.theme-control-sizing-14),
@@ -48503,7 +48503,6 @@ to {
 [data-theme="changan-dark"] :where(.theme-native-activity-button),
 [data-theme="changan-dark"] :where(.theme-native-workspace-action),
 [data-theme="changan-dark"] :where(.theme-native-field),
-[data-theme="changan-dark"] :where(.theme-native-question-field),
 [data-theme="changan-dark"] :where(.theme-native-rename-field),
 [data-theme="changan-dark"] :where(.theme-native-audit-link),
 [data-theme="changan-dark"] :where(.theme-native-audit-row),
@@ -48513,6 +48512,9 @@ to {
 [data-theme="changan-dark"] :where(.modal-backdrop),
 [data-theme="changan-dark"] :where(.modal-content),
 [data-theme="changan-dark"] :where(.theme-permission-inline-surface),
+[data-theme="changan-dark"] :where(.theme-permission-danger-banner),
+[data-theme="changan-dark"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="changan-dark"] :where(.theme-permission-danger-banner-warning),
 [data-theme="changan-dark"] :where(.theme-settings-modal-frame),
 [data-theme="changan-dark"] :where(.theme-settings-modal-shell),
 [data-theme="changan-dark"] :where(.theme-local-context-modal),
@@ -48599,8 +48601,6 @@ to {
 [data-theme="changan-dark"] :where(.theme-composer-drop-active),
 [data-theme="changan-dark"] :where(.theme-message-code-user),
 [data-theme="changan-dark"] :where(.theme-message-cowork-user),
-[data-theme="changan-dark"] :where(.theme-queue-question-content),
-[data-theme="changan-dark"] :where(.theme-queue-acceptance-content),
 [data-theme="changan-dark"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="changan-dark"] :where(.group.is-user .theme-message-body),
 [data-theme="changan-dark"] :where(.group.is-assistant .theme-message-body),
@@ -52798,10 +52798,6 @@ to {
 [data-theme="weiyang-light"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="weiyang-light"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="weiyang-light"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -53149,6 +53145,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="weiyang-light"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="weiyang-light"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 8%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 25%, transparent);
+  color: color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black));
+}
+[data-theme="weiyang-light"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 10%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 30%, transparent);
+  color: color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black));
 }
 [data-theme="weiyang-light"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -53514,14 +53526,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="weiyang-light"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="weiyang-light"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="weiyang-light"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -53860,7 +53864,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="weiyang-light"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -53876,7 +53880,7 @@ to {
 [data-theme="weiyang-light"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-light"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -55143,7 +55147,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="weiyang-light"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="weiyang-light"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -55619,9 +55623,6 @@ to {
   color: var(--muted-foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-textarea)::placeholder {
-  color: var(--muted-foreground);
-}
-[data-theme="weiyang-light"] :where(.theme-native-question-field)::placeholder {
   color: var(--muted-foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-select-content):where([data-starting-style]) {
@@ -56560,7 +56561,6 @@ to {
 [data-theme="weiyang-light"] :where(.theme-control-sizing-8),
 [data-theme="weiyang-light"] :where(.theme-control-sizing-9),
 [data-theme="weiyang-light"] :where(.theme-control-sizing-10),
-[data-theme="weiyang-light"] :where(.theme-control-sizing-11),
 [data-theme="weiyang-light"] :where(.theme-control-sizing-12),
 [data-theme="weiyang-light"] :where(.theme-control-sizing-13),
 [data-theme="weiyang-light"] :where(.theme-control-sizing-14),
@@ -56632,7 +56632,6 @@ to {
 [data-theme="weiyang-light"] :where(.theme-native-activity-button),
 [data-theme="weiyang-light"] :where(.theme-native-workspace-action),
 [data-theme="weiyang-light"] :where(.theme-native-field),
-[data-theme="weiyang-light"] :where(.theme-native-question-field),
 [data-theme="weiyang-light"] :where(.theme-native-rename-field),
 [data-theme="weiyang-light"] :where(.theme-native-audit-link),
 [data-theme="weiyang-light"] :where(.theme-native-audit-row),
@@ -56642,6 +56641,9 @@ to {
 [data-theme="weiyang-light"] :where(.modal-backdrop),
 [data-theme="weiyang-light"] :where(.modal-content),
 [data-theme="weiyang-light"] :where(.theme-permission-inline-surface),
+[data-theme="weiyang-light"] :where(.theme-permission-danger-banner),
+[data-theme="weiyang-light"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="weiyang-light"] :where(.theme-permission-danger-banner-warning),
 [data-theme="weiyang-light"] :where(.theme-settings-modal-frame),
 [data-theme="weiyang-light"] :where(.theme-settings-modal-shell),
 [data-theme="weiyang-light"] :where(.theme-local-context-modal),
@@ -56728,8 +56730,6 @@ to {
 [data-theme="weiyang-light"] :where(.theme-composer-drop-active),
 [data-theme="weiyang-light"] :where(.theme-message-code-user),
 [data-theme="weiyang-light"] :where(.theme-message-cowork-user),
-[data-theme="weiyang-light"] :where(.theme-queue-question-content),
-[data-theme="weiyang-light"] :where(.theme-queue-acceptance-content),
 [data-theme="weiyang-light"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="weiyang-light"] :where(.group.is-user .theme-message-body),
 [data-theme="weiyang-light"] :where(.group.is-assistant .theme-message-body),
@@ -60929,10 +60929,6 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-10) {
   padding: 0.75rem;
 }
-[data-theme="weiyang-dark"] :where(.theme-control-sizing-11) {
-  padding-inline: 1rem;
-  padding-block: 0.75rem;
-}
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-12) {
   padding-inline: 0rem;
   padding-block: 5px;
@@ -61280,6 +61276,22 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--border);
+}
+[data-theme="weiyang-dark"] :where(.theme-permission-danger-banner) {
+  border-radius: var(--zy-style-radius-lg);
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.75rem;
+}
+[data-theme="weiyang-dark"] :where(.theme-permission-danger-banner-destructive) {
+  background-color: color-mix(in oklab, var(--zy-destructive) 16%, transparent);
+  border-color: color-mix(in oklab, var(--zy-destructive) 40%, transparent);
+  color: var(--zy-destructive);
+}
+[data-theme="weiyang-dark"] :where(.theme-permission-danger-banner-warning) {
+  background-color: color-mix(in oklab, var(--zy-warning) 14%, transparent);
+  border-color: color-mix(in oklab, var(--zy-warning) 35%, transparent);
+  color: var(--zy-warning);
 }
 [data-theme="weiyang-dark"] :where(.theme-settings-modal-frame) {
   background-color: var(--zy-surface);
@@ -61645,14 +61657,6 @@ to {
   font-size: var(--zy-component-text-sm);
   color: var(--foreground);
 }
-[data-theme="weiyang-dark"] :where(.theme-queue-question-content) {
-  color: var(--foreground);
-}
-[data-theme="weiyang-dark"] :where(.theme-queue-acceptance-content) {
-  font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
-  line-height: var(--zy-component-text-sm--line-height);
-}
 [data-theme="weiyang-dark"] :where(.theme-composer-surface [data-slot="input-group"]) {
   border-radius: var(--zy-style-radius-3xl);
 }
@@ -61991,7 +61995,7 @@ to {
   width: 100%;
   border-width: 0px;
   border-radius: var(--zy-style-radius-md);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   box-shadow: none;
 }
 [data-theme="weiyang-dark"] :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
@@ -62007,7 +62011,7 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: color-mix(in oklab, var(--sidebar-foreground) 72%, transparent);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-dark"] :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
@@ -63287,7 +63291,7 @@ to {
   background-color: var(--zy-surface-raised);
 }
 [data-theme="weiyang-dark"] :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 4%, transparent);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
 }
 [data-theme="weiyang-dark"] :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
@@ -63764,9 +63768,6 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-textarea)::placeholder {
   color: var(--muted-foreground);
-}
-[data-theme="weiyang-dark"] :where(.theme-native-question-field)::placeholder {
-  color: var(--zy-text-secondary);
 }
 [data-theme="weiyang-dark"] :where(.theme-select-content):where([data-starting-style]) {
   opacity: 0;
@@ -64704,7 +64705,6 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-8),
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-9),
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-10),
-[data-theme="weiyang-dark"] :where(.theme-control-sizing-11),
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-12),
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-13),
 [data-theme="weiyang-dark"] :where(.theme-control-sizing-14),
@@ -64776,7 +64776,6 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-native-activity-button),
 [data-theme="weiyang-dark"] :where(.theme-native-workspace-action),
 [data-theme="weiyang-dark"] :where(.theme-native-field),
-[data-theme="weiyang-dark"] :where(.theme-native-question-field),
 [data-theme="weiyang-dark"] :where(.theme-native-rename-field),
 [data-theme="weiyang-dark"] :where(.theme-native-audit-link),
 [data-theme="weiyang-dark"] :where(.theme-native-audit-row),
@@ -64786,6 +64785,9 @@ to {
 [data-theme="weiyang-dark"] :where(.modal-backdrop),
 [data-theme="weiyang-dark"] :where(.modal-content),
 [data-theme="weiyang-dark"] :where(.theme-permission-inline-surface),
+[data-theme="weiyang-dark"] :where(.theme-permission-danger-banner),
+[data-theme="weiyang-dark"] :where(.theme-permission-danger-banner-destructive),
+[data-theme="weiyang-dark"] :where(.theme-permission-danger-banner-warning),
 [data-theme="weiyang-dark"] :where(.theme-settings-modal-frame),
 [data-theme="weiyang-dark"] :where(.theme-settings-modal-shell),
 [data-theme="weiyang-dark"] :where(.theme-local-context-modal),
@@ -64872,8 +64874,6 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-composer-drop-active),
 [data-theme="weiyang-dark"] :where(.theme-message-code-user),
 [data-theme="weiyang-dark"] :where(.theme-message-cowork-user),
-[data-theme="weiyang-dark"] :where(.theme-queue-question-content),
-[data-theme="weiyang-dark"] :where(.theme-queue-acceptance-content),
 [data-theme="weiyang-dark"] :where(.theme-composer-surface [data-slot="input-group"]),
 [data-theme="weiyang-dark"] :where(.group.is-user .theme-message-body),
 [data-theme="weiyang-dark"] :where(.group.is-assistant .theme-message-body),
