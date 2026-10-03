@@ -54,11 +54,9 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   await vi.waitFor(() => expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming'));
   expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
   expect(
-    screen
-      .getByRole('radiogroup', { name: 'appearanceMode' })
-      .querySelector('[data-theme-preview]'),
+    screen.getByRole('tablist', { name: 'appearanceMode' }).querySelector('[data-theme-preview]'),
   ).toBeNull();
-  await userEvent.setup().click(screen.getByRole('radio', { name: 'dark' }));
+  await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
   expect(callbacks.onAppearanceChange).toHaveBeenCalledWith('dark');
   view.rerender(
     createElement(AppearanceSettings, { ...callbacks, appearance: 'dark', styleId: 'daming' }),
