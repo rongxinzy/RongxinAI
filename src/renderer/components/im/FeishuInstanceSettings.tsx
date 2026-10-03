@@ -7,6 +7,7 @@ import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Switch } from '@shared/components/ui/switch';
 import { PlatformRegistry } from '@shared/platform';
+import { imPlatformLogo } from '../../assets/imLogos';
 import { Signal, Trash2, X } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -109,7 +110,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
             <img
-              src={PlatformRegistry.logo('feishu')}
+              src={imPlatformLogo('feishu')}
               alt="Feishu"
               className="size-4 object-contain rounded"
             />

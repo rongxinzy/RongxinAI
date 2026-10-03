@@ -8,6 +8,7 @@ import { Input } from '@shared/components/ui/input';
 import { Separator } from '@shared/components/ui/separator';
 import { Switch } from '@shared/components/ui/switch';
 import { PlatformRegistry } from '@shared/platform';
+import { imPlatformLogo } from '../../assets/imLogos';
 import { cn } from '@shared/lib/utils';
 import { RefreshCw, Signal, Trash2, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -204,7 +205,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
             <img
-              src={PlatformRegistry.logo('dingtalk')}
+              src={imPlatformLogo('dingtalk')}
               alt="DingTalk"
               className="size-4 object-contain rounded"
             />
