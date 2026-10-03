@@ -20,8 +20,8 @@ import type {
   CodingPromptAttachment,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import { SlashCommandMenu, type SlashCommandMenuItem } from '../common/SlashCommandMenu';
 import { CodingComposerConfigControls } from './CodingComposerConfigControls';
-import { CodingSlashCommandMenu, type CodingSlashCommandMenuItem } from './CodingSlashCommandMenu';
 import {
   filterCommandOptions,
   filterSlashCommands,
@@ -128,7 +128,7 @@ export const CodingComposer = ({
     availableCommands.length > 0 &&
     !commandMenuDismissed;
   const menuOpen = choiceMenuOpen || commandMenuOpen;
-  const menuItems: CodingSlashCommandMenuItem[] = choiceMenuOpen
+  const menuItems: SlashCommandMenuItem[] = choiceMenuOpen
     ? matchingOptions.map(option => ({
         key: option.value,
         token: option.label,
@@ -222,9 +222,11 @@ export const CodingComposer = ({
           />
         ) : null}
         {menuOpen ? (
-          <CodingSlashCommandMenu
+          <SlashCommandMenu
+            id="coding-agent-command-menu"
             items={menuItems}
             selectedKey={activeMenuItemKey}
+            emptyLabel={i18nService.t('codingAgentCommandNoMatches')}
             onSelectedKeyChange={setMenuSelection}
             onSelect={selectMenuChoice}
           />

@@ -31,6 +31,7 @@ import {
   hasVisiblePromptContent,
 } from '../../../shared/cowork/submissionContent';
 import { agentService } from '../../services/agent';
+import { showAppToast } from '../../services/appToast';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -48,11 +49,12 @@ import {
 } from '../../store/slices/coworkSlice';
 import { clearSelection } from '../../store/slices/quickActionSlice';
 import { type Model, setSelectedModel } from '../../store/slices/modelSlice';
-import { clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
+import { activateSkill, clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkFileAttachment, CoworkImageAttachment } from '../../types/cowork';
 import { toAgentModelRef } from '../../utils/agentModelRef';
 import ActiveMcpBadge from '../mcp/ActiveMcpBadge';
+import { SlashCommandMenu } from '../common/SlashCommandMenu';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
@@ -63,6 +65,8 @@ import { CoworkInlineAttachments } from './CoworkInlineAttachments';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SessionStatsLine } from './SessionStatsLine';
 import { CoworkModelPicker } from './CoworkModelPicker';
+import { parseCoworkSlashSubmission } from './coworkSlashCommands';
+import { useCoworkSlashMenu } from './useCoworkSlashMenu';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import PermissionModeMenu from './PermissionModeMenu';
@@ -513,6 +517,22 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
     }, [value, draftPrompt, dispatch, draftKey]);
 
+    // Slash command menu (`/skill`, `/compact`). State and filtering live in
+    // the hook; submitPrompt decides what the text actually does.
+    const slashMenu = useCoworkSlashMenu({
+      value,
+      disabled,
+      remoteManaged,
+      sessionId,
+      setValue,
+      focusEditor: () => textareaRef.current?.focus(),
+    });
+    const {
+      enabledSkills: slashEnabledSkills,
+      findEnabledSkill: findSlashSkill,
+      runCompact: runSlashCompact,
+    } = slashMenu;
+
     const submitPrompt = useCallback(async () => {
       if (showFolderSelector && !workingDirectory?.trim()) {
         setShowFolderRequiredWarning(true);
@@ -525,6 +545,42 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
 
       const trimmedValue = hasVisiblePromptContent(value) ? value.trim() : '';
+
+      // Slash commands are resolved before the normal submission guards: a
+      // control command (`/compact`) and a bare selection (`/skill <id>`)
+      // never become model input, and a selection with a body replaces the
+      // prompt text with that body. Unknown slash text falls through
+      // unchanged so it still reaches the model.
+      let promptText = trimmedValue;
+      if (trimmedValue) {
+        const slashSubmission = parseCoworkSlashSubmission(trimmedValue, {
+          skillIds: slashEnabledSkills.map(skill => skill.id),
+          compactAvailable: !!sessionId,
+        });
+        if (slashSubmission.kind === 'compact') {
+          if (disabled || sessionContextPending) return;
+          setValue('');
+          dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
+          void runSlashCompact();
+          return;
+        }
+        if (slashSubmission.kind === 'skill') {
+          const skill = findSlashSkill(slashSubmission.skillId);
+          if (skill) {
+            dispatch(activateSkill(skill.id));
+            if (!slashSubmission.body) {
+              setValue('');
+              dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
+              showAppToast(
+                `${i18nService.t('coworkSlashSkillActivated')}: ${skill.displayName || skill.name}`,
+              );
+              return;
+            }
+            promptText = slashSubmission.body;
+          }
+        }
+      }
+
       if (
         (!trimmedValue && attachments.length === 0 && !resumeTaskActive) ||
         (isStreaming && !canQueueWhileStreaming) ||
@@ -652,10 +708,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         )
         .map(attachment => `${i18nService.t('inputFileLabel')}: ${attachment.path}`)
         .join('\n');
-      const finalPrompt = trimmedValue
+      const finalPrompt = promptText
         ? attachmentLines
-          ? `${attachmentLines}\n\n${trimmedValue}`
-          : trimmedValue
+          ? `${attachmentLines}\n\n${promptText}`
+          : promptText
         : attachmentLines;
 
       if (
@@ -740,6 +796,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       goalMode,
       canQueueWhileStreaming,
       resumeTaskActive,
+      sessionId,
+      slashEnabledSkills,
+      findSlashSkill,
+      runSlashCompact,
     ]);
 
     const handleSubmit = usePromptSubmissionLock(submitPrompt);
@@ -752,7 +812,52 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
       const isComposing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
-      if (event.key !== 'Enter' || isComposing) return;
+      if (isComposing) return;
+
+      // While the slash menu is open it owns navigation keys; Enter either
+      // inserts the highlighted entry or, when the text already is that
+      // entry, dismisses the menu and falls through to the send logic.
+      if (slashMenu.open) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          slashMenu.dismiss();
+          return;
+        }
+        if (slashMenu.items.length > 0) {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const selectedIndex = slashMenu.items.findIndex(
+              item => item.key === slashMenu.activeItemKey,
+            );
+            const offset = event.key === 'ArrowDown' ? 1 : -1;
+            const nextIndex =
+              (Math.max(selectedIndex, 0) + offset + slashMenu.items.length) %
+              slashMenu.items.length;
+            slashMenu.setMenuSelection(slashMenu.items[nextIndex].key);
+            return;
+          }
+          if (event.key === 'Tab') {
+            event.preventDefault();
+            slashMenu.selectMenuChoice(slashMenu.activeItemKey);
+            return;
+          }
+          if (event.key === 'Enter') {
+            const matchesSelection =
+              slashMenu.activeSelectionPrompt !== null && value === slashMenu.activeSelectionPrompt;
+            const fallsThrough = slashMenu.choiceMenuOpen
+              ? matchesSelection
+              : matchesSelection && !slashMenu.selectedCommand?.hint;
+            if (!fallsThrough) {
+              event.preventDefault();
+              slashMenu.selectMenuChoice(slashMenu.activeItemKey);
+              return;
+            }
+            slashMenu.dismiss();
+          }
+        }
+      }
+
+      if (event.key !== 'Enter') return;
 
       // Use synced state (kept up-to-date via config-updated event) so that
       // changes made in the Settings panel are reflected immediately without
@@ -1164,6 +1269,16 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           </div>
         )}
         {topAccessory && <div className="relative">{topAccessory}</div>}
+        {slashMenu.open ? (
+          <SlashCommandMenu
+            id="cowork-slash-command-menu"
+            items={slashMenu.items}
+            selectedKey={slashMenu.activeItemKey}
+            emptyLabel={i18nService.t('coworkSlashCommandNoMatches')}
+            onSelectedKeyChange={slashMenu.setMenuSelection}
+            onSelect={slashMenu.selectMenuChoice}
+          />
+        ) : null}
         <PromptInput
           multiple
           className={cn(
@@ -1202,7 +1317,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               disabled={disabled}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              onChange={setValue}
+              onChange={nextValue => {
+                // A dismissal applies to the text that was on screen when the
+                // user closed the menu. Clearing it on every edit means typing
+                // the same text again (for example a lone "/") reopens the
+                // menu instead of staying dismissed forever.
+                slashMenu.clearDismissal();
+                setValue(nextValue);
+              }}
               className={cn(
                 'py-0 pr-1.5',
                 size === 'large' ? 'max-h-48 overflow-y-auto' : undefined,

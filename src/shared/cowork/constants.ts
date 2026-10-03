@@ -119,3 +119,24 @@ export type CoworkPermissionToolName =
 export const CoworkPermissionSessionId = {
   LegacyBridge: 'legacy-bridge',
 } as const;
+
+/**
+ * Why a `/compact` request did not compact. Classified in the main process so
+ * the renderer can show a localized toast instead of raw adapter messages.
+ */
+export const CoworkCompactFailure = {
+  NoSession: 'noSession',
+  Busy: 'busy',
+  NotNeeded: 'notNeeded',
+  Failed: 'failed',
+} as const;
+
+export type CoworkCompactFailure = (typeof CoworkCompactFailure)[keyof typeof CoworkCompactFailure];
+
+export interface CoworkCompactResult {
+  success: boolean;
+  /** True when the compaction was queued behind a running turn. */
+  queued?: boolean;
+  cancelled?: boolean;
+  reason?: CoworkCompactFailure;
+}

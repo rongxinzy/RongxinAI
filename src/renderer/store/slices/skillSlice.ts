@@ -50,6 +50,11 @@ const skillSlice = createSlice({
         state.activeSkillIds.splice(index, 1);
       }
     },
+    activateSkill: (state, action: PayloadAction<string>) => {
+      if (!state.activeSkillIds.includes(action.payload)) {
+        state.activeSkillIds.push(action.payload);
+      }
+    },
     setActiveSkillIds: (state, action: PayloadAction<string[]>) => {
       state.activeSkillIds = action.payload;
     },
@@ -66,6 +71,7 @@ export const {
   deleteSkill,
   toggleSkill,
   toggleActiveSkill,
+  activateSkill,
   setActiveSkillIds,
   clearActiveSkills,
 } = skillSlice.actions;
