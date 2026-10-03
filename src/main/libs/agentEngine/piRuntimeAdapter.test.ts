@@ -796,6 +796,78 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
+    it('forwards per-model compaction budgets through compaction.modelOverrides', async () => {
+      mockResolveRawApiConfigForModelRef.mockImplementationOnce(() => ({
+        config: {
+          apiKey: 'sk-test',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          model: 'qwen-compact',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'llamacpp',
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName: 'qwen-compact',
+          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+          contextWindow: 32768,
+          contextTokens: 32768,
+          maxTokens: 4096,
+          piRuntime: { compaction: { reserveTokens: 4096, keepRecentTokens: 6000 } },
+        },
+      }));
+      await adapter.startSession('per-model-compaction', 'Hello', {
+        modelOverride: 'llamacpp/qwen-compact',
+      });
+
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        compaction: {
+          enabled: true,
+          reserveTokens: 8_192,
+          keepRecentTokens: 16_384,
+          modelOverrides: {
+            'llamacpp/qwen-compact': { reserveTokens: 4096, keepRecentTokens: 6000 },
+          },
+        },
+      });
+    });
+
+    it('emits configured piRuntime input limits on the custom model only when set', async () => {
+      mockResolveRawApiConfigForModelRef.mockImplementationOnce(() => ({
+        config: {
+          apiKey: 'sk-test',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          model: 'qwen-limits',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'llamacpp',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          modelName: 'qwen-limits',
+          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+          contextWindow: 32768,
+          contextTokens: 32768,
+          maxTokens: 4096,
+          piRuntime: {
+            inputLimits: { images: { resize: { maxWidth: 1280, maxHeight: 960 } } },
+          },
+        },
+      }));
+      await adapter.startSession('input-limits', 'Hello', {
+        modelOverride: 'llamacpp/qwen-limits',
+      });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            inputLimits: { images: { resize: { maxWidth: 1280, maxHeight: 960 } } },
+          }),
+        }),
+      );
+    });
+
     it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
       await adapter.startSession('settings-manager', 'Hello Pi');
 

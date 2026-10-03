@@ -31,7 +31,11 @@ declare module '@earendil-works/pi-coding-agent' {
         enabled?: boolean;
         reserveTokens?: number;
         keepRecentTokens?: number;
+        /** Per-model budget overrides keyed by provider/modelId (pi 1.0.0). */
+        modelOverrides?: Record<string, { reserveTokens?: number; keepRecentTokens?: number }>;
       };
+      /** Tool activation overrides; "+name"/"-name" add/remove relative to defaults. */
+      defaultTools?: string[];
     }): void;
     getShellPath(): string | undefined;
   }

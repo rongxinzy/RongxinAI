@@ -72,6 +72,7 @@ import {
   ModelCapabilityStatus,
   ProviderName,
   ProviderModelPiApi,
+  type ProviderModelPiCompaction,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
@@ -316,6 +317,8 @@ interface ActivePiSession {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   modelRequestOptions?: { apiKey?: string };
+  /** Per-model compaction budgets applied on create and every reload. */
+  modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
   capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
@@ -444,7 +447,11 @@ interface PiSettingsManager {
       enabled?: boolean;
       reserveTokens?: number;
       keepRecentTokens?: number;
+      /** Per-model budget overrides keyed by provider/modelId (pi 1.0.0). */
+      modelOverrides?: Record<string, { reserveTokens?: number; keepRecentTokens?: number }>;
     };
+    /** Tool activation overrides; "+name"/"-name" add/remove relative to defaults. */
+    defaultTools?: string[];
   }): void;
   getShellPath?(): string | undefined;
   setHttpIdleTimeoutMs?(timeoutMs: number): void;
@@ -499,6 +506,11 @@ type PiResolvedModel = {
   capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
+  };
+  /** Per-model compaction budgets keyed for pi's compaction.modelOverrides. */
+  modelCompactionOverride?: {
+    key: string;
+    compaction: ProviderModelPiCompaction;
   };
 };
 
@@ -1103,6 +1115,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.applyPiCompactionOverrides(
         settingsManager,
         this.resolvePiContextWindowTokens(contextWindowTokens, resourceState.chatMode),
+        resolvedModel.modelCompactionOverride,
       );
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
@@ -1407,6 +1420,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         model: sessionModel,
         modelRuntime: resolvedModel.modelRuntime,
         modelRequestOptions: resolvedModel.requestOptions,
+        modelCompactionOverride: resolvedModel.modelCompactionOverride,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1769,6 +1783,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
             active.resourceState.chatMode,
           ),
+          active.modelCompactionOverride,
         );
         active.requestedSystemPrompt = nextSystemPrompt;
         active.requestedSkillIds = requestedSkillIds;
@@ -1967,6 +1982,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       active.requestedModelOverride = patch.model;
       active.modelRuntime = resolvedModel.modelRuntime;
       active.modelRequestOptions = resolvedModel.requestOptions;
+      active.modelCompactionOverride = resolvedModel.modelCompactionOverride;
       active.capabilities = {
         ...active.capabilities,
         ...resolvedModel.capabilities,
@@ -1995,6 +2011,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
             active.resourceState.chatMode,
           ),
+          active.modelCompactionOverride,
         );
       }
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
@@ -2402,6 +2419,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.applyPiCompactionOverrides(
           active.settingsManager,
           typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          active.modelCompactionOverride,
         );
         active.requestedSkillIds = steeredSkillIds;
       } catch (error) {
@@ -2645,6 +2663,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private applyPiCompactionOverrides(
     settingsManager: PiSettingsManager | null,
     contextWindowTokens?: number,
+    perModel?: { key: string; compaction: ProviderModelPiCompaction },
   ): void {
     if (!settingsManager) return;
     const contextWindow =
@@ -2661,6 +2680,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         enabled: true,
         reserveTokens,
         keepRecentTokens,
+        // Per-model budgets ride pi's modelOverrides keyed by provider/modelId;
+        // unconfigured fields fall back to the flat session budgets above. The
+        // key is omitted entirely when unconfigured so the override payload
+        // stays byte-identical to the pre-modelOverrides shape.
+        ...(perModel
+          ? {
+              modelOverrides: {
+                [perModel.key]: {
+                  ...(perModel.compaction.reserveTokens !== undefined
+                    ? { reserveTokens: perModel.compaction.reserveTokens }
+                    : {}),
+                  ...(perModel.compaction.keepRecentTokens !== undefined
+                    ? { keepRecentTokens: perModel.compaction.keepRecentTokens }
+                    : {}),
+                },
+              },
+            }
+          : {}),
       },
     });
   }
@@ -4289,6 +4326,11 @@ function buildPiCustomModel(
     ...(piRuntime?.thinkingLevelMap ? { thinkingLevelMap: piRuntime.thinkingLevelMap } : {}),
     input: supportsImage ? ['text', 'image'] : ['text'],
     ...(hasRecordEntries(compat) ? { compat } : {}),
+    // Per-model pi-ai settings are emitted only when configured so the
+    // default wire format stays byte-identical (golden-tape discipline).
+    ...(piRuntime?.inputLimits ? { inputLimits: piRuntime.inputLimits } : {}),
+    ...(piRuntime?.promptCache ? { promptCache: piRuntime.promptCache } : {}),
+    ...(piRuntime?.samplingParams ? { samplingParams: piRuntime.samplingParams } : {}),
     cost: {
       input: 0,
       output: 0,
@@ -4482,13 +4524,21 @@ async function resolvePiModel(
     resolution.config.model,
   );
   const useBuiltinModel = canUsePiBuiltinModel(builtinModel, resolution);
+  const resolvedModel =
+    (useBuiltinModel ? builtinModel : null) ??
+    (registeredModel && typeof registeredModel === 'object'
+      ? (registeredModel as Record<string, unknown>)
+      : customModel);
+  // pi keys compaction.modelOverrides by the model's own provider/id pair, so
+  // read both off the final model object (builtin catalog models use pi's
+  // provider ids, not our provider names).
+  const perModelCompaction = resolution.providerMetadata.piRuntime?.compaction;
+  const modelProviderId =
+    typeof resolvedModel.provider === 'string' ? resolvedModel.provider : undefined;
+  const modelId = typeof resolvedModel.id === 'string' ? resolvedModel.id : undefined;
 
   return {
-    model:
-      (useBuiltinModel ? builtinModel : null) ??
-      (registeredModel && typeof registeredModel === 'object'
-        ? (registeredModel as Record<string, unknown>)
-        : customModel),
+    model: resolvedModel,
     modelRuntime,
     maxOutputTokens:
       resolution.endpoint?.maxTokens ||
@@ -4504,6 +4554,14 @@ async function resolvePiModel(
         : resolution.config.apiKey
           ? { apiKey: resolution.config.apiKey }
           : undefined,
+    ...(perModelCompaction && modelProviderId && modelId
+      ? {
+          modelCompactionOverride: {
+            key: `${modelProviderId}/${modelId}`,
+            compaction: perModelCompaction,
+          },
+        }
+      : {}),
   };
 }
 
