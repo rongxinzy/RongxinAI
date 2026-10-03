@@ -128,6 +128,7 @@ import {
   importLegacySqliteMemoryCandidates,
 } from './memory/legacyMemoryFileImportService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
+import { resolveProjectIdentity } from './memory/projectIdentity';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
 import { SessionSummaryBackfillService } from './memory/sessionSummaryBackfillService';
@@ -1583,7 +1584,7 @@ const getProjectMemoryService = (): ProjectMemoryService => {
     projectMemoryService = new ProjectMemoryService(
       memoryRepository,
       engramAdapter,
-      undefined,
+      resolveProjectIdentity,
       path.join(app.getPath('userData'), 'memory'),
     );
   }
