@@ -17,6 +17,8 @@ export interface TriageConfig {
     cooldownRounds: number;
     useLocalModelTriage: boolean;
     triageModelName: string;
+    /** llama.cpp server root for pi classifier calls; empty disables them. */
+    classifierBaseUrl: string;
   };
 }
 
@@ -30,6 +32,7 @@ export const DEFAULT_TRIAGE_CONFIG: TriageConfig = {
     cooldownRounds: 3,
     useLocalModelTriage: false,
     triageModelName: '',
+    classifierBaseUrl: '',
   },
 };
 
