@@ -4602,6 +4602,7 @@ if (!gotTheLock) {
             confirmationMode: 'modal',
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
+            codemode: config.codemodeEnabled === true,
             approvalMode:
               (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
                 ? WorkbenchApprovalMode.AllowAll
@@ -4736,6 +4737,7 @@ if (!gotTheLock) {
           attachedSkillIds: options.activeSkillIds,
           sessionMode,
           goalMode: options.goalMode,
+          codemode: store.getConfig().codemodeEnabled === true,
           imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
           workspaceRoot: existingSession?.cwd,
@@ -5676,6 +5678,7 @@ if (!gotTheLock) {
         embeddingVectorWeight?: number;
         embeddingRemoteBaseUrl?: string;
         embeddingRemoteApiKey?: string;
+        codemodeEnabled?: boolean;
       },
     ) => {
       try {
@@ -5699,6 +5702,8 @@ if (!gotTheLock) {
           executionMode: parseCoworkExecutionMode(config.executionMode),
           permissionMode: normalizedPermissionMode,
           permissionModeBySession: normalizedPermissionModeBySession,
+          codemodeEnabled:
+            typeof config.codemodeEnabled === 'boolean' ? config.codemodeEnabled : undefined,
           ...normalizedEmbedding,
         };
         const previousConfig = getCoworkStore().getConfig();

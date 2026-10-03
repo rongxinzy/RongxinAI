@@ -319,6 +319,8 @@ interface ActivePiSession {
   modelRequestOptions?: { apiKey?: string };
   /** Per-model compaction budgets applied on create and every reload. */
   modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
+  /** Whether this session runs with the pi 1.0 codemode tool active. */
+  codemodeEnabled: boolean;
   capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
@@ -428,6 +430,10 @@ interface PiModules {
   ModelRuntime: {
     create(options?: PiModelRuntimeCreateOptions): Promise<PiModelRuntime>;
   };
+  /** Registers the codemode sandbox tool (inactive until defaultTools names it). */
+  createCodemodeExtension?: (options?: Record<string, unknown>) => unknown;
+  /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
+  createToolSearchExtension?: () => unknown;
   completeSimple: (
     model: unknown,
     context: ReturnType<typeof buildPiBackgroundCompletionContext>,
@@ -595,6 +601,26 @@ async function getPiModules(): Promise<PiModules> {
           : undefined,
         getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
         ModelRuntime: codingAgent.ModelRuntime as unknown as PiModules['ModelRuntime'],
+        createCodemodeExtension: Object.prototype.hasOwnProperty.call(
+          codingAgent,
+          'createCodemodeExtension',
+        )
+          ? ((
+              codingAgent as typeof codingAgent & {
+                createCodemodeExtension?: unknown;
+              }
+            ).createCodemodeExtension as PiModules['createCodemodeExtension'])
+          : undefined,
+        createToolSearchExtension: Object.prototype.hasOwnProperty.call(
+          codingAgent,
+          'createToolSearchExtension',
+        )
+          ? ((
+              codingAgent as typeof codingAgent & {
+                createToolSearchExtension?: unknown;
+              }
+            ).createToolSearchExtension as PiModules['createToolSearchExtension'])
+          : undefined,
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
         completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
@@ -1101,6 +1127,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         typeof resolvedModel.model.contextWindow === 'number'
           ? resolvedModel.model.contextWindow
           : undefined;
+      const codemodeEnabled =
+        options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
         taskOutputEnabled:
@@ -1111,12 +1139,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.activeSessions.get(sessionId)?.approvalMode ??
           options.approvalMode ??
           WorkbenchApprovalMode.Ask,
+        enableCodemode: codemodeEnabled,
       });
       this.applyPiCompactionOverrides(
         settingsManager,
         this.resolvePiContextWindowTokens(contextWindowTokens, resourceState.chatMode),
         resolvedModel.modelCompactionOverride,
       );
+      if (codemodeEnabled && settingsManager) {
+        // "+codemode" adds the sandbox tool on top of the default tool set;
+        // tool_search stays dormant until a deferred MCP server needs it.
+        settingsManager.applyOverrides({ defaultTools: ['+codemode'] });
+      }
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
       if (settingsManager) {
@@ -1421,6 +1455,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         modelRuntime: resolvedModel.modelRuntime,
         modelRequestOptions: resolvedModel.requestOptions,
         modelCompactionOverride: resolvedModel.modelCompactionOverride,
+        codemodeEnabled,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1674,6 +1709,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? CoworkSessionMode.Chat
         : CoworkSessionMode.Work);
     const nextGoalMode = options.goalMode ?? active.goalMode;
+    const nextCodemode = options.codemode ?? active.codemodeEnabled;
     // Plan mode is per-turn: an ordinary follow-up clears it again.
     const nextPlanMode = options.planMode === true;
     const mcpToolTopologyChanged =
@@ -1685,6 +1721,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         options.modelOverride !== active.requestedModelOverride) ||
       !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
       nextGoalMode !== active.goalMode ||
+      nextCodemode !== active.codemodeEnabled ||
       mcpToolTopologyChanged ||
       unattendedTopologyChanged
     ) {
@@ -1715,6 +1752,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
+        codemode: nextCodemode,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
@@ -1757,6 +1795,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
+        codemode: nextCodemode,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
@@ -2762,6 +2801,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
       getApprovalMode: () => WorkbenchApprovalMode;
+      /** Register the pi 1.0 codemode + tool_search extensions (work sessions). */
+      enableCodemode?: boolean;
     },
     additionalExtensionFactories: PiExtensionFactory[] = [],
   ): Promise<PiResourceLoader> {
@@ -2815,6 +2856,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           mcpServerStatuses: resourceState.chatMode
             ? []
             : (this.mcpServerManager?.serverStatuses ?? []),
+          codemodeEnabled: approvalContext?.enableCodemode === true,
         }),
       ),
       extensionFactories: [
@@ -2908,6 +2950,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               : undefined;
           });
         },
+        // Codemode lets the model orchestrate parallel tool calls from a
+        // QuickJS sandbox; both extensions register inactive and are activated
+        // through the defaultTools override next to the compaction settings.
+        ...(approvalContext?.enableCodemode &&
+        pi.createCodemodeExtension &&
+        pi.createToolSearchExtension
+          ? [pi.createCodemodeExtension(), pi.createToolSearchExtension()]
+          : []),
         ...additionalExtensionFactories,
       ],
     });
