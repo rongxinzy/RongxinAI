@@ -1302,10 +1302,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                     {renderConversationTurns()}
                     {inlineQuestionPermission && onRespondToInlineQuestion && (
                       <div className="px-3 pt-3">
-                        <AskUserQuestionCard
-                          permission={inlineQuestionPermission}
-                          onRespond={onRespondToInlineQuestion}
-                        />
+                        <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
+                          <AskUserQuestionCard
+                            permission={inlineQuestionPermission}
+                            onRespond={onRespondToInlineQuestion}
+                          />
+                        </div>
                       </div>
                     )}
                     {/* 2026/09/16 lixiang  对不上工具卡片时才在对话流里兜底展示独立授权卡 */}
@@ -1317,7 +1319,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                             <CoworkPermissionModal
                               permission={inlinePermission}
                               onRespond={onRespondToInlinePermission}
-                              inline
                             />
                           </div>
                         </div>
