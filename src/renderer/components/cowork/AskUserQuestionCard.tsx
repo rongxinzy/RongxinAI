@@ -1,9 +1,3 @@
-import {
-  Queue,
-  QueueItem,
-  QueueItemContent,
-  QueueItemDescription,
-} from '@shared/components/ai-elements/queue';
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { Label } from '@shared/components/ui/label';
@@ -15,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../../types/cowork';
+import { PermissionRequestCard } from '../permission/PermissionRequestCard';
 import {
   AskUserQuestionAnswerDelimiter,
   buildAskUserQuestionAllowResult,
@@ -126,21 +121,49 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
 
   // 2026/09/20 lixiang  与对话列同宽（issue #805）
   return (
-    <Queue className="w-full rounded-lg bg-card shadow-none">
-      <div className="flex items-center gap-2 px-1 text-sm font-medium text-foreground">
-        <ListChecks className="size-4 text-muted-foreground" />
-        <span>{i18nService.t('coworkQuestionWizardTitle')}</span>
-      </div>
-
+    <PermissionRequestCard
+      header={
+        <>
+          <ListChecks className="size-4 text-muted-foreground" />
+          <span>{i18nService.t('coworkQuestionWizardTitle')}</span>
+        </>
+      }
+      footer={
+        <>
+          {!isComplete && (
+            <p className="mr-auto text-xs text-muted-foreground" role="status">
+              {i18nService.t('coworkQuestionWizardAnswerRequired')}
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void respond(buildAskUserQuestionDenyResult())}
+            disabled={isSubmitting}
+          >
+            {i18nService.t('coworkDenyRequest')}
+          </Button>
+          <Button
+            type="button"
+            onClick={() =>
+              void respond(buildAskUserQuestionAllowResult(permission, buildAnswers()))
+            }
+            disabled={!isComplete || isSubmitting}
+          >
+            {i18nService.t('coworkQuestionWizardSubmit')}
+          </Button>
+        </>
+      }
+    >
       <ul className="flex flex-col divide-y divide-border">
         {questions.map((question, questionIndex) => {
           const selectedAnswers = splitAnswer(answers[question.question]);
           const otherInputId = `ask-user-other-${permission.requestId}-${questionIndex}`;
 
           return (
-            <QueueItem
+            <li
               key={`${question.question}-${questionIndex}`}
-              className="gap-3 px-1 py-3 hover:bg-transparent"
+              className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0"
             >
               <div className="flex flex-col gap-1">
                 {question.header && (
@@ -148,9 +171,7 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                     {question.header}
                   </span>
                 )}
-                <QueueItemContent className="theme-queue-question-content line-clamp-none">
-                  {question.question}
-                </QueueItemContent>
+                <p className="text-sm text-foreground">{question.question}</p>
               </div>
 
               {question.multiSelect ? (
@@ -180,9 +201,9 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                             {option.label}
                           </span>
                           {option.description && (
-                            <QueueItemDescription className="ml-0">
+                            <span className="text-xs text-muted-foreground">
                               {option.description}
-                            </QueueItemDescription>
+                            </span>
                           )}
                         </span>
                       </Label>
@@ -214,9 +235,9 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                             {option.label}
                           </span>
                           {option.description && (
-                            <QueueItemDescription className="ml-0">
+                            <span className="text-xs text-muted-foreground">
                               {option.description}
-                            </QueueItemDescription>
+                            </span>
                           )}
                         </span>
                       </Label>
@@ -240,35 +261,11 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                   disabled={isSubmitting}
                 />
               </div>
-            </QueueItem>
+            </li>
           );
         })}
       </ul>
-
-      {/* 2026/09/20 lixiang  次要动作 ghost + gap-3，与授权卡/验收卡操作行一致 */}
-      <div className="flex items-center justify-end gap-3 border-t border-border pt-3">
-        {!isComplete && (
-          <p className="mr-auto text-xs text-muted-foreground" role="status">
-            {i18nService.t('coworkQuestionWizardAnswerRequired')}
-          </p>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => void respond(buildAskUserQuestionDenyResult())}
-          disabled={isSubmitting}
-        >
-          {i18nService.t('coworkDenyRequest')}
-        </Button>
-        <Button
-          type="button"
-          onClick={() => void respond(buildAskUserQuestionAllowResult(permission, buildAnswers()))}
-          disabled={!isComplete || isSubmitting}
-        >
-          {i18nService.t('coworkQuestionWizardSubmit')}
-        </Button>
-      </div>
-    </Queue>
+    </PermissionRequestCard>
   );
 };
 

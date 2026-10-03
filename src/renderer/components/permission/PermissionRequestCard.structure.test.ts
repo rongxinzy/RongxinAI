@@ -26,11 +26,13 @@ test('renders both permission cards through the shared shell', () => {
   expect(codingCard).toContain('<PermissionToolBody');
 });
 
-test('keeps the risk banner palette confined to the shared shell', () => {
-  expect(shell).toContain('bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800');
-  expect(shell).toContain(
-    'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
-  );
+test('keeps the risk banner appearance in theme hooks, not local palettes', () => {
+  expect(shell).toContain('theme-permission-danger-banner');
+  expect(shell).toContain('theme-permission-danger-banner-destructive');
+  expect(shell).toContain('theme-permission-danger-banner-warning');
+  expect(shell).not.toContain('bg-red-50');
+  expect(shell).not.toContain('bg-yellow-50');
+  expect(shell).not.toContain('dark:');
   expect(workCard).not.toContain('bg-red-50');
   expect(workCard).not.toContain('bg-yellow-50');
   expect(codingCard).not.toContain('bg-red-50');
