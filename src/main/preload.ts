@@ -510,6 +510,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkQueueIpc.FollowUp, options),
 
     stopSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Stop, sessionId),
+    compactSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Compact, sessionId),
     saveSession: (session: Record<string, unknown>) =>
       ipcRenderer.invoke(CoworkSessionIpc.Save, session),
     deleteSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Delete, sessionId),
