@@ -196,6 +196,7 @@ interface CoworkConfig {
   embeddingVectorWeight: number;
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
+  codemodeEnabled: boolean;
 }
 
 type CoworkConfigUpdate = Partial<
@@ -211,6 +212,7 @@ type CoworkConfigUpdate = Partial<
     | 'embeddingVectorWeight'
     | 'embeddingRemoteBaseUrl'
     | 'embeddingRemoteApiKey'
+    | 'codemodeEnabled'
   >
 >;
 

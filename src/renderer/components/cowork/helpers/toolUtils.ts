@@ -65,6 +65,8 @@ export const getToolDisplayName = (toolName: string | undefined): string => {
       return 'MultiEdit';
     case 'mcp':
       return 'MCP';
+    case 'codemode':
+      return 'Codemode';
     case 'process':
       return 'Process';
     case 'websearch':
@@ -210,6 +212,8 @@ export const getToolInputSummary = (
     case 'glob':
     case 'grep':
       return getToolInputString(input, ['pattern', 'query']);
+    case 'codemode':
+      return getToolInputString(input, ['code']);
     case 'task':
     case 'subagent':
       return getToolInputString(input, ['description', 'task']);

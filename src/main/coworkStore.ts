@@ -528,6 +528,7 @@ export interface CoworkConfig {
   embeddingVectorWeight: number;
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
+  codemodeEnabled: boolean;
 }
 
 export type CoworkConfigUpdate = Partial<
@@ -544,6 +545,7 @@ export type CoworkConfigUpdate = Partial<
     | 'embeddingVectorWeight'
     | 'embeddingRemoteBaseUrl'
     | 'embeddingRemoteApiKey'
+    | 'codemodeEnabled'
   >
 >;
 
@@ -1695,6 +1697,7 @@ export class CoworkStore {
       'embeddingVectorWeight',
       'embeddingRemoteBaseUrl',
       'embeddingRemoteApiKey',
+      'codemodeEnabled',
     ] as const;
     const configRows = this.getAll<{ key: string; value: string }>(
       `SELECT key, value FROM cowork_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`,
@@ -1730,6 +1733,7 @@ export class CoworkStore {
       embeddingRemoteBaseUrl:
         cfg.get('embeddingRemoteBaseUrl') || DEFAULT_EMBEDDING_REMOTE_BASE_URL,
       embeddingRemoteApiKey: cfg.get('embeddingRemoteApiKey') || DEFAULT_EMBEDDING_REMOTE_API_KEY,
+      codemodeEnabled: cfg.get('codemodeEnabled') === '1',
     };
   }
 
@@ -1776,6 +1780,9 @@ export class CoworkStore {
     }
     if (config.embeddingRemoteApiKey !== undefined) {
       this.upsertConfig('embeddingRemoteApiKey', String(config.embeddingRemoteApiKey), now);
+    }
+    if (config.codemodeEnabled !== undefined) {
+      this.upsertConfig('codemodeEnabled', config.codemodeEnabled ? '1' : '0', now);
     }
   }
 

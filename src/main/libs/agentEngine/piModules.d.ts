@@ -42,6 +42,11 @@ declare module '@earendil-works/pi-coding-agent' {
 
   export function getAgentDir(): string;
 
+  /** Registers the codemode sandbox tool (inactive until defaultTools names it). */
+  export function createCodemodeExtension(options?: Record<string, unknown>): unknown;
+  /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
+  export function createToolSearchExtension(): unknown;
+
   export const ModelRuntime: {
     create(options?: { allowModelNetwork?: boolean }): Promise<{
       registerProvider(provider: string, config: Record<string, unknown>): void;

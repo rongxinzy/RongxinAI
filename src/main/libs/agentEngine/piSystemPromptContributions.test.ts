@@ -134,6 +134,22 @@ describe('piSystemPromptContributions', () => {
     expect(withMcp.some(prompt => prompt.includes('[Blender MCP] create_cube'))).toBe(true);
   });
 
+  it('adds the codemode orchestration policy only for enabled work sessions', () => {
+    const enabled = collectPiSystemPromptContributions({ ...FULL_CONTEXT, codemodeEnabled: true });
+    const chatEnabled = collectPiSystemPromptContributions({
+      ...FULL_CONTEXT,
+      codemodeEnabled: true,
+      chatMode: true,
+    });
+    const disabled = collectPiSystemPromptContributions(FULL_CONTEXT);
+
+    expect(enabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(true);
+    expect(chatEnabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(
+      false,
+    );
+    expect(disabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(false);
+  });
+
   it('adds MCP connection diagnostics when configured servers expose no tools', () => {
     const prompts = collectPiSystemPromptContributions(FAILED_MCP_CONTEXT);
 
