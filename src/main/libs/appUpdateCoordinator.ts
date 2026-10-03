@@ -155,6 +155,9 @@ export class AppUpdateCoordinator {
     this.handleDownloadProgress(progress);
   private readonly onUpdateDownloaded = (event: { downloadedFile: string }): void => {
     this.downloadedFilePath = event.downloadedFile;
+    // The cache directory is not obvious from the UI; log the concrete path
+    // so support can locate the payload from logs.
+    console.info(`[AppUpdate] update payload cached at: ${event.downloadedFile}`);
   };
   private readonly onUpdaterError = (error: Error): void => this.handleUpdaterError(error);
 
