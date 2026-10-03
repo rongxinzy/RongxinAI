@@ -119,6 +119,8 @@ export type PiStartOptions = {
   goalMode?: boolean;
   /** pi 1.0 codemode sandbox tool orchestration (work sessions, default off). */
   codemode?: boolean;
+  /** pi 1.0 builtin MCP extension replaces the gateway tool (default off). */
+  mcpNativeBridge?: boolean;
   /** Read-only planning turn: excludes workspace-mutating tools and requires plan_write. */
   planMode?: boolean;
   /** Registers plan_write for the whole session, so plan mode also works on a live session. */
@@ -156,6 +158,8 @@ export type PiContinueOptions = {
   goalMode?: boolean;
   /** pi 1.0 codemode sandbox orchestration, forwarded when the runtime recreates the session. */
   codemode?: boolean;
+  /** pi 1.0 native MCP bridge, forwarded when the runtime recreates the session. */
+  mcpNativeBridge?: boolean;
   /** Read-only planning turn, forwarded when the runtime recreates the session. */
   planMode?: boolean;
   /** Registers plan_write when the runtime has to recreate the session. */

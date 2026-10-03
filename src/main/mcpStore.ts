@@ -25,6 +25,8 @@ export interface McpServerRecord {
   githubUrl?: string;
   registryId?: string;
   credentialsError?: boolean;
+  /** pi native-bridge tool exposure; undefined keeps pi's "codemode" default. */
+  exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
   createdAt: number;
   updatedAt: number;
 }
@@ -42,6 +44,8 @@ export interface McpServerFormData {
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
+  /** pi native-bridge tool exposure; undefined keeps pi's "codemode" default. */
+  exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
 }
 
 interface McpServerRow {
@@ -65,6 +69,7 @@ interface McpConfigJson {
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
+  exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
 }
 
 export class McpStore {
@@ -110,6 +115,7 @@ export class McpStore {
       isBuiltIn: config.isBuiltIn === true,
       githubUrl: config.githubUrl,
       registryId: config.registryId,
+      ...(config.exposure ? { exposure: config.exposure } : {}),
       ...(credentialsError ? { credentialsError: true } : {}),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -129,6 +135,14 @@ export class McpStore {
     if (data.isBuiltIn) config.isBuiltIn = true;
     if (data.githubUrl) config.githubUrl = data.githubUrl;
     if (data.registryId) config.registryId = data.registryId;
+    if (
+      data.exposure === 'codemode' ||
+      data.exposure === 'deferred' ||
+      data.exposure === 'direct' ||
+      data.exposure === 'hidden'
+    ) {
+      config.exposure = data.exposure;
+    }
     return JSON.stringify(config);
   }
 
@@ -190,6 +204,8 @@ export class McpStore {
       isBuiltIn: data.isBuiltIn !== undefined ? data.isBuiltIn : existing.isBuiltIn,
       githubUrl: data.githubUrl !== undefined ? data.githubUrl : existing.githubUrl,
       registryId: data.registryId !== undefined ? data.registryId : existing.registryId,
+      exposure:
+        data.exposure !== undefined ? data.exposure : (existing as McpServerRecord).exposure,
     };
 
     const configJson = this.serializeConfig(merged);

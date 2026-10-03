@@ -45,6 +45,10 @@ export const normalizeToolName = (value: string): string =>
 
 export const getToolDisplayName = (toolName: string | undefined): string => {
   if (!toolName) return 'Tool';
+  // pi's native MCP bridge registers tools as mcp__<server>__<tool>.
+  if (toolName.startsWith('mcp__')) {
+    return toolName.slice('mcp__'.length).split('__').join(' / ');
+  }
   switch (normalizeToolName(toolName)) {
     case 'cron':
       return 'Cron';

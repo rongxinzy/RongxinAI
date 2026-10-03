@@ -498,6 +498,8 @@ export class McpServerManager {
   private servers: Map<string, ManagedMcpServer> = new Map();
   private _toolManifest: McpToolManifestEntry[] = [];
   private _serverStatuses: McpServerRuntimeStatus[] = [];
+  /** Records from the latest reconcile; the pi native bridge reads them. */
+  private _lastEnabledRecords: McpServerRecord[] = [];
 
   get toolManifest(): McpToolManifestEntry[] {
     return this._toolManifest;
@@ -511,12 +513,17 @@ export class McpServerManager {
     return this.servers.size > 0;
   }
 
+  get lastEnabledRecords(): McpServerRecord[] {
+    return this._lastEnabledRecords.map(record => ({ ...record }));
+  }
+
   /**
    * Reconcile the active MCP runtime with the enabled server records.
    * Unchanged connections remain alive; only added, removed, or materially
    * changed records are connected or restarted.
    */
   async reconcileServers(enabledServers: McpServerRecord[]): Promise<McpToolManifestEntry[]> {
+    this._lastEnabledRecords = enabledServers.map(server => ({ ...server }));
     const desiredByName = new Map(enabledServers.map(server => [server.name, server]));
     const unchangedStatuses = new Map(this._serverStatuses.map(status => [status.name, status]));
     const serversToStop = [...this.servers.entries()].filter(([name, server]) => {

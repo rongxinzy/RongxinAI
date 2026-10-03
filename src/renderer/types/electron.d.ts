@@ -197,6 +197,7 @@ interface CoworkConfig {
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
   codemodeEnabled: boolean;
+  mcpNativeBridge: boolean;
 }
 
 type CoworkConfigUpdate = Partial<
@@ -213,6 +214,7 @@ type CoworkConfigUpdate = Partial<
     | 'embeddingRemoteBaseUrl'
     | 'embeddingRemoteApiKey'
     | 'codemodeEnabled'
+    | 'mcpNativeBridge'
   >
 >;
 

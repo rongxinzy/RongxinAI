@@ -56,6 +56,7 @@ const hoisted = vi.hoisted(() => {
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
+    bindExtensions: vi.fn().mockResolvedValue(undefined),
     getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
@@ -88,6 +89,7 @@ const hoisted = vi.hoisted(() => {
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
     mockCreateCodemodeExtension: vi.fn(() => 'codemode-extension-factory'),
+    mockCreateMcpExtension: vi.fn(() => 'mcp-extension-factory'),
     mockCreateToolSearchExtension: vi.fn(() => 'tool-search-extension-factory'),
     mockApplyApplicationRuntimeEnv: vi.fn(),
     mockCompleteSimple,
@@ -211,6 +213,7 @@ const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockCreateCodemodeExtension = hoisted.mockCreateCodemodeExtension;
+const mockCreateMcpExtension = hoisted.mockCreateMcpExtension;
 const mockCreateToolSearchExtension = hoisted.mockCreateToolSearchExtension;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
@@ -235,6 +238,7 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
   },
   createCodemodeExtension: hoisted.mockCreateCodemodeExtension,
   createToolSearchExtension: hoisted.mockCreateToolSearchExtension,
+  createMcpExtension: hoisted.mockCreateMcpExtension,
 }));
 
 vi.mock('@earendil-works/pi-ai/compat', () => ({
@@ -923,6 +927,61 @@ describe('PiRuntimeAdapter', () => {
       expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
         defaultTools: ['+codemode'],
       });
+    });
+
+    it('routes work sessions through the native MCP extension when enabled', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [
+          {
+            server: 'Supabase',
+            name: 'list_projects',
+            description: 'List projects',
+            inputSchema: { type: 'object' },
+          },
+        ],
+        lastEnabledRecords: [],
+      } as never);
+      await adapter.startSession('mcp-native', 'Hello Pi', { mcpNativeBridge: true });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      expect(loaderOptions?.extensionFactories).toContain('mcp-extension-factory');
+      expect(mockCreateMcpExtension).toHaveBeenCalledWith(
+        expect.objectContaining({
+          loadConfig: expect.any(Function),
+          createTransport: expect.any(Function),
+        }),
+      );
+      expect(mockSession.bindExtensions).toHaveBeenCalled();
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions?.customTools?.map(tool => tool.name)).not.toContain(PiMcpTool.Name);
+    });
+
+    it('keeps the gateway tool when the native bridge is off', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [
+          {
+            server: 'Supabase',
+            name: 'list_projects',
+            description: 'List projects',
+            inputSchema: { type: 'object' },
+          },
+        ],
+      } as never);
+      await adapter.startSession('mcp-gateway', 'Hello Pi');
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      expect(loaderOptions?.extensionFactories ?? []).not.toContain('mcp-extension-factory');
+      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions?.customTools?.map(tool => tool.name)).toContain(PiMcpTool.Name);
     });
 
     it('excludes codemode from chat sessions even when requested', async () => {
