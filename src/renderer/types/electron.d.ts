@@ -847,6 +847,9 @@ interface IElectronAPI {
       itemId: string;
     }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     stopSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    compactSession: (
+      sessionId: string,
+    ) => Promise<import('../../shared/cowork/constants').CoworkCompactResult>;
     saveSession: (session: Record<string, unknown>) => Promise<CoworkSessionResult>;
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     deleteSessions: (sessionIds: string[]) => Promise<{ success: boolean; error?: string }>;
