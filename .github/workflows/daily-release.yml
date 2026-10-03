@@ -182,6 +182,9 @@ jobs:
             target: linux-x64-default
             runtime_target: linux-x64
     runs-on: ${{ matrix.runner }}
+    # The release environment has no protection rules; it scopes the Certum
+    # signing credentials to this job without adding an approval gate.
+    environment: release
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
