@@ -73,8 +73,8 @@ jobs:
                 --bucket "$R2_BUCKET" \
                 --prefix "releases/${base}-build." \
                 --delimiter '/' \
-                --query 'length(CommonPrefixes[])' \
-                --output text
+                --query 'CommonPrefixes' \
+                --output json | jq 'length'
             )"
             [[ "$count" =~ ^[0-9]+$ ]] || count=0
             version="${base}-build.$((count + 1))"
