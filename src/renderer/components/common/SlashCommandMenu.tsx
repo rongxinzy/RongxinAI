@@ -7,31 +7,35 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { useEffect, useRef } from 'react';
 
-import { i18nService } from '../../services/i18n';
-
 /** One row of the composer command menu: a command, or a command's choice. */
-export interface CodingSlashCommandMenuItem {
+export interface SlashCommandMenuItem {
   /** Stable key: the command name, or the value inserted after the command. */
   key: string;
-  /** Monospace token shown first, e.g. `/mcp`. */
+  /** Monospace token shown first, e.g. `/skill`. */
   token: string;
   description?: string;
   hint?: string;
 }
 
-interface CodingSlashCommandMenuProps {
-  items: CodingSlashCommandMenuItem[];
+interface SlashCommandMenuProps {
+  /** Element id, referenced by the textarea's aria-controls while open. */
+  id: string;
+  items: SlashCommandMenuItem[];
   selectedKey: string;
+  /** Localized empty-state copy; each composer owns its i18n key. */
+  emptyLabel: string;
   onSelectedKeyChange: (key: string) => void;
   onSelect: (key: string) => void;
 }
 
-export const CodingSlashCommandMenu = ({
+export const SlashCommandMenu = ({
+  id,
   items,
   selectedKey,
+  emptyLabel,
   onSelectedKeyChange,
   onSelect,
-}: CodingSlashCommandMenuProps) => {
+}: SlashCommandMenuProps) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // cmdk only scrolls the active item when its own store moves the selection.
@@ -52,7 +56,7 @@ export const CodingSlashCommandMenu = ({
   return (
     <PromptInputCommand
       ref={rootRef}
-      id="coding-agent-command-menu"
+      id={id}
       shouldFilter={false}
       value={selectedKey}
       onValueChange={onSelectedKeyChange}
@@ -60,9 +64,7 @@ export const CodingSlashCommandMenu = ({
     >
       <PromptInputCommandList className="max-h-72">
         {items.length === 0 ? (
-          <PromptInputCommandEmpty>
-            {i18nService.t('codingAgentCommandNoMatches')}
-          </PromptInputCommandEmpty>
+          <PromptInputCommandEmpty>{emptyLabel}</PromptInputCommandEmpty>
         ) : (
           <PromptInputCommandGroup>
             {items.map(item => (

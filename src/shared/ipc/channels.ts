@@ -143,6 +143,7 @@ export const CoworkSessionIpc = {
   Start: 'cowork:session:start',
   Continue: 'cowork:session:continue',
   Stop: 'cowork:session:stop',
+  Compact: 'cowork:session:compact',
   Save: 'cowork:session:save',
   Delete: 'cowork:session:delete',
   DeleteBatch: 'cowork:session:deleteBatch',
