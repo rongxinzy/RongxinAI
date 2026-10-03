@@ -862,6 +862,7 @@ contextBridge.exposeInMainWorld('electron', {
     resumeDownload: () => ipcRenderer.invoke(AppUpdateIpc.ResumeDownload),
     cancelDownload: () => ipcRenderer.invoke(AppUpdateIpc.CancelDownload),
     installReady: () => ipcRenderer.invoke(AppUpdateIpc.InstallReady),
+    revealDownload: () => ipcRenderer.invoke(AppUpdateIpc.RevealDownload),
     onStateChanged: (callback: (data: unknown) => void) =>
       onPush(AppUpdateIpc.StateChanged, callback),
   },
