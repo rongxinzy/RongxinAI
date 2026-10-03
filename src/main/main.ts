@@ -60,6 +60,8 @@ import {
   CoworkExecutionMode,
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
+  CoworkCompactFailure,
+  type CoworkCompactResult,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
@@ -4971,6 +4973,55 @@ if (!gotTheLock) {
       };
     }
   });
+
+  // `/compact` from the composer: never becomes model input. While a turn is
+  // in flight the compaction waits behind the queued prompts, otherwise it
+  // runs now; failures are classified so the renderer can localize them.
+  ipcMain.handle(
+    CoworkSessionIpc.Compact,
+    async (_event, rawSessionId: unknown): Promise<CoworkCompactResult> => {
+      try {
+        const sessionId = typeof rawSessionId === 'string' ? rawSessionId.trim() : '';
+        const runtime = getPiRuntimeAdapter();
+        if (!sessionId || runtime.isSessionActive(sessionId) === false) {
+          return { success: false, reason: CoworkCompactFailure.NoSession };
+        }
+        if (runtime.isSessionRunning(sessionId)) {
+          const queued = runtime.enqueueControlAction(sessionId, async () => {
+            try {
+              await runtime.compactSession(sessionId);
+            } catch (error) {
+              console.error('[Cowork] queued session compaction failed:', error);
+            }
+          });
+          return queued.success
+            ? { success: true, queued: true }
+            : { success: false, reason: CoworkCompactFailure.Busy };
+        }
+        try {
+          const result = await runtime.compactSession(sessionId);
+          return { success: true, queued: false, cancelled: result.cancelled };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (/nothing to compact|session too small/i.test(message)) {
+            return { success: false, reason: CoworkCompactFailure.NotNeeded };
+          }
+          // A retained-but-not-live session, or a turn that started between
+          // the liveness check and the compact call.
+          if (/not active/i.test(message)) {
+            return { success: false, reason: CoworkCompactFailure.NoSession };
+          }
+          if (/still running/i.test(message)) {
+            return { success: false, reason: CoworkCompactFailure.Busy };
+          }
+          throw error;
+        }
+      } catch (error) {
+        console.error('[Cowork] session compaction failed:', error);
+        return { success: false, reason: CoworkCompactFailure.Failed };
+      }
+    },
+  );
 
   ipcMain.handle(
     'cowork:session:save',
