@@ -10,7 +10,7 @@ type ProductAppearances = Pick<
     | `market-card${string}`
   >
 >;
-export function classicProductControls(): ProductAppearances {
+export function classicProductControls(dark: boolean): ProductAppearances {
   return {
     'permission-menu': recipe({ base: { padding: '0.5rem' } }),
     'permission-option': recipe({
@@ -52,5 +52,41 @@ export function classicProductControls(): ProductAppearances {
       },
     }),
     'market-card-description': recipe({ base: { 'font-size': 'var(--zy-component-text-xs)' } }),
+    'permission-danger-banner': recipe({
+      base: {
+        'border-radius': 'var(--zy-style-radius-lg)',
+        'border-width': '1px',
+        'border-style': 'solid',
+        padding: '0.75rem',
+      },
+    }),
+    // Light mode darkens the status hue for text so 14px titles keep AA
+    // contrast on the tinted surface; dark tokens are already bright enough.
+    'permission-danger-banner-destructive': recipe({
+      base: {
+        'background-color': dark
+          ? 'color-mix(in oklab, var(--zy-destructive) 16%, transparent)'
+          : 'color-mix(in oklab, var(--zy-destructive) 8%, transparent)',
+        'border-color': dark
+          ? 'color-mix(in oklab, var(--zy-destructive) 40%, transparent)'
+          : 'color-mix(in oklab, var(--zy-destructive) 25%, transparent)',
+        color: dark
+          ? 'var(--zy-destructive)'
+          : 'color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black))',
+      },
+    }),
+    'permission-danger-banner-warning': recipe({
+      base: {
+        'background-color': dark
+          ? 'color-mix(in oklab, var(--zy-warning) 14%, transparent)'
+          : 'color-mix(in oklab, var(--zy-warning) 10%, transparent)',
+        'border-color': dark
+          ? 'color-mix(in oklab, var(--zy-warning) 35%, transparent)'
+          : 'color-mix(in oklab, var(--zy-warning) 30%, transparent)',
+        color: dark
+          ? 'var(--zy-warning)'
+          : 'color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black))',
+      },
+    }),
   };
 }

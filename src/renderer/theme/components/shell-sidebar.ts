@@ -219,10 +219,10 @@ export function shellSidebarAppearances() {
         width: '100%',
         'border-width': '0px',
         'border-radius': 'var(--zy-style-radius-md)',
-        'background-color': surface(4),
+        'background-color': surface(8),
         'box-shadow': 'none',
       },
-      checked: { 'background-color': surface(4) },
+      checked: { 'background-color': surface(8) },
       focus,
     }),
     'shell-mode-thumb': recipe({
@@ -241,7 +241,7 @@ export function shellSidebarAppearances() {
       base: {
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
-        color: 'var(--muted-foreground)',
+        color: 'color-mix(in oklab, var(--sidebar-foreground) 72%, transparent)',
       },
     }),
     'shell-mode-label-selected': recipe({

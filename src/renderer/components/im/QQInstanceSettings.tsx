@@ -7,6 +7,7 @@ import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { Switch } from '@shared/components/ui/switch';
 import { PlatformRegistry } from '@shared/platform';
+import { imPlatformLogo } from '../../assets/imLogos';
 import { Signal, Trash2, X } from 'lucide-react';
 import React, { useState } from 'react';
 
@@ -78,11 +79,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
       <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
-            <img
-              src={PlatformRegistry.logo('qq')}
-              alt="QQ"
-              className="size-4 object-contain rounded"
-            />
+            <img src={imPlatformLogo('qq')} alt="QQ" className="size-4 object-contain rounded" />
           </div>
           {editingName ? (
             <Input

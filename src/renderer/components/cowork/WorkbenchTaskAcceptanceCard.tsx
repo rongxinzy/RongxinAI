@@ -1,4 +1,3 @@
-import { Queue, QueueItemContent } from '@shared/components/ai-elements/queue';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { ClipboardCheck } from 'lucide-react';
@@ -12,6 +11,7 @@ import {
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
 import { showAppErrorToast, showAppSuccessToast } from '../../services/toastNotification';
+import { PermissionRequestCard } from '../permission/PermissionRequestCard';
 import { getProjectedRun } from './workbenchTaskAudit/utils';
 
 interface WorkbenchTaskAcceptanceCardProps {
@@ -72,43 +72,46 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
     activeRun?.verificationResult?.summary ?? i18nService.t('workbenchTaskAcceptanceCardNoSummary');
 
   // 2026/09/20 lixiang  与对话列同宽，避免验收卡显得过窄（issue #805）
-  // 2026/09/20 lixiang  与上方文件卡留出间隙（TurnBlock 段内 gap-1 专为文件↔复制收紧）
   return (
-    <Queue className="mt-3 w-full rounded-lg bg-card shadow-none">
-      <div className="flex items-center gap-2 px-1 text-sm font-medium text-foreground">
-        <ClipboardCheck className="size-4 text-muted-foreground" />
-        <span>{i18nService.t('workbenchTaskAcceptanceCardTitle')}</span>
-        <Badge variant="outline" className="ml-auto">
-          {i18nService.t('workbenchTaskNeedsReviewLabel')}
-        </Badge>
-      </div>
-
-      <QueueItemContent className="theme-queue-acceptance-content line-clamp-none">
+    <PermissionRequestCard
+      className="mt-3"
+      header={
+        <>
+          <ClipboardCheck className="size-4 text-muted-foreground" />
+          <span>{i18nService.t('workbenchTaskAcceptanceCardTitle')}</span>
+          <Badge variant="outline" className="ml-auto">
+            {i18nService.t('workbenchTaskNeedsReviewLabel')}
+          </Badge>
+        </>
+      }
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => void runAction(() => window.electron.workbenchTask.retry(task.id))}
+          >
+            {i18nService.t('workbenchTaskRetry')}
+          </Button>
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void runAction(() => window.electron.workbenchTask.accept(task.id), true)
+            }
+          >
+            {i18nService.t('workbenchTaskAccept')}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-muted-foreground">
         {i18nService.t('workbenchTaskAcceptanceCardDescription')}
-      </QueueItemContent>
-
-      <div className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+      </p>
+      <div className="rounded-md bg-background px-3 py-2 text-xs text-muted-foreground">
         {verificationSummary}
       </div>
-
-      {/* 2026/09/20 lixiang  次要动作用 ghost（同授权卡），避免 outline 白底+边框与卡片糊成「贴死」主按钮 */}
-      <div className="flex items-center justify-end gap-3 border-t border-border pt-3">
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={busy}
-          onClick={() => void runAction(() => window.electron.workbenchTask.retry(task.id))}
-        >
-          {i18nService.t('workbenchTaskRetry')}
-        </Button>
-        <Button
-          type="button"
-          disabled={busy}
-          onClick={() => void runAction(() => window.electron.workbenchTask.accept(task.id), true)}
-        >
-          {i18nService.t('workbenchTaskAccept')}
-        </Button>
-      </div>
-    </Queue>
+    </PermissionRequestCard>
   );
 }
