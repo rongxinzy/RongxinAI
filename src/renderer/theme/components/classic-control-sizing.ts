@@ -46,8 +46,6 @@ export function classicControlSizing() {
     'control-sizing-9': recipe({ base: { 'padding-inline': '0.75rem' } }),
     // src/renderer/components/cowork/ContextUsageIndicator.tsx:121, src/renderer/components/localInference/panels/ModelsPanel.tsx:606, src/renderer/components/scheduledTasks/DateInput.tsx:157
     'control-sizing-10': recipe({ base: { padding: '0.75rem' } }),
-    // src/renderer/components/cowork/CoworkQuestionWizard.tsx:353
-    'control-sizing-11': recipe({ base: { 'padding-inline': '1rem', 'padding-block': '0.75rem' } }),
     // src/renderer/components/cowork/CoworkSessionDetail.tsx:1395
     'control-sizing-12': recipe({ base: { 'padding-inline': '0rem', 'padding-block': '5px' } }),
     // src/renderer/components/cowork/EmbeddingSettingsSection.tsx:64

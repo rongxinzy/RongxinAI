@@ -61,15 +61,6 @@ export const CodingPermissionCard = ({
         dangerReasonText={danger.reasonText}
         footer={
           <>
-            {primary && (
-              <Button
-                type="button"
-                disabled={disabled}
-                onClick={() => onRespond(primary.outcome, primary.optionId)}
-              >
-                {actionLabel(primary, 'codingAgentApprovePermission')}
-              </Button>
-            )}
             <Button
               type="button"
               variant="ghost"
@@ -105,6 +96,15 @@ export const CodingPermissionCard = ({
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            {primary && (
+              <Button
+                type="button"
+                disabled={disabled}
+                onClick={() => onRespond(primary.outcome, primary.optionId)}
+              >
+                {actionLabel(primary, 'codingAgentApprovePermission')}
+              </Button>
             )}
           </>
         }
