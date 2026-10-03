@@ -342,11 +342,11 @@ function MemoryRows(props: {
     );
   }
   return (
-    <div className="overflow-hidden rounded-lg border border-border">
+    <div className="flex flex-col">
       {records.map((record, index) => (
         <div key={record.id}>
           {index > 0 && <Separator />}
-          <div className="flex min-w-0 items-start gap-2 px-3 py-2.5 transition-colors hover:bg-muted">
+          <div className="flex min-w-0 items-center gap-2 px-3 py-2.5 transition-colors hover:bg-muted">
             <Button
               type="button"
               variant="ghost"
@@ -431,7 +431,7 @@ function MemoryRecordActions(props: MemoryRecordActionProps) {
             render={
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
                 size="icon-sm"
                 onClick={onConfirm}
                 aria-label={i18nService.t('managedMemoryConfirm')}

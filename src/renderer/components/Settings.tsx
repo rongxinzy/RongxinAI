@@ -3232,7 +3232,7 @@ const Settings: React.FC<SettingsProps> = ({
       },
       {
         key: 'triage' as TabType,
-        label: i18nService.t('modelTriageTitle') || '模型路由',
+        label: i18nService.t('modelTriageTitle'),
         icon: <RouteIcon className="size-4" />,
       },
       {
@@ -3377,35 +3377,19 @@ const Settings: React.FC<SettingsProps> = ({
             />
 
             {/* System proxy Section */}
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-3">
-                {i18nService.t('useSystemProxy')}
-              </h4>
-              <label className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {i18nService.t('useSystemProxyDescription')}
-                </span>
-                <Switch
-                  checked={useSystemProxy}
-                  onCheckedChange={next => setUseSystemProxy(next)}
-                />
-              </label>
-            </div>
+            <SettingsToggleRow
+              label={i18nService.t('useSystemProxy')}
+              description={i18nService.t('useSystemProxyDescription')}
+              checked={useSystemProxy}
+              onCheckedChange={next => setUseSystemProxy(next)}
+            />
 
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-3">
-                {i18nService.t('sqliteAutoBackupEnabled')}
-              </h4>
-              <label className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {i18nService.t('sqliteAutoBackupEnabledDescription')}
-                </span>
-                <Switch
-                  checked={sqliteAutoBackupEnabled}
-                  onCheckedChange={next => setSqliteAutoBackupEnabled(next)}
-                />
-              </label>
-            </div>
+            <SettingsToggleRow
+              label={i18nService.t('sqliteAutoBackupEnabled')}
+              description={i18nService.t('sqliteAutoBackupEnabledDescription')}
+              checked={sqliteAutoBackupEnabled}
+              onCheckedChange={next => setSqliteAutoBackupEnabled(next)}
+            />
           </div>
         );
 
@@ -4897,52 +4881,58 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="max-w-2xl space-y-6">
             <div>
               <h3 className="text-sm font-medium text-foreground">
-                {i18nService.t('modelTriageTitle') || '自动模型路由'}
+                {i18nService.t('modelTriageTitle')}
               </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                {i18nService.t('modelTriageGlobalHint') ||
-                  '按消息复杂度在轻量与重度模型间自动切换。此处配置全局参数，默认关闭。'}
+              <p className="mt-1 text-xs text-muted-foreground">
+                {i18nService.t('modelTriageGlobalHint')}
               </p>
             </div>
 
             {/* Global Defaults */}
-            <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
-              <h4 className="text-sm font-medium text-foreground">全局默认参数</h4>
+            <div className="space-y-3 rounded-xl border border-border bg-surface/40 p-4">
+              <h4 className="text-sm font-medium text-foreground">
+                {i18nService.t('modelTriageGlobalDefaults')}
+              </h4>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm text-foreground">冷却轮次</label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    切换后需等待 N 轮才能再次切换，防止频繁抖动
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <label className="text-sm text-foreground">
+                    {i18nService.t('modelTriageCooldownLabel')}
+                  </label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {i18nService.t('modelTriageCooldownHint')}
                   </p>
                 </div>
-                <Input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={triageCooldownRounds}
-                  onChange={async e => {
-                    const value = Math.max(1, Number(e.target.value) || 3);
-                    setTriageCooldownRounds(value);
-                    const config = await window.electron.triage.getConfig();
-                    await window.electron.triage.setConfig({
-                      ...config,
-                      rules: { ...config.rules, cooldownRounds: value },
-                    });
-                  }}
-                  className="theme-page-settings-input-2 text-center shrink-0"
-                />
+                <div className="w-20 shrink-0">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={triageCooldownRounds}
+                    onChange={async e => {
+                      const value = Math.max(1, Number(e.target.value) || 3);
+                      setTriageCooldownRounds(value);
+                      const config = await window.electron.triage.getConfig();
+                      await window.electron.triage.setConfig({
+                        ...config,
+                        rules: { ...config.rules, cooldownRounds: value },
+                      });
+                    }}
+                    className="text-center"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm text-foreground">对话路由上限</label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    超过此轮数后视为深度对话，使用默认模型
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <label className="text-sm text-foreground">
+                    {i18nService.t('modelTriageMaxRoundsLabel')}
+                  </label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {i18nService.t('modelTriageMaxRoundsHint')}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-xs text-muted-foreground">轮</span>
+                <div className="flex w-24 shrink-0 items-center gap-1.5">
                   <Input
                     type="number"
                     min={1}
@@ -4957,26 +4947,31 @@ const Settings: React.FC<SettingsProps> = ({
                         rules: { ...config.rules, maxConversationRoundsForTriage: value },
                       });
                     }}
-                    className="theme-page-settings-input-3 text-center"
+                    className="text-center"
                   />
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {i18nService.t('modelTriageRoundsUnit')}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Local Model Classifier */}
-            <div className="rounded-xl border border-border bg-surface/40 p-4 space-y-3">
-              <h4 className="text-sm font-medium text-foreground">本地模型分类（实验性）</h4>
+            <div className="space-y-3 rounded-xl border border-border bg-surface/40 p-4">
+              <h4 className="text-sm font-medium text-foreground">
+                {i18nService.t('modelTriageLocalClassifierTitle')}
+              </h4>
               <p className="text-xs text-muted-foreground">
-                规则无法确定路由目标时，调用本地 llama.cpp 小模型进行分类
+                {i18nService.t('modelTriageLocalClassifierHint')}
               </p>
 
-              <div className="flex items-center justify-between pt-1">
-                <div>
+              <div className="flex items-center justify-between gap-4 pt-1">
+                <div className="min-w-0 flex-1">
                   <span className="text-sm text-foreground">
-                    {i18nService.t('modelTriageUseLocalModelLabel') || '使用本地小模型辅助分类'}
+                    {i18nService.t('modelTriageUseLocalModelLabel')}
                   </span>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    需先在本地推理页启动 llama.cpp 并加载模型
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {i18nService.t('modelTriageUseLocalModelHint')}
                   </p>
                 </div>
                 <Switch
@@ -4989,14 +4984,14 @@ const Settings: React.FC<SettingsProps> = ({
                       rules: { ...config.rules, useLocalModelTriage: value },
                     });
                   }}
-                  className="shrink-0 ml-2"
+                  className="shrink-0"
                 />
               </div>
 
               {triageUseLocalModel && (
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1">
-                    {i18nService.t('modelTriageModelNameLabel') || '分类模型名称'}
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                    {i18nService.t('modelTriageModelNameLabel')}
                   </label>
                   <Input
                     type="text"
@@ -5010,18 +5005,15 @@ const Settings: React.FC<SettingsProps> = ({
                         rules: { ...config.rules, triageModelName: value },
                       });
                     }}
-                    placeholder={
-                      i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'
-                    }
-                    className="theme-page-settings-input-4 w-full max-w-xs"
+                    placeholder={i18nService.t('modelTriageModelNamePlaceholder')}
+                    className="w-full max-w-xs"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {i18nService.t('modelTriageModelNameNote') ||
-                      '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {i18nService.t('modelTriageModelNameNote')}
                   </p>
                   <div className="mt-3">
-                    <label className="text-xs font-medium text-muted-foreground block mb-1">
-                      {i18nService.t('modelTriageClassifierBaseUrlLabel') || '分类服务器地址'}
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      {i18nService.t('modelTriageClassifierBaseUrlLabel')}
                     </label>
                     <Input
                       type="text"
@@ -5035,12 +5027,11 @@ const Settings: React.FC<SettingsProps> = ({
                           rules: { ...config.rules, classifierBaseUrl: value },
                         });
                       }}
-                      placeholder="http://172.18.5.123:8000"
-                      className="theme-page-settings-input-4 w-full max-w-xs"
+                      placeholder={i18nService.t('modelTriageClassifierBaseUrlPlaceholder')}
+                      className="w-full max-w-xs"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {i18nService.t('modelTriageClassifierBaseUrlNote') ||
-                        'llama.cpp 服务器根地址（不带 /v1）。留空时自动使用已启用的 llama.cpp 端点。'}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {i18nService.t('modelTriageClassifierBaseUrlNote')}
                     </p>
                   </div>
                 </div>
