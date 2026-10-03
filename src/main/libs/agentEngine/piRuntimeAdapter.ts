@@ -245,6 +245,7 @@ interface PiSession {
   reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
   setThinkingLevel?(level: string): unknown;
+  bindExtensions?(bindings: Record<string, unknown>): Promise<void>;
   compact?(customInstructions?: string): Promise<{ cancelled?: boolean }>;
   getContextUsage?():
     | {
