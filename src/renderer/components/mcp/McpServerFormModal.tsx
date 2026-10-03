@@ -53,6 +53,9 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
   const [url, setUrl] = useState('');
   const [headerRows, setHeaderRows] = useState<{ key: string; value: string }[]>([]);
   const [timeoutText, setTimeoutText] = useState('60');
+  const [exposure, setExposure] = useState<'codemode' | 'deferred' | 'direct' | 'hidden'>(
+    'codemode',
+  );
   const [error, setError] = useState('');
   const [envErrors, setEnvErrors] = useState<Record<number, boolean>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -83,6 +86,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
           : [],
       );
       setTimeoutText(String(server.timeout ?? 60));
+      setExposure(server.exposure ?? 'codemode');
     } else if (registryEntry) {
       // Registry install mode — pre-fill from template
       setName(registryEntry.name);
@@ -198,6 +202,9 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       return null;
     }
     data.timeout = timeout;
+    if (exposure !== 'codemode') {
+      data.exposure = exposure;
+    }
 
     if (transportType === 'stdio') {
       data.command = validatedCommand;
@@ -497,6 +504,22 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
               </Field>
             </>
           )}
+
+          <Field>
+            <FieldLabel htmlFor="mcp-exposure">{i18nService.t('mcpExposure')}</FieldLabel>
+            <Select value={exposure} onValueChange={value => setExposure(value as typeof exposure)}>
+              <SelectTrigger id="mcp-exposure">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="codemode">{i18nService.t('mcpExposureCodemode')}</SelectItem>
+                <SelectItem value="deferred">{i18nService.t('mcpExposureDeferred')}</SelectItem>
+                <SelectItem value="direct">{i18nService.t('mcpExposureDirect')}</SelectItem>
+                <SelectItem value="hidden">{i18nService.t('mcpExposureHidden')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">{i18nService.t('mcpExposureHint')}</p>
+          </Field>
 
           <Field>
             <FieldLabel htmlFor="mcp-timeout">{i18nService.t('mcpTimeout')}</FieldLabel>

@@ -45,6 +45,10 @@ export const normalizeToolName = (value: string): string =>
 
 export const getToolDisplayName = (toolName: string | undefined): string => {
   if (!toolName) return 'Tool';
+  // pi's native MCP bridge registers tools as mcp__<server>__<tool>.
+  if (toolName.startsWith('mcp__')) {
+    return toolName.slice('mcp__'.length).split('__').join(' / ');
+  }
   switch (normalizeToolName(toolName)) {
     case 'cron':
       return 'Cron';
@@ -65,6 +69,8 @@ export const getToolDisplayName = (toolName: string | undefined): string => {
       return 'MultiEdit';
     case 'mcp':
       return 'MCP';
+    case 'codemode':
+      return 'Codemode';
     case 'process':
       return 'Process';
     case 'websearch':
@@ -210,6 +216,8 @@ export const getToolInputSummary = (
     case 'glob':
     case 'grep':
       return getToolInputString(input, ['pattern', 'query']);
+    case 'codemode':
+      return getToolInputString(input, ['code']);
     case 'task':
     case 'subagent':
       return getToolInputString(input, ['description', 'task']);

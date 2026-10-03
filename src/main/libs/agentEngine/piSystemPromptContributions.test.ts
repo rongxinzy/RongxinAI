@@ -134,6 +134,33 @@ describe('piSystemPromptContributions', () => {
     expect(withMcp.some(prompt => prompt.includes('[Blender MCP] create_cube'))).toBe(true);
   });
 
+  it('suppresses the legacy MCP preflight when the native bridge renders its own section', () => {
+    const legacy = collectPiSystemPromptContributions(MCP_CONTEXT);
+    const native = collectPiSystemPromptContributions({
+      ...MCP_CONTEXT,
+      mcpNativeBridge: true,
+    });
+
+    expect(legacy.some(prompt => prompt.includes('MCP capability preflight'))).toBe(true);
+    expect(native.some(prompt => prompt.includes('MCP capability preflight'))).toBe(false);
+  });
+
+  it('adds the codemode orchestration policy only for enabled work sessions', () => {
+    const enabled = collectPiSystemPromptContributions({ ...FULL_CONTEXT, codemodeEnabled: true });
+    const chatEnabled = collectPiSystemPromptContributions({
+      ...FULL_CONTEXT,
+      codemodeEnabled: true,
+      chatMode: true,
+    });
+    const disabled = collectPiSystemPromptContributions(FULL_CONTEXT);
+
+    expect(enabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(true);
+    expect(chatEnabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(
+      false,
+    );
+    expect(disabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(false);
+  });
+
   it('adds MCP connection diagnostics when configured servers expose no tools', () => {
     const prompts = collectPiSystemPromptContributions(FAILED_MCP_CONTEXT);
 

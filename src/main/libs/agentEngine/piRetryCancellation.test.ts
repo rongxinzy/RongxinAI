@@ -33,13 +33,39 @@ test('cancels the real SDK backoff and sends the next prompt through its public 
     _retryAttempt: 0,
     _eventListeners: [],
     _pendingNextTurnMessages: [],
+    _pendingCustomMessages: [],
+    _pendingToolNames: new Set<string>(),
+    _deferredSettledActions: [] as Array<() => Promise<void>>,
+    _entryIdsByMessage: new Map(),
+    sessionManager: {
+      getBranch: () => [] as never[],
+      buildSessionProjection: () => ({ entries: [] }),
+      getSessionFile: () => undefined,
+      getSessionId: () => 'retry-cancellation-test',
+      getSessionName: () => undefined,
+    },
     _baseSystemPrompt: '',
+    _baseSystemPromptOptions: { selectedTools: [] },
+    _lastAssistantToolResults: [],
+    _recordSelection: () => undefined,
+    _preparePromptAndToolLoadout: () => undefined,
+    _runBeforeSettleBoundary: async () => false,
+    // pi 1.0.0 persists abandoned retry attempts as context edits before
+    // scheduling the backoff; persistence is orthogonal to the cancellation
+    // lifecycle under test, so omit it in this in-memory harness.
+    _omitRecoveryAttempt: () => undefined,
+    getActiveToolNames: () => [] as string[],
     _flushPendingBashMessages: () => undefined,
     _checkCompaction: async () => false,
     _extensionRunner: {
       hasHandlers: () => false,
       emit: async () => undefined,
-      emitBeforeAgentStart: async () => undefined,
+      emitBeforeAgentStart: async (text: string, images: unknown, options: unknown) => ({
+        text,
+        images,
+        systemPromptOptions: options,
+        messages: [],
+      }),
     },
     _modelRuntime: { hasConfiguredAuth: () => true },
     settingsManager: {

@@ -72,9 +72,11 @@ import {
   ModelCapabilityStatus,
   ProviderName,
   ProviderModelPiApi,
+  type ProviderModelPiCompaction,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
+import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import type { CoworkMessage } from '../../coworkStore';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -243,6 +245,7 @@ interface PiSession {
   reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
   setThinkingLevel?(level: string): unknown;
+  bindExtensions?(bindings: Record<string, unknown>): Promise<void>;
   compact?(customInstructions?: string): Promise<{ cancelled?: boolean }>;
   getContextUsage?():
     | {
@@ -316,6 +319,12 @@ interface ActivePiSession {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   modelRequestOptions?: { apiKey?: string };
+  /** Per-model compaction budgets applied on create and every reload. */
+  modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
+  /** Whether this session runs with the pi 1.0 codemode tool active. */
+  codemodeEnabled: boolean;
+  /** Whether pi's builtin MCP extension owns this session's MCP tools. */
+  mcpNativeBridge: boolean;
   capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
@@ -425,6 +434,12 @@ interface PiModules {
   ModelRuntime: {
     create(options?: PiModelRuntimeCreateOptions): Promise<PiModelRuntime>;
   };
+  /** Registers the codemode sandbox tool (inactive until defaultTools names it). */
+  createCodemodeExtension?: (options?: Record<string, unknown>) => unknown;
+  /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
+  createToolSearchExtension?: () => unknown;
+  /** Registers the builtin MCP extension (config/transport injectable). */
+  createMcpExtension?: (options?: Record<string, unknown>) => unknown;
   completeSimple: (
     model: unknown,
     context: ReturnType<typeof buildPiBackgroundCompletionContext>,
@@ -444,7 +459,11 @@ interface PiSettingsManager {
       enabled?: boolean;
       reserveTokens?: number;
       keepRecentTokens?: number;
+      /** Per-model budget overrides keyed by provider/modelId (pi 1.0.0). */
+      modelOverrides?: Record<string, { reserveTokens?: number; keepRecentTokens?: number }>;
     };
+    /** Tool activation overrides; "+name"/"-name" add/remove relative to defaults. */
+    defaultTools?: string[];
   }): void;
   getShellPath?(): string | undefined;
   setHttpIdleTimeoutMs?(timeoutMs: number): void;
@@ -499,6 +518,11 @@ type PiResolvedModel = {
   capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
+  };
+  /** Per-model compaction budgets keyed for pi's compaction.modelOverrides. */
+  modelCompactionOverride?: {
+    key: string;
+    compaction: ProviderModelPiCompaction;
   };
 };
 
@@ -583,6 +607,33 @@ async function getPiModules(): Promise<PiModules> {
           : undefined,
         getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
         ModelRuntime: codingAgent.ModelRuntime as unknown as PiModules['ModelRuntime'],
+        createCodemodeExtension: Object.prototype.hasOwnProperty.call(
+          codingAgent,
+          'createCodemodeExtension',
+        )
+          ? ((
+              codingAgent as typeof codingAgent & {
+                createCodemodeExtension?: unknown;
+              }
+            ).createCodemodeExtension as PiModules['createCodemodeExtension'])
+          : undefined,
+        createToolSearchExtension: Object.prototype.hasOwnProperty.call(
+          codingAgent,
+          'createToolSearchExtension',
+        )
+          ? ((
+              codingAgent as typeof codingAgent & {
+                createToolSearchExtension?: unknown;
+              }
+            ).createToolSearchExtension as PiModules['createToolSearchExtension'])
+          : undefined,
+        createMcpExtension: Object.prototype.hasOwnProperty.call(codingAgent, 'createMcpExtension')
+          ? ((
+              codingAgent as typeof codingAgent & {
+                createMcpExtension?: unknown;
+              }
+            ).createMcpExtension as PiModules['createMcpExtension'])
+          : undefined,
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
         completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
@@ -1089,6 +1140,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         typeof resolvedModel.model.contextWindow === 'number'
           ? resolvedModel.model.contextWindow
           : undefined;
+      const codemodeEnabled =
+        options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
+      const mcpNativeBridge =
+        options.mcpNativeBridge === true &&
+        !resourceState.chatMode &&
+        Boolean(this.mcpServerManager);
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
         taskOutputEnabled:
@@ -1099,11 +1156,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.activeSessions.get(sessionId)?.approvalMode ??
           options.approvalMode ??
           WorkbenchApprovalMode.Ask,
+        enableCodemode: codemodeEnabled,
+        enableMcpNative: mcpNativeBridge,
       });
       this.applyPiCompactionOverrides(
         settingsManager,
         this.resolvePiContextWindowTokens(contextWindowTokens, resourceState.chatMode),
+        resolvedModel.modelCompactionOverride,
       );
+      if (codemodeEnabled && settingsManager) {
+        // "+codemode" adds the sandbox tool on top of the default tool set;
+        // tool_search stays dormant until a deferred MCP server needs it.
+        settingsManager.applyOverrides({ defaultTools: ['+codemode'] });
+      }
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
       if (settingsManager) {
@@ -1230,7 +1295,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
       if (!resourceState.chatMode) {
-        const mcpProxyTool = this.buildMcpProxyTool();
+        // The native bridge owns MCP tools when enabled; the gateway tool
+        // would expose the same servers a second time.
+        const mcpProxyTool = mcpNativeBridge ? null : this.buildMcpProxyTool();
         if (mcpProxyTool) {
           customTools.push(mcpProxyTool);
         }
@@ -1394,6 +1461,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
+      if (mcpNativeBridge && typeof session.bindExtensions === 'function') {
+        // The MCP extension connects its servers on session start; without an
+        // explicit bind, SDK sessions never emit it (verified against pi's SDK
+        // docs and examples/sdk/14-codemode-mcp.ts).
+        await session.bindExtensions({});
+      }
       const piSessionCreatedAt = Date.now();
       if (!isCurrentInitialization()) {
         void session.abort();
@@ -1407,6 +1480,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         model: sessionModel,
         modelRuntime: resolvedModel.modelRuntime,
         modelRequestOptions: resolvedModel.requestOptions,
+        modelCompactionOverride: resolvedModel.modelCompactionOverride,
+        codemodeEnabled,
+        mcpNativeBridge,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1660,6 +1736,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? CoworkSessionMode.Chat
         : CoworkSessionMode.Work);
     const nextGoalMode = options.goalMode ?? active.goalMode;
+    const nextCodemode = options.codemode ?? active.codemodeEnabled;
+    const nextMcpNativeBridge = options.mcpNativeBridge ?? active.mcpNativeBridge;
     // Plan mode is per-turn: an ordinary follow-up clears it again.
     const nextPlanMode = options.planMode === true;
     const mcpToolTopologyChanged =
@@ -1671,6 +1749,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         options.modelOverride !== active.requestedModelOverride) ||
       !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
       nextGoalMode !== active.goalMode ||
+      nextCodemode !== active.codemodeEnabled ||
+      nextMcpNativeBridge !== active.mcpNativeBridge ||
       mcpToolTopologyChanged ||
       unattendedTopologyChanged
     ) {
@@ -1701,6 +1781,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
+        codemode: nextCodemode,
+        mcpNativeBridge: nextMcpNativeBridge,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
@@ -1743,6 +1825,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
+        codemode: nextCodemode,
+        mcpNativeBridge: nextMcpNativeBridge,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
@@ -1769,6 +1853,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
             active.resourceState.chatMode,
           ),
+          active.modelCompactionOverride,
         );
         active.requestedSystemPrompt = nextSystemPrompt;
         active.requestedSkillIds = requestedSkillIds;
@@ -1967,6 +2052,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       active.requestedModelOverride = patch.model;
       active.modelRuntime = resolvedModel.modelRuntime;
       active.modelRequestOptions = resolvedModel.requestOptions;
+      active.modelCompactionOverride = resolvedModel.modelCompactionOverride;
       active.capabilities = {
         ...active.capabilities,
         ...resolvedModel.capabilities,
@@ -1995,6 +2081,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
             active.resourceState.chatMode,
           ),
+          active.modelCompactionOverride,
         );
       }
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
@@ -2402,6 +2489,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.applyPiCompactionOverrides(
           active.settingsManager,
           typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+          active.modelCompactionOverride,
         );
         active.requestedSkillIds = steeredSkillIds;
       } catch (error) {
@@ -2645,6 +2733,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private applyPiCompactionOverrides(
     settingsManager: PiSettingsManager | null,
     contextWindowTokens?: number,
+    perModel?: { key: string; compaction: ProviderModelPiCompaction },
   ): void {
     if (!settingsManager) return;
     const contextWindow =
@@ -2661,6 +2750,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         enabled: true,
         reserveTokens,
         keepRecentTokens,
+        // Per-model budgets ride pi's modelOverrides keyed by provider/modelId;
+        // unconfigured fields fall back to the flat session budgets above. The
+        // key is omitted entirely when unconfigured so the override payload
+        // stays byte-identical to the pre-modelOverrides shape.
+        ...(perModel
+          ? {
+              modelOverrides: {
+                [perModel.key]: {
+                  ...(perModel.compaction.reserveTokens !== undefined
+                    ? { reserveTokens: perModel.compaction.reserveTokens }
+                    : {}),
+                  ...(perModel.compaction.keepRecentTokens !== undefined
+                    ? { keepRecentTokens: perModel.compaction.keepRecentTokens }
+                    : {}),
+                },
+              },
+            }
+          : {}),
       },
     });
   }
@@ -2725,6 +2832,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
       getApprovalMode: () => WorkbenchApprovalMode;
+      /** Register the pi 1.0 codemode + tool_search extensions (work sessions). */
+      enableCodemode?: boolean;
+      /** Register pi's builtin MCP extension, replacing the gateway tool. */
+      enableMcpNative?: boolean;
     },
     additionalExtensionFactories: PiExtensionFactory[] = [],
   ): Promise<PiResourceLoader> {
@@ -2778,6 +2889,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           mcpServerStatuses: resourceState.chatMode
             ? []
             : (this.mcpServerManager?.serverStatuses ?? []),
+          codemodeEnabled: approvalContext?.enableCodemode === true,
+          mcpNativeBridge: approvalContext?.enableMcpNative === true,
         }),
       ),
       extensionFactories: [
@@ -2871,6 +2984,25 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               : undefined;
           });
         },
+        // Codemode lets the model orchestrate parallel tool calls from a
+        // QuickJS sandbox; both extensions register inactive and are activated
+        // through the defaultTools override next to the compaction settings.
+        ...(approvalContext?.enableCodemode &&
+        pi.createCodemodeExtension &&
+        pi.createToolSearchExtension
+          ? [pi.createCodemodeExtension(), pi.createToolSearchExtension()]
+          : []),
+        ...(approvalContext?.enableMcpNative && pi.createMcpExtension && this.mcpServerManager
+          ? [
+              pi.createMcpExtension({
+                loadConfig: () =>
+                  buildPiLoadedMcpConfig(this.mcpServerManager?.lastEnabledRecords ?? []),
+                createTransport: buildPiMcpTransportFactory(
+                  () => this.mcpServerManager?.lastEnabledRecords ?? [],
+                ),
+              }),
+            ]
+          : []),
         ...additionalExtensionFactories,
       ],
     });
@@ -4289,6 +4421,11 @@ function buildPiCustomModel(
     ...(piRuntime?.thinkingLevelMap ? { thinkingLevelMap: piRuntime.thinkingLevelMap } : {}),
     input: supportsImage ? ['text', 'image'] : ['text'],
     ...(hasRecordEntries(compat) ? { compat } : {}),
+    // Per-model pi-ai settings are emitted only when configured so the
+    // default wire format stays byte-identical (golden-tape discipline).
+    ...(piRuntime?.inputLimits ? { inputLimits: piRuntime.inputLimits } : {}),
+    ...(piRuntime?.promptCache ? { promptCache: piRuntime.promptCache } : {}),
+    ...(piRuntime?.samplingParams ? { samplingParams: piRuntime.samplingParams } : {}),
     cost: {
       input: 0,
       output: 0,
@@ -4482,13 +4619,21 @@ async function resolvePiModel(
     resolution.config.model,
   );
   const useBuiltinModel = canUsePiBuiltinModel(builtinModel, resolution);
+  const resolvedModel =
+    (useBuiltinModel ? builtinModel : null) ??
+    (registeredModel && typeof registeredModel === 'object'
+      ? (registeredModel as Record<string, unknown>)
+      : customModel);
+  // pi keys compaction.modelOverrides by the model's own provider/id pair, so
+  // read both off the final model object (builtin catalog models use pi's
+  // provider ids, not our provider names).
+  const perModelCompaction = resolution.providerMetadata.piRuntime?.compaction;
+  const modelProviderId =
+    typeof resolvedModel.provider === 'string' ? resolvedModel.provider : undefined;
+  const modelId = typeof resolvedModel.id === 'string' ? resolvedModel.id : undefined;
 
   return {
-    model:
-      (useBuiltinModel ? builtinModel : null) ??
-      (registeredModel && typeof registeredModel === 'object'
-        ? (registeredModel as Record<string, unknown>)
-        : customModel),
+    model: resolvedModel,
     modelRuntime,
     maxOutputTokens:
       resolution.endpoint?.maxTokens ||
@@ -4504,6 +4649,14 @@ async function resolvePiModel(
         : resolution.config.apiKey
           ? { apiKey: resolution.config.apiKey }
           : undefined,
+    ...(perModelCompaction && modelProviderId && modelId
+      ? {
+          modelCompactionOverride: {
+            key: `${modelProviderId}/${modelId}`,
+            compaction: perModelCompaction,
+          },
+        }
+      : {}),
   };
 }
 

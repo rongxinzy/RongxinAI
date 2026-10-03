@@ -155,6 +155,8 @@ export interface CoworkConfig {
   embeddingVectorWeight: number;
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
+  codemodeEnabled: boolean;
+  mcpNativeBridge: boolean;
 }
 
 export type CoworkConfigUpdate = Partial<
@@ -171,6 +173,8 @@ export type CoworkConfigUpdate = Partial<
     | 'embeddingVectorWeight'
     | 'embeddingRemoteBaseUrl'
     | 'embeddingRemoteApiKey'
+    | 'codemodeEnabled'
+    | 'mcpNativeBridge'
   >
 >;
 

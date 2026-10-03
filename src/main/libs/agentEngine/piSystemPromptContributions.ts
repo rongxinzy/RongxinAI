@@ -38,6 +38,10 @@ export interface PiSystemPromptContext {
   mcpToolManifest?: McpToolManifestEntry[];
   /** Configured MCP servers, including connection and discovery failures. */
   mcpServerStatuses?: McpServerRuntimeStatus[];
+  /** The pi 1.0 codemode sandbox tool is active for this work session. */
+  codemodeEnabled?: boolean;
+  /** pi's builtin MCP extension renders its own servers section this session. */
+  mcpNativeBridge?: boolean;
 }
 
 export interface PiSystemPromptContribution {
@@ -85,9 +89,23 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     prompt: PiBuiltinFileToolSystemPrompt,
   },
   {
+    id: 'codemode',
+    enabled: context => context.codemodeEnabled === true && context.chatMode !== true,
+    prompt: [
+      '## Parallel tool orchestration (codemode)',
+      '',
+      "- The `codemode` tool runs a JavaScript sandbox that can call this session's tools (`tools.read`, `tools.bash`, `tools.edit`, `tools.write`, plus registered workspace tools such as `task_output` and the MCP gateway).",
+      '- Prefer `codemode` when one step needs many independent tool calls: batch them inside the script with `await Promise.all(...)` instead of spending one reply per call.',
+      '- Filter and reduce large outputs inside the script; return only the distilled result so the conversation stays small.',
+      '- Every nested call still passes the session approval gate; a blocked call returns an error result inside the sandbox.',
+      '- Keep single tool calls, user interaction, and isolated multi-turn delegation on the normal tools (`subagent` for multi-turn work).',
+    ].join('\n'),
+  },
+  {
     id: 'mcp-capability-preflight',
     requiresFileTools: true,
     enabled: context =>
+      context.mcpNativeBridge !== true &&
       Boolean(context.mcpToolManifest?.length || context.mcpServerStatuses?.length),
     prompt: context =>
       buildPiMcpCapabilityPrompt(

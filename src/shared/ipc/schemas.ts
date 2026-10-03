@@ -443,6 +443,8 @@ export const CoworkConfigSetSchema = {
     embeddingVectorWeight: z.number().optional(),
     embeddingRemoteBaseUrl: z.string().optional(),
     embeddingRemoteApiKey: z.string().optional(),
+    codemodeEnabled: z.boolean().optional(),
+    mcpNativeBridge: z.boolean().optional(),
   }),
   output: IpcResult({}),
 };

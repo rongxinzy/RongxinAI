@@ -31,10 +31,13 @@ export {
   ProviderModelPiApi,
   ProviderModelPiCacheControlFormat,
   ProviderModelPiMaxTokensField,
+  ProviderModelPiThinkingBudgetField,
   ProviderModelPiThinkingFormat,
   resolveProviderModelPiReasoning,
 } from './piRuntime';
 export type {
+  ProviderModelPiCompaction,
+  ProviderModelPiInputLimits,
   ProviderModelPiRuntimeCompat,
   ProviderModelPiRuntimeConfig,
   ProviderModelPiThinkingLevel,

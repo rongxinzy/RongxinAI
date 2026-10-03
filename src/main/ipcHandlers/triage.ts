@@ -75,6 +75,11 @@ function sanitizeTriageConfig(raw: unknown): TriageConfig {
         typeof input.rules === 'object' && input.rules !== null
           ? String((input.rules as Record<string, unknown>).triageModelName || '')
           : DEFAULT_TRIAGE_CONFIG.rules.triageModelName,
+      classifierBaseUrl: /^https?:\/\//.test(
+        String((input.rules as Record<string, unknown>).classifierBaseUrl || ''),
+      )
+        ? String((input.rules as Record<string, unknown>).classifierBaseUrl).replace(/\/+$/, '')
+        : DEFAULT_TRIAGE_CONFIG.rules.classifierBaseUrl,
     },
   };
 }

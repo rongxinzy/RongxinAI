@@ -233,6 +233,14 @@ import {
   setStoreGetter,
 } from './libs/claudeSettings';
 import {
+  chooseTriageModelSwitch,
+  classifyMessage,
+  createTriageState,
+} from './libs/agentEngine/modelTriage';
+import { setTriageClassifierDeps } from './libs/agentEngine/piClassifierTriage';
+import { DEFAULT_TRIAGE_CONFIG, type TriageConfig, type TriageState } from '../shared/triage';
+import { ProviderName } from '../shared/providers';
+import {
   clearCopilotTokenState,
   initCopilotTokenManager,
   refreshCopilotTokenNow,
@@ -446,6 +454,64 @@ const resolveDefaultAgentModelRef = (): string => {
     return '';
   }
   return `${providerName}/${modelId}`;
+};
+
+const triageStatesBySession = new Map<string, TriageState>();
+
+/** Read the triage config from the sqlite kv store (same key as the IPC handlers). */
+const readTriageConfig = (): TriageConfig => {
+  try {
+    const stored = getStore().get<TriageConfig>('model_triage_config');
+    if (stored && typeof stored === 'object' && typeof stored.enabled === 'boolean') {
+      return stored;
+    }
+  } catch {
+    // fall through to defaults
+  }
+  return DEFAULT_TRIAGE_CONFIG;
+};
+
+/** classifier URL: explicit config first, then the enabled llama.cpp provider endpoint. */
+const resolveTriageClassifierBaseUrl = (config: TriageConfig): string => {
+  if (config.rules.classifierBaseUrl) return config.rules.classifierBaseUrl;
+  const llama = resolveAllEnabledProviderConfigs().find(
+    provider => provider.providerName === ProviderName.LlamaCpp && provider.baseURL,
+  );
+  return llama?.baseURL ?? '';
+};
+
+/**
+ * Classify the incoming prompt and switch the session model when the triage
+ * decision says so. Runs before the prompt is sent; failures never block the
+ * turn — the rule result and hysteresis keep routing conservative.
+ */
+const applyMessageTriageRouting = async (sessionId: string, prompt: string): Promise<void> => {
+  const config = readTriageConfig();
+  if (!config.enabled || !prompt.trim()) return;
+
+  const session = getCoworkStore().getSession(sessionId, null);
+  const messageCount = session?.messages?.length ?? 0;
+  const classifierBaseUrl = resolveTriageClassifierBaseUrl(config);
+  const effectiveConfig: TriageConfig = {
+    ...config,
+    rules: { ...config.rules, classifierBaseUrl },
+  };
+  const result = await classifyMessage(prompt, messageCount, effectiveConfig);
+  const state = triageStatesBySession.get(sessionId) ?? createTriageState();
+  const sessionOverride = session?.modelOverride?.trim() || '';
+  const currentModelRef = sessionOverride || resolveDefaultAgentModelRef();
+  const decision = chooseTriageModelSwitch(
+    currentModelRef,
+    result,
+    state,
+    config,
+    Math.max(1, messageCount),
+  );
+  triageStatesBySession.set(sessionId, decision.state);
+  if (decision.modelRef) {
+    await getPiRuntimeAdapter().patchSession(sessionId, { model: decision.modelRef });
+    console.log(`[Triage] session ${sessionId} routed to ${decision.modelRef} (${result.reason})`);
+  }
 };
 
 const migrateAgentModelRefs = (): number => {
@@ -3827,6 +3893,7 @@ if (!gotTheLock) {
         headers?: Record<string, string>;
         isBuiltIn?: boolean;
         registryId?: string;
+        exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
       },
     ) => {
       try {
@@ -3867,6 +3934,7 @@ if (!gotTheLock) {
         headers?: Record<string, string>;
         githubUrl?: string;
         registryId?: string;
+        exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
       },
     ) => {
       try {
@@ -3888,6 +3956,7 @@ if (!gotTheLock) {
           isBuiltIn: existing.isBuiltIn,
           githubUrl: data.githubUrl !== undefined ? data.githubUrl : existing.githubUrl,
           registryId: data.registryId !== undefined ? data.registryId : existing.registryId,
+          exposure: data.exposure !== undefined ? data.exposure : existing.exposure,
         };
 
         const validationError = await validateMcpServerConfig(merged);
@@ -4602,6 +4671,8 @@ if (!gotTheLock) {
             confirmationMode: 'modal',
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
+            codemode: config.codemodeEnabled === true,
+            mcpNativeBridge: config.mcpNativeBridge === true,
             approvalMode:
               (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
                 ? WorkbenchApprovalMode.AllowAll
@@ -4726,6 +4797,12 @@ if (!gotTheLock) {
         store.touchWorkspace(existingSession.workspaceId);
       }
 
+      try {
+        await applyMessageTriageRouting(options.sessionId, options.prompt);
+      } catch (triageError) {
+        console.warn('[Triage] routing failed; continuing with the current model:', triageError);
+      }
+
       runtime
         .continueSession(options.sessionId, options.prompt, {
           systemPrompt: runtimeSystemPrompt,
@@ -4736,6 +4813,8 @@ if (!gotTheLock) {
           attachedSkillIds: options.activeSkillIds,
           sessionMode,
           goalMode: options.goalMode,
+          codemode: store.getConfig().codemodeEnabled === true,
+          mcpNativeBridge: store.getConfig().mcpNativeBridge === true,
           imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
           workspaceRoot: existingSession?.cwd,
@@ -5676,6 +5755,8 @@ if (!gotTheLock) {
         embeddingVectorWeight?: number;
         embeddingRemoteBaseUrl?: string;
         embeddingRemoteApiKey?: string;
+        codemodeEnabled?: boolean;
+        mcpNativeBridge?: boolean;
       },
     ) => {
       try {
@@ -5699,6 +5780,10 @@ if (!gotTheLock) {
           executionMode: parseCoworkExecutionMode(config.executionMode),
           permissionMode: normalizedPermissionMode,
           permissionModeBySession: normalizedPermissionModeBySession,
+          codemodeEnabled:
+            typeof config.codemodeEnabled === 'boolean' ? config.codemodeEnabled : undefined,
+          mcpNativeBridge:
+            typeof config.mcpNativeBridge === 'boolean' ? config.mcpNativeBridge : undefined,
           ...normalizedEmbedding,
         };
         const previousConfig = getCoworkStore().getConfig();
@@ -7955,6 +8040,24 @@ if (!gotTheLock) {
     console.log(`[Main] initApp: MCP init done, ${mcpTools.length} tools available`);
 
     bindPiWorkbenchRuntimeForwarder();
+
+    // Wire pi's classifier API for message triage; failures disable the
+    // classifier path (rules still classify).
+    void (async () => {
+      try {
+        const [codingAgent, lazyApi] = await Promise.all([
+          import('@earendil-works/pi-coding-agent'),
+          import('@earendil-works/pi-ai/api/llama-cpp-classify.lazy'),
+        ]);
+        setTriageClassifierDeps({
+          ModelRuntime: codingAgent.ModelRuntime as never,
+          llamaCppClassifyApi: lazyApi.llamaCppClassifyApi as never,
+        });
+      } catch (error) {
+        console.warn('[Triage] pi classifier API unavailable:', error);
+        setTriageClassifierDeps(null);
+      }
+    })();
 
     const defaultAgentModelRef = resolveDefaultAgentModelRef();
     const backfilledAgentModels = getCoworkStore().backfillEmptyAgentModels(defaultAgentModelRef);

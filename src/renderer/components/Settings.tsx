@@ -23,6 +23,7 @@ import {
   PlusCircle,
   RefreshCw,
   ShieldCheck,
+  Route as RouteIcon,
   X,
   XCircle,
 } from 'lucide-react';
@@ -51,6 +52,8 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
+import { CodemodeToggleRow } from './settings/general/CodemodeToggleRow';
+import { McpNativeBridgeToggleRow } from './settings/general/McpNativeBridgeToggleRow';
 import {
   buildProviderModelConnectionTestNotification,
   buildProviderModelConnectionTestProgressNotification,
@@ -706,6 +709,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [triageMaxConversationRounds, setTriageMaxConversationRounds] = useState(20);
   const [triageUseLocalModel, setTriageUseLocalModel] = useState(false);
   const [triageModelName, setTriageModelName] = useState('');
+  const [triageClassifierBaseUrl, setTriageClassifierBaseUrl] = useState('');
   const [themeStyle, setThemeStyle] = useState(themeService.getStyle());
   const initialThemeStyleRef = useRef(themeService.getStyle());
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
@@ -1310,6 +1314,7 @@ const Settings: React.FC<SettingsProps> = ({
         setTriageMaxConversationRounds(config.rules.maxConversationRoundsForTriage);
         setTriageUseLocalModel(config.rules.useLocalModelTriage);
         setTriageModelName(config.rules.triageModelName);
+        setTriageClassifierBaseUrl(config.rules.classifierBaseUrl || '');
       })
       .catch(() => {
         /* triage not available */
@@ -3226,6 +3231,11 @@ const Settings: React.FC<SettingsProps> = ({
         icon: <SettingsAnimatedBoxIcon ref={modelIconRef} />,
       },
       {
+        key: 'triage' as TabType,
+        label: i18nService.t('modelTriageTitle') || '模型路由',
+        icon: <RouteIcon className="size-4" />,
+      },
+      {
         key: 'im' as TabType,
         label: i18nService.t('imBot'),
         icon: <SettingsAnimatedMessageCircleMoreIcon ref={imIconRef} />,
@@ -3334,6 +3344,12 @@ const Settings: React.FC<SettingsProps> = ({
               }}
               disabled={isUpdatingAutoLaunch}
             />
+
+            {/* Codemode Section */}
+            <CodemodeToggleRow />
+
+            {/* MCP Native Bridge Section */}
+            <McpNativeBridgeToggleRow />
 
             {/* Prevent Sleep Section */}
             <SettingsToggleRow
@@ -4884,7 +4900,8 @@ const Settings: React.FC<SettingsProps> = ({
                 {i18nService.t('modelTriageTitle') || '自动模型路由'}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                各 Agent 在 Agent 设置的「路由」tab 中分别启用和配置。此处为全局默认参数。
+                {i18nService.t('modelTriageGlobalHint') ||
+                  '按消息复杂度在轻量与重度模型间自动切换。此处配置全局参数，默认关闭。'}
               </p>
             </div>
 
@@ -5002,6 +5019,30 @@ const Settings: React.FC<SettingsProps> = ({
                     {i18nService.t('modelTriageModelNameNote') ||
                       '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。'}
                   </p>
+                  <div className="mt-3">
+                    <label className="text-xs font-medium text-muted-foreground block mb-1">
+                      {i18nService.t('modelTriageClassifierBaseUrlLabel') || '分类服务器地址'}
+                    </label>
+                    <Input
+                      type="text"
+                      value={triageClassifierBaseUrl}
+                      onChange={async e => {
+                        const value = e.target.value;
+                        setTriageClassifierBaseUrl(value);
+                        const config = await window.electron.triage.getConfig();
+                        await window.electron.triage.setConfig({
+                          ...config,
+                          rules: { ...config.rules, classifierBaseUrl: value },
+                        });
+                      }}
+                      placeholder="http://172.18.5.123:8000"
+                      className="theme-page-settings-input-4 w-full max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {i18nService.t('modelTriageClassifierBaseUrlNote') ||
+                        'llama.cpp 服务器根地址（不带 /v1）。留空时自动使用已启用的 llama.cpp 端点。'}
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

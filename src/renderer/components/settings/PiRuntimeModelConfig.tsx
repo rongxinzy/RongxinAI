@@ -5,6 +5,7 @@ import {
   CollapsibleTrigger,
 } from '@shared/components/ui/collapsible';
 import { Field, FieldGroup, FieldLabel, FieldSet } from '@shared/components/ui/field';
+import { Input } from '@shared/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -18,7 +19,9 @@ import {
   ProviderModelPiApi,
   ProviderModelPiCacheControlFormat,
   ProviderModelPiMaxTokensField,
+  ProviderModelPiThinkingBudgetField,
   ProviderModelPiThinkingFormat,
+  type ProviderModelPiInputLimits,
   type ProviderModelPiRuntimeCompat,
   type ProviderModelPiRuntimeConfig,
 } from '../../../shared/providers';
@@ -54,6 +57,7 @@ const COMPAT_BOOLEAN_FIELDS = [
   { key: 'supportsDeveloperRole', labelKey: 'piRuntimeCompatSupportsDeveloperRole' },
   { key: 'supportsReasoningEffort', labelKey: 'piRuntimeCompatSupportsReasoningEffort' },
   { key: 'supportsUsageInStreaming', labelKey: 'piRuntimeCompatSupportsUsageInStreaming' },
+  { key: 'supportsFinishReason', labelKey: 'piRuntimeCompatSupportsFinishReason' },
   { key: 'supportsStrictMode', labelKey: 'piRuntimeCompatSupportsStrictMode' },
   { key: 'requiresToolResultName', labelKey: 'piRuntimeCompatRequiresToolResultName' },
   {
@@ -66,6 +70,21 @@ const COMPAT_BOOLEAN_FIELDS = [
     labelKey: 'piRuntimeCompatRequiresReasoningContentOnAssistantMessages',
   },
 ] as const satisfies ReadonlyArray<{ key: CompatBooleanKey; labelKey: string }>;
+
+const THINKING_BUDGET_FIELD_OPTIONS = [
+  {
+    value: ProviderModelPiThinkingBudgetField.Vllm,
+    labelKey: 'piRuntimeThinkingBudgetFieldVllm',
+  },
+  {
+    value: ProviderModelPiThinkingBudgetField.QwenSglang,
+    labelKey: 'piRuntimeThinkingBudgetFieldQwenSglang',
+  },
+  {
+    value: ProviderModelPiThinkingBudgetField.LlamaCpp,
+    labelKey: 'piRuntimeThinkingBudgetFieldLlamaCpp',
+  },
+] as const;
 
 const MAX_TOKENS_FIELD_OPTIONS = [
   {
@@ -106,6 +125,21 @@ function updateCompatField<Key extends keyof ProviderModelPiRuntimeCompat>(
   return normalizeProviderModelPiRuntimeConfig({ ...value, compat });
 }
 
+function parseOptionalNumber(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (trimmed === '') return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function numberToInputValue(value: number | undefined): string {
+  return value === undefined ? '' : String(value);
+}
+
+type ImageResizeKey = keyof NonNullable<
+  NonNullable<ProviderModelPiInputLimits['images']>['resize']
+>;
+
 export interface PiRuntimeModelConfigProps {
   value?: ProviderModelPiRuntimeConfig;
   onChange: (value: ProviderModelPiRuntimeConfig | undefined) => void;
@@ -123,6 +157,71 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
 
   const updateReasoning = (checked: boolean) => {
     onChange(normalizeProviderModelPiRuntimeConfig({ ...value, reasoning: checked || undefined }));
+  };
+
+  const updateImageResizeField = (key: ImageResizeKey, raw: string) => {
+    const next = parseOptionalNumber(raw);
+    const limits = value?.inputLimits;
+    const resize = { ...(limits?.images?.resize ?? {}) };
+    if (next === undefined) {
+      delete resize[key];
+    } else {
+      resize[key] = next;
+    }
+    const images = { ...(limits?.images ?? {}) };
+    if (Object.keys(resize).length > 0) {
+      images.resize = resize;
+    } else {
+      delete images.resize;
+    }
+    const inputLimits = { ...(limits ?? {}) };
+    if (Object.keys(images).length > 0) {
+      inputLimits.images = images;
+    } else {
+      delete inputLimits.images;
+    }
+    if (Object.keys(inputLimits).length === 0) {
+      onChange(normalizeProviderModelPiRuntimeConfig({ ...value, inputLimits: undefined }));
+      return;
+    }
+    onChange(normalizeProviderModelPiRuntimeConfig({ ...value, inputLimits }));
+  };
+
+  const updateImageCountField = (key: 'maxPerMessage' | 'maxPerRequest', raw: string) => {
+    const next = parseOptionalNumber(raw);
+    const limits = value?.inputLimits;
+    const images = { ...(limits?.images ?? {}) };
+    if (next === undefined) {
+      delete images[key];
+    } else {
+      images[key] = next;
+    }
+    const inputLimits = { ...(limits ?? {}) };
+    if (Object.keys(images).length > 0) {
+      inputLimits.images = images;
+    } else {
+      delete inputLimits.images;
+    }
+    if (Object.keys(inputLimits).length === 0) {
+      onChange(normalizeProviderModelPiRuntimeConfig({ ...value, inputLimits: undefined }));
+      return;
+    }
+    onChange(normalizeProviderModelPiRuntimeConfig({ ...value, inputLimits }));
+  };
+
+  const updateCompactionField = (key: 'reserveTokens' | 'keepRecentTokens', raw: string) => {
+    const next = parseOptionalNumber(raw);
+    const compaction = { ...(value?.compaction ?? {}) };
+    if (next === undefined) {
+      delete compaction[key];
+    } else {
+      compaction[key] = next;
+    }
+    if (Object.keys(compaction).length === 0) {
+      onChange(normalizeProviderModelPiRuntimeConfig({ ...value, compaction: undefined }));
+      return;
+    }
+    onChange(normalizeProviderModelPiRuntimeConfig({ ...value, compaction }));
   };
 
   return (
@@ -283,6 +382,63 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
 
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
                   <FieldLabel className="theme-control-caption-muted">
+                    {i18nService.t('piRuntimeThinkingBudgetField')}
+                  </FieldLabel>
+                  <Select
+                    value={value?.compat?.thinkingTokenBudgetField ?? PiRuntimeSelectValue.Auto}
+                    onValueChange={nextValue =>
+                      onChange(
+                        updateCompatField(
+                          value,
+                          'thinkingTokenBudgetField',
+                          nextValue === PiRuntimeSelectValue.Auto || nextValue === null
+                            ? undefined
+                            : (nextValue as ProviderModelPiThinkingBudgetField),
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger>
+                      <SelectGroup>
+                        <SelectItem value={PiRuntimeSelectValue.Auto}>
+                          {i18nService.t('piRuntimeCompatAuto')}
+                        </SelectItem>
+                        {THINKING_BUDGET_FIELD_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {i18nService.t(option.labelKey)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field orientation="horizontal" className="items-center justify-between gap-2">
+                  <FieldLabel className="theme-control-caption-muted">
+                    {i18nService.t('piRuntimeVllmPriority')}
+                  </FieldLabel>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="theme-control-compact-field w-32 shrink-0"
+                    value={numberToInputValue(value?.compat?.vllmPriority)}
+                    onChange={e =>
+                      onChange(
+                        updateCompatField(
+                          value,
+                          'vllmPriority',
+                          parseOptionalNumber(e.target.value),
+                        ),
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field orientation="horizontal" className="items-center justify-between gap-2">
+                  <FieldLabel className="theme-control-caption-muted">
                     {i18nService.t('piRuntimeCacheControlFormat')}
                   </FieldLabel>
                   <Select
@@ -315,6 +471,114 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                   </Select>
                 </Field>
               </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Collapsible defaultOpen={false} className="col-span-2">
+          <CollapsibleTrigger className="theme-fold-compact flex w-full items-center justify-between">
+            {i18nService.t('piRuntimeInputLimitsAndBudgets')}
+            <ChevronDown className="size-4 text-muted-foreground" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeImageResizeMaxWidth')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.inputLimits?.images?.resize?.maxWidth)}
+                  onChange={e => updateImageResizeField('maxWidth', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeImageResizeMaxHeight')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.inputLimits?.images?.resize?.maxHeight)}
+                  onChange={e => updateImageResizeField('maxHeight', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeImageResizeMaxBytes')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.inputLimits?.images?.resize?.maxBytes)}
+                  onChange={e => updateImageResizeField('maxBytes', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeImageResizeJpegQuality')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.inputLimits?.images?.resize?.jpegQuality)}
+                  onChange={e => updateImageResizeField('jpegQuality', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeImageMaxPerMessage')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.inputLimits?.images?.maxPerMessage)}
+                  onChange={e => updateImageCountField('maxPerMessage', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeImageMaxPerRequest')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.inputLimits?.images?.maxPerRequest)}
+                  onChange={e => updateImageCountField('maxPerRequest', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeCompactionReserveTokens')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.compaction?.reserveTokens)}
+                  onChange={e => updateCompactionField('reserveTokens', e.target.value)}
+                />
+              </Field>
+              <Field orientation="horizontal" className="items-center justify-between gap-2">
+                <FieldLabel className="theme-control-caption-muted">
+                  {i18nService.t('piRuntimeCompactionKeepRecentTokens')}
+                </FieldLabel>
+                <Input
+                  type="number"
+                  min={1}
+                  className="theme-control-compact-field w-28 shrink-0"
+                  value={numberToInputValue(value?.compaction?.keepRecentTokens)}
+                  onChange={e => updateCompactionField('keepRecentTokens', e.target.value)}
+                />
+              </Field>
             </div>
           </CollapsibleContent>
         </Collapsible>

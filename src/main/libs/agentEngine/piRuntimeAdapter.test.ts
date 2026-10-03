@@ -56,6 +56,7 @@ const hoisted = vi.hoisted(() => {
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
+    bindExtensions: vi.fn().mockResolvedValue(undefined),
     getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
@@ -87,6 +88,9 @@ const hoisted = vi.hoisted(() => {
       this.reload = vi.fn().mockResolvedValue(undefined);
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
+    mockCreateCodemodeExtension: vi.fn(() => 'codemode-extension-factory'),
+    mockCreateMcpExtension: vi.fn(() => 'mcp-extension-factory'),
+    mockCreateToolSearchExtension: vi.fn(() => 'tool-search-extension-factory'),
     mockApplyApplicationRuntimeEnv: vi.fn(),
     mockCompleteSimple,
     mockGetModel: vi.fn((provider: string, modelId: string) => ({
@@ -208,6 +212,9 @@ const mockSessionManagerInMemory = hoisted.mockSessionManagerInMemory;
 const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
+const mockCreateCodemodeExtension = hoisted.mockCreateCodemodeExtension;
+const mockCreateMcpExtension = hoisted.mockCreateMcpExtension;
+const mockCreateToolSearchExtension = hoisted.mockCreateToolSearchExtension;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
@@ -229,6 +236,9 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
   ModelRuntime: {
     create: hoisted.mockModelRuntimeCreate,
   },
+  createCodemodeExtension: hoisted.mockCreateCodemodeExtension,
+  createToolSearchExtension: hoisted.mockCreateToolSearchExtension,
+  createMcpExtension: hoisted.mockCreateMcpExtension,
 }));
 
 vi.mock('@earendil-works/pi-ai/compat', () => ({
@@ -796,6 +806,78 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
+    it('forwards per-model compaction budgets through compaction.modelOverrides', async () => {
+      mockResolveRawApiConfigForModelRef.mockImplementationOnce(() => ({
+        config: {
+          apiKey: 'sk-test',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          model: 'qwen-compact',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'llamacpp',
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName: 'qwen-compact',
+          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+          contextWindow: 32768,
+          contextTokens: 32768,
+          maxTokens: 4096,
+          piRuntime: { compaction: { reserveTokens: 4096, keepRecentTokens: 6000 } },
+        },
+      }));
+      await adapter.startSession('per-model-compaction', 'Hello', {
+        modelOverride: 'llamacpp/qwen-compact',
+      });
+
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        compaction: {
+          enabled: true,
+          reserveTokens: 8_192,
+          keepRecentTokens: 16_384,
+          modelOverrides: {
+            'llamacpp/qwen-compact': { reserveTokens: 4096, keepRecentTokens: 6000 },
+          },
+        },
+      });
+    });
+
+    it('emits configured piRuntime input limits on the custom model only when set', async () => {
+      mockResolveRawApiConfigForModelRef.mockImplementationOnce(() => ({
+        config: {
+          apiKey: 'sk-test',
+          baseURL: 'http://127.0.0.1:11434/v1',
+          model: 'qwen-limits',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'llamacpp',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          modelName: 'qwen-limits',
+          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+          contextWindow: 32768,
+          contextTokens: 32768,
+          maxTokens: 4096,
+          piRuntime: {
+            inputLimits: { images: { resize: { maxWidth: 1280, maxHeight: 960 } } },
+          },
+        },
+      }));
+      await adapter.startSession('input-limits', 'Hello', {
+        modelOverride: 'llamacpp/qwen-limits',
+      });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            inputLimits: { images: { resize: { maxWidth: 1280, maxHeight: 960 } } },
+          }),
+        }),
+      );
+    });
+
     it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
       await adapter.startSession('settings-manager', 'Hello Pi');
 
@@ -815,6 +897,103 @@ describe('PiRuntimeAdapter', () => {
           keepRecentTokens: 16_384,
         },
       });
+    });
+
+    it('keeps codemode extensions off the default session wiring', async () => {
+      await adapter.startSession('codemode-off', 'Hello Pi');
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      const factories = loaderOptions?.extensionFactories ?? [];
+      expect(factories).not.toContain('codemode-extension-factory');
+      expect(factories).not.toContain('tool-search-extension-factory');
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
+        expect.objectContaining({ defaultTools: expect.any(Array) }),
+      );
+    });
+
+    it('registers codemode extensions and activates the tool when requested', async () => {
+      await adapter.startSession('codemode-on', 'Hello Pi', { codemode: true });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      const factories = loaderOptions?.extensionFactories ?? [];
+      expect(factories).toContain('codemode-extension-factory');
+      expect(factories).toContain('tool-search-extension-factory');
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        defaultTools: ['+codemode'],
+      });
+    });
+
+    it('routes work sessions through the native MCP extension when enabled', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [
+          {
+            server: 'Supabase',
+            name: 'list_projects',
+            description: 'List projects',
+            inputSchema: { type: 'object' },
+          },
+        ],
+        lastEnabledRecords: [],
+      } as never);
+      await adapter.startSession('mcp-native', 'Hello Pi', { mcpNativeBridge: true });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      expect(loaderOptions?.extensionFactories).toContain('mcp-extension-factory');
+      expect(mockCreateMcpExtension).toHaveBeenCalledWith(
+        expect.objectContaining({
+          loadConfig: expect.any(Function),
+          createTransport: expect.any(Function),
+        }),
+      );
+      expect(mockSession.bindExtensions).toHaveBeenCalled();
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions?.customTools?.map(tool => tool.name)).not.toContain(PiMcpTool.Name);
+    });
+
+    it('keeps the gateway tool when the native bridge is off', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [
+          {
+            server: 'Supabase',
+            name: 'list_projects',
+            description: 'List projects',
+            inputSchema: { type: 'object' },
+          },
+        ],
+      } as never);
+      await adapter.startSession('mcp-gateway', 'Hello Pi');
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      expect(loaderOptions?.extensionFactories ?? []).not.toContain('mcp-extension-factory');
+      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions?.customTools?.map(tool => tool.name)).toContain(PiMcpTool.Name);
+    });
+
+    it('excludes codemode from chat sessions even when requested', async () => {
+      await adapter.startSession('codemode-chat', 'Hello', {
+        codemode: true,
+        sessionMode: 'chat',
+      });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      expect(loaderOptions?.extensionFactories ?? []).not.toContain('codemode-extension-factory');
     });
 
     it('should resolve the explicit model override for a new session', async () => {
