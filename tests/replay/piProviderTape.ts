@@ -326,6 +326,9 @@ export class PiProviderTapeServer {
       contentType,
       responseBody,
     });
+    // A crashed recording must not lose everything captured so far: flush
+    // incrementally instead of only at close.
+    this.flushTape();
     res.writeHead(response.status, { 'content-type': contentType });
     res.end(responseBody);
   }
