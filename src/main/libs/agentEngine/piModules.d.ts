@@ -46,6 +46,24 @@ declare module '@earendil-works/pi-coding-agent' {
   export function createCodemodeExtension(options?: Record<string, unknown>): unknown;
   /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
   export function createToolSearchExtension(): unknown;
+  /** Registers the builtin MCP extension (config/transport injectable). */
+  export function createMcpExtension(options?: {
+    loadConfig?: () => {
+      servers: Array<{
+        name: string;
+        config: Record<string, unknown>;
+        source: string;
+        scope?: 'global' | 'project' | 'extension';
+      }>;
+      autoEnableCodemode?: boolean;
+      errors: string[];
+    };
+    createTransport?: (
+      entry: { name: string; config: Record<string, unknown>; source: string },
+      cwd: string,
+      authProvider: unknown,
+    ) => unknown;
+  }): unknown;
 
   export const ModelRuntime: {
     create(options?: { allowModelNetwork?: boolean }): Promise<{

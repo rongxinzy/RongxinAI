@@ -3827,6 +3827,7 @@ if (!gotTheLock) {
         headers?: Record<string, string>;
         isBuiltIn?: boolean;
         registryId?: string;
+        exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
       },
     ) => {
       try {
@@ -3867,6 +3868,7 @@ if (!gotTheLock) {
         headers?: Record<string, string>;
         githubUrl?: string;
         registryId?: string;
+        exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
       },
     ) => {
       try {
@@ -3888,6 +3890,7 @@ if (!gotTheLock) {
           isBuiltIn: existing.isBuiltIn,
           githubUrl: data.githubUrl !== undefined ? data.githubUrl : existing.githubUrl,
           registryId: data.registryId !== undefined ? data.registryId : existing.registryId,
+          exposure: data.exposure !== undefined ? data.exposure : existing.exposure,
         };
 
         const validationError = await validateMcpServerConfig(merged);
@@ -4603,6 +4606,7 @@ if (!gotTheLock) {
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
             codemode: config.codemodeEnabled === true,
+            mcpNativeBridge: config.mcpNativeBridge === true,
             approvalMode:
               (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
                 ? WorkbenchApprovalMode.AllowAll
@@ -4738,6 +4742,7 @@ if (!gotTheLock) {
           sessionMode,
           goalMode: options.goalMode,
           codemode: store.getConfig().codemodeEnabled === true,
+          mcpNativeBridge: store.getConfig().mcpNativeBridge === true,
           imageAttachments: storedImages,
           fileAttachments: options.fileAttachments,
           workspaceRoot: existingSession?.cwd,
@@ -5679,6 +5684,7 @@ if (!gotTheLock) {
         embeddingRemoteBaseUrl?: string;
         embeddingRemoteApiKey?: string;
         codemodeEnabled?: boolean;
+        mcpNativeBridge?: boolean;
       },
     ) => {
       try {
@@ -5704,6 +5710,8 @@ if (!gotTheLock) {
           permissionModeBySession: normalizedPermissionModeBySession,
           codemodeEnabled:
             typeof config.codemodeEnabled === 'boolean' ? config.codemodeEnabled : undefined,
+          mcpNativeBridge:
+            typeof config.mcpNativeBridge === 'boolean' ? config.mcpNativeBridge : undefined,
           ...normalizedEmbedding,
         };
         const previousConfig = getCoworkStore().getConfig();

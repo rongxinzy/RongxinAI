@@ -76,6 +76,7 @@ import {
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
+import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import type { CoworkMessage } from '../../coworkStore';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -321,6 +322,8 @@ interface ActivePiSession {
   modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
   /** Whether this session runs with the pi 1.0 codemode tool active. */
   codemodeEnabled: boolean;
+  /** Whether pi's builtin MCP extension owns this session's MCP tools. */
+  mcpNativeBridge: boolean;
   capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
@@ -434,6 +437,8 @@ interface PiModules {
   createCodemodeExtension?: (options?: Record<string, unknown>) => unknown;
   /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
   createToolSearchExtension?: () => unknown;
+  /** Registers the builtin MCP extension (config/transport injectable). */
+  createMcpExtension?: (options?: Record<string, unknown>) => unknown;
   completeSimple: (
     model: unknown,
     context: ReturnType<typeof buildPiBackgroundCompletionContext>,
@@ -620,6 +625,13 @@ async function getPiModules(): Promise<PiModules> {
                 createToolSearchExtension?: unknown;
               }
             ).createToolSearchExtension as PiModules['createToolSearchExtension'])
+          : undefined,
+        createMcpExtension: Object.prototype.hasOwnProperty.call(codingAgent, 'createMcpExtension')
+          ? ((
+              codingAgent as typeof codingAgent & {
+                createMcpExtension?: unknown;
+              }
+            ).createMcpExtension as PiModules['createMcpExtension'])
           : undefined,
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
@@ -1129,6 +1141,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           : undefined;
       const codemodeEnabled =
         options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
+      const mcpNativeBridge =
+        options.mcpNativeBridge === true &&
+        !resourceState.chatMode &&
+        Boolean(this.mcpServerManager);
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
         taskOutputEnabled:
@@ -1140,6 +1156,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           options.approvalMode ??
           WorkbenchApprovalMode.Ask,
         enableCodemode: codemodeEnabled,
+        enableMcpNative: mcpNativeBridge,
       });
       this.applyPiCompactionOverrides(
         settingsManager,
@@ -1277,7 +1294,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
       if (!resourceState.chatMode) {
-        const mcpProxyTool = this.buildMcpProxyTool();
+        // The native bridge owns MCP tools when enabled; the gateway tool
+        // would expose the same servers a second time.
+        const mcpProxyTool = mcpNativeBridge ? null : this.buildMcpProxyTool();
         if (mcpProxyTool) {
           customTools.push(mcpProxyTool);
         }
@@ -1441,6 +1460,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
+      if (mcpNativeBridge && typeof session.bindExtensions === 'function') {
+        // The MCP extension connects its servers on session start; without an
+        // explicit bind, SDK sessions never emit it (verified against pi's SDK
+        // docs and examples/sdk/14-codemode-mcp.ts).
+        await session.bindExtensions({});
+      }
       const piSessionCreatedAt = Date.now();
       if (!isCurrentInitialization()) {
         void session.abort();
@@ -1456,6 +1481,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         modelRequestOptions: resolvedModel.requestOptions,
         modelCompactionOverride: resolvedModel.modelCompactionOverride,
         codemodeEnabled,
+        mcpNativeBridge,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1710,6 +1736,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         : CoworkSessionMode.Work);
     const nextGoalMode = options.goalMode ?? active.goalMode;
     const nextCodemode = options.codemode ?? active.codemodeEnabled;
+    const nextMcpNativeBridge = options.mcpNativeBridge ?? active.mcpNativeBridge;
     // Plan mode is per-turn: an ordinary follow-up clears it again.
     const nextPlanMode = options.planMode === true;
     const mcpToolTopologyChanged =
@@ -1722,6 +1749,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
       nextGoalMode !== active.goalMode ||
       nextCodemode !== active.codemodeEnabled ||
+      nextMcpNativeBridge !== active.mcpNativeBridge ||
       mcpToolTopologyChanged ||
       unattendedTopologyChanged
     ) {
@@ -1753,6 +1781,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
         codemode: nextCodemode,
+        mcpNativeBridge: nextMcpNativeBridge,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
@@ -1796,6 +1825,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
         codemode: nextCodemode,
+        mcpNativeBridge: nextMcpNativeBridge,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
@@ -2803,6 +2833,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       getApprovalMode: () => WorkbenchApprovalMode;
       /** Register the pi 1.0 codemode + tool_search extensions (work sessions). */
       enableCodemode?: boolean;
+      /** Register pi's builtin MCP extension, replacing the gateway tool. */
+      enableMcpNative?: boolean;
     },
     additionalExtensionFactories: PiExtensionFactory[] = [],
   ): Promise<PiResourceLoader> {
@@ -2857,6 +2889,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             ? []
             : (this.mcpServerManager?.serverStatuses ?? []),
           codemodeEnabled: approvalContext?.enableCodemode === true,
+          mcpNativeBridge: approvalContext?.enableMcpNative === true,
         }),
       ),
       extensionFactories: [
@@ -2957,6 +2990,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         pi.createCodemodeExtension &&
         pi.createToolSearchExtension
           ? [pi.createCodemodeExtension(), pi.createToolSearchExtension()]
+          : []),
+        ...(approvalContext?.enableMcpNative && pi.createMcpExtension && this.mcpServerManager
+          ? [
+              pi.createMcpExtension({
+                loadConfig: () =>
+                  buildPiLoadedMcpConfig(this.mcpServerManager?.lastEnabledRecords ?? []),
+                createTransport: buildPiMcpTransportFactory(
+                  () => this.mcpServerManager?.lastEnabledRecords ?? [],
+                ),
+              }),
+            ]
           : []),
         ...additionalExtensionFactories,
       ],

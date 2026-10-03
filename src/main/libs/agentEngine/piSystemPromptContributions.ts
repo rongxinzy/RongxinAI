@@ -40,6 +40,8 @@ export interface PiSystemPromptContext {
   mcpServerStatuses?: McpServerRuntimeStatus[];
   /** The pi 1.0 codemode sandbox tool is active for this work session. */
   codemodeEnabled?: boolean;
+  /** pi's builtin MCP extension renders its own servers section this session. */
+  mcpNativeBridge?: boolean;
 }
 
 export interface PiSystemPromptContribution {
@@ -103,6 +105,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     id: 'mcp-capability-preflight',
     requiresFileTools: true,
     enabled: context =>
+      context.mcpNativeBridge !== true &&
       Boolean(context.mcpToolManifest?.length || context.mcpServerStatuses?.length),
     prompt: context =>
       buildPiMcpCapabilityPrompt(
