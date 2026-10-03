@@ -29,6 +29,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+// The mode switch defers onModeChange by one animation frame (optimistic
+// thumb transition); assertions must flush that frame first.
+const flushModeChangeFrame = () =>
+  new Promise<void>(resolve => {
+    requestAnimationFrame(() => resolve());
+  });
+
 const props = () => ({
   activeView: 'cowork' as const,
   workMode: WorkMode.Work,
@@ -49,11 +56,13 @@ test('changes work mode exactly once per click or keyboard activation', async ()
   render(createElement(SidebarNavigationControls, handlers));
   const toggle = screen.getByRole('switch');
   await user.click(toggle);
+  await flushModeChangeFrame();
   expect(handlers.onWorkModeChange).toHaveBeenCalledTimes(1);
   expect(handlers.onWorkModeChange.mock.calls[0][0]).toBe(true);
   handlers.onWorkModeChange.mockClear();
   toggle.focus();
   await user.keyboard(' ');
+  await flushModeChangeFrame();
   expect(handlers.onWorkModeChange).toHaveBeenCalledTimes(1);
 });
 
@@ -104,6 +113,7 @@ test('keeps managed-only and chat navigation policies and chat workspace selecti
   expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
   expect(mocks.clearWorkspaceSelection).not.toHaveBeenCalled();
   await user.click(screen.getByRole('switch', { name: 'workMode / chatMode' }));
+  await flushModeChangeFrame();
   expect(handlers.onWorkModeChange.mock.calls[0][0]).toBe(false);
 });
 

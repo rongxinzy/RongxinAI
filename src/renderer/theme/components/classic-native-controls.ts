@@ -1,7 +1,7 @@
 import { recipe } from './recipe';
 
 /** Native controls keep their DOM and handlers while sharing package-owned state styles. */
-export function classicNativeControls(dark: boolean) {
+export function classicNativeControls() {
   const transition = {
     'transition-property': 'color, background-color, border-color, box-shadow',
     'transition-duration': '150ms',
@@ -52,9 +52,6 @@ export function classicNativeControls(dark: boolean) {
       },
       hover: fieldRing,
       focus: { ...fieldRing, 'border-color': 'var(--ring)' },
-    }),
-    'native-question-field': recipe({
-      placeholder: { color: dark ? 'var(--zy-text-secondary)' : 'var(--muted-foreground)' },
     }),
     'native-rename-field': recipe({
       base: { 'font-weight': 'var(--zy-component-font-weight-medium)' },

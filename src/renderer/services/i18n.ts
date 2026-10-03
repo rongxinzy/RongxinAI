@@ -1746,11 +1746,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkStatusRunning: '运行中',
     coworkStatusCompleted: '已完成',
     coworkStatusError: '错误',
-    coworkPermissionRequired: '需要权限确认',
-    coworkPermissionDescription: '知远智能体 请求执行以下操作',
-    coworkSelectionRequired: '请选择',
-    coworkSelectionDescription: '知远智能体 需要你做出选择',
-    coworkToolName: '工具名称',
     coworkToolWebSearch: '网页搜索',
     coworkToolInput: '工具参数',
     coworkToolResult: '执行结果',
@@ -1766,7 +1761,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkTodoBlocked: '受阻',
     coworkTodoUntitled: '未命名待办',
     coworkTodoUnknownStatus: '未知状态',
-    coworkDangerousOperation: '警告：此操作可能会修改文件或执行系统命令，请仔细检查。',
     coworkDestructiveOperation: '高危操作：此命令可能导致不可逆的数据丢失，请务必确认。',
     coworkCautionOperation: '注意：此命令可能会修改文件或系统状态，请仔细检查。',
     dangerReasonRecursiveDelete: '递归删除文件',
@@ -1780,10 +1774,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     dangerReasonPermissionChange: '修改文件权限',
     coworkApprove: '允许',
     coworkDeny: '拒绝',
-    coworkConfirmSelection: '提交当前选择',
     coworkDenyRequest: '直接拒绝请求',
     coworkQuestionWizardTitle: '需要您的确认',
-    coworkQuestionWizardSkip: '跳过',
     coworkQuestionWizardPrevious: '上一个',
     coworkQuestionWizardNext: '下一个',
     coworkQuestionWizardSubmit: '提交',
@@ -2431,7 +2423,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '允许模型在沙箱脚本中并行编排多个工具调用，长任务的批量操作更省轮次；关闭时不影响现有会话行为',
     mcpNativeBridge: 'MCP 原生桥接',
     mcpNativeBridgeDescription:
-      '工作会话改用 pi 内置 MCP 扩展连接服务器，按服务器暴露级别渐进展示工具；关闭时沿用单网关工具',
+      '工作会话改用内置 MCP 扩展连接服务器，按服务器暴露级别渐进展示工具；关闭时沿用单网关工具',
     mcpExposure: '工具暴露级别',
     mcpExposureCodemode: 'codemode（仅编排脚本可见）',
     mcpExposureDeferred: 'deferred（按需经 tool_search 加载）',
@@ -3135,6 +3127,27 @@ const translations: Record<LanguageType, Record<string, string>> = {
     sqliteAutoBackupEnabledDescription: '开启后将自动备份数据，并在启动时尝试恢复损坏的数据',
     preventSleep: '防止休眠',
     preventSleepDescription: '防止系统将应用进程挂起（无法阻止系统睡眠或关闭显示器）',
+
+    // 模型路由
+    modelTriageTitle: '模型路由',
+    modelTriageGlobalHint: '按消息复杂度在轻量与重度模型间自动切换。此处配置全局参数，默认关闭。',
+    modelTriageGlobalDefaults: '全局默认参数',
+    modelTriageCooldownLabel: '冷却轮次',
+    modelTriageCooldownHint: '切换后需等待 N 轮才能再次切换，防止频繁抖动',
+    modelTriageMaxRoundsLabel: '对话路由上限',
+    modelTriageMaxRoundsHint: '超过此轮数后视为深度对话，使用默认模型',
+    modelTriageRoundsUnit: '轮',
+    modelTriageLocalClassifierTitle: '本地模型分类（实验性）',
+    modelTriageLocalClassifierHint: '规则无法确定路由目标时，调用本地小模型进行分类',
+    modelTriageUseLocalModelLabel: '使用本地小模型辅助分类',
+    modelTriageUseLocalModelHint: '需先在本地推理页启动服务并加载模型',
+    modelTriageModelNameLabel: '分类模型名称',
+    modelTriageModelNamePlaceholder: '例如: qwen2.5-0.5b',
+    modelTriageModelNameNote: '需要先在本地推理中加载该模型。推荐使用 0.5B-1B 的轻量模型。',
+    modelTriageClassifierBaseUrlLabel: '分类服务器地址',
+    modelTriageClassifierBaseUrlPlaceholder: 'http://127.0.0.1:8000',
+    modelTriageClassifierBaseUrlNote:
+      '本地推理服务器根地址（不带 /v1）。留空时自动使用已启用的端点。',
 
     // 定时任务
     scheduledTasks: '自动化',
@@ -5506,11 +5519,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkStatusRunning: 'Running',
     coworkStatusCompleted: 'Completed',
     coworkStatusError: 'Error',
-    coworkPermissionRequired: 'Permission Required',
-    coworkPermissionDescription: 'ZhiYuan Agent is requesting to perform the following action',
-    coworkSelectionRequired: 'Please Choose',
-    coworkSelectionDescription: 'ZhiYuan Agent needs your input',
-    coworkToolName: 'Tool Name',
     coworkToolWebSearch: 'Web Search',
     coworkToolInput: 'Tool Input',
     coworkToolResult: 'Result',
@@ -5526,8 +5534,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkTodoBlocked: 'blocked',
     coworkTodoUntitled: 'Untitled todo',
     coworkTodoUnknownStatus: 'Unknown status',
-    coworkDangerousOperation:
-      'Warning: This operation may modify files or execute system commands. Please review carefully.',
     coworkDestructiveOperation:
       'Destructive operation: This command may cause irreversible data loss. Please confirm carefully.',
     coworkCautionOperation:
@@ -5543,10 +5549,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     dangerReasonPermissionChange: 'File permission change',
     coworkApprove: 'Approve',
     coworkDeny: 'Deny',
-    coworkConfirmSelection: 'Submit selection',
     coworkDenyRequest: 'Deny request',
     coworkQuestionWizardTitle: 'Confirmation Needed',
-    coworkQuestionWizardSkip: 'Skip',
     coworkQuestionWizardPrevious: 'Previous',
     coworkQuestionWizardNext: 'Next',
     coworkQuestionWizardSubmit: 'Submit',
@@ -5601,7 +5605,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Let the model orchestrate parallel tool calls from a sandbox script — fewer rounds for batch work in long tasks. Off keeps current session behavior unchanged',
     mcpNativeBridge: 'MCP native bridge',
     mcpNativeBridgeDescription:
-      "Work sessions connect MCP servers through pi's builtin extension with per-server progressive tool exposure; off keeps the single gateway tool",
+      'Work sessions connect MCP servers through the builtin extension with per-server progressive tool exposure; off keeps the single gateway tool',
     mcpExposure: 'Tool exposure',
     mcpExposureCodemode: 'codemode (sandbox scripts only)',
     mcpExposureDeferred: 'deferred (loaded via tool_search)',
@@ -6993,6 +6997,33 @@ const translations: Record<LanguageType, Record<string, string>> = {
     preventSleep: 'Prevent Sleep',
     preventSleepDescription:
       'Prevent the system from suspending the app process (does not block system sleep or display off)',
+
+    // Model Routing
+    modelTriageTitle: 'Model Routing',
+    modelTriageGlobalHint:
+      'Automatically switch between lightweight and heavyweight models based on message complexity. Global parameters, off by default.',
+    modelTriageGlobalDefaults: 'Global Defaults',
+    modelTriageCooldownLabel: 'Cooldown Rounds',
+    modelTriageCooldownHint:
+      'After a switch, wait N rounds before switching again to prevent flapping',
+    modelTriageMaxRoundsLabel: 'Chat Routing Limit',
+    modelTriageMaxRoundsHint:
+      'Beyond this many rounds, the conversation is treated as deep and uses the default model',
+    modelTriageRoundsUnit: 'rounds',
+    modelTriageLocalClassifierTitle: 'Local Model Classification (Experimental)',
+    modelTriageLocalClassifierHint:
+      'When rules cannot determine a routing target, call a local small model to classify',
+    modelTriageUseLocalModelLabel: 'Use a local small model to assist classification',
+    modelTriageUseLocalModelHint:
+      'Start the service and load a model on the Local Inference page first',
+    modelTriageModelNameLabel: 'Classifier Model Name',
+    modelTriageModelNamePlaceholder: 'e.g. qwen2.5-0.5b',
+    modelTriageModelNameNote:
+      'The model must be loaded in Local Inference first. A lightweight 0.5B–1B model is recommended.',
+    modelTriageClassifierBaseUrlLabel: 'Classifier Server Address',
+    modelTriageClassifierBaseUrlPlaceholder: 'http://127.0.0.1:8000',
+    modelTriageClassifierBaseUrlNote:
+      'Root address of the local inference server (without /v1). Leave empty to use the enabled endpoint.',
 
     // Scheduled Tasks
     scheduledTasks: 'Automation',
