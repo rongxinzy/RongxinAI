@@ -14,6 +14,7 @@ import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
+import { imPlatformLogo } from '../../assets/imLogos';
 import WecomAIBotSDK from '@wecom/wecom-aibot-sdk';
 import {
   CheckCircle,
@@ -719,7 +720,7 @@ const IMSettings: React.FC = () => {
       {/* Platform List - Left Side */}
       <div className="w-48 shrink-0 border-r border-border pr-3 flex flex-col gap-2 overflow-y-auto">
         {platforms.map(platform => {
-          const logo = PlatformRegistry.logo(platform);
+          const logo = imPlatformLogo(platform);
           const isEnabled = isPlatformEnabled(platform);
           const canToggle = isEnabled || canStart(platform);
 
@@ -747,7 +748,7 @@ const IMSettings: React.FC = () => {
                   <div className="flex flex-1 items-center">
                     <div className="mr-2 flex size-7 items-center justify-center">
                       <img
-                        src={PlatformRegistry.logo('dingtalk')}
+                        src={imPlatformLogo('dingtalk')}
                         alt="DingTalk"
                         className="size-6 object-contain rounded-md"
                       />
@@ -826,7 +827,7 @@ const IMSettings: React.FC = () => {
                   <div className="flex flex-1 items-center">
                     <div className="mr-2 flex size-7 items-center justify-center">
                       <img
-                        src={PlatformRegistry.logo('feishu')}
+                        src={imPlatformLogo('feishu')}
                         alt="Feishu"
                         className="size-6 object-contain rounded-md"
                       />
@@ -902,7 +903,7 @@ const IMSettings: React.FC = () => {
                   <div className="flex flex-1 items-center">
                     <div className="mr-2 flex size-7 items-center justify-center">
                       <img
-                        src={PlatformRegistry.logo('qq')}
+                        src={imPlatformLogo('qq')}
                         alt="QQ"
                         className="size-6 object-contain rounded-md"
                       />
@@ -978,7 +979,7 @@ const IMSettings: React.FC = () => {
                   <div className="flex flex-1 items-center">
                     <div className="mr-2 flex size-7 items-center justify-center">
                       <img
-                        src={PlatformRegistry.logo('wecom')}
+                        src={imPlatformLogo('wecom')}
                         alt="WeCom"
                         className="size-6 object-contain rounded-md"
                       />
@@ -1056,7 +1057,7 @@ const IMSettings: React.FC = () => {
                   <div className="flex flex-1 items-center">
                     <div className="mr-2 flex size-7 items-center justify-center">
                       <img
-                        src={PlatformRegistry.logo('telegram')}
+                        src={imPlatformLogo('telegram')}
                         alt="Telegram"
                         className="size-6 object-contain rounded-md"
                       />
@@ -1135,7 +1136,7 @@ const IMSettings: React.FC = () => {
                   <div className="flex flex-1 items-center">
                     <div className="mr-2 flex size-7 items-center justify-center">
                       <img
-                        src={PlatformRegistry.logo('discord')}
+                        src={imPlatformLogo('discord')}
                         alt="Discord"
                         className="size-6 object-contain rounded-md"
                       />
@@ -1235,7 +1236,7 @@ const IMSettings: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
                 <img
-                  src={PlatformRegistry.logo(activePlatform)}
+                  src={imPlatformLogo(activePlatform)}
                   alt={i18nService.t(activePlatform)}
                   className="size-4 object-contain rounded"
                 />
@@ -1266,7 +1267,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'dingtalk' && !activeDingTalkInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img
-              src={PlatformRegistry.logo('dingtalk')}
+              src={imPlatformLogo('dingtalk')}
               alt="DingTalk"
               className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
@@ -1404,7 +1405,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'feishu' && !activeFeishuInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img
-              src={PlatformRegistry.logo('feishu')}
+              src={imPlatformLogo('feishu')}
               alt="Feishu"
               className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
@@ -1540,7 +1541,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'qq' && !activeQQInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img
-              src={PlatformRegistry.logo('qq')}
+              src={imPlatformLogo('qq')}
               alt="QQ"
               className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
@@ -1662,7 +1663,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'telegram' && !activeTelegramInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img
-              src={PlatformRegistry.logo('telegram')}
+              src={imPlatformLogo('telegram')}
               alt="Telegram"
               className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
@@ -1799,7 +1800,7 @@ const IMSettings: React.FC = () => {
         {activePlatform === 'discord' && !activeDiscordInstanceId && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <img
-              src={PlatformRegistry.logo('discord')}
+              src={imPlatformLogo('discord')}
               alt="Discord"
               className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
@@ -2201,7 +2202,7 @@ const IMSettings: React.FC = () => {
             return (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <img
-                  src={PlatformRegistry.logo('wecom')}
+                  src={imPlatformLogo('wecom')}
                   alt="WeCom"
                   className="size-12 object-contain rounded-md mb-4 opacity-50"
                 />
