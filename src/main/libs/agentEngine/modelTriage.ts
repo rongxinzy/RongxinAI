@@ -1,8 +1,7 @@
 import type { TriageConfig, TriageResult, TriageState, TriageTier } from '../../../shared/triage';
 import { TRIAGE_TIER_ORDER } from '../../../shared/triage';
 
-const LLAMACPP_BASE_URL = 'http://127.0.0.1:8080';
-const TRIAGE_LOCAL_MODEL_TIMEOUT_MS = 3_000;
+import { classifyTierForTriage } from './piClassifierTriage';
 
 /**
  * Build a classifier-friendly snippet from user input.
@@ -171,98 +170,75 @@ export async function classifyMessage(
   return ruleResult;
 }
 
-// ─── Phase 2.1b: Local model classification ──────────────────────────────
+// ─── Local model classification (pi classifier) ───────────────────────────
 
 /**
- * Classification prompt sent to the local model.
- * The user message is appended after this system prompt.
+ * Classify a user message with the configured llama.cpp classifier model.
  *
- * Design goals:
- * - Isolate classification from user content (separate system prompt)
- * - Request structured output (single word)
- * - Keep the prompt small for fast inference on small models
- */
-const TRIAGE_CLASSIFIER_PROMPT = `Classify the following user message into exactly one category:
-- light: simple greeting, thanks, goodbye, small talk, simple factual question, short translation
-- standard: normal conversation, general question, moderate instruction
-- heavy: complex coding task, architecture design, debugging, long analysis, refactoring
-
-Reply with only one word: light, standard, or heavy.`;
-
-interface _LocalClassificationResponse {
-  category: 'light' | 'standard' | 'heavy' | null;
-  error?: string;
-}
-
-/**
- * Classify a user message using a local llama.cpp model.
- *
- * Sends the classification prompt + truncated user message to the
- * llama.cpp server's /v1/chat/completions endpoint.
- *
- * Returns null on any failure — caller should fall back to standard tier.
+ * pi's llama-cpp-classify API reads next-token label probabilities from the
+ * server root configured in `rules.classifierBaseUrl` — no full generation,
+ * no hardcoded port. Returns null on any failure so the caller keeps the
+ * rule-based result.
  */
 export async function classifyByLocalModel(
   prompt: string,
   triageModelName: string,
   config: TriageConfig,
 ): Promise<TriageResult | null> {
-  const truncated = truncateForClassification(prompt);
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TRIAGE_LOCAL_MODEL_TIMEOUT_MS);
+  const baseUrl = config.rules.classifierBaseUrl;
+  if (!baseUrl || !triageModelName) return null;
 
-  try {
-    const response = await fetch(`${LLAMACPP_BASE_URL}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: triageModelName,
-        messages: [
-          { role: 'system', content: TRIAGE_CLASSIFIER_PROMPT },
-          { role: 'user', content: truncated },
-        ],
-        max_tokens: 5,
-        temperature: 0,
-        stream: false,
-      }),
-      signal: controller.signal,
-    });
+  const classified = await classifyTierForTriage(prompt, baseUrl, triageModelName);
+  if (!classified) return null;
 
-    if (!response.ok) {
-      return null;
-    }
-
-    const body = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const rawText = body?.choices?.[0]?.message?.content?.trim().toLowerCase() || '';
-
-    const category = parseClassificationResponse(rawText);
-    if (!category) {
-      return null;
-    }
-
-    return tierToResult(category, config);
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return tierToResult(classified.tier, config, classified.confidence);
 }
 
-function parseClassificationResponse(text: string): 'light' | 'standard' | 'heavy' | null {
-  if (/\blight\b/.test(text)) return 'light';
-  if (/\bheavy\b/.test(text)) return 'heavy';
-  if (/\bstandard\b/.test(text)) return 'standard';
-  return null;
-}
-
-function tierToResult(tier: 'light' | 'standard' | 'heavy', config: TriageConfig): TriageResult {
+function tierToResult(
+  tier: 'light' | 'standard' | 'heavy',
+  config: TriageConfig,
+  confidence?: number,
+): TriageResult {
+  const suffix = confidence !== undefined ? ` (${confidence.toFixed(2)})` : '';
   if (tier === 'light' && config.rules.lightModelRef) {
-    return { tier: 'light', modelRef: config.rules.lightModelRef, reason: 'llm: light' };
+    return { tier: 'light', modelRef: config.rules.lightModelRef, reason: `llm: light${suffix}` };
   }
   if (tier === 'heavy' && config.rules.heavyModelRef) {
-    return { tier: 'heavy', modelRef: config.rules.heavyModelRef, reason: 'llm: heavy' };
+    return { tier: 'heavy', modelRef: config.rules.heavyModelRef, reason: `llm: heavy${suffix}` };
   }
-  return { tier, modelRef: null, reason: `llm: ${tier}` };
+  return { tier, modelRef: null, reason: `llm: ${tier}${suffix}` };
+}
+
+/**
+ * Decide whether a triage result should switch the session model.
+ *
+ * Pure decision function: hysteresis (switching down respects the cooldown),
+ * provider gating (cross-provider switches need an explicit opt-in), and
+ * same-model short-circuit. Callers own applying the modelRef and storing the
+ * returned state.
+ */
+export function chooseTriageModelSwitch(
+  currentModelRef: string,
+  result: TriageResult,
+  state: TriageState,
+  config: TriageConfig,
+  currentRound: number,
+): { modelRef: string | null; state: TriageState } {
+  if (!result.modelRef || result.modelRef === currentModelRef) {
+    return { modelRef: null, state };
+  }
+  if (!shouldAllowSwitch(result.tier, currentRound, state, config.rules.cooldownRounds)) {
+    return { modelRef: null, state };
+  }
+  if (!config.rules.allowCrossProviderSwitch) {
+    const currentProvider = extractProviderId(currentModelRef);
+    const nextProvider = extractProviderId(result.modelRef);
+    if (currentProvider && nextProvider && currentProvider !== nextProvider) {
+      return { modelRef: null, state };
+    }
+  }
+  return {
+    modelRef: result.modelRef,
+    state: { lastSwitchRound: currentRound, activeTier: result.tier },
+  };
 }
