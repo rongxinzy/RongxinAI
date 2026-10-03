@@ -98,6 +98,8 @@ const getToolActionTranslationKey = (toolName: string | undefined): string => {
       return 'coworkExecutionList';
     case 'mcp':
       return 'coworkExecutionTool';
+    case 'codemode':
+      return 'coworkExecutionCodemode';
     case 'webfetch':
       return 'coworkExecutionFetch';
     case 'task':

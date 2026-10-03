@@ -7,6 +7,7 @@ import {
 const ACTIVITY_INPUT_KEYS = [
   'action',
   'cmd',
+  'code',
   'command',
   'commands',
   'description',

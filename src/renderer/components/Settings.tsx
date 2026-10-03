@@ -51,6 +51,7 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
+import { CodemodeToggleRow } from './settings/general/CodemodeToggleRow';
 import {
   buildProviderModelConnectionTestNotification,
   buildProviderModelConnectionTestProgressNotification,
@@ -3334,6 +3335,9 @@ const Settings: React.FC<SettingsProps> = ({
               }}
               disabled={isUpdatingAutoLaunch}
             />
+
+            {/* Codemode Section */}
+            <CodemodeToggleRow />
 
             {/* Prevent Sleep Section */}
             <SettingsToggleRow

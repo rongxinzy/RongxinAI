@@ -87,6 +87,8 @@ const hoisted = vi.hoisted(() => {
       this.reload = vi.fn().mockResolvedValue(undefined);
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
+    mockCreateCodemodeExtension: vi.fn(() => 'codemode-extension-factory'),
+    mockCreateToolSearchExtension: vi.fn(() => 'tool-search-extension-factory'),
     mockApplyApplicationRuntimeEnv: vi.fn(),
     mockCompleteSimple,
     mockGetModel: vi.fn((provider: string, modelId: string) => ({
@@ -208,6 +210,8 @@ const mockSessionManagerInMemory = hoisted.mockSessionManagerInMemory;
 const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
+const mockCreateCodemodeExtension = hoisted.mockCreateCodemodeExtension;
+const mockCreateToolSearchExtension = hoisted.mockCreateToolSearchExtension;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
@@ -229,6 +233,8 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
   ModelRuntime: {
     create: hoisted.mockModelRuntimeCreate,
   },
+  createCodemodeExtension: hoisted.mockCreateCodemodeExtension,
+  createToolSearchExtension: hoisted.mockCreateToolSearchExtension,
 }));
 
 vi.mock('@earendil-works/pi-ai/compat', () => ({
@@ -887,6 +893,48 @@ describe('PiRuntimeAdapter', () => {
           keepRecentTokens: 16_384,
         },
       });
+    });
+
+    it('keeps codemode extensions off the default session wiring', async () => {
+      await adapter.startSession('codemode-off', 'Hello Pi');
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      const factories = loaderOptions?.extensionFactories ?? [];
+      expect(factories).not.toContain('codemode-extension-factory');
+      expect(factories).not.toContain('tool-search-extension-factory');
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
+        expect.objectContaining({ defaultTools: expect.any(Array) }),
+      );
+    });
+
+    it('registers codemode extensions and activates the tool when requested', async () => {
+      await adapter.startSession('codemode-on', 'Hello Pi', { codemode: true });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      const factories = loaderOptions?.extensionFactories ?? [];
+      expect(factories).toContain('codemode-extension-factory');
+      expect(factories).toContain('tool-search-extension-factory');
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        defaultTools: ['+codemode'],
+      });
+    });
+
+    it('excludes codemode from chat sessions even when requested', async () => {
+      await adapter.startSession('codemode-chat', 'Hello', {
+        codemode: true,
+        sessionMode: 'chat',
+      });
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
+        extensionFactories?: unknown[];
+      };
+      expect(loaderOptions?.extensionFactories ?? []).not.toContain('codemode-extension-factory');
     });
 
     it('should resolve the explicit model override for a new session', async () => {

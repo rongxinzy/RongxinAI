@@ -2423,6 +2423,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkExecutionSearch: '正在搜索',
     coworkExecutionList: '正在列出目录',
     coworkExecutionTool: '正在调用工具',
+    coworkExecutionCodemode: '正在编排工具脚本',
+    codemodeEnabled: '工具编排（Codemode）',
+    codemodeEnabledDescription:
+      '允许模型在沙箱脚本中并行编排多个工具调用，长任务的批量操作更省轮次；关闭时不影响现有会话行为',
     coworkExecutionFetch: '正在获取内容',
     coworkExecutionDelegate: '正在处理子任务',
     coworkExecutionTodo: '正在更新待办事项',
@@ -5580,6 +5584,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkExecutionSearch: 'Searching',
     coworkExecutionList: 'Listing directory',
     coworkExecutionTool: 'Using tool',
+    coworkExecutionCodemode: 'Orchestrating tool script',
+    codemodeEnabled: 'Tool orchestration (Codemode)',
+    codemodeEnabledDescription:
+      'Let the model orchestrate parallel tool calls from a sandbox script — fewer rounds for batch work in long tasks. Off keeps current session behavior unchanged',
     coworkExecutionFetch: 'Fetching content',
     coworkExecutionDelegate: 'Running subtask',
     coworkExecutionTodo: 'Updating todo list',
