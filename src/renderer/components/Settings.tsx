@@ -52,6 +52,7 @@ import {
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
 import { CodemodeToggleRow } from './settings/general/CodemodeToggleRow';
+import { McpNativeBridgeToggleRow } from './settings/general/McpNativeBridgeToggleRow';
 import {
   buildProviderModelConnectionTestNotification,
   buildProviderModelConnectionTestProgressNotification,
@@ -3338,6 +3339,9 @@ const Settings: React.FC<SettingsProps> = ({
 
             {/* Codemode Section */}
             <CodemodeToggleRow />
+
+            {/* MCP Native Bridge Section */}
+            <McpNativeBridgeToggleRow />
 
             {/* Prevent Sleep Section */}
             <SettingsToggleRow

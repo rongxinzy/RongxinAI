@@ -568,6 +568,8 @@ contextBridge.exposeInMainWorld('electron', {
       embeddingVectorWeight?: number;
       embeddingRemoteBaseUrl?: string;
       embeddingRemoteApiKey?: string;
+      codemodeEnabled?: boolean;
+      mcpNativeBridge?: boolean;
     }) => ipcRenderer.invoke(CoworkConfigIpc.Set, config),
 
     readBootstrapFile: (filename: string) => ipcRenderer.invoke(CoworkBootstrapIpc.Read, filename),

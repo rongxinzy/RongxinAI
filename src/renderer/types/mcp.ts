@@ -16,6 +16,8 @@ export interface McpServerConfig {
   isBuiltIn: boolean; // installed from built-in registry
   githubUrl?: string; // GitHub repository URL
   registryId?: string; // matching registry entry ID
+  /** pi native-bridge tool exposure; undefined keeps pi's "codemode" default. */
+  exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
   createdAt: number;
   updatedAt: number;
 }
@@ -33,6 +35,7 @@ export interface McpServerFormData {
   isBuiltIn?: boolean;
   githubUrl?: string;
   registryId?: string;
+  exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
 }
 
 export interface McpConnectionTestResult {

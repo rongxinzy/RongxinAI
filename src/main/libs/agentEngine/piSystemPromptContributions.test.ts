@@ -134,6 +134,17 @@ describe('piSystemPromptContributions', () => {
     expect(withMcp.some(prompt => prompt.includes('[Blender MCP] create_cube'))).toBe(true);
   });
 
+  it('suppresses the legacy MCP preflight when the native bridge renders its own section', () => {
+    const legacy = collectPiSystemPromptContributions(MCP_CONTEXT);
+    const native = collectPiSystemPromptContributions({
+      ...MCP_CONTEXT,
+      mcpNativeBridge: true,
+    });
+
+    expect(legacy.some(prompt => prompt.includes('MCP capability preflight'))).toBe(true);
+    expect(native.some(prompt => prompt.includes('MCP capability preflight'))).toBe(false);
+  });
+
   it('adds the codemode orchestration policy only for enabled work sessions', () => {
     const enabled = collectPiSystemPromptContributions({ ...FULL_CONTEXT, codemodeEnabled: true });
     const chatEnabled = collectPiSystemPromptContributions({
