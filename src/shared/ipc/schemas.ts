@@ -444,6 +444,7 @@ export const CoworkConfigSetSchema = {
     embeddingRemoteBaseUrl: z.string().optional(),
     embeddingRemoteApiKey: z.string().optional(),
     codemodeEnabled: z.boolean().optional(),
+    mcpNativeBridge: z.boolean().optional(),
   }),
   output: IpcResult({}),
 };

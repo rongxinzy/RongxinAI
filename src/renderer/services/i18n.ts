@@ -2427,6 +2427,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codemodeEnabled: '工具编排（Codemode）',
     codemodeEnabledDescription:
       '允许模型在沙箱脚本中并行编排多个工具调用，长任务的批量操作更省轮次；关闭时不影响现有会话行为',
+    mcpNativeBridge: 'MCP 原生桥接',
+    mcpNativeBridgeDescription:
+      '工作会话改用 pi 内置 MCP 扩展连接服务器，按服务器暴露级别渐进展示工具；关闭时沿用单网关工具',
+    mcpExposure: '工具暴露级别',
+    mcpExposureCodemode: 'codemode（仅编排脚本可见）',
+    mcpExposureDeferred: 'deferred（按需经 tool_search 加载）',
+    mcpExposureDirect: 'direct（直接声明给模型）',
+    mcpExposureHidden: 'hidden（不可达）',
+    mcpExposureHint: '仅 MCP 原生桥接开启时生效',
     coworkExecutionFetch: '正在获取内容',
     coworkExecutionDelegate: '正在处理子任务',
     coworkExecutionTodo: '正在更新待办事项',
@@ -5588,6 +5597,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codemodeEnabled: 'Tool orchestration (Codemode)',
     codemodeEnabledDescription:
       'Let the model orchestrate parallel tool calls from a sandbox script — fewer rounds for batch work in long tasks. Off keeps current session behavior unchanged',
+    mcpNativeBridge: 'MCP native bridge',
+    mcpNativeBridgeDescription:
+      "Work sessions connect MCP servers through pi's builtin extension with per-server progressive tool exposure; off keeps the single gateway tool",
+    mcpExposure: 'Tool exposure',
+    mcpExposureCodemode: 'codemode (sandbox scripts only)',
+    mcpExposureDeferred: 'deferred (loaded via tool_search)',
+    mcpExposureDirect: 'direct (declared upfront)',
+    mcpExposureHidden: 'hidden (unreachable)',
+    mcpExposureHint: 'Effective when the MCP native bridge is on',
     coworkExecutionFetch: 'Fetching content',
     coworkExecutionDelegate: 'Running subtask',
     coworkExecutionTodo: 'Updating todo list',
