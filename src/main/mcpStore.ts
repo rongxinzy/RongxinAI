@@ -25,6 +25,8 @@ export interface McpServerRecord {
   githubUrl?: string;
   registryId?: string;
   credentialsError?: boolean;
+  /** pi native-bridge tool exposure; undefined keeps pi's "codemode" default. */
+  exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
   createdAt: number;
   updatedAt: number;
 }
