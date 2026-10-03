@@ -27,6 +27,7 @@ export const AppUpdateIpc = {
   ResumeDownload: 'appUpdate:resumeDownload',
   CancelDownload: 'appUpdate:cancelDownload',
   InstallReady: 'appUpdate:installReady',
+  RevealDownload: 'appUpdate:revealDownload',
   StateChanged: 'appUpdate:stateChanged',
 } as const;
 

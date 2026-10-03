@@ -60,4 +60,14 @@ export async function installWindowsNsis(exePath: string): Promise<void> {
   console.log(`[AppUpdate] Launcher PID: ${launcher.pid}, calling app.quit()`);
   recordAppQuitOrigin(AppQuitOrigin.UpdateInstall);
   app.quit();
+  // The helper script waits for this PID to exit before starting the
+  // installer, and starts it anyway after 120s. App cleanup is bounded by the
+  // before-quit deadline, but if anything on the quit path wedges, force the
+  // exit here so the handoff never degrades into an installer that races a
+  // still-running old process (observed on Windows 10 upgrades).
+  const forceExitTimer = setTimeout(() => {
+    console.warn('[AppUpdate] App still alive after quit; forcing exit for update install.');
+    app.exit(0);
+  }, 20_000);
+  forceExitTimer.unref();
 }

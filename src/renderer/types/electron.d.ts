@@ -1303,6 +1303,7 @@ interface IElectronAPI {
     resumeDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
+    revealDownload: () => Promise<{ success: boolean; path?: string; error?: string }>;
     onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) => () => void;
   };
   runtimeNotices: {

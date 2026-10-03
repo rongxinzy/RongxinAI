@@ -5235,27 +5235,59 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
                       </>
                     ) : update?.status === AppUpdateStatus.Ready ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          void window.electron.appUpdate.installReady().then(result => {
-                            if (!result.success) {
-                              window.dispatchEvent(
-                                new CustomEvent('app:showToast', {
-                                  detail: {
-                                    message: normalizeError(
-                                      result.error || i18nService.t('updateInstallFailed'),
-                                    ),
-                                    isError: true,
-                                  },
-                                }),
-                              );
-                            }
-                          });
-                        }}
-                      >
-                        {i18nService.t('updateReadyConfirm')}
-                      </Button>
+                      <div className="space-y-2">
+                        <Button
+                          onClick={() => {
+                            void window.electron.appUpdate.installReady().then(result => {
+                              if (!result.success) {
+                                window.dispatchEvent(
+                                  new CustomEvent('app:showToast', {
+                                    detail: {
+                                      message: normalizeError(
+                                        result.error || i18nService.t('updateInstallFailed'),
+                                      ),
+                                      isError: true,
+                                    },
+                                  }),
+                                );
+                              }
+                            });
+                          }}
+                        >
+                          {i18nService.t('updateReadyConfirm')}
+                        </Button>
+                        {update.readyFilePath ? (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
+                              title={update.readyFilePath}
+                            >
+                              {update.readyFilePath}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                void window.electron.appUpdate.revealDownload().then(result => {
+                                  if (!result.success) {
+                                    window.dispatchEvent(
+                                      new CustomEvent('app:showToast', {
+                                        detail: {
+                                          message:
+                                            result.error || i18nService.t('updateRevealFailed'),
+                                          isError: true,
+                                        },
+                                      }),
+                                    );
+                                  }
+                                });
+                              }}
+                            >
+                              {i18nService.t('updateRevealDownload')}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : update?.status === AppUpdateStatus.Error && update.info ? (
                       <div className="flex items-center justify-between gap-3">
                         <span className="text-xs text-destructive">
