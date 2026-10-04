@@ -847,6 +847,9 @@ interface IElectronAPI {
       itemId: string;
     }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     stopSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+    compactSession: (
+      sessionId: string,
+    ) => Promise<import('../../shared/cowork/constants').CoworkCompactResult>;
     saveSession: (session: Record<string, unknown>) => Promise<CoworkSessionResult>;
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     deleteSessions: (sessionIds: string[]) => Promise<{ success: boolean; error?: string }>;
@@ -922,13 +925,6 @@ interface IElectronAPI {
     }) => Promise<{ success: boolean; error?: string }>;
     getConfig: () => Promise<{ success: boolean; config?: CoworkConfig; error?: string }>;
     setConfig: (config: CoworkConfigUpdate) => Promise<{ success: boolean; error?: string }>;
-    readBootstrapFile: (
-      filename: string,
-    ) => Promise<{ success: boolean; content: string; error?: string }>;
-    writeBootstrapFile: (
-      filename: string,
-      content: string,
-    ) => Promise<{ success: boolean; error?: string }>;
     onStreamUiEvent: (
       callback: (event: import('../../shared/cowork/piUiEvent').PiUiEvent) => void,
     ) => () => void;
@@ -1303,6 +1299,7 @@ interface IElectronAPI {
     resumeDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
+    revealDownload: () => Promise<{ success: boolean; path?: string; error?: string }>;
     onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) => () => void;
   };
   runtimeNotices: {

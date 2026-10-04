@@ -143,6 +143,7 @@ export const CoworkSessionIpc = {
   Start: 'cowork:session:start',
   Continue: 'cowork:session:continue',
   Stop: 'cowork:session:stop',
+  Compact: 'cowork:session:compact',
   Save: 'cowork:session:save',
   Delete: 'cowork:session:delete',
   DeleteBatch: 'cowork:session:deleteBatch',
@@ -184,13 +185,6 @@ export const CoworkConfigIpc = {
   Set: 'cowork:config:set',
 } as const;
 export type CoworkConfigIpc = (typeof CoworkConfigIpc)[keyof typeof CoworkConfigIpc];
-
-// ─── Cowork Bootstrap ───────────────────────────────────────────────────────
-export const CoworkBootstrapIpc = {
-  Read: 'cowork:bootstrap:read',
-  Write: 'cowork:bootstrap:write',
-} as const;
-export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof CoworkBootstrapIpc];
 
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {

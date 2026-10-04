@@ -20,7 +20,7 @@ export const ToolPermissionActions = ({
     <ConfirmationRequest>{i18nService.t('codingAgentPermissionEvent')}</ConfirmationRequest>
     <ConfirmationActions>
       <ConfirmationAction
-        variant="outline"
+        variant="ghost"
         onClick={() =>
           onRespond({ behavior: CoworkPermissionBehavior.Deny, message: 'Permission denied' })
         }

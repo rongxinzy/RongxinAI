@@ -139,7 +139,7 @@ export const ConfirmationActions = ({ className, ...props }: ConfirmationActions
   }
 
   return (
-    <div className={cn('flex items-center justify-end gap-2 self-end', className)} {...props} />
+    <div className={cn('flex items-center justify-end gap-3 self-end', className)} {...props} />
   );
 };
 

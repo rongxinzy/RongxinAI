@@ -22,7 +22,7 @@ export const classicLight: ThemeDefinition = {
     'style-switch-motion-ms': '160',
     'style-switch-thumb': '#ffffff',
     'style-work-chat-thumb-radius': 'var(--zy-style-radius-md)',
-    'style-work-chat-thumb': 'color-mix(in oklab, var(--zy-foreground) 8%, var(--zy-background))',
+    'style-work-chat-thumb': 'var(--zy-background)',
     'style-font-heading': 'var(--zy-style-font-sans)',
     primary: 'oklch(0.564 0.218 259.8)',
     'primary-foreground': 'oklch(0.985 0.001 106.423)',

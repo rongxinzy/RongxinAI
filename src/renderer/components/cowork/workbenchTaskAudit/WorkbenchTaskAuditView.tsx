@@ -73,7 +73,7 @@ export function WorkbenchTaskAuditView({
 
   return (
     <ScrollArea className="h-full">
-      <div className="mx-auto w-full max-w-3xl px-6">
+      <div className="mx-auto w-full max-w-4xl px-6">
         <header className="flex flex-col gap-3 pt-8 pb-6">
           <div className="flex items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-2">

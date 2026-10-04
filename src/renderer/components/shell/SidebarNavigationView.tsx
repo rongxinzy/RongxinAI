@@ -10,6 +10,7 @@ import {
   Terminal,
   Users,
 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const icons = {
   conversation: MessageCirclePlus,
@@ -78,19 +79,43 @@ export function SidebarNavigationView({
   newConversation,
   entries,
 }: SidebarNavigationViewProps) {
+  // The mode flip re-renders the whole app (sidebar tree + main view) in one
+  // blocking commit. Reflect the toggle optimistically in this tiny tree and
+  // defer the heavy dispatch one frame, so the thumb's CSS transition starts
+  // immediately and keeps running on the compositor during the view swap.
+  const [optimisticIsChat, setOptimisticIsChat] = useState<boolean | null>(null);
+  const pendingModeChange = useRef<number | null>(null);
+  useEffect(() => {
+    setOptimisticIsChat(null);
+  }, [isChat]);
+  useEffect(
+    () => () => {
+      if (pendingModeChange.current !== null) cancelAnimationFrame(pendingModeChange.current);
+    },
+    [],
+  );
+  const shownIsChat = optimisticIsChat ?? isChat;
+  const handleModeChange = (checked: boolean) => {
+    setOptimisticIsChat(checked);
+    if (pendingModeChange.current !== null) cancelAnimationFrame(pendingModeChange.current);
+    pendingModeChange.current = requestAnimationFrame(() => {
+      pendingModeChange.current = null;
+      onModeChange(checked);
+    });
+  };
   return (
     <div className="flex flex-col gap-0.5 px-2 py-2">
       <div className="relative h-7 w-full">
         <Switch
-          checked={isChat}
-          onCheckedChange={onModeChange}
+          checked={shownIsChat}
+          onCheckedChange={handleModeChange}
           data-mode="work-chat"
           aria-label={`${workLabel} / ${chatLabel}`}
         />
         {[workLabel, chatLabel].map((label, index) => (
           <span
             key={index}
-            data-mode-selected={isChat === (index === 1)}
+            data-mode-selected={shownIsChat === (index === 1)}
             aria-hidden="true"
             className={cn(
               'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',

@@ -120,13 +120,15 @@ The Cowork feature provides AI-assisted coding sessions:
 
 SYSTEM_PROMPT.md declares this environment to the model (运行环境与工具链 section); keep that section in sync when the runtime layout changes.
 
-**Memory System**: File-based persistent memory stored in the application-owned agent workspace:
+**Memory System**: Semantic persistent memory in three scopes, backed by the local Engram runtime (`vendor/engram-runtime`, fork of z189yis/engram-cjk) with SQLite projection tables (`memory_links`, `memory_candidates`, `memory_outbox`):
 
-- `MEMORY.md` - Durable facts, preferences, and decisions; loaded automatically at every session start.
-- `memory/YYYY-MM-DD.md` - Daily notes for recent context.
-- `USER.md` / `SOUL.md` - User profile and agent personality files read at session startup.
-- Writes happen via the agent's `write` tool when the user issues an explicit "remember" instruction or the agent self-records important findings. No background extraction or confidence scoring.
-- GUI in Settings panel allows manual add/edit/delete of `MEMORY.md` entries.
+- `project` - Workspace-bound facts and decisions; the project id is `workspace-` + sha256(cwd) (see `src/main/workspaceUtils.ts` and `src/shared/memory/constants.ts`).
+- `personal` - Cross-workspace preferences under the fixed project id `personal://zhiyuan-agent/user`; writes enter a candidate queue and take effect only after user confirmation in Settings.
+- `session` - Per-session summaries with a 30-day TTL.
+- Writes: in Work mode the agent's `memory` tool (`src/main/memory/piMemoryTool.ts`) supports recall/list/save/propose_personal; save/propose first pass through evidence-based extraction (`AtomicMemoryExtractor`). After each turn, `runPostTurnMemoryMaintenance` rolls up the session summary.
+- Injection: before each turn a memory block is prepended to the prompt (`buildProjectMemoryContextSafe`, project/personal/session token budgets 900/250/350).
+- Chat mode does not use memory; IM/Cron sessions share the same pipeline as Work.
+- Legacy `MEMORY.md` files (`userData/agent-workspaces/main/`): imported at startup as legacy import candidates into the review queue; they are never injected into any prompt (legacy).
 
 **Stream Events** (IPC from main to renderer):
 

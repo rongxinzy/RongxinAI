@@ -14,7 +14,6 @@ import {
   AppIpc,
   CommunityAuthIpc,
   ContextMenuIpc,
-  CoworkBootstrapIpc,
   CoworkConfigIpc,
   CoworkPermissionIpc,
   CoworkQueueIpc,
@@ -510,6 +509,7 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkQueueIpc.FollowUp, options),
 
     stopSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Stop, sessionId),
+    compactSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Compact, sessionId),
     saveSession: (session: Record<string, unknown>) =>
       ipcRenderer.invoke(CoworkSessionIpc.Save, session),
     deleteSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Delete, sessionId),
@@ -571,10 +571,6 @@ contextBridge.exposeInMainWorld('electron', {
       codemodeEnabled?: boolean;
       mcpNativeBridge?: boolean;
     }) => ipcRenderer.invoke(CoworkConfigIpc.Set, config),
-
-    readBootstrapFile: (filename: string) => ipcRenderer.invoke(CoworkBootstrapIpc.Read, filename),
-    writeBootstrapFile: (filename: string, content: string) =>
-      ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
 
     onStreamUiEvent: (callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void) =>
       onPush(CoworkStreamIpc.UiEvent, callback),
@@ -862,6 +858,7 @@ contextBridge.exposeInMainWorld('electron', {
     resumeDownload: () => ipcRenderer.invoke(AppUpdateIpc.ResumeDownload),
     cancelDownload: () => ipcRenderer.invoke(AppUpdateIpc.CancelDownload),
     installReady: () => ipcRenderer.invoke(AppUpdateIpc.InstallReady),
+    revealDownload: () => ipcRenderer.invoke(AppUpdateIpc.RevealDownload),
     onStateChanged: (callback: (data: unknown) => void) =>
       onPush(AppUpdateIpc.StateChanged, callback),
   },

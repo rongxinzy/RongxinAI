@@ -205,6 +205,12 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot '${{ github.workspace }}/xiaoruan'
+      - name: Smoke-launch the packaged app to a visible window
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-app-launch-smoke.ps1
+          -ProjectRoot '${{ github.workspace }}/xiaoruan'
       - uses: actions/upload-artifact@v6
         with:
           name: signed-windows-build

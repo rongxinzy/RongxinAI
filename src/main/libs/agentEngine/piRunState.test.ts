@@ -70,3 +70,33 @@ test('does not serialize arbitrary or cyclic tool objects', () => {
   value.self = value;
   expect(getToolProgressPreview(value)).toBe('');
 });
+test('keeps the run alive while tool arguments stream in', () => {
+  vi.useFakeTimers();
+  const tracker = new PiRunStateTracker(() => {});
+  tracker.observe('a', { type: PiRunEvent.AgentStart });
+  const before = tracker.snapshot('a')!;
+  vi.advanceTimersByTime(1_000);
+  tracker.observe('a', {
+    type: PiRunEvent.MessageUpdate,
+    assistantMessageEvent: {
+      type: PiRunEvent.ToolCallDelta,
+      contentIndex: 0,
+      partial: {
+        content: [
+          {
+            type: 'toolCall',
+            id: 'write-1',
+            name: 'Write',
+            arguments: { path: 'report.md' },
+            partialJson: '{"path":"report.md","content":"aa',
+          },
+        ],
+      },
+    },
+  });
+  const after = tracker.snapshot('a')!;
+  expect(after.phase).toBe(CoworkRunPhase.Tool);
+  expect(after.toolName).toBe('Write');
+  expect(after.preview).toBe('Write report.md');
+  expect(after.lastProgressAt).toBeGreaterThan(before.lastProgressAt);
+});

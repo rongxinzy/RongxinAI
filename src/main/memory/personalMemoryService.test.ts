@@ -544,6 +544,7 @@ test('marks a memory deleted before attempting remote propagation', async () => 
     repository as never,
     { forget: vi.fn(async () => false) } as never,
     identityFor,
+    'C:/private/memory',
   );
 
   await expect(service.forgetMemory('link-1', false)).resolves.toBe(false);
@@ -564,7 +565,12 @@ test('keeps verified Task and Run provenance on a project review candidate', asy
     confirmMemory: vi.fn(async () => 92),
     discardCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    adapter as never,
+    identityFor,
+    'C:/private/memory',
+  );
   const id = service.proposeProjectMemoryCandidate({
     sessionId: 'session-1',
     workingDirectory: 'project-alpha',

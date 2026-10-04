@@ -20,7 +20,6 @@ interface PlatformDefInput {
   readonly region: 'china' | 'global';
   readonly channel: string;
   readonly channelAliases: readonly string[];
-  readonly logo: string;
   readonly guideUrl: string;
 }
 
@@ -37,7 +36,6 @@ const DEFINITIONS = [
     region: 'china',
     channel: 'weixin',
     channelAliases: [],
-    logo: 'weixin.png',
     guideUrl: '',
   },
   {
@@ -46,7 +44,6 @@ const DEFINITIONS = [
     region: 'china',
     channel: 'dingtalk-connector',
     channelAliases: ['dingtalk'],
-    logo: 'dingding.png',
     guideUrl: '',
   },
   {
@@ -55,7 +52,6 @@ const DEFINITIONS = [
     region: 'china',
     channel: 'feishu',
     channelAliases: [],
-    logo: 'feishu.png',
     guideUrl: 'https://open.feishu.cn/app/',
   },
   {
@@ -64,7 +60,6 @@ const DEFINITIONS = [
     region: 'china',
     channel: 'wecom',
     channelAliases: [],
-    logo: 'wecom.png',
     guideUrl: '',
   },
   {
@@ -73,7 +68,6 @@ const DEFINITIONS = [
     region: 'china',
     channel: 'qqbot',
     channelAliases: [],
-    logo: 'qq_bot.jpeg',
     guideUrl: 'https://q.qq.com/#/apps',
   },
   // ── Global ──
@@ -83,7 +77,6 @@ const DEFINITIONS = [
     region: 'global',
     channel: 'telegram',
     channelAliases: [],
-    logo: 'telegram.svg',
     guideUrl: '',
   },
   {
@@ -92,7 +85,6 @@ const DEFINITIONS = [
     region: 'global',
     channel: 'discord',
     channelAliases: [],
-    logo: 'discord.svg',
     guideUrl: '',
   },
 ] as const satisfies readonly PlatformDefInput[];
@@ -121,8 +113,6 @@ export interface PlatformDef {
   readonly channel: ChannelName;
   /** Additional transport channel aliases */
   readonly channelAliases: readonly ChannelName[];
-  /** Logo filename relative to /im-logos/ in public assets */
-  readonly logo: string;
   /** Setup guide URL (empty string if not yet available) */
   readonly guideUrl: string;
 }
@@ -182,11 +172,6 @@ class PlatformRegistryImpl {
   /** Get the full definition for a platform. */
   get(platform: Platform): PlatformDef {
     return this.platformIndex.get(platform)!;
-  }
-
-  /** Logo filename relative to /im-logos/. */
-  logo(platform: Platform): string {
-    return this.platformIndex.get(platform)!.logo;
   }
 
   /** Setup guide URL (empty string if not available). */

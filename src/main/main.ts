@@ -55,11 +55,14 @@ import {
   APP_UPDATE_STARTUP_DELAY_JITTER_MS,
   APP_UPDATE_STARTUP_DELAY_MIN_MS,
   AppUpdateIpc,
+  AppUpdateStatus,
 } from '../shared/appUpdate/constants';
 import {
   CoworkExecutionMode,
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
+  CoworkCompactFailure,
+  type CoworkCompactResult,
   CoworkPermissionMode,
   CoworkSessionMode,
   CoworkSessionSource,
@@ -125,6 +128,7 @@ import {
   importLegacySqliteMemoryCandidates,
 } from './memory/legacyMemoryFileImportService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
+import { resolveProjectIdentity } from './memory/projectIdentity';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
 import { SessionSummaryBackfillService } from './memory/sessionSummaryBackfillService';
@@ -331,7 +335,6 @@ import { getSystemMemorySnapshot } from './libs/systemMemory';
 import { OllamaManager } from './libs/ollamaManager';
 import { resolveQualifiedAgentModelRef } from './libs/agentModels';
 import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenceInstall';
-import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
@@ -1580,7 +1583,7 @@ const getProjectMemoryService = (): ProjectMemoryService => {
     projectMemoryService = new ProjectMemoryService(
       memoryRepository,
       engramAdapter,
-      undefined,
+      resolveProjectIdentity,
       path.join(app.getPath('userData'), 'memory'),
     );
   }
@@ -4972,6 +4975,55 @@ if (!gotTheLock) {
     }
   });
 
+  // `/compact` from the composer: never becomes model input. While a turn is
+  // in flight the compaction waits behind the queued prompts, otherwise it
+  // runs now; failures are classified so the renderer can localize them.
+  ipcMain.handle(
+    CoworkSessionIpc.Compact,
+    async (_event, rawSessionId: unknown): Promise<CoworkCompactResult> => {
+      try {
+        const sessionId = typeof rawSessionId === 'string' ? rawSessionId.trim() : '';
+        const runtime = getPiRuntimeAdapter();
+        if (!sessionId || runtime.isSessionActive(sessionId) === false) {
+          return { success: false, reason: CoworkCompactFailure.NoSession };
+        }
+        if (runtime.isSessionRunning(sessionId)) {
+          const queued = runtime.enqueueControlAction(sessionId, async () => {
+            try {
+              await runtime.compactSession(sessionId);
+            } catch (error) {
+              console.error('[Cowork] queued session compaction failed:', error);
+            }
+          });
+          return queued.success
+            ? { success: true, queued: true }
+            : { success: false, reason: CoworkCompactFailure.Busy };
+        }
+        try {
+          const result = await runtime.compactSession(sessionId);
+          return { success: true, queued: false, cancelled: result.cancelled };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (/nothing to compact|session too small/i.test(message)) {
+            return { success: false, reason: CoworkCompactFailure.NotNeeded };
+          }
+          // A retained-but-not-live session, or a turn that started between
+          // the liveness check and the compact call.
+          if (/not active/i.test(message)) {
+            return { success: false, reason: CoworkCompactFailure.NoSession };
+          }
+          if (/still running/i.test(message)) {
+            return { success: false, reason: CoworkCompactFailure.Busy };
+          }
+          throw error;
+        }
+      } catch (error) {
+        console.error('[Cowork] session compaction failed:', error);
+        return { success: false, reason: CoworkCompactFailure.Failed };
+      }
+    },
+  );
+
   ipcMain.handle(
     'cowork:session:save',
     async (
@@ -5665,32 +5717,6 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('cowork:bootstrap:read', async (_event, filename: string) => {
-    try {
-      const mainWorkspace = getMainAgentWorkspace();
-      const content = readBootstrapFile(mainWorkspace, filename);
-      return { success: true, content };
-    } catch (error) {
-      return {
-        success: false,
-        content: '',
-        error: error instanceof Error ? error.message : 'Failed to read bootstrap file',
-      };
-    }
-  });
-  ipcMain.handle('cowork:bootstrap:write', async (_event, filename: string, content: string) => {
-    try {
-      const mainWorkspace = getMainAgentWorkspace();
-      writeBootstrapFile(mainWorkspace, filename, content);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to write bootstrap file',
-      };
-    }
-  });
-
   const VALID_EMBEDDING_PROVIDERS = [
     'local',
     'openai',
@@ -5809,7 +5835,7 @@ if (!gotTheLock) {
         ) {
           getSkillManager().handleWorkingDirectoryChange();
           // Main agent workspace is decoupled from workingDirectory — no MEMORY.md
-          // or IDENTITY.md sync needed here. The workspace is always at
+          // sync needed here. The workspace is always at
           // {STATE_DIR}/workspace-main/ regardless of the user's working directory.
         }
 
@@ -7037,6 +7063,25 @@ if (!gotTheLock) {
     return getAppUpdateCoordinator().installReadyUpdate();
   });
 
+  // The downloaded installer lives in electron-updater's cache directory,
+  // which is not discoverable from the UI. Reveal it in the file manager so
+  // users can find, back up, or manually run the exact verified payload.
+  ipcMain.handle(AppUpdateIpc.RevealDownload, async () => {
+    const state = getAppUpdateCoordinator().getState();
+    if (state.status !== AppUpdateStatus.Ready || !state.readyFilePath) {
+      return { success: false, error: 'No downloaded update file is ready to reveal.' };
+    }
+    try {
+      shell.showItemInFolder(state.readyFilePath);
+      return { success: true, path: state.readyFilePath };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to reveal the update file.',
+      };
+    }
+  });
+
   // Helper: detect if a URL belongs to GitHub Copilot and apply token refresh on 401.
   const isCopilotUrl = (url: string) => url.includes('githubcopilot.com');
   const retryCopilotWithRefreshedToken = async (opts: {
@@ -7650,13 +7695,24 @@ if (!gotTheLock) {
     isCleanupInProgress = true;
     isQuitting = true;
 
-    void runAppCleanup()
+    // The cleanup chain stops many services sequentially with no per-service
+    // deadline; a single wedged stop used to block app.exit(0) forever, which
+    // on Windows turned update installs into an installer racing a live old
+    // process. Bound the whole chain: whatever finishes first wins.
+    const APP_QUIT_CLEANUP_TIMEOUT_MS = 15_000;
+    const cleanupDeadline = new Promise<void>(resolve =>
+      setTimeout(resolve, APP_QUIT_CLEANUP_TIMEOUT_MS).unref?.(),
+    );
+
+    void Promise.race([runAppCleanup(), cleanupDeadline])
       .catch(error => {
         console.error('[Main] Cleanup error:', error);
       })
       .finally(() => {
+        if (isCleanupFinished) return;
         isCleanupFinished = true;
         isCleanupInProgress = false;
+        console.log('[Main] App cleanup finished or timed out; exiting for quit.');
         app.exit(0);
       });
   });
