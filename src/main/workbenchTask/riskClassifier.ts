@@ -1,10 +1,9 @@
 import { createHash } from 'crypto';
 
-import { WorkbenchApprovalRiskLevel, WorkbenchOutputToolName } from '../../shared/workbenchTask';
+import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
 
 const readOnlyTools = new Set(['read', 'grep', 'find', 'ls', 'skill_runtime_capabilities']);
 const internalControlTools = new Set([
-  WorkbenchOutputToolName,
   'askuserquestion',
   'agent_loop',
   'workflow_state',
@@ -17,8 +16,7 @@ const irreversibleShellPattern =
 // Read-only shell commands, validated segment by segment instead of with one
 // permissive pattern: a pattern that allows arbitrary arguments also allows
 // `sort -o out.txt` or `find . -fprint out.txt`, which write files while looking
-// read-only (a ReadOnly classification bypasses both the contract gate and the
-// per-tool approval prompt).
+// read-only (a ReadOnly classification bypasses the per-tool approval prompt).
 const unsafeShellSegmentPattern = /[;&<>`$()\r\n]/;
 const readOnlyCdPrefixPattern =
   /^cd\s+(?:"[^"$`;&|<>()\r\n]+"|'[^'$`;&|<>()\r\n]+'|[-\w./~:@\\]+)\s*&&/;

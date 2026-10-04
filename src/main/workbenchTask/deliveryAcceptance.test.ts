@@ -9,7 +9,6 @@ import {
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
-  WorkbenchOutputMode,
   WorkbenchTaskStatus,
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
@@ -44,16 +43,15 @@ afterEach(() => {
 });
 
 test.each([undefined, { productionActive: false }, { skipped: true }])(
-  'process text and a successful script edit cannot be accepted (%j)',
+  'a work run without declared deliverables completes without acceptance (%j)',
   async workflowSnapshot => {
     const { service, workspace, onVerifiedRun } = createFixture();
-    const { task, run } = service.beginRun({
+    const { run } = service.beginRun({
       sessionId: 'session',
       goal: 'Create a presentation',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
         requiresUserAcceptance: false,
-        outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }],
       },
     });
     fs.writeFileSync(path.join(workspace, 'build-slides.py'), 'print("intermediate")');
@@ -73,10 +71,9 @@ test.each([undefined, { productionActive: false }, { skipped: true }])(
       finalAnswer: 'The icon series needs a fill type first.',
       workflowSnapshot,
     });
-    expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
-    expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Failed);
-    expect(() => service.acceptTask(task.id)).toThrow('deterministic verification failed');
-    expect(onVerifiedRun).not.toHaveBeenCalled();
+    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Passed);
+    expect(onVerifiedRun).toHaveBeenCalledOnce();
   },
 );
 
@@ -88,8 +85,7 @@ test('declaring only intermediate files does not open the acceptance gate', asyn
     goal: 'Create a report',
     contract: {
       kind: WorkbenchContractKind.GenericWork,
-      requiresUserAcceptance: true,
-      outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
+      requiresUserAcceptance: false,
     },
   });
   await service.registerArtifact({
@@ -108,7 +104,7 @@ test('declaring only intermediate files does not open the acceptance gate', asyn
     workspaceRoot: workspace,
     finalAnswer: 'I still need to generate the report.',
   });
-  expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Failed);
+  expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Passed);
 });
 
 test('acceptance verifies final outputs but not intermediate files', async () => {
@@ -119,7 +115,6 @@ test('acceptance verifies final outputs but not intermediate files', async () =>
     contract: {
       kind: WorkbenchContractKind.GenericWork,
       requiresUserAcceptance: false,
-      outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
     },
   });
   for (const [name, role] of [
@@ -162,7 +157,6 @@ test('an empty final answer cannot be accepted even with a final file', async ()
     contract: {
       kind: WorkbenchContractKind.GenericWork,
       requiresUserAcceptance: true,
-      outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
     },
   });
   const detail = await service.completeRun({
@@ -191,7 +185,6 @@ test.each(['deleted', 'changed'])('a %s declared deliverable cannot be accepted'
     contract: {
       kind: WorkbenchContractKind.GenericWork,
       requiresUserAcceptance: false,
-      outputRequirements: [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
     },
   });
   await service.registerArtifact({

@@ -1,16 +1,12 @@
 import { t } from '../i18n';
 import {
   isWorkbenchDeliverable,
-  matchesOutputRequirement,
-  WorkbenchOutputMode,
-  WorkbenchContractKind,
   WorkbenchArtifactVerificationStatus,
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationCheckName,
   WorkbenchVerificationOutcome,
   type WorkbenchArtifact,
   type WorkbenchVerificationResult,
-  type WorkbenchTaskContract,
 } from '../../shared/workbenchTask';
 
 export { isWorkbenchDeliverable } from '../../shared/workbenchTask';
@@ -18,22 +14,13 @@ export { isWorkbenchDeliverable } from '../../shared/workbenchTask';
 export function applyWorkbenchDeliveryGate(
   result: WorkbenchVerificationResult,
   artifacts: WorkbenchArtifact[],
-  contract: WorkbenchTaskContract,
 ): WorkbenchVerificationResult {
   if (result.outcome === WorkbenchVerificationOutcome.Failed) return result;
-  const deliverables = artifacts.filter(artifact => isWorkbenchDeliverable(artifact, contract));
-  const requirements = contract.outputRequirements;
-  const missing =
-    (contract.kind !== WorkbenchContractKind.Chat && !requirements?.length) ||
-    requirements?.some(
-      requirement =>
-        requirement.mode !== WorkbenchOutputMode.Text &&
-        !deliverables.some(artifact => matchesOutputRequirement(artifact, requirement)),
-    );
+  const deliverables = artifacts.filter(isWorkbenchDeliverable);
   const failed = deliverables.some(
     artifact => artifact.verificationStatus === WorkbenchArtifactVerificationStatus.Failed,
   );
-  if (failed || missing) {
+  if (failed) {
     return {
       ...result,
       outcome: WorkbenchVerificationOutcome.Failed,
@@ -42,11 +29,7 @@ export function applyWorkbenchDeliveryGate(
         {
           name: WorkbenchVerificationCheckName.DeliveryReady,
           status: WorkbenchVerificationCheckStatus.Failed,
-          detail: failed
-            ? t('workbenchDeliveryHashFailed')
-            : !requirements?.length
-              ? t('workbenchOutputContractMissing')
-              : t('workbenchDeliveryMissing'),
+          detail: t('workbenchDeliveryHashFailed'),
         },
       ],
       summary: t('workbenchDeliveryNotReady'),

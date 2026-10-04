@@ -165,8 +165,6 @@ import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
-import { buildPiTaskOutputTool } from './piTaskOutputTool';
-import { setWorkbenchOutputRequirements } from '../../workbenchTask/outputContract';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
@@ -198,7 +196,6 @@ import type {
 } from './piRuntimeTypes';
 import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
 import { disableModelImageInputCapability } from './piCapabilityCorrection';
-import { PiOutputContractCorrection } from './piOutputContractCorrection';
 import { PiStreamStallWatchdog } from './piStreamStallWatchdog';
 import {
   PiStreamStallRecovery,
@@ -758,8 +755,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly agentSettleFallback: PiAgentSettleFallback;
   /** Stall recovery flow: abort the dead turn, surface the error, resume once. */
   private readonly streamStallRecovery: PiStreamStallRecovery;
-  /** Forced set_task_output correction when the workbench gate hits its ceiling. */
-  private readonly outputContractCorrection: PiOutputContractCorrection;
   /** Test override for the stall window; production uses per-provider tiers. */
   private readonly streamStallTimeoutOverrideMs?: number;
 
@@ -804,23 +799,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       },
       options?.streamStallTimeoutMs ?? STREAM_STALL_TIMEOUT_MS,
     );
-    this.outputContractCorrection = new PiOutputContractCorrection({
-      getSession: sessionId => this.activeSessions.get(sessionId),
-      grantCorrectionGrace: runId =>
-        this.workbenchTaskService?.grantOutputContractCorrectionGrace(runId) ?? false,
-      failRun: sessionId =>
-        this.workbenchTaskService?.failRun?.(sessionId, {
-          code: 'output_contract_uncommitted',
-          stage: 'contract',
-          message:
-            'Stopped the run: the output contract was never committed, so no tool call could execute.',
-        }),
-      endTurn: (sessionId, reason) =>
-        this.endTerminatedWorkbenchTurn(
-          sessionId,
-          reason ?? 'The workbench run can no longer continue.',
-        ),
-    });
   }
 
   setCoworkStore(store: CoworkStore): void {
@@ -1150,8 +1128,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         Boolean(this.mcpServerManager);
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
-        taskOutputEnabled:
-          Boolean(this.workbenchTaskService) && options.sessionMode !== CoworkSessionMode.Chat,
         getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
         settingsManager,
         getApprovalMode: () =>
@@ -1182,33 +1158,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // sequential execution mode cannot block another session.
       const customTools: Record<string, unknown>[] = [];
       if (resourceState.chatMode) customTools.push(buildPiWebSearchTool());
-      if (this.workbenchTaskService && options.sessionMode !== CoworkSessionMode.Chat) {
-        customTools.push(
-          buildPiTaskOutputTool(requirements => {
-            const runId = this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
-            if (!runId || !this.workbenchTaskService)
-              throw new Error('No active workbench run is available.');
-            try {
-              setWorkbenchOutputRequirements(
-                this.workbenchTaskService.repository,
-                sessionId,
-                runId,
-                requirements,
-              );
-            } catch (error) {
-              // The gate keeps denying every tool call while no contract is
-              // committed, so the failure has to be remembered: otherwise the
-              // next denial repeats "commit the contract" with no hint that the
-              // previous attempt was rejected.
-              this.workbenchTaskService.recordOutputContractFailure(
-                runId,
-                error instanceof Error ? error.message : String(error),
-              );
-              throw error;
-            }
-          }),
-        );
-      }
 
       if (options.planTool === true || options.planMode === true) {
         // The plan tool never touches the workspace: it publishes the structured
@@ -2844,7 +2793,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     resourceState: PiResourceState,
     approvalContext?: {
       sessionId: string;
-      taskOutputEnabled?: boolean;
       getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
       getApprovalMode: () => WorkbenchApprovalMode;
@@ -2898,7 +2846,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           maxOutputTokens: resourceState.maxOutputTokens,
           platform: process.platform,
           unattended: resourceState.unattended,
-          taskOutputEnabled: approvalContext?.taskOutputEnabled,
           mcpToolManifest: resourceState.chatMode
             ? []
             : (this.mcpServerManager?.toolManifest ?? []),
@@ -2935,15 +2882,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                   });
                   if (!authorization) return undefined;
                   if (authorization.allow) return undefined;
-                  if (authorization.forceContractCorrection) {
-                    // The gate hit its first denial ceiling: steer the model
-                    // into one set_task_output call instead of killing the run.
-                    this.outputContractCorrection.enforce(
-                      approvalContext.sessionId,
-                      runId,
-                      authorization.reason,
-                    );
-                  } else if (authorization.terminateRun) {
+                  if (authorization.terminateRun) {
                     // The run cannot continue: end the turn with a visible error
                     // instead of returning another tool error the model would
                     // answer with yet another tool call.
@@ -4360,7 +4299,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             : WorkbenchContractKind.GenericWork;
     return {
       kind,
-      ...(sessionMode !== CoworkSessionMode.Chat ? { outputRequirements: [] } : {}),
       requiresUserAcceptance: false,
       metadata: {
         ...(skillIds?.length ? { skillIds } : {}),

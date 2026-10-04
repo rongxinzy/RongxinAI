@@ -5,7 +5,6 @@ import {
   CodingErrorI18nKey,
   CodingErrorMessage,
 } from '../../shared/codingAgent/errors';
-import { WorkbenchErrorI18nKey } from '../../shared/workbenchTask/errors';
 import { normalizeError } from './errorNormalization';
 import { appErrorText, reportAppError } from './appErrorText';
 import { i18nService } from './i18n';
@@ -95,10 +94,8 @@ describe('coding error text', () => {
 describe('coding error translations', () => {
   // A missing key makes i18nService.t() return the key itself, so an entry
   // without copy shows the user "codingErrorProfileNotReady" instead of a
-  // sentence. Both catalogs must carry every key the resolver can return.
-  const keys = [
-    ...new Set([...Object.values(CodingErrorI18nKey), ...Object.values(WorkbenchErrorI18nKey)]),
-  ];
+  // sentence. The catalog must carry every key the resolver can return.
+  const keys = [...new Set(Object.values(CodingErrorI18nKey))];
 
   test.each(keys)('%s has Chinese and English copy', key => {
     i18nService.setLanguage('zh', { persist: false });
