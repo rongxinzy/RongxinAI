@@ -2,6 +2,7 @@ import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
   type CoworkToolActivityEvent,
+  type CoworkToolActivityProgress,
 } from '../../../shared/cowork/toolActivity';
 
 const ACTIVITY_INPUT_KEYS = [
@@ -89,6 +90,20 @@ export type PreparingToolActivity = {
   toolCallId: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
+  progress?: CoworkToolActivityProgress;
+  /** Per-delta argument character count, used when no cumulative snapshot exists. */
+  progressDeltaChars?: number;
+};
+
+const readPreparingProgress = (
+  event: Record<string, unknown>,
+  toolCall: Record<string, unknown>,
+): Pick<PreparingToolActivity, 'progress' | 'progressDeltaChars'> => {
+  const partialJson = toolCall.partialJson;
+  if (typeof partialJson === 'string') return { progress: { argsChars: partialJson.length } };
+  const delta = event.delta;
+  if (typeof delta === 'string' && delta.length > 0) return { progressDeltaChars: delta.length };
+  return {};
 };
 
 export const getPiPreparingToolActivity = (
@@ -115,6 +130,7 @@ export const getPiPreparingToolActivity = (
     toolCallId: readString(toolCall, ['id', 'toolCallId', 'tool_call_id']) ?? fallbackToolCallId,
     toolName: readString(toolCall, ['name', 'toolName']),
     toolInput: toToolActivityInput(toolCall.arguments ?? toolCall.args ?? toolCall.input),
+    ...readPreparingProgress(event, toolCall),
   };
 };
 
@@ -179,7 +195,10 @@ export const createToolActivityUpsert = (
 ): CoworkToolActivityEvent => ({
   type: CoworkToolActivityEventType.Upsert,
   activity: {
-    ...activity,
+    toolCallId: activity.toolCallId,
+    toolName: activity.toolName,
+    toolInput: activity.toolInput,
+    progress: activity.progress,
     phase,
     updatedAt: Date.now(),
   },
@@ -194,27 +213,72 @@ export const createToolActivityClear = (): CoworkToolActivityEvent => ({
   type: CoworkToolActivityEventType.Clear,
 });
 
+export const TOOL_ACTIVITY_PROGRESS_CHARS_THRESHOLD = 1024;
+export const TOOL_ACTIVITY_PROGRESS_INTERVAL_MS = 250;
+
+type TrackedToolActivity = {
+  signature: string;
+  argsChars?: number;
+  lastEmittedArgsChars?: number;
+  lastEmittedAt: number;
+};
+
 export class ToolActivityTracker {
-  private readonly signatures = new Map<string, string>();
+  private readonly tracked = new Map<string, TrackedToolActivity>();
 
   upsert(
     activity: PreparingToolActivity,
     phase: CoworkToolActivityPhase = CoworkToolActivityPhase.Preparing,
   ): CoworkToolActivityEvent | null {
+    const now = Date.now();
+    const existing = this.tracked.get(activity.toolCallId);
     const signature = JSON.stringify([phase, activity.toolName, activity.toolInput]);
-    if (this.signatures.get(activity.toolCallId) === signature) return null;
-    this.signatures.set(activity.toolCallId, signature);
-    return createToolActivityUpsert(activity, phase);
+
+    let argsChars = activity.progress?.argsChars;
+    if (argsChars === undefined && activity.progressDeltaChars !== undefined) {
+      argsChars = (existing?.argsChars ?? 0) + activity.progressDeltaChars;
+    }
+    // Carry the last known count forward so later snapshots without a partial
+    // payload (e.g. toolcall_end) do not erase the displayed progress.
+    if (argsChars === undefined) argsChars = existing?.argsChars;
+
+    const emit = (): CoworkToolActivityEvent => {
+      this.tracked.set(activity.toolCallId, {
+        signature,
+        argsChars,
+        lastEmittedArgsChars: argsChars,
+        lastEmittedAt: now,
+      });
+      return createToolActivityUpsert(
+        { ...activity, progress: argsChars === undefined ? undefined : { argsChars } },
+        phase,
+      );
+    };
+
+    // Phase, tool name, or projected input changes always emit immediately.
+    if (!existing || existing.signature !== signature) return emit();
+    if (argsChars === undefined || argsChars === existing.argsChars) return null;
+
+    this.tracked.set(activity.toolCallId, { ...existing, argsChars });
+    const charsSinceEmit = argsChars - (existing.lastEmittedArgsChars ?? 0);
+    const msSinceEmit = now - existing.lastEmittedAt;
+    if (
+      charsSinceEmit >= TOOL_ACTIVITY_PROGRESS_CHARS_THRESHOLD ||
+      msSinceEmit >= TOOL_ACTIVITY_PROGRESS_INTERVAL_MS
+    ) {
+      return emit();
+    }
+    return null;
   }
 
   remove(toolCallId: string): CoworkToolActivityEvent | null {
-    if (!this.signatures.delete(toolCallId)) return null;
+    if (!this.tracked.delete(toolCallId)) return null;
     return createToolActivityRemove(toolCallId);
   }
 
   clear(): CoworkToolActivityEvent | null {
-    if (this.signatures.size === 0) return null;
-    this.signatures.clear();
+    if (this.tracked.size === 0) return null;
+    this.tracked.clear();
     return createToolActivityClear();
   }
 }

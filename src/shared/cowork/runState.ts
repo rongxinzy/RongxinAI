@@ -70,4 +70,6 @@ export const PiRunEvent = {
   CompactEnd: 'compaction_end',
   ThinkingDelta: 'thinking_delta',
   TextDelta: 'text_delta',
+  ToolCallStart: 'toolcall_start',
+  ToolCallDelta: 'toolcall_delta',
 } as const;
