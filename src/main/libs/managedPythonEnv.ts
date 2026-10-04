@@ -1,11 +1,15 @@
 import { delimiter, dirname } from 'path';
 
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
-import { findSharedSkillPythonExecutable } from './skillPythonRuntime';
+import {
+  ensureSharedSkillWindowsPython3Alias,
+  findSharedSkillPythonExecutable,
+} from './skillPythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 
 /** Shared by development and packaged launches; dependency Python must win. */
 export function applyManagedPythonEnv(env: Record<string, string | undefined>): void {
+  ensureSharedSkillWindowsPython3Alias();
   appendPythonRuntimeToEnv(env);
   appendUvRuntimeToEnv(env);
   configureUvForManagedPython(env);

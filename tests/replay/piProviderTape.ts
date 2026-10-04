@@ -105,6 +105,22 @@ const hashBody = (body: string): string => createHash('sha256').update(body, 'ut
 const LS_METADATA_ROW_PATTERN =
   /((?:^|\\n|"))[dlbcdps-][rwxstST-]{9}\+?\s+\d+\s+\S+\s+\S+\s+\d+\s+\w{3}\s+\d{1,2}\s+[\d:]{4,5}/g;
 
+/**
+ * The `ls -l` block-total line (`total 12`) varies with the filesystem (block
+ * size, allocation strategy) between the record and replay machines. The
+ * metadata rows are already collapsed to <LS-META>; anchor on that placeholder
+ * — or on a normalized directory header for empty listings — and blank the
+ * number so only deterministic content reaches the hash.
+ */
+const LS_BLOCK_TOTAL_PATTERN =
+  /total \d+(?=\\n(?:<LS-META>|<PI_REPLAY_WORKDIR>|<PI_REPLAY_REPOROOT>))/g;
+const LS_BLOCK_TOTAL_PLACEHOLDER = 'total <LS-BLOCKS>';
+
+/** Blank filesystem-dependent `ls -l` block totals after row normalization. */
+export function normalizeLsBlockTotals(normalizedBody: string): string {
+  return normalizedBody.replace(LS_BLOCK_TOTAL_PATTERN, LS_BLOCK_TOTAL_PLACEHOLDER);
+}
+
 const isGzipPath = (tapePath: string): boolean => tapePath.endsWith('.gz');
 
 export class PiProviderTapeServer {
@@ -194,7 +210,7 @@ export class PiProviderTapeServer {
     if (runtimeRepoRoot && runtimeRepoRoot !== recordedRepoRoot) {
       normalized = normalized.split(runtimeRepoRoot).join(REPO_ROOT_PLACEHOLDER);
     }
-    return normalized;
+    return normalizeLsBlockTotals(normalized);
   }
 
   private loadTape(): void {

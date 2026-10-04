@@ -5,6 +5,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  ensureWindowsPython3Alias,
   listRequirementFiles,
   normalizePlatform,
   parseImportNames,
@@ -101,6 +102,28 @@ describe('setup-skill-python-runtime', () => {
       expect(path.resolve(path.dirname(environmentPython), rebasedTarget)).toBe(basePython);
     } finally {
       fs.rmSync(resourcesRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('creates the Windows python3.exe alias beside the shared python.exe', () => {
+    const sharedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-python-alias-'));
+    try {
+      const scriptsDir = path.join(sharedRoot, 'Scripts');
+      fs.mkdirSync(scriptsDir, { recursive: true });
+      fs.writeFileSync(path.join(scriptsDir, 'python.exe'), 'trampoline');
+
+      ensureWindowsPython3Alias(sharedRoot, 'win32');
+
+      expect(fs.readFileSync(path.join(scriptsDir, 'python3.exe'), 'utf8')).toBe('trampoline');
+
+      // Idempotent, POSIX no-op, and missing python.exe is tolerated.
+      fs.writeFileSync(path.join(scriptsDir, 'python3.exe'), 'existing');
+      ensureWindowsPython3Alias(sharedRoot, 'win32');
+      expect(fs.readFileSync(path.join(scriptsDir, 'python3.exe'), 'utf8')).toBe('existing');
+      ensureWindowsPython3Alias(sharedRoot, 'darwin');
+      ensureWindowsPython3Alias(path.join(sharedRoot, 'empty'), 'win32');
+    } finally {
+      fs.rmSync(sharedRoot, { recursive: true, force: true });
     }
   });
 });
