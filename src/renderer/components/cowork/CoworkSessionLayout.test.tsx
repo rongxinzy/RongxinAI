@@ -88,6 +88,6 @@ test('renders the title above tabs and preserves conversation state across tab s
 test('renders the task audit as a single-column timeline view', () => {
   expect(taskAuditSource).not.toContain('md:grid-cols-2');
   expect(taskAuditSource).not.toContain('<WorkbenchTaskAuditSection');
-  expect(taskAuditSource).toContain('max-w-3xl');
+  expect(taskAuditSource).toContain('max-w-4xl');
   expect(taskAuditSource).toContain('WorkbenchTimeline');
 });
