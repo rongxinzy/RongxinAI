@@ -862,24 +862,6 @@ class CoworkService {
     return window.electron.saveApiConfig(config);
   }
 
-  async readBootstrapFile(filename: string): Promise<string> {
-    const api = window.electron?.cowork?.readBootstrapFile;
-    if (!api) return '';
-    const result = await api(filename);
-    if (!result?.success) {
-      console.warn(`[CoworkService] readBootstrapFile: failed to read ${filename}`, result?.error);
-      return '';
-    }
-    return result.content || '';
-  }
-
-  async writeBootstrapFile(filename: string, content: string): Promise<boolean> {
-    const api = window.electron?.cowork?.writeBootstrapFile;
-    if (!api) return false;
-    const result = await api(filename, content);
-    return Boolean(result?.success);
-  }
-
   async generateSessionTitle(prompt: string | null): Promise<string | null> {
     if (!window.electron?.generateSessionTitle) {
       return null;
