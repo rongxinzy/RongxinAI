@@ -7,7 +7,6 @@ import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
-  WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchRunEventType,
@@ -54,13 +53,6 @@ export interface WorkbenchToolAuthorizationResult {
    * against a run that is already over.
    */
   terminateRun?: boolean;
-  /**
-   * The output-contract gate hit its first denial ceiling. Instead of failing
-   * the run outright, the runtime must steer the model into exactly one
-   * set_task_output call; the run is only terminated when it keeps violating
-   * the gate after that forced correction.
-   */
-  forceContractCorrection?: boolean;
 }
 
 export interface VerifiedWorkbenchRunEvent {
@@ -86,21 +78,11 @@ const MAX_RESULT_NODES = 500;
 const MAX_RESULT_COLLECTION_ENTRIES = 50;
 const MAX_RESULT_STRING_LENGTH = 4_000;
 const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
-/** Consecutive output-contract denials before the runtime is asked to force a correction. */
-const MAX_OUTPUT_CONTRACT_DENIALS = 4;
-/** Extra denials granted once per run after the forced set_task_output correction. */
-const OUTPUT_CONTRACT_CORRECTION_GRACE_DENIALS = 3;
 
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
   readonly measurement: HarnessMeasurementService;
   private readonly pendingApprovals = new Map<string, PendingApproval>();
-  /** Last set_task_output failure per run, so the gate can explain what to fix. */
-  private readonly lastOutputContractErrors = new Map<string, string>();
-  /** Consecutive output-contract denials per run, so a stuck run can be stopped. */
-  private readonly outputContractDenials = new Map<string, number>();
-  /** Runs that already received their one forced-correction grace window. */
-  private readonly outputContractCorrectionGraceRuns = new Set<string>();
 
   constructor(
     db: Database.Database,
@@ -357,7 +339,7 @@ export class WorkbenchTaskService extends EventEmitter {
       const artifacts = this.repository
         .getDetail(task.id)!
         .artifacts.filter(artifact => artifact.runId === run.id);
-      finalResult = applyWorkbenchDeliveryGate(finalResult, artifacts, task.contract);
+      finalResult = applyWorkbenchDeliveryGate(finalResult, artifacts);
       if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
           verificationResult: finalResult,
@@ -404,7 +386,6 @@ export class WorkbenchTaskService extends EventEmitter {
       }
     }
     this.emitChanged(detail.task);
-    this.forgetRunScopedState(run.id);
     return detail;
   }
 
@@ -421,8 +402,8 @@ export class WorkbenchTaskService extends EventEmitter {
     }
     const runArtifacts = detail.artifacts.filter(artifact => artifact.runId === run.id);
     if (
-      applyWorkbenchDeliveryGate(run.verificationResult, runArtifacts, detail.task.contract)
-        .outcome === WorkbenchVerificationOutcome.Failed
+      applyWorkbenchDeliveryGate(run.verificationResult, runArtifacts).outcome ===
+      WorkbenchVerificationOutcome.Failed
     ) {
       throw new Error('This task cannot be accepted because no final deliverable is ready.');
     }
@@ -448,11 +429,7 @@ export class WorkbenchTaskService extends EventEmitter {
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
       // Acceptance attests final deliverables, never intermediate execution evidence.
-      const verifiedArtifacts = this.repository.markArtifactsVerified(
-        run.id,
-        detail.task.contract,
-        runArtifacts,
-      );
+      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id, runArtifacts);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
@@ -500,7 +477,6 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     this.resolvePendingApprovals(expiredApprovals, reason);
     this.emitChanged(this.requireTask(task.id));
-    this.forgetRunScopedState(run.id);
   }
 
   failRun(sessionId: string, failure: WorkbenchJsonObject): void {
@@ -520,7 +496,6 @@ export class WorkbenchTaskService extends EventEmitter {
       });
     });
     this.emitChanged(this.requireTask(task.id));
-    this.forgetRunScopedState(run.id);
   }
 
   cancelRun(sessionId: string, runId: string): void {
@@ -535,55 +510,11 @@ export class WorkbenchTaskService extends EventEmitter {
       });
     });
     this.emitChanged(this.requireTask(task.id));
-    this.forgetRunScopedState(run.id);
-  }
-
-  /**
-   * Records why the last set_task_output call failed for a run. The gate below
-   * reports this back, so a model that already tried to commit the contract
-   * learns what to fix instead of retrying other tools forever.
-   */
-  recordOutputContractFailure(runId: string, message: string): void {
-    const trimmed = message.trim();
-    if (trimmed) this.lastOutputContractErrors.set(runId, trimmed);
-  }
-
-  private forgetRunScopedState(runId: string): void {
-    this.lastOutputContractErrors.delete(runId);
-    this.outputContractDenials.delete(runId);
-    this.outputContractCorrectionGraceRuns.delete(runId);
-  }
-
-  /**
-   * Grants a run its one grace window of extra output-contract denials after
-   * the runtime steered the model back to set_task_output. Returns false when
-   * the run already used its grace, so the caller falls back to terminating
-   * the run.
-   */
-  grantOutputContractCorrectionGrace(runId: string): boolean {
-    if (this.outputContractCorrectionGraceRuns.has(runId)) return false;
-    this.outputContractCorrectionGraceRuns.add(runId);
-    return true;
   }
 
   /** True while the session has a tool approval waiting for the user. */
   hasPendingApprovalForSession(sessionId: string): boolean {
     return this.repository.listPendingApprovalsForSession(sessionId).length > 0;
-  }
-
-  /**
-   * Counts one output-contract denial and returns the reason for it: the exact
-   * failure of the previous commit attempt when there was one, otherwise the
-   * instruction with a copyable example.
-   */
-  private recordOutputContractDenial(runId: string): string {
-    const denials = (this.outputContractDenials.get(runId) ?? 0) + 1;
-    this.outputContractDenials.set(runId, denials);
-    const example = '{"requirements":[{"mode":"text","formats":[]}]}';
-    const lastError = this.lastOutputContractErrors.get(runId);
-    return lastError
-      ? `The output contract is not committed: the previous set_task_output call failed with "${lastError}". Fix that call, then continue — for example ${example} for a written answer.`
-      : `Before executing tools, call set_task_output to declare what this task must deliver — for example ${example} for a written answer.`;
   }
 
   async authorizeToolCall(input: {
@@ -610,33 +541,6 @@ export class WorkbenchTaskService extends EventEmitter {
       };
     }
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
-    if (
-      task.contract.kind !== WorkbenchContractKind.Chat &&
-      !task.contract.outputRequirements?.length &&
-      riskLevel !== WorkbenchApprovalRiskLevel.ReadOnly
-    ) {
-      const reason = this.recordOutputContractDenial(run.id);
-      const graceGranted = this.outputContractCorrectionGraceRuns.has(run.id);
-      const denialLimit = graceGranted
-        ? MAX_OUTPUT_CONTRACT_DENIALS + OUTPUT_CONTRACT_CORRECTION_GRACE_DENIALS
-        : MAX_OUTPUT_CONTRACT_DENIALS;
-      if ((this.outputContractDenials.get(run.id) ?? 0) >= denialLimit) {
-        if (!graceGranted) {
-          // First time at the ceiling: the runtime steers the model into one
-          // set_task_output call and grants extra denials. Only a run that
-          // keeps violating the gate after that correction is stopped.
-          return { allow: false, reason, forceContractCorrection: true };
-        }
-        this.failRun(input.sessionId, {
-          code: 'output_contract_uncommitted',
-          stage: 'contract',
-          message:
-            'Stopped the run: the output contract was never committed, so no tool call could execute.',
-        });
-        return { allow: false, reason, terminateRun: true };
-      }
-      return { allow: false, reason };
-    }
     if (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly) {
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ToolRead, {
         toolCallId: input.toolCallId,
