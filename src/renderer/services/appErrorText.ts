@@ -4,7 +4,6 @@ import {
   getUserErrorI18nKey,
 } from '../../common/coworkError';
 import { resolveCodingErrorTranslation } from '../../shared/codingAgent';
-import { resolveWorkbenchErrorTranslation } from '../../shared/workbenchTask';
 import { normalizeError, readErrorMessage } from './errorNormalization';
 import { i18nService } from './i18n';
 
@@ -60,9 +59,6 @@ export function reportAppError(
 function translateOwnMessage(message: string): string | null {
   const coding = resolveCodingErrorTranslation(message);
   if (coding) return formatTranslation(coding.key, coding.detail);
-
-  const workbench = resolveWorkbenchErrorTranslation(message);
-  if (workbench) return i18nService.t(workbench.key);
 
   return null;
 }

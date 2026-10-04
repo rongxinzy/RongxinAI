@@ -1,5 +1,4 @@
 export * from './constants';
 export * from './artifactDiscovery';
 export * from './artifactClassification';
-export * from './errors';
 export * from './types';

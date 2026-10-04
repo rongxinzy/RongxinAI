@@ -191,12 +191,6 @@ export class WorkbenchTaskRepository {
     return row ? this.mapTask(row) : null;
   }
 
-  updateTaskContract(taskId: string, contract: WorkbenchTaskContract): void {
-    this.db
-      .prepare('UPDATE workbench_tasks SET contract_json = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(contract), Date.now(), taskId);
-  }
-
   getLatestTaskForSession(sessionId: string): WorkbenchTask | null {
     const row = this.db
       .prepare(
@@ -479,18 +473,14 @@ export class WorkbenchTaskRepository {
    * Promote pending final deliverables only. Intermediate evidence, verified
    * artifacts and failed artifacts are left untouched.
    */
-  markArtifactsVerified(
-    runId: string,
-    contract: WorkbenchTaskContract,
-    artifacts: WorkbenchArtifact[],
-  ): number {
+  markArtifactsVerified(runId: string, artifacts: WorkbenchArtifact[]): number {
     return this.transaction(() => {
       const update = this.db.prepare(
         'UPDATE workbench_artifacts SET verification_status = ?, updated_at = ? WHERE id = ? AND verification_status = ?',
       );
       let changes = 0;
       for (const artifact of artifacts) {
-        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact, contract)) continue;
+        if (artifact.runId !== runId || !isWorkbenchDeliverable(artifact)) continue;
         changes += update.run(
           WorkbenchArtifactVerificationStatus.Verified,
           Date.now(),

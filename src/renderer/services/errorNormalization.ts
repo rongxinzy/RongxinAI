@@ -1,6 +1,5 @@
-﻿import { CoworkErrorKind, getUserErrorI18nKey } from '../../common/coworkError';
+import { CoworkErrorKind, getUserErrorI18nKey } from '../../common/coworkError';
 import { CodingErrorTranslationKeys } from '../../shared/codingAgent';
-import { WorkbenchErrorI18nKey } from '../../shared/workbenchTask';
 import { i18nService } from './i18n';
 
 export const TOAST_DEFAULT_DURATION_MS = 2200;
@@ -40,7 +39,6 @@ export function readErrorMessage(error: unknown): string {
 const APP_COPY_KEYS = [
   ...new Set([
     ...CodingErrorTranslationKeys,
-    ...Object.values(WorkbenchErrorI18nKey),
     ...Object.values(CoworkErrorKind).map(getUserErrorI18nKey),
     ...Object.values(CATEGORY_KEYS),
     // Copy `appErrorText` returns when the caller has no error to translate:

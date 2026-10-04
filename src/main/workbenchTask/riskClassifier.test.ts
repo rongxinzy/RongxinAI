@@ -52,9 +52,9 @@ test('only explicitly read-only shell commands qualify for allow-all auto approv
   expect(isSafeShellCommand('ls; rm -rf out')).toBe(false);
 });
 
-// A ReadOnly classification skips both the output-contract gate and the
-// per-tool approval prompt, so anything that can write from an apparently
-// read-only command must stay out of the allowlist.
+// A ReadOnly classification skips the per-tool approval prompt, so anything
+// that can write from an apparently read-only command must stay out of the
+// allowlist.
 test('read-only classification cannot be used to write files', () => {
   expect(isSafeShellCommand('ls | sort -o out.txt')).toBe(false);
   expect(isSafeShellCommand('find . -fprint out.txt')).toBe(false);
@@ -67,7 +67,7 @@ test('read-only classification cannot be used to write files', () => {
   expect(isSafeShellCommand('head -n 5 a.txt | tail -1')).toBe(true);
 });
 
-test('read-only shell commands are not blocked by the pre-execution contract gate', () => {
+test('read-only shell commands classify as ReadOnly without approval', () => {
   expect(classifyWorkbenchToolRisk('bash', { command: 'ls -lt | head -20' })).toBe(
     WorkbenchApprovalRiskLevel.ReadOnly,
   );

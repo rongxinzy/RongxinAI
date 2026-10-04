@@ -2377,10 +2377,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingErrorAcpAgentExited: '编程 Agent 进程已退出，请重试。',
     codingErrorAcpProtocolUnsupported: '该编程 Agent 的协议版本不受支持，请更换 Agent。',
 
-    // 工作台任务契约（src/shared/workbenchTask/errors.ts 的消息目录）
-    workbenchErrorOutputContractRequired: '执行工具前需要先声明本次任务的交付要求。',
-    workbenchErrorOutputContractUncommitted: '上一次声明交付要求的调用失败了，请修正后重试。',
-
     coworkIntermediateProcess: '正在工作',
     coworkExecutionCompletedSummary: '已完成 {thinking} 次思考、{tools} 次工具调用',
     coworkExecutionCompletedThinkingSummary: '已完成 {thinking} 次思考',
@@ -6263,12 +6259,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingErrorAcpAgentExited: 'The coding agent process exited. Try again.',
     codingErrorAcpProtocolUnsupported:
       'This coding agent speaks an unsupported protocol version. Use another agent.',
-
-    // Workbench task contract (mirrors src/shared/workbenchTask/errors.ts)
-    workbenchErrorOutputContractRequired:
-      'Declare what this task must deliver before running tools.',
-    workbenchErrorOutputContractUncommitted:
-      'The previous delivery declaration failed. Fix it and continue.',
 
     // Expert
     expert: 'Expert',
