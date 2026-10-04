@@ -128,6 +128,7 @@ import {
   importLegacySqliteMemoryCandidates,
 } from './memory/legacyMemoryFileImportService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
+import { resolveProjectIdentity } from './memory/projectIdentity';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
 import { SessionSummaryBackfillService } from './memory/sessionSummaryBackfillService';
@@ -334,7 +335,6 @@ import { getSystemMemorySnapshot } from './libs/systemMemory';
 import { OllamaManager } from './libs/ollamaManager';
 import { resolveQualifiedAgentModelRef } from './libs/agentModels';
 import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenceInstall';
-import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
@@ -1583,7 +1583,7 @@ const getProjectMemoryService = (): ProjectMemoryService => {
     projectMemoryService = new ProjectMemoryService(
       memoryRepository,
       engramAdapter,
-      undefined,
+      resolveProjectIdentity,
       path.join(app.getPath('userData'), 'memory'),
     );
   }
@@ -5717,32 +5717,6 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('cowork:bootstrap:read', async (_event, filename: string) => {
-    try {
-      const mainWorkspace = getMainAgentWorkspace();
-      const content = readBootstrapFile(mainWorkspace, filename);
-      return { success: true, content };
-    } catch (error) {
-      return {
-        success: false,
-        content: '',
-        error: error instanceof Error ? error.message : 'Failed to read bootstrap file',
-      };
-    }
-  });
-  ipcMain.handle('cowork:bootstrap:write', async (_event, filename: string, content: string) => {
-    try {
-      const mainWorkspace = getMainAgentWorkspace();
-      writeBootstrapFile(mainWorkspace, filename, content);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to write bootstrap file',
-      };
-    }
-  });
-
   const VALID_EMBEDDING_PROVIDERS = [
     'local',
     'openai',
@@ -5861,7 +5835,7 @@ if (!gotTheLock) {
         ) {
           getSkillManager().handleWorkingDirectoryChange();
           // Main agent workspace is decoupled from workingDirectory — no MEMORY.md
-          // or IDENTITY.md sync needed here. The workspace is always at
+          // sync needed here. The workspace is always at
           // {STATE_DIR}/workspace-main/ regardless of the user's working directory.
         }
 
