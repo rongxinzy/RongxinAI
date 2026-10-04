@@ -86,6 +86,7 @@ import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
 import type { LegacyMemoryMigrationService } from '../../memory/legacyMemoryMigrationService';
+import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import {
   buildProjectMemoryContextSafe,
@@ -748,6 +749,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private scheduledTaskService: ScheduledTaskService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
   private readonly pendingMemoryCompletions = new Map<string, Promise<string>>();
+  private readonly memoryInjectionDedup = new MemoryInjectionDedup();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
   /** Aborts turns whose model stream silently stops producing Pi events. */
@@ -1613,13 +1615,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (options.planMode === true) {
         initialPrompt = `${PiPlanModePrompt}\n\n${initialPrompt}`;
       }
+      // A fresh Pi transcript never contains an earlier memory block, so the
+      // per-session dedup fingerprint must restart with it.
+      this.memoryInjectionDedup.reset(sessionId);
       const projectMemoryContext = resourceState.chatMode
         ? null
-        : await buildProjectMemoryContextSafe(
-            this.projectMemoryService,
-            workspaceRoot,
+        : this.memoryInjectionDedup.take(
             sessionId,
-            prompt,
+            await buildProjectMemoryContextSafe(
+              this.projectMemoryService,
+              workspaceRoot,
+              sessionId,
+              prompt,
+            ),
           );
       if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
       if (projectMemoryContext) initialPrompt = `${projectMemoryContext}\n\n${initialPrompt}`;
@@ -1649,6 +1657,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // A stopped turn can immediately restart from the first queued follow-up.
       // Its eventual abort rejection must not delete that replacement session.
       if (activeSession && this.activeSessions.get(sessionId) === activeSession) {
+        this.memoryInjectionDedup.reset(sessionId);
         this.activeSessions.delete(sessionId);
       }
       if (abortController.signal.aborted) {
@@ -1991,11 +2000,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     try {
       const projectMemoryContext = active.resourceState.chatMode
         ? null
-        : await buildProjectMemoryContextSafe(
-            this.projectMemoryService,
-            active.workspaceRoot,
+        : this.memoryInjectionDedup.take(
             sessionId,
-            prompt,
+            await buildProjectMemoryContextSafe(
+              this.projectMemoryService,
+              active.workspaceRoot,
+              sessionId,
+              prompt,
+            ),
           );
       if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;
       if (!active.resourceState.chatMode) {
@@ -2112,6 +2124,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       'The session resources changed before the approval was resolved.',
     );
     this.clearApprovalsBySession(sessionId);
+    this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
   }
 
@@ -2664,6 +2677,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.agentSettleFallback.dispose(sessionId);
     this.streamStallRecovery.forgetSession(sessionId);
     this.clearApprovalsBySession(sessionId);
+    this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.delete(sessionId);
     this.clearThrottleStateBySession(sessionId, true);
@@ -2703,6 +2717,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.agentSettleFallback.dispose(session.sessionId);
       session.piSession.abortBash();
       void session.piSession.abort();
+      this.memoryInjectionDedup.reset(session.sessionId);
       this.activeSessions.delete(session.sessionId);
       this.retainedSessionIds.add(session.sessionId);
       this.clearThrottleStateBySession(session.sessionId, true);
@@ -2713,6 +2728,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private releaseStoppedSession(sessionId: string): void {
     this.streamStallWatchdog.dispose(sessionId);
     this.agentSettleFallback.dispose(sessionId);
+    this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.add(sessionId);
     this.clearThrottleStateBySession(sessionId, true);

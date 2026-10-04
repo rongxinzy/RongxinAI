@@ -68,6 +68,10 @@ export interface PersonalMemoryCandidateInput extends MemoryProjectionInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface ManagedMemoryQuery extends ManagedMemoryListInput {
+  projectIds?: string[];
+}
+
 export interface MemoryOutboxItem {
   id: string;
   linkId: string | null;
@@ -433,29 +437,40 @@ export class MemoryRepository {
       .run(new Date().toISOString(), MemoryOutboxStatus.Pending);
   }
 
-  listManaged(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {
+  listManaged(input: ManagedMemoryQuery = {}): ManagedMemoryRecord[] {
     this.expireDue();
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (input.scope) {
+      conditions.push('scope = ?');
+      params.push(input.scope);
+    }
+    if (input.status) {
+      conditions.push('status = ?');
+      params.push(input.status);
+    }
+    if (input.projectIds && input.projectIds.length > 0) {
+      conditions.push(`project_id IN (${input.projectIds.map(() => '?').join(', ')})`);
+      params.push(...input.projectIds);
+    }
+    const query = input.query?.trim().toLocaleLowerCase();
+    if (query) {
+      conditions.push("(LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(content) LIKE ? ESCAPE '\\')");
+      const pattern = `%${escapeLikePattern(query)}%`;
+      params.push(pattern, pattern);
+    }
+    const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : '';
     const links = this.db
-      .prepare('SELECT * FROM memory_links ORDER BY updated_at DESC')
-      .all() as SqlRow[];
+      .prepare(`SELECT * FROM memory_links${where} ORDER BY updated_at DESC`)
+      .all(...params) as SqlRow[];
     const candidates = this.db
-      .prepare('SELECT * FROM memory_candidates ORDER BY updated_at DESC')
-      .all() as SqlRow[];
+      .prepare(`SELECT * FROM memory_candidates${where} ORDER BY updated_at DESC`)
+      .all(...params) as SqlRow[];
     const records = [
       ...links.map(row => mapLink(row, this.getDelivery(String(row.id)))),
       ...candidates.map(row => mapCandidate(row, this.getDelivery(String(row.id)))),
     ];
-    const query = input.query?.trim().toLocaleLowerCase();
-    return records
-      .filter(record => !input.scope || record.scope === input.scope)
-      .filter(record => !input.status || record.status === input.status)
-      .filter(
-        record =>
-          !query ||
-          record.title.toLocaleLowerCase().includes(query) ||
-          record.content.toLocaleLowerCase().includes(query),
-      )
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    return records.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
   listMigrationRecordsForContext(projectId: string): MemoryMigrationRecord[] {
@@ -931,6 +946,10 @@ function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
     (candidate as Record<string, unknown>).extractorKind === MemoryExtractorKind.Atomic &&
     (candidate as Record<string, unknown>).extractorVersion === ATOMIC_MEMORY_EXTRACTOR_VERSION,
   );
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, match => `\\${match}`);
 }
 
 function nullableString(value: unknown): string | null {

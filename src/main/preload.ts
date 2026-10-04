@@ -14,7 +14,6 @@ import {
   AppIpc,
   CommunityAuthIpc,
   ContextMenuIpc,
-  CoworkBootstrapIpc,
   CoworkConfigIpc,
   CoworkPermissionIpc,
   CoworkQueueIpc,
@@ -572,10 +571,6 @@ contextBridge.exposeInMainWorld('electron', {
       codemodeEnabled?: boolean;
       mcpNativeBridge?: boolean;
     }) => ipcRenderer.invoke(CoworkConfigIpc.Set, config),
-
-    readBootstrapFile: (filename: string) => ipcRenderer.invoke(CoworkBootstrapIpc.Read, filename),
-    writeBootstrapFile: (filename: string, content: string) =>
-      ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
 
     onStreamUiEvent: (callback: (event: import('../shared/cowork/piUiEvent').PiUiEvent) => void) =>
       onPush(CoworkStreamIpc.UiEvent, callback),

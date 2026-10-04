@@ -186,13 +186,6 @@ export const CoworkConfigIpc = {
 } as const;
 export type CoworkConfigIpc = (typeof CoworkConfigIpc)[keyof typeof CoworkConfigIpc];
 
-// ─── Cowork Bootstrap ───────────────────────────────────────────────────────
-export const CoworkBootstrapIpc = {
-  Read: 'cowork:bootstrap:read',
-  Write: 'cowork:bootstrap:write',
-} as const;
-export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof CoworkBootstrapIpc];
-
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {
   RunState: 'cowork:stream:runState',

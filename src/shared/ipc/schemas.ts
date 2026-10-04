@@ -449,18 +449,6 @@ export const CoworkConfigSetSchema = {
   output: IpcResult({}),
 };
 
-// ─── Cowork Bootstrap ───────────────────────────────────────────────────────
-
-export const CoworkBootstrapReadSchema = {
-  input: z.string().min(1),
-  output: IpcResult({ content: z.string().optional() }),
-};
-
-export const CoworkBootstrapWriteSchema = {
-  input: z.object({ filename: z.string().min(1), content: z.string() }),
-  output: IpcResult({}),
-};
-
 // ─── Project (working directory helpers) ────────────────────────────────────
 
 export const ProjectCreateDirectorySchema = {

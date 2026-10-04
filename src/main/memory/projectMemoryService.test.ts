@@ -94,12 +94,15 @@ function identityFor(cwd: string): ProjectIdentity {
   };
 }
 
+const TEST_PERSONAL_DIRECTORY = '/personal-memory';
+
 test('always recalls with the current project identity', async () => {
   const recall = vi.fn(async () => []);
   const service = new ProjectMemoryService(
     new FakeRepository() as never,
     { recall } as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   await service.recallProject({ workingDirectory: 'alpha', query: 'database' });
@@ -120,12 +123,20 @@ test('filters managed memories to the selected workspace while retaining persona
     { id: 'personal', scope: MemoryScope.Personal, projectId: PERSONAL_MEMORY_PROJECT_ID },
   ];
   const listManaged = vi.fn(() => memories);
-  const service = new ProjectMemoryService({ listManaged } as never, {} as never, identityFor);
+  const service = new ProjectMemoryService(
+    { listManaged } as never,
+    {} as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   expect(
     service.listManagedMemories({ workingDirectory: 'alpha' }).map(memory => memory.id),
   ).toEqual(['project-alpha', 'session-alpha', 'personal']);
-  expect(listManaged).toHaveBeenCalledWith({ workingDirectory: 'alpha' });
+  expect(listManaged).toHaveBeenCalledWith({
+    workingDirectory: 'alpha',
+    projectIds: ['project-alpha', PERSONAL_MEMORY_PROJECT_ID],
+  });
 });
 
 test('returns referenced memory only when it is recallable in the current boundary', () => {
@@ -140,6 +151,7 @@ test('returns referenced memory only when it is recallable in the current bounda
     { findLinkByMemoryId, isCurrentSemanticMemoryLink: vi.fn(() => true) } as never,
     {} as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   expect(
@@ -165,7 +177,12 @@ test('persists the outbox before confirming and linking a project memory', async
     confirmMemory: vi.fn(async () => 42),
     discardCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    adapter as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   await expect(
     service.saveProjectMemory({
@@ -204,7 +221,12 @@ test('creates manual memory as a controlled candidate before confirmation', asyn
     getLink: vi.fn(() => active),
     getCandidate: vi.fn(() => null),
   };
-  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    {} as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
   const confirm = vi.spyOn(service, 'confirmMemoryCandidate').mockResolvedValue(active.memoryId);
 
   await expect(
@@ -243,7 +265,12 @@ test('records a rejected legacy candidate without retaining its content', async 
     rejectCandidate: vi.fn(),
     deleteCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    {} as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   await expect(service.forgetMemory(candidate.id, false)).resolves.toBe(true);
 
@@ -280,7 +307,12 @@ test('records an import rejection before permanently forgetting a confirmed lega
     deleteLink: vi.fn(),
   };
   const adapter = { forget: vi.fn(async () => true) };
-  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    adapter as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   await expect(service.forgetMemory(link.id, true)).resolves.toBe(true);
 
@@ -295,7 +327,12 @@ test('does not reimport a legacy entry with a rejection receipt', () => {
     getLink: vi.fn(),
     createPersonalCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    {} as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   expect(
     service.importLegacyPersonalMemoryCandidate({
@@ -323,7 +360,12 @@ test('edits active manual memory by confirming a superseding candidate', async (
     getLink: vi.fn((id: string) => (id === current.id ? current : replacement)),
     createPersonalCandidate: vi.fn(() => replacement.id),
   };
-  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    {} as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
   const confirm = vi
     .spyOn(service, 'confirmMemoryCandidate')
     .mockResolvedValue(replacement.memoryId);
@@ -388,7 +430,12 @@ test('supersedes a legacy Project link through the durable outbox', async () => 
     supersede: vi.fn(async () => 42),
     discardCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    adapter as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   const memoryId = await service.saveProjectMemory({
     sessionId: 'session-new',
@@ -427,7 +474,12 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
     confirmMemory: vi.fn(async () => null),
     discardCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    adapter as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   await service.saveProjectMemory({
     sessionId: 'session-1',
@@ -461,6 +513,7 @@ test('enforces the project context token budget', async () => {
     new FakeRepository() as never,
     adapter as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   const context = await service.buildProjectContext({
@@ -491,6 +544,7 @@ test('broadens an empty CJK search with any-match terms', async () => {
     new FakeRepository() as never,
     { recall, recent: vi.fn(async () => []) } as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   await expect(
@@ -515,6 +569,7 @@ test('falls back to bounded recent active memory only for explicit memory intent
     new FakeRepository() as never,
     { recall: vi.fn(async () => []), recent } as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   await expect(
@@ -556,6 +611,7 @@ test('lists the current workspace, confirmed personal, and current-session memor
     } as never,
     {} as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   expect(
@@ -583,6 +639,7 @@ test('does not expose legacy copy-style Session summaries through controlled lis
     } as never,
     {} as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   expect(
@@ -599,7 +656,12 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
     confirmMemory: vi.fn(async () => 21),
     discardCandidate: vi.fn(),
   };
-  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const service = new ProjectMemoryService(
+    repository as never,
+    adapter as never,
+    identityFor,
+    TEST_PERSONAL_DIRECTORY,
+  );
 
   await expect(
     service.saveSessionSummary({
@@ -663,6 +725,7 @@ test('injects only the current session recall under its own context budget', asy
     new FakeRepository() as never,
     adapter as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   await expect(
@@ -709,6 +772,7 @@ test('excludes session summaries returned by project recall', async () => {
     new FakeRepository() as never,
     adapter as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   await expect(
@@ -728,6 +792,7 @@ test('counts CJK characters conservatively against context budgets', async () =>
     new FakeRepository() as never,
     adapter as never,
     identityFor,
+    TEST_PERSONAL_DIRECTORY,
   );
 
   await expect(

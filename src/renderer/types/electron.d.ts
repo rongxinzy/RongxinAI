@@ -925,13 +925,6 @@ interface IElectronAPI {
     }) => Promise<{ success: boolean; error?: string }>;
     getConfig: () => Promise<{ success: boolean; config?: CoworkConfig; error?: string }>;
     setConfig: (config: CoworkConfigUpdate) => Promise<{ success: boolean; error?: string }>;
-    readBootstrapFile: (
-      filename: string,
-    ) => Promise<{ success: boolean; content: string; error?: string }>;
-    writeBootstrapFile: (
-      filename: string,
-      content: string,
-    ) => Promise<{ success: boolean; error?: string }>;
     onStreamUiEvent: (
       callback: (event: import('../../shared/cowork/piUiEvent').PiUiEvent) => void,
     ) => () => void;

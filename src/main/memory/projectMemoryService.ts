@@ -25,7 +25,6 @@ import {
   SESSION_SUMMARY_TTL_DAYS,
 } from './constants';
 import type { ProjectIdentity } from './projectIdentity';
-import { resolveProjectIdentity } from './projectIdentity';
 import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
 import type { MemoryMigrationRecord, MemoryOutboxItem } from './repository';
 import { MemoryRepository } from './repository';
@@ -81,8 +80,8 @@ export class ProjectMemoryService {
   constructor(
     readonly repository: MemoryRepository,
     private readonly adapter: ZhiYuanEngramAdapter,
-    private readonly resolveIdentity: (cwd: string) => ProjectIdentity = resolveProjectIdentity,
-    private readonly personalDirectory = process.cwd(),
+    private readonly resolveIdentity: (cwd: string) => ProjectIdentity,
+    private readonly personalDirectory: string,
   ) {}
 
   getProjectIdentity(workingDirectory: string): ProjectIdentity {
@@ -222,7 +221,11 @@ export class ProjectMemoryService {
     const project = this.resolveIdentity(input.workingDirectory);
     const limit = Math.min(Math.max(input.limit ?? 12, 1), 20);
     return this.repository
-      .listManaged({ status: MemoryLifecycleStatus.Active, query: input.query })
+      .listManaged({
+        status: MemoryLifecycleStatus.Active,
+        query: input.query,
+        projectIds: [project.id, PERSONAL_MEMORY_PROJECT_ID],
+      })
       .filter(
         memory =>
           (memory.scope === MemoryScope.Project &&
@@ -572,11 +575,14 @@ export class ProjectMemoryService {
   }
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {
-    const records = this.repository.listManaged(input);
     const workingDirectory = input.workingDirectory?.trim();
-    if (!workingDirectory) return records;
+    if (!workingDirectory) return this.repository.listManaged(input);
 
     const projectId = this.resolveIdentity(workingDirectory).id;
+    const records = this.repository.listManaged({
+      ...input,
+      projectIds: [projectId, PERSONAL_MEMORY_PROJECT_ID],
+    });
     return records.filter(
       memory =>
         (memory.scope === MemoryScope.Personal &&

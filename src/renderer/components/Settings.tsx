@@ -11,7 +11,6 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
-import { Textarea } from '@shared/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
@@ -160,7 +159,6 @@ type TabType =
   | 'model'
   | 'triage'
   | 'coworkMemory'
-  | 'coworkAgent'
   | 'shortcuts'
   | 'im'
   | 'email'
@@ -962,13 +960,6 @@ const Settings: React.FC<SettingsProps> = ({
   );
   const [embeddingRemoteApiKey, setEmbeddingRemoteApiKey] = useState<string>(
     coworkConfig.embeddingRemoteApiKey ?? '',
-  );
-  const [bootstrapIdentity, setBootstrapIdentity] = useState<string>('');
-  const [bootstrapUser, setBootstrapUser] = useState<string>('');
-  const [bootstrapSoul, setBootstrapSoul] = useState<string>('');
-  const [bootstrapLoaded, setBootstrapLoaded] = useState<boolean>(false);
-  const [bootstrapTab, setBootstrapTab] = useState<'IDENTITY.md' | 'SOUL.md' | 'USER.md'>(
-    'IDENTITY.md',
   );
 
   const syncLlamaCppProviderFromConfig = useCallback(async () => {
@@ -1877,20 +1868,6 @@ const Settings: React.FC<SettingsProps> = ({
     embeddingVectorWeight !== (coworkConfig.embeddingVectorWeight ?? 0.7) ||
     embeddingRemoteBaseUrl !== (coworkConfig.embeddingRemoteBaseUrl ?? '') ||
     embeddingRemoteApiKey !== (coworkConfig.embeddingRemoteApiKey ?? '');
-  useEffect(() => {
-    if (activeTab !== 'coworkAgent') return;
-    void (async () => {
-      const [identity, user, soul] = await Promise.all([
-        coworkService.readBootstrapFile('IDENTITY.md'),
-        coworkService.readBootstrapFile('USER.md'),
-        coworkService.readBootstrapFile('SOUL.md'),
-      ]);
-      setBootstrapIdentity(identity);
-      setBootstrapUser(user);
-      setBootstrapSoul(soul);
-      setBootstrapLoaded(true);
-    })();
-  }, [activeTab]);
 
   // Toggle provider enabled status
   const toggleProviderEnabled = (provider: ProviderType) => {
@@ -2119,18 +2096,6 @@ const Settings: React.FC<SettingsProps> = ({
         });
         if (!updated) {
           throw new Error(i18nService.t('coworkConfigSaveFailed'));
-        }
-      }
-
-      // Save bootstrap files (IDENTITY.md, USER.md, SOUL.md) only if loaded.
-      if (bootstrapLoaded) {
-        const results = await Promise.all([
-          coworkService.writeBootstrapFile('IDENTITY.md', bootstrapIdentity),
-          coworkService.writeBootstrapFile('USER.md', bootstrapUser),
-          coworkService.writeBootstrapFile('SOUL.md', bootstrapSoul),
-        ]);
-        if (results.some(r => !r)) {
-          throw new Error(i18nService.t('coworkBootstrapSaveFailed'));
         }
       }
 
@@ -5039,58 +5004,6 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
         );
-
-      case 'coworkAgent': {
-        const bootstrapTabs = [
-          {
-            key: 'IDENTITY.md' as const,
-            titleKey: 'coworkBootstrapIdentityTitle',
-            hintKey: 'coworkBootstrapIdentityHint',
-            value: bootstrapIdentity,
-            setter: setBootstrapIdentity,
-          },
-          {
-            key: 'SOUL.md' as const,
-            titleKey: 'coworkBootstrapSoulTitle',
-            hintKey: 'coworkBootstrapSoulHint',
-            value: bootstrapSoul,
-            setter: setBootstrapSoul,
-          },
-          {
-            key: 'USER.md' as const,
-            titleKey: 'coworkBootstrapUserTitle',
-            hintKey: 'coworkBootstrapUserHint',
-            value: bootstrapUser,
-            setter: setBootstrapUser,
-          },
-        ];
-        const activeItem = bootstrapTabs.find(t => t.key === bootstrapTab) ?? bootstrapTabs[0];
-        return (
-          <div className="flex flex-col h-full space-y-4">
-            <FluidTabs
-              aria-label={activeTabLabel}
-              items={bootstrapTabs.map(tab => ({
-                value: tab.key,
-                label: i18nService.t(tab.titleKey),
-              }))}
-              value={activeItem.key}
-              onValueChange={setBootstrapTab}
-            />
-            <div className="flex flex-col flex-1 min-h-0 space-y-2">
-              <p className="text-xs text-muted-foreground shrink-0">
-                {i18nService.t(activeItem.hintKey)}
-              </p>
-              <Textarea
-                key={activeItem.key}
-                value={activeItem.value}
-                onChange={e => activeItem.setter(e.target.value)}
-                className="theme-page-settings-textarea-1 w-full flex-1 resize-none"
-                placeholder={i18nService.t('coworkBootstrapPlaceholder')}
-              />
-            </div>
-          </div>
-        );
-      }
 
       case 'shortcuts':
         return (

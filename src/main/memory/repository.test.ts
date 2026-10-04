@@ -450,3 +450,83 @@ test('authorizes recall against projected scope, session, and lifecycle state', 
     db.close();
   }
 });
+
+test('filters managed memories in SQL by scope, status, project, and query', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    repository.createLink({
+      id: 'active-project',
+      memoryId: 1,
+      projectId: 'project-a',
+      scope: MemoryScope.Project,
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Database decision',
+      content: 'Use SQLite.',
+      kind: MemoryKind.Decision,
+    });
+    repository.createLink({
+      id: 'other-project',
+      memoryId: 2,
+      projectId: 'project-b',
+      scope: MemoryScope.Project,
+      sessionId: 'session-b',
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Database decision',
+      content: 'Use SQLite.',
+      kind: MemoryKind.Decision,
+    });
+    repository.createLink({
+      id: 'archived-project',
+      memoryId: 3,
+      projectId: 'project-a',
+      scope: MemoryScope.Project,
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Old decision',
+      content: 'Use 100% wildcard % safely.',
+      kind: MemoryKind.Decision,
+    });
+    repository.setLinkStatus('archived-project', MemoryLifecycleStatus.Archived);
+    repository.createPersonalCandidate({
+      id: 'pending-personal',
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.ModelProposal,
+      title: 'Editor preference',
+      content: 'Prefer compact diffs.',
+      kind: MemoryKind.Preference,
+    });
+
+    expect(
+      repository
+        .listManaged()
+        .map(record => record.id)
+        .sort(),
+    ).toEqual(['active-project', 'archived-project', 'other-project', 'pending-personal']);
+    expect(
+      repository
+        .listManaged({ status: MemoryLifecycleStatus.Active })
+        .map(record => record.id)
+        .sort(),
+    ).toEqual(['active-project', 'other-project']);
+    expect(
+      repository
+        .listManaged({ projectIds: ['project-a'] })
+        .map(record => record.id)
+        .sort(),
+    ).toEqual(['active-project', 'archived-project']);
+    expect(
+      repository.listManaged({ scope: MemoryScope.Personal }).map(record => record.id),
+    ).toEqual(['pending-personal']);
+    expect(repository.listManaged({ query: 'editor' }).map(record => record.id)).toEqual([
+      'pending-personal',
+    ]);
+    expect(repository.listManaged({ query: '100% wildcard %' }).map(record => record.id)).toEqual([
+      'archived-project',
+    ]);
+  } finally {
+    db.close();
+  }
+});
