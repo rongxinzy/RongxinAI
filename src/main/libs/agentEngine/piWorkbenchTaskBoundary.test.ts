@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
-import { WorkbenchContractKind, WorkbenchOutputMode } from '../../../shared/workbenchTask';
+import { WorkbenchContractKind } from '../../../shared/workbenchTask';
 import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -23,7 +23,6 @@ test('user acceptance is persisted and injected into reused and restored convers
       contract: {
         kind: WorkbenchContractKind.GenericWork,
         requiresUserAcceptance: true,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       },
     });
     await service.completeRun({

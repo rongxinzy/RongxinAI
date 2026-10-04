@@ -1,24 +1,15 @@
 import { CoworkArtifactRole } from '../cowork/artifacts';
-import {
-  WorkbenchArtifactCandidateSource,
-  WorkbenchArtifactKind,
-  WorkbenchOutputMode,
-} from './constants';
-import type { WorkbenchArtifact, WorkbenchTaskContract, WorkbenchOutputRequirement } from './types';
+import { WorkbenchArtifactCandidateSource, WorkbenchArtifactKind } from './constants';
+import type { WorkbenchArtifact } from './types';
 
-export function isWorkbenchDeliverable(
-  artifact: WorkbenchArtifact,
-  contract?: WorkbenchTaskContract,
-): boolean {
+export function isWorkbenchDeliverable(artifact: WorkbenchArtifact): boolean {
   if (artifact.metadata.role === CoworkArtifactRole.Intermediate) return false;
   if (artifact.kind === WorkbenchArtifactKind.MessageBlock) {
+    // An inline reply block only counts as delivery when it was declared as one
+    // (explicit artifact fence) and marked with the deliverable role.
     return (
       artifact.metadata.explicit === true &&
-      contract?.outputRequirements?.some(
-        requirement =>
-          requirement.mode === WorkbenchOutputMode.Inline &&
-          matchesOutputRequirement(artifact, requirement),
-      ) === true
+      artifact.metadata.role === CoworkArtifactRole.Deliverable
     );
   }
   return (
@@ -27,27 +18,4 @@ export function isWorkbenchDeliverable(
       (artifact.metadata.source === WorkbenchArtifactCandidateSource.Declaration &&
         artifact.metadata.role === CoworkArtifactRole.Deliverable))
   );
-}
-
-export function matchesOutputRequirement(
-  artifact: WorkbenchArtifact,
-  requirement: WorkbenchOutputRequirement,
-): boolean {
-  if (requirement.mode === WorkbenchOutputMode.Text) return false;
-  if (requirement.mode === WorkbenchOutputMode.File && artifact.kind !== WorkbenchArtifactKind.File)
-    return false;
-  if (
-    requirement.mode === WorkbenchOutputMode.Inline &&
-    artifact.kind !== WorkbenchArtifactKind.MessageBlock
-  )
-    return false;
-  const format =
-    artifact.kind === WorkbenchArtifactKind.File
-      ? artifact.reference
-          .split(/[/\\]/)
-          .pop()
-          ?.match(/\.([^.]+)$/)?.[1]
-          ?.toLowerCase()
-      : artifact.metadata.language;
-  return requirement.formats.length === 0 || requirement.formats.includes(String(format));
 }

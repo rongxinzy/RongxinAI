@@ -8,7 +8,6 @@ import type {
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
-  WorkbenchOutputMode,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
@@ -22,26 +21,7 @@ export type WorkbenchJsonObject = Record<string, unknown>;
 export interface WorkbenchTaskContract {
   kind: WorkbenchContractKind;
   requiresUserAcceptance: boolean;
-  /** Required for Work delivery. Chat alone may omit this for a plain text response. */
-  outputRequirements?: WorkbenchOutputRequirement[];
   metadata?: WorkbenchJsonObject;
-}
-
-export interface WorkbenchOutputRequirement {
-  mode: WorkbenchOutputMode;
-  /** Allowed extensions or inline languages. Entries are alternatives, not substitutes for other requirements. */
-  formats: string[];
-}
-
-/**
- * Raw requirement as a model submits it: `formats` may be omitted, and a text
- * requirement may carry formats. Both are normalized away instead of rejected,
- * because a rejected requirement leaves the task without an output contract and
- * every later tool call is blocked with no way for the model to recover.
- */
-export interface WorkbenchOutputRequirementInput {
-  mode: WorkbenchOutputMode;
-  formats?: string[];
 }
 
 export interface WorkbenchVerificationCheck {
