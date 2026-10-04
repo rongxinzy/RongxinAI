@@ -221,4 +221,5 @@ PR 工作流：分支 → PR → 门禁全绿 → 合并。多会话共处规则
 
 - `SKILLs/` 是 Pi 运行时使用的内置 skill 定义，别与 IDE/agent 插件 skill 混淆。
 - Claude Code 经 CLAUDE.md 读本文件。UI 工作可参考全局 skills：`shadcn/ui`、`vercel/ai-elements`、`rongxinai-ui-adapter`（项目适配层：`--zy-*` 主题映射、页面级组件选择矩阵、i18n 与常量约定）——它们补充而非替代本文件约定。
+- 前端开发推荐安装 impeccable skill：在项目目录运行 `npx impeccable install`（[impeccable.style](https://impeccable.style/)），之后用 `/impeccable` 命令做界面设计、打磨与 AI-slop 检查；它尊重现有设计系统（会读取 DESIGN.md）。
 - 前端 skill 路由：产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 `DESIGN.md` + 共享组件 + `rongxinai-ui-adapter` 为准，不套用营销页默认；landing/营销/作品集/品牌/重设计用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。冲突优先级：`AGENTS.md` / `DESIGN.md` > 项目 UI skills（`frontend-ui-change-strategy`、`rongxinai-ui-adapter`）> `design-taste-frontend` > `high-end-visual-design`。
