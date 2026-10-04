@@ -11,7 +11,11 @@ export interface BrowserConfig {
   userDataDir?: string;
   /** Whether to run browser headless */
   headless: boolean;
-  /** Retry once with visible browser when headless search appears blocked */
+  /**
+   * Retry once with a visible browser when headless search appears blocked.
+   * Default off: a visible Chrome window can cover the Agent and confuse users
+   * (issue #37 hardening). Enable only for local debugging.
+   */
   fallbackToHeadful: boolean;
   /** Additional Chrome flags */
   chromeFlags?: string[];
@@ -50,7 +54,8 @@ export const defaultConfig: Config = {
   browser: {
     cdpPort: 9222,
     headless: true,
-    fallbackToHeadful: true,
+    // Off by default: visible Chrome can cover the Agent window (issue #37 hardening).
+    fallbackToHeadful: false,
     chromeFlags: [
       '--no-first-run',
       '--no-default-browser-check',
