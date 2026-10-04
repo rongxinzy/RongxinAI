@@ -12,11 +12,16 @@ export const CoworkToolActivityEventType = {
   Clear: 'clear',
 } as const;
 
+export type CoworkToolActivityProgress = {
+  argsChars: number;
+};
+
 export type CoworkToolActivity = {
   toolCallId: string;
   phase: CoworkToolActivityPhase;
   toolName?: string;
   toolInput?: Record<string, unknown>;
+  progress?: CoworkToolActivityProgress;
   updatedAt: number;
 };
 

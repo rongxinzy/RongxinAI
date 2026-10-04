@@ -5,6 +5,7 @@ import {
   PiRunEvent,
   type CoworkRunSnapshot,
 } from '../../../shared/cowork/runState';
+import { getPiPreparingToolActivity } from './toolActivity';
 
 export interface PiRunProgressEvent {
   type: string;
@@ -13,8 +14,30 @@ export interface PiRunProgressEvent {
   toolCallId?: string;
   toolName?: string;
   partialResult?: unknown;
-  assistantMessageEvent?: { type: string };
+  assistantMessageEvent?: {
+    type: string;
+    contentIndex?: number;
+    partial?: unknown;
+    toolCall?: unknown;
+  };
 }
+
+const ACTIVITY_TARGET_KEYS = [
+  'path',
+  'filePath',
+  'file_path',
+  'targetFile',
+  'target_file',
+] as const;
+
+const readActivityTarget = (input: Record<string, unknown> | undefined): string | undefined => {
+  if (!input) return undefined;
+  for (const key of ACTIVITY_TARGET_KEYS) {
+    const value = input[key];
+    if (typeof value === 'string' && value) return value;
+  }
+  return undefined;
+};
 
 /** Bounded projection only: never stringify arbitrary tool objects on the agent stream path. */
 export function getToolProgressPreview(value: unknown): string {
@@ -77,14 +100,33 @@ export class PiRunStateTracker {
       case PiRunEvent.MessageStart:
         phase = CoworkRunPhase.Waiting;
         break;
-      case PiRunEvent.MessageUpdate:
+      case PiRunEvent.MessageUpdate: {
+        const assistantEvent = event.assistantMessageEvent;
+        if (
+          assistantEvent?.type === PiRunEvent.ToolCallStart ||
+          assistantEvent?.type === PiRunEvent.ToolCallDelta
+        ) {
+          // Streaming tool arguments: keep the run alive and surface which
+          // tool (and target) is being generated.
+          phase = CoworkRunPhase.Tool;
+          const activity = getPiPreparingToolActivity(assistantEvent, '');
+          if (activity) {
+            if (activity.toolName) state.toolName = activity.toolName;
+            const preview = [activity.toolName, readActivityTarget(activity.toolInput)]
+              .filter(Boolean)
+              .join(' ');
+            if (preview) state.preview = preview;
+          }
+          break;
+        }
         phase =
-          event.assistantMessageEvent?.type === PiRunEvent.ThinkingDelta
+          assistantEvent?.type === PiRunEvent.ThinkingDelta
             ? CoworkRunPhase.Thinking
-            : event.assistantMessageEvent?.type === PiRunEvent.TextDelta
+            : assistantEvent?.type === PiRunEvent.TextDelta
               ? CoworkRunPhase.Writing
               : undefined;
         break;
+      }
       case PiRunEvent.ToolStart:
         phase = CoworkRunPhase.Tool;
         state.toolName = event.toolName;

@@ -2,8 +2,11 @@ import { expect, test } from 'vitest';
 
 import type { AssistantTurnItem } from './messageGrouping';
 import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
+import { i18nService } from '../../../services/i18n';
 import {
   ExecutionStatusKind,
+  formatGeneratedCharacterCount,
+  getExecutionStatusText,
   getFinalAnswerIndex,
   getToolActivityExecutionStatus,
 } from './executionStatus';
@@ -43,13 +46,42 @@ test('formats a transient Write activity before tool execution starts', () => {
       phase: CoworkToolActivityPhase.Preparing,
       toolName: 'Write',
       toolInput: { path: 'src/app.ts' },
+      progress: { argsChars: 2_048 },
       updatedAt: 1,
     }),
   ).toEqual({
     kind: ExecutionStatusKind.Tool,
     toolName: 'Write',
     target: 'src/app.ts',
+    progress: { argsChars: 2_048 },
   });
+});
+
+test('formats generated character counts with compact units', () => {
+  expect(formatGeneratedCharacterCount(0)).toBe('0');
+  expect(formatGeneratedCharacterCount(999)).toBe('999');
+  expect(formatGeneratedCharacterCount(1_000)).toBe('1k');
+  expect(formatGeneratedCharacterCount(12_400)).toBe('12.4k');
+  expect(formatGeneratedCharacterCount(2_500_000)).toBe('2.5M');
+});
+
+test('appends generated character progress to the tool status text', () => {
+  const withProgress = getExecutionStatusText({
+    kind: ExecutionStatusKind.Tool,
+    toolName: 'Write',
+    target: 'report.md',
+    progress: { argsChars: 12_400 },
+  });
+  expect(withProgress).toContain(i18nService.t('coworkExecutionWrite'));
+  expect(withProgress).toContain('report.md');
+  expect(withProgress).toContain('12.4k');
+
+  const withoutProgress = getExecutionStatusText({
+    kind: ExecutionStatusKind.Tool,
+    toolName: 'Write',
+    target: 'report.md',
+  });
+  expect(withoutProgress).toBe(`${i18nService.t('coworkExecutionWrite')} report.md`);
 });
 
 test('recognizes only an explicitly marked final answer', () => {
