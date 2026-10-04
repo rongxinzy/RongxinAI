@@ -40,9 +40,9 @@ test('escalates the copy after a long silence', () => {
   );
 });
 
-test('leaves message-level waiting static while the session run bar owns animation', () => {
-  expect(source).toContain('<span className="text-sm text-muted-foreground">{statusText}</span>');
-  expect(source).not.toContain('Shimmer');
+test('renders the waiting status through the ai-elements Shimmer sweep', () => {
+  expect(source).toContain("import { Shimmer } from '@shared/components/ai-elements/shimmer';");
+  expect(source).toContain('<Shimmer duration={1.5} className="text-sm">');
   expect(source).not.toContain('AgentCompanion');
   expect(source).not.toContain('animate-');
 });
