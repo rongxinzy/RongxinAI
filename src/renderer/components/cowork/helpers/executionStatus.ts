@@ -1,5 +1,8 @@
 import { i18nService } from '../../../services/i18n';
-import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
+import type {
+  CoworkToolActivity,
+  CoworkToolActivityProgress,
+} from '../../../../shared/cowork/toolActivity';
 
 import type { AssistantTurnItem } from './messageGrouping';
 import { getToolInputSummary, hasText, normalizeToolName, truncatePreview } from './toolUtils';
@@ -17,6 +20,7 @@ export type ExecutionStatus =
       kind: typeof ExecutionStatusKind.Tool;
       toolName?: string;
       target?: string;
+      progress?: CoworkToolActivityProgress;
     };
 
 const getToolTarget = (toolName: string | undefined, toolInput: unknown): string | undefined => {
@@ -30,6 +34,7 @@ export const getToolActivityExecutionStatus = (activity: CoworkToolActivity): Ex
   kind: ExecutionStatusKind.Tool,
   toolName: activity.toolName,
   target: getToolTarget(activity.toolName, activity.toolInput),
+  progress: activity.progress,
 });
 
 export const getFinalAnswerIndex = (
@@ -119,11 +124,25 @@ const getToolActionTranslationKey = (toolName: string | undefined): string => {
   }
 };
 
+const trimUnitDecimal = (value: string): string =>
+  value.endsWith('.0') ? value.slice(0, -2) : value;
+
+export const formatGeneratedCharacterCount = (count: number): string => {
+  if (count < 1000) return String(count);
+  if (count < 1_000_000) return `${trimUnitDecimal((count / 1000).toFixed(1))}k`;
+  return `${trimUnitDecimal((count / 1_000_000).toFixed(1))}M`;
+};
+
 export const getExecutionStatusText = (status: ExecutionStatus): string => {
   if (status.kind === ExecutionStatusKind.Thinking) {
     return i18nService.t('coworkExecutionThinking');
   }
 
   const actionText = i18nService.t(getToolActionTranslationKey(status.toolName));
-  return status.target ? `${actionText} ${status.target}` : actionText;
+  const baseText = status.target ? `${actionText} ${status.target}` : actionText;
+  if (!status.progress) return baseText;
+  const progressText = i18nService
+    .t('coworkExecutionGeneratedChars')
+    .replace('{chars}', formatGeneratedCharacterCount(status.progress.argsChars));
+  return `${baseText} · ${progressText}`;
 };
