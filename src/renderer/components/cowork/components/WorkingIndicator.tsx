@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+import { Shimmer } from '@shared/components/ai-elements/shimmer';
+
 import { i18nService } from '../../../services/i18n';
 
 export const WORKING_INDICATOR_ELAPSED_THRESHOLD_MS = 8_000;
@@ -28,8 +30,8 @@ export const getWorkingIndicatorPhase = (elapsedMs: number): WorkingIndicatorPha
  * Live "still working" indicator shown while a session has started streaming
  * but no assistant content has arrived yet. It only renders during that
  * initial wait window, so mount time is a faithful stand-in for the last
- * activity timestamp. The session run bar owns the loading animation;
- * this message-level status and elapsed ticker remain static.
+ * activity timestamp. The status text uses the ai-elements Shimmer sweep;
+ * the elapsed ticker remains static informational text.
  */
 export const WorkingIndicator: React.FC = () => {
   const startedAtRef = useRef(Date.now());
@@ -51,7 +53,9 @@ export const WorkingIndicator: React.FC = () => {
   return (
     <div className="flex items-center gap-2" role="status" aria-live="polite">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="text-sm text-muted-foreground">{statusText}</span>
+        <Shimmer duration={1.5} className="text-sm">
+          {statusText}
+        </Shimmer>
         {phase !== WorkingIndicatorPhase.Initial && (
           <span className="text-sm text-muted-foreground tabular-nums">
             {i18nService
