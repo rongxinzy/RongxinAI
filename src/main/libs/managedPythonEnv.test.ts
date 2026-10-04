@@ -7,6 +7,7 @@ vi.mock('./pythonRuntime', () => ({
   },
 }));
 vi.mock('./skillPythonRuntime', () => ({
+  ensureSharedSkillWindowsPython3Alias: vi.fn(),
   findSharedSkillPythonExecutable: () => '/managed/shared/python',
 }));
 vi.mock('./uvRuntime', () => ({

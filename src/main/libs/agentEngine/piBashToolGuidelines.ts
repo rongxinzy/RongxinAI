@@ -10,6 +10,18 @@ const POWERSHELL_CMDLET =
 const WINDOWS_DIR_SWITCH = /(?:^|[\s;&|])dir\b[^\n]*\/(?:s|b|a|o)(?:\s|$)/i;
 const WINDOWS_BACKSLASH_PATH = /(?:^|[\s"'(])[A-Za-z]:\\[^\n]*/;
 
+// A pip command at a command position (start or after a shell separator);
+// path-qualified invocations like .venv/bin/pip are deliberately not matched.
+const PIP_INSTALL_COMMAND = /(?:^|[;&|(\s])pip3?(?:\.(?:exe|cmd|bat))?\s+[^\n;&|]*\binstall\b/;
+const PYTHON_PIP_MODULE =
+  /(?:^|[;&|(\s])python3?(?:\.exe)?\s+(?:-{1,2}[\w.-]+\s+)*-m\s+pip\s+[^\n;&|]*\binstall\b/;
+// Commands that explicitly operate on a project-local environment are exempt:
+// installing into the user's own venv or uv project is legitimate toolchain use.
+const PROJECT_ENV_CONTEXT =
+  /(?:[\\/]\.?venv[\\/]|activate|VIRTUAL_ENV=|pyproject\.toml|uv\s+(?:add|sync|lock))/;
+const PYTHON_INVOCATION = /(?:^|[;&|(\s])python3?(?:\.exe)?\s/;
+const SKILLS_ROOT_VARIABLE = /\$\{?SKILLS_ROOT\}?/;
+
 export const PiBashToolSystemPrompt = [
   '## Bash execution contract',
   '',
@@ -42,14 +54,58 @@ export const normalizePiBashTimeoutSeconds = (timeout: unknown): number => {
 };
 
 /**
+ * Block model-issued shell commands that would damage or bypass the managed
+ * Python environment. `pip install` resolves to the bare base runtime's pip,
+ * so the packages never appear for the interpreter the agent actually runs;
+ * bundled Skill scripts must go through run_skill_script so the per-Skill
+ * dependency gate applies. Matches the policy in PiPythonEnvSystemPrompt.
+ */
+export const getPiBashPythonEnvViolation = (
+  command: string,
+  skillsRoot?: string,
+): string | undefined => {
+  if (
+    (PIP_INSTALL_COMMAND.test(command) || PYTHON_PIP_MODULE.test(command)) &&
+    !PROJECT_ENV_CONTEXT.test(command)
+  ) {
+    return (
+      'The managed Python environment is fixed and already carries the bundled libraries. ' +
+      'Do not pip install into it: for a missing library use run_skill_script, and inside a ' +
+      "user project use the project's own toolchain (its venv pip, uv add/uv sync) instead of the global pip."
+    );
+  }
+
+  if (PYTHON_INVOCATION.test(command)) {
+    const referencesSkillsRoot =
+      SKILLS_ROOT_VARIABLE.test(command) ||
+      Boolean(
+        skillsRoot && command.toLowerCase().includes(skillsRoot.replace(/\\/g, '/').toLowerCase()),
+      );
+    if (referencesSkillsRoot) {
+      return (
+        'Bundled Skill scripts must run through the run_skill_script tool so the managed ' +
+        'runtime and the Skill dependency set are used; do not invoke them with python/python3.'
+      );
+    }
+  }
+
+  return undefined;
+};
+
+/**
  * Return an actionable block reason for command dialects that are certainly
  * wrong for the configured Windows Git Bash shell. Deliberate cmd/PowerShell
  * invocations remain valid because they name their intended interpreter.
+ * Python environment violations are evaluated first on every platform.
  */
 export const getPiBashCommandViolation = (
   command: string,
   platform: NodeJS.Platform = process.platform,
+  skillsRoot?: string,
 ): string | undefined => {
+  const pythonEnvViolation = getPiBashPythonEnvViolation(command, skillsRoot);
+  if (pythonEnvViolation) return pythonEnvViolation;
+
   if (platform !== WINDOWS_PLATFORM || EXPLICIT_WINDOWS_SHELL.test(command)) return undefined;
 
   if (POWERSHELL_CMDLET.test(command) || /\$env:[A-Za-z_][A-Za-z0-9_]*/.test(command)) {
