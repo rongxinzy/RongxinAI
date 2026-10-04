@@ -24,7 +24,10 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { findSharedSkillPythonExecutable } from './skillPythonRuntime';
+import {
+  ensureSharedSkillWindowsPython3Alias,
+  findSharedSkillPythonExecutable,
+} from './skillPythonRuntime';
 
 const sharedExecutableRelPath =
   process.platform === 'win32' ? path.join('Scripts', 'python.exe') : path.join('bin', 'python3');
@@ -51,4 +54,46 @@ test('returns null when no shared layer exists', () => {
 test('resolves the shared layer interpreter under the userData runtime root', () => {
   const expected = createSharedExecutable(path.join(userDataRoot, 'runtimes', 'skill-python'));
   expect(findSharedSkillPythonExecutable()).toBe(expected);
+});
+
+test('creates the Windows python3.exe alias beside the shared python.exe', () => {
+  const scriptsDir = path.join(
+    userDataRoot,
+    'runtimes',
+    'skill-python',
+    'layers',
+    'shared',
+    'Scripts',
+  );
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  const pythonExe = path.join(scriptsDir, 'python.exe');
+  fs.writeFileSync(pythonExe, 'trampoline');
+
+  ensureSharedSkillWindowsPython3Alias('win32');
+
+  const python3Exe = path.join(scriptsDir, 'python3.exe');
+  expect(fs.existsSync(python3Exe)).toBe(true);
+  expect(fs.readFileSync(python3Exe, 'utf8')).toBe('trampoline');
+
+  // Idempotent: a second pass must not rewrite the existing alias.
+  fs.writeFileSync(python3Exe, 'existing');
+  ensureSharedSkillWindowsPython3Alias('win32');
+  expect(fs.readFileSync(python3Exe, 'utf8')).toBe('existing');
+});
+
+test('leaves the shared layer untouched on non-Windows platforms', () => {
+  const scriptsDir = path.join(
+    userDataRoot,
+    'runtimes',
+    'skill-python',
+    'layers',
+    'shared',
+    'Scripts',
+  );
+  fs.mkdirSync(scriptsDir, { recursive: true });
+  fs.writeFileSync(path.join(scriptsDir, 'python.exe'), 'trampoline');
+
+  ensureSharedSkillWindowsPython3Alias('linux');
+
+  expect(fs.existsSync(path.join(scriptsDir, 'python3.exe'))).toBe(false);
 });

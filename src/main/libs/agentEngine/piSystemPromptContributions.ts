@@ -17,6 +17,7 @@ import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
+import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 import { PiWebSearchSystemPrompt } from './piWebSearchTool';
 
@@ -73,6 +74,11 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     id: 'bash-tool',
     requiresFileTools: true,
     prompt: context => createPiBashToolSystemPrompt(context.platform),
+  },
+  {
+    id: 'python-runtime',
+    requiresFileTools: true,
+    prompt: PiPythonEnvSystemPrompt,
   },
   {
     id: 'document-reader',
