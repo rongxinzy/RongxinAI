@@ -2973,7 +2973,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             input.timeout = normalizePiBashTimeoutSeconds(input.timeout);
             const command = (event.input as Record<string, unknown>).command;
             if (typeof command !== 'string') return undefined;
-            const reason = getPiBashCommandViolation(command);
+            const reason = getPiBashCommandViolation(command, process.platform, getSkillsRoot());
             return reason ? { block: true as const, reason } : undefined;
           });
         },

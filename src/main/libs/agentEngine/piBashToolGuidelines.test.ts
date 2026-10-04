@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createPiBashToolSystemPrompt,
   getPiBashCommandViolation,
+  getPiBashPythonEnvViolation,
   normalizePiBashTimeoutSeconds,
   PI_BASH_DEFAULT_TIMEOUT_SECONDS,
   PI_BASH_MAX_TIMEOUT_SECONDS,
@@ -42,5 +43,48 @@ describe('piBashToolGuidelines', () => {
     expect(normalizePiBashTimeoutSeconds(PI_BASH_MAX_TIMEOUT_SECONDS + 1)).toBe(
       PI_BASH_MAX_TIMEOUT_SECONDS,
     );
+  });
+
+  it('blocks pip installs that would target the managed interpreters', () => {
+    expect(getPiBashPythonEnvViolation('pip install pandas')).toContain('managed Python');
+    expect(getPiBashPythonEnvViolation('pip3 install --user requests')).toContain('managed Python');
+    expect(getPiBashPythonEnvViolation('python3 -m pip install openpyxl')).toContain(
+      'managed Python',
+    );
+    expect(
+      getPiBashPythonEnvViolation('python -m pip install pandas && python check.py'),
+    ).toContain('managed Python');
+  });
+
+  it('allows project-local environment installs and read-only pip usage', () => {
+    expect(getPiBashPythonEnvViolation('.venv/bin/pip install pandas')).toBeUndefined();
+    expect(
+      getPiBashPythonEnvViolation('source .venv/bin/activate && pip install pandas'),
+    ).toBeUndefined();
+    expect(getPiBashPythonEnvViolation('uv add pandas')).toBeUndefined();
+    expect(getPiBashPythonEnvViolation('pip list')).toBeUndefined();
+    expect(getPiBashPythonEnvViolation('python3 -m pip --version')).toBeUndefined();
+  });
+
+  it('redirects direct python invocations of bundled Skill scripts', () => {
+    const skillsRoot = '/home/user/app/SKILLs';
+    expect(
+      getPiBashPythonEnvViolation(
+        `python3 ${skillsRoot}/xlsx/scripts/xlsx_reader.py in.xlsx`,
+        skillsRoot,
+      ),
+    ).toContain('run_skill_script');
+    expect(getPiBashPythonEnvViolation('python "$SKILLS_ROOT/pdf/scripts/render.py"')).toContain(
+      'run_skill_script',
+    );
+    expect(
+      getPiBashPythonEnvViolation('python3 /tmp/adhoc/analyze.py', skillsRoot),
+    ).toBeUndefined();
+  });
+
+  it('evaluates Python environment violations on every platform', () => {
+    expect(getPiBashCommandViolation('pip install pandas', 'linux')).toContain('managed Python');
+    expect(getPiBashCommandViolation('pip install pandas', 'win32')).toContain('managed Python');
+    expect(getPiBashCommandViolation('ls -la', 'win32')).toBeUndefined();
   });
 });
