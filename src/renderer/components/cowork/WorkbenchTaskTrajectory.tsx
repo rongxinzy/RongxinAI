@@ -298,7 +298,7 @@ export function WorkbenchTaskTrajectory({
 function WorkbenchTaskTrajectorySkeleton() {
   return (
     <div className="h-full w-full overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-3xl flex-col px-6">
+      <div className="mx-auto flex w-full max-w-4xl flex-col px-6">
         <div className="flex flex-col gap-3 pt-8 pb-6">
           <div className="flex items-center justify-between gap-3">
             <Skeleton className="h-5 w-20" />
