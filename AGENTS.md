@@ -115,10 +115,10 @@ The Cowork feature provides AI-assisted coding sessions:
 
 **Managed Python runtimes**: two layers, both synced to `userData/runtimes/` on first run.
 
-- `resources/python-win|mac|linux` — bare portable CPython (uv-managed). On the agent shell PATH as the base interpreter; `UV_PYTHON` binds uv to it.
-- `resources/skill-python/layers/shared` — a single relocatable uv venv built on the base runtime, carrying the merged `requirements.txt` of every bundled Skill (pandas, numpy, openpyxl, ...). Its interpreter is prepended to the agent shell PATH (`prependSkillSharedPythonToEnv` in `src/main/libs/coworkUtil.ts`), so ad-hoc `python` scripts can `import pandas` directly. Skill script execution (`run_skill_script`) resolves it via `findSkillPythonExecutable`, which additionally enforces a per-Skill `requirementsSha256` manifest gate.
+- `resources/python-win|mac|linux` — bare portable CPython (uv-managed). On the agent shell PATH as the base interpreter; `UV_PYTHON` binds uv to it. Windows ships `python.exe` + `python3.exe`.
+- `resources/skill-python/layers/shared` — a single relocatable uv venv built on the base runtime, carrying the merged `requirements.txt` of every bundled Skill (pandas, numpy, openpyxl, ...). Its interpreter is prepended to the agent shell PATH (`applyManagedPythonEnv` in `src/main/libs/managedPythonEnv.ts`), so ad-hoc `python` / `python3` scripts can `import pandas` directly. Windows layers carry a `python3.exe` alias next to `python.exe` (uv venvs do not create one; without it `python3` falls through to the bare base runtime) — created by the setup script and self-healed at runtime via `ensureSharedSkillWindowsPython3Alias`. Skill script execution (`run_skill_script`) resolves the layer via `findSkillPythonExecutable`, which additionally enforces a per-Skill `requirementsSha256` manifest gate.
 
-SYSTEM_PROMPT.md declares this environment to the model (运行环境与工具链 section); keep that section in sync when the runtime layout changes.
+The model-facing policy lives in two places and must stay aligned: SYSTEM_PROMPT.md (托管环境与工具 section) and the `python-runtime` contribution in `src/main/libs/agentEngine/piSystemPromptContributions.ts` (`piPythonEnvGuidelines.ts`), which survives user system-prompt overrides. `getPiBashPythonEnvViolation` in `piBashToolGuidelines.ts` mechanically blocks pip installs into the managed interpreters and direct `python` invocations of bundled Skill scripts. Keep all three in sync when the runtime layout or policy changes.
 
 **Memory System**: Semantic persistent memory in three scopes, backed by the local Engram runtime (`vendor/engram-runtime`, fork of z189yis/engram-cjk) with SQLite projection tables (`memory_links`, `memory_candidates`, `memory_outbox`):
 

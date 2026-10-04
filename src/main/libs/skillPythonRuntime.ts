@@ -116,3 +116,36 @@ export function findSharedSkillPythonExecutable(): string | null {
   }
   return null;
 }
+
+/**
+ * Create the Windows python3.exe alias inside the user-owned shared layer.
+ *
+ * uv venvs on Windows expose only Scripts/python.exe, while the bare base
+ * runtime ships python.exe + python3.exe. Without an alias, `python3` on the
+ * agent shell PATH resolves past the shared layer to the base interpreter,
+ * which lacks the preinstalled Skill dependencies. The alias sits next to
+ * python.exe, so venv home discovery behaves identically. Read-only resource
+ * roots are never touched — packaged layers ship the alias from the build.
+ */
+export function ensureSharedSkillWindowsPython3Alias(
+  platform: NodeJS.Platform = process.platform,
+): void {
+  if (platform !== 'win32') return;
+  try {
+    const scriptsDir = path.join(
+      app.getPath('userData'),
+      'runtimes',
+      RUNTIME_DIR_NAME,
+      LAYERS_DIRECTORY_NAME,
+      SHARED_ENVIRONMENT_NAME,
+      'Scripts',
+    );
+    const pythonExe = path.join(scriptsDir, 'python.exe');
+    const python3Exe = path.join(scriptsDir, 'python3.exe');
+    if (!fs.existsSync(pythonExe) || fs.existsSync(python3Exe)) return;
+    fs.copyFileSync(pythonExe, python3Exe);
+    console.log('[skill-python-runtime] created python3.exe alias in the shared layer');
+  } catch (error) {
+    console.warn('[skill-python-runtime] could not create the python3.exe alias:', error);
+  }
+}

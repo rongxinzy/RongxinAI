@@ -12,6 +12,7 @@ import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import {
   collectPiSystemPromptContributions,
@@ -89,6 +90,7 @@ describe('piSystemPromptContributions', () => {
       PiUnattendedSystemPrompt,
       PiDocumentReaderSystemPrompt,
       PiBuiltinFileToolSystemPrompt,
+      PiPythonEnvSystemPrompt,
       DeclareArtifactSystemPrompt,
     ]) {
       expect(registeredPrompts).toContain(policy);
@@ -100,12 +102,19 @@ describe('piSystemPromptContributions', () => {
     const text = collectPiSystemPromptContributions(TEXT_CONTEXT);
     expect(full).toContain(PiDocumentReaderSystemPrompt);
     expect(full).toContain(PiBuiltinFileToolSystemPrompt);
+    expect(full).toContain(PiPythonEnvSystemPrompt);
     expect(text).not.toContain(PiDocumentReaderSystemPrompt);
     expect(text).not.toContain(PiBuiltinFileToolSystemPrompt);
+    expect(text).not.toContain(PiPythonEnvSystemPrompt);
     expect(text.some(prompt => prompt.includes('## Large File Writes'))).toBe(false);
     // Tool-agnostic policies stay present in both modes.
     expect(text).toContain(PiAskUserQuestionSystemPrompt);
     expect(text).toContain(DeclareArtifactSystemPrompt);
+  });
+
+  it('keeps the managed Python policy adjacent to the Bash contract', () => {
+    const ids = PiSystemPromptContributions.map(contribution => contribution.id);
+    expect(ids.indexOf('python-runtime')).toBe(ids.indexOf('bash-tool') + 1);
   });
 
   it('replaces the user-question policy with autonomous guidance when unattended', () => {
