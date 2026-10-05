@@ -51,7 +51,7 @@ import {
 import { toAgentModelRef } from '../../utils/agentModelRef';
 import { isScratchWorkspacePath } from '../../utils/path';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
-import type { SettingsOpenOptions } from '../Settings';
+import type { SettingsOpenOptions } from '../settings/types';
 import PageHeader from '../PageHeader';
 import { LogoLoadingState } from '../LogoLoadingState';
 import { useAgentSelectedModel } from './agentModelSelection';

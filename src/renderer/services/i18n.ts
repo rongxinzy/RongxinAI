@@ -728,11 +728,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // 设置
     settings: '设置',
+    settingsGroupGeneral: '通用',
+    settingsGroupModel: '模型',
+    settingsGroupChannels: '渠道',
     general: '通用',
     model: '模型',
     triageTab: '模型路由',
     shortcuts: '快捷键',
     about: '关于',
+    aboutTagline: '开放源码，汇聚智慧',
+    aboutUsLabel: '关于我们',
+    aboutCompanyName: '北京容芯致远科技有限公司',
     aboutVersion: '版本',
     aboutOfficialWebsite: '官网链接',
     aboutContactEmail: '联系邮箱',
@@ -876,6 +882,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '当前模型的工具调用能力尚未确认，已改用普通对话，未执行联网搜索。',
     modelSuffixSecure: '（安全）',
     codingPlanSubscriptionBadge: '订阅套餐',
+    codingPlanBetaBadge: 'Beta',
     inputFileLabel: '输入文件',
     imageVisionHint:
       '当前模型未启用图片输入，图片将以文件路径形式发送。若该模型本身支持图片理解，可在模型配置中开启图片输入选项。',
@@ -3120,6 +3127,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // 通用设置
     autoLaunch: '开机自启动',
     autoLaunchDescription: '系统启动时自动运行应用',
+    autoLaunchUpdateFailed: '更新开机自启动设置失败',
+    preventSleepUpdateFailed: '更新防止休眠设置失败',
+    settingsLoadFailed: '加载设置失败',
     useSystemProxy: '使用系统代理',
     useSystemProxyDescription: '开启后网络请求将跟随系统代理（保存后生效）',
     sqliteAutoBackupEnabled: '启用自动备份与恢复',
@@ -3205,6 +3215,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityEmptyAction: '查看定时任务',
     activityFilterEmpty: '暂无相关活动数据',
     activityFilterClear: '清除筛选条件',
+    managedMemoryFilterClear: '清除筛选',
     activityGroupToday: '今天',
     activityGroupYesterday: '昨天',
     activityTimeJustNow: '刚刚',
@@ -4422,11 +4433,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // Settings
     settings: 'Settings',
+    settingsGroupGeneral: 'General',
+    settingsGroupModel: 'Models',
+    settingsGroupChannels: 'Channels',
     general: 'General',
     model: 'Model',
     triageTab: 'Model Routing',
     shortcuts: 'Shortcuts',
     about: 'About',
+    // TODO: translate
+    aboutTagline: 'Open Source, Collective Wisdom',
+    aboutUsLabel: 'About Us',
+    // TODO: translate
+    aboutCompanyName: 'Beijing Rongxin Zhiyuan Technology Co., Ltd.',
     aboutVersion: 'Version',
     aboutOfficialWebsite: 'Official website',
     aboutContactEmail: 'Contact Email',
@@ -4575,6 +4594,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Tool-calling support for this model is unknown. Switched to regular chat without web search.',
     modelSuffixSecure: '(Secure)',
     codingPlanSubscriptionBadge: 'Subscription',
+    codingPlanBetaBadge: 'Beta',
     inputFileLabel: 'Input Files',
     imageVisionHint:
       'Image input is not enabled for the current model. Images will be sent as file paths. If the model supports vision, you can enable image input in the model configuration.',
@@ -6982,6 +7002,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // General Settings
     autoLaunch: 'Launch at Login',
     autoLaunchDescription: 'Automatically start the app when you log in',
+    autoLaunchUpdateFailed: 'Failed to update launch at login setting',
+    preventSleepUpdateFailed: 'Failed to update prevent sleep setting',
+    settingsLoadFailed: 'Failed to load settings',
     useSystemProxy: 'Use System Proxy',
     useSystemProxyDescription:
       'When enabled, network requests follow system proxy settings (applies after Save)',
@@ -7077,6 +7100,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityEmptyAction: 'View scheduled tasks',
     activityFilterEmpty: 'No related activity data',
     activityFilterClear: 'Clear filters',
+    managedMemoryFilterClear: 'Clear filters',
     activityGroupToday: 'Today',
     activityGroupYesterday: 'Yesterday',
     activityTimeJustNow: 'Just now',

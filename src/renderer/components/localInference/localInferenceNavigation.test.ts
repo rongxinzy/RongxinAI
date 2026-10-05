@@ -7,7 +7,9 @@ const readSource = (relativePath: string): string =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
 
 const appSource = readSource('../../App.tsx');
-const settingsSource = readSource('../Settings.tsx');
+const providersControllerSource = readSource('../settings/model/useProvidersController.ts');
+const connectionTestSource = readSource('../settings/model/useConnectionTest.ts');
+const providerModelsSectionSource = readSource('../settings/model/ProviderModelsSection.tsx');
 const localInferenceSource = readSource('./LocalInferenceView.tsx');
 const modelsPanelSource = readSource('./panels/ModelsPanel.tsx');
 const providerModelRowSource = readSource('../settings/ProviderModelRow.tsx');
@@ -30,16 +32,16 @@ test('opens local model settings after enabling the local provider', () => {
 });
 
 test('keeps the requested provider selected while settings configuration loads', () => {
-  expect(settingsSource).toContain('initialProvider?: ProviderType;');
-  expect(settingsSource).toContain('initialProvider ?? getDefaultActiveProvider()');
-  expect(settingsSource).toContain('if (!initialProvider && config.api)');
-  expect(settingsSource).toContain('if (!initialProvider && firstEnabledProvider)');
-  expect(settingsSource).toContain('if (isInitialProviderPending) return;');
-  expect(settingsSource).toContain('initialProvider === activeProvider ||');
-  expect(settingsSource).toContain('ModelConnectionStatus.Failure');
-  // 双向断言：Settings 继续消费提取出来的行组件，LlamaCpp 特判留在组件内部。
-  expect(settingsSource).toContain('<ProviderModelRow');
-  expect(settingsSource).toContain('providerId={activeProvider}');
+  expect(providersControllerSource).toContain('initialProvider?: ProviderType;');
+  expect(providersControllerSource).toContain('initialProvider ?? getDefaultActiveProvider()');
+  expect(providersControllerSource).toContain('if (!initialProvider && config.api)');
+  expect(providersControllerSource).toContain('if (!initialProvider && firstEnabledProvider)');
+  expect(providersControllerSource).toContain('if (isInitialProviderPending) return;');
+  expect(providersControllerSource).toContain('initialProvider === activeProvider ||');
+  expect(connectionTestSource).toContain('ModelConnectionStatus.Failure');
+  // 双向断言：模型设置面板继续消费提取出来的行组件，LlamaCpp 特判留在组件内部。
+  expect(providerModelsSectionSource).toContain('<ProviderModelRow');
+  expect(providerModelsSectionSource).toContain('providerId={activeProvider}');
   expect(providerModelRowSource).toContain('providerId === ProviderName.LlamaCpp');
 });
 

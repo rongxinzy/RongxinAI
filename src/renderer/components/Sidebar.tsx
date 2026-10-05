@@ -601,6 +601,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               {updateEntry}
               {!hideLogin ? (
                 <LoginButton
+                  settingsActive={activeView === 'settings'}
                   onShowSettings={() => {
                     onPrefetchView?.('settings');
                     onShowSettings();

@@ -3,11 +3,14 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
-const source = readFileSync(fileURLToPath(new URL('./Settings.tsx', import.meta.url)), 'utf8');
+const source = readFileSync(
+  fileURLToPath(new URL('./settings/SettingsPage.tsx', import.meta.url)),
+  'utf8',
+);
 
 test('hides embedding controls until semantic recall is implemented', () => {
   const memorySettingsStart = source.indexOf("case 'coworkMemory':");
-  const memorySettingsEnd = source.indexOf("case 'model':", memorySettingsStart);
+  const memorySettingsEnd = source.indexOf("case 'triage':", memorySettingsStart);
   const memorySettingsSource = source.slice(memorySettingsStart, memorySettingsEnd);
 
   expect(memorySettingsStart).toBeGreaterThanOrEqual(0);
