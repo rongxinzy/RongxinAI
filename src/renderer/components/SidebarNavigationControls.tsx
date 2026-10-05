@@ -11,6 +11,7 @@ import { SidebarNavigationView, type SidebarNavigationEntry } from './shell/Side
 
 export type SidebarActiveView =
   | 'cowork'
+  | 'settings'
   | 'skills'
   | 'scheduledTasks'
   | 'activity'

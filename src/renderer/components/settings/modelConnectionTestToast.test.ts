@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 
 const settingsSource = readFileSync(
-  fileURLToPath(new URL('../Settings.tsx', import.meta.url)),
+  fileURLToPath(new URL('./model/useConnectionTest.ts', import.meta.url)),
   'utf8',
 );
 

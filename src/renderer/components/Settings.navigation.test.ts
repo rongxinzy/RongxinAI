@@ -4,15 +4,17 @@ import { expect, test } from 'vitest';
 
 import { themePlugins } from '../theme/themes/plugins';
 
-test('uses the same theme-owned icon slot for every settings entry', () => {
-  const source = readFileSync(new URL('./Settings.tsx', import.meta.url), 'utf8');
-  const navigation = source.slice(source.indexOf('{sidebarTabs.map'), source.indexOf('</nav>'));
+test('uses main-sidebar navigation semantics for every settings category entry', () => {
+  const source = readFileSync(new URL('./settings/SettingsPage.tsx', import.meta.url), 'utf8');
+  const navigation = source.slice(source.indexOf('{navGroups.map'), source.indexOf('</nav>'));
 
-  expect(navigation).toMatch(
-    /<span\s+className="theme-settings-navigation-icon[^"]*"\s+aria-hidden="true"\s*>\s*\{tab.icon\}\s*<\/span>/,
-  );
+  expect(navigation).toContain('variant="navigation"');
+  expect(navigation).toContain('size="navigation"');
+  expect(navigation).toContain('data-active={activeTab === tab.key || undefined}');
+  expect(navigation).toContain("aria-current={activeTab === tab.key ? 'page' : undefined}");
+  expect(navigation).toContain('strokeWidth={1.75}');
   expect(navigation).toContain('min-w-0 truncate');
-  expect(navigation).toContain('items-start justify-start');
+  expect(navigation).not.toContain('theme-settings-navigation-icon');
 });
 
 test('provides a consistent settings icon slot in every theme and appearance', () => {

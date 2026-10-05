@@ -21,11 +21,13 @@ interface CommunityUser {
 
 interface LoginButtonProps {
   onShowSettings: () => void;
+  /** Marks the settings menu entry as the current page while the settings view is active. */
+  settingsActive?: boolean;
 }
 
 const HELP_CENTER_URL = 'https://www.rongxzyai.com/docs/';
 
-const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
+const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings, settingsActive = false }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [user, setUser] = useState<CommunityUser | null>(null);
   const [enterpriseIdentity, setEnterpriseIdentity] = useState<EnterpriseSessionIdentity | null>(
@@ -206,6 +208,8 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
             variant="ghost"
             role="menuitem"
             onClick={handleSettings}
+            data-active={settingsActive || undefined}
+            aria-current={settingsActive ? 'page' : undefined}
             className="theme-action-row w-full justify-start gap-2"
           >
             <Settings data-icon="inline-start" />
