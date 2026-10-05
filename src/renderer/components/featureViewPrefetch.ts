@@ -17,7 +17,7 @@ export type PrefetchableFeatureView =
 export const prefetchFeatureView = (view: PrefetchableFeatureView): void => {
   switch (view) {
     case 'settings':
-      void import('./Settings').catch(() => undefined);
+      void import('./settings/SettingsPage').catch(() => undefined);
       break;
     case 'skills':
       void import('./skills').catch(() => undefined);

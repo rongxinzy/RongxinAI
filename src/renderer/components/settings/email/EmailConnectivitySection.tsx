@@ -32,7 +32,7 @@ export function EmailConnectivitySection({
   const locale = i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US';
 
   return (
-    <section className="flex flex-col gap-3 border-t border-border pt-5">
+    <section className="flex flex-col gap-3 border-t border-border pt-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h4 className="text-sm font-medium text-foreground">

@@ -448,7 +448,7 @@ function MemoryEditorDialog(props: {
           </DialogTitle>
           <DialogDescription>{i18nService.t('managedMemoryEditorDescription')}</DialogDescription>
         </DialogHeader>
-        <FieldGroup>
+        <FieldGroup className="gap-4">
           <Field data-disabled={Boolean(editor?.record) || undefined}>
             <FieldLabel htmlFor="managed-memory-scope">
               {i18nService.t('managedMemoryFieldScope')}
@@ -496,7 +496,7 @@ function MemoryEditorDialog(props: {
               placeholder={i18nService.t('managedMemoryContentPlaceholder')}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <Field>
               <FieldLabel htmlFor="managed-memory-kind">
                 {i18nService.t('managedMemoryFieldKind')}
