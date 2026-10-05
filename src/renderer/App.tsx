@@ -749,15 +749,22 @@ const App: React.FC = () => {
     hasAskUserQuestions(pendingPermission),
   );
 
-  const handleLeaveSettings = () => {
+  const handleLeaveSettings = useCallback(() => {
     setMainView('cowork');
+  }, []);
+
+  const previousMainViewRef = useRef(mainView);
+  useEffect(() => {
+    const previousView = previousMainViewRef.current;
+    previousMainViewRef.current = mainView;
+    if (previousView !== 'settings' || mainView === 'settings') return;
     const config = configService.getConfig();
     void collectAvailableModels(config)
       .then(allModels => {
         dispatch(setAvailableModels(allModels));
       })
       .catch(() => undefined);
-  };
+  }, [mainView, dispatch]);
 
   const isShortcutInputActive = () => {
     const activeElement = document.activeElement;

@@ -16,88 +16,11 @@ export function classicConditionalControls(dark: boolean) {
       hover: { 'background-color': 'var(--zy-surface-raised)' },
       disabled: { opacity: '0.7' },
     }),
-    'page-settings-button-variant-1': recipe({
-      base: {
-        'border-color': 'var(--zy-primary)',
-        'background-color': 'color-mix(in oklab, var(--zy-primary) 5%, transparent)',
-      },
-    }),
-    'page-settings-button-variant-2': recipe({
-      base: { 'border-color': 'var(--zy-border)', opacity: '0.6' },
-      hover: { opacity: '0.8' },
-    }),
-    'page-settings-button-variant-3': recipe({
-      base: {
-        padding: '0.75rem',
-        'border-radius': 'var(--zy-style-radius-lg)',
-        'border-width': '1px',
-        'border-style': 'solid',
-        'transition-property': 'background-color,border-color,opacity',
-        'transition-duration': '150ms',
-      },
-    }),
-    'page-settings-button-variant-4': recipe({
-      base: {
-        'border-color': 'var(--zy-primary)',
-        'background-color': 'color-mix(in oklab, var(--zy-primary) 5%, transparent)',
-      },
-    }),
-    'page-settings-button-variant-5': recipe({
-      base: { 'border-color': 'var(--zy-border)', opacity: '0.6' },
-      hover: { opacity: '0.8' },
-    }),
-    'page-settings-button-variant-6': recipe({
-      base: {
-        padding: '0.75rem',
-        'border-radius': 'var(--zy-style-radius-lg)',
-        'border-width': '1px',
-        'border-style': 'solid',
-        'transition-property': 'background-color,border-color,opacity',
-        'transition-duration': '150ms',
-      },
-    }),
     'page-settings-input-variant-1': recipe({ base: { 'padding-right': '2.5rem' } }),
     'page-settings-input-variant-2': recipe({
       base: { 'font-size': 'var(--zy-component-text-sm)' },
     }),
     'page-settings-input-variant-3': recipe({ base: { opacity: '0.5' } }),
-    'page-settings-button-variant-7': recipe({
-      base: {
-        gap: '0.75rem',
-        'border-radius': 'var(--zy-style-radius-lg)',
-        'border-width': '1px',
-        'border-style': 'solid',
-        'border-color': 'transparent',
-        'background-color': 'transparent',
-        'padding-inline': '0.75rem',
-        'padding-block': '0.5rem',
-        'font-size': 'var(--zy-component-text-sm)',
-        'font-weight': 'var(--zy-component-font-weight-medium)',
-        'transition-property': 'color, background-color, border-color, box-shadow',
-        'transition-duration': '200ms',
-        'transition-timing-function': 'ease-out',
-      },
-    }),
-    'page-settings-button-variant-8': recipe({
-      base: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
-        color: 'var(--zy-foreground)',
-      },
-      hover: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
-        color: 'var(--zy-foreground)',
-      },
-    }),
-    'page-settings-button-variant-9': recipe({
-      base: { color: 'var(--muted-foreground)' },
-      hover: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
-        color: 'var(--zy-foreground)',
-      },
-    }),
     'page-agent-task-row-button-variant-1': recipe({
       base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
       parentHover: { opacity: '0.3' },
