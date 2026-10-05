@@ -65,7 +65,9 @@ test('keeps the session permission selector available during an active run', () 
 });
 
 test('keeps model and permission controls reachable in compact toolbars', () => {
-  const compactControlsStart = source.lastIndexOf('<div className="flex items-center gap-1.5">');
+  const compactControlsStart = source.indexOf(
+    '{isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant))',
+  );
   const compactControls = source.slice(compactControlsStart);
 
   expect(compactControlsStart).toBeGreaterThanOrEqual(0);
