@@ -3,9 +3,9 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
-import { themePlugins } from '../../theme/themes/plugins';
-import { AppearanceSettings } from './AppearanceSettings';
-vi.mock('../../services/i18n', () => ({
+import { themePlugins } from '../../../theme/themes/plugins';
+import { AppearanceSettingsPanel } from './AppearanceSettingsPanel';
+vi.mock('../../../services/i18n', () => ({
   i18nService: { t: (key: string) => key, getLanguage: () => 'en' },
 }));
 afterEach(() => {
@@ -45,7 +45,7 @@ const props = () => ({
 test('shows one preview per theme and keeps mode controls separate from theme selection', async () => {
   systemAppearance();
   const callbacks = props();
-  const view = render(createElement(AppearanceSettings, callbacks));
+  const view = render(createElement(AppearanceSettingsPanel, callbacks));
   expect(view.container.querySelectorAll('[data-theme-preview]')).toHaveLength(themePlugins.length);
   expect(screen.getByRole('button', { name: /Codex/i })).toHaveAttribute('aria-pressed', 'true');
   const daming = screen.getByRole('button', { name: /Daming Fenghua/i });
@@ -59,7 +59,7 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
   expect(callbacks.onAppearanceChange).toHaveBeenCalledWith('dark');
   view.rerender(
-    createElement(AppearanceSettings, { ...callbacks, appearance: 'dark', styleId: 'daming' }),
+    createElement(AppearanceSettingsPanel, { ...callbacks, appearance: 'dark', styleId: 'daming' }),
   );
   expect(view.container.querySelector('[data-theme-preview="classic-dark"]')).not.toBeNull();
   expect(view.container.querySelector('[data-theme-preview="daming-dark"]')).not.toBeNull();
@@ -71,7 +71,7 @@ test('shows an applying spinner on the selected style before the change runs', (
   vi.useFakeTimers();
   systemAppearance();
   const callbacks = props();
-  const view = render(createElement(AppearanceSettings, callbacks));
+  const view = render(createElement(AppearanceSettingsPanel, callbacks));
   const daming = screen.getByRole('button', { name: /Daming Fenghua/i });
 
   act(() => {
@@ -92,7 +92,7 @@ test('shows an applying spinner on the selected style before the change runs', (
   expect(daming).toHaveAttribute('aria-busy', 'true');
   expect(daming).toHaveAttribute('aria-pressed', 'true');
 
-  view.rerender(createElement(AppearanceSettings, { ...callbacks, styleId: 'daming' }));
+  view.rerender(createElement(AppearanceSettingsPanel, { ...callbacks, styleId: 'daming' }));
   expect(daming).not.toHaveAttribute('aria-busy');
   expect(daming).toHaveAttribute('aria-pressed', 'true');
 });
@@ -100,7 +100,9 @@ test('shows an applying spinner on the selected style before the change runs', (
 test('system mode updates all previews live while explicit mode stays fixed and listener is cleaned up', () => {
   const system = systemAppearance();
   const callbacks = props();
-  const view = render(createElement(AppearanceSettings, { ...callbacks, appearance: 'system' }));
+  const view = render(
+    createElement(AppearanceSettingsPanel, { ...callbacks, appearance: 'system' }),
+  );
   const previews = () =>
     Array.from(view.container.querySelectorAll('[data-theme-preview]'), e =>
       e.getAttribute('data-theme-preview'),
@@ -109,7 +111,7 @@ test('system mode updates all previews live while explicit mode stays fixed and 
   system.change(true);
   expect(previews()).toEqual(themePlugins.map(p => p.appearances.dark.meta.id));
   expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
-  view.rerender(createElement(AppearanceSettings, callbacks));
+  view.rerender(createElement(AppearanceSettingsPanel, callbacks));
   expect(previews()).toEqual(themePlugins.map(p => p.appearances.light.meta.id));
   system.change(false);
   system.change(true);

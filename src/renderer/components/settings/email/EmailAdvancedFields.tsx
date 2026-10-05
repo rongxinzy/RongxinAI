@@ -128,7 +128,7 @@ export function EmailAdvancedFields({
 
         <FieldSet>
           <FieldLegend variant="label">{i18nService.t('emailSecuritySettings')}</FieldLegend>
-          <FieldGroup className="gap-3">
+          <FieldGroup className="gap-4">
             <Field orientation="horizontal" className="theme-scene-email-field">
               <FieldContent>
                 <FieldLabel htmlFor="email-imap-tls">{i18nService.t('emailImapTls')}</FieldLabel>

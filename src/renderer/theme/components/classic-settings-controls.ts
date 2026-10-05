@@ -9,7 +9,6 @@ type SettingsAppearances = Pick<
     | 'auth-choice'
     | 'code-header-button'
     | 'code-hint'
-    | 'settings-navigation-icon'
   >
 >;
 export function classicSettingsControls(): SettingsAppearances {
@@ -20,7 +19,6 @@ export function classicSettingsControls(): SettingsAppearances {
   };
   const codeHighlight = { 'background-color': 'var(--zy-surface)', color: 'var(--foreground)' };
   return {
-    'settings-navigation-icon': recipe({ base: { width: '1.25rem', height: '1.25rem' } }),
     'shortcut-input': recipe({
       base: {
         ...surface,

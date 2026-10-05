@@ -60,7 +60,15 @@ export class CoworkRunSync {
 
   start(): () => void {
     const api = window.electron?.cowork;
-    if (!api?.getRunSnapshot || !api.onStreamRunState) return () => {};
+    if (!api?.getRunSnapshot || !api.onStreamRunState) {
+      // Even without a live API the sync must disarm pending recovery timers on
+      // teardown, otherwise they fire after disposal.
+      return () => {
+        this.disposed = true;
+        for (const pending of this.recoveryTimers.values()) clearTimeout(pending);
+        this.recoveryTimers.clear();
+      };
+    }
     const remove = api.onStreamRunState(snapshot => {
       const previous = store.getState().coworkRun?.bySession[snapshot.sessionId];
       this.receive(snapshot);
