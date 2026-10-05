@@ -1,7 +1,6 @@
 import {
   PromptInput,
   PromptInputBody,
-  PromptInputButton,
   PromptInputFooter,
   PromptInputHeader,
   PromptInputProvider,
@@ -17,7 +16,7 @@ import {
   TooltipTrigger,
 } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
-import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
+import { Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -67,7 +66,7 @@ import { SessionStatsLine } from './SessionStatsLine';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import { parseCoworkSlashSubmission } from './coworkSlashCommands';
 import { useCoworkSlashMenu } from './useCoworkSlashMenu';
-import FolderSelectorPopover from './FolderSelectorPopover';
+import { PromptWorkspaceSelector } from './PromptWorkspaceSelector';
 import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
@@ -1327,14 +1326,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               }}
               className={cn(
                 'py-0 pr-1.5',
-                size === 'large' ? 'max-h-48 overflow-y-auto' : undefined,
+                size === 'large' ? 'theme-home-prompt-editor max-h-48 overflow-y-auto' : undefined,
               )}
             />
           </PromptInputBody>
           <PromptInputFooter className="flex-nowrap">
             <PromptInputTools
               className={cn(
-                'min-w-0 flex-1 flex-nowrap overflow-hidden',
+                'min-w-0 flex-1 flex-wrap',
                 sessionContextPending && 'pointer-events-none opacity-50',
               )}
               aria-disabled={sessionContextPending}
@@ -1364,22 +1363,37 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 </>
               )}
               {isPlusToolbar && (
+                <PromptPlusMenu
+                  onAddFile={() => {
+                    void handleAddFile();
+                  }}
+                  onManageSkills={handleManageSkills}
+                  onManageConnectors={() => onManageConnectors?.()}
+                  experts={
+                    isWorkVariant
+                      ? { selectedExpertIds, onChange: setSelectedExpertIds }
+                      : undefined
+                  }
+                  goalMode={goalMode}
+                  onGoalModeChange={setGoalMode}
+                  disabled={disabled || isStreaming || isAddingFile}
+                />
+              )}
+              {showFolderSelector && (
+                <PromptWorkspaceSelector
+                  onSelectFolder={handleFolderSelect}
+                  onCreateProject={handleProjectCreate}
+                  onUseNoFolder={onUseNoFolder}
+                  showNoFolderAction={showNoFolderAction}
+                  initialDirectory={workingDirectory}
+                  label={workingDirectoryName || i18nService.t('enterProjectWork')}
+                  compact={isTightToolbar}
+                  warning={showFolderRequiredWarning}
+                  disabled={disabled || sessionContextPending}
+                />
+              )}
+              {isPlusToolbar && (
                 <>
-                  <PromptPlusMenu
-                    onAddFile={() => {
-                      void handleAddFile();
-                    }}
-                    onManageSkills={handleManageSkills}
-                    onManageConnectors={() => onManageConnectors?.()}
-                    experts={
-                      isWorkVariant
-                        ? { selectedExpertIds, onChange: setSelectedExpertIds }
-                        : undefined
-                    }
-                    goalMode={goalMode}
-                    onGoalModeChange={setGoalMode}
-                    disabled={disabled || isStreaming || isAddingFile}
-                  />
                   {!isCompactToolbar && isWorkVariant && (
                     <PermissionModeMenu
                       value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
@@ -1407,7 +1421,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               )}
             </PromptInputTools>
             {isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 shrink-0 items-center gap-1.5">
                 {showModelSelector && (
                   <>
                     {!isCompactToolbar && (
@@ -1481,30 +1495,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           </PromptInputFooter>
         </PromptInput>
         <SessionStatsLine messages={currentSession?.messages ?? []} />
-        {showFolderSelector && (
-          <div className="relative mt-1.5 flex justify-start">
-            <FolderSelectorPopover
-              onSelectFolder={handleFolderSelect}
-              onCreateProject={handleProjectCreate}
-              onUseNoFolder={onUseNoFolder}
-              side="bottom"
-              align="start"
-              showNoFolderAction={showNoFolderAction}
-              initialDirectory={workingDirectory}
-            >
-              <PromptInputButton
-                className={`sidebar-interactive-surface theme-prompt-folder-action gap-1 ${showFolderRequiredWarning ? 'theme-prompt-folder-warning animate-shake' : ''}`}
-              >
-                <Folder className="size-4 shrink-0" />
-                <span>{workingDirectoryName || i18nService.t('enterProjectWork')}</span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              </PromptInputButton>
-            </FolderSelectorPopover>
-            {showFolderRequiredWarning && (
-              <div className="absolute bottom-full mb-1 px-2 py-1 rounded-md bg-surface-raised text-warning text-xs whitespace-nowrap animate-fade-in-up shadow-subtle z-10">
-                {i18nService.t('coworkSelectFolderFirst')}
-              </div>
-            )}
+        {showFolderSelector && showFolderRequiredWarning && (
+          <div className="theme-home-folder-warning mt-2" role="alert">
+            {i18nService.t('coworkSelectFolderFirst')}
           </div>
         )}
       </div>

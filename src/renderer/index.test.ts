@@ -12,7 +12,7 @@ test('Codex switches retain their dimensions and the sidebar uses a neutral comp
     const t = theme.tokens;
     const c = theme.components;
     expect(t['style-switch-thumb']).toBe('#ffffff');
-    expect(t['style-work-chat-thumb-radius']).toBe('var(--zy-style-radius-md)');
+    expect(t['style-work-chat-thumb-radius']).toBe('8px');
     expect(c['shell-mode'].base.height).toBe('1.75rem');
     expect(c['shell-mode-thumb'].base.height).toBe('1.5rem');
     expect(t['style-switch-width']).toBe('34px');

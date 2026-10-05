@@ -61,6 +61,17 @@ test('font-size overrides retain theme line-height while allowing explicit typog
 test('isolates theme motion and places pseudo-element state selectors on their owners', () => {
   const theme = structuredClone(classicLight);
   theme.meta.id = 'motion-proof';
+  // Exercise the compiler with explicit motion data; the Studio composer has no glow.
+  theme.components['composer-far'] = recipe({
+    base: { opacity: '0' },
+    composerFocus: {
+      opacity: '1',
+      'animation-name': 'component-motion',
+      'animation-duration': '200ms',
+    },
+    motionStart: { opacity: '0' },
+    motionEnd: { opacity: '1' },
+  });
   const css = generateThemeCSS(theme);
   const original = generateThemeCSS(classicLight);
   const motion = css.match(/animation-name: (zy-component-composer-far-[\w-]+)/)?.[1];
