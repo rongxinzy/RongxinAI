@@ -516,6 +516,19 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
     }, [value, draftPrompt, dispatch, draftKey]);
 
+    // Flush the pending debounced draft on unmount so navigating away (e.g.
+    // opening the full-page settings) does not lose the last keystrokes.
+    const latestDraftRef = useRef({ value, draftPrompt, draftKey });
+    latestDraftRef.current = { value, draftPrompt, draftKey };
+    useEffect(() => {
+      return () => {
+        const latest = latestDraftRef.current;
+        if (latest.value !== latest.draftPrompt) {
+          dispatch(setDraftPrompt({ sessionId: latest.draftKey, draft: latest.value }));
+        }
+      };
+    }, [dispatch]);
+
     // Slash command menu (`/skill`, `/compact`). State and filtering live in
     // the hook; submitPrompt decides what the text actually does.
     const slashMenu = useCoworkSlashMenu({

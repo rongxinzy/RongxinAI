@@ -39,10 +39,6 @@ export function classicModalEffects() {
         'box-shadow': 'var(--zy-style-shadow-sm)',
       },
     }),
-    'settings-modal-frame': recipe({ base: { ...surface, ...border, 'border-radius': 'inherit' } }),
-    'settings-modal-shell': recipe({
-      base: { 'background-color': 'transparent', 'box-shadow': 'none' },
-    }),
     'local-context-modal': recipe({
       base: {
         ...border,

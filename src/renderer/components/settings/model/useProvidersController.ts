@@ -323,7 +323,7 @@ export function useProvidersController({
         }
       } catch {
         if (active) {
-          setError('Failed to load settings');
+          setError(i18nService.t('settingsLoadFailed'));
         }
       } finally {
         if (active) {
