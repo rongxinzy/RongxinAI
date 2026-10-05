@@ -38,6 +38,7 @@ import { classicCodingDiff } from './classic-coding-diff';
 import { runIndicatorAppearances } from './run-indicator';
 import { chatToolAppearances } from './chat-tool';
 import { shellSidebarAppearances } from './shell-sidebar';
+import { homeStudioAppearances } from './home-studio';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
 
 /** Codex appearance recipes are package data, never imported by React controls. */
@@ -168,7 +169,7 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     }),
     ...classicSharedCompositions(),
     ...classicLocalControls(),
-    ...classicModalEffects(dark),
+    ...classicModalEffects(),
     ...classicNativeControls(),
     ...classicInteractiveSurfaces(dark),
     ...classicEditorControls(),
@@ -187,5 +188,6 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...chatToolAppearances(),
     ...shellSidebarAppearances(),
     ...classicAppearancePreview(),
+    ...homeStudioAppearances(),
   };
 }

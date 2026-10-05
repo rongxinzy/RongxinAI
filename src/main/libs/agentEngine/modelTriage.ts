@@ -4,16 +4,6 @@ import { TRIAGE_TIER_ORDER } from '../../../shared/triage';
 import { classifyTierForTriage } from './piClassifierTriage';
 
 /**
- * Build a classifier-friendly snippet from user input.
- * Truncate to 200 chars to keep the classification fast and prevent prompt injection.
- */
-function truncateForClassification(prompt: string): string {
-  const singleLine = prompt.replace(/\n/g, ' ').trim();
-  if (singleLine.length <= 200) return singleLine;
-  return singleLine.slice(0, 197) + '...';
-}
-
-/**
  * Classify a user message using rule-based heuristics.
  *
  * Returns a TriageResult with the recommended tier and optional model override.

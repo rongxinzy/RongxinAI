@@ -1,7 +1,7 @@
 import { modalOverlayBlur, modalOverlayScrim } from './modal-overlay-style';
 import { recipe } from './recipe';
 
-export function classicModalEffects(dark: boolean) {
+export function classicModalEffects() {
   const surface = {
     'background-color': 'var(--zy-surface)',
     'border-radius': 'var(--zy-style-radius-2xl)',
@@ -16,21 +16,6 @@ export function classicModalEffects(dark: boolean) {
     'animation-name': 'component-motion',
     'animation-duration': '200ms',
     'animation-timing-function': 'ease-out',
-  };
-  // 2026/09/18 lixiang  只去掉 scale，避免获焦/失焦边框内收；光晕尺寸保持原样
-  const aura = {
-    'border-radius': 'inherit',
-    opacity: '0',
-    scale: '1',
-    'transition-property': 'opacity',
-    'transition-duration': '520ms',
-    'transition-timing-function': 'cubic-bezier(0.4, 0, 0.2, 1)',
-  };
-  const focused = {
-    opacity: '1',
-    scale: '1',
-    'transition-duration': '340ms',
-    'transition-timing-function': 'cubic-bezier(0.16, 1, 0.3, 1)',
   };
   return {
     'legacy-modal-backdrop': recipe({
@@ -81,35 +66,7 @@ export function classicModalEffects(dark: boolean) {
     'skill-import-modal': recipe({
       base: { ...surface, ...border, 'box-shadow': 'var(--zy-style-shadow-2xl)' },
     }),
-    'composer-near': recipe({
-      base: {
-        ...aura,
-        // 2026/09/20 lixiang  近层只留模糊光晕，实线描边交给 input-group 的 1px border
-        'box-shadow':
-          '0 0 0 1px color-mix(in oklch, var(--zy-primary) 45%, transparent), 0 0 6px color-mix(in oklch, var(--zy-primary) 28%, transparent)',
-      },
-      composerFocus: focused,
-    }),
-    'composer-far': recipe({
-      base: {
-        ...aura,
-        // 2026/09/20 lixiang  远层去掉 spread，避免和边框叠成粗实线
-        'box-shadow': dark
-          ? '0 0 10px 0 color-mix(in oklch, var(--zy-primary) 42%, transparent), 0 0 22px 2px color-mix(in oklch, var(--zy-primary) 22%, transparent)'
-          : '0 0 8px 0 color-mix(in oklch, var(--zy-primary) 36%, transparent), 0 0 18px 2px color-mix(in oklch, var(--zy-primary) 18%, transparent)',
-      },
-      composerFocus: {
-        ...focused,
-        'animation-name': 'component-motion',
-        'animation-duration': '5.2s',
-        'animation-delay': '340ms',
-        'animation-timing-function': 'cubic-bezier(0.45, 0, 0.55, 1)',
-        'animation-iteration-count': 'infinite',
-        'animation-direction': 'alternate',
-      },
-      // 2026/09/18 lixiang  呼吸动画不再改 scale，避免失焦时边框内收
-      motionStart: { opacity: '0.6' },
-      motionEnd: { opacity: '1' },
-    }),
+    'composer-near': recipe({ base: { opacity: '0', 'box-shadow': 'none' } }),
+    'composer-far': recipe({ base: { opacity: '0', 'box-shadow': 'none' } }),
   };
 }

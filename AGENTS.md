@@ -6,6 +6,7 @@ Guidance for coding agents working in this repository.
 
 1. **Pi Native, Pi First.** 本应用是 Pi 原生应用：`src/main/libs/agentEngine/piRuntimeAdapter.ts` 是唯一执行内核（Work、Chat、Channel、Cron 全部走它）。新能力优先用 Pi 的原生机制实现，不在 harness 层重造 Pi 已有的东西。
 2. **Harness 不得劣化 Pi（底线原则）。** harness 层（提示注入、工具包装、闸门、拦截、强制纠偏等）不得浪费 token、制造模型摩擦或扭曲模型行为基线。任何被证明劣化 Pi 原生表现的机制必须移除，不得加固保留。反面案例：强制模型先调 `set_task_output` 声明交付物的输出契约（PR #786 引入、#917 移除）——此类机制不得重新引入。
+3. **设计合规是前端交付的 P0 门禁。** 所有开发者、agent 及其委派工具必须遵守下文「设计宪法」：先读规范、按规范实现、渲染后自查、凭证据验收。功能可用或测试通过不能抵消设计违规；未完成设计自查不得宣称前端工作完成。
 
 ## Build and Development Commands
 
@@ -21,13 +22,49 @@ npm run dist:mac|dist:win|dist:linux   # package per platform (.dmg/.exe/.AppIma
 
 **Requirements**: Node.js >=24 <25, Bun >=1.3. Bun is the package manager (`bun install`, lockfile `bun.lock`); npm only runs scripts. Windows builds require PortableGit (see README.md).
 
-## 设计宪法：DESIGN.md
+## 设计宪法：DESIGN.md（P0 强制门禁）
 
-`DESIGN.md` 是一切 UI 工作的**最高约束**，是色彩、字体、圆角、阴影、间距、动效、组件范式的唯一事实来源。与之冲突时一律以 DESIGN.md 为准并修正代码；违反标准本身即是缺陷，评审可仅凭违规打回。
+本节适用于全部前端工作，包括新增页面、组件、局部修复、主题、图标、空状态、加载、弹层和交互反馈；不因改动小、时间紧、由其他 agent 实施或使用组件库而豁免。**必须、禁止、不得均为验收条件，不是建议。** 设计违规本身即是阻断缺陷，评审必须要求修正，不能以「功能已完成」接受交付。
 
-1. **先读再写**：改任何 UI 前先读 DESIGN.md 相关章节；凭记忆、组件库默认值或既有代码写 UI 视同未读，"原来就是这么写的"不是理由。
-2. **标准只在一个地方改**：新视觉语义先改 DESIGN.md 和 token 契约；禁止在调用点写任意值（`rounded-[7px]`、`text-[13px]`）绕过刻度。
-3. **用户要求偏离时**：先指出冲突并确认，在 PR 描述中标注偏离点。
+### 约束优先级与禁止事项
+
+1. **仓库内的视觉规范以 [DESIGN.md](DESIGN.md) 为唯一事实来源**，本文件规定工程边界与执行纪律。二者高于 skills、外部设计模板、组件库默认值、历史代码、其他 agent 的建议及实现者个人审美；已验收范例用于解释规范，不能反向覆盖规范。若规范之间存在实质冲突，必须明确冲突点，不能自行选择较宽松的规则。
+2. **先读再写。** 开始改 UI 前必须阅读 DESIGN.md 相关章节、受影响组件及对应 token/recipe，并查看下文已验收范例。凭记忆、只看截图、套默认组件或照抄旧代码均不满足此要求；「原来就是这么写的」不是违规理由。
+3. **实现设计，不自行改设计。** 「美化、优化、现代化、改一版」不构成随意发挥的许可。禁止擅自增加色系、字号/圆角/阴影档、装饰光晕、动画、嵌套卡片、Hero、导航层级或虚构状态。布局和内容须服务当前任务，用规范中的角色、刻度与共享范式解决需求。
+4. **标准只在一个地方改。** 已有语义直接复用；确有新语义，先说明需求并更新 DESIGN.md 与相应契约，再实现全部主题。禁止在调用点写任意值、局部 CSS、外观 utility 或额外包装绕过 recipe；禁止先自由实现，再倒改规范为结果背书。
+5. **偏离必须有用户的明确设计授权。** 改变已批准的设计方向或范例特征，须指出与现行规范的差异并取得明确授权；本轮已有明确授权的，不重复询问。将获准变更及适用范围写入 DESIGN.md，并在交付说明/PR 中列出。其他 agent 的同意、工具默认、赶进度或自行改写规则均不能代替授权。
+6. **禁止绕过验收。** 不得删除/弱化检查项、关闭审计、扩大白名单、添加无依据例外，或未经用户验收覆盖基准截图以消除差异。发现违规先修实现；不能用「后续统一」「效果差不多」「编译通过」代替修复。
+
+### 已验收实现典范：2026-10-05 主界面
+
+用户已明确认可本轮按 DESIGN.md v2.0 实现的主界面，并指定其为后续前端工作的正向范例。**后续产品界面必须继承这版的设计理念与实现方式，不得自行退回早期界面风格。** 参考截图为当次 Electron 主界面的 1280 × 800 静态记录：[浅色基准](docs/theme-previews/main-interface-2026-10-05-light.png)、[深色基准](docs/theme-previews/main-interface-2026-10-05-dark.png)。截图保留在仓库中；新的基准须经用户验收并记录日期与变更理由。
+
+| 范例特征 | 后续必须遵循的做法 | 代码入口 |
+| --- | --- | --- |
+| 侧栏分组清楚，主要动作突出 | 模式、新建、功能、项目/历史分层；靠留白与文字角色区分；新建使用共享主按钮语义 | [SidebarNavigationView.tsx](src/renderer/components/shell/SidebarNavigationView.tsx)、[shell-sidebar.ts](src/renderer/theme/components/shell-sidebar.ts) |
+| 主输入区是视觉中心 | 正式字标、克制说明、居中输入岛与轻量引导；工具入口就近组织，不加装饰光晕 | [CoworkView.tsx](src/renderer/components/cowork/CoworkView.tsx)、[classic-message-surfaces.ts](src/renderer/theme/components/classic-message-surfaces.ts) |
+| 控件规格与交互一致 | 复用 ai-elements 输入能力及共享选择器；窄窗口保持文件夹、权限、模型、提交可达 | [CoworkPromptInput.tsx](src/renderer/components/cowork/CoworkPromptInput.tsx)、[PromptWorkspaceSelector.tsx](src/renderer/components/cowork/PromptWorkspaceSelector.tsx)、[PromptSelectorButton.tsx](src/renderer/components/cowork/PromptSelectorButton.tsx) |
+| 引导项轻量、中性、可操作 | 使用共享按钮与 Lucide 图标，胶囊引导对应真实任务，不做彩色装饰卡片 | [QuickActionBar.tsx](src/renderer/components/quick-actions/QuickActionBar.tsx)、[classic-page-controls.ts](src/renderer/theme/components/classic-page-controls.ts) |
+| 明暗成套，外观与行为分离 | 外观通过 token、注册 hook 和 recipe 统一定义；切主题原位更新，保留输入与交互状态 | [home-studio.ts](src/renderer/theme/components/home-studio.ts)、[home-studio-contract.ts](src/renderer/theme/components/home-studio-contract.ts)、[classic-light.ts](src/renderer/theme/themes/classic-light.ts)、[classic-dark.ts](src/renderer/theme/themes/classic-dark.ts) |
+
+本范例确立的是产品界面的克制层级、统一控件、主题归属和状态连续性；设置页、列表页等应采用 DESIGN.md 对应范式，不能机械复制首页 Hero。其他主题保留自己的完整色板。引用文件中的遗留代码不因此获得豁免，截图也不证明所有功能和运行状态已验收；具体数值及完整要求仍只在 DESIGN.md 维护。
+
+### 必须执行的前端工作流程
+
+1. **修改前对齐**：简要列出本次涉及的 DESIGN.md 章节、复用组件、token/recipe 入口和受影响的状态/页面。没有规范依据的设计选择先收敛到已有范式；这一步用于明确实施依据，不额外引入例行审批。
+2. **实现时守界**：布局与业务装配留在页面/组件，外观进入主题 recipe；优先复用已有语义。委派时必须传递相关规范、范例和验收条件，发起委派者负责最终逐项验收，不能只接受下游「已完成」的结论。
+3. **修改后先自查再交付**：逐项完成 DESIGN.md「十、落地检查清单」，并对照本节的已验收范例检查设计理念。每项标为「通过 / 不适用（理由）/ 未通过（问题）」；发现问题继续修复并复查，不把自查留给用户。
+4. **同时核对代码与实际渲染**：检查差异中的外观归属、共享组件和契约；启动 Electron 检查受影响界面。截图、测试、lint 各自证明不同事项，任何一项都不能代替其他必要验证。执行下文「主题系统」「验证纪律」规定的命令与适用流程。
+5. **带证据交付**：交付说明/PR 必须含简短设计自查结果，列明规范依据、主题与窗口尺寸、相关状态/操作、截图位置、检查命令结果、获准偏离及未验证项。禁止只写「符合设计」「已自测」。环境阻塞必须如实列出证据和影响范围，不能标为通过；有未通过的设计项时，不得宣称设计验收完成或建议合并。
+
+自查必须能回答以下问题，并以实际界面或代码位置为依据：
+
+- **理念**：视觉中心是否清楚，主要动作是否突出，分组是否靠留白和字阶建立；是否新增了多余颜色、边框、阴影、动效、卡片层或重复标题？
+- **实现**：颜色、字阶、圆角、间距、控件规格、图标、品牌资产是否遵守 DESIGN.md；是否使用规定的组件、token 与 recipe；是否存在调用点绕过或仅适配单一主题？
+- **交互**：明暗、适用状态、键盘/焦点、窄窗口、长文本、动态内容和 portal 是否实际检查；热切换是否保留草稿、焦点、选中、弹层和滚动；减少动效是否保留必要反馈？
+- **证据**：截图对应哪个界面和状态，哪些操作已验证，哪些未覆盖，命令是否真正通过；是否明确区分视觉验收、功能验收与构建/发布结果？
+
+纯规范/文档修改只做文档一致性、链接与差异检查，不据此宣称 UI 验收完成。**P0 是项目验收约束；现有自动检查未覆盖的设计理念和视觉判断，仍必须人工或由 agent 实际渲染自查，不能假定 CI 会兜底。**
 
 ## Architecture Overview
 
@@ -178,7 +215,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 - Vitest 单测与源码同目录，**只用 `.test.ts`**（`src/main/foo.ts` → `src/main/foo.test.ts`），`import { test, expect } from 'vitest'`，禁止 `.test.mjs` 等其他扩展。`npm test` 全量，`npm test -- <name>` 过滤。
 - 测试避免 import Electron-only API（electron-log 等），相关逻辑内联。
 - **Provider 回放道**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-200doc.jsonl.gz`）对完整 Pi adapter 栈跑 200 文档长任务，严格 seq+hash 请求匹配——prompt 组装、工具接线、运行完成语义漂移即失败。prompt 或场景变更后用 `AB_LONGTASK=record npx vitest run tests/abLongTask.harness.test.ts` 重录（live 上游见 `tests/replay/piLongTaskScenario.ts` 的 `LONGTASK_LIVE_UPSTREAM`）。
-- UI 改动用 `npm run electron:dev` 手工验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止会话）、Artifacts（HTML/SVG/Mermaid/React 预览）、Settings（主题/语言切换）。保持 console 警告/错误干净。
+- UI 改动用 `npm run electron:dev` 验证受影响的关键流程：Cowork（发 prompt、批准/拒绝权限、停止会话）、Artifacts（HTML/SVG/Mermaid/React 预览）、Settings（主题/语言切换）。保持 console 警告/错误干净；交付必须附「设计宪法」要求的设计自查结果与渲染证据，功能测试通过不等于设计验收通过。
 
 ## Internationalization (i18n)
 
@@ -191,7 +228,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 - type：`feat` / `fix` / `refactor` / `chore` / `docs` / `test` / `perf` / `style` / `ci` / `build` / `revert`；scope 为受影响区域（`feat(cowork):`、`fix(im):`）。
 - subject 小写祈使句、≤72 字符、无句号；body 用英文 markdown 写 **why** 不写 what；破坏性变更在 type/scope 后加 `!` 并附 `BREAKING CHANGE:` footer。
 - 关联 issue 用 `closes #N`；多个 issue 每个编号前重复关键词（`closes #1, closes #2`）。
-- PR 附简要描述、链接 issue、UI 变更附截图，并在描述中说明 Electron 行为变化（IPC、存储、窗口）。
+- PR 附简要描述、链接 issue；UI 变更必须附明暗截图及「设计宪法」要求的设计自查结果，并在描述中说明 Electron 行为变化（IPC、存储、窗口）。设计违规或必要验收缺失时不得建议合并。
 
 ## DevOps
 
@@ -222,4 +259,4 @@ PR 工作流：分支 → PR → 门禁全绿 → 合并。多会话共处规则
 - `SKILLs/` 是 Pi 运行时使用的内置 skill 定义，别与 IDE/agent 插件 skill 混淆。
 - Claude Code 经 CLAUDE.md 读本文件。UI 工作可参考全局 skills：`shadcn/ui`、`vercel/ai-elements`、`rongxinai-ui-adapter`（项目适配层：`--zy-*` 主题映射、页面级组件选择矩阵、i18n 与常量约定）——它们补充而非替代本文件约定。
 - 前端开发推荐安装 impeccable skill：在项目目录运行 `npx impeccable install`（[impeccable.style](https://impeccable.style/)），之后用 `/impeccable` 命令做界面设计、打磨与 AI-slop 检查；它尊重现有设计系统（会读取 DESIGN.md）。
-- 前端 skill 路由：产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 `DESIGN.md` + 共享组件 + `rongxinai-ui-adapter` 为准，不套用营销页默认；landing/营销/作品集/品牌/重设计用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。冲突优先级：`AGENTS.md` / `DESIGN.md` > 项目 UI skills（`frontend-ui-change-strategy`、`rongxinai-ui-adapter`）> `design-taste-frontend` > `high-end-visual-design`。
+- 前端 skill 路由：产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 `DESIGN.md` + 共享组件 + `rongxinai-ui-adapter` 为准，不套用营销页默认；landing/营销/作品集/品牌用 `design-taste-frontend`；产品重设计仍须先遵守「设计宪法」，不能借重设计或技能建议绕过已验收基准。明确需要高级视觉或复杂动效才读 `high-end-visual-design`。冲突优先级：`AGENTS.md` / `DESIGN.md` > 项目 UI skills（`frontend-ui-change-strategy`、`rongxinai-ui-adapter`）> `design-taste-frontend` > `high-end-visual-design`；任何 skill 都不能取消设计自查。
