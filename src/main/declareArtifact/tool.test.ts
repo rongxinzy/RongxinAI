@@ -54,6 +54,7 @@ test('rejects declarations when the file does not exist', async () => {
   const tool = buildDeclareArtifactTool({
     onDeclare,
     fileExists: async () => false,
+    existenceWaitMs: 0,
   }) as unknown as DeclareArtifactTool;
 
   const result = await tool.execute('call-1', {
@@ -63,4 +64,29 @@ test('rejects declarations when the file does not exist', async () => {
   expect(onDeclare).not.toHaveBeenCalled();
   expect(result.content[0].text).toContain('file does not exist');
   expect(result.details.isError).toBe(true);
+});
+
+test('waits for a file that is still being written by a parallel tool call', async () => {
+  const onDeclare = vi.fn();
+  let checks = 0;
+  const tool = buildDeclareArtifactTool({
+    onDeclare,
+    existencePollIntervalMs: 1,
+    fileExists: async () => {
+      checks += 1;
+      return checks >= 3;
+    },
+  }) as unknown as DeclareArtifactTool;
+
+  const result = await tool.execute('call-1', {
+    filePath: 'C:/Users/Administrator/.zhiyuan/scratch/剑影残阳.md',
+  });
+
+  expect(onDeclare).toHaveBeenCalledWith({
+    filePath: 'C:/Users/Administrator/.zhiyuan/scratch/剑影残阳.md',
+    role: 'deliverable',
+  });
+  expect(result.details).toMatchObject({
+    filePath: 'C:/Users/Administrator/.zhiyuan/scratch/剑影残阳.md',
+  });
 });
