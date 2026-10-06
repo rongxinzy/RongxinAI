@@ -1,4 +1,4 @@
-﻿import { Button } from '@shared/components/ui/button';
+import { Button } from '@shared/components/ui/button';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { MessageCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,7 +17,7 @@ import {
 import type { ExpertTab } from './components/expert/ExpertView';
 import type { CodingSidebarSelection } from './components/coding/CodingWorkspaceSidebar';
 import type { McpRegistryId } from './components/mcp/constants';
-import type { SettingsOpenOptions } from './components/Settings';
+import type { SettingsOpenOptions } from './components/settings/types';
 import { prefetchFeatureView } from './components/featureViewPrefetch';
 import { ParticleBootScreen } from './components/boot/ParticleBootScreen';
 import { LazyChunkErrorBoundary } from './components/LazyChunkErrorBoundary';
@@ -71,7 +71,7 @@ const loadCoworkView = () =>
 // Start the default view chunk during the boot animation so first paint isn't waiting on it.
 const coworkViewPromise = loadCoworkView();
 const CoworkView = React.lazy(() => coworkViewPromise);
-const Settings = React.lazy(() => import('./components/Settings'));
+const SettingsPage = React.lazy(() => import('./components/settings/SettingsPage'));
 const SkillsView = React.lazy(() =>
   import('./components/skills').then(module => ({ default: module.SkillsView })),
 );
@@ -110,10 +110,11 @@ const lazyViewFallback = (
 );
 
 const App: React.FC = () => {
-  const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
+  const [initErrorSettingsOpen, setInitErrorSettingsOpen] = useState(false);
   const [mainView, setMainView] = useState<
     | 'cowork'
+    | 'settings'
     | 'skills'
     | 'scheduledTasks'
     | 'activity'
@@ -417,7 +418,6 @@ const App: React.FC = () => {
       .consumePendingLocalInferenceInstall()
       .then(requestId => {
         if (!active || !requestId) return;
-        setShowSettings(false);
         setLocalInferenceInstallRequestId(requestId);
         setMainView('localInference');
       })
@@ -481,7 +481,7 @@ const App: React.FC = () => {
       initialProvider: options?.initialProvider,
       notice: options?.notice,
     });
-    setShowSettings(true);
+    setMainView('settings');
   }, []);
 
   const handleOpenLocalModelSettings = useCallback(async () => {
@@ -749,15 +749,22 @@ const App: React.FC = () => {
     hasAskUserQuestions(pendingPermission),
   );
 
-  const handleCloseSettings = () => {
-    setShowSettings(false);
+  const handleLeaveSettings = useCallback(() => {
+    setMainView('cowork');
+  }, []);
+
+  const previousMainViewRef = useRef(mainView);
+  useEffect(() => {
+    const previousView = previousMainViewRef.current;
+    previousMainViewRef.current = mainView;
+    if (previousView !== 'settings' || mainView === 'settings') return;
     const config = configService.getConfig();
     void collectAvailableModels(config)
       .then(allModels => {
         dispatch(setAvailableModels(allModels));
       })
       .catch(() => undefined);
-  };
+  }, [mainView, dispatch]);
 
   const isShortcutInputActive = () => {
     const activeElement = document.activeElement;
@@ -821,7 +828,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const text = (e as CustomEvent<string>).detail;
-      setShowSettings(false);
       setMainView('cowork');
       window.setTimeout(() => {
         window.dispatchEvent(
@@ -838,7 +844,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const handler = () => {
       if (managedModelsOnly) return;
-      setShowSettings(false);
       setMainView('localInference');
     };
     window.addEventListener('app:show-local-inference', handler);
@@ -861,7 +866,6 @@ const App: React.FC = () => {
     return unsubscribe;
   }, [handleNewChat]);
 
-  const isOverlayActive = showSettings;
   const shouldShowUpdateBadge =
     updateInfo &&
     (appUpdateState.status === AppUpdateStatus.Ready ||
@@ -876,7 +880,7 @@ const App: React.FC = () => {
   ) : null;
   const windowsStandaloneTitleBar = isWindows ? (
     <div className="draggable relative h-9 shrink-0 bg-surface-raised">
-      <WindowTitleBar isOverlayActive={isOverlayActive} />
+      <WindowTitleBar isOverlayActive={false} />
     </div>
   ) : null;
 
@@ -896,26 +900,12 @@ const App: React.FC = () => {
     return (
       <div className="h-screen overflow-hidden flex flex-col">
         {windowsStandaloneTitleBar}
-        <div className="flex-1 flex flex-col items-center justify-center bg-background">
-          <div className="flex flex-col items-center space-y-6 max-w-md px-6">
-            <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-lg">
-              <MessageCircle className="h-8 w-8 text-destructive-foreground" />
-            </div>
-            <div className="text-foreground text-xl font-medium text-center">{initError}</div>
-            <div className="flex items-center gap-3">
-              <Button onClick={() => window.electron.appInfo.relaunch()}>
-                {i18nService.t('restartApp')}
-              </Button>
-              <Button variant="outline" onClick={() => handleShowSettings()}>
-                {i18nService.t('openSettings')}
-              </Button>
-            </div>
-          </div>
-          {showSettings && (
+        {initErrorSettingsOpen ? (
+          <div className="flex-1 flex min-h-0">
             <LazyChunkErrorBoundary>
               <React.Suspense fallback={null}>
-                <Settings
-                  onClose={handleCloseSettings}
+                <SettingsPage
+                  onClose={() => setInitErrorSettingsOpen(false)}
                   initialTab={settingsOptions.initialTab}
                   initialProvider={settingsOptions.initialProvider}
                   notice={settingsOptions.notice}
@@ -925,8 +915,25 @@ const App: React.FC = () => {
                 />
               </React.Suspense>
             </LazyChunkErrorBoundary>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center bg-background">
+            <div className="flex flex-col items-center space-y-6 max-w-md px-6">
+              <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-lg">
+                <MessageCircle className="h-8 w-8 text-destructive-foreground" />
+              </div>
+              <div className="text-foreground text-xl font-medium text-center">{initError}</div>
+              <div className="flex items-center gap-3">
+                <Button onClick={() => window.electron.appInfo.relaunch()}>
+                  {i18nService.t('restartApp')}
+                </Button>
+                <Button variant="outline" onClick={() => setInitErrorSettingsOpen(true)}>
+                  {i18nService.t('openSettings')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -997,7 +1004,20 @@ const App: React.FC = () => {
               )}
               <LazyChunkErrorBoundary resetKey={mainView}>
                 <React.Suspense fallback={lazyViewFallback}>
-                  {mainView === 'skills' ? (
+                  {mainView === 'settings' ? (
+                    <SettingsPage
+                      onClose={handleLeaveSettings}
+                      initialTab={settingsOptions.initialTab}
+                      initialProvider={settingsOptions.initialProvider}
+                      notice={settingsOptions.notice}
+                      enterpriseConfig={enterpriseConfig}
+                      appUpdateState={appUpdateState}
+                      managedModelsOnly={managedModelsOnly}
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                    />
+                  ) : mainView === 'skills' ? (
                     <SkillsView
                       isSidebarCollapsed={isSidebarCollapsed}
                       onToggleSidebar={handleToggleSidebar}
@@ -1094,23 +1114,6 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* 璁剧疆绐楀彛鏄剧ず鍦ㄦ墍鏈変富鍐呭涔嬩笂锛屼絾涓嶅奖鍝嶄富鐣岄潰鐨勪氦浜?*/}
-        {showSettings && (
-          <LazyChunkErrorBoundary>
-            <React.Suspense fallback={null}>
-              <Settings
-                onClose={handleCloseSettings}
-                initialTab={settingsOptions.initialTab}
-                initialProvider={settingsOptions.initialProvider}
-                notice={settingsOptions.notice}
-                enterpriseConfig={enterpriseConfig}
-                appUpdateState={appUpdateState}
-                managedModelsOnly={managedModelsOnly}
-              />
-            </React.Suspense>
-          </LazyChunkErrorBoundary>
-        )}
       </div>
     </TooltipProvider>
   );

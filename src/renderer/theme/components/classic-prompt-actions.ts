@@ -1,6 +1,6 @@
 import { recipe } from './recipe';
 export function classicPromptActions() {
-  const shadow = { 'box-shadow': 'var(--zy-style-shadow-subtle)' };
+  const raised = { 'background-color': 'var(--zy-surface-raised)', 'box-shadow': 'none' };
   const compact = { 'padding-inline': '0.5rem', 'font-size': 'var(--zy-component-text-sm)' };
   const sidebar = {
     'background-color': 'color-mix(in srgb, var(--zy-text-primary) 4%, transparent)',
@@ -46,13 +46,13 @@ export function classicPromptActions() {
       base: compact,
       hover: { 'background-color': 'var(--zy-surface-raised)' },
     }),
-    'prompt-raised-action': recipe({ hover: shadow, expanded: shadow }),
-    'prompt-hover-action': recipe({ hover: shadow }),
-    'prompt-folder-action': recipe({ base: compact, hover: shadow, expanded: shadow }),
+    'prompt-raised-action': recipe({ hover: raised, expanded: raised }),
+    'prompt-hover-action': recipe({ hover: raised }),
+    'prompt-folder-action': recipe({ base: compact, hover: raised, expanded: raised }),
     'prompt-folder-warning': recipe({
       base: { 'box-shadow': '0 0 0 1px var(--zy-warning)', color: 'var(--zy-warning)' },
-      hover: { 'box-shadow': '0 0 0 1px var(--zy-warning), var(--zy-style-shadow-subtle)' },
-      expanded: { 'box-shadow': '0 0 0 1px var(--zy-warning), var(--zy-style-shadow-subtle)' },
+      hover: { 'box-shadow': '0 0 0 1px var(--zy-warning)' },
+      expanded: { 'box-shadow': '0 0 0 1px var(--zy-warning)' },
     }),
     'prompt-expert-chip': recipe({
       base: {

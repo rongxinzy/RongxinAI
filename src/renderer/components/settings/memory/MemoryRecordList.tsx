@@ -150,6 +150,12 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
     onForget: () => onForget(record),
   });
 
+  const handleClearFilters = () => {
+    setQuery('');
+    setScope(ManagedMemoryScopeFilter.All);
+    setStatus(ManagedMemoryStatusFilter.All);
+  };
+
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -255,6 +261,7 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
                 sessionTitles={sessionTitles}
                 onCreate={onCreate}
                 onSelect={record => setSelectedId(record.id)}
+                onClearFilters={handleClearFilters}
                 actionProps={actionProps}
               />
             </div>
@@ -295,6 +302,7 @@ function MemoryRows(props: {
   sessionTitles: ReadonlyMap<string, string>;
   onCreate: () => void;
   onSelect: (record: ManagedMemoryRecord) => void;
+  onClearFilters: () => void;
   actionProps: (record: ManagedMemoryRecord) => Omit<MemoryRecordActionProps, 'record'>;
 }) {
   const {
@@ -307,6 +315,7 @@ function MemoryRows(props: {
     sessionTitles,
     onCreate,
     onSelect,
+    onClearFilters,
     actionProps,
   } = props;
   if (viewTotal === 0) {
@@ -336,8 +345,13 @@ function MemoryRows(props: {
   }
   if (records.length === 0) {
     return (
-      <div className="py-10 text-center text-sm text-muted-foreground">
-        {i18nService.t('managedMemorySearchEmptyDescription')}
+      <div className="flex flex-col items-center gap-3 py-10">
+        <p className="text-sm text-muted-foreground">
+          {i18nService.t('managedMemorySearchEmptyDescription')}
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={onClearFilters}>
+          {i18nService.t('managedMemoryFilterClear')}
+        </Button>
       </div>
     );
   }
@@ -553,7 +567,7 @@ function MemoryDetailsDialog(props: {
         </DialogHeader>
         {record && (
           <ScrollArea className="h-[min(55vh,28rem)] min-h-0">
-            <div className="flex flex-col gap-5 pr-3">
+            <div className="flex flex-col gap-6 pr-3">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge record={record} />
                 {isLegacySessionSummaryAwaitingUpgrade(record) && (

@@ -51,7 +51,7 @@ import {
 import { toAgentModelRef } from '../../utils/agentModelRef';
 import { isScratchWorkspacePath } from '../../utils/path';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
-import type { SettingsOpenOptions } from '../Settings';
+import type { SettingsOpenOptions } from '../settings/types';
 import PageHeader from '../PageHeader';
 import { LogoLoadingState } from '../LogoLoadingState';
 import { useAgentSelectedModel } from './agentModelSelection';
@@ -757,53 +757,41 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto min-h-0 relative">
-        {/* Spacer. The case gallery is far taller than the viewport, so the brand block
-            and the input cannot be centred as one column: centring the column would let
-            the gallery drag the input up under the page header as soon as a category is
-            open. This spacer holds the input on the visible area's vertical middle
-            instead, and the gallery flows straight after the input the way the
-            reference homepage does. 15.5rem = brand block (7rem) + hero gap (2.5rem) +
-            the input block's sticky top padding (0.5rem) + half the prompt input
-            (5.5rem). */}
-        <div aria-hidden className="min-h-[max(0px,calc(50%-15.5rem))]" />
+        {/* Anchor to the viewport so opening a long case gallery never moves the input. */}
+        <div aria-hidden className="min-h-[max(1.5rem,calc(45%-10rem))]" />
 
-        <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-center gap-10 px-4">
+        <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-6 px-6">
           {/* Welcome Section and the prompt input share one sticky layer: once the
               cases start scrolling, the brand mark and the input both stay on screen
               instead of sliding away with the list. The layer is opaque and full
               width so the cases pass behind it rather than through it. It sits in the
               same column as the list, which is the box the sticky range is measured
               against, so it holds all the way to the last case. */}
-          <div className="sticky top-0 z-10 flex w-full flex-col items-center gap-10 bg-background pt-2 pb-2">
-            {/* Welcome Section - staggered entrance animation */}
-            <div className="flex min-h-28 flex-col items-center justify-center gap-5 text-center">
+          <div className="sticky theme-home-sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
+            <div className="flex flex-col items-center justify-center gap-4 text-center">
               <img
                 src="zhiyuan-logo-light.svg"
-                alt="logo"
-                className="logo-light h-16 w-auto mx-auto animate-fade-in-up"
+                alt={i18nService.t('cowork')}
+                className="theme-home-brand logo-light w-auto mx-auto"
               />
               <img
                 src="zhiyuan-logo-dark.svg"
-                alt="logo"
-                className="logo-dark h-16 w-auto mx-auto animate-fade-in-up"
+                alt={i18nService.t('cowork')}
+                className="theme-home-brand logo-dark w-auto mx-auto"
               />
               <p
                 className={cn(
-                  'min-h-5 max-w-md px-2 text-sm text-muted-foreground animate-fade-in-up',
+                  'theme-home-caption min-h-5 max-w-md px-2',
                   workMode === WorkMode.Chat && 'invisible',
                 )}
-                style={{ animationDelay: '120ms', animationFillMode: 'both' }}
               >
                 {i18nService.t('coworkHomeSubtitle')}
               </p>
             </div>
 
             {/* Prompt Input Area - Large version with folder selector */}
-            <div
-              className="mx-auto flex w-full max-w-3xl flex-col gap-3 animate-fade-in-up"
-              style={{ animationDelay: '200ms', animationFillMode: 'both' }}
-            >
-              <div className="rounded-2xl">
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+              <div className="min-w-0">
                 <CoworkPromptInput
                   ref={promptInputRef}
                   onSubmit={handleStartSession}
@@ -864,10 +852,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               cases can scroll all the way to the end while the input stays in place.
               The column keeps the full width: the bar needs it for its labels, and the case
               panel narrows itself to the composer width (see PromptPanel). */}
-          <div
-            className="flex w-full flex-col gap-4 pb-8 animate-fade-in-up"
-            style={{ animationDelay: '300ms', animationFillMode: 'both' }}
-          >
+          <div className="flex w-full flex-col gap-4 pb-8">
             {!selectedAction && (
               <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
             )}
