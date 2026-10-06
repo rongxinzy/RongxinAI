@@ -5,18 +5,18 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from '@shared/components/ui/empty';
+import { Button } from '@shared/components/ui/button';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { cn } from '@shared/lib/utils';
+import { Activity } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import activityEmptyIcon from '../../assets/activity/activity-empty-icon.svg';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import { selectActivityRuns } from '../../store/selectors/activitySelectors';
 import type { ActivityRun } from '../../../shared/activity/types';
 import PageHeader from '../PageHeader';
-import ActivityHero from './ActivityHero';
 import ActivityRunRow from './ActivityRunRow';
 import { ActivityStatusFilter, ActivityTriggerFilter } from './constants';
 import { formatActivityDayLabel } from './utils';
@@ -45,7 +45,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   const [triggerFilter, setTriggerFilter] = useState<ActivityTriggerFilter>(
     ActivityTriggerFilter.All,
   );
-  // 2026/09/15 lixiang  状态筛选默认高亮「进行中」
+  // 状态筛选默认高亮「进行中」
   const [statusFilter, setStatusFilter] = useState<ActivityStatusFilter>(
     ActivityStatusFilter.Started,
   );
@@ -91,11 +91,11 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   }, [currentTime, filteredRuns, language]);
 
   const hasAnyRun = runs.length > 0;
-  // 2026/09/15 lixiang  清除筛选仅判断来源 Tab，不把状态筛选算作可清除条件
+  // 清除筛选仅判断来源 Tab，不把状态筛选算作可清除条件
   const hasActiveFilters = triggerFilter !== ActivityTriggerFilter.All;
   const isFilterEmpty = hasAnyRun && dayGroups.length === 0;
 
-  // 2026/09/15 lixiang  清除筛选条件只切回「全部」，下方状态筛选保持不变
+  // 清除筛选条件只切回「全部」，下方状态筛选保持不变
   const clearFilters = () => {
     setTriggerFilter(ActivityTriggerFilter.All);
   };
@@ -121,66 +121,61 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         onToggleSidebar={onToggleSidebar}
         onNewChat={onNewChat}
         updateBadge={updateBadge}
+        tabs={
+          <PageTabs
+            value={triggerFilter}
+            onValueChange={setTriggerFilter}
+            items={triggerOptions.map(option => ({
+              value: option.value,
+              label: i18nService.t(option.labelKey),
+            }))}
+          />
+        }
       />
 
-      {/* 2026/09/15 lixiang  内容区底部留白，避免贴边 */}
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-8 pb-[20px]">
-        <ActivityHero />
-
-        {/* 2026/09/15 lixiang  内容区高度：最小半屏，最大为当前可用高度，超出滚动 */}
-        <section className="flex h-fit min-h-[50vh] max-h-full flex-col overflow-hidden rounded-xl border border-border shadow-sm">
-          {/* Source tabs */}
-          {/* 2026/09/15 lixiang  仅 Tab 行保留表面色，下半区透出页面底色 */}
-          {/* 2026/09/15 lixiang  活动页来源 Tab 加高，贴近设计稿点击热区 */}
-          <div className="flex h-12 shrink-0 items-center border-b border-border bg-surface px-6">
-            <PageTabs
-              className="h-full [&_.theme-page-tabs-list]:h-full [&_.theme-page-tabs-trigger]:h-full"
-              value={triggerFilter}
-              onValueChange={setTriggerFilter}
-              items={triggerOptions.map(option => ({
-                value: option.value,
-                label: i18nService.t(option.labelKey),
-              }))}
-            />
-          </div>
-
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+        <div className="mx-auto flex h-full w-full max-w-4xl flex-col px-4 pt-4 pb-8 sm:px-6">
           {/* Status filter pills */}
-          <div className="flex shrink-0 items-center gap-1 px-6 py-2.5">
-            {statusOptions.map(option => {
-              const active = statusFilter === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setStatusFilter(active ? ActivityStatusFilter.All : option.value)}
-                  className={cn(
-                    'rounded-full px-2.5 py-1 text-xs leading-4 transition-colors',
-                    active
-                      ? 'bg-primary-muted font-medium text-primary'
-                      : 'font-normal text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {i18nService.t(option.labelKey)}
-                </button>
-              );
-            })}
+          <div className="flex shrink-0 items-center justify-between gap-2 pb-3">
+            <div className="flex items-center gap-1.5">
+              {statusOptions.map(option => {
+                const active = statusFilter === option.value;
+                return (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant={active ? 'secondary' : 'ghost'}
+                    size="xs"
+                    onClick={() =>
+                      setStatusFilter(active ? ActivityStatusFilter.All : option.value)
+                    }
+                    className={cn('rounded-full', active && 'font-medium')}
+                  >
+                    {i18nService.t(option.labelKey)}
+                  </Button>
+                );
+              })}
+            </div>
+            {hasActiveFilters && !isFilterEmpty && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                {i18nService.t('activityFilterClear')}
+              </Button>
+            )}
           </div>
 
           {/* Feed / empty */}
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
             {!hasAnyRun || dayGroups.length === 0 ? (
-              // 2026/09/15 lixiang  活动页空态收紧图标与文案间距，不改全局 Empty 组件
               <Empty className="min-h-[18rem] gap-2 px-6 py-20">
                 <EmptyHeader className="gap-1">
-                  <EmptyMedia className="mb-0 size-16 overflow-clip">
-                    <img
-                      src={activityEmptyIcon}
-                      alt=""
-                      className="size-full"
-                      width={64}
-                      height={64}
-                      aria-hidden="true"
-                    />
+                  <EmptyMedia className="mb-2 size-10 rounded-xl bg-surface-raised flex items-center justify-center text-muted-foreground overflow-clip">
+                    <Activity className="size-5" />
                   </EmptyMedia>
                   <EmptyDescription className="text-sm text-muted-foreground">
                     {i18nService.t(hasAnyRun ? 'activityFilterEmpty' : 'activityEmpty')}
@@ -188,34 +183,26 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                 </EmptyHeader>
                 {isFilterEmpty && hasActiveFilters ? (
                   <EmptyContent>
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="text-xs text-primary transition-colors hover:text-primary-hover"
-                    >
+                    <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
                       {i18nService.t('activityFilterClear')}
-                    </button>
+                    </Button>
                   </EmptyContent>
                 ) : !hasAnyRun && onShowScheduledTasks ? (
                   <EmptyContent>
-                    <button
-                      type="button"
-                      onClick={onShowScheduledTasks}
-                      className="text-xs text-primary transition-colors hover:text-primary-hover"
-                    >
+                    <Button type="button" size="sm" onClick={onShowScheduledTasks}>
                       {i18nService.t('activityEmptyAction')}
-                    </button>
+                    </Button>
                   </EmptyContent>
                 ) : null}
               </Empty>
             ) : (
-              <div className="px-3 pb-6 pt-2">
+              <div className="pb-6">
                 {dayGroups.map(group => (
                   <section key={group.label} className="pb-4">
-                    <h2 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                    <h2 className="px-1 pb-2 text-xs font-medium text-muted-foreground">
                       {group.label}
                     </h2>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col gap-1.5">
                       {group.runs.map(run => (
                         <ActivityRunRow
                           key={run.id}
@@ -229,7 +216,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
               </div>
             )}
           </div>
-        </section>
+        </div>
       </div>
     </div>
   );
