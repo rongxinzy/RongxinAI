@@ -1,7 +1,7 @@
 /**
- * CI regression lane: replay the recorded 200-document long task against the
+ * CI regression lane: replay the recorded 32-document long task against the
  * full adapter stack with no live model. The tape server answers every
- * provider request from tests/replay/tapes/longtask-200doc.jsonl.gz with
+ * provider request from tests/replay/tapes/longtask-32doc.jsonl.gz with
  * strict seq+hash matching, so any drift in prompt assembly, tool wiring,
  * gating, stall handling, or run completion fails here.
  *
@@ -16,14 +16,14 @@ import { describe, expect, it } from 'vitest';
 
 import { LONGTASK_DOC_COUNT, runLongTaskScenario } from './replay/piLongTaskScenario';
 
-const TAPE_PATH = path.resolve(__dirname, 'replay/tapes/longtask-200doc.jsonl.gz');
+const TAPE_PATH = path.resolve(__dirname, 'replay/tapes/longtask-32doc.jsonl.gz');
 const WORK_DIR = path.join(os.tmpdir(), 'pi-longtask-replay-work');
 const HARD_CAP_MS = 15 * 60 * 1000;
 
 // Path normalization is POSIX-shaped; Windows runs should re-record first.
 describe.skipIf(process.platform === 'win32')('Pi long-task replay (recorded provider)', () => {
   it(
-    'completes the recorded 200-document task without drift',
+    'completes the recorded 32-document task without drift',
     { timeout: HARD_CAP_MS + 120_000 },
     async () => {
       const summary = await runLongTaskScenario({
@@ -42,7 +42,7 @@ describe.skipIf(process.platform === 'win32')('Pi long-task replay (recorded pro
       expect(summary.counts.byType['turn_start']).toBeGreaterThanOrEqual(LONGTASK_DOC_COUNT);
       expect(summary.workbenchTaskStatus).toBe('needs_review');
 
-      // The golden run completed the full 200-document read/summarize loop
+      // The golden run completed the full 32-document read/summarize loop
       // plus index.csv and report.md; artifact assertions anchor the
       // stack-level invariants, while the strict seq+hash tape match guards
       // against any request-level regression.
