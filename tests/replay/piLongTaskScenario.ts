@@ -1,11 +1,12 @@
 /**
  * Shared long-task scenario for the Pi provider tape experiment.
  *
- * One deterministic 200-document serial task exercised in three modes:
+ * One deterministic 32-document serial task exercised in three modes:
  *
  * - live:   real provider (manual, AB_LONGTASK=live) — the A/B harness arm.
- * - record: real provider behind the tape server (manual, AB_LONGTASK=record)
- *           — produces the tape consumed by replay.
+ * - record: real provider behind the tape server (manual, AB_LONGTASK=record,
+ *           AB_LONGTASK_UPSTREAM_API_KEY bearer) — produces the tape consumed
+ *           by replay.
  * - replay: tape server only (CI, tests/piLongTaskReplay.test.ts) — no model,
  *           strict seq+hash request matching; any drift fails the test.
  *
@@ -39,22 +40,26 @@ if (typeof mutableApp.getAppPath !== 'function') {
   mutableApp.getAppPath = () => process.cwd();
 }
 
-export const LONGTASK_SCENARIO_ID = 'longtask-200doc';
+export const LONGTASK_SCENARIO_ID = 'longtask-32doc';
 export const LONGTASK_FROZEN_TIME = '2026-06-15T08:00:00.000Z';
-export const LONGTASK_DOC_COUNT = 200;
-export const LONGTASK_LIVE_UPSTREAM = 'http://172.18.5.123:8000';
-export const LONGTASK_MODEL_ID = 'Qwen3.6-35B-A3B';
+export const LONGTASK_DOC_COUNT = 32;
+// 2026-10 compute endpoint: single qwen3.8-flash-next deployment with a 64K
+// window and no cross-request prefix caching. AB_LONGTASK_UPSTREAM points a
+// recording run at a different origin without touching the tape semantics.
+export const LONGTASK_LIVE_UPSTREAM =
+  process.env.AB_LONGTASK_UPSTREAM ?? 'http://172.18.6.119:8080';
+export const LONGTASK_MODEL_ID = 'qwen3.8-flash-next';
 
 const PROVIDER_NAME = 'custom_ab';
 const ARTIFACT_NAMES = ['summaries.md', 'index.csv', 'report.md'] as const;
 
-const TASK_PROMPT = `工作目录下 data/ 子目录中有 200 个文本文档（doc-001.txt 到 doc-200.txt），是一份产品技术文档集的章节。请严格按以下步骤完成：
+const TASK_PROMPT = `工作目录下 data/ 子目录中有 32 个文本文档（doc-001.txt 到 doc-032.txt），是一份产品技术文档集的章节。请严格按以下步骤完成：
 
-1. 用 read 工具逐个读取每个文档，每次只读一个文件，按 doc-001 到 doc-200 的顺序处理，禁止跳读、禁止批量读取。**每一条助手回复最多只能调用 1 个工具**：调用一个工具后必须等待其结果，再在下一轮回复中继续下一步，严禁在同一回复中并行发起多个工具调用。
+1. 用 read 工具逐个读取每个文档，每次只读一个文件，按 doc-001 到 doc-032 的顺序处理，禁止跳读、禁止批量读取。**每一条助手回复最多只能调用 1 个工具**：调用一个工具后必须等待其结果，再在下一轮回复中继续下一步，严禁在同一回复中并行发起多个工具调用。
 2. 每读完一个文档，立即向 summaries.md 追加一节：二级标题为「## doc-XXX 章节名」，下面跟 2-3 句中文摘要，概括该章节的核心机制与工程建议。
-3. 全部 200 个文档处理完后，生成 index.csv：每行一个文档，列为 文档编号,章节名,主题分类,一句话要点。
+3. 全部 32 个文档处理完后，生成 index.csv：每行一个文档，列为 文档编号,章节名,主题分类,一句话要点。
 4. 然后写一份 report.md：综合技术分析报告，至少 1500 字，涵盖全部章节的主题归类、共性工程原则、相互之间的矛盾点与取舍建议，最后给出结论。
-5. 宣布完成前必须自查：用 bash 执行 grep -c '^## doc-' summaries.md，结果必须恰好等于 200；不足 200 时必须回到第 1 步，继续处理尚未摘要的文档，直到自查通过。禁止以"剩余文档结构类似"等理由跳过。
+5. 宣布完成前必须自查：用 bash 执行 grep -c '^## doc-' summaries.md，结果必须恰好等于 32；不足 32 时必须回到第 1 步，继续处理尚未摘要的文档，直到自查通过。禁止以"剩余文档结构类似"等理由跳过。
 6. 自查通过后，用一句话告诉我 summaries.md、index.csv 和 report.md 已生成。
 
 注意：必须真实读写文件；不要在回复里直接输出全部内容代替写文件。`;
@@ -108,7 +113,7 @@ const PARAGRAPHS = [
   '最后强调文档与值班机制。所有关于{t1}的运维手册必须随车发布，值班同学应能在不看代码的情况下完成 80% 的常见问题处置。',
 ];
 
-/** Deterministic 200-document workspace content (identical on every machine). */
+/** Deterministic 32-document workspace content (identical on every machine). */
 export function seedLongTaskWorkspace(workDir: string): void {
   fs.rmSync(workDir, { recursive: true, force: true });
   const dataDir = path.join(workDir, 'data');
@@ -118,9 +123,13 @@ export function seedLongTaskWorkspace(workDir: string): void {
     const variant = VARIANTS[Math.floor(index / TOPICS.length)] ?? '综合';
     const id = String(index + 1).padStart(3, '0');
     const parts = [`# ${id} ${topic}（${variant}）`, ''];
-    // Keep each doc small: the 200-doc transcript must peak far below the
+    // Keep each doc small: the 32-doc transcript must peak far below the
     // compaction threshold so the trigger point (which is usage-accounting
     // dependent and not portable across runtimes) never fires mid-replay.
+    // Doc count is sized for the 2026-10 compute endpoint: 32 docs peak at
+    // roughly 38-40K tokens against the 49,152-token trigger
+    // (65,536-window minus the 16,384 reserve), and the endpoint's lack of
+    // prefix caching keeps the recording inside the 180-minute hard cap.
     for (let i = 0; i < 3; i++) {
       parts.push(
         PARAGRAPHS[(i + index) % PARAGRAPHS.length]
@@ -198,6 +207,10 @@ export async function runLongTaskScenario(
         scenario: LONGTASK_SCENARIO_ID,
         workDir: options.workDir,
         upstream: options.mode === 'record' ? LONGTASK_LIVE_UPSTREAM : undefined,
+        // The bearer token lives only in forwarded request headers; it never
+        // reaches the tape, so replays stay credential-free.
+        upstreamApiKey:
+          options.mode === 'record' ? process.env.AB_LONGTASK_UPSTREAM_API_KEY : undefined,
         tapePath: options.tapePath,
         matchMode: options.tapeMatchMode ?? 'strict',
         debugDumpDir: options.tapeDebugDumpDir,
@@ -235,8 +248,10 @@ export async function runLongTaskScenario(
               // compaction threshold (window minus reserve): the threshold
               // trigger depends on provider usage accounting that is not
               // portable across runtimes, and a mid-run compaction would
-              // slide off the tape's request sequence.
-              contextWindow: 262_144,
+              // slide off the tape's request sequence. The window mirrors
+              // the endpoint's real 64K limit — larger values would let the
+              // transcript grow past what the provider accepts.
+              contextWindow: 65_536,
               maxTokens: 4096,
             },
           ],

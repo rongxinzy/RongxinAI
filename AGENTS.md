@@ -177,7 +177,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 - Vitest 单测与源码同目录，**只用 `.test.ts`**（`src/main/foo.ts` → `src/main/foo.test.ts`），`import { test, expect } from 'vitest'`，禁止 `.test.mjs` 等其他扩展。`npm test` 全量，`npm test -- <name>` 过滤。
 - 测试避免 import Electron-only API（electron-log 等），相关逻辑内联。
-- **Provider 回放道**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-200doc.jsonl.gz`）对完整 Pi adapter 栈跑 200 文档长任务，严格 seq+hash 请求匹配——prompt 组装、工具接线、运行完成语义漂移即失败。prompt 或场景变更后用 `AB_LONGTASK=record npx vitest run tests/abLongTask.harness.test.ts` 重录（live 上游见 `tests/replay/piLongTaskScenario.ts` 的 `LONGTASK_LIVE_UPSTREAM`）。
+- **Provider 回放道**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，严格 seq+hash 请求匹配——prompt 组装、工具接线、运行完成语义漂移即失败。prompt 或场景变更后用 `AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> npx vitest run tests/abLongTask.harness.test.ts` 重录（live 上游与模型见 `tests/replay/piLongTaskScenario.ts` 的 `LONGTASK_LIVE_UPSTREAM`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
 - UI 改动用 `npm run electron:dev` 手工验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止会话）、Artifacts（HTML/SVG/Mermaid/React 预览）、Settings（主题/语言切换）。保持 console 警告/错误干净。
 
 ## Internationalization (i18n)
