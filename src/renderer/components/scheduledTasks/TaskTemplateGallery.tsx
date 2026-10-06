@@ -26,7 +26,7 @@ export interface TaskTemplateValues {
   promptText: string;
 }
 
-interface TaskTemplate {
+export interface TaskTemplate {
   id: string;
   icon: React.ComponentType<{ className?: string }>;
   nameKey: string;
@@ -36,7 +36,7 @@ interface TaskTemplate {
   schedule: { kind: 'cron'; expr: string };
 }
 
-const TEMPLATES: TaskTemplate[] = [
+export const TASK_TEMPLATES: TaskTemplate[] = [
   {
     id: 'finance-news',
     icon: TrendingUp,
@@ -97,7 +97,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
 
       {/* Template Cards Grid */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {TEMPLATES.map(tpl => (
+        {TASK_TEMPLATES.map(tpl => (
           <Card
             key={tpl.id}
             className="theme-page-task-template-gallery-card-1 cursor-pointer h-full"

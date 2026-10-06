@@ -10,7 +10,7 @@ import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Spinner } from '@shared/components/ui/spinner';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { MessageCirclePlus } from 'lucide-react';
+import { MessageCirclePlus, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -157,13 +157,31 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background">
       <PageHeader
         title={i18nService.t('scheduledTasksTitle')}
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
         onNewChat={onNewChat}
         updateBadge={updateBadge}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCreateByChat}
+              className="gap-1.5"
+            >
+              <MessageCirclePlus className="size-4" />
+              <span>{i18nService.t('scheduledTasksCreateByChat')}</span>
+            </Button>
+            <Button type="button" size="sm" onClick={() => openCreateModal()} className="gap-1.5">
+              <Plus className="size-4" />
+              <span>{i18nService.t('scheduledTasksNewTask')}</span>
+            </Button>
+          </div>
+        }
         tabs={
           <PageTabs
             value={activeTab}
@@ -182,16 +200,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         }
       />
 
-      <div className="mx-auto w-full max-w-2xl shrink-0 px-8">
-        <div className="flex items-center justify-between gap-4 pt-4">
-          <p className="text-sm text-muted-foreground">{i18nService.t('scheduledTasksHeroDesc')}</p>
-          <Button type="button" variant="outline" size="sm" onClick={handleCreateByChat}>
-            <MessageCirclePlus className="size-4" />
-            {i18nService.t('scheduledTasksCreateByChat')}
-          </Button>
-        </div>
-      </div>
-
       <div
         ref={activePaneScrollRef}
         className={cn(
@@ -201,14 +209,14 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       >
         <div
           className={cn(
-            'mx-auto w-full max-w-2xl px-8',
+            'mx-auto w-full max-w-4xl px-4 sm:px-6',
             activeTab === AUTO_TAB.History && 'flex min-h-0 flex-1 flex-col',
           )}
         >
           <div
             key={activeTab}
             className={cn(
-              'animate-fade-in pt-6 pb-10',
+              'animate-fade-in pt-4 pb-10',
               activeTab === AUTO_TAB.History ? 'flex min-h-0 flex-1 flex-col' : 'min-h-full',
             )}
           >
@@ -220,7 +228,13 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             )}
 
             {activeTab === AUTO_TAB.Tasks && (
-              <TaskList onRequestDelete={handleRequestDelete} onRequestEdit={handleRequestEdit} />
+              <TaskList
+                onRequestDelete={handleRequestDelete}
+                onRequestEdit={handleRequestEdit}
+                onCreateTask={() => openCreateModal(undefined)}
+                onCreateByChat={handleCreateByChat}
+                onSelectTemplate={values => openCreateModal(values)}
+              />
             )}
 
             {activeTab === AUTO_TAB.History && <AllRunsHistory />}

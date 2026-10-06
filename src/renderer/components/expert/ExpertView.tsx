@@ -1,7 +1,6 @@
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { Users } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -87,15 +86,8 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           className="min-h-0 flex-1 overflow-y-auto"
           contentClassName="h-full"
         >
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4 sm:px-6">
-            <header className="flex items-center gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-                <Users className="size-6 text-primary" aria-hidden="true" />
-              </div>
-              <p className="min-w-0 text-sm text-muted-foreground">
-                {i18nService.t('expertsDescription')}
-              </p>
-            </header>
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 pt-4 pb-8 sm:px-6">
+            <p className="text-sm text-muted-foreground">{i18nService.t('expertsDescription')}</p>
             <PresetExpertList onChatWithExpert={onChatWithExpert} />
           </div>
         </LayeredTabsContent>
