@@ -42,7 +42,9 @@ export function classicButtons(dark: boolean): ButtonAppearances {
     }),
     'button-default': recipe({
       base: { 'background-color': 'var(--zy-primary-strong)', color: 'var(--primary-foreground)' },
-      hover: { 'background-color': mix('zy-primary-strong', 80) },
+      hover: {
+        'background-color': 'color-mix(in oklab, var(--zy-primary-strong) 90%, black)',
+      },
     }),
     'button-outline': recipe({
       base: {
@@ -65,9 +67,9 @@ export function classicButtons(dark: boolean): ButtonAppearances {
       base: { color: 'inherit', 'background-color': 'transparent' },
     }),
     'button-prompt-selector': recipe({
-      base: { 'transition-duration': '200ms' },
-      hover: raised,
-      expanded: raised,
+      base: { 'transition-duration': '150ms' },
+      hover: { ...raised, color: 'var(--foreground)' },
+      expanded: { ...raised, color: 'var(--foreground)' },
     }),
     'button-navigation': recipe({
       base: {

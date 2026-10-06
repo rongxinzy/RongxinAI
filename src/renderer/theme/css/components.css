@@ -368,19 +368,6 @@ select::-ms-expand {
   inset: 0;
   pointer-events: none;
 }
-/* 2026/09/18 lixiang  鼠标点入 contenteditable 不一定有 :focus-visible，原光晕 opacity 会一直是 0 */
-.input-aura:focus-within::before,
-.input-aura:focus-within::after {
-  opacity: 1;
-  transition-duration: 340ms;
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-/* 2026/09/20 lixiang  获焦只保留 1px 边框，不再叠一层 box-shadow 实线 */
-.input-aura:focus-within [data-slot='input-group'] {
-  border-color: color-mix(in oklch, var(--ring) 40%, transparent);
-  border-width: 1px;
-  box-shadow: none;
-}
 
 /* Skeleton loading */
 .skeleton {

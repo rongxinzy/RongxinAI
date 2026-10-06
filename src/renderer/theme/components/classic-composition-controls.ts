@@ -11,12 +11,11 @@ export function classicCompositionControls() {
     'input-submit': recipe({
       base: {
         'border-radius': '9999px',
-        'transition-property': 'scale',
+        'transition-property': 'background-color, translate',
         'transition-duration': '150ms',
         'transition-timing-function': 'ease-out',
       },
-      hover: { scale: '1.05' },
-      pressed: { scale: '0.95' },
+      pressed: { translate: '0 1px' },
     }),
     'local-compact-action': recipe({
       base: {

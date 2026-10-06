@@ -7,6 +7,7 @@ import {
   Bot,
   ListTodo,
   MessageCirclePlus,
+  Plus,
   Terminal,
   Users,
 } from 'lucide-react';
@@ -104,7 +105,7 @@ export function SidebarNavigationView({
     });
   };
   return (
-    <div className="flex flex-col gap-0.5 px-2 py-2">
+    <div className="flex flex-col gap-4 px-2 py-4">
       <div className="relative h-7 w-full">
         <Switch
           checked={shownIsChat}
@@ -126,12 +127,28 @@ export function SidebarNavigationView({
           </span>
         ))}
       </div>
-      <div className="mt-2">
-        <SidebarNavigationItem entry={newConversation} />
-      </div>
-      {entries.map(entry => (
-        <SidebarNavigationItem key={entry.id} entry={entry} />
-      ))}
+      <Button
+        type="button"
+        variant="default"
+        size="lg"
+        className="w-full justify-start gap-2"
+        data-testid={newConversation.testId}
+        data-active={newConversation.active || undefined}
+        aria-current={newConversation.currentPage ? 'page' : undefined}
+        onClick={newConversation.onClick}
+        onMouseEnter={newConversation.onIntent}
+        onFocus={newConversation.onIntent}
+      >
+        <Plus data-icon="inline-start" aria-hidden="true" />
+        <span className="min-w-0 truncate">{newConversation.label}</span>
+      </Button>
+      {entries.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {entries.map(entry => (
+            <SidebarNavigationItem key={entry.id} entry={entry} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

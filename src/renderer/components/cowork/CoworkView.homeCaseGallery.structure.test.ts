@@ -19,10 +19,9 @@ const panelGuard = compact(
               <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
             )}`,
 );
-const spacer = 'min-h-[max(0px,calc(50%-15.5rem))]';
-const columnWrapper =
-  'mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-center gap-10 px-4';
-const galleryWrapper = 'flex w-full flex-col gap-4 pb-8 animate-fade-in-up';
+const spacer = 'min-h-[max(1.5rem,calc(45%-10rem))]';
+const columnWrapper = 'mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-6 px-6';
+const galleryWrapper = 'flex w-full flex-col gap-4 pb-8';
 
 const countOf = (needle: string) => source.split(needle).length - 1;
 
@@ -94,12 +93,12 @@ test('pins the prompt input while the case list scrolls underneath it', () => {
   const stickyClass = /<div className="(sticky[^"]*)"/.exec(source)?.[1] ?? '';
   expect(stickyClass).toContain('top-0');
   expect(stickyClass).toContain('z-10');
-  expect(stickyClass).toContain('bg-background');
+  expect(stickyClass).toContain('theme-home-sticky');
   expect(stickyClass).toContain('w-full');
 
   // The brand mark travels in the same layer: it has to stay on screen next to the
   // input rather than sliding away with the cases, so it must be nested inside it.
-  const brandIndex = source.indexOf('min-h-28 flex-col items-center justify-center gap-5');
+  const brandIndex = source.indexOf('flex-col items-center justify-center gap-4');
   expect(brandIndex).toBeGreaterThan(stickyIndex);
   expect(source.indexOf('max-w-3xl flex-col gap-3')).toBeGreaterThan(brandIndex);
 
