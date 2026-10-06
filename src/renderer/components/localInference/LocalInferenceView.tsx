@@ -1139,6 +1139,64 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onToggleSidebar={onToggleSidebar}
           onNewChat={onNewChat}
           updateBadge={updateBadge}
+          actions={
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`${localInferenceCompactButtonClass} theme-page-local-inference-view-button-variant-1`}
+                    size="sm"
+                  >
+                    <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
+                    <span>{i18nService.t('localInferenceSettings')}</span>
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="min-w-32">
+                <DropdownMenuItem
+                  onClick={() => setRuntimeSettingsOpen(true)}
+                  onFocus={() => startMenuIconAnimation(runtimeSettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(runtimeSettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(runtimeSettingsIconRef)}
+                >
+                  <SidebarAnimatedCpuIcon ref={runtimeSettingsIconRef} />
+                  {i18nService.t('localInferenceRuntimeSettings')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={openAccessSettings}
+                  onFocus={() => startMenuIconAnimation(accessSettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(accessSettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(accessSettingsIconRef)}
+                >
+                  <LocalInferenceAnimatedWifiPenIcon ref={accessSettingsIconRef} />
+                  {i18nService.t('localInferenceAccessMenuItem')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={openMemorySettings}
+                  onFocus={() => startMenuIconAnimation(memorySettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(memorySettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(memorySettingsIconRef)}
+                >
+                  <GalleryThumbnailsIcon ref={memorySettingsIconRef} />
+                  {i18nService.t('localInferenceMemoryMenuItem')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setDraftModelsDir(modelsDir);
+                    setLibrarySettingsOpen(true);
+                  }}
+                  onFocus={() => startMenuIconAnimation(librarySettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(librarySettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(librarySettingsIconRef)}
+                >
+                  <LocalInferenceAnimatedFolderDownIcon ref={librarySettingsIconRef} />
+                  {i18nService.t('localInferenceLibraryMenuItem')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
           tabs={
             <PageTabs
               bare
@@ -1170,71 +1228,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             <div
               className={
                 activeTab === 'marketplace'
-                  ? 'flex h-full min-h-0 w-full flex-col gap-4 px-6 py-4'
-                  : 'w-full space-y-4 px-6 py-4'
+                  ? 'mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6'
+                  : 'mx-auto w-full max-w-5xl space-y-4 px-4 py-4 sm:px-6'
               }
             >
-              {activeTab === 'models' ? (
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={`${localInferenceCompactButtonClass} theme-page-local-inference-view-button-variant-1 min-w-32 `}
-                          size="default"
-                        >
-                          <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
-                          {i18nService.t('localInferenceSettings')}
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end" className="min-w-32">
-                      <DropdownMenuItem
-                        onClick={() => setRuntimeSettingsOpen(true)}
-                        onFocus={() => startMenuIconAnimation(runtimeSettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(runtimeSettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(runtimeSettingsIconRef)}
-                      >
-                        <SidebarAnimatedCpuIcon ref={runtimeSettingsIconRef} />
-                        {i18nService.t('localInferenceRuntimeSettings')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={openAccessSettings}
-                        onFocus={() => startMenuIconAnimation(accessSettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(accessSettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(accessSettingsIconRef)}
-                      >
-                        <LocalInferenceAnimatedWifiPenIcon ref={accessSettingsIconRef} />
-                        {i18nService.t('localInferenceAccessMenuItem')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={openMemorySettings}
-                        onFocus={() => startMenuIconAnimation(memorySettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(memorySettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(memorySettingsIconRef)}
-                      >
-                        <GalleryThumbnailsIcon ref={memorySettingsIconRef} />
-                        {i18nService.t('localInferenceMemoryMenuItem')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setDraftModelsDir(modelsDir);
-                          setLibrarySettingsOpen(true);
-                        }}
-                        onFocus={() => startMenuIconAnimation(librarySettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(librarySettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(librarySettingsIconRef)}
-                      >
-                        <LocalInferenceAnimatedFolderDownIcon ref={librarySettingsIconRef} />
-                        {i18nService.t('localInferenceLibraryMenuItem')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ) : null}
-
               <LayeredTabsContent
                 value="models"
                 activeValue={activeTab}

@@ -241,15 +241,15 @@ export function MarketplacePanel({
         </div>
       </form>
 
-      <div className="flex w-full shrink-0 flex-wrap items-stretch justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
           <div className="shrink-0">
             <FluidTabs
               className="w-fit max-w-full"
               inactiveTabClassName="hover:opacity-100"
               listClassName="border border-border-subtle"
               showInactiveHoverIndicator
-              size={FluidTabsSize.Default}
+              size={FluidTabsSize.Small}
               aria-label={i18nService.t('marketplaceFilterTask')}
               value={taskFilter}
               onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
@@ -262,8 +262,8 @@ export function MarketplacePanel({
               ]}
             />
           </div>
-          <div className="inline-flex h-10 items-center gap-1 rounded-lg border border-border-subtle bg-muted/80 px-1 py-0.5">
-            <span className="px-2 text-sm leading-5 font-normal text-muted-foreground">
+          <div className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border-subtle bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground">
+            <span className="font-medium text-muted-foreground">
               {i18nService.t('marketplaceFilterFit')}
             </span>
             <Select
@@ -273,9 +273,9 @@ export function MarketplacePanel({
               }
             >
               <SelectTrigger
-                size="default"
+                size="sm"
                 aria-label={i18nService.t('marketplaceFilterFit')}
-                className="theme-page-marketplace-panel-select-trigger-1 min-w-32"
+                className="theme-page-marketplace-panel-select-trigger-1 h-7 min-w-28 border-0 bg-transparent px-2 text-xs shadow-none hover:bg-surface-raised"
               >
                 <SelectValue className="theme-part-marketplace-panel-select-value-1">
                   {fitFilterLabel}

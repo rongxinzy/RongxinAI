@@ -74,14 +74,14 @@ export function classicSupplementaryControls(dark: boolean) {
         'line-height': '1.25rem',
         'font-weight': 'var(--zy-component-font-weight-normal)',
         color: 'var(--muted-foreground)',
-        opacity: '0.5',
+        opacity: '0.85',
         'outline-style': 'none',
       },
-      hover: { color: 'var(--foreground)' },
+      hover: { color: 'var(--foreground)', opacity: '1' },
       selected: {
         color: 'var(--foreground)',
         opacity: '1',
-        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
       },
       focus: {
         'box-shadow':
@@ -100,7 +100,7 @@ export function classicSupplementaryControls(dark: boolean) {
         'border-style': 'solid',
         'border-color': 'var(--zy-border-subtle)',
         'background-color': 'var(--zy-surface)',
-        'box-shadow': 'var(--zy-style-shadow-md)',
+        'box-shadow': 'var(--zy-style-shadow-subtle)',
       },
     }),
     'fluid-hover-indicator': recipe({
@@ -110,9 +110,9 @@ export function classicSupplementaryControls(dark: boolean) {
         'border-radius': '9999px',
         'border-width': '1px',
         'border-style': 'solid',
-        'border-color': 'var(--zy-border-subtle)',
+        'border-color': 'transparent',
         'background-color': 'var(--zy-surface)',
-        'box-shadow': 'var(--zy-style-shadow-md)',
+        'box-shadow': 'none',
       },
     }),
     'fluid-hover-visible': recipe({ parentHover: { opacity: '1' }, parentFocus: { opacity: '1' } }),

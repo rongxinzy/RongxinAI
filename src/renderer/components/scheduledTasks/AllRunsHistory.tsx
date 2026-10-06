@@ -178,13 +178,26 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
 
         {/* Empty state */}
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center py-16 px-6">
-            <Clock className="size-12 text-muted-foreground/40 mb-4" />
-            <p className="text-sm font-medium text-muted-foreground">
+          <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+            <div className="size-10 rounded-xl bg-surface-raised flex items-center justify-center text-muted-foreground mb-3">
+              <Clock className="size-5" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">
               {hasActiveFilter
                 ? i18nService.t('scheduledTasksFilterNoResults')
                 : i18nService.t('scheduledTasksHistoryEmpty')}
             </p>
+            {hasActiveFilter && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleClearFilter}
+                className="mt-3 gap-1.5"
+              >
+                <span>{i18nService.t('scheduledTasksFilterClear')}</span>
+              </Button>
+            )}
           </div>
         )}
 
