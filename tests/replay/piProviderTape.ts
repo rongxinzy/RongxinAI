@@ -79,8 +79,13 @@ export interface PiProviderTapeServerOptions {
   scenario: string;
   /** Replay-time workspace path; normalized away for hashing. */
   workDir: string;
-  /** Record mode: real provider origin, e.g. http://172.18.5.123:8000. */
+  /** Record mode: real provider origin, e.g. http://172.18.6.119:8080. */
   upstream?: string;
+  /**
+   * Record mode: bearer token for the upstream provider. Sent as a request
+   * header only — never written into the tape, so replays need no credential.
+   */
+  upstreamApiKey?: string;
   /** Tape file path (.jsonl or .jsonl.gz). Required in both modes. */
   tapePath: string;
   /** Replay mode: 'strict' requires seq+hash match; 'sequential' ignores hashes. */
@@ -321,9 +326,14 @@ export class PiProviderTapeServer {
   ): Promise<void> {
     const upstream = this.options.upstream;
     if (!upstream) throw new Error('record mode requires an upstream origin');
+    const headers: Record<string, string> = {
+      'content-type': req.headers['content-type'] ?? 'application/json',
+    };
+    if (this.options.upstreamApiKey)
+      headers.authorization = `Bearer ${this.options.upstreamApiKey}`;
     const response = await fetch(`${upstream}${req.url}`, {
       method: req.method,
-      headers: { 'content-type': req.headers['content-type'] ?? 'application/json' },
+      headers,
       body: req.method === 'GET' || req.method === 'HEAD' ? undefined : body,
     });
     const responseBody = await response.text();

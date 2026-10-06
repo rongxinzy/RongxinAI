@@ -186,7 +186,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 - 改 token/recipe/生成器：`bun run theme:generate`。改共享契约/主题引擎：另跑 `npx vitest run src/renderer src/shared`、`npm run build`、`npm run test:bundle-budget`。
 - 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
 - 全量测试有少量环境相关存量失败（skill smoke、release manifest 等）。遇失败用 `git stash` 对照 HEAD 判断是否由你引入。
-- **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-200doc.jsonl.gz`）对完整 Pi adapter 栈做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record npx vitest run tests/abLongTask.harness.test.ts`（live 上游见 `tests/replay/piLongTaskScenario.ts`）。
+- **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> npx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
 - UI 改动在 `npm run electron:dev` 验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。
 
 ## Git 与 PR
