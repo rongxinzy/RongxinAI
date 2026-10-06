@@ -23,7 +23,7 @@ export function MarketplaceCardLayout({
       <CardHeader className="theme-control-sizing-20 theme-market-card-header flex min-w-0 flex-row items-start gap-3">
         {header}
       </CardHeader>
-      <CardContent className="theme-market-card-content flex min-w-0 flex-wrap items-center justify-between gap-2">
+      <CardContent className="theme-market-card-content flex min-w-0 flex-col gap-2">
         {children}
       </CardContent>
       <CardFooter className="theme-market-card-footer mt-auto flex min-w-0 flex-wrap items-center gap-2">
@@ -54,8 +54,11 @@ export function MarketplaceModelCardSkeleton() {
         </>
       }
     >
-      <Skeleton className="h-5 w-36" />
-      <Skeleton className="h-5 w-24" />
+      <Skeleton className="h-4 w-full" />
+      <div className="flex w-full items-center justify-between gap-2">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-4 w-20" />
+      </div>
     </MarketplaceCardLayout>
   );
 }
