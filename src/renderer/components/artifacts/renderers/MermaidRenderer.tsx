@@ -105,7 +105,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="p-4 text-sm text-red-500">
+      <div className="p-4 text-sm text-destructive">
         <p className="font-medium">Mermaid render error</p>
         <pre className="mt-2 text-xs whitespace-pre-wrap">{error}</pre>
       </div>

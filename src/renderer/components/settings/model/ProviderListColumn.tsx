@@ -138,6 +138,7 @@ export default function ProviderListColumn({
                     onDeleteCustomProvider(providerKey);
                   }}
                   title={i18nService.t('deleteCustomProvider')}
+                  aria-label={i18nService.t('deleteCustomProvider')}
                 >
                   <X className="w-3.5 h-3.5" />
                 </Button>

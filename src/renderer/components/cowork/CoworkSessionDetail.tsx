@@ -169,7 +169,7 @@ class ArtifactPanelErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <aside className="w-[420px] shrink-0 border-l border-border-subtle bg-background flex flex-col h-full items-center justify-center p-4">
-          <p className="text-sm text-red-500 mb-2">Artifact panel error</p>
+          <p className="text-sm text-destructive mb-2">Artifact panel error</p>
           <pre className="text-xs text-muted whitespace-pre-wrap max-w-full overflow-auto mb-3">
             {this.state.error?.message}
           </pre>

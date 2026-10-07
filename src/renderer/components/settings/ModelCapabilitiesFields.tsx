@@ -1,3 +1,4 @@
+import { Field, FieldLabel } from '@shared/components/ui/field';
 import { Input } from '@shared/components/ui/input';
 import {
   Select,
@@ -61,9 +62,12 @@ export function ModelCapabilitiesFields({
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-3">
       <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm text-foreground">
-          <span>{i18nService.t('modelContextWindowK')}</span>
+        <Field>
+          <FieldLabel htmlFor="model-context-window-k">
+            {i18nService.t('modelContextWindowK')}
+          </FieldLabel>
           <Input
+            id="model-context-window-k"
             type={onContextWindowChange ? 'number' : 'text'}
             min={onContextWindowChange ? 1 : undefined}
             value={contextWindow ?? ''}
@@ -71,10 +75,13 @@ export function ModelCapabilitiesFields({
             onChange={event => onContextWindowChange?.(event.target.value)}
             placeholder="128"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm text-foreground">
-          <span>{i18nService.t('modelMaxOutputTokensK')}</span>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="model-max-output-tokens-k">
+            {i18nService.t('modelMaxOutputTokensK')}
+          </FieldLabel>
           <Input
+            id="model-max-output-tokens-k"
             type={onMaxTokensChange ? 'number' : 'text'}
             min={onMaxTokensChange ? 1 : undefined}
             value={maxTokens ?? ''}
@@ -82,7 +89,7 @@ export function ModelCapabilitiesFields({
             onChange={event => onMaxTokensChange?.(event.target.value)}
             placeholder="4"
           />
-        </label>
+        </Field>
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {fields.map(field => {
@@ -91,8 +98,8 @@ export function ModelCapabilitiesFields({
             ? editableCapabilities[field.key] === true
             : Boolean(onCapabilityChange);
           return (
-            <label key={field.key} className="flex flex-col gap-1 text-sm text-foreground">
-              <span>{i18nService.t(field.labelKey)}</span>
+            <Field key={field.key}>
+              <FieldLabel>{i18nService.t(field.labelKey)}</FieldLabel>
               <Select
                 value={status}
                 disabled={!editable}
@@ -115,7 +122,7 @@ export function ModelCapabilitiesFields({
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </label>
+            </Field>
           );
         })}
       </div>

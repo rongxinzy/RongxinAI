@@ -1101,6 +1101,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                   setSkillActionError('');
                 }}
                 className="theme-page-skills-manager-button-1"
+                aria-label={i18nService.t('close')}
               >
                 <X className="h-5 w-5" />
               </Button>
