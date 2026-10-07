@@ -215,3 +215,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 - 产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 DESIGN.md + 共享组件 + `rongxinai-ui-adapter` 为准，不套营销页默认。landing/营销/品牌页用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。可选 `shadcn/ui`、`vercel/ai-elements`、impeccable（`npx impeccable install`，`/impeccable`）。
 - 任何 skill 只补充本文件，不能取消设计自查或绕过已验收基准。
+
+## 跨仓协作规范
+
+提交、PR 标题与说明、review、bug fix 验证遵循 [DEVOPS.md](DEVOPS.md)。本仓已有专项安全、设计与发布门继续执行。

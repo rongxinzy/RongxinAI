@@ -1,5 +1,7 @@
 # Contributing to ZhiYuan Agent
 
+The shared PR and review process is defined in [DEVOPS.md](DEVOPS.md). Use its concise template; the UI, Electron, security, and release requirements below remain in effect.
+
 Thank you for your interest in contributing to ZhiYuan Agent. Contributions of all sizes are welcome, including bug reports, documentation improvements, tests, UI refinements, and new features.
 
 Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change. `AGENTS.md` contains the repository's detailed architecture and implementation rules.
