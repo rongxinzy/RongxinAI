@@ -201,9 +201,11 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 **提交**：Conventional Commits，全英文 `type(scope): summary`。type ∈ `feat|fix|refactor|chore|docs|test|perf|style|ci|build|revert`；subject 小写祈使、≤72 字符、无句号；body 写 why；破坏性变更加 `!` 与 `BREAKING CHANGE:` footer；关联 issue 每个都写关键词（`closes #1, closes #2`）。不用 emoji、不写客套话。
 
-**PR**：简要描述 + 关联 issue；说明 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
+**PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。所有 PR（含文档）需非作者的一次正式 GitHub approval，新提交使旧 approval 失效；不按作者姓名指定特殊评审人。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
 
-**CI**（`.github/workflows/ci.yml`）：基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 按 PR diff 路径选择；`merge-gate`（`scripts/ci/gates/verify.ts`）是唯一合并门禁。`author-review-gate` 用 `pull_request_target` 跑 main 上的版本。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
+**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 按 PR diff 路径选择；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员同样适用，禁止强推和删除，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
+
+**项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 
 ## 协作
 

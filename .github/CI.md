@@ -60,10 +60,20 @@ the miss and investigate the measured bottleneck without relaxing installation t
 
 ## Required-check rollout and measurement
 
-The main ruleset requires `merge-gate` from GitHub Actions (app ID 15368), with the
-branch up to date before merging. This was enabled on September 5, 2026 after verifying
-the merged workflow's real check. Existing role bypasses remain unchanged; they can
-still bypass this requirement. Do not require conditional platform jobs directly.
+The default branch requires `ci-gate` and retains `merge-gate` from GitHub Actions
+(app ID 15368), with the branch up to date before merging. `ci-gate` validates the
+PR title/body and aggregates applicable workflows at the current head;
+`.github/devops-ci.json` records their triggers. `merge-gate` retains application
+job validation. Do not require conditional platform jobs directly.
+
+All PRs, including documentation, require one independent GitHub approval. New
+commits dismiss stale approvals; the latest push must be approved by another person.
+Resolve review threads before merging. These rules apply to administrators as well,
+with no role bypass, force pushes, or branch deletion. The former author-specific
+`author-review-gate` is replaced by these uniform server-side review requirements.
+
+See [DEVOPS.md](../DEVOPS.md) for PR titles, descriptions, bug-fix evidence and the
+[team Project](https://github.com/orgs/rongxinzy/projects/2) for owners and status.
 
 The lint job checks all workflows with actionlint 1.7.12 before installing application
 dependencies. Its Linux binary is verified against a pinned SHA-256. This validates
