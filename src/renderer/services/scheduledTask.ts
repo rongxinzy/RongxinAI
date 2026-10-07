@@ -24,9 +24,10 @@ import {
   updateTaskState,
 } from '../store/slices/scheduledTaskSlice';
 import { i18nService } from './i18n';
+import { showAppToast } from './toastNotification';
 
 function showToast(message: string): void {
-  window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
+  showAppToast(message);
 }
 
 function hasTaskDataAnomaly(task: ScheduledTask): boolean {

@@ -43,30 +43,20 @@ import {
   TooltipTrigger,
 } from '@shared/components/ui/tooltip';
 import CodeMirror from '@uiw/react-codemirror';
-import { Check, ChevronDown, ChevronUp, Copy, Download, Search } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Download,
+  Maximize2,
+  Search,
+  WrapText,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { i18nService } from '../services/i18n';
-
-/** Word-wrap toggle icon: mimics a "wrap text" glyph */
-const WrapTextIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M3 12h13a3 3 0 0 1 0 6h-3" />
-    <polyline points="11 15 8 18 11 21" />
-    <line x1="3" y1="18" x2="5" y2="18" />
-  </svg>
-);
 
 // ---------------------------------------------------------------------------
 // Language alias map
@@ -861,7 +851,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
                 ariaLabel={wrap ? t('codeBlockWordWrapOff') : t('codeBlockWordWrap')}
                 active={wrap}
               >
-                <WrapTextIcon className="h-4 w-4" />
+                <WrapText className="h-4 w-4" />
               </HeaderButton>
             </CodeBlockTooltip>
             <CodeBlockTooltip content={t('copyToClipboard')}>
@@ -1445,7 +1435,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               }
               active={wrap}
             >
-              <WrapTextIcon className="h-4 w-4" />
+              <WrapText className="h-4 w-4" />
             </HeaderButton>
           </CodeBlockTooltip>
           {/* Fullscreen expand */}
@@ -1454,31 +1444,13 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               onClick={() => setFullscreen(true)}
               ariaLabel={i18nService.t('codeBlockFullscreen')}
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <polyline points="15 3 21 3 21 9" />
-                <polyline points="9 21 3 21 3 15" />
-                <line x1="21" y1="3" x2="14" y2="10" />
-                <line x1="3" y1="21" x2="10" y2="14" />
-              </svg>
+              <Maximize2 className="h-4 w-4" />
             </HeaderButton>
           </CodeBlockTooltip>
           {/* Copy */}
           <CodeBlockTooltip content={i18nService.t('copyToClipboard')}>
             <HeaderButton onClick={handleCopy} ariaLabel={i18nService.t('copyToClipboard')}>
-              {isCopied ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {isCopied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
             </HeaderButton>
           </CodeBlockTooltip>
           {/* Save to file */}

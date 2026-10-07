@@ -459,7 +459,7 @@ const WorkspaceNode = ({
     <div className="space-y-0.5">
       <div
         data-slot="workspace-tree-row"
-        className="sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors hover:shadow-subtle"
+        className="sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors"
       >
         <Button
           variant="ghost"

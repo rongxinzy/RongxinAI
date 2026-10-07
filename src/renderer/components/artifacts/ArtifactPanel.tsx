@@ -2,7 +2,21 @@ import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { resolveArtifactPath } from '@shared/cowork/artifactPath';
-import { ArrowLeft, Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
+import {
+  ArrowLeft,
+  Copy,
+  Expand,
+  ExternalLink,
+  Files,
+  Filter,
+  Folder,
+  Globe,
+  Maximize2,
+  Minimize2,
+  RefreshCw,
+  Shrink,
+  X,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -459,7 +473,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   className="theme-action-icon-muted"
                   title={t('artifactRefresh')}
                 >
-                  <RefreshIcon />
+                  <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
               )}
               {isCodeView && selectedArtifact.type !== 'unsupported' && (
@@ -481,7 +495,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   className="theme-action-icon-muted"
                   title={t('artifactOpenInBrowser')}
                 >
-                  <BrowserIcon />
+                  <Globe className="h-3.5 w-3.5" />
                 </Button>
               )}
               {hasLocalFilePreview && !BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
@@ -492,7 +506,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   className="theme-action-icon-muted"
                   title={t('artifactOpenWithApp')}
                 >
-                  <OpenExternalIcon />
+                  <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
               )}
               {selectedArtifact.filePath && (
@@ -503,7 +517,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   className="theme-action-icon-muted"
                   title={t('artifactOpenFolder')}
                 >
-                  <FolderIcon />
+                  <Folder className="h-3.5 w-3.5" />
                 </Button>
               )}
               {document.fullscreenEnabled && (
@@ -537,7 +551,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 }`}
                 title={t('artifactFileList')}
               >
-                <FileListIcon />
+                <Files className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
@@ -547,7 +561,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 title={t('close')}
                 aria-label={t('close')}
               >
-                <CloseIcon />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
 
@@ -611,7 +625,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 onClick={handleClose}
                 className="theme-action-icon-muted"
               >
-                <CloseIcon />
+                <X className="h-3.5 w-3.5" />
               </Button>
             </div>
             <FileDirectoryView
@@ -625,102 +639,5 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     </>
   );
 };
-
-const FolderIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M2 4.5A1.5 1.5 0 013.5 3h2.879a1.5 1.5 0 011.06.44l.622.62a1.5 1.5 0 001.06.44H12.5A1.5 1.5 0 0114 6v5.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" />
-  </svg>
-);
-
-const BrowserIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="8" cy="8" r="6" />
-    <ellipse cx="8" cy="8" rx="2.5" ry="6" />
-    <path d="M2 8h12" />
-  </svg>
-);
-
-const OpenExternalIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 9v3.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 012 12.5v-7A1.5 1.5 0 013.5 4H7" />
-    <path d="M10 2h4v4" />
-    <path d="M7 9l7-7" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <path d="M4 4l8 8M12 4l-8 8" />
-  </svg>
-);
-
-const FileListIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M4.5 2.881c0-.644.522-1.167 1.167-1.167h2.552c.323 0 .635.117.878.33l.58.507c.243.213.555.33.877.33h3.351c.736 0 1.333.597 1.333 1.333v5.945c0 .49-.398.889-.889.889" />
-    <path d="M1.143 6.476c0-.736.597-1.333 1.333-1.333h2.314c.323 0 .635.117.878.33l.58.507c.242.213.554.33.877.33h3.351c.736 0 1.333.597 1.333 1.334v4.833c0 .736-.597 1.333-1.333 1.333H2.476c-.736 0-1.333-.597-1.333-1.333V6.476z" />
-  </svg>
-);
-
-const RefreshIcon = () => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M13.5 8a5.5 5.5 0 01-9.55 3.75" />
-    <path d="M2.5 8a5.5 5.5 0 019.55-3.75" />
-    <path d="M12.05 1.25v3h-3" />
-    <path d="M3.95 14.75v-3h3" />
-  </svg>
-);
 
 export default ArtifactPanel;

@@ -7,7 +7,6 @@ import {
 } from '@shared/components/ui/empty';
 import { Button } from '@shared/components/ui/button';
 import { PageTabs } from '@shared/components/ui/page-tabs';
-import { cn } from '@shared/lib/utils';
 import { Activity } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
@@ -149,7 +148,6 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                     onClick={() =>
                       setStatusFilter(active ? ActivityStatusFilter.All : option.value)
                     }
-                    className={cn('rounded-full', active && 'font-medium')}
                   >
                     {i18nService.t(option.labelKey)}
                   </Button>
@@ -157,13 +155,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
               })}
             </div>
             {hasActiveFilters && !isFilterEmpty && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
+              <Button type="button" variant="ghost" size="xs" onClick={clearFilters}>
                 {i18nService.t('activityFilterClear')}
               </Button>
             )}

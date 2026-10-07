@@ -132,7 +132,7 @@ const ClampedText: React.FC<{ text: string; className?: string }> = ({ text, cla
           className="absolute bottom-full left-0 right-0 mb-1 z-50
           rounded-lg px-3 py-2 text-xs leading-relaxed
           bg-surface-raised text-foreground
-          shadow-xl border border-border"
+          shadow-lg border border-border"
         >
           {text}
         </div>
