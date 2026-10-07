@@ -1,5 +1,12 @@
 import { Button } from '@shared/components/ui/button';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
 import { Input } from '@shared/components/ui/input';
 import {
   Sheet,
@@ -444,27 +451,31 @@ const TodoView: React.FC<TodoViewProps> = ({
                   </Button>
                 </div>
               ) : todos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-                  <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-                    <ListTodo className="size-6 text-muted-foreground" aria-hidden="true" />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {query.trim()
-                      ? i18nService.t('todoNoSearchResults')
-                      : i18nService.t('todoEmpty')}
-                  </p>
+                <Empty className="py-16">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <ListTodo className="size-6" aria-hidden="true" />
+                    </EmptyMedia>
+                    <EmptyTitle>
+                      {query.trim()
+                        ? i18nService.t('todoNoSearchResults')
+                        : i18nService.t('todoEmpty')}
+                    </EmptyTitle>
+                  </EmptyHeader>
                   {!query.trim() && activeView !== TodoViewFilter.Completed ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('todo-new-input')?.focus()}
-                      className="gap-2"
-                    >
-                      <Plus />
-                      {i18nService.t('todoNewTask')}
-                    </Button>
+                    <EmptyContent>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('todo-new-input')?.focus()}
+                        className="gap-2"
+                      >
+                        <Plus />
+                        {i18nService.t('todoNewTask')}
+                      </Button>
+                    </EmptyContent>
                   ) : null}
-                </div>
+                </Empty>
               ) : (
                 <div className="space-y-1">
                   {todos.map(todo => (

@@ -61,7 +61,7 @@ export const CodingSessionSetupDialog = ({
       aria-modal="false"
       aria-labelledby="coding-session-setup-title"
     >
-      <div className="relative grid w-full max-w-md gap-4 rounded-xl border border-border bg-surface p-4 text-sm text-surface-foreground shadow-xl">
+      <div className="relative grid w-full max-w-md gap-4 rounded-xl border border-border bg-surface p-4 text-sm text-surface-foreground shadow-lg">
         <div className="flex flex-col gap-2 pr-8">
           <h2 id="coding-session-setup-title" className="text-base leading-none font-medium">
             {i18nService.t('codingSessionSetupTitle')}

@@ -1267,8 +1267,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     return (
       <div ref={promptRootRef} className="relative">
         {imageVisionHint && (
-          <div className="mb-2 flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
-            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <div className="mb-2 flex items-start gap-1.5 rounded-md border border-border bg-surface-raised px-2.5 py-1.5 text-xs text-muted-foreground">
+            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5 text-warning" />
             <span>{i18nService.t('imageVisionHint')}</span>
             <Button
               variant="ghost"

@@ -83,10 +83,10 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
           onMouseDown={event => event.stopPropagation()}
           onClick={event => event.stopPropagation()}
         >
-          <div className="max-w-[min(90vw,720px)] truncate rounded-full bg-black/35 px-3 py-1 text-center text-xs font-medium text-white/85 ring-1 ring-white/10">
+          <div className="max-w-[min(90vw,720px)] truncate rounded-full bg-surface-overlay/80 px-3 py-1 text-center text-xs font-medium text-foreground border border-border">
             {label}
           </div>
-          <div className="flex max-h-full max-w-[75vw] items-center justify-center rounded-xl bg-white/95 p-1 shadow-2xl ring-1 ring-white/15">
+          <div className="flex max-h-full max-w-[75vw] items-center justify-center rounded-xl bg-surface-overlay p-1 shadow-lg border border-border">
             <img
               src={image.src}
               alt={image.alt ?? label}
