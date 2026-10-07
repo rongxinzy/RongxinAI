@@ -1,68 +1,19 @@
-## Summary
+<!-- title: type(scope): summary，例如 fix(cowork): preserve session state -->
+<!-- 遵守根目录 DEVOPS.md；删除不适用的提示，不保留空占位符。 -->
 
-<!-- Provide a brief summary of the changes in this PR -->
+# PR 说明
 
-## Related Issue
+## 改动
 
-<!-- Link to the related issue(s) if applicable -->
+<!-- 哪个场景的行为发生变化，影响谁。 -->
 
-Fixes #(issue number)
+## 原因
 
-## Changes Made
+<!-- bug fix：触发条件、修复前行为、原因、修复后行为。已有 issue 才写 Fixes #123。 -->
 
-<!-- Describe the changes you've made -->
+## 验证
 
--
--
--
-
-## Type of Change
-
-<!-- Mark the relevant option with an [x] -->
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Code refactoring
-- [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Other (please describe):
-
-## Testing
-
-<!-- Describe the tests you've performed -->
-
-- [ ] Tested locally
-- [ ] Added new tests
-- [ ] Updated existing tests
-- [ ] Manual testing performed
-
-## Screenshots (if applicable)
-
-<!-- Add screenshots for UI changes -->
-
-## Checklist
-
-<!-- Mark the completed items with [x] -->
-
-- [ ] My code follows the project's style guidelines
-- [ ] I have performed a self-review of my code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-
-## Electron-Specific Changes
-
-<!-- If your PR includes Electron-specific changes, describe them here -->
-
-- [ ] Changes to main process (src/main/)
-- [ ] Changes to preload script (src/main/preload.ts)
-- [ ] Changes to IPC communication
-- [ ] Changes to window management
-- [ ] None
-
-## Additional Notes
-
-<!-- Any additional information that reviewers should know -->
+<!-- 实际命令/手工步骤与结果；回归测试或无法自动化的原因；未运行/阻塞项。 -->
+<!-- UI：按本仓设计规范附截图/录屏。协议/数据/发布：必要时说明兼容、迁移与回滚。 -->
+<!-- 合并前需一次正式 GitHub approval；独立 AI 可辅助 review，作者自审不替代 approval。 -->
+<!-- 加入知远数字员工平台 Project，填写实际负责人；已有 Issue 时互链，不重复创建台账。 -->
