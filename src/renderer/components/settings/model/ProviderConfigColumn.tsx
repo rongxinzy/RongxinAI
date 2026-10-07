@@ -541,21 +541,21 @@ export default function ProviderConfigColumn({
                       value="anthropic"
                       id={`${activeProvider}-apiFormat-anthropic`}
                     />
-                    <label
+                    <FieldLabel
                       htmlFor={`${activeProvider}-apiFormat-anthropic`}
-                      className="text-sm text-foreground"
+                      className="text-sm font-normal text-foreground"
                     >
                       {i18nService.t('apiFormatNative')}
-                    </label>
+                    </FieldLabel>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="openai" id={`${activeProvider}-apiFormat-openai`} />
-                    <label
+                    <FieldLabel
                       htmlFor={`${activeProvider}-apiFormat-openai`}
-                      className="text-sm text-foreground"
+                      className="text-sm font-normal text-foreground"
                     >
                       {i18nService.t('apiFormatOpenAI')}
-                    </label>
+                    </FieldLabel>
                   </div>
                 </RadioGroup>
               </div>

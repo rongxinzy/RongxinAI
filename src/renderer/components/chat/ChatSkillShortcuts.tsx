@@ -58,7 +58,7 @@ const ChatSkillShortcuts: React.FC = () => {
 
   return (
     <div className="mb-2">
-      <div className="theme-sidebar-section flex items-center">
+      <div className="theme-sidebar-section flex items-center min-w-0">
         <h2 className="min-w-0 truncate">{i18nService.t('chatQuickSkillsTitle')}</h2>
       </div>
       <div className="space-y-0.5">
