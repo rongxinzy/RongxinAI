@@ -68,8 +68,8 @@ job validation. Do not require conditional platform jobs directly.
 
 All PRs, including documentation, require one independent GitHub approval. New
 commits dismiss stale approvals; the latest push must be approved by another person.
-Resolve review threads before merging. These rules apply to administrators as well,
-with no role bypass, force pushes, or branch deletion. The former author-specific
+Resolve review threads before merging. Only repository administrators may bypass review through a pull request; other
+roles may not. CI, force-push and deletion rules have no administrator bypass. The former author-specific
 `author-review-gate` is replaced by these uniform server-side review requirements.
 
 See [DEVOPS.md](../DEVOPS.md) for PR titles, descriptions, bug-fix evidence and the
