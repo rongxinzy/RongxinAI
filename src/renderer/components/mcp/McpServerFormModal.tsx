@@ -434,6 +434,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                           size="icon"
                           onClick={() => handleRemoveEnvRow(index)}
                           className="shrink-0"
+                          aria-label={i18nService.t('delete')}
                         >
                           <Trash2 />
                         </Button>
@@ -496,6 +497,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                       size="icon"
                       onClick={() => handleRemoveHeaderRow(index)}
                       className="shrink-0"
+                      aria-label={i18nService.t('delete')}
                     >
                       <Trash2 />
                     </Button>
