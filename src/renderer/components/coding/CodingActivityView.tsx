@@ -139,7 +139,7 @@ const LocationChip = ({ location }: { location: CodingToolCallLocation }) => (
 const PLAN_STATUS_ICON: Record<string, ReactNode> = {
   pending: <Circle className="size-3.5 shrink-0 text-muted-foreground" />,
   in_progress: <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />,
-  completed: <CheckCircle2 className="size-3.5 shrink-0 text-green-600" />,
+  completed: <CheckCircle2 className="size-3.5 shrink-0 text-success" />,
 };
 
 const PLAN_PRIORITY_VARIANT: Record<string, 'destructive' | 'secondary' | 'outline'> = {

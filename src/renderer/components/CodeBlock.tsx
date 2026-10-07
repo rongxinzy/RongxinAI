@@ -857,7 +857,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
             <CodeBlockTooltip content={t('copyToClipboard')}>
               <HeaderButton onClick={handleCopy} ariaLabel={t('copyToClipboard')}>
                 {isCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
+                  <Check className="h-4 w-4 text-success" />
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
@@ -1349,11 +1349,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               className="theme-page-code-block-button-1 inline-flex items-center justify-center transform-gpu"
               aria-label={i18nService.t('copyToClipboard')}
             >
-              {isCopied ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {isCopied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
             </Button>
           </CodeBlockTooltip>
           <code className="block px-4 py-3 font-mono text-editor-foreground whitespace-pre">
@@ -1457,7 +1453,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
           <CodeBlockTooltip content={i18nService.t('saveToFile')}>
             <HeaderButton onClick={handleSave} ariaLabel={i18nService.t('saveToFile')}>
               {isSaved ? (
-                <Check className="h-4 w-4 text-green-500" />
+                <Check className="h-4 w-4 text-success" />
               ) : (
                 <Download className="h-4 w-4" />
               )}

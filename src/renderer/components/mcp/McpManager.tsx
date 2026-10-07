@@ -1142,6 +1142,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                               onClick={() => handleOpenEditForm(server)}
                               className="theme-page-mcp-manager-button-4"
                               title={i18nService.t('editMcpServer')}
+                              aria-label={i18nService.t('editMcpServer')}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -1152,6 +1153,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                               onClick={() => handleRequestDelete(server)}
                               className="theme-page-mcp-manager-button-5"
                               title={i18nService.t('deleteMcpServer')}
+                              aria-label={i18nService.t('deleteMcpServer')}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

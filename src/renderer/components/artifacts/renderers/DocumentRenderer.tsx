@@ -183,7 +183,7 @@ const DocxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div className="flex items-center justify-center h-full text-destructive text-sm p-4">
         {t('artifactDocumentError')}: {error}
       </div>
     );
@@ -361,7 +361,7 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div className="flex items-center justify-center h-full text-destructive text-sm p-4">
         {t('artifactDocumentError')}: {error}
       </div>
     );
@@ -589,7 +589,7 @@ const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div className="flex items-center justify-center h-full text-destructive text-sm p-4">
         {t('artifactDocumentError')}: {error}
       </div>
     );
