@@ -21,6 +21,7 @@ import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
+import { showAppErrorToast } from '../../services/toastNotification';
 import { quickActionService } from '../../services/quickAction';
 import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
 import { workspaceService } from '../../services/workspace';
@@ -823,11 +824,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   onUseNoFolder={async dir => {
                     const selected = await selectUnmanagedWorkingDirectory(dir);
                     if (!selected) {
-                      window.dispatchEvent(
-                        new CustomEvent('app:showToast', {
-                          detail: i18nService.t('projectCreateFailed'),
-                        }),
-                      );
+                      showAppErrorToast(i18nService.t('projectCreateFailed'));
                     }
                   }}
                   showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}

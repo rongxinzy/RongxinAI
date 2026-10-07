@@ -29,7 +29,7 @@ const Toast: React.FC<ToastProps> = ({ message, isError = false, isSuccess = fal
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-10000 w-fit max-w-[calc(100vw-2rem)] -translate-x-1/2">
       <div
-        className={`pointer-events-auto animate-fade-in-down rounded-lg border border-border px-4 py-3 shadow-xl ${toastClass}`}
+        className={`pointer-events-auto animate-fade-in-down rounded-lg border border-border px-4 py-3 shadow-lg ${toastClass}`}
       >
         <div className="flex items-center gap-3">
           <div

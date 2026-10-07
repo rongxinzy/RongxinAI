@@ -359,7 +359,7 @@ export function ModelInspectorSidebar({
       aria-hidden={!open}
       ref={sidebarRef}
       onTransitionEnd={handleTransitionEnd}
-      className="absolute inset-y-0 right-0 z-30 flex h-full overflow-hidden border-l border-border-subtle bg-surface shadow-xl transition-[width,transform] ease-(--ease-smooth)"
+      className="absolute inset-y-0 right-0 z-30 flex h-full overflow-hidden border-l border-border-subtle bg-surface shadow-lg transition-[width,transform] ease-(--ease-smooth)"
       style={{
         width: isClosing ? sidebarWidth : isEntered ? sidebarWidth : 0,
         transform: isClosing ? 'translateX(100%)' : 'translateX(0)',
