@@ -273,11 +273,14 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-2">
                 {COMPAT_BOOLEAN_FIELDS.map(field => (
-                  <label
+                  <Field
                     key={field.key}
-                    className="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground"
+                    orientation="horizontal"
+                    className="items-center justify-between gap-2"
                   >
-                    <span className="min-w-0 leading-tight">{i18nService.t(field.labelKey)}</span>
+                    <FieldLabel className="theme-control-caption-muted min-w-0 leading-tight">
+                      {i18nService.t(field.labelKey)}
+                    </FieldLabel>
                     <Select
                       value={booleanToSelectValue(value?.compat?.[field.key])}
                       onValueChange={nextValue =>
@@ -303,7 +306,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                  </label>
+                  </Field>
                 ))}
               </div>
 
