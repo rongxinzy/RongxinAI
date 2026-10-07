@@ -17,7 +17,12 @@ function validatePr(pr) {
   ) {
     errors.push('Title must use type(scope): summary with an English lowercase summary.');
   }
-  const body = (pr.body || '').replace(/<!--[\s\S]*?-->/g, '').replace(/\r/g, '');
+  let body = (pr.body || '').replace(/\r/g, '');
+  while (body.includes('<!--')) {
+    const start = body.indexOf('<!--');
+    const end = body.indexOf('-->', start + 4);
+    body = body.slice(0, start) + (end === -1 ? '' : body.slice(end + 3));
+  }
   const sections = [...body.matchAll(/^##\s+([^\n]+)\n([\s\S]*?)(?=^#{1,2}\s|$(?![\s\S]))/gm)];
   for (const names of [
     ['改动', 'What changed', 'Summary', 'Changes'],
@@ -43,6 +48,7 @@ function validatePr(pr) {
 }
 
 function globMatches(path, pattern) {
+  if (/[[\]+]/.test(pattern)) throw new Error(`Unsupported filter pattern: ${pattern}; update the gate matcher.`);
   let source = '^';
   for (let i = 0; i < pattern.length; i++) {
     const c = pattern[i];

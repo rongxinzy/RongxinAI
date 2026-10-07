@@ -70,6 +70,7 @@ test('paths match root Go files, exclusions and branch selection', () => {
   assert.equal(workflowApplies(workflow, ['cli/main.go'], 'main'), false);
   assert.equal(workflowApplies(workflow, ['internal/server.go'], 'master'), false);
   assert.equal(workflowApplies({ pathsIgnore: ['docs/**'] }, ['docs/a.md'], 'main'), false);
+  assert.throws(() => workflowApplies({ paths: ['src/[ab].js'] }, ['src/a.js'], 'main'), /Unsupported/);
 });
 test('only the actual Dependabot bot may use generated release notes', () => {
   const pr = {
