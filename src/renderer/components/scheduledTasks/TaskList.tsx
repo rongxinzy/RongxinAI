@@ -307,7 +307,8 @@ const TaskList: React.FC<TaskListProps> = ({
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {TASK_TEMPLATES.map(tpl => (
-                <div
+                <button
+                  type="button"
                   key={tpl.id}
                   onClick={() =>
                     onSelectTemplate({
@@ -321,7 +322,7 @@ const TaskList: React.FC<TaskListProps> = ({
                       ),
                     })
                   }
-                  className="group flex flex-col justify-between p-3 rounded-lg border border-border bg-card hover:bg-surface-raised cursor-pointer transition-colors"
+                  className="group flex flex-col justify-between p-3 rounded-lg border border-border bg-card hover:bg-surface-raised cursor-pointer text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="flex items-start gap-2.5 mb-2">
                     <div className="size-7 rounded-md bg-surface-raised flex items-center justify-center text-muted-foreground shrink-0 group-hover:text-foreground">
@@ -340,7 +341,7 @@ const TaskList: React.FC<TaskListProps> = ({
                     <CalendarClock className="size-3" />
                     {i18nService.t(tpl.scheduleLabelKey as Parameters<typeof i18nService.t>[0])}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>

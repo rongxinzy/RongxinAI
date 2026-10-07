@@ -138,7 +138,7 @@ export function MarketplaceDownloadSidebar({
       data-marketplace-download-sidebar
       className={cn(
         'flex h-full overflow-hidden bg-background transition-[width] ease-in-out',
-        isCompact ? 'absolute inset-y-0 right-0 z-30 shadow-xl' : 'relative shrink-0',
+        isCompact ? 'absolute inset-y-0 right-0 z-30 shadow-lg' : 'relative shrink-0',
       )}
       style={{
         width: visibleWidth,

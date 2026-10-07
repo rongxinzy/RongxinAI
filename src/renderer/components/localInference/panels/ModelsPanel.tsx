@@ -414,7 +414,7 @@ export function ModelsPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="theme-control-sizing-24 min-w-28 cursor-pointer transition-[background-color,border-color] duration-200 ease-out"
+                  className="min-w-28"
                   onClick={onOpenMarketplace}
                 >
                   {i18nService.t('localInferenceLocalModelsEmptyAction')}

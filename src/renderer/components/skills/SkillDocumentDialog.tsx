@@ -131,6 +131,17 @@ export function SkillDocumentDialog({
     };
   }, [skill.id, skill.prompt]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <div
       className="modal-backdrop absolute inset-0 z-20 flex items-center justify-center p-4"
@@ -138,7 +149,12 @@ export function SkillDocumentDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section className="flex h-[min(32rem,calc(100%-3rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={skill.displayName || skill.name}
+        className="flex h-[min(32rem,calc(100%-3rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
+      >
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-5">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="theme-scene-skill-document-avatar">
