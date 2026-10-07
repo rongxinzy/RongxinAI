@@ -484,7 +484,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <ChatSkillShortcuts />
                   </div>
                   {renderSearchControl(true)}
-                  <div className="theme-sidebar-section sticky top-0 z-30 flex items-center">
+                  <div className="theme-sidebar-section sticky top-0 z-30 flex items-center min-w-0">
                     <h2 className="min-w-0 truncate">{i18nService.t('chatRecentTitle')}</h2>
                   </div>
                   {!chatSessionsLoaded ? (

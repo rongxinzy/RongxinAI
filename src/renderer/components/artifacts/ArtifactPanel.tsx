@@ -472,6 +472,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   onClick={handleRefresh}
                   className="theme-action-icon-muted"
                   title={t('artifactRefresh')}
+                  aria-label={t('artifactRefresh')}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                 </Button>
@@ -483,6 +484,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   onClick={handleCopy}
                   className="theme-action-icon-muted"
                   title={t('artifactCopyCode')}
+                  aria-label={t('artifactCopyCode')}
                 >
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
@@ -494,6 +496,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   onClick={handleOpenInBrowser}
                   className="theme-action-icon-muted"
                   title={t('artifactOpenInBrowser')}
+                  aria-label={t('artifactOpenInBrowser')}
                 >
                   <Globe className="h-3.5 w-3.5" />
                 </Button>
@@ -505,6 +508,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   onClick={handleOpenWithApp}
                   className="theme-action-icon-muted"
                   title={t('artifactOpenWithApp')}
+                  aria-label={t('artifactOpenWithApp')}
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </Button>
@@ -516,6 +520,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   onClick={handleRevealInFolder}
                   className="theme-action-icon-muted"
                   title={t('artifactOpenFolder')}
+                  aria-label={t('artifactOpenFolder')}
                 >
                   <Folder className="h-3.5 w-3.5" />
                 </Button>
@@ -550,6 +555,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                     : 'theme-page-artifact-panel-button-variant-4'
                 }`}
                 title={t('artifactFileList')}
+                aria-label={t('artifactFileList')}
               >
                 <Files className="h-3.5 w-3.5" />
               </Button>
@@ -624,6 +630,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 size="icon"
                 onClick={handleClose}
                 className="theme-action-icon-muted"
+                title={t('close')}
+                aria-label={t('close')}
               >
                 <X className="h-3.5 w-3.5" />
               </Button>

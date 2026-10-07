@@ -171,7 +171,14 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
 
           <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon" className="shrink-0" />}
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  aria-label={i18nService.t('scheduledTasksActions')}
+                />
+              }
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
               <EllipsisVertical />
