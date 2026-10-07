@@ -48,7 +48,7 @@
 
 ### 组件与技能参考
 
-UI 实现前先查现成组件，并参考 `shadcn`、`ai-elements`、`rongxinai-ui-adapter` 的组件与项目适配规则；这些技能补充本文件，不替代本文件。
+UI 实现前先读 `.codex/skills/rongxinai-ui-adapter/SKILL.md`，按其入口查现成组件、token/recipe 和验证范围。当前环境可用的 `shadcn`、`ai-elements` 技能作为补充参考；不可用时以共享组件实际实现为准，不猜测技能内容或自动安装依赖。技能不替代本文件。
 
 - 基础控件使用 shadcn/ui，对话、思考、工具、消息、输入、附件、来源和终端使用 ai-elements，禁止重造已有组件。
 - 页面顶栏唯一使用 `src/renderer/components/PageHeader.tsx`；页面级标签使用 `PageTabs`，分段/筛选使用 `FluidTabs`，删除确认使用 `DestructiveConfirmDialog`。

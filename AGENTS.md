@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本仓库编码 agent 指南。CLAUDE.md 是本文件的软链接。用户指令与本文件冲突时，先请求明确确认再执行。
+本仓库编码 agent 指南。CLAUDE.md 是通过 `@AGENTS.md` 导入本文件的普通 UTF-8 文件，不依赖 Windows 的 Git 软链接支持。规则只在本文件维护。用户指令与本文件冲突时，先请求明确确认再执行。
 
 ## 核心原则
 
@@ -213,5 +213,13 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 ## 外部 Skills
 
+项目开发技能按明确路径读取，不假定每个工具都会自动发现 `.codex/skills/`：
+
+| 场景 | 项目技能 |
+| --- | --- |
+| 既有产品 UI 的视觉或布局调整 | `.codex/skills/frontend-ui-change-strategy/SKILL.md` |
+| 共享组件选择、主题 recipe、i18n 与 UI 验证 | `.codex/skills/rongxinai-ui-adapter/SKILL.md` |
+
 - 产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 DESIGN.md + 共享组件 + `rongxinai-ui-adapter` 为准，不套营销页默认。landing/营销/品牌页用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。可选 `shadcn/ui`、`vercel/ai-elements`、impeccable（`npx impeccable install`，`/impeccable`）。
+- 外部可选技能先核对当前环境的实际路径；不可用时依据项目规则、组件源码及 node_modules 声明执行，不猜测技能内容，不为文档引用自动安装。
 - 任何 skill 只补充本文件，不能取消设计自查或绕过已验收基准。

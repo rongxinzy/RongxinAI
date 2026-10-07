@@ -11,10 +11,13 @@ Use this skill for existing ZhiYuan Agent frontend pages and components. Follow 
 
 Use this skill as the project-specific entry point, then route to the optional visual skills by page type:
 
+Read `.codex/skills/rongxinai-ui-adapter/SKILL.md` for product component, recipe, i18n and verification routing. Its paths are relative to the repository root; it is a project skill, not a global installation requirement.
+
 - For Work, Chat, Settings, MCP, Skills, local inference, and other product surfaces, follow `DESIGN.md`, the shared UI components, and `rongxinai-ui-adapter`. The marketing-page rules in the taste skills are not global defaults.
 - For landing pages, marketing pages, portfolios, brand surfaces, or redesigns, read `design-taste-frontend` before forming the design read and scoped strategy.
 - When the brief explicitly requests premium visual treatment or complex motion, also read `high-end-visual-design` and use it as a reference for direction and choreography.
 - Both optional skills are advisory. Resolve conflicts in this order: `AGENTS.md` / `DESIGN.md`, project UI skills, `design-taste-frontend`, then `high-end-visual-design`.
+- Verify each referenced skill's actual path in the current environment. A documentation reference does not mean it is installed; when an optional skill is absent, follow the repository rules, shared component source and installed library declarations, and report the missing reference without inventing its instructions.
 - Do not install a font, icon library, animation library, or other dependency solely because an optional skill mentions it. Follow the repository's dependency approval rules.
 
 ## Required Workflow
@@ -51,7 +54,7 @@ Give a concrete patch strategy before implementation:
 - Prefer a one-file, minimal-diff adjustment when the target is local.
 - Reuse existing shadcn/ui or ai-elements components; do not create replacement buttons, selects, tabs, dialogs, or tooltips.
 - Preserve i18n, callbacks, state, IPC, pagination, and data flow unless the request explicitly changes behavior.
-- Use semantic theme tokens and existing Tailwind scale values. Avoid hardcoded colors, arbitrary spacing, and unrelated refactors.
+- Keep control appearance in the registered theme recipes and shared variant/size interfaces. Tailwind classes at call sites express layout relationships only; semantic color utilities and fixed control dimensions must not bypass recipes. Avoid hardcoded colors, arbitrary spacing, and unrelated refactors.
 - Account for responsive wrapping, focus-visible, disabled, hover, and dark-mode behavior.
 - State whether tests or visual verification should be added or run.
 
@@ -60,6 +63,8 @@ For ambiguous visual requests, present the recommended interpretation and briefl
 ### 4. Wait for Explicit Approval
 
 Stop after the strategy and wait for approval. Treat direct confirmations such as `批准`, `执行`, `实施`, `部署该修改`, `ok`, or `go ahead` as approval.
+
+Honor explicit approval already given for the same concrete strategy and scope; do not ask again solely because a new turn or tool call starts.
 
 Do not edit merely because the user described a target. Do not treat a request for analysis or strategy as approval.
 
@@ -81,7 +86,8 @@ Run the narrowest relevant verification first:
 
 - `git diff --check`
 - The co-located Vitest test for the changed component or module.
-- `npm run lint` and `npm run build` when the change is broad enough to justify them.
+- `npm run lint` after every code change, as required by AGENTS.md; run the build and other checks according to the affected scope. For documentation-only changes, check consistency and `git diff --check` without claiming rendered UI validation.
+- After token/recipe/generator changes, run `bun run theme:generate`. For shared theme contract or engine changes, also run renderer/shared tests, the production build and bundle-budget checks required by AGENTS.md.
 - For UI changes, inspect the affected flow manually or use the project's browser/dev server tooling when available. Check desktop and narrow layouts, light and dark themes, and focus/disabled states when relevant.
 
 Report passed checks and any verification that could not be run. Do not claim visual verification without actually performing it.
@@ -89,7 +95,7 @@ Report passed checks and any verification that could not be run. Do not claim vi
 ## ZhiYuan Agent UI Guardrails
 
 - Follow `DESIGN.md`: semantic tokens, system fonts, approved type scale and weights, standard spacing, 1px borders, restrained shadows, and short `opacity`/`transform` transitions.
-- Prefer `bg-background`, `bg-card`, `bg-muted`, `text-foreground`, `text-muted-foreground`, `border-border`, and project `--zy-*` tokens over literal colors.
+- Resolve colors, dimensions and visual states through registered theme recipes; semantic tokens are inputs to those recipes, not permission for call-site appearance overrides.
 - Prefer existing `FluidTabs`, shadcn `Select`, `Button`, `Card`, `Dialog`, `Tooltip`, and related components where already used by the page.
 - Use `cn()` for conditional classes and lucide-react for icons.
 - Keep the primary action visible; do not hide essential controls behind hover-only affordances.
