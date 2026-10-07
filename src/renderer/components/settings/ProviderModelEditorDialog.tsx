@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@shared/components/ui/field';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Input } from '@shared/components/ui/input';
 import { Tabs, TabsContent } from '@shared/components/ui/tabs';
@@ -114,15 +115,16 @@ export function ProviderModelEditorDialog({
             onValueChange={value => setTab(value as ModelEditorTab)}
           />
           <TabsContent value={ModelEditorTab.Basic} className="mt-0">
-            <div className="flex flex-col gap-3">
+            <FieldGroup className="gap-3">
               {isOllama ? (
                 <>
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    <span>
+                  <Field>
+                    <FieldLabel htmlFor="provider-ollama-model-id">
                       {i18nService.t('ollamaModelName')}
                       <span className="ml-0.5 text-destructive">*</span>
-                    </span>
+                    </FieldLabel>
                     <Input
+                      id="provider-ollama-model-id"
                       autoFocus
                       type="text"
                       value={draft.id}
@@ -130,26 +132,30 @@ export function ProviderModelEditorDialog({
                       onChange={event => updateModelId(event.target.value)}
                       placeholder={i18nService.t('ollamaModelNamePlaceholder')}
                     />
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    <span>{i18nService.t('ollamaDisplayName')}</span>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="provider-ollama-model-name">
+                      {i18nService.t('ollamaDisplayName')}
+                    </FieldLabel>
                     <Input
+                      id="provider-ollama-model-name"
                       type="text"
                       value={draft.name === draft.id ? '' : draft.name}
                       disabled={isLocalModel}
                       onChange={event => onDraftChange({ name: event.target.value || draft.id })}
                       placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
                     />
-                  </label>
+                  </Field>
                 </>
               ) : (
                 <>
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    <span>
+                  <Field>
+                    <FieldLabel htmlFor="provider-model-name">
                       {i18nService.t('modelName')}
                       <span className="ml-0.5 text-destructive">*</span>
-                    </span>
+                    </FieldLabel>
                     <Input
+                      id="provider-model-name"
                       autoFocus
                       type="text"
                       value={draft.name}
@@ -157,23 +163,24 @@ export function ProviderModelEditorDialog({
                       onChange={event => onDraftChange({ name: event.target.value })}
                       placeholder="GPT-4"
                     />
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    <span>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="provider-model-id">
                       {i18nService.t('modelId')}
                       <span className="ml-0.5 text-destructive">*</span>
-                    </span>
+                    </FieldLabel>
                     <Input
+                      id="provider-model-id"
                       type="text"
                       value={draft.id}
                       disabled={isLocalModel}
                       onChange={event => updateModelId(event.target.value)}
                       placeholder="gpt-4"
                     />
-                  </label>
+                  </Field>
                 </>
               )}
-            </div>
+            </FieldGroup>
           </TabsContent>
           <TabsContent value={ModelEditorTab.Capabilities} className="mt-0">
             <div className="flex flex-col gap-3">
