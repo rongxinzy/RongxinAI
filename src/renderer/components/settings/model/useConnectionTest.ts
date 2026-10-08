@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import {
   applyProviderModelConnectionTestResults,
@@ -63,6 +63,30 @@ export function useConnectionTest({
   setModelConnectionStatus,
   setProviderModelConnectionStatuses,
 }: UseConnectionTestParams) {
+  const providersRef = useRef(providers);
+  providersRef.current = providers;
+
+  const startConnectionTest = useCallback(
+    (provider: ProviderType, snapshot: ProviderConfig) => {
+      const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
+      modelConnectionTestRequestIdRef.current[provider] = requestId;
+      return () => {
+        const current = providersRef.current[provider];
+        return (
+          modelConnectionTestRequestIdRef.current[provider] === requestId &&
+          current !== undefined &&
+          current.apiKey === snapshot.apiKey &&
+          current.baseUrl === snapshot.baseUrl &&
+          current.apiFormat === snapshot.apiFormat &&
+          current.codingPlanEnabled === snapshot.codingPlanEnabled &&
+          current.authType === snapshot.authType &&
+          current.oauthAccessToken === snapshot.oauthAccessToken
+        );
+      };
+    },
+    [modelConnectionTestRequestIdRef],
+  );
+
   const showConnectionTestNotification = (
     result: { success: boolean; message: string },
     provider: ProviderType,
@@ -98,54 +122,68 @@ export function useConnectionTest({
       failureKind?: ProviderModelConnectionFailureKind;
     }>,
     signature: string,
+    isCurrent: () => boolean,
   ): Promise<void> => {
     if (provider === ProviderName.LlamaCpp) return;
+    await configService.updateConfig(currentConfig => {
+      if (!isCurrent()) return;
+      const currentProviderConfig = currentConfig.providers?.[provider];
+      if (!currentProviderConfig || !isProviderEnabled(provider, currentProviderConfig)) return;
 
-    const currentConfig = configService.getConfig();
-    const currentProviderConfig = currentConfig.providers?.[provider];
-    if (!currentProviderConfig || !isProviderEnabled(provider, currentProviderConfig)) return;
+      const testedProviderConfig = applyProviderModelConnectionTestResults(
+        currentProviderConfig,
+        outcomes,
+        signature,
+      );
+      if (testedProviderConfig === currentProviderConfig) return;
 
-    const testedProviderConfig = applyProviderModelConnectionTestResults(
-      currentProviderConfig,
-      outcomes,
-      signature,
-    );
-    if (testedProviderConfig === currentProviderConfig) return;
-
-    const nextProviders = {
-      ...(currentConfig.providers ?? {}),
-      [provider]: testedProviderConfig,
-    } as ProvidersConfig;
-    await configService.updateConfig({ providers: nextProviders });
+      const nextProviders = {
+        ...(currentConfig.providers ?? {}),
+        [provider]: testedProviderConfig,
+      } as ProvidersConfig;
+      return { providers: nextProviders };
+    });
   };
 
   const persistTestedProviderConfiguration = async (
     provider: ProviderType,
     providerConfig: ProviderConfig,
+    isCurrent: () => boolean,
   ): Promise<void> => {
     if (provider === ProviderName.LlamaCpp) return;
-
-    const apiFormat = getEffectiveApiFormat(provider, providerConfig.apiFormat);
-    const currentConfig = configService.getConfig();
-    const nextProviders = {
-      ...(currentConfig.providers ?? {}),
-      [provider]: {
-        ...providerConfig,
-        enabled: true,
-        apiFormat,
-        baseUrl: resolveBaseUrl(provider, providerConfig.baseUrl, apiFormat),
-      },
-    } as ProvidersConfig;
-    await configService.updateConfig({ providers: nextProviders });
+    await configService.updateConfig(currentConfig => {
+      if (!isCurrent()) return;
+      const current = providersRef.current[provider];
+      const testedById = new Map(providerConfig.models?.map(model => [model.id, model]));
+      const apiFormat = getEffectiveApiFormat(provider, providerConfig.apiFormat);
+      const nextProviders = {
+        ...(currentConfig.providers ?? {}),
+        [provider]: {
+          ...current,
+          models: current.models?.map(model => {
+            const tested = testedById.get(model.id);
+            return tested && tested.piRuntime?.api === model.piRuntime?.api
+              ? { ...model, connectionTest: tested.connectionTest }
+              : model;
+          }),
+          enabled: true,
+          apiFormat,
+          baseUrl: resolveBaseUrl(provider, providerConfig.baseUrl, apiFormat),
+        },
+      } as ProvidersConfig;
+      return { providers: nextProviders };
+    });
   };
 
   const completeSuccessfulConnectionTest = async (
     provider: ProviderType,
     providerConfig: ProviderConfig,
     model: Pick<NonNullable<ProviderConfig['models']>[number], 'id' | 'name'>,
+    isCurrent: () => boolean,
   ): Promise<void> => {
     try {
-      await persistTestedProviderConfiguration(provider, providerConfig);
+      await persistTestedProviderConfiguration(provider, providerConfig, isCurrent);
+      if (!isCurrent()) return;
       if (provider !== ProviderName.LlamaCpp) {
         enableProvider(provider);
       }
@@ -155,6 +193,7 @@ export function useConnectionTest({
         model,
       );
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('[Settings] failed to save tested provider configuration:', error);
       showConnectionTestNotification(
         { success: false, message: i18nService.t('failedToSaveSettings') },
@@ -168,6 +207,7 @@ export function useConnectionTest({
   const handleTestConnection = async (requestedModelId?: string) => {
     const testingProvider = activeProvider;
     const providerConfig = providers[testingProvider];
+    if (!providerConfig) return;
     const hasValidAuth = providerConfig.apiKey;
 
     if (providerRequiresApiKey(testingProvider) && !hasValidAuth) {
@@ -177,6 +217,10 @@ export function useConnectionTest({
       );
       return;
     }
+
+    // Allocate before any asynchronous work so configuration edits invalidate
+    // even a request still waiting for its signature or local-model lookup.
+    const isCurrent = startConnectionTest(testingProvider, providerConfig);
 
     const selectedModel = providerConfig.models?.find(
       model => model.id === (requestedModelId ?? selectedModelId),
@@ -189,6 +233,7 @@ export function useConnectionTest({
 
     if (testingProvider === ProviderName.LlamaCpp) {
       const runningModels = await window.electron.llamacpp.listRunningModels().catch(() => []);
+      if (!isCurrent()) return;
       const runningModelNames = runningModels
         .map(model => model.name?.trim() || model.model?.trim() || model.id?.trim() || '')
         .filter(Boolean);
@@ -242,8 +287,7 @@ export function useConnectionTest({
       apiFormat: testingApiFormat,
       provider: providerConfig,
     });
-    const requestId = (modelConnectionTestRequestIdRef.current[testingProvider] ?? 0) + 1;
-    modelConnectionTestRequestIdRef.current[testingProvider] = requestId;
+    if (!isCurrent()) return;
     const result = await testProviderModelConnection({
       providerId: testingProvider,
       provider: providerConfig,
@@ -251,37 +295,61 @@ export function useConnectionTest({
       apiFormat: testingApiFormat,
       model: firstModel,
     });
-    if (modelConnectionTestRequestIdRef.current[testingProvider] !== requestId) return;
+    if (!isCurrent()) return;
+
+    const currentProviderConfig = providersRef.current[testingProvider];
+    if (
+      testingProvider !== ProviderName.LlamaCpp &&
+      !currentProviderConfig.models?.some(
+        model => model.id === firstModel.id && model.piRuntime?.api === firstModel.piRuntime?.api,
+      )
+    )
+      return;
 
     setModelConnectionStatus(
       testingProvider,
       firstModel.id,
       result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
     );
+    const outcomes = [
+      {
+        modelId: firstModel.id,
+        success: result.success,
+        failureKind: result.success ? undefined : result.failureKind,
+      },
+    ];
+    const testedAt = Date.now();
     const testedProviderConfig = applyProviderModelConnectionTestResults(
-      providerConfig,
-      [
-        {
-          modelId: firstModel.id,
-          success: result.success,
-          failureKind: result.success ? undefined : result.failureKind,
-        },
-      ],
+      currentProviderConfig,
+      outcomes,
       connectionSignature,
+      testedAt,
     );
     setProviders(previous => ({
       ...previous,
-      [testingProvider]: testedProviderConfig,
+      [testingProvider]: applyProviderModelConnectionTestResults(
+        previous[testingProvider],
+        outcomes,
+        connectionSignature,
+        testedAt,
+      ),
     }));
 
     if (result.success) {
-      await completeSuccessfulConnectionTest(testingProvider, testedProviderConfig, firstModel);
+      await completeSuccessfulConnectionTest(
+        testingProvider,
+        testedProviderConfig,
+        firstModel,
+        isCurrent,
+      );
     } else {
       await persistProviderModelConnectionResults(
         testingProvider,
-        [{ modelId: firstModel.id, success: false }],
+        outcomes,
         connectionSignature,
+        isCurrent,
       );
+      if (!isCurrent()) return;
       showConnectionTestNotification(
         { success: false, message: result.message },
         testingProvider,
@@ -301,7 +369,8 @@ export function useConnectionTest({
       discoveredModels: readonly DiscoveredProviderModel[],
     ): Promise<void> => {
       const provider = providerId as ProviderType;
-      const providerConfig = providers[provider];
+      const providerConfig = providersRef.current[provider];
+      if (!providerConfig) return;
       // 自定义 provider 与 Ollama 的模型列表语义是镜像当前端点:端点不再返回、且非手动
       // 添加(origin "user")的条目随刷新移除,避免历史 URL 遗留的失效模型持续累积。
       // 内置 provider 的列表是官方目录加端点补充,保持只增不减的合并语义。
@@ -313,18 +382,15 @@ export function useConnectionTest({
         ...providerConfig,
         models: merged.models,
       };
-      const modelsToTest = merged.models.map(model => ({
-        id: model.id,
-        name: model.name,
-      }));
+      const modelsToTest = merged.models;
       // 一个模型都没发现时列表保持原样，也不必把已有模型再测一遍；空结果由调用方提示。
       if (discoveredModels.length === 0 || modelsToTest.length === 0) return;
-      const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
-      modelConnectionTestRequestIdRef.current[provider] = requestId;
+      const isCurrent = startConnectionTest(provider, providerConfig);
 
       if (provider === activeProvider && discoveredModels.length > 0) {
         setSelectedModelId(current => current || discoveredModels[0].id);
       }
+      providersRef.current = { ...providersRef.current, [provider]: nextProviderConfig };
       setProviders(current => ({
         ...current,
         [provider]: {
@@ -354,7 +420,7 @@ export function useConnectionTest({
       let progressTimer: number | null = null;
       if (shouldReportProviderModelConnectionTestProgress(modelsToTest.length)) {
         progressTimer = window.setInterval(() => {
-          if (modelConnectionTestRequestIdRef.current[provider] !== requestId) {
+          if (!isCurrent()) {
             if (progressTimer !== null) window.clearInterval(progressTimer);
             return;
           }
@@ -376,14 +442,23 @@ export function useConnectionTest({
           apiFormat: testingApiFormat,
           provider: nextProviderConfig,
         });
+        if (!isCurrent()) return;
         // 结果回来的节奏不可控（快速失败时会成批返回），按帧合并成一次状态更新，
         // 避免整张列表跟着每个模型重渲染一遍。
         const pendingConnectionStatuses: Record<string, ModelConnectionStatus> = {};
         let flushScheduled = false;
         const flushModelConnectionStatuses = () => {
           flushScheduled = false;
-          if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return;
-          mergeProviderModelConnectionStatuses(provider, { ...pendingConnectionStatuses });
+          if (!isCurrent()) return;
+          const currentModelIds = new Set(
+            providersRef.current[provider].models?.map(model => model.id),
+          );
+          mergeProviderModelConnectionStatuses(
+            provider,
+            Object.fromEntries(
+              Object.entries(pendingConnectionStatuses).filter(([id]) => currentModelIds.has(id)),
+            ),
+          );
         };
         const queueModelConnectionStatus = (modelId: string, status: ModelConnectionStatus) => {
           pendingConnectionStatuses[modelId] = status;
@@ -399,6 +474,7 @@ export function useConnectionTest({
           apiFormat: testingApiFormat,
           models: modelsToTest,
           onResult: ({ model, result }) => {
+            if (!isCurrent()) return;
             testedCount += 1;
             queueModelConnectionStatus(
               model.id,
@@ -406,40 +482,56 @@ export function useConnectionTest({
             );
           },
         });
-        if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return;
+        if (!isCurrent()) return;
 
-        const outcomes = results.map(({ model, result }) => ({
+        const currentProviderConfig = providersRef.current[provider];
+        const currentModels = new Map(
+          currentProviderConfig.models?.map(model => [model.id, model]),
+        );
+        const currentResults = results.filter(
+          ({ model }) =>
+            currentModels.has(model.id) &&
+            currentModels.get(model.id)?.piRuntime?.api === model.piRuntime?.api,
+        );
+        if (currentResults.length === 0) return;
+        const outcomes = currentResults.map(({ model, result }) => ({
           modelId: model.id,
           success: result.success,
           failureKind: result.success ? undefined : result.failureKind,
         }));
+        const testedAt = Date.now();
         const testedProviderConfig = applyProviderModelConnectionTestResults(
-          nextProviderConfig,
+          currentProviderConfig,
           outcomes,
           connectionSignature,
+          testedAt,
         );
         setProviders(current => ({
           ...current,
-          [provider]: {
-            ...current[provider],
-            models: testedProviderConfig.models,
-          },
+          [provider]: applyProviderModelConnectionTestResults(
+            current[provider],
+            outcomes,
+            connectionSignature,
+            testedAt,
+          ),
         }));
 
         const statuses = Object.fromEntries(
-          results.map(({ model, result }) => [
+          currentResults.map(({ model, result }) => [
             model.id,
             result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
           ]),
         );
         setProviderModelConnectionStatuses(provider, statuses);
 
-        const successCount = results.filter(({ result }) => result.success).length;
+        const successCount = currentResults.filter(({ result }) => result.success).length;
         if (successCount > 0) {
           try {
-            await persistTestedProviderConfiguration(provider, testedProviderConfig);
+            await persistTestedProviderConfiguration(provider, testedProviderConfig, isCurrent);
+            if (!isCurrent()) return;
             if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
           } catch (error) {
+            if (!isCurrent()) return;
             console.error('[Settings] failed to save auto-tested provider configuration:', error);
             showConnectionTestNotification(
               { success: false, message: i18nService.t('failedToSaveSettings') },
@@ -448,21 +540,27 @@ export function useConnectionTest({
             return;
           }
         } else {
-          await persistProviderModelConnectionResults(provider, outcomes, connectionSignature);
+          await persistProviderModelConnectionResults(
+            provider,
+            outcomes,
+            connectionSignature,
+            isCurrent,
+          );
         }
+        if (!isCurrent()) return;
 
         // 结果汇总在这里同步派发，且必须早于 finally 清掉 interval：App 的 Toast 宿主每收到
         // 一次 app:showToast 就覆盖文案并重置自动关闭计时器，所以最后留在屏幕上的是这条结果，
         // 进度提示会被原地替换而不是挂在顶部（调度上 finally 是 microtask，interval 是 macrotask，
         // 不可能插在两者之间多刷一条进度）。这条顺序由 modelConnectionTestToast.test.ts 锁住。
-        const firstFailed = results.find(({ result }) => !result.success);
+        const firstFailed = currentResults.find(({ result }) => !result.success);
         const firstFailureMessage =
           firstFailed && !firstFailed.result.success ? firstFailed.result.message : undefined;
 
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
             detail: buildProviderModelConnectionTestNotification({
-              total: results.length,
+              total: currentResults.length,
               successCount,
               firstFailureMessage,
             }),
@@ -470,6 +568,7 @@ export function useConnectionTest({
         );
       })()
         .catch(error => {
+          if (!isCurrent()) return;
           console.error('[Settings] provider model connection batch failed:', error);
           showConnectionTestNotification(
             { success: false, message: i18nService.t('modelConnectionTestBatchFailed') },
@@ -484,11 +583,10 @@ export function useConnectionTest({
       activeProvider,
       enableProvider,
       mergeProviderModelConnectionStatuses,
-      modelConnectionTestRequestIdRef,
-      providers,
       setProviderModelConnectionStatuses,
       setProviders,
       setSelectedModelId,
+      startConnectionTest,
     ],
   );
 

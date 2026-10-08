@@ -3,6 +3,9 @@ import {
   buildAnthropicMessagesUrl,
   ProviderModelConnectionFailureKind,
   resolveCodingPlanBaseUrl,
+  normalizeProviderBaseUrl,
+  ProviderModelPiApi,
+  type ProviderModelPiRuntimeConfig,
   type ProviderConfig,
 } from '../../shared/providers';
 import { ApiRequestPurpose } from '../../shared/ipc/apiRequest';
@@ -11,6 +14,7 @@ import { i18nService } from './i18n';
 export interface ProviderModelConnectionTarget {
   id: string;
   name: string;
+  piRuntime?: ProviderModelPiRuntimeConfig;
 }
 
 export interface ProviderModelConnectionTestInput {
@@ -114,11 +118,12 @@ function classifyConnectionFailure(
   status?: number,
   message = '',
 ): ProviderModelConnectionFailureKind {
+  // Kimi Coding reports its concurrency quota as HTTP 403, not 429.
+  if (status === 429 || (status === 403 && /concurrent request limit/i.test(message))) {
+    return ProviderModelConnectionFailureKind.RateLimit;
+  }
   if (status === 401 || status === 403) {
     return ProviderModelConnectionFailureKind.Auth;
-  }
-  if (status === 429) {
-    return ProviderModelConnectionFailureKind.RateLimit;
   }
   if (status !== undefined && status >= 500) {
     return ProviderModelConnectionFailureKind.Server;
@@ -173,8 +178,14 @@ export async function testProviderModelConnection(
           input.apiFormat,
           input.baseUrl,
         );
-  const baseUrl = resolved.baseUrl.trim().replace(/\/+$/, '');
-  const apiFormat = resolved.effectiveFormat;
+  const baseUrl = normalizeProviderBaseUrl(input.providerId, resolved.baseUrl);
+  const configuredApi = input.model.piRuntime?.api;
+  const apiFormat =
+    configuredApi === ProviderModelPiApi.AnthropicMessages
+      ? ApiFormat.Anthropic
+      : configuredApi
+        ? ApiFormat.OpenAI
+        : resolved.effectiveFormat;
   const apiKey = input.provider.apiKey;
 
   try {
@@ -216,7 +227,9 @@ export async function testProviderModelConnection(
       return getProviderModelConnectionTestResult(response);
     }
 
-    const useResponsesApi = input.providerId === 'openai';
+    const useResponsesApi = configuredApi
+      ? configuredApi === ProviderModelPiApi.OpenAIResponses
+      : input.providerId === 'openai';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     if (input.providerId === 'github-copilot') {
@@ -273,6 +286,34 @@ export interface ProviderModelConnectionTestEntry {
 
 export const PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY = 4;
 
+function getConnectionTestConcurrency(
+  input: Omit<ProviderModelConnectionTestInput, 'model'>,
+): number {
+  const baseUrl =
+    input.apiFormat === ApiFormat.Gemini
+      ? input.baseUrl
+      : resolveCodingPlanBaseUrl(
+          input.providerId,
+          input.provider.codingPlanEnabled === true,
+          input.apiFormat,
+          input.baseUrl,
+        ).baseUrl;
+  try {
+    const endpoint = new URL(baseUrl);
+    if (
+      (endpoint.hostname === 'api.kimi.com' || endpoint.hostname === 'api.kimi.ai') &&
+      /^\/coding(?:\/|$)/.test(endpoint.pathname)
+    ) {
+      // Some subscriptions allow only one request. Parallel probes would mark
+      // usable models as failed and hide them from the conversation picker.
+      return 1;
+    }
+  } catch {
+    // The individual request reports an invalid endpoint through the normal result path.
+  }
+  return PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY;
+}
+
 export async function testProviderModelsConcurrently(
   input: Omit<ProviderModelConnectionTestInput, 'model'> & {
     models: readonly ProviderModelConnectionTarget[];
@@ -305,9 +346,8 @@ export async function testProviderModelsConcurrently(
   };
 
   await Promise.all(
-    Array.from(
-      { length: Math.min(PROVIDER_MODEL_CONNECTION_TEST_CONCURRENCY, models.length) },
-      () => runWorker(),
+    Array.from({ length: Math.min(getConnectionTestConcurrency(testInput), models.length) }, () =>
+      runWorker(),
     ),
   );
 

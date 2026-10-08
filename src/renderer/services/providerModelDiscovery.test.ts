@@ -19,6 +19,7 @@ describe('mergeDiscoveredProviderModels', () => {
       {
         id: 'model-a',
         name: 'Custom A',
+        origin: ProviderModelOrigin.Discovered,
         supportsImage: true,
         contextWindow: 128_000,
       },
@@ -31,7 +32,10 @@ describe('mergeDiscoveredProviderModels', () => {
     ]);
 
     expect(result).toEqual({
-      models: [...existing, { id: 'model-b', name: 'Remote B' }],
+      models: [
+        ...existing,
+        { id: 'model-b', name: 'Remote B', origin: ProviderModelOrigin.Discovered },
+      ],
       addedCount: 1,
       removedCount: 0,
       changed: true,
@@ -41,7 +45,7 @@ describe('mergeDiscoveredProviderModels', () => {
 
   test('merges against the latest draft after concurrent manual edits', () => {
     const latestDraft = [
-      { id: 'model-a', name: 'Renamed while loading' },
+      { id: 'model-a', name: 'Renamed while loading', origin: ProviderModelOrigin.User },
       { id: 'manual-model', name: 'Added while loading' },
     ];
 
@@ -50,7 +54,10 @@ describe('mergeDiscoveredProviderModels', () => {
         { id: 'model-a', displayName: 'Remote A' },
         { id: 'model-b', displayName: 'Remote B' },
       ]).models,
-    ).toEqual([...latestDraft, { id: 'model-b', name: 'Remote B' }]);
+    ).toEqual([
+      ...latestDraft,
+      { id: 'model-b', name: 'Remote B', origin: ProviderModelOrigin.Discovered },
+    ]);
   });
 
   test('updates an existing context length from explicit discovery metadata', () => {
@@ -82,6 +89,7 @@ describe('mergeDiscoveredProviderModels', () => {
         name: 'Model A',
         contextWindow: 32768,
         maxTokens: 4096,
+        origin: ProviderModelOrigin.Discovered,
         supportsImage: true,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unsupported,
@@ -116,6 +124,7 @@ describe('mergeDiscoveredProviderModels', () => {
         id: 'qwen3-vl',
         name: 'Qwen3 VL',
         supportsImage: false,
+        origin: ProviderModelOrigin.Discovered,
         capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
       },
     ]);
@@ -127,6 +136,7 @@ describe('mergeDiscoveredProviderModels', () => {
         id: 'qwen3-vl',
         name: 'Qwen3 VL',
         supportsImage: true,
+        origin: ProviderModelOrigin.Discovered,
         capabilities: { imageInput: ModelCapabilityStatus.Supported },
       },
     ];
@@ -197,7 +207,10 @@ describe('mergeDiscoveredProviderModels', () => {
     );
 
     expect(result).toEqual({
-      models: [existing[0], { id: 'model-b', name: 'Remote B' }],
+      models: [
+        { ...existing[0], origin: ProviderModelOrigin.Discovered },
+        { id: 'model-b', name: 'Remote B', origin: ProviderModelOrigin.Discovered },
+      ],
       addedCount: 1,
       removedCount: 2,
       changed: true,
@@ -251,6 +264,7 @@ describe('mergeDiscoveredProviderModels', () => {
         name: 'Model A',
         contextWindow: 32768,
         supportsImage: true,
+        origin: ProviderModelOrigin.Discovered,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unsupported,
           imageInput: ModelCapabilityStatus.Supported,

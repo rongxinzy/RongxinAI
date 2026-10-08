@@ -4,6 +4,7 @@ import { ProviderModelPiApi, ProviderName } from '../../../shared/providers';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
 import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
 import type { ApiConfigResolution } from '../claudeSettings';
+import type { PiModelApi } from './piModelApi';
 import {
   registerPiOpenAICompatTokenRefresher,
   registerPiOpenAICompatUpstream,
@@ -24,7 +25,7 @@ export interface PiManagedProviderLookup {
 
 export function shouldUsePiOpenAICompatProxy(
   resolution: ApiConfigResolution,
-  api: ProviderModelPiApi,
+  api: PiModelApi,
 ): boolean {
   const providerName = resolution.providerMetadata?.providerName ?? '';
   return (
@@ -46,7 +47,7 @@ export function shouldUsePiOpenAICompatProxy(
  */
 function shouldUsePiManagedAnthropicProxy(
   resolution: ApiConfigResolution,
-  api: ProviderModelPiApi,
+  api: PiModelApi,
   managedProviders: PiManagedProviderLookup,
 ): boolean {
   const providerName = resolution.providerMetadata?.providerName ?? '';
@@ -59,7 +60,7 @@ function shouldUsePiManagedAnthropicProxy(
 
 export async function resolvePiCustomModelBaseUrl(
   resolution: ApiConfigResolution,
-  api: ProviderModelPiApi,
+  api: PiModelApi,
   managedProviders: PiManagedProviderLookup = zhiyuanManagedProviderBridge,
 ): Promise<string> {
   const config = resolution.config;

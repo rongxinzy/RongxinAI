@@ -71,7 +71,6 @@ import {
   type ModelCapabilities,
   ModelCapabilityStatus,
   ProviderName,
-  ProviderModelPiApi,
   type ProviderModelPiCompaction,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
@@ -157,6 +156,7 @@ import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool, PiCadViewerService } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { resolvePiBuiltinProviderId } from './piProviderIds';
+import { resolvePiCustomModelApi } from './piModelApi';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
@@ -4326,14 +4326,6 @@ const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
 interface ModelPoolRequestContext {
   conversationId: string;
   workload: ZhiyuanModelPoolWorkloadValue;
-}
-
-function resolvePiCustomModelApi(resolution: ApiConfigResolution): ProviderModelPiApi {
-  const configuredApi = resolution.providerMetadata?.piRuntime?.api;
-  if (configuredApi) return configuredApi;
-  return resolution.config?.apiType === 'anthropic'
-    ? ProviderModelPiApi.AnthropicMessages
-    : ProviderModelPiApi.OpenAICompletions;
 }
 
 function hasRecordEntries(value: unknown): value is Record<string, unknown> {

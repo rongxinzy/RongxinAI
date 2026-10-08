@@ -1,4 +1,5 @@
 export { resolveCodingPlanBaseUrl } from './codingPlan';
+export { resolveConfiguredProviderModels } from './configuredModels';
 export {
   applyProviderModelConnectionTestResults,
   createProviderConnectionTestSignature,
@@ -7,7 +8,7 @@ export {
   ProviderModelConnectionTestStatus,
 } from './connectionTest';
 export type { ProviderModelConnectionTest } from './connectionTest';
-export { buildAnthropicMessagesUrl } from './apiUrl';
+export { buildAnthropicMessagesUrl, normalizeProviderBaseUrl } from './apiUrl';
 export * from './modelDiscovery';
 export type { ModelCapabilities, ProviderDef, ProviderModelDefinition } from './constants';
 export {

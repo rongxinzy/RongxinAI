@@ -3,6 +3,7 @@ import {
   ModelCapabilityStatus,
   type ModelCapabilities,
   ProviderRegistry,
+  ProviderName,
 } from './constants';
 import type { ProviderConfig } from './types';
 import { resolveCodingPlanBaseUrl } from './codingPlan';
@@ -208,7 +209,7 @@ export function resolveModelEndpoint(
   // ProviderRegistry owns both per-model metadata and the verified capability
   // fact tables. Keep it as the catalog layer, then apply runtime evidence and
   // explicit user overrides in the documented priority order.
-  const catalogCapabilities = ProviderRegistry.resolveModelCapabilities(
+  let catalogCapabilities = ProviderRegistry.resolveModelCapabilities(
     normalizedProviderId,
     requestedModelId,
     protocol,
@@ -219,6 +220,11 @@ export function resolveModelEndpoint(
           ...(userModel?.capabilities ? { capabilities: userModel.capabilities } : {}),
         },
   );
+  // The Coding Plan endpoint supports tools independently of the general
+  // Moonshot Anthropic endpoint. This also applies to newly discovered models.
+  if (codingPlanEnabled && normalizedProviderId === ProviderName.Moonshot) {
+    catalogCapabilities = { ...catalogCapabilities, toolCalling: ModelCapabilityStatus.Supported };
+  }
   // Re-expanding the raw user capabilities would let the configured
   // "unknown" residue (DEFAULT_CUSTOM_MODEL_CAPABILITIES) clobber the
   // resolver's verdict. Only explicit supported/unsupported is user intent
@@ -240,7 +246,10 @@ export function resolveModelEndpoint(
   // capability derives to false). Only a positively checked toggle is a
   // verdict here; a derived false must not overwrite an unknown
   // capability that the resolver preserved.
-  if (userSupportsImage === true) {
+  if (
+    userSupportsImage === true &&
+    explicitUserCapabilities.imageInput !== ModelCapabilityStatus.Unsupported
+  ) {
     capabilities.imageInput = ModelCapabilityStatus.Supported;
   }
   const explicitApiKey = options.apiKey ?? providerConfig?.apiKey;

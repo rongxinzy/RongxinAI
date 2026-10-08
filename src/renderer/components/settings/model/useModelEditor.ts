@@ -122,13 +122,11 @@ export function useModelEditor({ providers, setProviders, activeProvider }: UseM
     if (!pendingDeleteModel || !providers[activeProvider].models) return;
     const modelId = pendingDeleteModel.id;
 
-    const updatedModels = providers[activeProvider].models.filter(model => model.id !== modelId);
-
     setProviders(prev => ({
       ...prev,
       [activeProvider]: {
         ...prev[activeProvider],
-        models: updatedModels,
+        models: prev[activeProvider].models?.filter(model => model.id !== modelId),
       },
     }));
     setPendingDeleteModel(null);
@@ -211,16 +209,24 @@ export function useModelEditor({ providers, setProviders, activeProvider }: UseM
         ? { piRuntime: newModelPiRuntime }
         : {}),
     };
-    const updatedModels =
-      isEditingModel && editingModelId
-        ? currentModels.map(model => (model.id === editingModelId ? nextModel : model))
-        : [...currentModels, nextModel];
-
     setProviders(prev => ({
       ...prev,
       [activeProvider]: {
         ...prev[activeProvider],
-        models: updatedModels,
+        models:
+          isEditingModel && editingModelId
+            ? (prev[activeProvider].models ?? []).map(model =>
+                model.id === editingModelId
+                  ? {
+                      ...nextModel,
+                      // Labels and capacity edits do not change the tested model.
+                      ...(model.id === modelId && model.piRuntime?.api === nextModel.piRuntime?.api
+                        ? { connectionTest: model.connectionTest }
+                        : {}),
+                    }
+                  : model,
+              )
+            : [...(prev[activeProvider].models ?? []), nextModel],
       },
     }));
 
