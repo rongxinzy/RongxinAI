@@ -157,6 +157,8 @@ const App: React.FC = () => {
     readyFileHash: null,
     errorMessage: null,
     lastCheckedAt: null,
+    failureStage: null,
+    lastInstallResult: null,
   });
   const [enterpriseConfig, setEnterpriseConfig] = useState<{
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
@@ -708,30 +710,9 @@ const App: React.FC = () => {
 
   const updateInfo = appUpdateState.info;
 
-  const handleUpdateAction = useCallback(async () => {
-    if (appUpdateState.status === AppUpdateStatus.Ready && appUpdateState.readyFilePath) {
-      const installResult = await window.electron.appUpdate.installReady();
-      if (!installResult.success) {
-        showToast(installResult.error || i18nService.t('updateInstallFailed'));
-      }
-      return;
-    }
-    if (appUpdateState.status === AppUpdateStatus.Error) {
-      await window.electron.appUpdate.retryDownload();
-      return;
-    }
-    if (
-      appUpdateState.status === AppUpdateStatus.Available &&
-      appUpdateState.info?.manualDownloadOnly
-    ) {
-      await window.electron.appUpdate.retryDownload();
-    }
-  }, [
-    appUpdateState.info?.manualDownloadOnly,
-    appUpdateState.readyFilePath,
-    appUpdateState.status,
-    showToast,
-  ]);
+  const handleUpdateAction = useCallback(() => {
+    handleShowSettings({ initialTab: 'about' });
+  }, [handleShowSettings]);
 
   const handlePermissionResponse = useCallback(
     async (result: CoworkPermissionResult) => {

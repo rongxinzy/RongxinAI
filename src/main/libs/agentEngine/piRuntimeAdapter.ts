@@ -2303,6 +2303,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return Boolean(active && active.isRunning && !active.aborted);
   }
 
+  hasRunningSessions(): boolean {
+    return (
+      this.initializingSessions.size > 0 ||
+      [...this.activeSessions.values()].some(session => session.isRunning && !session.aborted)
+    );
+  }
+
   respondToCodingElicitation(requestId: string, answer: string): boolean {
     const normalized = answer.trim();
     if (!normalized) return false;
