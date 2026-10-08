@@ -25,6 +25,8 @@ export interface ResolvedModelEndpoint {
   displayName: string;
   protocol: 'openai' | 'anthropic' | 'gemini';
   baseUrl: string;
+  /** Per-model endpoint override recorded on the model entry; does not affect baseUrl resolution. */
+  modelBaseUrl?: string;
   apiKey?: string;
   capabilities: ModelCapabilities;
   contextWindow?: number;
@@ -255,6 +257,7 @@ export function resolveModelEndpoint(
     displayName: userModel?.name?.trim() || catalogModel?.name || requestedModelId,
     protocol,
     baseUrl,
+    ...(userModel?.baseUrl ? { modelBaseUrl: userModel.baseUrl } : {}),
     ...(explicitApiKey?.trim() ? { apiKey: explicitApiKey.trim() } : {}),
     capabilities,
     ...(contextWindow ? { contextWindow } : {}),
