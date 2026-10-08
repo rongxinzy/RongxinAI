@@ -65,6 +65,7 @@ fs.rmSync(readyPath, { force: true });
 await build(createBuildOptions('src/main/preload.ts'));
 await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
+await build(createBuildOptions('src/main/libs/appUpdateHashWorker.ts'));
 await build(
   createBuildOptions('src/main/main.ts', {
     output: {

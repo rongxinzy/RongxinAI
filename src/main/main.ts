@@ -7060,6 +7060,13 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(AppUpdateIpc.InstallReady, async () => {
+    if (piRuntimeAdapter?.hasRunningSessions()) {
+      return {
+        success: false,
+        state: getAppUpdateCoordinator().getState(),
+        error: t('update.activeTask'),
+      };
+    }
     return getAppUpdateCoordinator().installReadyUpdate();
   });
 

@@ -154,6 +154,19 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                // Hash large update payloads without blocking Electron's main process.
+                entry: 'src/main/libs/appUpdateHashWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {

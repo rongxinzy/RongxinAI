@@ -12,6 +12,15 @@ export const AppUpdateStatus = {
 
 export type AppUpdateStatus = (typeof AppUpdateStatus)[keyof typeof AppUpdateStatus];
 
+export const AppUpdateFailureStage = {
+  Check: 'check',
+  Download: 'download',
+  Verify: 'verify',
+  Install: 'install',
+} as const;
+export type AppUpdateFailureStage =
+  (typeof AppUpdateFailureStage)[keyof typeof AppUpdateFailureStage];
+
 export const AppUpdateSource = {
   Auto: 'auto',
   Manual: 'manual',
@@ -38,6 +47,20 @@ export interface AppUpdateDownloadProgress {
   speed: number | undefined;
 }
 
+export const AppUpdateInstallOutcome = {
+  Pending: 'pending',
+  Succeeded: 'succeeded',
+  Failed: 'failed',
+} as const;
+export type AppUpdateInstallOutcome =
+  (typeof AppUpdateInstallOutcome)[keyof typeof AppUpdateInstallOutcome];
+export interface AppUpdateInstallResult {
+  outcome: AppUpdateInstallOutcome;
+  targetVersion: string;
+  detail: string | null;
+  recordedAt: number;
+}
+
 export interface AppUpdateInfo {
   latestVersion: string;
   url: string;
@@ -62,6 +85,8 @@ export interface AppUpdateRuntimeState {
   readyFilePath: string | null;
   readyFileHash: string | null;
   errorMessage: string | null;
+  failureStage: AppUpdateFailureStage | null;
+  lastInstallResult: AppUpdateInstallResult | null;
 }
 
 export interface AppUpdateCheckResult {
