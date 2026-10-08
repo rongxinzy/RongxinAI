@@ -14,7 +14,6 @@ import {
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
-  WorkbenchOutputMode,
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
   WorkbenchRunStatus,
@@ -22,7 +21,6 @@ import {
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
 import { initializeWorkbenchTaskSchema } from './schema';
-import { setWorkbenchOutputRequirements } from './outputContract';
 import { WorkbenchTaskService } from './taskService';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import type { WorkbenchTaskServiceOptions } from './taskService';
@@ -173,7 +171,6 @@ test('rejects completion when deterministic domain verification fails', async ()
   try {
     const contract = {
       kind: WorkbenchContractKind.Shortcut,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
     const { run } = service.beginRun({
@@ -204,7 +201,6 @@ test('keeps acceptance-required work pending until explicit user acceptance', as
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -240,7 +236,6 @@ test('user acceptance promotes pending workspace artifacts to verified', async (
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -293,7 +288,6 @@ test('baseline pass without the production workflow requires acceptance when art
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
     const { task, run } = service.beginRun({
@@ -356,7 +350,6 @@ test('baseline pass without artifacts completes without acceptance', async () =>
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: false,
     };
     const { run } = service.beginRun({
@@ -388,7 +381,6 @@ test('user acceptance dispatches the verified-run memory promotion', async () =>
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -454,7 +446,6 @@ test('lightweight inspected artifacts enter pending and are elevated by acceptan
   try {
     const contract = {
       kind: WorkbenchContractKind.GenericWork,
-      outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
       requiresUserAcceptance: true,
     };
     const { task, run } = service.beginRun({
@@ -529,7 +520,6 @@ test('supersedes a paused task instead of reusing its contract', async () => {
       goal: 'create a presentation',
       contract: {
         kind: WorkbenchContractKind.Shortcut,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: false,
       },
     });
@@ -550,7 +540,6 @@ test('supersedes a paused task instead of reusing its contract', async () => {
       goal: 'hello',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -655,7 +644,6 @@ test('successful side effects are not authorized twice', async () => {
       goal: 'write',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -685,7 +673,6 @@ test('pending, denied, and failed side effects cannot be authorized again', asyn
       goal: 'write',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -1033,7 +1020,6 @@ test('startup recovery marks executing effects and their runs for review', async
       goal: 'write',
       contract: {
         kind: WorkbenchContractKind.GenericWork,
-        outputRequirements: [{ mode: WorkbenchOutputMode.Text, formats: [] }],
         requiresUserAcceptance: true,
       },
     });
@@ -1133,143 +1119,6 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
     expect(nextCompleted.artifacts).toHaveLength(0);
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
-    db.close();
-  }
-});
-
-test('a work run can look around and commit a text contract', async () => {
-  const { db, service } = createService();
-  try {
-    const { run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'sort the downloaded files into folders',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: false,
-        outputRequirements: [],
-      },
-    });
-    const authorize = (toolCallId: string, command: string) =>
-      service.authorizeToolCall({
-        sessionId: 'session',
-        runId: run.id,
-        toolCallId,
-        toolName: 'bash',
-        toolInput: { command },
-        approvalMode: WorkbenchApprovalMode.AllowAll,
-      });
-
-    // Looking around must not require the contract.
-    expect(await authorize('peek', 'ls -lt | head -20')).toEqual({ allow: true });
-
-    // The contract shape a model submits for a written answer is accepted.
-    setWorkbenchOutputRequirements(service.repository, 'session', run.id, [
-      { mode: WorkbenchOutputMode.Text, formats: ['markdown'] },
-    ]);
-    expect(await authorize('work', 'python move_files.py')).toEqual({ allow: true });
-    const committed = service.getDetail(service.getCurrent('session')!.task.id);
-    expect(committed?.task.contract.outputRequirements).toEqual([
-      { mode: WorkbenchOutputMode.Text, formats: [] },
-    ]);
-  } finally {
-    db.close();
-  }
-});
-
-test('the contract gate explains the previous failure and forces a correction at the ceiling', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'sort the downloaded files into folders',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: false,
-        outputRequirements: [],
-      },
-    });
-    const authorize = (toolCallId: string) =>
-      service.authorizeToolCall({
-        sessionId: 'session',
-        runId: run.id,
-        toolCallId,
-        toolName: 'bash',
-        toolInput: { command: 'python move_files.py' },
-        approvalMode: WorkbenchApprovalMode.AllowAll,
-      });
-
-    const first = await authorize('call-1');
-    expect(first.allow).toBe(false);
-    expect(first.reason).toContain('call set_task_output');
-
-    // A model that already tried to commit learns why the attempt failed.
-    service.recordOutputContractFailure(run.id, 'Text output does not take file formats.');
-    const second = await authorize('call-2');
-    expect(second.reason).toContain('Text output does not take file formats.');
-
-    await authorize('call-3');
-    const fourth = await authorize('call-4');
-    // The first ceiling hit asks the runtime to force a set_task_output
-    // correction instead of killing the run.
-    expect(fourth.allow).toBe(false);
-    expect(fourth.forceContractCorrection).toBe(true);
-    expect(fourth.terminateRun).toBeUndefined();
-    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Running);
-  } finally {
-    db.close();
-  }
-});
-
-test('the contract gate stops a spinning run only after the correction grace is spent', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'sort the downloaded files into folders',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: false,
-        outputRequirements: [],
-      },
-    });
-    const authorize = (toolCallId: string) =>
-      service.authorizeToolCall({
-        sessionId: 'session',
-        runId: run.id,
-        toolCallId,
-        toolName: 'bash',
-        toolInput: { command: 'python move_files.py' },
-        approvalMode: WorkbenchApprovalMode.AllowAll,
-      });
-
-    await authorize('call-1');
-    await authorize('call-2');
-    await authorize('call-3');
-    const fourth = await authorize('call-4');
-    expect(fourth.forceContractCorrection).toBe(true);
-
-    // The runtime grants the grace exactly once per run.
-    expect(service.grantOutputContractCorrectionGrace(run.id)).toBe(true);
-    expect(service.grantOutputContractCorrectionGrace(run.id)).toBe(false);
-
-    // The grace window tolerates further denials without stopping the run.
-    const fifth = await authorize('call-5');
-    expect(fifth.allow).toBe(false);
-    expect(fifth.terminateRun).toBeUndefined();
-    expect(fifth.forceContractCorrection).toBeUndefined();
-    const sixth = await authorize('call-6');
-    expect(sixth.terminateRun).toBeUndefined();
-    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Running);
-
-    // With the grace spent, the breaker fails the run and tells the runtime to
-    // end the turn instead of flipping only the database status.
-    const seventh = await authorize('call-7');
-    expect(seventh.terminateRun).toBe(true);
-    expect(service.repository.getTask(task.id)?.status).toBe(WorkbenchTaskStatus.Failed);
-    const afterFailure = await authorize('call-8');
-    expect(afterFailure.terminateRun).toBe(true);
-    expect(afterFailure.reason).toContain('does not belong to the active run');
-  } finally {
     db.close();
   }
 });

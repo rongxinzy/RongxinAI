@@ -276,7 +276,6 @@ test('marks only pending final deliverables of a run as verified', () => {
 
     const changes = repository.markArtifactsVerified(
       run.id,
-      task.contract,
       repository.getDetail(task.id)!.artifacts,
     );
 

@@ -45,7 +45,11 @@ import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
 import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
 import PageHeader from '../PageHeader';
 import { PageTabs } from '@shared/components/ui/page-tabs';
-import { LocalInferenceToastView } from './components/Common';
+import {
+  showAppErrorToast,
+  showAppInfoToast,
+  showAppSuccessToast,
+} from '../../services/toastNotification';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { ModelInspectorSidebar, ModelInspectorTab } from './components/ModelInspectorSidebar';
@@ -55,7 +59,6 @@ import { RuntimeInstallCard } from './components/RuntimeInstallCard';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
   MARKETPLACE_PREFETCH_PAGE_COUNT,
-  LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS,
   LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
@@ -73,7 +76,6 @@ import type {
   InstallProgressState,
   LocalInferenceSessionState,
   LocalInferenceTab,
-  LocalInferenceToast,
   LocalInferenceToastKind as LocalInferenceToastKindType,
 } from './types';
 import { LocalInferenceToastKind } from './types';
@@ -204,7 +206,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const cancelledModelLoadRef = useRef(false);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [startedModelName, setStartedModelName] = useState<string | null>(null);
-  const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [isMarketplaceInstallPending, setIsMarketplaceInstallPending] = useState(false);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
@@ -245,7 +246,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   // so keystrokes do not re-render the models grid and sibling UI.
   const marketplaceQueryRef = useRef('');
   const marketplaceHasSearchedRef = useRef(marketplaceHasSearched);
-  const toastTimerRef = useRef<number | null>(null);
   const installProgressDismissTimersRef = useRef<Record<string, number>>({});
   const installedModelPathMap = useMemo(
     () =>
@@ -293,32 +293,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return filtered;
   }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
-  const dismissToast = useCallback(() => {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    setToast(null);
-  }, []);
-
   const showToast = useCallback(
-    (
-      message: string,
-      kind: LocalInferenceToastKindType = LocalInferenceToastKind.Info,
-      autoDismiss = true,
-    ) => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = null;
+    (message: string, kind: LocalInferenceToastKindType = LocalInferenceToastKind.Info) => {
+      if (kind === LocalInferenceToastKind.Error) {
+        showAppErrorToast(message);
+      } else if (kind === LocalInferenceToastKind.Success) {
+        showAppSuccessToast(message);
+      } else {
+        showAppInfoToast(message);
       }
-      setToast({
-        id:
-          globalThis.crypto?.randomUUID?.() ??
-          `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        kind,
-        message,
-        autoDismiss,
-      });
     },
     [],
   );
@@ -629,7 +612,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       clearInstallProgressDismissTimer(name);
       setActivePullName(name);
       setIsMarketplaceInstallPending(true);
-      dismissToast();
       try {
         const selectedFile =
           model.files?.find(file => file.path === model.filePath) ??
@@ -684,7 +666,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     },
     [
       clearInstallProgressDismissTimer,
-      dismissToast,
       openMarketplaceDownloadPanel,
       pulling,
       refreshLocalModels,
@@ -695,7 +676,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const runAction = useCallback(
     async (action: () => Promise<void>) => {
       setLoading(true);
-      dismissToast();
       try {
         await action();
       } catch (actionError) {
@@ -707,7 +687,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setLoading(false);
       }
     },
-    [dismissToast, showToast],
+    [showToast],
   );
   const handleRestartStatus = useCallback((nextStatus: OllamaStatusSnapshot) => {
     cachedStatus = nextStatus;
@@ -782,24 +762,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   }, [activeTab]);
 
   useEffect(() => {
-    if (!toast?.autoDismiss) return;
-    toastTimerRef.current = window.setTimeout(() => {
-      setToast(current => (current?.id === toast.id ? null : current));
-      toastTimerRef.current = null;
-    }, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS);
     return () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = null;
-      }
-    };
-  }, [toast]);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
       Object.values(installProgressDismissTimersRef.current).forEach(timer => {
         window.clearTimeout(timer);
       });
@@ -1078,7 +1041,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         [modelName]: nextPreference,
       }));
       setLoading(true);
-      dismissToast();
       try {
         const nextPreferences = await window.electron.llamacpp.setModelPreference({
           modelName,
@@ -1108,7 +1070,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setLoading(false);
       }
     },
-    [dismissToast, modelPreferences, runningModels, showToast],
+    [modelPreferences, runningModels, showToast],
   );
 
   const handleTabChange = useCallback(
@@ -1139,6 +1101,64 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           onToggleSidebar={onToggleSidebar}
           onNewChat={onNewChat}
           updateBadge={updateBadge}
+          actions={
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`${localInferenceCompactButtonClass} theme-page-local-inference-view-button-variant-1`}
+                    size="sm"
+                  >
+                    <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
+                    <span>{i18nService.t('localInferenceSettings')}</span>
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="min-w-32">
+                <DropdownMenuItem
+                  onClick={() => setRuntimeSettingsOpen(true)}
+                  onFocus={() => startMenuIconAnimation(runtimeSettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(runtimeSettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(runtimeSettingsIconRef)}
+                >
+                  <SidebarAnimatedCpuIcon ref={runtimeSettingsIconRef} />
+                  {i18nService.t('localInferenceRuntimeSettings')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={openAccessSettings}
+                  onFocus={() => startMenuIconAnimation(accessSettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(accessSettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(accessSettingsIconRef)}
+                >
+                  <LocalInferenceAnimatedWifiPenIcon ref={accessSettingsIconRef} />
+                  {i18nService.t('localInferenceAccessMenuItem')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={openMemorySettings}
+                  onFocus={() => startMenuIconAnimation(memorySettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(memorySettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(memorySettingsIconRef)}
+                >
+                  <GalleryThumbnailsIcon ref={memorySettingsIconRef} />
+                  {i18nService.t('localInferenceMemoryMenuItem')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setDraftModelsDir(modelsDir);
+                    setLibrarySettingsOpen(true);
+                  }}
+                  onFocus={() => startMenuIconAnimation(librarySettingsIconRef)}
+                  onMouseEnter={() => startMenuIconAnimation(librarySettingsIconRef)}
+                  onMouseLeave={() => stopMenuIconAnimation(librarySettingsIconRef)}
+                >
+                  <LocalInferenceAnimatedFolderDownIcon ref={librarySettingsIconRef} />
+                  {i18nService.t('localInferenceLibraryMenuItem')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
           tabs={
             <PageTabs
               bare
@@ -1153,11 +1173,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             />
           }
         />
-        {toast && (
-          <div className="pointer-events-none absolute right-4 top-16 z-30 flex w-[min(24rem,calc(100%-2rem))] justify-end">
-            <LocalInferenceToastView toast={toast} onClose={dismissToast} />
-          </div>
-        )}
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <div
             ref={contentViewportRef}
@@ -1170,71 +1185,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             <div
               className={
                 activeTab === 'marketplace'
-                  ? 'flex h-full min-h-0 w-full flex-col gap-4 px-6 py-4'
-                  : 'w-full space-y-4 px-6 py-4'
+                  ? 'mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-4 px-4 py-4 sm:px-6'
+                  : 'mx-auto w-full max-w-5xl space-y-4 px-4 py-4 sm:px-6'
               }
             >
-              {activeTab === 'models' ? (
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={`${localInferenceCompactButtonClass} theme-page-local-inference-view-button-variant-1 min-w-32 `}
-                          size="default"
-                        >
-                          <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
-                          {i18nService.t('localInferenceSettings')}
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end" className="min-w-32">
-                      <DropdownMenuItem
-                        onClick={() => setRuntimeSettingsOpen(true)}
-                        onFocus={() => startMenuIconAnimation(runtimeSettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(runtimeSettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(runtimeSettingsIconRef)}
-                      >
-                        <SidebarAnimatedCpuIcon ref={runtimeSettingsIconRef} />
-                        {i18nService.t('localInferenceRuntimeSettings')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={openAccessSettings}
-                        onFocus={() => startMenuIconAnimation(accessSettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(accessSettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(accessSettingsIconRef)}
-                      >
-                        <LocalInferenceAnimatedWifiPenIcon ref={accessSettingsIconRef} />
-                        {i18nService.t('localInferenceAccessMenuItem')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={openMemorySettings}
-                        onFocus={() => startMenuIconAnimation(memorySettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(memorySettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(memorySettingsIconRef)}
-                      >
-                        <GalleryThumbnailsIcon ref={memorySettingsIconRef} />
-                        {i18nService.t('localInferenceMemoryMenuItem')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setDraftModelsDir(modelsDir);
-                          setLibrarySettingsOpen(true);
-                        }}
-                        onFocus={() => startMenuIconAnimation(librarySettingsIconRef)}
-                        onMouseEnter={() => startMenuIconAnimation(librarySettingsIconRef)}
-                        onMouseLeave={() => stopMenuIconAnimation(librarySettingsIconRef)}
-                      >
-                        <LocalInferenceAnimatedFolderDownIcon ref={librarySettingsIconRef} />
-                        {i18nService.t('localInferenceLibraryMenuItem')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ) : null}
-
               <LayeredTabsContent
                 value="models"
                 activeValue={activeTab}

@@ -3,7 +3,7 @@
   "actions": [
     {
       "id": "pptx",
-      "icon": "PresentationChartBarIcon",
+      "icon": "Presentation",
       "color": "#F59E0B",
       "skillMapping": "presentation-studio",
       "prompts": [
@@ -59,7 +59,7 @@
     },
     {
       "id": "data-analysis",
-      "icon": "ChartBarIcon",
+      "icon": "ChartColumn",
       "color": "#8B5CF6",
       "skillMapping": "xlsx",
       "prompts": [
@@ -115,7 +115,7 @@
     },
     {
       "id": "website",
-      "icon": "GlobeAltIcon",
+      "icon": "Globe",
       "color": "#3B82F6",
       "skillMapping": "frontend-design",
       "prompts": [

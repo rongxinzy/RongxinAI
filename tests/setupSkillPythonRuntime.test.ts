@@ -1,17 +1,30 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildProbeCode,
+  describeProbeFailure,
+  ensureWindowsPython3Alias,
   listRequirementFiles,
   normalizePlatform,
   parseImportNames,
+  probePython,
   rebaseEnvironmentSymlinks,
   sharedLockPath,
   validateSkillDependencyDeclarations,
 } from '../scripts/setup-skill-python-runtime.js';
+
+function findPythonExecutable() {
+  for (const candidate of ['python3', 'python']) {
+    const result = spawnSync(candidate, ['--version'], { encoding: 'utf8' });
+    if (result.status === 0) return candidate;
+  }
+  return null;
+}
 
 describe('setup-skill-python-runtime', () => {
   it('normalizes supported packaging platforms', () => {
@@ -102,5 +115,70 @@ describe('setup-skill-python-runtime', () => {
     } finally {
       fs.rmSync(resourcesRoot, { recursive: true, force: true });
     }
+  });
+
+  it('creates the Windows python3.exe alias beside the shared python.exe', () => {
+    const sharedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-python-alias-'));
+    try {
+      const scriptsDir = path.join(sharedRoot, 'Scripts');
+      fs.mkdirSync(scriptsDir, { recursive: true });
+      fs.writeFileSync(path.join(scriptsDir, 'python.exe'), 'trampoline');
+
+      ensureWindowsPython3Alias(sharedRoot, 'win32');
+
+      expect(fs.readFileSync(path.join(scriptsDir, 'python3.exe'), 'utf8')).toBe('trampoline');
+
+      // Idempotent, POSIX no-op, and missing python.exe is tolerated.
+      fs.writeFileSync(path.join(scriptsDir, 'python3.exe'), 'existing');
+      ensureWindowsPython3Alias(sharedRoot, 'win32');
+      expect(fs.readFileSync(path.join(scriptsDir, 'python3.exe'), 'utf8')).toBe('existing');
+      ensureWindowsPython3Alias(sharedRoot, 'darwin');
+      ensureWindowsPython3Alias(path.join(sharedRoot, 'empty'), 'win32');
+    } finally {
+      fs.rmSync(sharedRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('announces each import before running it in the probe code', () => {
+    const code = buildProbeCode(['numpy', 'trimesh']);
+    expect(code).toContain('print("importing numpy", file=sys.stderr, flush=True)');
+    expect(code).toContain('importlib.import_module("numpy")');
+    expect(code.indexOf('importing numpy')).toBeLessThan(code.indexOf('import_module("numpy")'));
+    expect(code).toContain('print("importing trimesh", file=sys.stderr, flush=True)');
+    expect(code).toContain('print("skill-python-health-ok")');
+  });
+
+  it('describes probe timeouts, signals, exit codes, and output tails', () => {
+    expect(
+      describeProbeFailure(
+        { error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' }) },
+        60_000,
+      ),
+    ).toBe('probe timed out after 60s');
+    expect(describeProbeFailure({ signal: 'SIGTERM', status: null }, 60_000)).toBe(
+      'probe killed by signal SIGTERM',
+    );
+    expect(describeProbeFailure({ status: 1, stderr: 'boom' }, 60_000)).toBe(
+      'probe exited with code 1; output tail:\nboom',
+    );
+    const longOutput = Array.from({ length: 30 }, (_, index) => `line-${index}`).join('\n');
+    const described = describeProbeFailure({ status: 1, stderr: longOutput }, 60_000);
+    expect(described).toContain('line-29');
+    expect(described).not.toContain('line-9');
+  });
+
+  it('probes imports with the real interpreter when one is available', () => {
+    const python = findPythonExecutable();
+    if (!python) return;
+
+    expect(probePython(python, ['json'], { timeoutMs: 30_000 })).toEqual({ ok: true, detail: '' });
+
+    const failing = probePython(python, ['json', 'definitely_missing_module_zz9'], {
+      timeoutMs: 30_000,
+    });
+    expect(failing.ok).toBe(false);
+    expect(failing.detail).toContain('probe exited with code 1');
+    expect(failing.detail).toContain('importing definitely_missing_module_zz9');
+    expect(failing.detail).toContain('ModuleNotFoundError');
   });
 });

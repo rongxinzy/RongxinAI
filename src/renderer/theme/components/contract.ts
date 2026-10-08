@@ -4,6 +4,7 @@ import { LOGO_LOADING_SELECTORS } from './logo-loading-contract';
 import { CODING_SIDEBAR_SELECTORS } from './coding-sidebar-contract';
 import { CHAT_TOOL_SELECTORS } from './chat-tool-contract';
 import { SHELL_SIDEBAR_SELECTORS } from './shell-sidebar-contract';
+import { HOME_STUDIO_SELECTORS } from './home-studio-contract';
 const appearanceVariables = new Set<string>([
   ...Object.values(TOKEN_CONTRACT),
   '--zy-control-icon-size',
@@ -526,19 +527,9 @@ export const COMPONENT_SELECTORS = {
   'page-sidebar-sheet-content-1': '.theme-page-sidebar-sheet-content-1',
   'page-model-selector-select-trigger-variant-1':
     '.theme-page-model-selector-select-trigger-variant-1',
-  'page-settings-button-variant-1': '.theme-page-settings-button-variant-1',
-  'page-settings-button-variant-2': '.theme-page-settings-button-variant-2',
-  'page-settings-button-variant-3': '.theme-page-settings-button-variant-3',
-  'page-settings-button-variant-4': '.theme-page-settings-button-variant-4',
-  'page-settings-button-variant-5': '.theme-page-settings-button-variant-5',
-  'page-settings-button-variant-6': '.theme-page-settings-button-variant-6',
   'page-settings-input-variant-1': '.theme-page-settings-input-variant-1',
   'page-settings-input-variant-2': '.theme-page-settings-input-variant-2',
   'page-settings-input-variant-3': '.theme-page-settings-input-variant-3',
-  'page-settings-button-variant-7': '.theme-page-settings-button-variant-7',
-  'settings-navigation-icon': '.theme-settings-navigation-icon',
-  'page-settings-button-variant-8': '.theme-page-settings-button-variant-8',
-  'page-settings-button-variant-9': '.theme-page-settings-button-variant-9',
   'page-agent-task-row-button-variant-1': '.theme-page-agent-task-row-button-variant-1',
   'page-agent-task-row-button-variant-2': '.theme-page-agent-task-row-button-variant-2',
   'page-agent-task-row-button-variant-3': '.theme-page-agent-task-row-button-variant-3',
@@ -833,8 +824,6 @@ export const COMPONENT_SELECTORS = {
   'permission-danger-banner': '.theme-permission-danger-banner',
   'permission-danger-banner-destructive': '.theme-permission-danger-banner-destructive',
   'permission-danger-banner-warning': '.theme-permission-danger-banner-warning',
-  'settings-modal-frame': '.theme-settings-modal-frame',
-  'settings-modal-shell': '.theme-settings-modal-shell',
   'local-context-modal': '.theme-local-context-modal',
   'local-capability-modal': '.theme-local-capability-modal',
   'skill-modal-backdrop': '.theme-skill-modal-backdrop',
@@ -937,7 +926,7 @@ export const COMPONENT_SELECTORS = {
   'composer-drop-active': '.theme-composer-drop-active',
   'message-code-user': '.theme-message-code-user',
   'message-cowork-user': '.theme-message-cowork-user',
-  'composer-input-surface': '.theme-composer-surface [data-slot="input-group"]',
+  'composer-input-surface': '.theme-composer-surface .theme-input-group',
   'message-role-user': '.group.is-user .theme-message-body',
   'message-role-assistant': '.group.is-assistant .theme-message-body',
   'tabs-list': '.theme-tabs-list',
@@ -964,6 +953,7 @@ export const COMPONENT_SELECTORS = {
   // Transcript compositions refine the primitive Badge and Collapsible recipes.
   ...CHAT_TOOL_SELECTORS,
   ...SHELL_SIDEBAR_SELECTORS,
+  ...HOME_STUDIO_SELECTORS,
 } as const;
 
 const enabled =

@@ -244,6 +244,35 @@ function pythonExecutableForEnvironment(environmentRoot, platform) {
   return candidates.find(candidate => fs.existsSync(candidate)) || null;
 }
 
+/**
+ * uv venvs on Windows expose only Scripts/python.exe, while the bare base
+ * runtime ships python.exe + python3.exe. Without an alias, `python3` on the
+ * agent shell PATH resolves past the shared layer to the base interpreter,
+ * which lacks the preinstalled Skill dependencies. The alias lives next to
+ * python.exe, so venv home discovery (pyvenv.cfg) behaves identically.
+ */
+function ensureWindowsPython3Alias(sharedRoot, platform) {
+  if (platform !== 'win32') return;
+  const scriptsDir = path.join(sharedRoot, 'Scripts');
+  const pythonExe = path.join(scriptsDir, 'python.exe');
+  const python3Exe = path.join(scriptsDir, 'python3.exe');
+  if (!fs.existsSync(pythonExe) || fs.existsSync(python3Exe)) return;
+  try {
+    fs.copyFileSync(pythonExe, python3Exe);
+    console.log('[setup-skill-python-runtime] created python3.exe alias in the shared layer');
+  } catch (error) {
+    console.warn(
+      `[setup-skill-python-runtime] could not create the python3.exe alias: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function hasWindowsPython3Alias(sharedRoot, platform) {
+  return platform !== 'win32' || fs.existsSync(path.join(sharedRoot, 'Scripts', 'python3.exe'));
+}
+
 function walkSymlinks(root) {
   const links = [];
   const visit = current => {
@@ -315,24 +344,69 @@ function run(command, args, options = {}) {
   return result;
 }
 
-function probePython(pythonPath, importNames) {
-  const code = [
+const PROBE_TIMEOUT_MS = 5 * 60 * 1000;
+const PROBE_MAX_ATTEMPTS = 2;
+
+// Each import is announced on stderr before it runs so a timeout or native
+// crash still reports which module was being imported when the probe died.
+function buildProbeCode(importNames) {
+  return [
     'import importlib',
-    ...importNames.map(name => `importlib.import_module(${JSON.stringify(name)})`),
+    'import sys',
+    ...importNames.flatMap(name => [
+      `print(${JSON.stringify(`importing ${name}`)}, file=sys.stderr, flush=True)`,
+      `importlib.import_module(${JSON.stringify(name)})`,
+    ]),
     'print("skill-python-health-ok")',
   ].join('\n');
-  const result = spawnSync(pythonPath, ['-c', code], {
-    cwd: PROJECT_ROOT,
-    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
-    encoding: 'utf8',
-    stdio: 'pipe',
-    timeout: 60_000,
-    windowsHide: true,
-  });
-  return {
-    ok: result.status === 0,
-    detail: `${result.stderr || result.stdout || ''}`.trim(),
-  };
+}
+
+function describeProbeFailure(result, timeoutMs) {
+  const parts = [];
+  if (result.error) {
+    parts.push(
+      result.error.code === 'ETIMEDOUT'
+        ? `probe timed out after ${Math.round(timeoutMs / 1000)}s`
+        : `probe could not start: ${result.error.message}`,
+    );
+  } else if (result.signal) {
+    parts.push(`probe killed by signal ${result.signal}`);
+  } else {
+    parts.push(`probe exited with code ${result.status}`);
+  }
+  const output = `${result.stderr || ''}\n${result.stdout || ''}`.trim();
+  if (output) {
+    const tail = output.split(/\r?\n/).slice(-20).join('\n');
+    parts.push(`output tail:\n${tail}`);
+  }
+  return parts.join('; ');
+}
+
+// Timeouts and launch failures are usually cold-runner transients (freshly
+// unpacked wheels still being scanned by antivirus), so retry them once;
+// a non-zero exit is a deterministic import error and fails immediately.
+function probePython(pythonPath, importNames, options = {}) {
+  const timeoutMs = options.timeoutMs || PROBE_TIMEOUT_MS;
+  const maxAttempts = options.maxAttempts || PROBE_MAX_ATTEMPTS;
+  const code = buildProbeCode(importNames);
+  let detail = 'probe did not run';
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const result = spawnSync(pythonPath, ['-c', code], {
+      cwd: PROJECT_ROOT,
+      env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+      encoding: 'utf8',
+      stdio: 'pipe',
+      timeout: timeoutMs,
+      windowsHide: true,
+    });
+    if (result.status === 0) return { ok: true, detail: '' };
+    detail = describeProbeFailure(result, timeoutMs);
+    if (!result.error || attempt >= maxAttempts) break;
+    console.warn(
+      `[setup-skill-python-runtime] probe attempt ${attempt} failed (${detail.split('\n')[0]}), retrying`,
+    );
+  }
+  return { ok: false, detail };
 }
 
 function readManifest(environmentRoot) {
@@ -428,6 +502,9 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   const pythonPath = pythonExecutableForEnvironment(sharedRoot, platform);
   const sharedManifest = readManifest(sharedRoot);
   if (!pythonPath) missing.push('shared: python executable');
+  if (pythonPath && !hasWindowsPython3Alias(sharedRoot, platform)) {
+    missing.push('shared: python3.exe alias');
+  }
   if (
     !sharedManifest ||
     sharedManifest.version !== MANIFEST_VERSION ||
@@ -532,6 +609,10 @@ async function ensureSkillPythonRuntimes(options = {}) {
     uvVersion,
   );
   const existingPython = pythonExecutableForEnvironment(sharedRoot, platform);
+  // Self-heal layers built before the python3.exe alias existed; on read-only
+  // runtime roots the copy inside the helper fails softly and the health
+  // check below reports the missing alias.
+  ensureWindowsPython3Alias(sharedRoot, platform);
   const healthyExistingLayer =
     existingPython &&
     isEnvironmentRelocatable(sharedRoot) &&
@@ -606,6 +687,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
     ];
     run(base.uvPath, installArgs, { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } });
     rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
+    ensureWindowsPython3Alias(sharedRoot, platform);
     for (const entry of requirements) {
       const probe = probePython(environmentPython, parseImportNames(entry.requirementsPath));
       if (!probe.ok)
@@ -657,13 +739,17 @@ if (require.main === module) {
 
 module.exports = {
   RUNTIME_ROOT,
+  buildProbeCode,
   checkSkillPythonRuntimeHealth,
+  describeProbeFailure,
+  ensureSkillPythonRuntimes,
+  ensureWindowsPython3Alias,
   listRequirementFiles,
   normalizePlatform,
   parseImportNames,
+  probePython,
   pythonExecutableForEnvironment,
   rebaseEnvironmentSymlinks,
   sharedLockPath,
   validateSkillDependencyDeclarations,
-  ensureSkillPythonRuntimes,
 };

@@ -25,16 +25,13 @@ import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchApprovalMode,
   WorkbenchRunTrigger,
-  WorkbenchOutputToolName,
   WorkbenchContractKind,
-  WorkbenchOutputMode,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
-import { setWorkbenchOutputRequirements } from '../../workbenchTask/outputContract';
 import {
   runTextWorkerOperation,
   type TextWorkerInput,
@@ -212,9 +209,7 @@ const mockSessionManagerInMemory = hoisted.mockSessionManagerInMemory;
 const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
-const mockCreateCodemodeExtension = hoisted.mockCreateCodemodeExtension;
 const mockCreateMcpExtension = hoisted.mockCreateMcpExtension;
-const mockCreateToolSearchExtension = hoisted.mockCreateToolSearchExtension;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
@@ -540,7 +535,6 @@ describe('PiRuntimeAdapter', () => {
           const names = (options.customTools as Array<{ name: string }>).map(tool => tool.name);
           expect(names).not.toContain('production_loop');
           expect(names).not.toContain(PiAgentLoopToolName);
-          expect(names).toContain(WorkbenchOutputToolName);
         }
         const promptCount = mockSession.prompt.mock.calls.length;
         const onComplete = vi.fn();
@@ -1798,8 +1792,7 @@ describe('PiRuntimeAdapter', () => {
       const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
         run: { id: `run-${beginRun.mock.calls.length}` },
       }));
-      const message =
-        'Stopped the run: the output contract was never committed, so no tool call could execute.';
+      const message = 'The workbench run can no longer continue.';
       const authorizeToolCall = vi
         .fn()
         .mockResolvedValue({ allow: false, reason: message, terminateRun: true });
@@ -1853,144 +1846,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
       expect(onError).toHaveBeenCalledWith(
         'test',
-        expect.objectContaining({ message: expect.stringContaining('output contract') }),
-      );
-    });
-
-    it('steers the model back to set_task_output when the gate asks for a forced correction', async () => {
-      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
-        run: { id: `run-${beginRun.mock.calls.length}` },
-      }));
-      const authorizeToolCall = vi.fn().mockResolvedValue({
-        allow: false,
-        reason: 'Before executing tools, call set_task_output to declare deliverables.',
-        forceContractCorrection: true,
-      });
-      const grantOutputContractCorrectionGrace = vi.fn().mockReturnValue(true);
-      adapter.setWorkbenchTaskService({
-        beginRun,
-        authorizeToolCall,
-        grantOutputContractCorrectionGrace,
-        updateRunContext: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-      } as unknown as WorkbenchTaskService);
-      const onError = vi.fn();
-      adapter.on('error', onError);
-
-      await adapter.startSession('test', 'First');
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: {
-            on: (
-              event: 'tool_call',
-              handler: (toolCall: {
-                toolCallId: string;
-                toolName: string;
-                input: Record<string, unknown>;
-              }) => Promise<unknown>,
-            ) => void;
-          }) => void
-        >;
-      };
-      let handleToolCall:
-        | ((toolCall: {
-            toolCallId: string;
-            toolName: string;
-            input: Record<string, unknown>;
-          }) => Promise<unknown>)
-        | undefined;
-      loaderOptions.extensionFactories?.[0]({
-        on: (_event, handler) => {
-          handleToolCall = handler;
-        },
-      });
-
-      const abortsBeforeCall = mockSession.abort.mock.calls.length;
-      const result = await handleToolCall?.({
-        toolCallId: 'gated-call',
-        toolName: 'bash',
-        input: { command: 'python move_files.py' },
-      });
-
-      // The tool call stays blocked, but the run survives: the live session is
-      // steered into exactly one set_task_output call instead of being aborted.
-      expect(result).toMatchObject({ block: true });
-      expect(grantOutputContractCorrectionGrace).toHaveBeenCalledWith('run-1');
-      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('set_task_output'));
-      expect(mockSession.abort.mock.calls.length).toBe(abortsBeforeCall);
-      expect(onError).not.toHaveBeenCalled();
-    });
-
-    it('terminates the run when the forced correction cannot be delivered', async () => {
-      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
-        run: { id: `run-${beginRun.mock.calls.length}` },
-      }));
-      const authorizeToolCall = vi.fn().mockResolvedValue({
-        allow: false,
-        reason: 'Before executing tools, call set_task_output to declare deliverables.',
-        forceContractCorrection: true,
-      });
-      // The grace was already spent: the runtime must fall back to killing the run.
-      const grantOutputContractCorrectionGrace = vi.fn().mockReturnValue(false);
-      const failRun = vi.fn();
-      adapter.setWorkbenchTaskService({
-        beginRun,
-        authorizeToolCall,
-        grantOutputContractCorrectionGrace,
-        failRun,
-        updateRunContext: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-      } as unknown as WorkbenchTaskService);
-      const onError = vi.fn();
-      adapter.on('error', onError);
-
-      await adapter.startSession('test', 'First');
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: {
-            on: (
-              event: 'tool_call',
-              handler: (toolCall: {
-                toolCallId: string;
-                toolName: string;
-                input: Record<string, unknown>;
-              }) => Promise<unknown>,
-            ) => void;
-          }) => void
-        >;
-      };
-      let handleToolCall:
-        | ((toolCall: {
-            toolCallId: string;
-            toolName: string;
-            input: Record<string, unknown>;
-          }) => Promise<unknown>)
-        | undefined;
-      loaderOptions.extensionFactories?.[0]({
-        on: (_event, handler) => {
-          handleToolCall = handler;
-        },
-      });
-
-      const abortsBeforeCall = mockSession.abort.mock.calls.length;
-      const result = await handleToolCall?.({
-        toolCallId: 'gated-call',
-        toolName: 'bash',
-        input: { command: 'python move_files.py' },
-      });
-
-      expect(result).toMatchObject({ block: true });
-      expect(mockSession.steer).not.toHaveBeenCalled();
-      expect(failRun).toHaveBeenCalledWith(
-        'test',
-        expect.objectContaining({ code: 'output_contract_uncommitted' }),
-      );
-      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
-      expect(onError).toHaveBeenCalledWith(
-        'test',
-        expect.objectContaining({ message: expect.stringContaining('set_task_output') }),
+        expect.objectContaining({ message: expect.stringContaining('no longer continue') }),
       );
     });
 
@@ -2208,12 +2064,6 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot,
         });
         const first = service.getCurrent('denied-shortcut')!;
-        setWorkbenchOutputRequirements(
-          service.repository,
-          'denied-shortcut',
-          first.task.activeRunId!,
-          [{ mode: WorkbenchOutputMode.File, formats: ['pptx'] }],
-        );
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-shortcut',
           runId: first.task.activeRunId!,
@@ -2559,12 +2409,6 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot: createTemporaryWorkspace(),
         });
         const detail = service.getCurrent('denied-workbench');
-        setWorkbenchOutputRequirements(
-          service.repository,
-          'denied-workbench',
-          detail!.task.activeRunId!,
-          [{ mode: WorkbenchOutputMode.File, formats: ['md'] }],
-        );
         const authorization = service.authorizeToolCall({
           sessionId: 'denied-workbench',
           runId: detail!.task.activeRunId!,
@@ -4538,9 +4382,6 @@ describe('PiRuntimeAdapter', () => {
         listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
         // A pending approval means the session waits on the user, not the model.
         const runId = service.getCurrent('approval-session')!.task.activeRunId!;
-        setWorkbenchOutputRequirements(service.repository, 'approval-session', runId, [
-          { mode: WorkbenchOutputMode.Text, formats: [] },
-        ]);
         const authorization = service.authorizeToolCall({
           sessionId: 'approval-session',
           runId,

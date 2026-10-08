@@ -173,12 +173,22 @@ export function MarketplaceModelCardView({
         </>
       }
     >
-      <p className="min-h-5 break-words text-xs leading-5 text-muted-foreground">
-        {[MARKETPLACE_GGUF_FORMAT, ...capabilities.map(capabilityLabel)].join(' · ')}
-      </p>
-      <div className={cn('flex min-h-5 items-center gap-1.5 text-xs', tone)}>
-        <FitIcon className="size-3.5 shrink-0" aria-hidden="true" />
-        <span>{marketplaceFitLabel(model.fit?.status)}</span>
+      {model.description ? (
+        <p
+          className="line-clamp-2 w-full text-sm leading-relaxed text-muted-foreground"
+          title={model.description}
+        >
+          {model.description}
+        </p>
+      ) : null}
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2">
+        <p className="min-h-5 break-words text-xs leading-5 text-muted-foreground">
+          {[MARKETPLACE_GGUF_FORMAT, ...capabilities.map(capabilityLabel)].join(' · ')}
+        </p>
+        <div className={cn('flex min-h-5 items-center gap-1.5 text-xs', tone)}>
+          <FitIcon className="size-3.5 shrink-0" aria-hidden="true" />
+          <span>{marketplaceFitLabel(model.fit?.status)}</span>
+        </div>
       </div>
     </MarketplaceCardLayout>
   );

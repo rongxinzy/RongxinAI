@@ -148,7 +148,7 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
       )}
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex items-baseline justify-between gap-3 min-w-0">
           <span className="truncate text-sm text-foreground">{sourceLabel(run)}</span>
           <span className="shrink-0 text-xs text-muted-foreground">
             {formatActivityClockTime(run.updatedAt)}

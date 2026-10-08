@@ -37,7 +37,7 @@ export function GeneralLanguageField({ value, onValueChange }: GeneralLanguageFi
           if (nextValue) onValueChange(nextValue);
         }}
       >
-        <SelectTrigger id="settings-language-select" className="w-[140px] shrink-0">
+        <SelectTrigger id="settings-language-select" className="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

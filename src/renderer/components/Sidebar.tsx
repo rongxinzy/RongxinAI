@@ -5,6 +5,13 @@ import { cn } from '@shared/lib/utils';
 import { MotionConfig } from 'motion/react';
 import { MessageCircle, PanelLeftClose, Trash2 } from 'lucide-react';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -477,7 +484,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <ChatSkillShortcuts />
                   </div>
                   {renderSearchControl(true)}
-                  <div className="theme-sidebar-section sticky top-0 z-30 flex items-center">
+                  <div className="theme-sidebar-section sticky top-0 z-30 flex items-center min-w-0">
                     <h2 className="min-w-0 truncate">{i18nService.t('chatRecentTitle')}</h2>
                   </div>
                   {!chatSessionsLoaded ? (
@@ -485,15 +492,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                       {i18nService.t('loading')}
                     </div>
                   ) : chatTaskNodes.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 px-4">
-                      <MessageCircle className="size-10 text-muted-foreground mb-3" />
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        {i18nService.t('chatNoSessions')}
-                      </p>
-                      <p className="text-xs text-muted-foreground text-center">
-                        {i18nService.t('chatNoSessionsHint')}
-                      </p>
-                    </div>
+                    <Empty className="gap-2 py-8 px-4">
+                      <EmptyHeader className="gap-1">
+                        <EmptyMedia variant="icon" className="mb-1">
+                          <MessageCircle
+                            className="size-8 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                        </EmptyMedia>
+                        <EmptyTitle className="text-sm font-medium">
+                          {i18nService.t('chatNoSessions')}
+                        </EmptyTitle>
+                        <EmptyDescription className="text-xs">
+                          {i18nService.t('chatNoSessionsHint')}
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   ) : (
                     <div className="space-y-0.5">
                       {chatTaskNodes.map(task => (
@@ -601,6 +615,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               {updateEntry}
               {!hideLogin ? (
                 <LoginButton
+                  settingsActive={activeView === 'settings'}
                   onShowSettings={() => {
                     onPrefetchView?.('settings');
                     onShowSettings();

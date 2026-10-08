@@ -17,7 +17,7 @@ import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
-import { PiTaskOutputSystemPrompt } from './piTaskOutputTool';
+import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 import { PiWebSearchSystemPrompt } from './piWebSearchTool';
 
@@ -32,8 +32,6 @@ export interface PiSystemPromptContext {
   platform?: NodeJS.Platform;
   /** Whether the current run has no foreground user interaction. */
   unattended?: boolean;
-  /** The output-contract tool is registered for this Work session. */
-  taskOutputEnabled?: boolean;
   /** Concrete MCP capabilities discovered before this session was created. */
   mcpToolManifest?: McpToolManifestEntry[];
   /** Configured MCP servers, including connection and discovery failures. */
@@ -78,6 +76,11 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     prompt: context => createPiBashToolSystemPrompt(context.platform),
   },
   {
+    id: 'python-runtime',
+    requiresFileTools: true,
+    prompt: PiPythonEnvSystemPrompt,
+  },
+  {
     id: 'document-reader',
     requiresFileTools: true,
     enabled: context => context.chatMode !== true,
@@ -94,7 +97,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     prompt: [
       '## Parallel tool orchestration (codemode)',
       '',
-      "- The `codemode` tool runs a JavaScript sandbox that can call this session's tools (`tools.read`, `tools.bash`, `tools.edit`, `tools.write`, plus registered workspace tools such as `task_output` and the MCP gateway).",
+      "- The `codemode` tool runs a JavaScript sandbox that can call this session's tools (`tools.read`, `tools.bash`, `tools.edit`, `tools.write`, plus registered workspace tools and the MCP gateway).",
       '- Prefer `codemode` when one step needs many independent tool calls: batch them inside the script with `await Promise.all(...)` instead of spending one reply per call.',
       '- Filter and reduce large outputs inside the script; return only the distilled result so the conversation stays small.',
       '- Every nested call still passes the session approval gate; a blocked call returns an error result inside the sandbox.',
@@ -122,11 +125,6 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     id: 'declare-artifact',
     enabled: context => context.chatMode !== true,
     prompt: DeclareArtifactSystemPrompt,
-  },
-  {
-    id: 'task-output',
-    enabled: context => context.taskOutputEnabled === true,
-    prompt: PiTaskOutputSystemPrompt,
   },
 ];
 

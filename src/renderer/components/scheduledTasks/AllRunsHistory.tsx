@@ -1,5 +1,12 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
@@ -169,6 +176,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
                 onClick={handleClearFilter}
                 className="size-6"
                 title={i18nService.t('scheduledTasksFilterClear')}
+                aria-label={i18nService.t('scheduledTasksFilterClear')}
               >
                 <X className="size-3" />
               </Button>
@@ -178,14 +186,31 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
 
         {/* Empty state */}
         {isEmpty && (
-          <div className="flex flex-col items-center justify-center py-16 px-6">
-            <Clock className="size-12 text-muted-foreground/40 mb-4" />
-            <p className="text-sm font-medium text-muted-foreground">
-              {hasActiveFilter
-                ? i18nService.t('scheduledTasksFilterNoResults')
-                : i18nService.t('scheduledTasksHistoryEmpty')}
-            </p>
-          </div>
+          <Empty className="py-16 px-6">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Clock className="size-5" />
+              </EmptyMedia>
+              <EmptyTitle>
+                {hasActiveFilter
+                  ? i18nService.t('scheduledTasksFilterNoResults')
+                  : i18nService.t('scheduledTasksHistoryEmpty')}
+              </EmptyTitle>
+            </EmptyHeader>
+            {hasActiveFilter && (
+              <EmptyContent>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearFilter}
+                  className="gap-1.5"
+                >
+                  <span>{i18nService.t('scheduledTasksFilterClear')}</span>
+                </Button>
+              </EmptyContent>
+            )}
+          </Empty>
         )}
 
         {/* Run rows */}

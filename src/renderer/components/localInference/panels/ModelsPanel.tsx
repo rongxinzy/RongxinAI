@@ -1,6 +1,13 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Card, CardHeader, CardTitle } from '@shared/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@shared/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -227,7 +234,7 @@ export function ModelsPanel({
   const modelGridClassName =
     logPanelLayoutVisible && logPanelGridColumns === MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG
       ? 'grid-cols-1 mx-auto w-full max-w-5xl'
-      : 'grid-cols-2 mx-auto w-full max-w-5xl';
+      : 'grid-cols-1 md:grid-cols-2 mx-auto w-full max-w-5xl';
   const visibleModelCards = modelCards.slice(
     (currentModelPage - 1) * modelsPerPage,
     currentModelPage * modelsPerPage,
@@ -352,7 +359,7 @@ export function ModelsPanel({
           <>
             <div
               ref={gridRef}
-              className={cn('grid w-full auto-rows-min content-start gap-3', modelGridClassName)}
+              className={cn('grid w-full auto-rows-min content-start gap-4', modelGridClassName)}
             >
               {visibleModelCards.map(({ model, runningModel }) => (
                 <ModelCard
@@ -407,7 +414,7 @@ export function ModelsPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="theme-control-sizing-24 min-w-28 cursor-pointer transition-[background-color,border-color] duration-200 ease-out"
+                  className="min-w-28"
                   onClick={onOpenMarketplace}
                 >
                   {i18nService.t('localInferenceLocalModelsEmptyAction')}
@@ -484,7 +491,7 @@ const ModelCard = memo(function ModelCard({
   return (
     <div
       data-local-inference-model-card-frame="true"
-      className="relative z-0 h-full w-full rounded-lg transition-[z-index] duration-200 hover:z-20 focus-within:z-20"
+      className="relative z-0 h-full w-full rounded-xl transition-[z-index] duration-200 hover:z-20 focus-within:z-20"
     >
       <Card
         size="sm"
@@ -494,18 +501,18 @@ const ModelCard = memo(function ModelCard({
         onDrop={event => onDrop(event, model.name)}
         onDragEnd={onDragEnd}
         className={cn(
-          'theme-page-models-panel-card-variant-1 relative h-full w-full cursor-grab select-none active:cursor-grabbing',
+          'theme-page-models-panel-card-variant-1 relative flex h-full w-full flex-col cursor-grab select-none active:cursor-grabbing',
           'theme-page-models-panel-card-variant-2',
           (loadingModel || unloading) && 'theme-page-models-panel-card-variant-3',
           dragging && 'theme-page-models-panel-card-variant-4',
         )}
       >
         {loadingModel || unloading ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/80 backdrop-blur-[1px]">
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col sm:flex-row items-center justify-center gap-2 rounded-xl bg-background/80 backdrop-blur-[1px]">
             <Button
               type="button"
               disabled
-              size="lg"
+              size="default"
               variant={unloading ? 'destructive' : 'secondary'}
               data-local-inference-unload-button={unloading ? 'true' : undefined}
             >
@@ -525,7 +532,7 @@ const ModelCard = memo(function ModelCard({
             {loadingModel ? (
               <Button
                 type="button"
-                size="lg"
+                size="default"
                 variant="outline"
                 className="pointer-events-auto"
                 onClick={handleOpenLaunchLog}
@@ -537,7 +544,7 @@ const ModelCard = memo(function ModelCard({
             {loadingModel ? (
               <Button
                 type="button"
-                size="lg"
+                size="default"
                 variant="destructive"
                 className="pointer-events-auto"
                 disabled={cancellingModelLoad}
@@ -555,7 +562,7 @@ const ModelCard = memo(function ModelCard({
         ) : null}
 
         {isRunning ? (
-          <span className="pointer-events-none absolute right-4 top-2 z-10">
+          <span className="pointer-events-none absolute right-3.5 top-3.5 z-10">
             <BreathingDot
               color="var(--zy-success)"
               duration={2}
@@ -565,132 +572,147 @@ const ModelCard = memo(function ModelCard({
           </span>
         ) : null}
 
-        <CardHeader className="theme-control-sizing-21 flex flex-col gap-2">
-          <div className="flex min-w-0 w-full items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-            >
-              <ProviderIcon className="size-5" />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <CardTitle className="theme-page-models-panel-card-title-1 truncate">
-                  {displayName}
-                </CardTitle>
-              </div>
+        <CardHeader className="flex flex-row items-start gap-3 p-4 pb-2">
+          <span
+            aria-hidden="true"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-raised text-muted-foreground"
+          >
+            <ProviderIcon className="size-5" />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <CardTitle className="theme-page-models-panel-card-title-1 line-clamp-2 text-base font-semibold leading-snug">
+              {displayName}
+            </CardTitle>
+            <CardDescription className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              {provider ? <span className="truncate">{provider}</span> : null}
+              {provider && modifiedDate ? (
+                <span className="text-muted-foreground/40">·</span>
+              ) : null}
               {modifiedDate ? (
-                <div className="flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
                   <Clock3 aria-hidden="true" className="size-3.5 shrink-0" />
                   <span>{modifiedDate}</span>
-                </div>
+                </span>
               ) : null}
-            </div>
-            <div className="ml-auto flex shrink-0 items-center gap-1">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="theme-control-muted"
-                      disabled={buttonsDisabled}
-                      aria-label={i18nService.t('coworkSessionActions')}
-                      title={i18nService.t('coworkSessionActions')}
-                      data-local-inference-model-actions-button="true"
-                    >
-                      <Ellipsis className="size-5" />
-                    </Button>
-                  }
-                />
-                <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onClick={() => onOpenInspector(model)}>
-                    <PanelRightOpen className="size-4" />
-                    {i18nService.t('localInferenceOpenInspector')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    data-local-inference-delete-button="true"
-                    onClick={() => onDelete(model)}
-                  >
-                    <Trash2 className="size-4" />
-                    {i18nService.t('delete')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            </CardDescription>
           </div>
-
-          <div className="flex min-w-0 w-full items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-              {hasDetailsTag ? (
-                <HoverCard>
-                  <HoverCardTrigger
-                    delay={200}
-                    closeDelay={100}
-                    render={
-                      <Badge
-                        variant="secondary"
-                        className={cn(modelCardTagBaseClassName, 'shrink-0 cursor-default')}
-                      >
-                        {i18nService.t('localInferenceDetails')}
-                      </Badge>
-                    }
-                  />
-                  <HoverCardContent
-                    side="right"
-                    align="start"
-                    className="theme-control-sizing-10 w-auto min-w-52"
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="theme-control-muted"
+                    disabled={buttonsDisabled}
+                    aria-label={i18nService.t('coworkSessionActions')}
+                    title={i18nService.t('coworkSessionActions')}
+                    data-local-inference-model-actions-button="true"
                   >
-                    <div className="flex flex-col gap-2">
-                      {details.map(item => (
-                        <MetadataRow key={item.label} label={item.label} value={item.value} />
-                      ))}
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
-              ) : null}
-              {visibleTags.map(tag => (
-                <Badge
-                  key={tag.label}
-                  variant="secondary"
-                  className={cn(modelCardTagBaseClassName, 'shrink-0')}
-                >
-                  {tag.label}
-                </Badge>
-              ))}
-            </div>
-            <div className="flex shrink-0 items-center">
-              {loadingModel ? null : isRunning ? (
-                <Button
-                  type="button"
+                    <Ellipsis className="size-5" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuItem onClick={() => onOpenInspector(model)}>
+                  <PanelRightOpen className="size-4" />
+                  {i18nService.t('localInferenceOpenInspector')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   variant="destructive"
-                  className="min-w-16"
-                  disabled={buttonsDisabled}
-                  data-local-inference-model-action-button="true"
-                  data-local-inference-unload-button="true"
-                  onClick={() => onUnload(model.name)}
+                  data-local-inference-delete-button="true"
+                  onClick={() => onDelete(model)}
                 >
-                  {i18nService.t('close')}
-                </Button>
-              ) : renderLoadButton ? (
-                renderLoadButton(model, { disabled: buttonsDisabled, onClick: handleLoadModel })
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-w-16"
-                  disabled={buttonsDisabled}
-                  data-local-inference-model-action-button="true"
-                  onClick={handleLoadModel}
-                >
-                  {i18nService.t('start')}
-                </Button>
-              )}
-            </div>
+                  <Trash2 className="size-4" />
+                  {i18nService.t('delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </CardHeader>
+
+        <CardContent className="flex flex-1 flex-col justify-center gap-1.5 px-4 py-2">
+          <p className="line-clamp-1 text-xs leading-5 text-muted-foreground">
+            {[
+              quantization,
+              formatModelFormatTag(model.details?.format),
+              model.size ? formatBytes(model.size) : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || i18nService.t('localInferenceDetails')}
+          </p>
+        </CardContent>
+
+        <CardFooter className="mt-auto flex items-center justify-between gap-3 p-4 pt-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {hasDetailsTag ? (
+              <HoverCard>
+                <HoverCardTrigger
+                  delay={200}
+                  closeDelay={100}
+                  render={
+                    <Badge
+                      variant="secondary"
+                      className={cn(modelCardTagBaseClassName, 'shrink-0 cursor-default')}
+                    >
+                      {i18nService.t('localInferenceDetails')}
+                    </Badge>
+                  }
+                />
+                <HoverCardContent
+                  side="right"
+                  align="start"
+                  className="theme-control-sizing-10 w-auto min-w-52"
+                >
+                  <div className="flex flex-col gap-2">
+                    {details.map(item => (
+                      <MetadataRow key={item.label} label={item.label} value={item.value} />
+                    ))}
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            ) : null}
+            {visibleTags.map(tag => (
+              <Badge
+                key={tag.label}
+                variant="secondary"
+                className={cn(modelCardTagBaseClassName, 'shrink-0')}
+              >
+                {tag.label}
+              </Badge>
+            ))}
+          </div>
+
+          <div className="flex shrink-0 items-center">
+            {loadingModel ? null : isRunning ? (
+              <Button
+                type="button"
+                variant="destructive"
+                className="min-w-16"
+                disabled={buttonsDisabled}
+                data-local-inference-model-action-button="true"
+                data-local-inference-unload-button="true"
+                onClick={() => onUnload(model.name)}
+              >
+                {i18nService.t('close')}
+              </Button>
+            ) : renderLoadButton ? (
+              renderLoadButton(model, { disabled: buttonsDisabled, onClick: handleLoadModel })
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-w-16"
+                disabled={buttonsDisabled}
+                data-local-inference-model-action-button="true"
+                onClick={handleLoadModel}
+              >
+                {i18nService.t('start')}
+              </Button>
+            )}
+          </div>
+        </CardFooter>
       </Card>
     </div>
   );

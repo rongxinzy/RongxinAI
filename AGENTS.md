@@ -1,484 +1,223 @@
 # AGENTS.md
 
-This file provides guidance to coding agents when working with code in this repository.
+本仓库编码 agent 指南。CLAUDE.md 是本文件的软链接。用户指令与本文件冲突时，先请求明确确认再执行。
 
-## Build and Development Commands
+## 核心原则
+
+1. **Pi First。** `src/main/libs/agentEngine/piRuntimeAdapter.ts` 是唯一执行内核（Work/Chat/Channel/Cron 全走它）。新能力优先用 Pi 原生机制，不在 harness 层重造。
+2. **Harness 不得劣化 Pi。** 提示注入、工具包装、闸门、拦截、强制纠偏等不得浪费 token、制造模型摩擦或扭曲行为基线；被证明劣化的机制直接移除，不加固。反例：强制模型先调 `set_task_output` 声明交付物（#786 引入、#917 移除），不得重新引入。
+3. **设计合规是前端 P0 门禁。** 见下文「前端设计规则」。设计违规即阻断缺陷，功能可用或测试通过不能抵消。
+
+## 命令
 
 ```bash
-# Development - starts Vite + Electron with hot reload (port starts at 5175, auto-increments if busy)
-npm run electron:dev
-
-# Build production bundle (TypeScript + Vite)
-npm run build
-
-# Lint with oxlint (config: .oxlintrc.json)
-npm run lint
-
-# Format with oxfmt (config: .oxfmtrc.json)
-npm run format
-
-# Run unit tests (Vitest)
-npm test
-
-# Compile Electron main process only
-npm run compile:electron
-
-# Package for distribution (platform-specific)
-npm run dist:mac        # macOS (.dmg)
-npm run dist:win        # Windows (.exe)
-npm run dist:linux      # Linux (.AppImage)
-
+npm run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
+npm run build              # 生产构建（TS + Vite）
+npm run lint               # oxlint，含 theme:check / theme:audit
+npm run format             # oxfmt；提交前 bun run format:check
+npm test                   # Vitest；npm test -- <name> 过滤
+npm run compile:electron   # 仅主进程
+npm run dist:mac|dist:win|dist:linux
+bun run theme:generate     # 改 token/recipe/生成器后必跑
+npm run rebuild:electron-native   # 原生模块依赖变更后
 ```
 
-**Requirements**: Node.js >=24 <25, Bun >=1.3 (package manager; `bun install` instead of `npm install`, lockfile is `bun.lock`). Windows builds require PortableGit (see README.md for setup).
+Node >=24 <25，Bun >=1.3。包管理只用 Bun（`bun install`、`bun.lock`），npm 只跑脚本。Windows 构建需 PortableGit（见 README.md）。
 
-## 设计宪法：DESIGN.md
+## 产品与品牌
 
-`DESIGN.md` 是本仓库一切 UI 工作的**最高约束（宪法级）**，是色彩、字体、字号、圆角、阴影、间距、边框、透明度、动效、交互手感、组件范式的唯一事实来源。本文件中任何 UI 条目与 DESIGN.md 冲突时，以 DESIGN.md 为准。
+知远智能体 (ZhiYuan Agent)：Electron + React 本地优先 AI Agent 桌面应用（Cowork 会话、本地推理、Skills/MCP、Artifacts 预览）。
 
-1. **先读再写。** 新增或修改任何 UI 代码之前，必须先读 DESIGN.md 的相关章节。凭记忆、凭组件库默认值、凭仓库现有代码写 UI，视同未读。
-2. **冲突时代码让路。** 既有代码、组件库默认样式、第三方示例与 DESIGN.md 冲突时，以 DESIGN.md 为准并修正代码。禁止引用旧先例为新违规辩护——"原来就是这么写的"不是理由。
-3. **评审可仅凭违反 DESIGN.md 打回。** 不需要证明存在 bug 或功能缺陷；违反标准本身即是缺陷。
-4. **标准只在一个地方改。** 需要新颜色、新圆角、新动效、新控件范式时，先改 DESIGN.md 和 token 契约，再写代码。禁止在调用点用任意值（`rounded-[7px]`、`shadow-[...]`、`text-[13px]`）绕过刻度。
-5. **用户明确要求偏离时**，先指出与 DESIGN.md 的冲突并确认，然后在 PR 描述中标注偏离点。
+- 对外文案只用「知远智能体 (ZhiYuan Agent)」，旧名不得复活。Pi、cc-connect、llama.cpp 是内部细节，不得出现在用户可见文案；对外称全栈自研。
+- **焦土政策**：旧标识、旧运行时、旧库文件不做迁移、兼容层、读取、启动、打包或回退；旧数据原地弃置，不主动删除。不做用户未要求的向后兼容。
 
-## Architecture Overview
+## 架构
 
-知远智能体 is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
+### 进程
 
-1. **Cowork Mode** - AI-assisted task sessions powered exclusively by the in-process Pi runtime
-2. **llama.cpp Local Inference** - local model service management, model launch options, and Pi model integration
-3. **Skills and MCP** - built-in skills, remote skill marketplace, and MCP server configuration
-4. **Artifacts System** - rich preview of code outputs (HTML, SVG, React, Mermaid)
+- **Main**（`src/main/main.ts`）：窗口、SQLite（better-sqlite3，`sqliteStore.ts`，库文件 userData/`zhiyuan.sqlite`）、Pi 运行时、llama.cpp 生命周期（`libs/llamacppManager.ts`、`src/shared/llamacpp/`）、Skill 管理（`skillManager.ts`）、MCP、IPC handler。安全：contextIsolation 开、nodeIntegration 关、sandbox 开。
+- **Channel/Cron 传输**（`src/main/libs/ccConnect*`、`src/main/im/`）：只搬运事件与 cron 触发，不执行 Agent、不持有任务状态。对外渠道：微信、企业微信、钉钉、飞书/Lark、QQ、Email；旧 connector 不得在 UI/文档重新暴露。
+- **Preload**（`src/main/preload.ts`）：`window.electron`，含 `cowork` 命名空间。
+- **Renderer**（`src/renderer/`）：全部 UI 与业务逻辑，只经 IPC 访问主进程；非 UI 逻辑放 `src/renderer/services/`。
 
-Uses strict process isolation with IPC communication.
+### 主进程 / Worker 边界
 
-Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. All pre-rebrand product names are retired and must not be reintroduced. Pi, cc-connect, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Legacy identifiers and the retired runtime are handled under a scorched-earth policy: no data migration, compatibility shims, reads, startup, packaging, or fallback. Old data and directories are abandoned in place and are not actively deleted.
+主进程必须保持响应：请求/IPC/agent 流路径上禁止同步递归扫盘、整文件读/哈希、大 JSON/Markdown 解析、重正则、压缩等 CPU 密集工作，放 `worker_threads`：
 
-### Authentication Flow
+- Worker 要求：入出参可序列化、隔离可变状态、有界池 ≤2、可取消、限输入/队列、结构化错误、尽量传 ArrayBuffer。主进程负责校验路径与结果、执行写操作、维护用户可见状态，并记录新任务排队/运行耗时。
+- 永不进 Worker：Electron API、SQLite 连接/事务、agent 会话生命周期、工具审批、流排序、密钥、renderer/DOM。
+- **Touch-to-refactor**：改动含阻塞扫描/哈希/解析/转换的组件（Skill 安全扫描、artifact 收集哈希、备份快照哈希、模型目录扫描、大 artifact 解析等）时，同 PR 抽到 Worker，附边界测试与前后耗时/事件循环延迟证据；不可分离的部分在 PR 说明保留边界。
 
-浏览器登录后通过 deep-link 一次性 `authCode` 换取 2 小时 access token 与 30 天 refresh token；令牌保存在 SQLite `auth_tokens`。`fetchWithAuth()` 附带 Bearer token，401 或 access token 剩余不足 5 分钟时刷新并轮换 refresh token；30 天未使用则清除。实现见 `src/renderer/services/api.ts`、`src/main/main.ts`、`src/main/sqliteStore.ts`。
+### Cowork 与数据流
 
-### Process Model
+- `App.tsx` → `coworkService.init()` → IPC 加载配置/会话 → 流监听；`startSession()` → IPC → `PiRuntimeAdapter` → 流事件 → Redux。
+- 流事件：`message` / `messageUpdate` / `permissionRequest` / `complete` / `error`。权限请求经 `CoworkPermissionModal` 回传引擎。
+- IPC：`cowork:startSession`、`continueSession`、`stopSession`、`getSession`、`listSessions`、`deleteSession`、`respondToPermission`、`getConfig`、`setConfig`。`cowork:stream:*` 承载 Work/Chat；Channel/Cron run 以只读 activity 投影暴露。
+- 执行模式 `CoworkExecutionMode`：`auto` / `local`。
+- 存储：`cowork_sessions` / `cowork_messages`；应用配置在 `kv`；Cowork 配置在 `cowork_config`；Task/Run/Delivery/ChannelAccount/ChannelSession 以 ZhiYuan SQLite 为准。
+- 认证：deep-link `authCode` 换 2h access + 30d refresh token（`auth_tokens`）；`fetchWithAuth()` 在 401 或剩余 <5 分钟时刷新并轮换。见 `src/renderer/services/api.ts`。
 
-**Main Process** (`src/main/main.ts`):
+### 托管 Python 运行时
 
-- Window lifecycle management
-- SQLite storage via `better-sqlite3` (`src/main/sqliteStore.ts`)
-- Agent runtime (`src/main/libs/agentEngine/`) - `piRuntimeAdapter.ts` is the sole execution kernel for Work, Chat, Channel, and Cron runs
-- Channel/Cron transport (`src/main/libs/ccConnect*`, `src/main/im/`) - cc-connect sidecars carry inbound/outbound events and cron triggers only; they never execute the agent or own task state
-- llama.cpp lifecycle and local inference management (`src/main/libs/llamacppManager.ts`, `src/shared/llamacpp/`)
-- Skill management (`src/main/skillManager.ts`)
-- MCP server configuration and marketplace integration
-- IM/email gateways (`src/main/im/`) - public-facing channels are WeChat, WeCom, DingTalk, Feishu/Lark, QQ, and Email. Legacy/global connector code may exist; do not re-expose it in UI or docs unless explicitly requested.
-- IPC handlers for store, cowork, and API operations (40+ channels)
-- Security: context isolation enabled, node integration disabled, sandbox enabled
+首启同步到 `userData/runtimes/`，两层：
 
-**Preload Script** (`src/main/preload.ts`):
+- `resources/python-win|mac|linux`：便携 CPython（uv 管理），agent shell PATH 基础解释器，`UV_PYTHON` 绑定。
+- `resources/skill-python/layers/shared`：合并所有内置 Skill requirements 的单个 uv venv，经 `applyManagedPythonEnv`（`src/main/libs/managedPythonEnv.ts`）前置到 PATH。Windows 需 `python3.exe` 别名（安装脚本创建，`ensureSharedSkillWindowsPython3Alias` 自愈）。`run_skill_script` 经 `findSkillPythonExecutable` 解析并强制 per-Skill `requirementsSha256` manifest 门。
+- **模型面策略三处必须同步**：`SYSTEM_PROMPT.md`（托管环境与工具节）、`piPythonEnvGuidelines.ts`（`python-runtime` contribution，用户覆盖系统提示后仍生效）、`piBashToolGuidelines.ts` 的 `getPiBashPythonEnvViolation`（拦截向托管解释器 pip install、直接 `python` 调内置 Skill 脚本）。
 
-- Exposes `window.electron` API via `contextBridge`
-- Includes `cowork` namespace for session management and streaming events
+### 记忆系统
 
-**Renderer Process** (React in `src/renderer/`):
+本地 Engram（`vendor/engram-runtime`）+ SQLite 投影表 `memory_links` / `memory_candidates` / `memory_outbox`。
 
-- All UI and business logic
-- Communicates with main process exclusively through IPC
+- 作用域：`project`（id = `workspace-` + sha256(cwd)，见 `src/main/workspaceUtils.ts`、`src/shared/memory/constants.ts`）；`personal`（`personal://zhiyuan-agent/user`，写入进候选队列，用户确认后生效）；`session`（摘要，30 天 TTL）。
+- 写入：Work 模式 `memory` 工具（`src/main/memory/piMemoryTool.ts`）先经 `AtomicMemoryExtractor`；每轮后 `runPostTurnMemoryMaintenance`。
+- 注入：每轮前 `buildProjectMemoryContextSafe`，预算 project/personal/session = 900/250/350 token。Chat 不用记忆；IM/Cron 同 Work。旧 `MEMORY.md` 只在启动时导入为候选，永不注入 prompt。
 
-### Main Process / Worker Boundary
+### 其他
 
-The Electron main process owns lifecycle, IPC, security decisions, persistent state, and ordering. It must remain responsive: do not add synchronous recursive filesystem traversal, whole-file reads/hashes, large JSON/Markdown parsing, regex-heavy scanning, compression, or other CPU-bound work to request, IPC, or agent-stream paths.
+- **Artifacts**：HTML/React 跑隔离 iframe，SVG 经 DOMPurify，Mermaid 严格安全模式——改渲染器不得破坏这些边界。
+- **TS**：`tsconfig.json`（renderer）、`electron-tsconfig.json`（主进程，CommonJS → `dist-electron/`）；别名 `@` → `src/renderer/`。
+- **Skills**：`SKILLs/` 是 Pi 运行时的内置 skill（经 `skills.config.json`），不是 IDE/agent 插件 skill。
+- **llama.cpp**：服务级选项管 `llama-server` 进程，模型级选项在加载/运行时传入。
 
-Use a Node `worker_threads` worker for a task only when its input/output is serializable and it can be isolated from mutable application state. Workers may scan files, parse/index content, hash immutable files, and perform bounded transforms. Use a bounded reusable pool (maximum two background workers), cancellation, input/queue limits, structured error results, and transfer `ArrayBuffer` payloads when practical. Main process code validates paths and results, owns writes and user-visible state changes, and records queue wait/run time for new worker jobs.
+## 前端设计规则（P0）
 
-Never move these across the boundary without an approved dedicated architecture change: Electron APIs (`BrowserWindow`, `ipcMain`, dialogs, `safeStorage`), SQLite connections/transactions, agent session lifecycle, tool approval, stream ordering, secrets, or renderer/DOM work. A Worker Thread does not make SQLite concurrency safe.
+适用于全部前端工作，不因改动小、赶时间、委派或使用组件库豁免。
 
-**Touch-to-refactor rule.** Any PR that changes a component containing blocking file scan/hash/parse/transform work must extract that work to a Worker Thread in the same PR; it is not optional cleanup. This applies in particular to Skill security scanning, artifact collection and hashing, backup snapshot hashing, model catalog scanning, and large artifact parsing. The PR must include a worker-boundary test plus before/after timing or event-loop-lag evidence. If the touched component owns a prohibited stateful operation, extract every separable pure blocking portion and document the retained ownership boundary in the PR; do not add further synchronous work there.
+### 事实来源与优先级
 
-### Data Flow
+- 视觉规范唯一来源是 [DESIGN.md](DESIGN.md)，具体数值只在那里维护。优先级：AGENTS.md / DESIGN.md > 项目 UI skills（`frontend-ui-change-strategy`、`rongxinai-ui-adapter`）> `design-taste-frontend` > `high-end-visual-design` > 组件库默认、历史代码、个人审美。规范间有实质冲突时指出冲突点，不得自选较宽松的一方。
+- 改 UI 前必须读 DESIGN.md 相关章节、受影响组件及其 token/recipe，并看下方范例。「原来就是这么写的」不是理由。
+- 「美化/优化/现代化」不是自由发挥许可。禁止擅自新增色系、字号/圆角/阴影档、装饰光晕、动画、嵌套卡片、Hero、导航层级或虚构状态。
+- 新视觉语义：先更新 DESIGN.md 与契约，再实现全部主题；禁止先实现再改规范背书。
+- 偏离已批准设计须取得用户明确授权（本轮已授权的不重复问），写入 DESIGN.md 并在 PR 列出。其他 agent 同意或工具默认不算授权。
+- 禁止绕过验收：不删弱检查项、不关审计、不扩白名单、不加无依据例外、不未经用户验收覆盖基准截图。
 
-1. **Initialization**: `src/renderer/App.tsx` → `coworkService.init()` → loads config/sessions via IPC → sets up stream listeners
-2. **Cowork Session**: User sends prompt → `coworkService.startSession()` → IPC to main → `PiRuntimeAdapter` → streaming events back to renderer via IPC → Redux updates
-3. **Tool Permissions**: Agent requests tool use → `PiRuntimeAdapter` emits `permissionRequest` → UI shows `CoworkPermissionModal` → user approves/denies → result sent back to engine
-4. **Persistence**: Cowork sessions stored in SQLite (`cowork_sessions`, `cowork_messages` tables)
-5. **Local Inference**: Renderer invokes llama.cpp IPC → main process manages `llama-server`, model install/list/load state, and service/model launch parameters
+### 已验收范例：2026-10-05 主界面
 
-### Cowork System
+后续产品界面必须继承此版理念，不得退回早期风格。基准截图（1280×800）：[浅色](docs/theme-previews/main-interface-2026-10-05-light.png)、[深色](docs/theme-previews/main-interface-2026-10-05-dark.png)；新基准须经用户验收并记录日期与理由。
 
-The Cowork feature provides AI-assisted coding sessions:
+| 特征 | 做法 | 入口 |
+| --- | --- | --- |
+| 侧栏分组清楚、主动作突出 | 模式/新建/功能/项目历史分层，靠留白与文字角色区分；新建用共享主按钮 | [SidebarNavigationView.tsx](src/renderer/components/shell/SidebarNavigationView.tsx)、[shell-sidebar.ts](src/renderer/theme/components/shell-sidebar.ts) |
+| 主输入区是视觉中心 | 正式字标、克制说明、居中输入岛；工具入口就近，无装饰光晕 | [CoworkView.tsx](src/renderer/components/cowork/CoworkView.tsx)、[classic-message-surfaces.ts](src/renderer/theme/components/classic-message-surfaces.ts) |
+| 控件规格一致 | 复用 ai-elements 输入与共享选择器；窄窗口下文件夹/权限/模型/提交仍可达 | [CoworkPromptInput.tsx](src/renderer/components/cowork/CoworkPromptInput.tsx)、[PromptWorkspaceSelector.tsx](src/renderer/components/cowork/PromptWorkspaceSelector.tsx)、[PromptSelectorButton.tsx](src/renderer/components/cowork/PromptSelectorButton.tsx) |
+| 引导项轻量中性 | 共享按钮 + Lucide 图标，胶囊对应真实任务，不做彩色装饰卡 | [QuickActionBar.tsx](src/renderer/components/quick-actions/QuickActionBar.tsx)、[classic-page-controls.ts](src/renderer/theme/components/classic-page-controls.ts) |
+| 明暗成套、外观与行为分离 | token + 注册 hook + recipe；切主题原位更新，保留输入与交互状态 | [home-studio.ts](src/renderer/theme/components/home-studio.ts)、[home-studio-contract.ts](src/renderer/theme/components/home-studio-contract.ts)、[classic-light.ts](src/renderer/theme/themes/classic-light.ts)、[classic-dark.ts](src/renderer/theme/themes/classic-dark.ts) |
 
-**Execution Modes** (`CoworkExecutionMode`):
+范例确立的是克制层级、统一控件、主题归属与状态连续性。设置页、列表页用 DESIGN.md 对应范式，不复制首页 Hero；引用文件中的遗留代码不因此豁免。
 
-- `auto` - Automatically choose based on context
-- `local` - Run tools directly on the local machine
+### 组件
 
-**Agent Engine**: Pi is the only execution kernel. `cowork:stream:*` carries Work/Chat events, while Channel/Cron runs are exposed as their own read-only activity projection. cc-connect only transports Channel/Cron inputs and deliveries.
+先查再写，禁止自造轮子。用户只能选整套主题 + 浅色/深色/跟随系统，不加其他独立样式设置。
 
-**Managed Python runtimes**: two layers, both synced to `userData/runtimes/` on first run.
+- **shadcn/ui**（`src/shared/components/ui/`）：页面 tab 只用 `PageTabs`（放 PageHeader tabs 槽），分段/筛选只用 `FluidTabs`，删除确认只用 `DestructiveConfirmDialog`。
+- **ai-elements**（`src/shared/components/ai-elements/`）：聊天/推理/工具/附件/代码等展示必须用它。
+- 图标只用 `lucide-react`，禁止手写 SVG 图标组件。
+- 页面顶栏只用 `src/renderer/components/PageHeader.tsx`；标题只在 PageHeader 出现一次，内容区不重复。
+- Button 的 className 只许布局类（`w-full`、`justify-start`、`gap-*`），外观走 variant/size。行级可点区域不用裸 `div onClick`（见 DESIGN.md「Button 使用纪律」）。
+- 结构组合用 Tailwind `className` + `cn()`（`@shared/lib/utils`）。Tailwind v4，无 `tailwind.config.js`；优先 shorthand variant（`data-active:` 而非 `data-[active]:`）。
 
-- `resources/python-win|mac|linux` — bare portable CPython (uv-managed). On the agent shell PATH as the base interpreter; `UV_PYTHON` binds uv to it.
-- `resources/skill-python/layers/shared` — a single relocatable uv venv built on the base runtime, carrying the merged `requirements.txt` of every bundled Skill (pandas, numpy, openpyxl, ...). Its interpreter is prepended to the agent shell PATH (`prependSkillSharedPythonToEnv` in `src/main/libs/coworkUtil.ts`), so ad-hoc `python` scripts can `import pandas` directly. Skill script execution (`run_skill_script`) resolves it via `findSkillPythonExecutable`, which additionally enforces a per-Skill `requirementsSha256` manifest gate.
+### 主题系统
 
-SYSTEM_PROMPT.md declares this environment to the model (运行环境与工具链 section); keep that section in sync when the runtime layout changes.
+主题包是仓库内注册的展示数据，不是插件或用户 CSS。详见 `src/renderer/theme/README.md`。
 
-**Memory System**: Semantic persistent memory in three scopes, backed by the local Engram runtime (`vendor/engram-runtime`, fork of z189yis/engram-cjk) with SQLite projection tables (`memory_links`, `memory_candidates`, `memory_outbox`):
-
-- `project` - Workspace-bound facts and decisions; the project id is `workspace-` + sha256(cwd) (see `src/main/workspaceUtils.ts` and `src/shared/memory/constants.ts`).
-- `personal` - Cross-workspace preferences under the fixed project id `personal://zhiyuan-agent/user`; writes enter a candidate queue and take effect only after user confirmation in Settings.
-- `session` - Per-session summaries with a 30-day TTL.
-- Writes: in Work mode the agent's `memory` tool (`src/main/memory/piMemoryTool.ts`) supports recall/list/save/propose_personal; save/propose first pass through evidence-based extraction (`AtomicMemoryExtractor`). After each turn, `runPostTurnMemoryMaintenance` rolls up the session summary.
-- Injection: before each turn a memory block is prepended to the prompt (`buildProjectMemoryContextSafe`, project/personal/session token budgets 900/250/350).
-- Chat mode does not use memory; IM/Cron sessions share the same pipeline as Work.
-- Legacy `MEMORY.md` files (`userData/agent-workspaces/main/`): imported at startup as legacy import candidates into the review queue; they are never injected into any prompt (legacy).
-
-**Stream Events** (IPC from main to renderer):
-
-- `message` - New message added to session
-- `messageUpdate` - Streaming content update for existing message
-- `permissionRequest` - Tool needs user approval
-- `complete` - Session execution finished
-- `error` - Session encountered an error
-
-**Key IPC Channels**:
-
-- `cowork:startSession`, `cowork:continueSession`, `cowork:stopSession`
-- `cowork:getSession`, `cowork:listSessions`, `cowork:deleteSession`
-- `cowork:respondToPermission`, `cowork:getConfig`, `cowork:setConfig`
-
-### Key Patterns
-
-- **Streaming responses**: provider chat APIs can use SSE with `onProgress` callback for real-time message updates
-- **Cowork streaming**: Uses IPC event listeners (`onStreamMessage`, `onStreamMessageUpdate`, etc.) for bidirectional communication
-- **Markdown rendering**: `react-markdown` with `remark-gfm`, `remark-math`, `rehype-katex` for GitHub markdown and LaTeX
-- **Theme system**: Class-based Tailwind dark mode, applies `dark` class to `<html>` element
-- **i18n**: Simple key-value translation in `services/i18n.ts`, supports Chinese (default) and English. Language auto-detected from system locale on first run.
-- **Path alias**: `@` maps to `src/renderer/` in Vite config for imports.
-- **Skills**: Custom skill definitions in `SKILLs/` directory, configured via `skills.config.json`
-- **llama.cpp parameters**: service-level options control the managed `llama-server` process; model-level options are passed when loading or running a model.
-
-### Artifacts System
-
-Artifacts support HTML, SVG, Mermaid, React/JSX, and code through explicit `artifact:*` fences or heuristics. HTML and React run in isolated iframes; SVG is sanitized with DOMPurify; Mermaid uses strict security. Preserve these boundaries when changing renderers.
-
-### Configuration
-
-- App config stored in SQLite `kv` table
-- Cowork config stored in `cowork_config` table (workingDirectory, systemPrompt, executionMode, **agentEngine**)
-- Cowork sessions and messages stored in `cowork_sessions` and `cowork_messages` tables
-- Task, Run, Delivery, ChannelAccount, and ChannelSession records are canonical in ZhiYuan SQLite
-- Database file: `zhiyuan.sqlite` in the user data directory. Pre-rename database files are not migrated or read — old data is abandoned in place (scorched earth).
-
-### TypeScript Configuration
-
-- `tsconfig.json`: React/renderer code (ES2020, ESNext modules)
-- `electron-tsconfig.json`: Electron main process (CommonJS output to `dist-electron/`)
-
-### Key Dependencies
-
-- Pi SDK packages - sole in-process agent execution kernel
-- cc-connect sidecar - Channel/Cron transport only
-- `better-sqlite3` - SQLite database for persistence
-- `react-markdown`, `remark-gfm`, `rehype-katex` - Markdown rendering with math support
-- `mermaid` - Diagram rendering
-- `dompurify` - SVG/HTML sanitization
-
-## UI Component Libraries
-
-项目使用两套 UI 组件库。**所有 UI 代码必须优先使用这些组件，禁止自造轮子。**
-
-**设计标准见 `DESIGN.md`——它是宪法级约束（见本文顶部「设计宪法」）。** 用户只能选择整套主题，以及浅色 / 深色 / 跟随系统模式；其他样式不提供单独设置。
-
-### shadcn/ui（基础组件）
-
-位于 `src/shared/components/ui/`，基于 [shadcn/ui](https://ui.shadcn.com/) 和 lucide。优先使用现有按钮、输入、选择、弹层、菜单、表格、反馈和布局组件；页面 tab 仅用 `page-tabs`，分段/筛选仅用 `fluid-tabs`，删除确认仅用 `destructive-confirm-dialog`。
-
-### ai-elements（对话组件）
-
-位于 `src/shared/components/ai-elements/`；聊天使用 `conversation`、`message`、`prompt-input`，按需使用 code、reasoning、tool、attachment、source、suggestion、loading 与 terminal 组件。
-
-### 规则
-
-1. **先查再写。** 写任何 UI 前，先检查上面两个目录是否有现成组件可用。
-2. **禁止自造基础组件。** 不要自己写 button / dialog / select / tooltip / tabs / popover 等，shadcn/ui 已有。
-3. **图标用 lucide-react。** 禁止手写 SVG 图标组件（项目已删除 30+ 个自定义 icon，全部迁移到 lucide）。
-4. **对话 UI 用 ai-elements。** 聊天、消息、推理展示等场景必须用 ai-elements，不要自己拼。
-5. **页面顶栏用 PageHeader。** 侧边栏切换的功能页必须使用 `src/renderer/components/PageHeader.tsx`（统一 h-12 / px-4 / draggable / border-b / 折叠按钮组 / mac 留白 / WindowTitleBar），禁止手写页面顶栏。页面标题只在 PageHeader 出现一次，内容区 hero 不重复标题。
-6. **三个唯一实现。** 页面级标签页用 `PageTabs`（放 PageHeader 的 tabs 槽位）、分段/筛选控件用 `FluidTabs`、删除确认用 `DestructiveConfirmDialog`。禁止手搓 tab、自造分段条、自写确认框——细则与选中态语言见 DESIGN.md 对应章节。
-7. **Button 覆写守纪律。** className 只许布局类（`w-full`、`justify-start`、`gap-*`）；颜色、圆角、阴影、字重、字号、高度一律走 variant/size 枚举。行级可点区域不得用裸 `div onClick`（完整范式见 DESIGN.md「Button 使用纪律」）。
-
-Use Tailwind `className` for structural composition and `cn()` from `@shared/lib/utils` for class merging. Control appearance belongs to theme recipes; do not add page-local CSS or appearance utilities to bypass them.
-
-## 主题系统开发约束
-
-设计边界以 `DESIGN.md` 为准；本节规定实现流程。当前主题包是仓库内注册的展示数据，不是可执行插件或用户自定义 CSS。
-
-### 事实来源与职责
-
-- `src/renderer/theme/themes/plugins.ts`：主题包注册，提供版本、唯一 ID、中英文名称及 light/dark 两套完整外观。新增风格必须同时提供两套，不得复制页面分支。
-- `src/renderer/theme/themes/types.ts`：`ThemeDefinition` 包含 `tokens`、`components` 和可选 `background`。token 契约在 `tokens/contract.ts`，组件 hook、状态和属性白名单在 `components/contract.ts`。
-- `src/renderer/theme/components/`：按钮、输入框、选择器、标签、卡片、弹层及其组合控件的外观数据；包含固定尺寸、内边距、字体、边框、圆角、阴影、透明度和状态动效。共享组件只绑定稳定 hook、语义 variant/size 与真实状态。
-- 共享组件和页面保留 DOM、布局关系、响应式排列、滚动、命中区域、键盘、焦点、禁用语义及业务逻辑。父容器填充、flex 收缩和弹层可用视口尺寸属于布局；控件自己的固定高宽、图标尺寸、内边距属于外观。
-- `engine/` 和 `components/css.ts` 负责变量、规则生成与原位应用。`css/themes.css` 必须由 `bun run theme:generate` 生成，禁止手改或用全局覆盖修补生成结果。
-
-### 修改与扩展规则
-
-1. 修改外观先定位现有 recipe；新增视觉语义时扩展共享 variant/size 或注册组件 hook，再补齐所有已注册主题外观。不得在页面、包装组件、原生控件或运行时生成的 DOM 中写局部颜色、圆角、阴影、字号、尺寸或状态样式来绕过契约；使用语义色 utility 也不能绕过控件 recipe。
-2. 每个 hook 必须声明 `COMPONENT_STATES` 的全部状态；使用 `recipe()` 补齐空状态。无独立视觉用空对象继承，不能漏字段。状态选择器和优先级由引擎统一定义，主题只能填写白名单外观属性；禁止任意选择器、脚本、事件、IPC、任意 CSS 注入及未登记变量。
-3. 组合组件、portal、伪元素和第三方控件也必须验证主题生效。稳定 hook 不能依赖会被包装层替换的 `data-slot`。第三方样式优先级适配只能放在引擎固定集成点，不在主题包中提高选择器权重或加入 `!important`。
-4. 切换主题不得改 React key、重建编辑器或清空草稿；不得改变焦点顺序、滚动、选中项、打开中的弹层、事件和持久化行为。动效遵守 `prefers-reduced-motion`；主题定义视觉参数，共享组件保留布局测量与交互时序。
-5. 背景的颜色、本地图片、内置绘制纹理和图层透明度由主题包统一提供。不得新增用户背景、颜色、字体、圆角、透明度等独立设置、存储键或覆盖入口。用户仅选择整套主题和明暗模式。
-6. 当前 Codex 外观继续遵守 `DESIGN.md` 的视觉刻度；新增主题在完整包中定义自己的外观，保留通用可访问性、功能与性能约束。内容图片、品牌标识和第三方文档预览不强制重着色。
-
-### 验证要求
-
-- 修改 token、recipe 或生成器后运行 `bun run theme:generate`；提交代码前运行 `npm run lint`（包含 `theme:check` 与 `theme:audit`）。不得用关闭审计、放宽白名单或随意增加例外代替迁移。
-- 按影响范围运行测试；共享主题契约或引擎改动运行 `npx vitest run src/renderer src/shared`、`npm run build` 和 `npm run test:bundle-budget`。仅修改文档时核对路径、命令与规则一致性，并运行 `git diff --check`。
-- 实际渲染验证覆盖 light/dark、键盘焦点、适用的 hover/pressed/selected/disabled/invalid/open 状态及减少动效。修改组合控件时同时验证包装层、portal 和动态内容。
-- 用一个修改了组件 recipe 的主题验证热切换，确认新值实际生效，草稿、焦点、选中项和弹层保留。检查实际尺寸与内容溢出，不能以截图相似或编译通过推断功能不变。
-- 源码审计是防回退检查，不能证明所有样式及第三方生成器都已覆盖。报告实际运行的验证及边界；组件浏览器测试不等于打包 Electron/IPC 全流程验证。
-
-## Coding Style & Naming Conventions
-
-- Use TypeScript, functional React components, and Hooks; keep logic in `src/renderer/services/` when it is not UI-specific.
-- Match existing formatting: 2-space indentation, single quotes, and semicolons.
-- Naming: `PascalCase` for components (e.g., `Chat.tsx`), `camelCase` for functions/vars, and `*Slice.ts` for Redux slices.
-- Tailwind CSS v4 supplies layout utilities and semantic token mappings. Control appearance is compiled from theme recipes, not assembled with local appearance utilities. CSS configuration starts in `src/renderer/index.css` and `src/renderer/theme/css/tailwind.css` (no `tailwind.config.js`).
-
-### File Length Limit
-
-- **单文件行数上限：** 单个文件最好不要超过 **800 行**，最多不能超过 **1000 行**。
-- **仅适用于新增文件：** 创建新文件时必须遵守此限制。拆分策略（子组件、按职责拆模块、提取类型到 `types.ts`）仅用于新建场景。
-- **已有超长文件：** 禁止给已有的超长文件继续追加逻辑。如需修改，将新增逻辑写入新文件，通过导入方式引用。**不要主动拆分已有超长文件**，除非用户明确要求重构。
-
-## 协作与沟通
-
-- 回答简洁直接，只写技术内容；commit、issue、PR 评论中不用 emoji、不写客套话。
-- 用户提问时先回答问题，再动手改代码或跑命令。
-- 回应用户反馈或方案评审时，先明确说同意或不同意，再说改了什么。
-- 解释非平凡设计按「问题 → 具体例子 → 方案 → 为什么必须这样做」的顺序，区分必要复杂度与可选复杂度。
-- 用户指令与本文件冲突时，先请求明确确认，再执行。
-
-## 代码质量红线
-
-- 大范围改动前完整读相关文件，不凭搜索片段做判断。
-- 禁止 `any`；确有必要时在旁注释理由。
-- 使用第三方库的 API/类型前，查 `node_modules` 里的实际声明，不凭记忆猜。
-- 禁止内联动态 import（`await import()`），一律顶层 import。
-- 删除看似有意为之的功能或代码前，先问用户。
-- 不做用户未要求的向后兼容（与焦土政策一致）。
-- 不通过降级或删除代码来绕过过期依赖的类型错误；升级依赖。
-- 临时脚本写到临时文件执行，用完删除；不在 bash 命令里嵌多行脚本。
-
-## 验证纪律
-
-- 代码改动（非文档）后运行 `npm run lint`，看完整输出，清零所有警告再提交。提交前运行 `bun run format:check`，CI 会拦截未过 oxfmt 的改动。
-- 新建或修改测试文件后，必须运行该测试并迭代到通过。
-- 全量测试存在少量环境相关的存量失败（skill smoke、release manifest 等）。遇到失败先用 `git stash` 对照 HEAD 判断是否由你的改动引入：既不把存量失败算到自己头上，也不拿它为自己的回归开脱。
-
-## 依赖纪律
-
-- 依赖与 `bun.lock` 变更视同代码评审：只在确有必要时新增依赖，先确认仓库内没有现成能力。
-- 直添依赖锁定精确版本；安装用 `bun install`。
-- 含原生模块（better-sqlite3、node-pty）的依赖变更后，用 `npm run rebuild:electron-native` 重建。
-
-## String Literal Constants
-
-**Never use bare string literals** for values that act as discriminants, status codes, IPC channel names, mode selectors, or any string compared/switched against in multiple places. Instead, define a centralized `as const` object and derive the type from it.
-
-### Pattern
+- 入口：`themes/plugins.ts`（注册；每套主题必须提供完整 light/dark）、`themes/types.ts`（`ThemeDefinition`）、`tokens/contract.ts`、`components/contract.ts`（hook/状态/属性白名单）、`theme/components/`（控件 recipe）、`engine/` + `components/css.ts`（生成与原位应用）。
+- `css/themes.css` 只由 `bun run theme:generate` 生成，禁止手改或全局覆盖。
+- **布局归组件**（DOM、排列、滚动、命中区、键盘、焦点、禁用语义、父容器填充、flex 收缩）；**外观归 recipe**（控件自身尺寸、内边距、字体、边框、圆角、阴影、透明度、状态动效）。禁止在页面/包装组件/原生控件/运行时 DOM 写局部颜色、圆角、阴影、字号、尺寸或状态样式；语义色 utility 也不得绕过 recipe。
+- 改外观先找现有 recipe；新语义先扩共享 variant/size 或注册 hook，再补齐所有主题。
+- 每个 hook 声明 `COMPONENT_STATES` 全部状态（无独立视觉用 `recipe()` 补空对象）。主题只能填白名单属性，禁止任意选择器、脚本、事件、IPC、CSS 注入、未登记变量。稳定 hook 不依赖会被包装层替换的 `data-slot`；第三方样式优先级只在引擎固定集成点处理，禁止提权重或 `!important`。
+- 切主题不得改 React key、重建编辑器、清草稿，不改变焦点、滚动、选中、弹层、事件和持久化；动效遵守 `prefers-reduced-motion`。
+- 背景由主题包提供，不新增用户侧设置、存储键或覆盖入口。
+
+### 前端工作流程
+
+1. **改前**：列出涉及的 DESIGN.md 章节、复用组件、token/recipe 入口、受影响页面/状态。
+2. **委派**：传递规范、范例与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
+3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」，每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
+4. **实际渲染**（`npm run electron:dev`）：light/dark；适用状态（hover/pressed/selected/disabled/invalid/open）；键盘焦点；窄窗口、长文本、动态内容、portal；reduced-motion；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留；检查实际尺寸与溢出。
+5. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
+
+截图、测试、lint 各证明不同事项，互不替代；自动检查不覆盖设计判断。纯文档改动只做一致性与链接检查，不宣称 UI 验收。
+
+## 编码规范
+
+- TypeScript，函数组件 + Hooks；2 空格、单引号、分号。组件 `PascalCase`，函数/变量 `camelCase`，Redux slice `*Slice.ts`。
+- 禁止 `any`（确需时旁注理由）。第三方 API/类型先查 `node_modules` 实际声明。
+- 禁止内联 `await import()`，一律顶层 import。
+- 文件：新文件目标 ≤800 行、硬上限 1000 行。已有超长文件不再追加，新逻辑写新文件 import；不主动拆旧文件，除非用户要求。
+- 大范围改动前完整读相关文件，不凭搜索片段判断。
+- 删除看似有意为之的功能/代码前先问用户。
+- 过期依赖的类型错误靠升级依赖解决，不降级或删代码绕过。
+- 临时脚本写临时文件执行、用完删除；不在 bash 命令里嵌多行脚本。
+
+### 字符串常量
+
+判别值、状态码、IPC channel、模式选择器等多处比较的字符串禁止裸字面量，每模块一个 `constants.ts`（范例 `src/scheduledTask/constants.ts`）：
 
 ```typescript
-// In constants.ts (one per module, e.g. src/scheduledTask/constants.ts)
-export const SessionTarget = {
-  Main: 'main',
-  Isolated: 'isolated',
-} as const;
+export const SessionTarget = { Main: 'main', Isolated: 'isolated' } as const;
 export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 ```
 
-### Rules
+- 构造、比较、测试都用常量（`SessionTarget.Main`）；接口判别字段保持字面量定义联合形状（`kind: 'at'`），常量值与之对齐。
+- 所有 `ipcMain.handle()` / `ipcRenderer.invoke()` 必须引用 `IpcChannel` 常量。
+- 豁免：外部透传平台标识（`'feishu'`）、单点一次性字符串（错误消息、log tag）、Tailwind/React UI 字符串。
 
-1. **One source of truth per module.** Each module that owns a set of string constants must have a `constants.ts` file. Consumer modules import both the value object and the type.
-2. **Value construction and comparison must use constants.** Write `SessionTarget.Main`, not `'main'`. This applies to source files, test files, and any other TypeScript that references these values.
-3. **Discriminant `kind` fields in interface definitions remain literal.** The `kind: 'at'` in `interface ScheduleAt` defines the discriminated union shape and must stay as a literal. The constant should match this value; consumers use the constant object for comparisons and construction.
-4. **IPC channel names must be constants.** All `ipcMain.handle()` registrations and `ipcRenderer.invoke()` calls must reference an `IpcChannel` constant, never a bare string.
-5. **Tests use constants too.** Test files must import and use the same constants — this is the primary defense against "modified the constant but forgot to update the test" drift.
+### 日志
 
-### What NOT to constantize
+`src/main/logger.ts`（electron-log）接管主进程 `console.*`，直接用 console，禁止另引日志库。
 
-- Platform-specific identifiers passed through from external sources (e.g., `'feishu'`, `'weixin'`, `'email'` as IM/email platform names from user config).
-- One-off strings used in a single location with no comparison logic (e.g., error messages, log tags).
-- CSS class names, HTML attributes, and other UI-layer strings managed by Tailwind/React.
+- `error` 不可恢复；`warn` 可恢复/降级；`log` 关键生命周期（服务启停、连接、会话创建销毁、配置变更）；`debug` 调试细节。
+- 格式：`[ModuleName]` + 纯英文自然语句（`received 5 messages`，不写 `historyMessages: 5`）；一行一事；error/warn 带可追踪 ID；error 对象作最后参数：`console.error('[Module] operation failed:', error)`。
+- 高频路径（轮询、心跳、同步循环）禁止逐 tick info 日志；不写函数入口日志。
 
-### Existing reference
+### i18n
 
-`src/scheduledTask/constants.ts` is the canonical example of this pattern, covering schedule kinds, payload kinds, delivery modes, session targets, wake modes, origin kinds, binding kinds, task status, IPC channels, and migration keys.
+用户可见字符串一律走 `t()`：renderer 用 `src/renderer/services/i18n.ts`，主进程（托盘、会话标题、通知）用 `src/main/i18n.ts`。新键 zh/en 齐全，不确定先留 `// TODO: translate`。仅 DevTools/日志可见的信息豁免。
 
-## Logging Guidelines
+### 依赖
 
-The main process uses `electron-log` via `src/main/logger.ts`, which intercepts all `console.*` calls and writes them to daily-rotated log files. **No additional logging library is needed** — use the standard `console` API everywhere in `src/main/`.
+只在必要时新增，先确认仓库内无现成能力；精确锁版本，用 `bun install`；`bun.lock` 变更视同代码评审。含原生模块（better-sqlite3、node-pty）的变更后跑 `npm run rebuild:electron-native`。
 
-### Log Levels
+## 测试与验证
 
-Choose the level that matches the **significance** of the event:
+- 代码改动后跑 `npm run lint` 并清零警告；提交前 `bun run format:check`。
+- 改 token/recipe/生成器：`bun run theme:generate`。改共享契约/主题引擎：另跑 `npx vitest run src/renderer src/shared`、`npm run build`、`npm run test:bundle-budget`。
+- 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
+- 全量测试有少量环境相关存量失败（skill smoke、release manifest 等）。遇失败用 `git stash` 对照 HEAD 判断是否由你引入。
+- **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> npx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
+- UI 改动在 `npm run electron:dev` 验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。
 
-| Level | API             | When to use                                                                                                                                                    |
-| ----- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Error | `console.error` | Unrecoverable failures that need investigation — caught exceptions, broken invariants, data corruption                                                         |
-| Warn  | `console.warn`  | Unexpected but recoverable situations — missing optional config, fallback behavior, degraded service                                                           |
-| Info  | `console.log`   | Key lifecycle events worth keeping in production logs — service started/stopped, connection established/lost, session created/destroyed, configuration changed |
-| Debug | `console.debug` | Development-time detail useful only when actively debugging — intermediate state, request/response payloads, loop iterations, sync cursors                     |
+## Git 与 PR
 
-### Message Format
+本仓库可能有多个 agent 会话并行，工作区改动混杂：
 
-Log messages must read as **plain English sentences**, not as variable dumps.
+- 只提交本会话改的文件：`git add <显式路径>`，禁止 `git add -A` / `.`；提交前 `git status` 核对。
+- 禁止 `git reset --hard`、`git checkout .`、`git clean -fd`、`git commit --no-verify`、`git push --force`。
+- `git stash` 必带 `-m` 并在本会话尽快 pop。冲突只解自己改过的文件，否则中止问用户。
+- 评审 PR 用 `gh pr view` / `gh pr diff` / `gh api`，不 checkout 他人分支。审查等对方声明完成后再做，或约定不重叠文件域；边写边审须标注审查时点。
+- 报缺陷前对照 HEAD 验证根因；不确定按「疑似」上报。
 
-**Tag**: Every message starts with a bracketed module tag: `[ModuleName]`.
+**提交**：Conventional Commits，全英文 `type(scope): summary`。type ∈ `feat|fix|refactor|chore|docs|test|perf|style|ci|build|revert`；subject 小写祈使、≤72 字符、无句号；body 写 why；破坏性变更加 `!` 与 `BREAKING CHANGE:` footer；关联 issue 每个都写关键词（`closes #1, closes #2`）。不用 emoji、不写客套话。
 
-```typescript
-// Good — describes what happened in natural language
-console.log('[ChannelSync] discovered 3 new channel sessions, notified 2 windows');
-console.warn('[ChannelSync] session list returned unexpected type, skipping');
-console.error('[ChannelSync] polling failed:', error);
+**PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。所有 PR（含文档）需非作者的一次正式 GitHub approval，新提交使旧 approval 失效；不按作者姓名指定特殊评审人。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
 
-// Bad — dumps variable names and raw values
-console.log(
-  '[ChannelSync] pollChannelSessions: got',
-  sessions.length,
-  'sessions, keys:',
-  sessions.map(s => s?.key).join(', '),
-);
-console.log(
-  '[Debug:syncChannelUserMessages] cursor:',
-  cursor,
-  'history entries:',
-  historyEntries.length,
-);
-```
+**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 按 PR diff 路径选择；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
 
-### Rules
+**项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 
-- **No per-tick logging at info level.** Polling loops, sync cycles, and heartbeats that fire every few seconds must use `console.debug` or be removed entirely. A single summary line at info level is acceptable only when something meaningful changed (e.g. new session discovered, messages synced).
-- **No function-entry logging.** Do not log "function X called with args Y" unless it is a rare or important operation. Routine calls (per-poll, per-message) must not produce info-level output.
-- **No variable-name labels.** Write `received 5 messages` not `historyMessages: 5`. Write `session not found` not `sessionId: null`.
-- **Include context only when useful.** An error log should include the relevant identifier (session ID, channel key) so the issue can be traced. A routine success log should not list every parameter.
-- **Keep messages concise.** One line per event. Do not spread a single log across multiple `console.log` calls.
-- **Errors must include the error object.** Always pass the caught error as the last argument: `console.error('[Module] operation failed:', error)`.
-- **Use English for all log messages.** No Chinese or other non-ASCII text in logs.
+## 协作
 
-### Before Submitting
+- 回答简洁直接；用户提问先回答，再动手。
+- 回应评审先明确同意/不同意，再说改了什么。
+- 解释非平凡设计按「问题 → 例子 → 方案 → 为何必须」，区分必要与可选复杂度。
 
-When adding or modifying log statements, verify:
+## 外部 Skills
 
-1. No new `console.log` calls inside hot loops or polling callbacks — use `console.debug` instead.
-2. Messages read as natural English, not as stringified code.
-3. Error/warn logs include enough context to diagnose without a debugger.
+- 产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 DESIGN.md + 共享组件 + `rongxinai-ui-adapter` 为准，不套营销页默认。landing/营销/品牌页用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。可选 `shadcn/ui`、`vercel/ai-elements`、impeccable（`npx impeccable install`，`/impeccable`）。
+- 任何 skill 只补充本文件，不能取消设计自查或绕过已验收基准。
 
-## Testing Guidelines
+## 跨仓协作规范
 
-- Unit tests use [Vitest](https://vitest.dev/) and are **co-located** with the source files they cover.
-- Test files must use the `.test.ts` extension and be placed next to the source file (e.g. `src/main/foo.ts` → `src/main/foo.test.ts`).
-- Import test utilities from `vitest`: `import { test, expect } from 'vitest';`
-- **Never** use `.test.mjs` or any other extension — `.test.ts` is the only accepted format.
-- Run all tests: `npm test`. Filter by module: `npm test -- <name>` (e.g. `npm test -- logger`).
-- Avoid importing Electron-only APIs (e.g. `electron-log`) in tests — inline any logic that depends on them.
-- **Provider replay lane**: `tests/piLongTaskReplay.test.ts` runs a recorded 200-document long task against the full Pi adapter stack with no live model. `tests/replay/piProviderTape.ts` serves the tape (`tests/replay/tapes/longtask-200doc.jsonl.gz`) with strict seq+hash request matching, so prompt-assembly, tool-wiring, gating, or run-completion drift fails the test. Re-record intentionally with `AB_LONGTASK=record npx vitest run tests/abLongTask.harness.test.ts` (uses the live provider at `LONGTASK_LIVE_UPSTREAM` in `tests/replay/piLongTaskScenario.ts`) when prompts or the scenario change.
-- Validate UI changes manually by running `npm run electron:dev` and exercising key flows:
-  - Cowork: start session, send prompts, approve/deny tool permissions, stop session
-  - Artifacts: preview HTML, SVG, Mermaid diagrams, React components
-  - Settings: theme switching, language switching
-- Keep console warnings/errors clean; lint via `npm run lint` before submitting.
-
-## Internationalization (i18n)
-
-- **Never hardcode user-visible strings.** All UI text, labels, messages, and titles must go through the i18n system.
-- **Renderer process**: use `t('key')` from `src/renderer/services/i18n.ts`. Add new keys to both the `zh` and `en` sections in that file.
-- **Main process** (tray menu, session titles, notifications, etc.): use `t('key')` from `src/main/i18n.ts`. Add new keys to both the `zh` and `en` sections in that file.
-- When adding a new key, always provide translations for **both** languages. If unsure of a translation, leave a comment like `// TODO: translate` rather than omitting the key.
-- Error messages shown only in DevTools/logs (not visible to users) are exempt.
-
-## Commit & Pull Request Guidelines
-
-**All commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) spec and be written in English.**
-
-### Commit Message Format
-
-```
-type(scope): short imperative summary
-
-Optional body in English markdown explaining *why* (not what).
-
-Optional footer: BREAKING CHANGE: ..., Closes #123, etc.
-```
-
-**Types**: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `style`, `ci`, `build`, `revert`
-
-**Rules**:
-
-- Subject line: lowercase, imperative mood, no trailing period, ≤72 chars
-- Scope (optional): the affected area, e.g. `feat(cowork):`, `fix(im):`
-- Body and footer must be in English markdown
-- Breaking changes: add `!` after type/scope (`feat!:`) **and** a `BREAKING CHANGE:` footer
-
-**Examples**:
-
-```
-feat(cowork): add streaming progress indicator
-fix(sqlite): prevent duplicate session insert on retry
-chore: bump version to 2026.3.18
-```
-
-- PRs should include a concise description, linked issue if applicable, and screenshots for UI changes.
-- Call out any Electron-specific behavior changes (IPC, storage, windowing) in the PR description.
-- 关联 issue 的修复在提交信息或 PR 中用 `closes #N`；多个 issue 时每个编号前都要重复关键词（`closes #1, closes #2`，共享关键词只关闭第一个）。
-
-### Git 安全（多会话共处）
-
-本仓库可能同时有多个 agent 会话在工作，工作区改动相互混杂。遵守：
-
-- 只提交你在本会话改动的文件；`git add` 用显式路径，禁止 `git add -A` / `git add .`；提交前 `git status` 核对暂存区。
-- 禁止 `git reset --hard`、`git checkout .`、`git clean -fd`、`git commit --no-verify`、`git push --force`——这些会摧毁其他会话的工作或绕过检查。
-- `git stash` 谨慎使用：必须带 `-m` 说明，并在同一会话内尽快 pop。
-- rebase/merge 冲突只解决你改过的文件；冲突出现在你没碰过的文件时，中止并问用户。
-- 评审 PR 用 `gh pr view` / `gh pr diff` / `gh api`，不要仅为评审而 checkout 别人的分支。
-- 审查类工作（对抗式审查、跨会话复核）等对面会话声明完成后再做，或提前约定互不重叠的文件域；一边写一边审时，报告必须标注审查对应的时点，说明结论只对该瞬间成立。
-- 报告缺陷前先验证根因：对照 HEAD 或用 `git stash` 区分新引入与历史遗留，不靠推断下结论；根因不确定时按“疑似”上报。
-
-## Agent-specific notes
-
-### Built-in skills
-
-The `SKILLs/` directory contains bundled skill definitions used by the Pi runtime. Do not confuse these with IDE/agent plugin skills.
-
-### Claude Code
-
-When using Claude Code with this repository, it reads `CLAUDE.md` (which points to this file) for context. For UI work, you may also use the following global Claude skills installed for this project:
-
-- `shadcn/ui` — shadcn/ui component usage and styling rules.
-- `vercel/ai-elements` — AI Elements chat components.
-- `rongxinai-ui-adapter` — 项目适配层：`--zy-*` 主题映射、页面级组件选择矩阵、i18n 与常量约定（与 DESIGN.md「技能参考」一致）。
-
-These global skills complement, not replace, the conventions in this file.
-
-### Frontend design skill routing
-
-- `design-taste-frontend` - brief inference, anti-slop review, and redesign guidance for landing pages, marketing pages, portfolios, and brand surfaces.
-- `high-end-visual-design` - optional reference for premium visual direction and motion choreography when the brief explicitly calls for it.
-- `frontend-ui-change-strategy` is the project-specific entry point for existing ZhiYuan Agent UI changes.
-- For Work, Chat, Settings, MCP, Skills, local inference, and other product surfaces, use `DESIGN.md`, the shared UI components, and `rongxinai-ui-adapter` as the source of truth. Do not apply marketing-page defaults from the taste skills wholesale.
-- For landing, marketing, portfolio, brand, or redesign work, read `design-taste-frontend` for brief inference and audit guidance.
-- Read `high-end-visual-design` only when premium visual treatment or complex motion is an explicit requirement, and adapt its ideas to the project's tokens, components, accessibility, and performance rules.
-- Conflict precedence is: `AGENTS.md` / `DESIGN.md` > project UI skills (`frontend-ui-change-strategy`, `rongxinai-ui-adapter`) > `design-taste-frontend` > `high-end-visual-design`.
-
-> **主题开发入口：** 遵守本文「主题系统开发约束」与 `DESIGN.md` 的主题章节；契约、注册方法和验证边界见 `src/renderer/theme/README.md`。
->
-> **CRITICAL: Tailwind v4 Variant Syntax**
->
-> This project uses **Tailwind v4** (upgraded from v3.4). v4 supports shorthand variant syntax natively:
->
-> | Variant             | Tailwind v4 (shorthand)     |
-> | ------------------- | --------------------------- |
-> | `data-*` attribute  | `data-active:bg-background` |
-> | `data-*` with value | `data-checked:bg-primary`   |
-> | `data-*` boolean    | `data-disabled:opacity-50`  |
->
-> **Note**: The full syntax `data-[active]:bg-background` also works in v4, but shorthand is preferred. The upgrade codemod automatically converted v3-style `data-[active]:` to v4-style `data-active:` in all component files.
+提交、PR 标题与说明、review、bug fix 验证遵循 [DEVOPS.md](DEVOPS.md)。本仓已有专项安全、设计与发布门继续执行。

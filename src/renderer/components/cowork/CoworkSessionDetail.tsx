@@ -3,6 +3,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
 import { Button } from '@shared/components/ui/button';
 import { ChevronDown, ChevronUp, Download, Image as ImageIcon } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -168,7 +169,7 @@ class ArtifactPanelErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <aside className="w-[420px] shrink-0 border-l border-border-subtle bg-background flex flex-col h-full items-center justify-center p-4">
-          <p className="text-sm text-red-500 mb-2">Artifact panel error</p>
+          <p className="text-sm text-destructive mb-2">Artifact panel error</p>
           <pre className="text-xs text-muted whitespace-pre-wrap max-w-full overflow-auto mb-3">
             {this.state.error?.message}
           </pre>
@@ -1202,22 +1203,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         )
       }
     >
-      {/* Export Options Modal */}
-      {!isSessionSwitching && showExportOptions && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
-          onClick={() => setShowExportOptions(false)}
-        >
-          <div
-            className="w-full max-w-xs mx-4 overflow-hidden modal-content"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b dark:border-claude-darkBorder border-claude-border">
-              <h3 className="text-base font-semibold dark:text-claude-darkText text-claude-text">
+      {/* Export Options Dialog */}
+      {!isSessionSwitching && (
+        <Dialog open={showExportOptions} onOpenChange={setShowExportOptions}>
+          <DialogContent className="sm:max-w-xs">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold">
                 {i18nService.t('coworkExportAs')}
-              </h3>
-            </div>
-            <div className="py-1">
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-1 py-1">
               <Button
                 variant="ghost"
                 className="theme-action-row-large w-full justify-start gap-3"
@@ -1227,8 +1222,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 }}
                 disabled={isExportingImage}
               >
-                <ImageIcon className="h-5 w-5" />
-                <div>
+                <ImageIcon className="h-5 w-5 shrink-0" />
+                <div className="text-left">
                   <div className="font-medium">{i18nService.t('coworkExportImage')}</div>
                   <div className="text-xs text-muted-foreground">
                     {i18nService.t('coworkExportImageDesc')}
@@ -1243,8 +1238,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   handleExportText('md');
                 }}
               >
-                <Download className="h-5 w-5" />
-                <div>
+                <Download className="h-5 w-5 shrink-0" />
+                <div className="text-left">
                   <div className="font-medium">Markdown</div>
                   <div className="text-xs text-muted-foreground">
                     {i18nService.t('coworkExportMarkdownDesc')}
@@ -1259,8 +1254,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   handleExportText('json');
                 }}
               >
-                <Download className="h-5 w-5" />
-                <div>
+                <Download className="h-5 w-5 shrink-0" />
+                <div className="text-left">
                   <div className="font-medium">JSON</div>
                   <div className="text-xs text-muted-foreground">
                     {i18nService.t('coworkExportJSONDesc')}
@@ -1268,8 +1263,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 </div>
               </Button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Content row: chat + artifact panel */}
@@ -1544,13 +1539,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               createPortal(
                 <div
                   className={`fixed z-100 px-3.5 py-2 text-sm leading-snug pointer-events-none overflow-hidden
-              max-w-[240px] shadow-elevated
-              border
-              ${
-                railTooltip.isUser
-                  ? 'rounded-xl rounded-br-sm bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
-                  : 'rounded-xl bg-neutral-50 border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
-              }`}
+              max-w-[240px] shadow-lg border border-border bg-surface-overlay text-foreground
+              ${railTooltip.isUser ? 'rounded-xl rounded-br-sm' : 'rounded-xl'}`}
                   style={{
                     top: railTooltip.top,
                     right: railTooltip.right,
@@ -1558,12 +1548,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   }}
                 >
                   {!railTooltip.isUser && (
-                    <div className="text-xs font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
-                      知远智能体：
-                    </div>
+                    <div className="text-xs font-medium mb-0.5 text-foreground">知远智能体：</div>
                   )}
                   <div
-                    className="text-neutral-600 dark:text-neutral-300"
+                    className="text-muted-foreground"
                     style={{
                       display: '-webkit-box',
                       WebkitLineClamp: 2,

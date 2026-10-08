@@ -43,12 +43,11 @@ const DIMENSION_LABELS: Record<string, string> = {
   web_content: 'securityDimWebContent',
 };
 
-// Severity dots shifted down one level to reduce user alarm
 const SEVERITY_DOTS: Record<string, string> = {
-  info: 'bg-gray-400',
-  warning: 'bg-blue-400',
-  danger: 'bg-yellow-500',
-  critical: 'bg-orange-500',
+  info: 'bg-muted-foreground',
+  warning: 'bg-info',
+  danger: 'bg-warning',
+  critical: 'bg-destructive',
 };
 
 const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
@@ -109,6 +108,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
           size="icon-sm"
           onClick={() => onAction('cancel')}
           className="theme-page-skill-security-report-button-1"
+          aria-label={i18nService.t('close')}
         >
           <X className="h-4 w-4 text-muted-foreground" />
         </Button>
@@ -178,7 +178,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                               {finding.line ? `:${finding.line}` : ''}
                             </p>
                             {finding.matchedPattern && (
-                              <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-xs text-muted-foreground break-all overflow-x-auto max-h-16">
+                              <p className="mt-1 px-2 py-1 rounded-md bg-surface-raised font-mono text-xs text-muted-foreground break-all overflow-x-auto max-h-16">
                                 {finding.matchedPattern}
                               </p>
                             )}
