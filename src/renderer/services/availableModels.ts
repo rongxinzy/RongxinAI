@@ -12,6 +12,8 @@ import {
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
+  resolveConfiguredProviderModels,
+  resolveModelEndpoint,
 } from '../../shared/providers';
 import { type AppConfig, getProviderDisplayName } from '../config';
 import type { Model } from '../store/slices/modelSlice';
@@ -50,10 +52,7 @@ export function buildConfiguredAvailableModels(
     }
 
     const providerDefinition = ProviderRegistry.get(providerName);
-    const configuredModels =
-      providerConfig.codingPlanEnabled && providerDefinition?.codingPlanModels
-        ? providerDefinition.codingPlanModels
-        : providerConfig.models;
+    const configuredModels = resolveConfiguredProviderModels(providerName, providerConfig);
     if (!configuredModels) {
       return;
     }
@@ -77,17 +76,20 @@ export function buildConfiguredAvailableModels(
         model.id,
         model.supportsImage,
       );
-      const capabilities = ProviderRegistry.resolveModelCapabilities(
-        providerName,
-        model.id,
-        effectiveApiFormat,
-        { ...model, supportsImage: toggleSupportsImage },
-      );
+      const capabilities = resolveModelEndpoint(providerName, model.id, {
+        providerConfig,
+        apiFormat: effectiveApiFormat,
+        modelConfig: model,
+      }).capabilities;
       // The endpoint layer treats an explicit imageInput capability as
       // authoritative over a stale persisted toggle; the cowork attach gate
       // follows the same verdict so UI gating cannot diverge from requests.
       const supportsImage =
-        capabilities.imageInput === ModelCapabilityStatus.Supported ? true : toggleSupportsImage;
+        capabilities.imageInput === ModelCapabilityStatus.Supported
+          ? true
+          : capabilities.imageInput === ModelCapabilityStatus.Unsupported
+            ? false
+            : toggleSupportsImage;
       models.push({
         id: model.id,
         name: model.name,
@@ -198,10 +200,7 @@ async function buildHiddenConfiguredModelKeys(
     }
 
     const providerDefinition = ProviderRegistry.get(providerName);
-    const configuredModels =
-      providerConfig.codingPlanEnabled && providerDefinition?.codingPlanModels
-        ? providerDefinition.codingPlanModels
-        : providerConfig.models;
+    const configuredModels = resolveConfiguredProviderModels(providerName, providerConfig);
     if (!configuredModels?.length) continue;
 
     const configuredApiFormat =

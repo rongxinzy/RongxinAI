@@ -82,6 +82,30 @@ test('unverified models default to tool calling support', () => {
   expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Unknown);
 });
 
+test('Kimi Coding extras use the coding endpoint tool capability while respecting explicit overrides', () => {
+  const modelConfig = { id: 'new-coding-model', name: 'New coding model' };
+  const coding = resolveModelEndpoint(ProviderName.Moonshot, modelConfig.id, {
+    apiFormat: 'openai',
+    codingPlanEnabled: true,
+    modelConfig,
+  });
+  expect(coding.protocol).toBe('anthropic');
+  expect(coding.capabilities.toolCalling).toBe(ModelCapabilityStatus.Supported);
+  const general = resolveModelEndpoint(ProviderName.Moonshot, modelConfig.id, {
+    apiFormat: 'anthropic',
+    modelConfig,
+  });
+  expect(general.capabilities.toolCalling).toBe(ModelCapabilityStatus.Unsupported);
+  const override = resolveModelEndpoint(ProviderName.Moonshot, modelConfig.id, {
+    codingPlanEnabled: true,
+    modelConfig: {
+      ...modelConfig,
+      capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+    },
+  });
+  expect(override.capabilities.toolCalling).toBe(ModelCapabilityStatus.Unsupported);
+});
+
 test('runtime-detected unsupported tool calling overrides the default', () => {
   const endpoint = resolveModelEndpoint('custom_0', 'my-model', {
     apiFormat: 'openai',

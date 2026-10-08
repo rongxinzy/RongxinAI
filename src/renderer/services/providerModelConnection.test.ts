@@ -1,6 +1,7 @@
 import {
   ApiFormat,
   ProviderModelConnectionFailureKind,
+  ProviderModelPiApi,
   type ProviderConfig,
 } from '../../shared/providers';
 import { ApiRequestPurpose } from '../../shared/ipc/apiRequest';
@@ -49,6 +50,45 @@ const input = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+test.each([
+  [ProviderModelPiApi.AnthropicMessages, '/v1/messages', 'messages', ApiFormat.OpenAI],
+  [ProviderModelPiApi.OpenAICompletions, '/v1/chat/completions', 'messages', ApiFormat.Anthropic],
+  [ProviderModelPiApi.OpenAIResponses, '/v1/responses', 'input', ApiFormat.Anthropic],
+] as const)(
+  'tests the explicitly selected %s API instead of the provider default',
+  async (api, path, bodyKey, apiFormat) => {
+    const fetchMock = vi.fn(async (_request: ConnectionFetchRequest) => ({
+      ok: true,
+      status: 200,
+    }));
+    vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
+    const result = await testProviderModelConnection({
+      ...input,
+      providerId: 'custom_0',
+      apiFormat,
+      model: { id: 'override-model', name: 'Override', piRuntime: { api } },
+    });
+    expect(result.success).toBe(true);
+    expect(fetchMock.mock.calls[0][0].url).toBe(`${provider.baseUrl}${path}`);
+    const body = JSON.parse(fetchMock.mock.calls[0][0].body!);
+    expect(body[bodyKey]).toBeDefined();
+    expect(body.model).toBe('override-model');
+  },
+);
+
+test('an OpenAI model can explicitly use chat completions instead of Responses', async () => {
+  const fetchMock = vi.fn(async (_request: ConnectionFetchRequest) => ({ ok: true, status: 200 }));
+  vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
+  await testProviderModelConnection({
+    ...input,
+    providerId: 'openai',
+    apiFormat: ApiFormat.OpenAI,
+    model: { id: 'gpt-5', name: 'GPT', piRuntime: { api: ProviderModelPiApi.OpenAICompletions } },
+  });
+  expect(fetchMock.mock.calls[0][0].url).toBe(`${provider.baseUrl}/v1/chat/completions`);
+  expect(JSON.parse(fetchMock.mock.calls[0][0].body!).max_completion_tokens).toBe(64);
 });
 
 test('tests models with bounded concurrency and preserves result order', async () => {
@@ -115,6 +155,44 @@ test('treats a model output limit response as successful connectivity', () => {
   ).toEqual({ success: true });
 });
 
+test('serializes Kimi Coding probes for built-in and custom provider configurations', async () => {
+  for (const configuration of [
+    {
+      providerId: 'moonshot',
+      provider: { ...provider, codingPlanEnabled: true },
+      baseUrl: 'https://api.moonshot.cn/v1',
+    },
+    { providerId: 'custom_0', provider, baseUrl: 'https://api.kimi.com/coding/v1' },
+    { providerId: 'custom_0', provider, baseUrl: 'https://api.kimi.ai/coding' },
+  ]) {
+    let active = 0;
+    let maxActive = 0;
+    const fetchMock = vi.fn(async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      const overQuota = active > 1;
+      await Promise.resolve();
+      active -= 1;
+      return overQuota
+        ? {
+            ok: false,
+            status: 403,
+            data: { error: { message: "You've reached your concurrent request limit." } },
+          }
+        : { ok: true, status: 200 };
+    });
+    vi.stubGlobal('window', { electron: { api: { fetch: fetchMock } } });
+    const results = await testProviderModelsConcurrently({
+      ...input,
+      ...configuration,
+      models: models.slice(0, 5),
+    });
+    expect(maxActive).toBe(1);
+    expect(results).toHaveLength(5);
+    expect(results.every(entry => entry.result.success)).toBe(true);
+  }
+});
+
 test('returns the provider error message for a failed connectivity test', () => {
   expect(
     getProviderModelConnectionTestResult({
@@ -147,6 +225,14 @@ test('classifies connection test failures by provider response', () => {
 
   expect(result(403, 'Forbidden')).toMatchObject({
     failureKind: ProviderModelConnectionFailureKind.Auth,
+  });
+  expect(
+    result(
+      403,
+      "You've reached your concurrent request limit. Please wait for your ongoing requests to finish and try again.",
+    ),
+  ).toMatchObject({
+    failureKind: ProviderModelConnectionFailureKind.RateLimit,
   });
   expect(result(429, 'Too many requests')).toMatchObject({
     failureKind: ProviderModelConnectionFailureKind.RateLimit,

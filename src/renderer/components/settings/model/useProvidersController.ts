@@ -412,6 +412,7 @@ export function useProvidersController({
   const confirmDeleteCustomProvider = () => {
     const key = pendingDeleteProvider;
     if (!key) return;
+    invalidateProviderModelConnectionStatuses(key);
     setPendingDeleteProvider(null);
     setProviders(prev => {
       const next = { ...prev };
@@ -439,7 +440,14 @@ export function useProvidersController({
 
   // Handle provider configuration change
   const handleProviderConfigChange = (provider: ProviderType, field: string, value: string) => {
-    if (field === 'apiKey' || field === 'baseUrl' || field === 'apiFormat') {
+    if (
+      field === 'apiKey' ||
+      field === 'baseUrl' ||
+      field === 'apiFormat' ||
+      field === 'codingPlanEnabled' ||
+      field === 'authType' ||
+      field === 'oauthAccessToken'
+    ) {
       invalidateProviderModelConnectionStatuses(provider);
     }
     if (field === 'apiFormat') {
@@ -590,6 +598,7 @@ export function useProvidersController({
       return;
     }
 
+    invalidateProviderModelConnectionStatuses(provider);
     setProviders(prev => ({
       ...prev,
       [provider]: {
