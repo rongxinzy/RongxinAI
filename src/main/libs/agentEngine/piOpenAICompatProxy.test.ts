@@ -382,6 +382,177 @@ describe('piOpenAICompatProxy', () => {
       await close(upstream);
     }
   });
+
+  it('forwards Anthropic messages byte-identically with bearer injection and no remap', async () => {
+    let receivedBody = '';
+    let receivedAuthorization: string | undefined;
+    const upstream = http.createServer(async (request, response) => {
+      expect(request.url).toBe('/bench-anthropic/v1/messages');
+      receivedAuthorization = request.headers.authorization;
+      for await (const chunk of request) {
+        receivedBody += chunk.toString('utf8');
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          id: 'msg_1',
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'hi' }],
+        }),
+      );
+    });
+    const upstreamBaseURL = await listen(upstream);
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream(
+        'custom_enterprise#bench-anthropic',
+        {
+          baseURL: `${upstreamBaseURL}/bench-anthropic`,
+          apiKey: 'managed-jwt',
+        },
+        { bareBaseUrl: true },
+      );
+      expect(proxyBaseURL.endsWith('/v1')).toBe(false);
+
+      const payload = JSON.stringify({
+        model: 'bench-anthropic',
+        max_tokens: 1024,
+        system: 'You are a helpful assistant.',
+        messages: [{ role: 'user', content: 'Hi' }],
+      });
+      const response = await fetch(`${proxyBaseURL}/v1/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: payload,
+      });
+
+      expect(response.ok).toBe(true);
+      expect(receivedAuthorization).toBe('Bearer managed-jwt');
+      expect(receivedBody).toBe(payload);
+      const parsed = (await response.json()) as { type?: string };
+      expect(parsed.type).toBe('message');
+    } finally {
+      await close(upstream);
+    }
+  });
+
+  it('passes Anthropic SSE bytes through without OpenAI stream normalization', async () => {
+    const ssePayload =
+      'event: message_start\n' +
+      'data: {"type":"message_start","message":{"id":"msg_1"}}\n\n' +
+      'event: content_block_delta\n' +
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}\n\n' +
+      'event: message_stop\n' +
+      'data: {"type":"message_stop"}\n\n';
+    const upstream = http.createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
+      response.end(ssePayload);
+    });
+    const upstreamBaseURL = await listen(upstream);
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream(
+        'custom_enterprise#bench-anthropic',
+        {
+          baseURL: `${upstreamBaseURL}/bench-anthropic`,
+          apiKey: 'managed-jwt',
+        },
+        { bareBaseUrl: true },
+      );
+      const response = await fetch(`${proxyBaseURL}/v1/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'bench-anthropic', stream: true, messages: [] }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/event-stream');
+      expect(await response.text()).toBe(ssePayload);
+    } finally {
+      await close(upstream);
+    }
+  });
+
+  it('passes a non-stream Anthropic JSON response through even when stream was requested', async () => {
+    const jsonPayload = JSON.stringify({
+      id: 'msg_1',
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello' }],
+      stop_reason: 'end_turn',
+    });
+    const upstream = http.createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(jsonPayload);
+    });
+    const upstreamBaseURL = await listen(upstream);
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream(
+        'custom_enterprise#bench-anthropic',
+        {
+          baseURL: `${upstreamBaseURL}/bench-anthropic`,
+          apiKey: 'managed-jwt',
+        },
+        { bareBaseUrl: true },
+      );
+      const response = await fetch(`${proxyBaseURL}/v1/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'bench-anthropic', stream: true, messages: [] }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('application/json');
+      expect(await response.text()).toBe(jsonPayload);
+    } finally {
+      await close(upstream);
+    }
+  });
+
+  it('refreshes a per-model Anthropic upstream via the provider-level refresher and retries', async () => {
+    const authorizations: Array<string | undefined> = [];
+    const upstream = http.createServer((request, response) => {
+      authorizations.push(request.headers.authorization);
+      if (request.headers.authorization === 'Bearer old-token') {
+        response.writeHead(401, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ type: 'error', error: { type: 'authentication_error' } }));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ id: 'msg_1', type: 'message' }));
+    });
+    const upstreamBaseURL = await listen(upstream);
+    let refreshCount = 0;
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream(
+        'custom_enterprise#bench-anthropic',
+        {
+          baseURL: `${upstreamBaseURL}/bench-anthropic`,
+          apiKey: 'old-token',
+        },
+        { bareBaseUrl: true },
+      );
+      registerPiOpenAICompatTokenRefresher('custom_enterprise', async () => {
+        refreshCount += 1;
+        return 'new-token';
+      });
+
+      const response = await fetch(`${proxyBaseURL}/v1/messages`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'bench-anthropic', messages: [] }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(authorizations).toEqual(['Bearer old-token', 'Bearer new-token']);
+      expect(refreshCount).toBe(1);
+    } finally {
+      await close(upstream);
+    }
+  });
 });
 
 async function listen(server: http.Server): Promise<string> {

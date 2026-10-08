@@ -193,14 +193,144 @@ describe('Zhiyuan managed provider bridge', () => {
     expect(bridge.catalog()).toEqual([]);
     expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig).providers).toEqual({});
   });
+
+  test('defaults the API format to openai when the source omits it', async () => {
+    const store = new MemoryStore({
+      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+    });
+    const bridge = new ZhiyuanManagedProviderBridge();
+    const unregister = bridge.registerSource({
+      providerKey: LegacyManagedProviderKey.Enterprise,
+      exclusive: true,
+      snapshot: async () => providerConfig(),
+    });
+    bridge.attachStore(store);
+    await bridge.refresh();
+
+    expect(projectedProvider(store)?.apiFormat).toBe('openai');
+    unregister();
+  });
+
+  test('passes through declared openai and anthropic API formats', async () => {
+    for (const apiFormat of ['openai', 'anthropic'] as const) {
+      const store = new MemoryStore({
+        [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+      });
+      const bridge = new ZhiyuanManagedProviderBridge();
+      const unregister = bridge.registerSource({
+        providerKey: LegacyManagedProviderKey.Enterprise,
+        exclusive: true,
+        snapshot: async () => providerConfig({ apiFormat }),
+      });
+      bridge.attachStore(store);
+      await bridge.refresh();
+
+      expect(projectedProvider(store)?.apiFormat).toBe(apiFormat);
+      unregister();
+    }
+  });
+
+  test('rejects an unsupported API format and clears the managed snapshot', async () => {
+    const store = new MemoryStore({
+      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+    });
+    const bridge = new ZhiyuanManagedProviderBridge();
+    bridge.registerSource({
+      providerKey: LegacyManagedProviderKey.Enterprise,
+      exclusive: true,
+      snapshot: async () => providerConfig({ apiFormat: 'gemini' }),
+    });
+    bridge.attachStore(store);
+    await bridge.refresh();
+
+    expect(bridge.catalog()).toEqual([]);
+    expect(projectedProvider(store)).toBeUndefined();
+  });
+
+  test('passes through a validated per-model baseUrl', async () => {
+    const store = new MemoryStore({
+      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+    });
+    const bridge = new ZhiyuanManagedProviderBridge();
+    const unregister = bridge.registerSource({
+      providerKey: LegacyManagedProviderKey.Enterprise,
+      exclusive: true,
+      snapshot: async () =>
+        providerConfig({
+          apiFormat: 'anthropic',
+          models: [
+            {
+              id: 'bench-anthropic',
+              name: 'Bench Anthropic',
+              baseUrl: 'https://gateway.example.test/bench-anthropic/',
+            },
+          ],
+        }),
+    });
+    bridge.attachStore(store);
+    await bridge.refresh();
+
+    const projected = projectedProvider(store);
+    expect(projected?.apiFormat).toBe('anthropic');
+    expect(projected?.models?.[0]?.baseUrl).toBe('https://gateway.example.test/bench-anthropic');
+    unregister();
+  });
+
+  test('rejects an invalid per-model baseUrl and clears the managed snapshot', async () => {
+    const store = new MemoryStore({
+      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+    });
+    const bridge = new ZhiyuanManagedProviderBridge();
+    bridge.registerSource({
+      providerKey: LegacyManagedProviderKey.Enterprise,
+      exclusive: true,
+      snapshot: async () =>
+        providerConfig({
+          models: [
+            {
+              id: 'bench-anthropic',
+              name: 'Bench Anthropic',
+              baseUrl: 'ftp://gateway.example.test/bench-anthropic',
+            },
+          ],
+        }),
+    });
+    bridge.attachStore(store);
+    await bridge.refresh();
+
+    expect(bridge.catalog()).toEqual([]);
+    expect(projectedProvider(store)).toBeUndefined();
+  });
+
+  test('reports only the registered source key as a managed provider', () => {
+    const bridge = new ZhiyuanManagedProviderBridge();
+    expect(bridge.isManagedProvider(LegacyManagedProviderKey.Enterprise)).toBe(false);
+
+    const unregister = bridge.registerSource({
+      providerKey: LegacyManagedProviderKey.Enterprise,
+      exclusive: true,
+      snapshot: async () => providerConfig(),
+    });
+
+    expect(bridge.isManagedProvider(LegacyManagedProviderKey.Enterprise)).toBe(true);
+    expect(bridge.isManagedProvider('custom_community')).toBe(false);
+
+    unregister();
+    expect(bridge.isManagedProvider(LegacyManagedProviderKey.Enterprise)).toBe(false);
+  });
 });
+
+function projectedProvider(store: MemoryStore): ProviderConfig | undefined {
+  return store.get<{ providers: Record<string, ProviderConfig> }>(
+    EnterpriseExtensionStoreKey.AppConfig,
+  )?.providers[LegacyManagedProviderKey.Enterprise];
+}
 
 function providerConfig(overrides: Partial<ProviderConfig> = {}): ProviderConfig {
   return {
     enabled: true,
     apiKey: 'model-token',
     baseUrl: 'http://127.0.0.1:8090/v1/',
-    apiFormat: 'openai',
     displayName: 'Zhiyuan',
     models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
     ...overrides,

@@ -78,7 +78,6 @@ import {
 import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import type { CoworkMessage } from '../../coworkStore';
-import { getModelPoolAccessToken } from '../../communityAuthSession';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkStore } from '../../coworkStore';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
@@ -146,10 +145,7 @@ import {
   ShortcutWorkflowKind,
 } from './piShortcutWorkflow';
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
-import {
-  registerPiOpenAICompatTokenRefresher,
-  registerPiOpenAICompatUpstream,
-} from './piOpenAICompatProxy';
+import { PI_MANAGED_PROXY_API_KEY, resolvePiCustomModelBaseUrl } from './piManagedModelProxy';
 import {
   PiExtensionEventType,
   type PiExtensionApi,
@@ -4319,7 +4315,6 @@ const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
 const DEFAULT_PI_CLOUD_CONTEXT_WINDOW = 256000;
 const DEFAULT_PI_CLOUD_MAX_TOKENS = 32768;
 const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
-const PI_MANAGED_PROXY_API_KEY = `sk-zhiyuan-${randomUUID()}`;
 
 interface ModelPoolRequestContext {
   conversationId: string;
@@ -4413,52 +4408,6 @@ function canUsePiBuiltinModel(
 ): boolean {
   if (!builtinModel || !resolution.config) return false;
   return normalizePiBaseUrl(builtinModel.baseUrl) === normalizePiBaseUrl(resolution.config.baseURL);
-}
-
-function shouldUsePiOpenAICompatProxy(
-  resolution: ApiConfigResolution,
-  api: ProviderModelPiApi,
-): boolean {
-  const providerName = resolution.providerMetadata?.providerName ?? '';
-  return (
-    (providerName === ProviderName.Zhiyuan || providerName.startsWith('custom_')) &&
-    resolution.config?.apiType === 'openai' &&
-    api === ProviderModelPiApi.OpenAICompletions
-  );
-}
-
-async function resolvePiCustomModelBaseUrl(
-  resolution: ApiConfigResolution,
-  api: ProviderModelPiApi,
-): Promise<string> {
-  const config = resolution.config;
-  const providerMetadata = resolution.providerMetadata;
-  if (!config || !providerMetadata) {
-    return '';
-  }
-
-  if (providerMetadata.providerName === ProviderName.Zhiyuan) {
-    const accessToken = await getModelPoolAccessToken();
-    registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
-      getModelPoolAccessToken({ forceRefresh: true }),
-    );
-    return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
-      baseURL: config.baseURL,
-      apiKey: accessToken,
-      requiredIncomingApiKey: PI_MANAGED_PROXY_API_KEY,
-    });
-  }
-
-  if (!shouldUsePiOpenAICompatProxy(resolution, api)) {
-    return config.baseURL;
-  }
-
-  return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
-    baseURL: config.baseURL,
-    ...(providerMetadata.usesAnonymousAccess
-      ? { forwardIncomingAuthorization: false }
-      : { apiKey: config.apiKey }),
-  });
 }
 
 interface PiCustomModelRuntimeResolution {

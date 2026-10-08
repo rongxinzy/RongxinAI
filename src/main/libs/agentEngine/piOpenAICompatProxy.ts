@@ -1,8 +1,9 @@
-﻿import http, { type IncomingMessage, type ServerResponse } from 'http';
+import http, { type IncomingMessage, type ServerResponse } from 'http';
 
 import { timingSafeEqual } from 'crypto';
 
 import { ZhiyuanModelPoolHeader } from '../../../shared/modelPool/constants';
+import { buildAnthropicMessagesUrl } from '../../../shared/providers';
 import { buildOpenAIChatCompletionsURL } from '../coworkFormatTransform';
 
 interface PiOpenAICompatUpstream {
@@ -10,6 +11,11 @@ interface PiOpenAICompatUpstream {
   apiKey?: string;
   requiredIncomingApiKey?: string;
   forwardIncomingAuthorization?: boolean;
+}
+
+interface PiOpenAICompatUpstreamRegistrationOptions {
+  /** Return the loopback base URL without the `/v1` suffix (Anthropic SDK appends `/v1/messages`). */
+  bareBaseUrl?: boolean;
 }
 
 function incomingApiKeyMatches(request: IncomingMessage, expected: string): boolean {
@@ -45,6 +51,10 @@ let proxyStartPromise: Promise<number> | null = null;
 
 function isOpenAIChatCompletionsPath(pathname: string): boolean {
   return pathname.endsWith('/chat/completions');
+}
+
+function isAnthropicMessagesPath(pathname: string): boolean {
+  return pathname.endsWith('/v1/messages');
 }
 
 function writeJson(
@@ -96,7 +106,14 @@ async function refreshPiOpenAICompatToken(
   if (!upstream) return false;
   if (upstream.apiKey !== rejectedApiKey) return true;
 
-  const registration = tokenRefreshers.get(providerId);
+  // Per-model upstreams (`<providerKey>#<modelId>`) share the refresher
+  // registered under the bare provider key.
+  const registrationKey = tokenRefreshers.has(providerId)
+    ? providerId
+    : providerId.includes('#')
+      ? providerId.slice(0, providerId.indexOf('#'))
+      : providerId;
+  const registration = tokenRefreshers.get(registrationKey);
   if (!registration) return false;
   if (!registration.refreshPromise) {
     registration.refreshPromise = registration
@@ -114,7 +131,7 @@ async function refreshPiOpenAICompatToken(
 
   try {
     const apiKey = await registration.refreshPromise;
-    if (tokenRefreshers.get(providerId) !== registration) return false;
+    if (tokenRefreshers.get(registrationKey) !== registration) return false;
     const currentUpstream = upstreams.get(providerId);
     if (!currentUpstream) return false;
     currentUpstream.apiKey = apiKey;
@@ -426,6 +443,22 @@ async function pipeNormalizedOpenAIStream(
   }
 }
 
+async function pipeRawStream(
+  body: ReadableStream<Uint8Array>,
+  response: ServerResponse,
+): Promise<void> {
+  const reader = body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) response.write(Buffer.from(value));
+    }
+  } finally {
+    response.end();
+  }
+}
+
 async function handleProxyRequest(
   request: IncomingMessage,
   response: ServerResponse,
@@ -457,14 +490,23 @@ async function handleProxyRequest(
   }
 
   const proxiedPath = `/${pathSegments.slice(2).join('/')}`;
-  if (!isOpenAIChatCompletionsPath(proxiedPath)) {
-    writeJson(response, 404, { error: 'Only OpenAI chat completions are supported.' });
+  const openAICompletions = isOpenAIChatCompletionsPath(proxiedPath);
+  const anthropicMessages = !openAICompletions && isAnthropicMessagesPath(proxiedPath);
+  if (!openAICompletions && !anthropicMessages) {
+    writeJson(response, 404, {
+      error: 'Only OpenAI chat completions or Anthropic messages are supported.',
+    });
     return;
   }
 
-  const body = remapDeveloperRolesForOpenAICompletions(await readRequestBody(request));
+  const rawBody = await readRequestBody(request);
+  // Anthropic payloads are forwarded byte-identically; the developer-role
+  // remap is an OpenAI-compatibility concern only.
+  const body = openAICompletions ? remapDeveloperRolesForOpenAICompletions(rawBody) : rawBody;
   const model = extractRequestModel(body);
-  const upstreamURL = buildOpenAIChatCompletionsURL(upstream.baseURL);
+  const upstreamURL = openAICompletions
+    ? buildOpenAIChatCompletionsURL(upstream.baseURL)
+    : buildAnthropicMessagesUrl(upstream.baseURL);
   const rejectedApiKey = upstream.apiKey;
   const fetchUpstream = (): Promise<Response> =>
     fetch(upstreamURL, {
@@ -497,12 +539,16 @@ async function handleProxyRequest(
       'cache-control': 'no-cache',
       connection: 'keep-alive',
     });
-    await pipeNormalizedOpenAIStream(upstreamResponse.body, response, model);
+    if (anthropicMessages) {
+      await pipeRawStream(upstreamResponse.body, response);
+    } else {
+      await pipeNormalizedOpenAIStream(upstreamResponse.body, response, model);
+    }
     return;
   }
 
   const text = await upstreamResponse.text();
-  if (requestWantsStream(body)) {
+  if (openAICompletions && requestWantsStream(body)) {
     const converted = convertOpenAIChatCompletionTextToSSEForPi(text, model);
     if (converted) {
       response.writeHead(upstreamResponse.status, {
@@ -516,7 +562,7 @@ async function handleProxyRequest(
   }
 
   copyResponseHeaders(upstreamResponse, response);
-  response.end(normalizeNonStreamOpenAIResponse(text));
+  response.end(openAICompletions ? normalizeNonStreamOpenAIResponse(text) : text);
 }
 
 async function ensurePiOpenAICompatProxyServer(): Promise<number> {
@@ -559,6 +605,7 @@ async function ensurePiOpenAICompatProxyServer(): Promise<number> {
 export async function registerPiOpenAICompatUpstream(
   providerId: string,
   upstream: PiOpenAICompatUpstream,
+  options?: PiOpenAICompatUpstreamRegistrationOptions,
 ): Promise<string> {
   const port = await ensurePiOpenAICompatProxyServer();
   upstreams.set(providerId, {
@@ -567,9 +614,10 @@ export async function registerPiOpenAICompatUpstream(
     requiredIncomingApiKey: upstream.requiredIncomingApiKey,
     forwardIncomingAuthorization: upstream.forwardIncomingAuthorization,
   });
-  return `http://127.0.0.1:${port}${PI_OPENAI_COMPAT_PROXY_PREFIX}/${encodeURIComponent(
+  const loopbackBaseUrl = `http://127.0.0.1:${port}${PI_OPENAI_COMPAT_PROXY_PREFIX}/${encodeURIComponent(
     providerId,
-  )}/v1`;
+  )}`;
+  return options?.bareBaseUrl ? loopbackBaseUrl : `${loopbackBaseUrl}/v1`;
 }
 
 export function registerPiOpenAICompatTokenRefresher(
