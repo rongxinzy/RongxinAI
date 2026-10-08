@@ -6,6 +6,7 @@ import {
   type ManagedProviderSnapshot,
 } from '../../shared/managedProviders';
 import {
+  ApiFormat,
   isProviderEnabled,
   normalizeProviderModelPiRuntimeConfig,
   type ProviderConfig,
@@ -113,6 +114,10 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
       mode: ManagedProviderAccessMode.Exclusive,
       providerKeys: Object.freeze([source.providerKey]),
     });
+  }
+
+  isManagedProvider(providerName: string): boolean {
+    return this.#source?.providerKey === providerName;
   }
 
   catalog(): readonly ManagedProviderCatalogModel[] {
@@ -365,11 +370,12 @@ function normalizeConfig(value: ProviderConfig): ProviderConfig {
     userEnabled: true,
     apiKey: normalizeText(value.apiKey, MAX_TEXT_LENGTH),
     baseUrl: normalizeHttpUrl(value.baseUrl),
-    apiFormat: 'openai',
+    apiFormat: normalizeApiFormat(value.apiFormat),
     displayName: normalizeText(value.displayName ?? 'Zhiyuan', 128),
     models: models.map(model => ({
       id: normalizeText(model.id, 256),
       name: normalizeText(model.name, 128),
+      ...(model.baseUrl !== undefined ? { baseUrl: normalizeHttpUrl(model.baseUrl) } : {}),
       ...(model.supportsImage !== undefined ? { supportsImage: model.supportsImage === true } : {}),
       ...(model.capabilities ? { capabilities: Object.freeze({ ...model.capabilities }) } : {}),
       ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
@@ -380,6 +386,12 @@ function normalizeConfig(value: ProviderConfig): ProviderConfig {
         : {}),
     })),
   });
+}
+
+function normalizeApiFormat(value: unknown): ApiFormat {
+  if (value === undefined) return ApiFormat.OpenAI;
+  if (value === ApiFormat.OpenAI || value === ApiFormat.Anthropic) return value;
+  throw new Error('Managed provider API format is invalid.');
 }
 
 function normalizeHttpUrl(value: unknown): string {

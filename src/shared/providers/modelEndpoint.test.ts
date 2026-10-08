@@ -198,6 +198,61 @@ test('derived supportsImage false preserves an unstated image capability', () =>
   expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Unknown);
 });
 
+test('model entry baseUrl surfaces as modelBaseUrl without affecting baseUrl resolution', () => {
+  const endpoint = resolveModelEndpoint('custom_enterprise', 'bench-anthropic', {
+    providerConfig: {
+      apiKey: 'key',
+      baseUrl: 'https://gateway.example.test/v1',
+      apiFormat: 'anthropic',
+      models: [
+        {
+          id: 'bench-anthropic',
+          name: 'Bench Anthropic',
+          baseUrl: 'https://gateway.example.test/bench-anthropic',
+        },
+      ],
+    },
+  });
+
+  expect(endpoint.baseUrl).toBe('https://gateway.example.test/v1');
+  expect(endpoint.modelBaseUrl).toBe('https://gateway.example.test/bench-anthropic');
+});
+
+test('models without a baseUrl omit modelBaseUrl and keep the provider baseUrl', () => {
+  const endpoint = resolveModelEndpoint('custom_enterprise', 'bench-anthropic', {
+    providerConfig: {
+      apiKey: 'key',
+      baseUrl: 'https://gateway.example.test/v1',
+      apiFormat: 'anthropic',
+      models: [{ id: 'bench-anthropic', name: 'Bench Anthropic' }],
+    },
+  });
+
+  expect(endpoint.baseUrl).toBe('https://gateway.example.test/v1');
+  expect(endpoint.modelBaseUrl).toBeUndefined();
+});
+
+test('an explicit baseUrl override still wins while modelBaseUrl surfaces the model entry', () => {
+  const endpoint = resolveModelEndpoint('custom_enterprise', 'bench-anthropic', {
+    baseUrl: 'https://override.example.test/v1',
+    providerConfig: {
+      apiKey: 'key',
+      baseUrl: 'https://gateway.example.test/v1',
+      apiFormat: 'anthropic',
+      models: [
+        {
+          id: 'bench-anthropic',
+          name: 'Bench Anthropic',
+          baseUrl: 'https://gateway.example.test/bench-anthropic',
+        },
+      ],
+    },
+  });
+
+  expect(endpoint.baseUrl).toBe('https://override.example.test/v1');
+  expect(endpoint.modelBaseUrl).toBe('https://gateway.example.test/bench-anthropic');
+});
+
 test('llama.cpp runtime capabilities map declared modalities', () => {
   expect(
     parseLlamaCppRuntimeCapabilities({

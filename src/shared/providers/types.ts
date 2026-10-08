@@ -12,6 +12,8 @@ export interface ProviderConfig {
   models?: Array<{
     id: string;
     name: string;
+    /** Per-model endpoint override (e.g. managed gateway per-model route prefixes). */
+    baseUrl?: string;
     supportsImage?: boolean;
     /** Explicit model capability metadata. Unknown values must not enable a feature. */
     capabilities?: Partial<ModelCapabilities>;
