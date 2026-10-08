@@ -17,7 +17,7 @@ interface AppUpdateBadgeProps {
 const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, onClick }) => {
   const label =
     status === AppUpdateStatus.Ready
-      ? i18nService.t('updateReadyConfirm')
+      ? i18nService.t('updateReadyPill')
       : status === AppUpdateStatus.Available
         ? i18nService.t('updateOpenDownloadPage')
         : i18nService.t('updateErrorPill');

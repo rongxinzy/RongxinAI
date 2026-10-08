@@ -3,6 +3,8 @@ import { Progress } from '@shared/components/ui/progress';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
+  AppUpdateFailureStage,
+  AppUpdateInstallOutcome,
   type AppUpdateRuntimeState,
   AppUpdateStatus,
 } from '../../../../shared/appUpdate/constants';
@@ -79,6 +81,21 @@ export default function AboutSettingsPanel({
   const update = appUpdateState;
   const progress = update?.progress;
   const isDownloading = update?.status === AppUpdateStatus.Downloading;
+  const failureStage = update?.failureStage;
+  const failureLabel =
+    failureStage === AppUpdateFailureStage.Download
+      ? i18nService.t('updateDownloadFailed')
+      : failureStage === AppUpdateFailureStage.Verify
+        ? i18nService.t('updateVerifyFailed')
+        : failureStage === AppUpdateFailureStage.Install
+          ? i18nService.t('updateInstallFailed')
+          : i18nService.t('updateCheckFailed');
+  const retryLabel =
+    failureStage === AppUpdateFailureStage.Install
+      ? i18nService.t('updateReturnToInstall')
+      : failureStage === AppUpdateFailureStage.Check
+        ? i18nService.t('updateCheckNow')
+        : i18nService.t('updateRetry');
   const formatBytes = (value: number) =>
     value < 1024 * 1024
       ? `${Math.round(value / 1024)} KB`
@@ -121,12 +138,23 @@ export default function AboutSettingsPanel({
                     : update?.status === AppUpdateStatus.UpToDate
                       ? i18nService.t('updateUpToDate')
                       : update?.status === AppUpdateStatus.Error
-                        ? i18nService.t('updateCheckFailed')
+                        ? failureLabel
                         : update?.info?.latestVersion
                           ? `v${update.info.latestVersion}`
                           : i18nService.t('updateNotChecked')}
                 </span>
               </div>
+              {update?.lastInstallResult && update.status !== AppUpdateStatus.Installing ? (
+                <div className="text-xs text-muted-foreground" role="status">
+                  {update.lastInstallResult.outcome === AppUpdateInstallOutcome.Succeeded
+                    ? i18nService
+                        .t('updatePreviousInstallSucceeded')
+                        .replace('{version}', update.lastInstallResult.targetVersion)
+                    : update.lastInstallResult.outcome === AppUpdateInstallOutcome.Failed
+                      ? `${i18nService.t('updatePreviousInstallFailed')}${update.lastInstallResult.detail ? `: ${normalizeError(update.lastInstallResult.detail)}` : ''}`
+                      : i18nService.t('updatePreviousInstallPending')}
+                </div>
+              ) : null}
               {isDownloading ? (
                 <>
                   <Progress
@@ -159,6 +187,10 @@ export default function AboutSettingsPanel({
                     </Button>
                   </div>
                 </>
+              ) : update?.status === AppUpdateStatus.Installing ? (
+                <div className="text-xs text-muted-foreground" role="status">
+                  {i18nService.t('updateInstalling')}
+                </div>
               ) : update?.status === AppUpdateStatus.Ready ? (
                 <div className="space-y-2">
                   <Button
@@ -216,10 +248,10 @@ export default function AboutSettingsPanel({
               ) : update?.status === AppUpdateStatus.Error && update.info ? (
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-destructive">
-                    {update.errorMessage || i18nService.t('updateDownloadFailed')}
+                    {failureLabel} · {i18nService.t('updateFailureHint')}
                   </span>
                   <Button size="sm" onClick={() => void window.electron.appUpdate.retryDownload()}>
-                    {i18nService.t('updateRetry')}
+                    {retryLabel}
                   </Button>
                 </div>
               ) : update?.status === AppUpdateStatus.Available ? (
@@ -249,7 +281,7 @@ export default function AboutSettingsPanel({
               ) : null}
               {update?.status === AppUpdateStatus.Error && !update.info ? (
                 <div className="text-xs text-destructive">
-                  {update.errorMessage || i18nService.t('updateCheckFailed')}
+                  {failureLabel} · {i18nService.t('updateFailureHint')}
                 </div>
               ) : null}
               {update?.lastCheckedAt ? (

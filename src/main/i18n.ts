@@ -396,6 +396,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelPoolStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
 
     'enterprise.updateBlocked': '版本更新由企业统一管理',
+    'update.activeTask': '有任务正在运行，请等任务完成或停止后再安装更新。',
   },
   en: {
     webSearchToolLabel: 'Web search',
@@ -846,6 +847,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'The response was interrupted. Received content is preserved. Retry or ask to continue.',
 
     'enterprise.updateBlocked': 'Updates are managed by enterprise',
+    'update.activeTask': 'A task is running. Finish or stop it before installing the update.',
   },
 };
 

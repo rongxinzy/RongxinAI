@@ -72,6 +72,14 @@ vi.mock('electron', () => ({
 const installerMocks = vi.hoisted(() => ({ installWindowsNsis: vi.fn() }));
 
 vi.mock('./appUpdateInstaller', () => installerMocks);
+vi.mock('./appUpdateFileHasher', () => ({
+  sha512UpdateFile: async (filePath: string) =>
+    crypto
+      .createHash('sha512')
+      .update(await fs.promises.readFile(filePath))
+      .digest('base64'),
+}));
+vi.mock('./appUpdateInstallReceipt', () => ({ readInstallResult: () => null }));
 
 import { AppUpdateCoordinator } from './appUpdateCoordinator';
 
@@ -369,8 +377,42 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     const result = await coordinator.installReadyUpdate();
 
     expect(result.success).toBe(true);
-    expect(installerMocks.installWindowsNsis).toHaveBeenCalledWith(installerFile);
+    expect(installerMocks.installWindowsNsis).toHaveBeenCalledWith(installerFile, '2026.7.2');
     expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
+  });
+
+  test('keeps the verified Windows installer when handoff fails so retry does not download again', async () => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+    Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
+    const installerFile = path.join(path.dirname(downloadedFile), 'ZhiYuan.Setup.exe');
+    await fs.promises.rename(downloadedFile, installerFile);
+    downloadedFile = installerFile;
+    const envelope = signedManifest(privateKey, {
+      updaterSha512,
+      platform: 'win32',
+      arch: 'x64',
+      variant: 'lite',
+      updaterFilename: 'ZhiYuan.Setup.exe',
+    });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512, 'ZhiYuan.Setup.exe'),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
+      updaterMocks.emit('update-downloaded', { downloadedFile });
+      return [downloadedFile];
+    });
+    installerMocks.installWindowsNsis.mockRejectedValueOnce(new Error('Installer handoff failed'));
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const install = await coordinator.installReadyUpdate();
+    expect(install.success).toBe(false);
+    expect(install.state.failureStage).toBe('install');
+    expect((await coordinator.retryDownload()).status).toBe(AppUpdateStatus.Ready);
+    expect(updaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledTimes(1);
   });
 
   test('rejects a v2 feed whose version or checksum is not authorized by the signed manifest', async () => {
@@ -404,6 +446,56 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(result.success).toBe(false);
     expect(result.state.status).toBe(AppUpdateStatus.Error);
     expect(updaterMocks.autoUpdater.downloadUpdate).not.toHaveBeenCalled();
+  });
+
+  test('retries a failed check by checking again instead of requesting a download', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 })),
+    );
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    expect((await coordinator.checkNow()).state.failureStage).toBe('check');
+    const state = await coordinator.retryDownload();
+    expect(state.status).toBe(AppUpdateStatus.Downloading);
+    expect(updaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledOnce();
+  });
+
+  test('keeps a verified file for a retry when the post-download freshness check fails', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify(envelope), { status: 200 }))
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 })),
+    );
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
+      updaterMocks.emit('update-downloaded', { downloadedFile });
+      return [downloadedFile];
+    });
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().failureStage).toBe('verify'));
+    expect(updaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledOnce();
+    const state = await coordinator.retryDownload();
+    expect(state.status).toBe(AppUpdateStatus.Ready);
+    expect(updaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledOnce();
   });
 
   test('rejects legacy manifests without electron-updater SHA-512 metadata', async () => {
