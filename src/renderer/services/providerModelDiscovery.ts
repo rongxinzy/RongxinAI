@@ -44,8 +44,16 @@ function applyDiscoveredMetadata(
   current: ProviderModel,
   discovered: DiscoveredProviderModel,
 ): ProviderModel {
-  let changed = false;
-  const next: ProviderModel = { ...current };
+  let changed =
+    current.origin !== ProviderModelOrigin.User &&
+    current.origin !== ProviderModelOrigin.Discovered;
+  const next: ProviderModel = {
+    ...current,
+    origin:
+      current.origin === ProviderModelOrigin.User
+        ? ProviderModelOrigin.User
+        : ProviderModelOrigin.Discovered,
+  };
 
   if (discovered.contextWindow !== undefined && next.contextWindow !== discovered.contextWindow) {
     next.contextWindow = discovered.contextWindow;
@@ -102,6 +110,7 @@ function createDiscoveredProviderModel(discovered: DiscoveredProviderModel): Pro
   const imageCapability = discovered.capabilities?.imageInput;
   return {
     id: discovered.id,
+    origin: ProviderModelOrigin.Discovered,
     name: discovered.displayName?.trim() || discovered.id,
     ...(discovered.contextWindow !== undefined ? { contextWindow: discovered.contextWindow } : {}),
     ...(discovered.maxTokens !== undefined ? { maxTokens: discovered.maxTokens } : {}),

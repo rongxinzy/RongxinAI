@@ -1,11 +1,18 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { ManagedProviderAccessMode } from '@shared/managedProviders';
-import { ProviderName } from '@shared/providers';
+import {
+  applyProviderModelConnectionTestResults,
+  createProviderConnectionTestSignature,
+  ProviderName,
+  ModelCapabilityStatus,
+  type ProviderConfig,
+} from '@shared/providers';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { ConfigService } from './config';
 import { localStore } from './store';
+import { collectAvailableModels } from './availableModels';
 
 vi.mock('./store', () => ({
   localStore: {
@@ -20,6 +27,7 @@ describe('ConfigService', () => {
   let storedConfig: AppConfig;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     storedConfig = cloneConfig();
     vi.mocked(localStore.getItem).mockImplementation(async () => structuredClone(storedConfig));
     vi.mocked(localStore.setItem).mockImplementation(async (_key, value) => {
@@ -64,6 +72,44 @@ describe('ConfigService', () => {
     expect(storedConfig.language).toBe('en');
   });
 
+  test('merges queued provider updates after delayed writes without losing either provider', async () => {
+    const service = new ConfigService();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    vi.mocked(localStore.setItem).mockImplementationOnce(async (_key, value) => {
+      await gate;
+      storedConfig = structuredClone(value as AppConfig);
+    });
+    const save = (id: string) =>
+      service.updateConfig(current => ({
+        providers: {
+          ...current.providers!,
+          [id]: {
+            ...current.providers![id],
+            enabled: true,
+            models: [{ id: 'five-models-tested', name: id }],
+          },
+        },
+      }));
+    const first = save(ProviderName.Moonshot);
+    const second = save(ProviderName.OpenAI);
+    release();
+    await Promise.all([first, second]);
+    for (const id of [ProviderName.Moonshot, ProviderName.OpenAI]) {
+      expect(storedConfig.providers![id].enabled).toBe(true);
+      expect(storedConfig.providers![id].models?.[0].id).toBe('five-models-tested');
+    }
+  });
+
+  test('skips an invalidated queued update without publishing or writing', async () => {
+    const service = new ConfigService();
+    await service.updateConfig(() => undefined);
+    expect(localStore.setItem).not.toHaveBeenCalled();
+    expect(window.dispatchEvent).not.toHaveBeenCalled();
+  });
+
   test('does not re-inject a catalog model after the migration has completed', async () => {
     const service = new ConfigService();
     storedConfig.migrations = undefined;
@@ -90,6 +136,64 @@ describe('ConfigService', () => {
     await Promise.all([update, reload]);
 
     expect(service.getConfig().theme).toBe('dark');
+  });
+
+  test('keeps all tested coding-plan models selectable after save and repeated reload', async () => {
+    vi.stubGlobal('window', {
+      dispatchEvent: vi.fn(),
+      electron: { llamacpp: { listRunningModels: vi.fn(async () => []) } },
+    });
+    const provider: ProviderConfig = {
+      ...storedConfig.providers![ProviderName.Moonshot],
+      enabled: true,
+      apiKey: 'test-key',
+      codingPlanEnabled: true,
+      models: ['kimi-for-coding', 'kimi-for-coding-highspeed', 'k3', 'k3-256k', 'new-model'].map(
+        id => ({
+          id,
+          name: id,
+          contextWindow: 1_000_000,
+          maxTokens: 16_384,
+          piRuntime: { reasoning: true },
+        }),
+      ),
+    };
+    const signature = await createProviderConnectionTestSignature({
+      providerId: ProviderName.Moonshot,
+      baseUrl: provider.baseUrl,
+      apiFormat: provider.apiFormat!,
+      provider,
+    });
+    const tested = applyProviderModelConnectionTestResults(
+      provider,
+      provider.models!.map(model => ({ modelId: model.id, success: true })),
+      signature,
+    );
+    const service = new ConfigService();
+    await service.updateConfig({
+      providers: { ...storedConfig.providers!, [ProviderName.Moonshot]: tested },
+    });
+    for (let reload = 0; reload < 2; reload += 1) {
+      const config = await service.reload();
+      expect(config.providers![ProviderName.Moonshot].models).toHaveLength(5);
+      expect(config.providers![ProviderName.Moonshot].models?.[0].connectionTest).toEqual(
+        tested.models?.[0].connectionTest,
+      );
+      expect(config.providers![ProviderName.Moonshot].models?.[0]).toMatchObject({
+        contextWindow: 1_000_000,
+        maxTokens: 16_384,
+        piRuntime: { reasoning: true },
+      });
+      expect(
+        config.providers![ProviderName.Moonshot].models?.every(
+          model => model.capabilities?.toolCalling === ModelCapabilityStatus.Supported,
+        ),
+      ).toBe(true);
+      const available = (await collectAvailableModels(config)).filter(
+        model => model.providerKey === ProviderName.Moonshot,
+      );
+      expect(available.map(model => model.id)).toEqual(provider.models!.map(model => model.id));
+    }
   });
 
   describe('exclusive managed provider policy', () => {

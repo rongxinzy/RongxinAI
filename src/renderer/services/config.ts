@@ -3,6 +3,10 @@ import {
   type ProviderConfig,
   ProviderName,
   ProviderRegistry,
+  resolveConfiguredProviderModels,
+  normalizeProviderBaseUrl,
+  resolveModelEndpoint,
+  ModelCapabilityStatus,
 } from '@shared/providers';
 import {
   ManagedProviderAccessMode,
@@ -23,37 +27,6 @@ const getFixedProviderApiFormat = (providerKey: string): ApiFormat | null => {
   return null;
 };
 
-const normalizeProviderBaseUrl = (providerKey: string, baseUrl: unknown): string => {
-  if (typeof baseUrl !== 'string') {
-    return '';
-  }
-
-  const normalized = baseUrl.trim().replace(/\/+$/, '');
-  if (providerKey !== 'gemini') {
-    return normalized;
-  }
-
-  if (!normalized || !normalized.includes('generativelanguage.googleapis.com')) {
-    return normalized;
-  }
-
-  // Strip the /openai suffix for native Gemini API
-  if (normalized.endsWith('/v1beta/openai')) {
-    return normalized.slice(0, -'/openai'.length);
-  }
-  if (normalized.endsWith('/v1/openai')) {
-    return normalized.slice(0, -'/openai'.length);
-  }
-  if (normalized.endsWith('/v1beta')) {
-    return normalized;
-  }
-  if (normalized.endsWith('/v1')) {
-    return `${normalized.slice(0, -3)}v1beta`;
-  }
-
-  return 'https://generativelanguage.googleapis.com/v1beta';
-};
-
 const normalizeProviderApiFormat = (
   providerKey: string,
   apiFormat: unknown,
@@ -72,15 +45,26 @@ const normalizeProviderModels = (
   providerKey: string,
   models: ProviderConfig['models'],
   apiFormat: ApiFormat,
+  codingPlanEnabled?: boolean,
 ): ProviderConfig['models'] =>
   models?.map(model => {
+    const endpoint = resolveModelEndpoint(providerKey, model.id, {
+      apiFormat,
+      codingPlanEnabled,
+      modelConfig: model,
+    });
     const catalogModel = ProviderRegistry.getModel(providerKey, model.id);
     const catalogCapacity = catalogModel
       ? {
-          ...(typeof catalogModel.contextWindow === 'number' && catalogModel.contextWindow > 0
+          ...(!model.contextWindow &&
+          !model.contextTokens &&
+          typeof catalogModel.contextWindow === 'number' &&
+          catalogModel.contextWindow > 0
             ? { contextWindow: catalogModel.contextWindow }
             : {}),
-          ...(typeof catalogModel.maxTokens === 'number' && catalogModel.maxTokens > 0
+          ...(!model.maxTokens &&
+          typeof catalogModel.maxTokens === 'number' &&
+          catalogModel.maxTokens > 0
             ? { maxTokens: catalogModel.maxTokens }
             : {}),
         }
@@ -88,17 +72,8 @@ const normalizeProviderModels = (
     return {
       ...model,
       ...catalogCapacity,
-      supportsImage: ProviderRegistry.resolveModelSupportsImage(
-        providerKey,
-        model.id,
-        model.supportsImage,
-      ),
-      capabilities: ProviderRegistry.resolveModelCapabilities(
-        providerKey,
-        model.id,
-        apiFormat,
-        model,
-      ),
+      supportsImage: endpoint.capabilities.imageInput === ModelCapabilityStatus.Supported,
+      capabilities: endpoint.capabilities,
     };
   });
 
@@ -129,6 +104,7 @@ const normalizeProvidersConfig = (
             ? defaultConfig.providers![ProviderName.Zhiyuan].models
             : providerConfig.models,
           normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
+          providerConfig.codingPlanEnabled,
         ),
       },
     ]),
@@ -400,13 +376,10 @@ export class ConfigService {
                         : [...mergedProvider.models, ...newModels];
                   }
                 }
-                const codingPlanModels = ProviderRegistry.get(providerKey)?.codingPlanModels;
-                if (
-                  (mergedProvider as { codingPlanEnabled?: boolean }).codingPlanEnabled &&
-                  codingPlanModels
-                ) {
-                  mergedProvider.models = codingPlanModels.map(model => ({ ...model }));
-                }
+                mergedProvider.models = resolveConfiguredProviderModels(
+                  providerKey,
+                  mergedProvider as ProviderConfig,
+                );
                 return {
                   ...mergedProvider,
                   baseUrl: normalizeProviderBaseUrl(providerKey, mergedProvider.baseUrl),
@@ -415,6 +388,7 @@ export class ConfigService {
                     providerKey,
                     mergedProvider.models as ProviderConfig['models'],
                     normalizeProviderApiFormat(providerKey, mergedProvider.apiFormat),
+                    mergedProvider.codingPlanEnabled,
                   ),
                 };
               })(),
@@ -510,18 +484,21 @@ export class ConfigService {
     return this.config;
   }
 
-  async updateConfig(newConfig: Partial<AppConfig>) {
+  async updateConfig(
+    update: Partial<AppConfig> | ((current: AppConfig) => Partial<AppConfig> | undefined),
+  ) {
     await this.enqueue(async () => {
       await this.refreshManagedProviderPolicy();
-      const normalizedProviders = normalizeProvidersConfig(
-        newConfig.providers as AppConfig['providers'] | undefined,
-        this.isManagedProviderExclusive(),
-      );
-
       // Read only after earlier operations finish so concurrent partial updates
       // cannot merge against the same stale snapshot and overwrite each other.
       const stored = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
       const base = stored ?? this.config;
+      const newConfig = typeof update === 'function' ? update(base) : update;
+      if (!newConfig) return;
+      const normalizedProviders = normalizeProvidersConfig(
+        newConfig.providers as AppConfig['providers'] | undefined,
+        this.isManagedProviderExclusive(),
+      );
 
       this.config = {
         ...base,

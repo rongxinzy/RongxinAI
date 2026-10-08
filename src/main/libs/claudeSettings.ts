@@ -12,6 +12,7 @@ import {
   type ResolvedModelEndpoint,
   type RuntimeModelSnapshot,
   resolveCodingPlanBaseUrl,
+  resolveConfiguredProviderModels,
 } from '../../shared/providers';
 import type { SqliteStore } from '../sqliteStore';
 import type { CoworkApiConfig } from './coworkConfigStore';
@@ -211,6 +212,7 @@ function normalizeProviderModels(
   providerName: string,
   models?: readonly ProviderModelInputConfig[],
   apiFormat: ApiFormat = ProviderRegistry.get(providerName)?.defaultApiFormat ?? 'anthropic',
+  codingPlanEnabled?: boolean,
 ): ProviderModelConfig[] {
   return (models ?? [])
     .filter(model => model.id?.trim())
@@ -219,10 +221,20 @@ function normalizeProviderModels(
       const supportsImage = model.supportsImage ?? registeredModel?.supportsImage;
       const capabilities =
         registeredModel || model.capabilities
-          ? ProviderRegistry.resolveModelCapabilities(providerName, model.id, apiFormat, {
-              ...model,
-              ...(supportsImage === undefined ? {} : { supportsImage }),
-            })
+          ? codingPlanEnabled
+            ? resolveModelEndpoint(providerName, model.id, {
+                apiFormat,
+                codingPlanEnabled,
+                modelConfig: {
+                  ...model,
+                  name: model.name || model.id,
+                  ...(supportsImage === undefined ? {} : { supportsImage }),
+                },
+              }).capabilities
+            : ProviderRegistry.resolveModelCapabilities(providerName, model.id, apiFormat, {
+                ...model,
+                ...(supportsImage === undefined ? {} : { supportsImage }),
+              })
           : undefined;
       return {
         ...model,
@@ -364,11 +376,7 @@ function getEffectiveProviderModels(
 
     return [...modelsById.values()].sort((left, right) => left.id.localeCompare(right.id));
   }
-  const providerDefinition = ProviderRegistry.get(providerName);
-  const configuredModels =
-    providerConfig.codingPlanEnabled && providerDefinition?.codingPlanModels
-      ? providerDefinition.codingPlanModels
-      : providerConfig.models;
+  const configuredModels = resolveConfiguredProviderModels(providerName, providerConfig);
   const configuredApiFormat = getEffectiveProviderApiFormat(providerName, providerConfig.apiFormat);
   const effectiveApiFormat = providerConfig.codingPlanEnabled
     ? resolveCodingPlanBaseUrl(
@@ -378,7 +386,12 @@ function getEffectiveProviderModels(
         providerConfig.baseUrl ?? '',
       ).effectiveFormat
     : configuredApiFormat;
-  return normalizeProviderModels(providerName, configuredModels, effectiveApiFormat);
+  return normalizeProviderModels(
+    providerName,
+    configuredModels,
+    effectiveApiFormat,
+    providerConfig.codingPlanEnabled,
+  );
 }
 
 function getAgentEligibleProviderModels(
@@ -474,7 +487,6 @@ function resolveMatchedProviderFromSelection(
       !!(providerConfig as any).oauthAccessToken?.trim()) ||
     shouldUseOpenAICodexOAuth(providerName, providerConfig);
   if (
-    apiFormat === 'anthropic' &&
     providerRequiresApiKey(providerName) &&
     !providerConfig.apiKey?.trim() &&
     !hasApiKey &&
@@ -482,7 +494,7 @@ function resolveMatchedProviderFromSelection(
   ) {
     return {
       matched: null,
-      error: `Provider ${providerName} requires API key for Anthropic-compatible mode.`,
+      error: `Provider ${providerName} requires API key for ${apiFormat === 'anthropic' ? 'Anthropic-compatible' : 'OpenAI-compatible'} mode.`,
     };
   }
 
