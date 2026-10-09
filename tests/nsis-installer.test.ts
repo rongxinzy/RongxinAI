@@ -207,7 +207,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(13);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(15);
   });
 
   test('records optional local inference intent via an options checkbox instead of a popup', () => {
@@ -271,7 +271,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript.indexOf('!macro StopAppProcesses')).toBeLessThan(
       installerScript.indexOf('!macro customInit'),
     );
-    expect(installerScript.match(/!insertmacro StopAppProcesses/g)).toHaveLength(2);
+    expect(installerScript.match(/!insertmacro StopAppProcesses/g)).toHaveLength(3);
 
     const macroStart = installerScript.indexOf('!macro StopAppProcesses');
     const macroBlock = installerScript.slice(
@@ -358,9 +358,48 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('ShowInstDetails nevershow');
   });
 
+  test('distinguishes a locked install directory from a running app with translated messages', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    // A failed detach must be diagnosed: processes are counted first, and the
+    // retry dialog uses cause-specific LangStrings instead of the misleading
+    // electron-builder "cannot be closed" message. Labels carry the macro
+    // token because the macro is compiled once per invocation mode.
+    expect(installerScript).toContain('!macro CountInstallDirProcesses RESULT');
+    expect(installerScript).toContain('OldInstallDetachRetry_${TOKEN}');
+    expect(installerScript).toContain('!insertmacro CountInstallDirProcesses $R0');
+    expect(installerScript).toContain('MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_APP_UNCLOSABLE)"');
+    expect(installerScript).toContain('MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_DIR_OCCUPIED)"');
+    // Cancelling must leave the installer outright; Abort inside a page-leave
+    // callback would only cancel the page change.
+    const detachStart = installerScript.indexOf('Detaching previous application version');
+    const detachBlock = installerScript.slice(
+      detachStart,
+      installerScript.indexOf('!insertmacro ForgetOldInstallRegistry', detachStart),
+    );
+    expect(detachBlock).toContain('Quit');
+
+    // Messages ship translations for every installer language: zh-CN, zh-TW,
+    // and English for the remaining configured languages.
+    for (const message of ['ZY_APP_UNCLOSABLE', 'ZY_DIR_OCCUPIED']) {
+      for (const lcid of ['2052', '1028', '1033', '1041', '1042', '1036', '3082', '2058']) {
+        expect(installerScript).toContain(`LangString ${message} ${lcid} `);
+      }
+    }
+
+    // The detached previous version is unregistered so electron-builder skips
+    // the legacy uninstaller whose exit code 2 caused the misleading dialog;
+    // any uninstaller it still launches must not abort the installation.
+    expect(installerScript).toContain('!macro ForgetOldInstallRegistry');
+    expect(installerScript).toContain('!insertmacro ForgetOldInstallRegistry');
+    expect(installerScript).toContain('DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"');
+    expect(installerScript).toContain('!macro customUnInstallCheck');
+    expect(installerScript).toContain('!macro customUnInstallCheckCurrentUser');
+  });
+
   test('detaches expanded runtime caches before deleting them asynchronously', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
-    const uninstallBlock = installerScript.slice(installerScript.indexOf('!macro customUnInstall'));
+    const uninstallBlock = installerScript.slice(installerScript.indexOf('!macro customUnInstall\n'));
 
     expect(uninstallBlock).toContain('StrCpy $3 "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"');
     expect(uninstallBlock).toContain('StrCpy $4 "$3.uninstall.$4"');
