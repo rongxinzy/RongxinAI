@@ -383,10 +383,39 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(detachBlock).toContain('Quit');
 
-    // Messages ship translations for every installer language: zh-CN, zh-TW,
-    // and English for the remaining configured languages.
+    // Messages ship an entry for every bundled NSIS language: zh-CN and
+    // zh-TW translated, the rest on English fallback (makensis promotes an
+    // unset-per-language LangString to a build error).
+    const bundledLcids = [
+      '1033',
+      '1031',
+      '1036',
+      '3082',
+      '2052',
+      '1028',
+      '1041',
+      '1042',
+      '1040',
+      '1043',
+      '1030',
+      '1053',
+      '1044',
+      '1035',
+      '1049',
+      '2070',
+      '1046',
+      '1045',
+      '1058',
+      '1029',
+      '1051',
+      '1038',
+      '1025',
+      '1055',
+      '1054',
+      '1066',
+    ];
     for (const message of ['ZY_APP_UNCLOSABLE', 'ZY_DIR_OCCUPIED']) {
-      for (const lcid of ['2052', '1028', '1033', '1041', '1042', '1036', '3082', '2058']) {
+      for (const lcid of bundledLcids) {
         expect(installerScript).toContain(`LangString ${message} ${lcid} `);
       }
     }
