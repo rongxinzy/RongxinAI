@@ -12,6 +12,11 @@ on:
         required: false
         type: string
         default: ''
+      upload_r2:
+        description: 'Upload the signed installer to the xiaoruan-releases R2 bucket after signing. Uncheck to only produce the signed package artifact.'
+        required: false
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       source_run_id:
@@ -22,6 +27,11 @@ on:
         description: 'Package SemVer without a v prefix'
         required: true
         type: string
+      upload_r2:
+        description: 'Upload the signed installer to the xiaoruan-releases R2 bucket after signing'
+        required: false
+        type: boolean
+        default: true
     secrets:
       # In workflow_call mode the Certum credentials resolve from the caller
       # repository's `release` environment (job-level environment secrets win
@@ -275,3 +285,49 @@ jobs:
             echo
             echo "https://github.com/rongxinzy/RongxinAI/actions/runs/$GITHUB_RUN_ID"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  upload:
+    needs: [prepare, sign]
+    if: inputs.upload_r2
+    runs-on: ubuntu-latest
+    environment: xiaoruan-release
+    timeout-minutes: 30
+    env:
+      R2_BUCKET: xiaoruan-releases
+      PACKAGE_SOURCE_COMMIT: ${{ needs.prepare.outputs.source-sha }}
+      XIAORUAN_R2_ACCOUNT_ID: ${{ vars.XIAORUAN_R2_ACCOUNT_ID }}
+    steps:
+      # The upload tooling is vendored in the signed source tree, which pins it
+      # to the commit being released (same contract as the Certum action).
+      - name: Checkout Xiaoruan source commit
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.prepare.outputs.source-repository }}
+          ref: ${{ needs.prepare.outputs.source-sha }}
+          path: xiaoruan
+          token: ${{ secrets.XIAORUAN_ARTIFACT_READ_TOKEN || secrets.RUNTIME_ARTIFACT_READ_TOKEN || github.token }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Check dedicated storage configuration
+        working-directory: xiaoruan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.XIAORUAN_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.XIAORUAN_R2_SECRET_ACCESS_KEY }}
+        run: node --input-type=module -e "import { uploadIdentity } from './scripts/release/upload-custom-packages.mjs'; uploadIdentity(process.env)"
+      - uses: actions/download-artifact@v8
+        with:
+          name: signed-windows-build
+          path: packages/signed-windows-build
+      - name: Verify and store installers
+        env:
+          SOURCE_BUILD_RUN_ID: ${{ needs.prepare.outputs.source-run-id }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.XIAORUAN_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.XIAORUAN_R2_SECRET_ACCESS_KEY }}
+        run: node xiaoruan/scripts/release/upload-custom-packages.mjs packages 1
+      - uses: actions/upload-artifact@v6
+        with:
+          name: xiaoruan-r2-upload-receipt
+          path: custom-upload-receipt/packages.json
+          if-no-files-found: error
+          retention-days: 30
