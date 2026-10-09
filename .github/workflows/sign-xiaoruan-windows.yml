@@ -205,12 +205,51 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot '${{ github.workspace }}/xiaoruan'
-      - name: Smoke-launch the packaged app to a visible window
+      # Launching release/win-unpacked directly cannot work: the offline
+      # components (channel runtime, Python, uv, PortableGit, SKILLs, MCPs)
+      # ship as 7z payloads inside the NSIS installer and only exist under
+      # resources/ after installation expands them. Silent-install the signed
+      # package first, then smoke-launch the installed executable.
+      - name: Silent-install the signed package
         shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-app-launch-smoke.ps1
-          -ProjectRoot '${{ github.workspace }}/xiaoruan'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = @(Get-ChildItem -LiteralPath 'release' -Filter '*.exe' -File |
+            Where-Object { $_.Name -notlike '*Uninstall*' })
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one Windows installer; found $($installers.Count)"
+          }
+          $setup = Start-Process -FilePath $installers[0].FullName -ArgumentList '/S' -PassThru
+          if (-not $setup.WaitForExit(15 * 60 * 1000)) {
+            Stop-Process -Id $setup.Id -Force -ErrorAction SilentlyContinue
+            throw 'Installer did not finish within 15 minutes.'
+          }
+          if ($setup.ExitCode -ne 0) {
+            throw "Installer exited with code $($setup.ExitCode)."
+          }
+      - name: Stop any auto-launched app instance
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.Path -and $_.Path -like '*\Programs\xiaoruan-ai-agent\*' } |
+            Stop-Process -Force
+          Start-Sleep -Seconds 3
+      - name: Smoke-launch the installed app to a visible window
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = Get-Content -LiteralPath package.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $builder = Get-Content -LiteralPath electron-builder.json -Raw -Encoding UTF8 | ConvertFrom-Json
+          $exeName = $builder.executableName
+          if (-not $exeName) { $exeName = $builder.productName }
+          $exe = Join-Path $env:LOCALAPPDATA ("Programs\{0}\{1}.exe" -f $package.name, $exeName)
+          powershell -NoProfile -ExecutionPolicy Bypass `
+            -File scripts/ci/windows-app-launch-smoke.ps1 `
+            -ExePath $exe -WindowTimeoutSeconds 300
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installed app launch smoke failed with exit code $LASTEXITCODE."
+          }
       - uses: actions/upload-artifact@v6
         with:
           name: signed-windows-build
