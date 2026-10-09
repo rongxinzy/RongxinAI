@@ -368,8 +368,12 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('!macro CountInstallDirProcesses RESULT');
     expect(installerScript).toContain('OldInstallDetachRetry_${TOKEN}');
     expect(installerScript).toContain('!insertmacro CountInstallDirProcesses $R0');
-    expect(installerScript).toContain('MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_APP_UNCLOSABLE)"');
-    expect(installerScript).toContain('MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_DIR_OCCUPIED)"');
+    expect(installerScript).toContain(
+      'MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_APP_UNCLOSABLE)"',
+    );
+    expect(installerScript).toContain(
+      'MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_DIR_OCCUPIED)"',
+    );
     // Cancelling must leave the installer outright; Abort inside a page-leave
     // callback would only cancel the page change.
     const detachStart = installerScript.indexOf('Detaching previous application version');
@@ -399,7 +403,9 @@ describe('NSIS offline resource and local inference flow', () => {
 
   test('detaches expanded runtime caches before deleting them asynchronously', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
-    const uninstallBlock = installerScript.slice(installerScript.indexOf('!macro customUnInstall\n'));
+    const uninstallBlock = installerScript.slice(
+      installerScript.indexOf('!macro customUnInstall\n'),
+    );
 
     expect(uninstallBlock).toContain('StrCpy $3 "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"');
     expect(uninstallBlock).toContain('StrCpy $4 "$3.uninstall.$4"');

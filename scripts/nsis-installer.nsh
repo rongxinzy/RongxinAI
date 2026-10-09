@@ -5,6 +5,13 @@
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
 
+; PrepareExistingInstallForExtraction is inserted from LocalInferencePageLeave,
+; which lives in this include file — ahead of multiUser.nsh, where electron-
+; builder defines these keys with the same /ifndef fallback values. Mirror the
+; defaults here so registry macros expand correctly at that earlier point.
+!define /ifndef INSTALL_REGISTRY_KEY "Software\${APP_GUID}"
+!define /ifndef UNINSTALL_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}"
+
 ; electron-builder's CHECK_APP_RUNNING treats any process whose image path
 ; starts with $INSTDIR as "app still running". Sidecars (cc-connect,
 ; llama-server, python, git) survive a force-killed main process, so kill by
