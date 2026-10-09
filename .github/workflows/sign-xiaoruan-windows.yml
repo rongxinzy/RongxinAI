@@ -49,6 +49,10 @@ on:
         required: false
       RUNTIME_ARTIFACT_READ_TOKEN:
         required: false
+      XIAORUAN_R2_ACCESS_KEY_ID:
+        required: false
+      XIAORUAN_R2_SECRET_ACCESS_KEY:
+        required: false
 
 permissions:
   contents: read
