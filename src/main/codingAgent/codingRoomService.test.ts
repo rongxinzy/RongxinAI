@@ -31,8 +31,22 @@ import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
 
 let db: Database.Database | undefined;
 const tempDirectories: string[] = [];
+const services: CodingRoomService[] = [];
 
-afterEach(() => {
+function createService(
+  ...args: ConstructorParameters<typeof CodingRoomService>
+): CodingRoomService {
+  const service = new CodingRoomService(...args);
+  services.push(service);
+  return service;
+}
+
+afterEach(async () => {
+  // Dispose services (which awaits their in-flight turns) before closing the
+  // database, otherwise a late turn completion touches a closed connection.
+  for (const service of services.splice(0)) {
+    await service.dispose();
+  }
   db?.close();
   db = undefined;
   for (const directory of tempDirectories.splice(0)) {
@@ -50,7 +64,7 @@ test('creates workspace-scoped sessions with immutable agent and source bindings
   mkdirSync(primaryRoot);
   mkdirSync(sharedRoot);
   tempDirectories.push(root);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -97,7 +111,7 @@ test('does not persist a draft session when its default agent model is unavailab
   initializeCodingAgentSchema(db);
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-unavailable-'));
   tempDirectories.push(root);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -161,7 +175,7 @@ test('does not persist a session before an external ACP session is established',
       ].join(''),
     ],
   });
-  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+  const service = createService(new CodingRoomRepository(db), registry, {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -193,7 +207,7 @@ test('routes a builtin lane through its driver and projects runtime completion',
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -236,7 +250,7 @@ test('advertises the builtin commands for a lane whose row predates them', async
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -269,7 +283,7 @@ test('refreshes stale builtin commands and config options when the lane is prepa
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -332,7 +346,7 @@ test('re-projects builtin commands for an already bound lane on the next prompt'
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -369,7 +383,7 @@ test('forwards the goal command to the builtin runtime as goal mode', async () =
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -403,7 +417,7 @@ test('forwards the plan command to the builtin runtime as a planning turn', asyn
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -438,7 +452,7 @@ test('reacquires the workspace writer lease before resuming a builtin elicitatio
   initializeCodingAgentSchema(db);
   const repository = new CodingRoomRepository(db);
   const respondBuiltinElicitation = vi.fn(() => true);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     respondBuiltinElicitation,
@@ -480,7 +494,7 @@ test('blocks builtin prompts while an elicitation awaits an answer', async () =>
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -511,7 +525,7 @@ test('blocks builtin prompts while an elicitation awaits an answer', async () =>
 test('cancels a stale question and frees its lane after an application restart', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -556,7 +570,7 @@ test('cancels a pending elicitation before stopping its session and blocks delet
   initializeCodingAgentSchema(db);
   const repository = new CodingRoomRepository(db);
   const cancelBuiltinElicitation = vi.fn(() => true);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     cancelBuiltinElicitation,
@@ -604,7 +618,7 @@ test('runs builtin control commands locally instead of forwarding them to the ag
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
   const compactBuiltinSession = vi.fn(async () => ({ cancelled: false }));
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     compactBuiltinSession,
     isBuiltinSessionRunning: () => false,
@@ -661,7 +675,7 @@ test('answers the mcp command from the runtime instead of the agent', async () =
     servers: [{ name: 'github', enabled: true, connected: true, toolCount: 1 }],
     tools: [{ server: 'github', name: 'create_issue' }],
   }));
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     describeBuiltinMcp,
     isBuiltinSessionRunning: () => false,
@@ -707,7 +721,7 @@ test('answers the mcp command from the runtime instead of the agent', async () =
 test('treats a too-small builtin compaction as a no-op instead of a failure', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     compactBuiltinSession: async () => {
       throw new Error('Nothing to compact (session too small)');
@@ -737,7 +751,7 @@ test('reports a missing builtin session instead of failing to compact', async ()
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const compactBuiltinSession = vi.fn(async () => ({ cancelled: false }));
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     compactBuiltinSession,
     isBuiltinSessionRunning: () => false,
@@ -768,7 +782,7 @@ test('queues a builtin control command while the session is running', async () =
   initializeCodingAgentSchema(db);
   const compactBuiltinSession = vi.fn(async () => ({ cancelled: false }));
   let queued: (() => Promise<void>) | null = null;
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     compactBuiltinSession,
     isBuiltinSessionRunning: () => true,
@@ -801,7 +815,7 @@ test('queues a builtin control command while the session is running', async () =
 test('does not create a mission when the selected agent needs model configuration', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(
+  const service = createService(
     new CodingRoomRepository(db),
     new CodingAgentRegistry(undefined, () => false),
     {
@@ -828,7 +842,7 @@ test('rediscovers external agents on demand and returns the refreshed room snaps
   const discoverExternalAgents = vi
     .spyOn(registry, 'discoverExternalAgents')
     .mockResolvedValue(undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+  const service = createService(new CodingRoomRepository(db), registry, {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -848,7 +862,7 @@ test('rediscovers external agents on demand and returns the refreshed room snaps
 test('projects builtin permission requests into the coding room status', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -875,7 +889,7 @@ test('responds to builtin coding permissions through the in-process runtime', as
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const respondBuiltinPermission = vi.fn();
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -912,7 +926,7 @@ test('responds to builtin coding permissions through the in-process runtime', as
 test('pauses a builtin lane when its runtime reports a recoverable interruption', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -951,7 +965,7 @@ test('cancels a running turn and retains the mission and lane', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const cancelled: string[] = [];
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async sessionId => {
       cancelled.push(sessionId);
@@ -983,7 +997,7 @@ test('cancel leaves a lane without an active turn untouched', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const cancelled: string[] = [];
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async sessionId => {
       cancelled.push(sessionId);
@@ -1012,7 +1026,7 @@ test('reports a failed automatic collaboration stage without changing assignment
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1060,7 +1074,7 @@ test('reports a failed automatic collaboration stage without changing assignment
 test('recovers stale running lanes after an application restart without losing the mission', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1115,7 +1129,7 @@ test('requires explicit confirmation before sending a recovery summary to a repl
     ],
   });
   const beginExternalWorkbenchRun = vi.fn(() => ({ taskId: 'task', runId: 'run' }));
-  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+  const service = createService(new CodingRoomRepository(db), registry, {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1179,7 +1193,7 @@ test('prepares a new ACP lane and projects its dynamic commands before the first
       ].join(''),
     ],
   });
-  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+  const service = createService(new CodingRoomRepository(db), registry, {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1202,6 +1216,109 @@ test('prepares a new ACP lane and projects its dynamic commands before the first
   await service.dispose();
 });
 
+test('dispose waits for an in-flight turn to record its failure', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'Silent ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: [
+      '-e',
+      // Answers initialize and session/new but never session/prompt, so the
+      // turn stays in flight until dispose() kills the child process.
+      "let buffer=''; process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1); if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'silent-session' } }) + '\\n'); } });",
+    ],
+  });
+  const service = createService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = process.cwd();
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+  const lane = created.lanes[0];
+
+  await service.prompt(workspaceRoot, { laneId: lane.id, prompt: 'Keep working silently.' });
+  // The turn is still parked on the silent agent here. dispose() must wait for
+  // it to unwind and persist the outcome instead of returning early.
+  await service.dispose();
+
+  const snapshot = service.bootstrap(workspaceRoot);
+  expect(snapshot.events.map(event => event.kind)).toContain(CodingEventKind.TurnFailed);
+  expect(snapshot.lanes[0].status).toBe(CodingLaneStatus.Failed);
+});
+
+test('a turn settling after the test body does not touch a closed database', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'Slow ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: [
+      '-e',
+      // Answers session/prompt after 250ms with no session updates, so the turn
+      // fails with AgentNoOutput well after this test body has returned. The
+      // shared afterEach must dispose the service (awaiting the turn) before
+      // closing the database, otherwise the failure handler hits a closed
+      // connection and vitest reports an unhandled error.
+      "let buffer=''; process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1); if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'slow-session' } }) + '\\n'); if (request.method === 'session/prompt') setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n'), 250); } });",
+    ],
+  });
+  const service = createService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = process.cwd();
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+
+  await service.prompt(workspaceRoot, {
+    laneId: created.lanes[0].id,
+    prompt: 'Answer slowly.',
+  });
+  // Deliberately end the test while the turn is still in flight. Success is
+  // the absence of an unhandled 'database connection is not open' error after
+  // teardown.
+});
+
 test('creates collaborator lanes in isolated workspaces and runs them independently', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
@@ -1210,7 +1327,7 @@ test('creates collaborator lanes in isolated workspaces and runs them independen
     async ({ laneId }: { laneId: string }) => `/isolated/${laneId}`,
   );
   const getWorkspaceBaseline = vi.fn(async () => 'base-commit');
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1253,7 +1370,7 @@ test('previews and persists an immutable handoff with the source Git baseline', 
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1310,7 +1427,7 @@ test('requires an isolated lane and an idle primary writer before applying colla
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const applyIsolatedWorkspaceDiff = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1358,7 +1475,7 @@ test('creates deterministic isolated review and verification assignments for a c
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1423,7 +1540,7 @@ test('deleteSession removes a collaborator lane but keeps the primary session', 
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
   tempDirectories.push(root);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1468,7 +1585,7 @@ test('deleteSession of the primary session removes the whole mission', async () 
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
   tempDirectories.push(root);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1504,7 +1621,7 @@ test('deleteSession refuses a running session', async () => {
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
   tempDirectories.push(root);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1536,7 +1653,7 @@ test('applies draft config option overrides when starting a builtin session', as
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-overrides-'));
   tempDirectories.push(root);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1577,7 +1694,7 @@ test('ignores invalid draft config option overrides instead of failing the sessi
   initializeCodingAgentSchema(db);
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-overrides-'));
   tempDirectories.push(root);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1614,7 +1731,7 @@ test('prepareLane populates config options for legacy builtin lanes', async () =
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-prepare-'));
   tempDirectories.push(root);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1647,7 +1764,7 @@ test('prepareLane populates config options for legacy builtin lanes', async () =
 test('getProfileConfigOptions returns defaults for the builtin profile only', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1665,7 +1782,7 @@ test('getProfileConfigOptions returns defaults for the builtin profile only', ()
 test('getProfileAvailableCommands returns the builtin command list without a session', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1687,7 +1804,7 @@ test('setLaneModelOverride persists the model and patches the live builtin sessi
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-model-'));
   tempDirectories.push(root);
   const patchBuiltinSession = vi.fn(async () => undefined);
-  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+  const service = createService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     patchBuiltinSession,
@@ -1747,7 +1864,7 @@ test('setLaneModelOverride rejects non-builtin lanes', async () => {
     args: ['-e', ''],
   });
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, registry, {
+  const service = createService(repository, registry, {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1805,7 +1922,7 @@ test('probeAgent revives a needs_auth profile when the agent responds', async ()
   const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
   registry.markNeedsAuth(profile.id);
 
-  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+  const service = createService(new CodingRoomRepository(db), registry, {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
@@ -1824,7 +1941,7 @@ test('manages agent profiles without an open workspace', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const repository = new CodingRoomRepository(db);
-  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+  const service = createService(repository, new CodingAgentRegistry(), {
     startBuiltinSession: async () => undefined,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,

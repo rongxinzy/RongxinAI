@@ -198,6 +198,7 @@ export class CodingRoomService extends EventEmitter {
   private readonly cancelledTurnGenerations = new Map<string, number>();
   private readonly acpPendingMessages = new Map<string, CoworkPendingMessage[]>();
   private readonly stagedLaneIds = new Set<string>();
+  private readonly inFlightTurns = new Set<Promise<void>>();
   /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
   private readonly builtinSessionLaneMap = new Map<string, string>();
 
@@ -814,18 +815,20 @@ export class CodingRoomService extends EventEmitter {
         this.linkLaneAssignment(snapshot, lane.id, workbench.taskId, workbench.runId);
       }
       const turnGeneration = this.beginLaneTurn(lane.id);
-      void this.runTurn(
-        workspaceRoot,
-        executionRoot,
-        snapshot.room.id,
-        lane,
-        profile.driverKind,
-        driver,
-        session.id,
-        prompt,
-        queuedItemId,
-        turnGeneration,
-        input.attachments,
+      this.trackTurn(
+        this.runTurn(
+          workspaceRoot,
+          executionRoot,
+          snapshot.room.id,
+          lane,
+          profile.driverKind,
+          driver,
+          session.id,
+          prompt,
+          queuedItemId,
+          turnGeneration,
+          input.attachments,
+        ),
       );
     } catch (error) {
       if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
@@ -890,19 +893,21 @@ export class CodingRoomService extends EventEmitter {
         this.linkLaneAssignment(snapshot, lane.id, workbench.taskId, workbench.runId);
       }
       const turnGeneration = this.beginLaneTurn(lane.id);
-      void this.runTurn(
-        workspaceRoot,
-        executionRoot,
-        snapshot.room.id,
-        lane,
-        profile.driverKind,
-        driver,
-        session.id,
-        includeRecoveryContext
-          ? `${lane.pendingRecoveryContext}\n\n${lane.pendingRecoveryPrompt}`
-          : lane.pendingRecoveryPrompt,
-        undefined,
-        turnGeneration,
+      this.trackTurn(
+        this.runTurn(
+          workspaceRoot,
+          executionRoot,
+          snapshot.room.id,
+          lane,
+          profile.driverKind,
+          driver,
+          session.id,
+          includeRecoveryContext
+            ? `${lane.pendingRecoveryContext}\n\n${lane.pendingRecoveryPrompt}`
+            : lane.pendingRecoveryPrompt,
+          undefined,
+          turnGeneration,
+        ),
       );
     } catch (error) {
       if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
@@ -1753,6 +1758,10 @@ export class CodingRoomService extends EventEmitter {
     this.driverSessionPromises.clear();
     this.authTerminals.dispose();
     this.builtinSessionLaneMap.clear();
+    // Disposing the drivers terminates their streams, which settles in-flight
+    // turns. Wait for those turns so their completion/failure handlers finish
+    // writing to the repository before callers close the database.
+    await Promise.all([...this.inFlightTurns]);
   }
 
   private getDriver(lane: CodingAgentLane): CodingAgentDriver {
@@ -2140,6 +2149,19 @@ export class CodingRoomService extends EventEmitter {
         console.error('[CodingRoom] failed to start queued ACP message:', error);
       },
     );
+  }
+
+  private trackTurn(turn: Promise<void>): void {
+    const tracked = turn
+      .catch(error => {
+        // runTurn records turn failures itself; a rejection here means the
+        // failure handler itself threw, e.g. the repository was closed first.
+        console.error('[CodingRoom] turn failure handling did not complete:', error);
+      })
+      .finally(() => {
+        this.inFlightTurns.delete(tracked);
+      });
+    this.inFlightTurns.add(tracked);
   }
 
   private beginLaneTurn(laneId: string): number {
