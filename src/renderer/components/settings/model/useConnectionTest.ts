@@ -3,7 +3,6 @@ import { useCallback, useRef } from 'react';
 import {
   applyProviderModelConnectionTestResults,
   createProviderConnectionTestSignature,
-  isProviderEnabled,
   ProviderName,
   ProviderRegistry,
   type DiscoveredProviderModel,
@@ -66,6 +65,20 @@ export function useConnectionTest({
   const providersRef = useRef(providers);
   providersRef.current = providers;
 
+  // Single source of truth for the providers draft: apply the update to the
+  // ref synchronously and mirror it into React state, so asynchronous test
+  // continuations always read the latest draft instead of a stale render
+  // snapshot. Writing the ref and the state separately lets an edit in
+  // between fork the two and drop updates.
+  const updateProviders = useCallback(
+    (updater: (current: ProvidersConfig) => ProvidersConfig) => {
+      const next = updater(providersRef.current);
+      providersRef.current = next;
+      setProviders(next);
+    },
+    [setProviders],
+  );
+
   const startConnectionTest = useCallback(
     (provider: ProviderType, snapshot: ProviderConfig) => {
       const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
@@ -114,8 +127,60 @@ export function useConnectionTest({
     );
   };
 
-  const persistProviderModelConnectionResults = async (
+  // Persist the connectionTest verdicts of the tested models into the latest
+  // stored provider entry. Only the tested models' connectionTest fields are
+  // merged by model id; every other stored field (enabled, baseUrl, models
+  // the test did not cover, ...) is left untouched, and a stored entry missing
+  // the provider or holding a different model API is never recreated or
+  // overwritten. With appendMissing, tested models absent from storage are
+  // appended with their verdict (discovery flow) instead of being dropped.
+  const persistTestedProviderModels = async (
     provider: ProviderType,
+    testedModels: readonly NonNullable<ProviderConfig['models']>[number][],
+    isCurrent: () => boolean,
+    options: { appendMissing?: boolean } = {},
+  ): Promise<void> => {
+    if (provider === ProviderName.LlamaCpp) return;
+    await configService.updateConfig(currentConfig => {
+      if (!isCurrent()) return;
+      const storedProvider = currentConfig.providers?.[provider];
+      if (!storedProvider) return;
+
+      const testedById = new Map(testedModels.map(model => [model.id, model]));
+      let changed = false;
+      const mergedModels = (storedProvider.models ?? []).map(model => {
+        const tested = testedById.get(model.id);
+        if (!tested || tested.connectionTest === undefined) return model;
+        if (tested.piRuntime?.api !== model.piRuntime?.api) return model;
+        if (tested.connectionTest === model.connectionTest) return model;
+        changed = true;
+        return { ...model, connectionTest: tested.connectionTest };
+      });
+
+      let nextModels = mergedModels;
+      if (options.appendMissing === true) {
+        const knownIds = new Set(mergedModels.map(model => model.id));
+        for (const tested of testedModels) {
+          if (knownIds.has(tested.id) || tested.connectionTest === undefined) continue;
+          knownIds.add(tested.id);
+          changed = true;
+          nextModels = [...nextModels, { ...tested }];
+        }
+      }
+
+      if (!changed) return;
+      return {
+        providers: {
+          ...(currentConfig.providers ?? {}),
+          [provider]: { ...storedProvider, models: nextModels },
+        },
+      };
+    });
+  };
+
+  const completeSuccessfulConnectionTest = async (
+    provider: ProviderType,
+    model: Pick<NonNullable<ProviderConfig['models']>[number], 'id' | 'name'>,
     outcomes: ReadonlyArray<{
       modelId: string;
       success: boolean;
@@ -124,65 +189,13 @@ export function useConnectionTest({
     signature: string,
     isCurrent: () => boolean,
   ): Promise<void> => {
-    if (provider === ProviderName.LlamaCpp) return;
-    await configService.updateConfig(currentConfig => {
-      if (!isCurrent()) return;
-      const currentProviderConfig = currentConfig.providers?.[provider];
-      if (!currentProviderConfig || !isProviderEnabled(provider, currentProviderConfig)) return;
-
+    try {
       const testedProviderConfig = applyProviderModelConnectionTestResults(
-        currentProviderConfig,
+        { models: [{ ...model }] },
         outcomes,
         signature,
       );
-      if (testedProviderConfig === currentProviderConfig) return;
-
-      const nextProviders = {
-        ...(currentConfig.providers ?? {}),
-        [provider]: testedProviderConfig,
-      } as ProvidersConfig;
-      return { providers: nextProviders };
-    });
-  };
-
-  const persistTestedProviderConfiguration = async (
-    provider: ProviderType,
-    providerConfig: ProviderConfig,
-    isCurrent: () => boolean,
-  ): Promise<void> => {
-    if (provider === ProviderName.LlamaCpp) return;
-    await configService.updateConfig(currentConfig => {
-      if (!isCurrent()) return;
-      const current = providersRef.current[provider];
-      const testedById = new Map(providerConfig.models?.map(model => [model.id, model]));
-      const apiFormat = getEffectiveApiFormat(provider, providerConfig.apiFormat);
-      const nextProviders = {
-        ...(currentConfig.providers ?? {}),
-        [provider]: {
-          ...current,
-          models: current.models?.map(model => {
-            const tested = testedById.get(model.id);
-            return tested && tested.piRuntime?.api === model.piRuntime?.api
-              ? { ...model, connectionTest: tested.connectionTest }
-              : model;
-          }),
-          enabled: true,
-          apiFormat,
-          baseUrl: resolveBaseUrl(provider, providerConfig.baseUrl, apiFormat),
-        },
-      } as ProvidersConfig;
-      return { providers: nextProviders };
-    });
-  };
-
-  const completeSuccessfulConnectionTest = async (
-    provider: ProviderType,
-    providerConfig: ProviderConfig,
-    model: Pick<NonNullable<ProviderConfig['models']>[number], 'id' | 'name'>,
-    isCurrent: () => boolean,
-  ): Promise<void> => {
-    try {
-      await persistTestedProviderConfiguration(provider, providerConfig, isCurrent);
+      await persistTestedProviderModels(provider, testedProviderConfig.models ?? [], isCurrent);
       if (!isCurrent()) return;
       if (provider !== ProviderName.LlamaCpp) {
         enableProvider(provider);
@@ -319,16 +332,10 @@ export function useConnectionTest({
       },
     ];
     const testedAt = Date.now();
-    const testedProviderConfig = applyProviderModelConnectionTestResults(
-      currentProviderConfig,
-      outcomes,
-      connectionSignature,
-      testedAt,
-    );
-    setProviders(previous => ({
-      ...previous,
+    updateProviders(current => ({
+      ...current,
       [testingProvider]: applyProviderModelConnectionTestResults(
-        previous[testingProvider],
+        current[testingProvider],
         outcomes,
         connectionSignature,
         testedAt,
@@ -338,15 +345,21 @@ export function useConnectionTest({
     if (result.success) {
       await completeSuccessfulConnectionTest(
         testingProvider,
-        testedProviderConfig,
         firstModel,
+        outcomes,
+        connectionSignature,
         isCurrent,
       );
     } else {
-      await persistProviderModelConnectionResults(
-        testingProvider,
+      const testedProviderConfig = applyProviderModelConnectionTestResults(
+        { models: [{ ...firstModel }] },
         outcomes,
         connectionSignature,
+        testedAt,
+      );
+      await persistTestedProviderModels(
+        testingProvider,
+        testedProviderConfig.models ?? [],
         isCurrent,
       );
       if (!isCurrent()) return;
@@ -378,10 +391,6 @@ export function useConnectionTest({
       const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels, {
         pruneMissing: mirrorEndpoint,
       });
-      const nextProviderConfig: ProviderConfig = {
-        ...providerConfig,
-        models: merged.models,
-      };
       const modelsToTest = merged.models;
       // 一个模型都没发现时列表保持原样，也不必把已有模型再测一遍；空结果由调用方提示。
       if (discoveredModels.length === 0 || modelsToTest.length === 0) return;
@@ -390,8 +399,7 @@ export function useConnectionTest({
       if (provider === activeProvider && discoveredModels.length > 0) {
         setSelectedModelId(current => current || discoveredModels[0].id);
       }
-      providersRef.current = { ...providersRef.current, [provider]: nextProviderConfig };
-      setProviders(current => ({
+      updateProviders(current => ({
         ...current,
         [provider]: {
           ...current[provider],
@@ -430,17 +438,13 @@ export function useConnectionTest({
       }
 
       void (async () => {
-        const testingApiFormat = getEffectiveApiFormat(provider, nextProviderConfig.apiFormat);
-        const testingBaseUrl = resolveBaseUrl(
-          provider,
-          nextProviderConfig.baseUrl,
-          testingApiFormat,
-        );
+        const testingApiFormat = getEffectiveApiFormat(provider, providerConfig.apiFormat);
+        const testingBaseUrl = resolveBaseUrl(provider, providerConfig.baseUrl, testingApiFormat);
         const connectionSignature = await createProviderConnectionTestSignature({
           providerId: provider,
           baseUrl: testingBaseUrl,
           apiFormat: testingApiFormat,
-          provider: nextProviderConfig,
+          provider: providerConfig,
         });
         if (!isCurrent()) return;
         // 结果回来的节奏不可控（快速失败时会成批返回），按帧合并成一次状态更新，
@@ -469,7 +473,7 @@ export function useConnectionTest({
 
         const results = await testProviderModelsConcurrently({
           providerId: provider,
-          provider: nextProviderConfig,
+          provider: providerConfig,
           baseUrl: testingBaseUrl,
           apiFormat: testingApiFormat,
           models: modelsToTest,
@@ -506,7 +510,7 @@ export function useConnectionTest({
           connectionSignature,
           testedAt,
         );
-        setProviders(current => ({
+        updateProviders(current => ({
           ...current,
           [provider]: applyProviderModelConnectionTestResults(
             current[provider],
@@ -524,28 +528,30 @@ export function useConnectionTest({
         );
         setProviderModelConnectionStatuses(provider, statuses);
 
+        // Persist whatever the batch produced, success or failure: merge each
+        // tested model's verdict into the latest stored entry and append
+        // discovered models the user has not saved yet, without touching any
+        // other stored field. A fully failed batch used to be dropped silently
+        // when the provider was not saved yet, losing the discovered models.
         const successCount = currentResults.filter(({ result }) => result.success).length;
-        if (successCount > 0) {
-          try {
-            await persistTestedProviderConfiguration(provider, testedProviderConfig, isCurrent);
-            if (!isCurrent()) return;
-            if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
-          } catch (error) {
-            if (!isCurrent()) return;
-            console.error('[Settings] failed to save auto-tested provider configuration:', error);
-            showConnectionTestNotification(
-              { success: false, message: i18nService.t('failedToSaveSettings') },
-              provider,
-            );
-            return;
-          }
-        } else {
-          await persistProviderModelConnectionResults(
+        const testedModelIds = new Set(outcomes.map(outcome => outcome.modelId));
+        const testedModels = (testedProviderConfig.models ?? []).filter(model =>
+          testedModelIds.has(model.id),
+        );
+        try {
+          await persistTestedProviderModels(provider, testedModels, isCurrent, {
+            appendMissing: true,
+          });
+          if (!isCurrent()) return;
+          if (successCount > 0 && provider !== ProviderName.LlamaCpp) enableProvider(provider);
+        } catch (error) {
+          if (!isCurrent()) return;
+          console.error('[Settings] failed to save auto-tested provider configuration:', error);
+          showConnectionTestNotification(
+            { success: false, message: i18nService.t('failedToSaveSettings') },
             provider,
-            outcomes,
-            connectionSignature,
-            isCurrent,
           );
+          return;
         }
         if (!isCurrent()) return;
 
@@ -584,9 +590,9 @@ export function useConnectionTest({
       enableProvider,
       mergeProviderModelConnectionStatuses,
       setProviderModelConnectionStatuses,
-      setProviders,
       setSelectedModelId,
       startConnectionTest,
+      updateProviders,
     ],
   );
 

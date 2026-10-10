@@ -100,6 +100,43 @@ describe('mergeDiscoveredProviderModels', () => {
     ]);
   });
 
+  test('never overwrites a context length the user entered by hand', () => {
+    const existing = [
+      {
+        id: 'model-a',
+        name: 'Model A',
+        origin: ProviderModelOrigin.User,
+        contextWindow: 8192,
+      },
+    ];
+
+    const result = mergeDiscoveredProviderModels(existing, [
+      { id: 'model-a', displayName: 'Remote A', contextWindow: 32768 },
+    ]);
+
+    expect(result.changed).toBe(false);
+    expect(result.models[0]).toBe(existing[0]);
+    expect(result.models[0].contextWindow).toBe(8192);
+  });
+
+  test('backfills a discovered context length on a non-user entry', () => {
+    const existing = [
+      {
+        id: 'model-a',
+        name: 'Model A',
+        origin: ProviderModelOrigin.Discovered,
+        contextWindow: 8192,
+      },
+    ];
+
+    const result = mergeDiscoveredProviderModels(existing, [
+      { id: 'model-a', displayName: 'Remote A', contextWindow: 32768 },
+    ]);
+
+    expect(result.changed).toBe(true);
+    expect(result.models[0].contextWindow).toBe(32768);
+  });
+
   test('lets a runtime-probe verdict override a stale supported capability', () => {
     const existing = [
       {

@@ -102,9 +102,10 @@ function syncSelectedModelByAgent(
     const matched = allAvailableModels.find(m => isSameModelIdentity(m, agentModel));
     if (matched) {
       selectedModelByAgent[agentId] = matched;
-    } else {
-      delete selectedModelByAgent[agentId];
     }
+    // Models hidden by a transient refresh (e.g. an in-flight connection test)
+    // must not drop the user's selection: keep the entry so the picker's
+    // selection is restored once the model reappears.
   }
 }
 
@@ -139,7 +140,12 @@ const modelSlice = createSlice({
         const matchedModel = state.availableModels.find(m =>
           isSameModelIdentity(m, state.defaultSelectedModel),
         );
-        state.defaultSelectedModel = matchedModel ?? state.availableModels[0];
+        // A model temporarily missing from the list (hidden by the connection
+        // test gate) must not permanently rewrite the default: keep the stored
+        // object so the previous default is restored on the next refresh.
+        if (matchedModel) {
+          state.defaultSelectedModel = matchedModel;
+        }
       }
       syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
     },

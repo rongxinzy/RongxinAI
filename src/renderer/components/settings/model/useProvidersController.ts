@@ -521,6 +521,7 @@ export function useProvidersController({
         },
       };
     });
+    enableProviderIfConfigured(provider);
   };
 
   const handleApiKeyInputChange = (provider: ProviderType, value: string) => {
@@ -627,6 +628,22 @@ export function useProvidersController({
     });
   };
 
+  // Editing a provider's connection or models signals intent to use it, so the
+  // form flips the switch on (visibly, still reversible before saving) instead
+  // of persisting a provider the user just configured as disabled.
+  const enableProviderIfConfigured = (provider: ProviderType) => {
+    if (provider === ProviderName.LlamaCpp || provider === ProviderName.Zhiyuan) return;
+    setProviders(prev => {
+      const providerConfig = prev[provider];
+      if (!providerConfig || isProviderEnabled(provider, providerConfig)) return prev;
+      if (!hasProviderAuthConfigured(provider, providerConfig)) return prev;
+      return {
+        ...prev,
+        [provider]: { ...providerConfig, enabled: true },
+      };
+    });
+  };
+
   return {
     providers,
     setProviders,
@@ -658,5 +675,6 @@ export function useProvidersController({
     handleBaseUrlBlur,
     toggleProviderEnabled,
     enableProvider,
+    enableProviderIfConfigured,
   };
 }

@@ -157,3 +157,47 @@ test('API key edits schedule one discovery on blur, while a second blur is a no-
   act(() => result.current.handleApiKeyBlur(ProviderName.Moonshot));
   expect(result.current.autoDetectRequest).toBe(request);
 });
+
+test('editing a configured but disabled provider flips it enabled in the form', async () => {
+  const { result } = await renderController(ProviderName.Moonshot, { enabled: false });
+  expect(result.current.providers.moonshot.enabled).toBe(false);
+  act(() =>
+    result.current.handleProviderConfigChange(
+      ProviderName.Moonshot,
+      'baseUrl',
+      'https://edited.invalid/v1',
+    ),
+  );
+  expect(result.current.providers.moonshot.enabled).toBe(true);
+});
+
+test('editing a provider without auth configured leaves it disabled', async () => {
+  const { result } = await renderController(ProviderName.Moonshot, {
+    enabled: false,
+    apiKey: '',
+  });
+  act(() =>
+    result.current.handleProviderConfigChange(ProviderName.Moonshot, 'displayName', 'Friendly'),
+  );
+  expect(result.current.providers.moonshot.enabled).toBe(false);
+});
+
+test('filling a new custom provider base URL flips it enabled in the form', async () => {
+  const { result } = await renderController();
+  act(() => result.current.handleAddCustomProvider());
+  const key = result.current.activeProvider;
+  expect(result.current.providers[key].enabled).toBe(false);
+  act(() => result.current.handleBaseUrlInputChange(key, 'http://172.18.5.188:3000'));
+  expect(result.current.providers[key].enabled).toBe(true);
+});
+
+test('llama.cpp and zhiyuan are excluded from edit-driven enabling', async () => {
+  const { result } = await renderController(ProviderName.LlamaCpp, {
+    enabled: false,
+    userEnabled: false,
+  });
+  const before = result.current.providers[ProviderName.LlamaCpp];
+  act(() => result.current.enableProviderIfConfigured(ProviderName.LlamaCpp));
+  expect(result.current.providers[ProviderName.LlamaCpp]).toBe(before);
+  expect(result.current.providers[ProviderName.LlamaCpp].enabled).toBe(false);
+});

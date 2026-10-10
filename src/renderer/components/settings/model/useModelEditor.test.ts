@@ -32,7 +32,8 @@ const verifiedModel: Model = {
 };
 
 function renderEditor(provider: ProviderType = 'custom_0') {
-  return renderHook(() => {
+  const enableProviderIfConfigured = vi.fn();
+  const hook = renderHook(() => {
     const [providers, setProviders] = useState<ProvidersConfig>({
       ...defaultConfig.providers,
       [provider]: {
@@ -46,9 +47,15 @@ function renderEditor(provider: ProviderType = 'custom_0') {
     return {
       providers,
       setProviders,
-      ...useModelEditor({ providers, setProviders, activeProvider: provider }),
+      ...useModelEditor({
+        providers,
+        setProviders,
+        activeProvider: provider,
+        enableProviderIfConfigured,
+      }),
     };
   });
+  return { ...hook, enableProviderIfConfigured };
 }
 
 beforeEach(() => vi.restoreAllMocks());
@@ -129,6 +136,22 @@ test('a new model starts unverified and preserves the other model entries', asyn
   expect(models[0]).toEqual(verifiedModel);
   expect(models[2]).toMatchObject({ id: 'new-model', origin: ProviderModelOrigin.User });
   expect(models[2].connectionTest).toBeUndefined();
+});
+
+test('saving a model marks the provider as intended for use', async () => {
+  const { result, enableProviderIfConfigured } = renderEditor();
+  act(() => result.current.handleAddModel());
+  act(() => result.current.handleModelEditorDraftChange({ id: 'new-model', name: 'New model' }));
+  await act(async () => result.current.handleSaveNewModel());
+  expect(enableProviderIfConfigured).toHaveBeenCalledWith('custom_0');
+});
+
+test('rejected drafts do not mark the provider as intended for use', async () => {
+  const { result, enableProviderIfConfigured } = renderEditor();
+  act(() => result.current.handleAddModel());
+  act(() => result.current.handleModelEditorDraftChange({ id: '', name: 'Name' }));
+  await act(async () => result.current.handleSaveNewModel());
+  expect(enableProviderIfConfigured).not.toHaveBeenCalled();
 });
 
 test.each([

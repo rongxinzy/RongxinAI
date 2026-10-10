@@ -116,7 +116,18 @@ function renderConnection(
       }),
     };
   });
-  return { ...hook, requestRef, callbacks, saved: () => savedConfig.providers![provider] };
+  // Simulate the settings page save button persisting the current form draft
+  // to storage while a connection test is still in flight.
+  const saveFormToStorage = (providers: ProvidersConfig) => {
+    savedConfig = { ...savedConfig, providers };
+  };
+  return {
+    ...hook,
+    requestRef,
+    callbacks,
+    saved: () => savedConfig.providers![provider],
+    saveFormToStorage,
+  };
 }
 
 beforeEach(() => {
@@ -202,7 +213,9 @@ test.each(remoteProviders)('%s saves all five tested models after discovery', as
     await result.current.handleModelsDiscovered(provider, discovered);
   });
   await waitFor(() => expect(mocks.updateConfig).toHaveBeenCalledTimes(1));
-  expect(saved().enabled).toBe(true);
+  // The merge only writes connectionTest verdicts and newly discovered
+  // models; it never flips stored fields such as enabled by itself.
+  expect(saved().enabled).toBe(false);
   expect(saved().models?.map(model => model.id)).toEqual(discovered.map(model => model.id));
   expect(
     saved().models?.every(
@@ -244,6 +257,54 @@ test('a single test persists the complete list and only marks the requested mode
   expect(mocks.single.mock.calls[0][0].model.id).toBe('model-3');
 });
 
+test('a successful single test does not force enabled or rewrite stored provider fields', async () => {
+  const { result, saved } = renderConnection();
+  await act(async () => result.current.handleTestConnection('model-3'));
+  // The incremental merge only writes connectionTest verdicts; enabled,
+  // baseUrl, apiFormat and untested models stay exactly as stored.
+  expect(saved().enabled).toBe(false);
+  expect(saved().baseUrl).toBe('https://mock-provider.invalid/v1');
+  expect(saved().apiFormat).toBe(ApiFormat.OpenAI);
+  expect(saved().models?.filter(model => model.connectionTest !== undefined)).toHaveLength(1);
+});
+
+test('a stored model removed from storage while testing is not resurrected', async () => {
+  const batch = deferred<ProviderModelConnectionTestEntry[]>();
+  mocks.batch.mockReturnValue(batch.promise);
+  const { result, saved, saveFormToStorage } = renderConnection();
+  let pending: Promise<void>;
+  await act(async () => {
+    pending = result.current.handleModelsDiscovered(ProviderName.Moonshot, discovered);
+  });
+  // The user deletes model-2 from the form and saves while the batch runs.
+  act(() =>
+    result.current.setProviders(current => ({
+      ...current,
+      moonshot: {
+        ...current.moonshot,
+        models: [current.moonshot.models![0], ...current.moonshot.models!.slice(2)],
+      },
+    })),
+  );
+  act(() => saveFormToStorage(result.current.providers));
+  await act(async () => {
+    batch.resolve(initialModels.map(model => ({ model, result: { success: true } })));
+    await pending;
+  });
+  await waitFor(() => expect(mocks.updateConfig).toHaveBeenCalledOnce());
+  expect(saved().models?.map(model => model.id)).toEqual([
+    'model-1',
+    'model-3',
+    'model-4',
+    'model-5',
+  ]);
+  expect(
+    saved().models?.every(
+      model => model.connectionTest?.status === ProviderModelConnectionTestStatus.Success,
+    ),
+  ).toBe(true);
+});
+
 test('single failures persist their classification without enabling a provider', async () => {
   mocks.single.mockResolvedValue({
     success: false,
@@ -260,13 +321,13 @@ test('single failures persist their classification without enabling a provider',
 });
 
 test.each(['single', 'batch'] as const)(
-  '%s results preserve edits made while testing',
+  '%s merges verdicts into the latest saved draft without touching other stored fields',
   async mode => {
     const single = deferred<ProviderModelConnectionTestResult>();
     const batch = deferred<ProviderModelConnectionTestEntry[]>();
     mocks.single.mockReturnValue(single.promise);
     mocks.batch.mockReturnValue(batch.promise);
-    const { result, saved } = renderConnection();
+    const { result, saved, saveFormToStorage } = renderConnection();
     let pending: Promise<void>;
     await act(async () => {
       pending =
@@ -274,6 +335,10 @@ test.each(['single', 'batch'] as const)(
           ? result.current.handleTestConnection()
           : result.current.handleModelsDiscovered(ProviderName.Moonshot, discovered);
     });
+    // While the test is in flight the user edits the form and hits save:
+    // storage now holds the edited draft, including a deleted and an added
+    // model. A late test verdict must merge into THIS state, not overwrite
+    // it with the form snapshot taken when the test started.
     act(() =>
       result.current.setProviders(current => ({
         ...current,
@@ -288,6 +353,7 @@ test.each(['single', 'batch'] as const)(
         },
       })),
     );
+    act(() => saveFormToStorage(result.current.providers));
     await act(async () => {
       single.resolve({ success: true });
       batch.resolve(initialModels.map(model => ({ model, result: { success: true } })));
@@ -303,7 +369,13 @@ test.each(['single', 'batch'] as const)(
       'added-during-test',
     ]);
     expect(saved().models?.[0]).toMatchObject({ name: 'Edited model', maxTokens: 8192 });
+    // model-2 was deleted before the save, so its late verdict is dropped
+    // instead of resurrecting the model; the model added during the test was
+    // never probed and stays without a verdict.
+    expect(saved().models?.some(model => model.id === 'model-2')).toBe(false);
     expect(saved().models?.at(-1)?.connectionTest).toBeUndefined();
+    // Untested stored models keep their saved shape untouched.
+    expect(saved().models?.[1]).toMatchObject({ id: 'model-3', name: 'Model 3' });
     expect(result.current.providers.moonshot.models).toEqual(saved().models);
   },
 );
@@ -474,7 +546,7 @@ test.each([0, 2])(
   },
 );
 
-test('failed tests do not persist or enable a disabled provider', async () => {
+test('failed tests persist their classification without enabling a disabled provider', async () => {
   const failure: ProviderModelConnectionTestResult = {
     success: false,
     message: 'Mock auth failure',
@@ -487,9 +559,41 @@ test('failed tests do not persist or enable a disabled provider', async () => {
   const { result, callbacks, saved } = renderConnection();
   await act(async () => result.current.handleTestConnection());
   await act(async () => result.current.handleModelsDiscovered(ProviderName.Moonshot, discovered));
-  expect(saved().models?.every(model => !model.connectionTest)).toBe(true);
+  // Failure verdicts are merged into storage (they only hide models), but the
+  // provider itself must not be enabled and no other stored field is touched.
+  expect(
+    saved().models?.every(
+      model => model.connectionTest?.status === ProviderModelConnectionTestStatus.Failure,
+    ),
+  ).toBe(true);
+  expect(saved().enabled).toBe(false);
   expect(callbacks.enable).not.toHaveBeenCalled();
   expect(result.current.providers.moonshot.enabled).toBe(false);
+});
+
+test('a fully failed discovery still saves the discovered models with their verdicts', async () => {
+  const failure: ProviderModelConnectionTestResult = {
+    success: false,
+    message: 'Mock server failure',
+    failureKind: ProviderModelConnectionFailureKind.Server,
+  };
+  mocks.batch.mockImplementation(async (input: BatchInput) =>
+    input.models.map(model => ({ model, result: failure })),
+  );
+  const { result, saved, callbacks } = renderConnection(ProviderName.Moonshot, { models: [] });
+  await act(async () => {
+    await result.current.handleModelsDiscovered(ProviderName.Moonshot, discovered);
+  });
+  await waitFor(() => expect(mocks.updateConfig).toHaveBeenCalledOnce());
+  expect(saved().models?.map(model => model.id)).toEqual(discovered.map(model => model.id));
+  expect(
+    saved().models?.every(
+      model =>
+        model.connectionTest?.status === ProviderModelConnectionTestStatus.Failure &&
+        model.connectionTest.failureKind === ProviderModelConnectionFailureKind.Server,
+    ),
+  ).toBe(true);
+  expect(callbacks.enable).not.toHaveBeenCalled();
 });
 
 test('a superseded single test cannot replace a newer successful result', async () => {

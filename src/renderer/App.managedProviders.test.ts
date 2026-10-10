@@ -11,7 +11,7 @@ test('refreshes available models when the managed provider projection changes', 
   const handlerStart = appSource.indexOf('const handleManagedProvidersChanged = () => {');
   expect(handlerStart).toBeGreaterThanOrEqual(0);
   const handlerBody = appSource.slice(handlerStart, handlerStart + 200);
-  expect(handlerBody).toContain('void refreshAvailableModels().catch(() => undefined);');
+  expect(handlerBody).toContain('void refreshAvailableModels();');
   expect(appSource).toContain('window.electron.managedProviders.onChanged(');
   expect(appSource).toContain('unsubscribeManagedProviders();');
 });

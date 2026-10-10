@@ -303,40 +303,53 @@ const App: React.FC = () => {
     return () => window.cancelAnimationFrame(frame);
   }, [initError, isInitialized]);
 
-  useEffect(() => {
-    if (!isInitialized) {
-      return;
-    }
+  const availableModelsRefreshRequestIdRef = useRef(0);
 
-    const refreshAvailableModels = async () => {
+  const refreshAvailableModels = useCallback(async () => {
+    const requestId = ++availableModelsRefreshRequestIdRef.current;
+    try {
       const [config, policy] = await Promise.all([
         configService.reload(),
         getManagedProviderAccessPolicy(),
       ]);
+      if (requestId !== availableModelsRefreshRequestIdRef.current) return;
       setManagedProviderPolicy(policy);
       if (policy.mode === ManagedProviderAccessMode.Exclusive) {
         setLocalInferenceInstallRequestId(undefined);
         setMainView(currentView => (currentView === 'localInference' ? 'cowork' : currentView));
       }
       const allModels = await collectAvailableModels(config);
+      if (requestId !== availableModelsRefreshRequestIdRef.current) return;
       dispatch(setAvailableModels(allModels));
-    };
+    } catch (error) {
+      // Keep the previous list on failure, but log it: a silent swallow left
+      // the picker showing stale or empty state with no trace.
+      console.error('[App] failed to refresh available models:', error);
+    }
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
 
     const handleConfigUpdated = () => {
-      void refreshAvailableModels().catch(() => undefined);
+      void refreshAvailableModels();
     };
     const handleLlamaCppRunningModelsChanged = () => {
-      void refreshAvailableModels().catch(() => undefined);
+      void refreshAvailableModels();
     };
     const handleLlamaCppModelBindingsChanged = () => {
       // Reload first so existing settings listeners receive the authoritative model configuration.
       void configService
         .reload()
         .then(() => notifyLlamaCppRunningModelsChanged())
-        .catch(() => undefined);
+        .catch(error => {
+          console.error('[App] failed to reload config after model bindings changed:', error);
+        });
     };
     const handleManagedProvidersChanged = () => {
-      void refreshAvailableModels().catch(() => undefined);
+      void refreshAvailableModels();
     };
 
     window.addEventListener('config-updated', handleConfigUpdated);
@@ -364,7 +377,7 @@ const App: React.FC = () => {
       unsubscribeModelBindings();
       unsubscribeManagedProviders();
     };
-  }, [dispatch, isInitialized]);
+  }, [isInitialized, refreshAvailableModels]);
 
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {
@@ -739,12 +752,21 @@ const App: React.FC = () => {
     const previousView = previousMainViewRef.current;
     previousMainViewRef.current = mainView;
     if (previousView !== 'settings' || mainView === 'settings') return;
-    const config = configService.getConfig();
-    void collectAvailableModels(config)
-      .then(allModels => {
+    // Reload instead of reading the in-memory snapshot: an async persistence
+    // still in flight (e.g. a connection test finishing during save) may not
+    // be reflected by getConfig() yet, which collected models against stale
+    // connectionTest metadata and flapped the picker list.
+    const requestId = ++availableModelsRefreshRequestIdRef.current;
+    void (async () => {
+      try {
+        const config = await configService.reload();
+        const allModels = await collectAvailableModels(config);
+        if (requestId !== availableModelsRefreshRequestIdRef.current) return;
         dispatch(setAvailableModels(allModels));
-      })
-      .catch(() => undefined);
+      } catch (error) {
+        console.error('[App] failed to refresh available models after leaving settings:', error);
+      }
+    })();
   }, [mainView, dispatch]);
 
   const isShortcutInputActive = () => {
