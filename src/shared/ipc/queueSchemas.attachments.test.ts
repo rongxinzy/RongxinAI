@@ -14,6 +14,23 @@ describe('CoworkQueueEnqueueSchema attachment limits', () => {
     });
 
     expect(parsed.skillIds).toEqual(['skill-docx']);
+    expect(parsed.imageAttachments?.[0]?.path).toBeUndefined();
+  });
+
+  test('keeps the source path on a queued image', () => {
+    const parsed = CoworkQueueEnqueueSchema.parse({
+      ...baseInput,
+      imageAttachments: [
+        {
+          name: 'screen.png',
+          mimeType: 'image/png',
+          base64Data: 'a',
+          path: 'C:\\images\\screen.png',
+        },
+      ],
+    });
+
+    expect(parsed.imageAttachments?.[0]?.path).toBe('C:\\images\\screen.png');
   });
 
   test('rejects image queues beyond the configured limits', () => {

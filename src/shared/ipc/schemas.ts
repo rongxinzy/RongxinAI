@@ -253,6 +253,8 @@ const ImageAttachmentSchema = z.object({
   name: z.string(),
   mimeType: z.string(),
   base64Data: z.string(),
+  // Kept so the stored image and the prompt's "输入文件" line refer to one file.
+  path: z.string().min(1).optional(),
 });
 const FileAttachmentSchema = z.object({
   name: z.string(),

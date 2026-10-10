@@ -12,6 +12,27 @@ test.each(['', ' \n\t', '\u200b\u200d\ufeff'])(
   },
 );
 
+test('keeps the source path on an image attachment', () => {
+  const image = {
+    name: 'example.png',
+    mimeType: 'image/png',
+    base64Data: 'aW1hZ2U=',
+    path: 'C:\\images\\example.png',
+  };
+  const parsed = CoworkSessionStartSchema.input.parse({
+    prompt: '看这张图',
+    imageAttachments: [image],
+  });
+  expect(parsed.imageAttachments?.[0]?.path).toBe(image.path);
+  expect(
+    CoworkSessionContinueSchema.input.parse({
+      sessionId: 'session',
+      prompt: '看这张图',
+      imageAttachments: [image],
+    }).imageAttachments?.[0]?.path,
+  ).toBe(image.path);
+});
+
 test('both IPC entry points allow image-only submissions', () => {
   const input = {
     prompt: '',

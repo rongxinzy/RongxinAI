@@ -9,6 +9,7 @@ const CoworkQueueImageAttachmentSchema = z.object({
   name: z.string(),
   mimeType: z.string(),
   base64Data: z.string().max(CoworkQueueAttachmentLimit.MaxImageBase64Chars),
+  path: z.string().min(1).optional(),
 });
 
 const CoworkQueueFileAttachmentSchema = z.object({
