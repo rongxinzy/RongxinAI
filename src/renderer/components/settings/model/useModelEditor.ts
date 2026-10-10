@@ -190,21 +190,24 @@ export function useModelEditor({ providers, setProviders, activeProvider }: UseM
       return;
     }
 
+    const imageCapability = newModelCapabilities.imageInput;
+    const supportsImage =
+      imageCapability === ModelCapabilityStatus.Supported
+        ? true
+        : imageCapability === ModelCapabilityStatus.Unsupported
+          ? false
+          : ProviderRegistry.resolveModelSupportsImage(activeProvider, modelId);
     const nextModel = {
       id: modelId,
       name: modelName,
-      supportsImage: ProviderRegistry.resolveModelSupportsImage(
-        activeProvider,
-        modelId,
-        newModelCapabilities.imageInput === ModelCapabilityStatus.Supported,
-      ),
+      supportsImage,
       // 表单保存过的条目视为人工维护,镜像端点的刷新不自动清理。
       origin: ProviderModelOrigin.User,
       ...(contextWindow ? { contextWindow } : {}),
       ...(maxTokens ? { maxTokens } : {}),
-      ...(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama
-        ? { capabilities: newModelCapabilities }
-        : {}),
+      // Built-in catalog providers used to drop this object. The endpoint
+      // resolver still ignores an explicit "unknown" and keeps its own verdict.
+      capabilities: newModelCapabilities,
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
         : {}),
