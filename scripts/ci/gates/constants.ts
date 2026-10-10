@@ -22,4 +22,5 @@ export const BaselineJob = {
   Lint: 'lint',
   Test: 'test',
   Bundle: 'bundle-budget',
+  Enterprise: 'enterprise',
 } as const;

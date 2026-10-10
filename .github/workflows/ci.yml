@@ -150,6 +150,35 @@ jobs:
       - name: Enforce renderer bundle budgets
         run: bun run test:bundle-budget
 
+  enterprise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore Bun package cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: enterprise-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            enterprise-${{ runner.os }}-1.4.0-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Typecheck enterprise extension
+        run: bun run typecheck:enterprise
+      - name: Run enterprise extension tests
+        run: bun run test:enterprise
+      - name: Build enterprise extension bundle and renderer
+        run: bun run build:enterprise
+      - name: Verify enterprise extension bundle
+        run: bun run verify:enterprise:bundle
+
   memory-leak:
     needs: changes
     if: needs.changes.outputs.memory-leak == 'true'
@@ -170,7 +199,7 @@ jobs:
   merge-gate:
     name: merge-gate
     if: always()
-    needs: [changes, lint, test, bundle-budget, memory-leak, linux-install, windows-install]
+    needs: [changes, lint, test, bundle-budget, enterprise, memory-leak, linux-install, windows-install]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
