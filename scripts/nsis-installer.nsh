@@ -5,6 +5,13 @@
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
 
+; PrepareExistingInstallForExtraction is inserted from LocalInferencePageLeave,
+; which lives in this include file — ahead of multiUser.nsh, where electron-
+; builder defines these keys with the same /ifndef fallback values. Mirror the
+; defaults here so registry macros expand correctly at that earlier point.
+!define /ifndef INSTALL_REGISTRY_KEY "Software\${APP_GUID}"
+!define /ifndef UNINSTALL_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}"
+
 ; electron-builder's CHECK_APP_RUNNING treats any process whose image path
 ; starts with $INSTDIR as "app still running". Sidecars (cc-connect,
 ; llama-server, python, git) survive a force-killed main process, so kill by
@@ -30,6 +37,74 @@
     };\
     Write-Output \"stopped=$$stopped remaining=$$($$remaining.Count)\""'
   Pop $0
+!macroend
+
+; Counts processes whose image path starts with $INSTDIR (the count is the
+; PowerShell exit code, so no stdout parsing is needed). After a failed
+; detach this distinguishes "app still running" from "directory held by
+; another program" — electron-builder reports both as "cannot be closed".
+!macro CountInstallDirProcesses RESULT
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith(\"$INSTDIR\", \"CurrentCultureIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
+  Pop ${RESULT}
+  Pop $R0
+!macroend
+
+; electron-builder's uninstallOldVersion launches the previous uninstaller and
+; treats any non-zero exit as "cannot be closed", retrying five times before
+; quitting the install. The previous version is already detached (renamed
+; away) here, so that uninstaller is redundant — and when the detach could not
+; run, a locked file makes the old uninstaller exit with code 2, producing
+; exactly that misleading dialog. Remove the old registration so
+; uninstallOldVersion returns early; only entries pointing at $INSTDIR are
+; touched, an installation in a different directory keeps its entry and is
+; removed by electron-builder as usual.
+!macro ForgetOldInstallRegistry TOKEN
+  ReadRegStr $R7 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
+  StrCmp $R7 "" ForgetOldInstallRegistry_Do_${TOKEN}
+  StrCmp $R7 $INSTDIR ForgetOldInstallRegistry_Do_${TOKEN} ForgetOldInstallRegistry_Done_${TOKEN}
+  ForgetOldInstallRegistry_Do_${TOKEN}:
+    SetRegView 64
+    DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
+    DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
+    DeleteRegKey HKLM "${UNINSTALL_REGISTRY_KEY}"
+    DeleteRegKey HKLM "${INSTALL_REGISTRY_KEY}"
+    SetRegView 32
+    DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
+    DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
+    DeleteRegKey HKLM "${UNINSTALL_REGISTRY_KEY}"
+    DeleteRegKey HKLM "${INSTALL_REGISTRY_KEY}"
+    SetRegView 64
+    !ifdef UNINSTALL_REGISTRY_KEY_2
+      SetRegView 32
+      DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY_2}"
+      DeleteRegKey HKLM "${UNINSTALL_REGISTRY_KEY_2}"
+      SetRegView 64
+    !endif
+  ForgetOldInstallRegistry_Done_${TOKEN}:
+!macroend
+
+; Safety net for any path where electron-builder still runs the previous
+; uninstaller (e.g. it lives in a different install directory). The stock
+; handler quits the whole installation on a non-zero exit code after showing
+; the "cannot be closed" dialog — even when the failure is a locked file,
+; not a running process. Files the old uninstaller could not remove are
+; overwritten in place by the extraction that follows, so a failed legacy
+; uninstall must never abort the install.
+!macro customUnInstallCheck
+  IfErrors 0 +3
+    DetailPrint "[Installer] Previous uninstaller could not be launched; continuing with in-place upgrade"
+    Return
+  ${if} $R0 != 0
+    DetailPrint "[Installer] Previous uninstaller exited with code $R0; continuing with in-place upgrade"
+    !insertmacro OpenTimingLogForAppend $8
+    FileWrite $8 "phase=previous-uninstall-ignored exit=$R0$\r$\n"
+    FileClose $8
+  ${endIf}
+  Return
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  !insertmacro customUnInstallCheck
 !macroend
 
 ; electron-builder compiles the uninstaller before the installer. Its assisted
@@ -105,26 +180,48 @@ Var /GLOBAL preparedInstallRoot
     ; shared resource pack, and physical cleanup is delayed until installation ends.
     DetailPrint "[Installer] Detaching previous application version"
     System::Call 'kernel32::GetTickCount()i .r7'
-    StrCpy $3 "result=no-previous-install"
+    OldInstallDetachRetry_${TOKEN}:
     ${If} ${FileExists} "$INSTDIR\*.*"
       System::Call 'kernel32::GetTickCount()i .r4'
       StrCpy $3 "$INSTDIR.old.$4"
       ClearErrors
       Rename "$INSTDIR" "$3"
       ${If} ${Errors}
-        StrCpy $3 "result=rename-failed"
-      ${Else}
-        FileOpen $8 "$APPDATA\ZhiYuanAgent\old-install-path.txt" w
-        FileWrite $8 "$3"
+        ; A failed rename is a sharing violation, not a running app. Report the
+        ; actual cause instead of electron-builder's blanket "cannot be closed".
+        !insertmacro CountInstallDirProcesses $R0
+        ${If} $R0 > 0
+          DetailPrint "[Installer] Detach blocked by $R0 running app processes"
+          !insertmacro StopAppProcesses
+          MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_APP_UNCLOSABLE)" /SD IDCANCEL IDRETRY OldInstallDetachRetry_${TOKEN}
+        ${Else}
+          DetailPrint "[Installer] Detach blocked: install directory is in use by another program"
+          MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_DIR_OCCUPIED)" /SD IDCANCEL IDRETRY OldInstallDetachRetry_${TOKEN}
+        ${EndIf}
+        StrCpy $3 "result=detach-aborted processes=$R0"
+        !insertmacro OpenTimingLogForAppend $8
+        FileWrite $8 "phase=old-install-detach-aborted $3$\r$\n"
         FileClose $8
-        StrCpy $3 "result=detached path=$3"
+        ; Matches electron-builder's own cancel handling in CHECK_APP_RUNNING.
+        ; Abort would only cancel the page leave in interactive installs.
+        Quit
       ${EndIf}
+      FileOpen $8 "$APPDATA\ZhiYuanAgent\old-install-path.txt" w
+      FileWrite $8 "$3"
+      FileClose $8
+      StrCpy $3 "result=detached path=$3"
+    ${Else}
+      StrCpy $3 "result=no-previous-install"
     ${EndIf}
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $5 $6 - $7
     !insertmacro OpenTimingLogForAppend $8
     FileWrite $8 "phase=old-install-detached elapsed_ms=$5 $3$\r$\n"
     FileClose $8
+    ; The old installation is detached or absent at this point; drop its
+    ; registration so electron-builder skips the redundant legacy uninstaller
+    ; whose exit code 2 would surface as a bogus "cannot be closed" dialog.
+    !insertmacro ForgetOldInstallRegistry ${TOKEN}
   ${EndIf}
 !macroend
 
@@ -155,6 +252,66 @@ Var /GLOBAL preparedInstallRoot
   ; Payload integrity is covered by per-entry 7z CRCs during extraction plus
   ; sentinel SHA-256 verification, so the extra full-file scan is redundant.
   CRCCheck off
+  ; Detach-failure messages. electron-builder only knows "cannot be closed",
+  ; which blames a running app even when the blocker is a directory handle
+  ; held by another program (typically an Explorer window); keep the two
+  ; causes in separate, translated strings. LCIDs are numeric because the
+  ; LANG_* constants are not defined at this point in the generated script.
+  ; The build loads every bundled NSIS language, and makensis promotes an
+  ; unset-per-language LangString (warning 6040) to an error, so every
+  ; bundled language gets an entry; untranslated ones fall back to English.
+  LangString ZY_APP_UNCLOSABLE 2052 "检测到知远进程仍在运行，且无法自动关闭。$\r$\n$\r$\n可能是以管理员身份运行的。请手动退出知远（右键点击任务栏托盘图标并选择退出），然后点击“重试”。"
+  LangString ZY_APP_UNCLOSABLE 1028 "偵測到知遠處理程序仍在執行，且無法自動關閉。$\r$\n$\r$\n可能是以系統管理員身分執行的。請手動結束知遠（在工作列通知區域圖示上按一下右鍵並選擇結束），然後按一下「重試」。"
+  LangString ZY_APP_UNCLOSABLE 1033 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1031 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1036 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 3082 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1041 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1042 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1040 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1043 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1030 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1053 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1044 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1035 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1049 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 2070 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1046 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1045 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1058 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1029 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1051 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1038 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1025 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1055 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1054 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_APP_UNCLOSABLE 1066 "ZhiYuan is still running and could not be closed automatically.$\r$\n$\r$\nIt may have been started with administrator rights. Exit ZhiYuan manually (right-click its system tray icon and choose Exit), then click Retry."
+  LangString ZY_DIR_OCCUPIED 2052 "无法更新安装目录，目录正被其他程序占用。$\r$\n$\r$\n未检测到正在运行的知远进程。最常见的原因是文件资源管理器正在浏览该目录：$\r$\n$INSTDIR$\r$\n$\r$\n请关闭占用该目录的窗口或程序，然后点击“重试”。"
+  LangString ZY_DIR_OCCUPIED 1028 "無法更新安裝目錄，目錄正被其他程式佔用。$\r$\n$\r$\n未偵測到正在執行的知遠處理程序。最常見的原因是檔案總管正在瀏覽該目錄：$\r$\n$INSTDIR$\r$\n$\r$\n請關閉佔用該目錄的視窗或程式，然後按一下「重試」。"
+  LangString ZY_DIR_OCCUPIED 1033 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1031 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1036 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 3082 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1041 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1042 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1040 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1043 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1030 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1053 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1044 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1035 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1049 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 2070 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1046 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1045 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1058 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1029 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1051 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1038 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1025 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1055 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1054 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
+  LangString ZY_DIR_OCCUPIED 1066 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
 !macroend
 
 !macro customWelcomePage
