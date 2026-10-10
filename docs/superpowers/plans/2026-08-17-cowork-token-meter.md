@@ -49,7 +49,7 @@ test('omits cache, throughput, and TTFT when their provider data is unavailable'
 
 - [ ] **Step 2: Verify the test fails**
 
-Run: `npm test -- sessionStats`
+Run: `bun run test -- sessionStats`
 
 Expected: FAIL because `sessionStats.ts` does not exist.
 
@@ -66,7 +66,7 @@ Use `input + cacheRead + cacheWrite` as billed input and calculate cache hit as 
 
 - [ ] **Step 4: Verify the focused test passes**
 
-Run: `npm test -- sessionStats`
+Run: `bun run test -- sessionStats`
 
 Expected: PASS.
 
@@ -98,7 +98,7 @@ expect(toolResult.metadata?.metrics?.toolDurationMs).toBe(600);
 
 - [ ] **Step 2: Verify the adapter test fails**
 
-Run: `npm test -- piRuntimeAdapter`
+Run: `bun run test -- piRuntimeAdapter`
 
 Expected: FAIL because the metadata has no `metrics` field.
 
@@ -108,7 +108,7 @@ Define `requestStartedAt`, `firstVisibleTextAt`, `completedAt`, and `toolDuratio
 
 - [ ] **Step 4: Verify adapter tests pass**
 
-Run: `npm test -- piRuntimeAdapter`
+Run: `bun run test -- piRuntimeAdapter`
 
 Expected: PASS.
 
@@ -137,7 +137,7 @@ expect(chunks).toContainEqual({
 
 - [ ] **Step 2: Verify the test fails**
 
-Run: `npm test -- chatChatTransport`
+Run: `bun run test -- chatChatTransport`
 
 Expected: FAIL because the stream emits no metrics chunk.
 
@@ -147,7 +147,7 @@ Record `Date.now()` at request construction, set first-visible time at the first
 
 - [ ] **Step 4: Verify direct-chat tests pass**
 
-Run: `npm test -- chatChatTransport directChatSnapshot`
+Run: `bun run test -- chatChatTransport directChatSnapshot`
 
 Expected: PASS.
 
@@ -175,7 +175,7 @@ expect(screen.getByText(/system prompt/i)).toBeVisible();
 
 - [ ] **Step 2: Verify the test fails**
 
-Run: `npm test -- ContextUsageIndicator`
+Run: `bun run test -- ContextUsageIndicator`
 
 Expected: FAIL because the current hover card has no click-open dialog or composition rows.
 
@@ -185,7 +185,7 @@ Use `Popover`, `PopoverTrigger`, `PopoverContent`, `Button`, `Progress`, and `To
 
 - [ ] **Step 4: Verify UI tests pass**
 
-Run: `npm test -- ContextUsageIndicator`
+Run: `bun run test -- ContextUsageIndicator`
 
 Expected: PASS.
 
@@ -212,7 +212,7 @@ expect(screen.queryByText(/input/i)).toBeNull(); // usage is unavailable
 
 - [ ] **Step 2: Verify the test fails**
 
-Run: `npm test -- SessionStatsLine`
+Run: `bun run test -- SessionStatsLine`
 
 Expected: FAIL because the component does not exist.
 
@@ -222,7 +222,7 @@ Use the pure fold, a no-wrap `text-xs` line, `ResizeObserver` clipping detection
 
 - [ ] **Step 4: Verify focused UI tests pass**
 
-Run: `npm test -- SessionStatsLine CoworkPromptInput`
+Run: `bun run test -- SessionStatsLine CoworkPromptInput`
 
 Expected: PASS.
 
@@ -244,15 +244,15 @@ Run:
 
 ```bash
 git diff --check
-npm test -- sessionStats piRuntimeAdapter chatChatTransport ContextUsageIndicator SessionStatsLine
-npm run lint
+bun run test -- sessionStats piRuntimeAdapter chatChatTransport ContextUsageIndicator SessionStatsLine
+bun run lint
 ```
 
 Expected: all commands exit 0.
 
 - [ ] **Step 2: Run Electron manual verification**
 
-Run: `npm run electron:dev`
+Run: `bun run electron:dev`
 
 Verify both Work and direct chat show the same context trigger, the click-open details close correctly, missing provider usage suppresses only token-dependent groups, and the stats line behaves correctly in light, dark, and narrow layouts.
 

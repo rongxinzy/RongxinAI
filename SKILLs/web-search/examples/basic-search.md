@@ -318,7 +318,7 @@ cat SKILLs/web-search/.server.log
 
 # Reinstall dependencies
 cd SKILLs/web-search
-bun install
+npm install
 bun run build
 ```
 

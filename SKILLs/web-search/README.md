@@ -38,7 +38,7 @@ Claude → Bash Tool → CLI Scripts → Bridge Server (localhost:8923) → Play
 
 ```bash
 cd SKILLs/web-search
-bun install
+npm install
 ```
 
 ### 2. Build
