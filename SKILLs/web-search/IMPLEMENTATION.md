@@ -339,7 +339,7 @@ Claude: [Automatically detects need for real-time info]
 ```bash
 # Server won't start
 cat SKILLs/web-search/.server.log
-npm run build --prefix SKILLs/web-search
+bun --cwd SKILLs/web-search run build
 
 # Chrome not found
 # Install from https://www.google.com/chrome/

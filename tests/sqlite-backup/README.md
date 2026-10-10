@@ -45,7 +45,7 @@ First, generate enough data for backup performance testing.
 ### Example: medium-sized dataset
 
 ```bash
-npm run test:sqlite-backup:seed -- \
+bun run test:sqlite-backup:seed -- \
   --db '/Users/jj.deng/Library/Application Support/ZhiYuanAgent/zhiyuan.sqlite' \
   --sessions 10 \
   --messages-per-session 2000 \
@@ -55,7 +55,7 @@ npm run test:sqlite-backup:seed -- \
 ### Example: larger dataset
 
 ```bash
-npm run test:sqlite-backup:seed -- \
+bun run test:sqlite-backup:seed -- \
   --db '/Users/jj.deng/Library/Application Support/ZhiYuanAgent/zhiyuan.sqlite' \
   --sessions 50 \
   --messages-per-session 10000 \
@@ -94,7 +94,7 @@ Supported truthy values: `1`, `true`.
 ### Example: run in dev mode with forced startup backup
 
 ```bash
-ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1 npm run electron:dev
+ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP=1 bun run electron:dev
 ```
 
 ### What this does
