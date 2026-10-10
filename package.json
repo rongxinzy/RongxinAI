@@ -88,7 +88,6 @@
     "typecheck:enterprise": "tsc --project enterprise/tsconfig.json --noEmit && tsc --project enterprise/tsconfig.ui.json --noEmit",
     "verify:enterprise:bundle": "node enterprise/scripts/verify-bundle.mjs",
     "verify:enterprise:agent-control": "node enterprise/scripts/verify-agent-control-e2e.mjs",
-    "verify:enterprise:model-acceptance": "node enterprise/scripts/verify-model-acceptance.mjs",
     "test:sqlite-backup:seed": "node tests/sqlite-backup/generate-large-db.cjs",
     "preview": "vite preview",
     "compile:electron": "tsc --project electron-tsconfig.json",
