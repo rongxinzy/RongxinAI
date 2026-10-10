@@ -1,0 +1,8 @@
+{
+  "extension": {
+    "id": "zhiyuan.aaas",
+    "version": "0.8.0",
+    "apiVersion": 1,
+    "artifact": "dist/extension.cjs"
+  }
+}
