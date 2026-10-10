@@ -142,7 +142,6 @@ test.each([ProviderName.Moonshot, ProviderName.OpenAI] as ProviderType[])(
     );
     await act(async () => result.current.handleSaveNewModel());
     expect(result.current.providers[provider].models?.[0]).toMatchObject({
-      supportsImage: false,
       capabilities: {
         toolCalling: ModelCapabilityStatus.Unsupported,
         imageInput: ModelCapabilityStatus.Unsupported,
