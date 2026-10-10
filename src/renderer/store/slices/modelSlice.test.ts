@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { Model } from './modelSlice';
 import modelReducer, {
   clearAgentSelectedModel,
+  pruneUnconfiguredSelectedModels,
   selectAgentSelectedModel,
   setAvailableModels,
   setDefaultSelectedModel,
@@ -100,6 +101,41 @@ describe('setAvailableModels', () => {
     const updatedModelA: Model = { ...modelA, supportsImage: true };
     state = modelReducer(state, setAvailableModels([updatedModelA, modelB]));
     expect(state.defaultSelectedModel).toEqual(updatedModelA);
+  });
+});
+
+describe('pruneUnconfiguredSelectedModels', () => {
+  test('drops selections whose model was deleted from the stored config', () => {
+    let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: modelA }));
+    state = modelReducer(state, setSelectedModel({ agentId: 'agent-2', model: modelB }));
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels(['zhipu::glm-5.1']));
+
+    expect(state.selectedModelByAgent['agent-1']).toBeUndefined();
+    expect(state.selectedModelByAgent['agent-2']).toEqual(modelB);
+  });
+
+  test('keeps hidden-but-configured selections', () => {
+    let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: modelA }));
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels(['openai::gpt-4o']));
+
+    expect(state.selectedModelByAgent['agent-1']).toEqual(modelA);
+  });
+
+  test('keeps selections backed by dynamic sources or no provider key', () => {
+    const local: Model = { id: 'qwen3-32b', name: 'Qwen3 32B', providerKey: 'llamacpp' };
+    const managed: Model = { id: 'free-model', name: 'Free', providerKey: 'zhiyuan' };
+    const legacy: Model = { id: 'legacy-model', name: 'Legacy' };
+    let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: local }));
+    state = modelReducer(state, setSelectedModel({ agentId: 'agent-2', model: managed }));
+    state = modelReducer(state, setSelectedModel({ agentId: 'agent-3', model: legacy }));
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels([]));
+
+    expect(state.selectedModelByAgent['agent-1']).toEqual(local);
+    expect(state.selectedModelByAgent['agent-2']).toEqual(managed);
+    expect(state.selectedModelByAgent['agent-3']).toEqual(legacy);
   });
 });
 

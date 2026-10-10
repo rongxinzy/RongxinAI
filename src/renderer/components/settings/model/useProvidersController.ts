@@ -26,6 +26,18 @@ import {
   shouldShowProviderModels,
 } from './providerUtils';
 
+// Fields that define how the provider is reached. Editing one signals intent
+// to use the provider (the form flips it enabled) and invalidates previous
+// connection-test verdicts; label-only fields such as displayName do neither.
+const CONNECTION_INPUT_FIELDS: ReadonlySet<string> = new Set([
+  'apiKey',
+  'baseUrl',
+  'apiFormat',
+  'codingPlanEnabled',
+  'authType',
+  'oauthAccessToken',
+]);
+
 interface UseProvidersControllerParams {
   initialProvider?: ProviderType;
   language: LanguageType;
@@ -440,14 +452,7 @@ export function useProvidersController({
 
   // Handle provider configuration change
   const handleProviderConfigChange = (provider: ProviderType, field: string, value: string) => {
-    if (
-      field === 'apiKey' ||
-      field === 'baseUrl' ||
-      field === 'apiFormat' ||
-      field === 'codingPlanEnabled' ||
-      field === 'authType' ||
-      field === 'oauthAccessToken'
-    ) {
+    if (CONNECTION_INPUT_FIELDS.has(field)) {
       invalidateProviderModelConnectionStatuses(provider);
     }
     if (field === 'apiFormat') {
@@ -521,7 +526,11 @@ export function useProvidersController({
         },
       };
     });
-    enableProviderIfConfigured(provider);
+    // Only connection edits signal intent to use the provider; renaming it
+    // (displayName) or other label edits must not flip the switch.
+    if (CONNECTION_INPUT_FIELDS.has(field)) {
+      enableProviderIfConfigured(provider);
+    }
   };
 
   const handleApiKeyInputChange = (provider: ProviderType, value: string) => {

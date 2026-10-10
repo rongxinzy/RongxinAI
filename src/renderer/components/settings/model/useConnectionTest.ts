@@ -15,7 +15,10 @@ import {
   testProviderModelConnection,
   testProviderModelsConcurrently,
 } from '../../../services/providerModelConnection';
-import { mergeDiscoveredProviderModels } from '../../../services/providerModelDiscovery';
+import {
+  createDiscoveredProviderModel,
+  mergeDiscoveredProviderModels,
+} from '../../../services/providerModelDiscovery';
 import {
   buildProviderModelConnectionTestNotification,
   buildProviderModelConnectionTestProgressNotification,
@@ -132,13 +135,15 @@ export function useConnectionTest({
   // merged by model id; every other stored field (enabled, baseUrl, models
   // the test did not cover, ...) is left untouched, and a stored entry missing
   // the provider or holding a different model API is never recreated or
-  // overwritten. With appendMissing, tested models absent from storage are
-  // appended with their verdict (discovery flow) instead of being dropped.
+  // overwritten. With appendDiscovered, tested models absent from storage are
+  // appended with their verdict (discovery flow) instead of being dropped —
+  // rebuilt from the discovery payload, so unsaved form edits to fields other
+  // than the verdict never leak into storage without an explicit save.
   const persistTestedProviderModels = async (
     provider: ProviderType,
     testedModels: readonly NonNullable<ProviderConfig['models']>[number][],
     isCurrent: () => boolean,
-    options: { appendMissing?: boolean } = {},
+    options: { appendDiscovered?: readonly DiscoveredProviderModel[] } = {},
   ): Promise<void> => {
     if (provider === ProviderName.LlamaCpp) return;
     await configService.updateConfig(currentConfig => {
@@ -152,19 +157,38 @@ export function useConnectionTest({
         const tested = testedById.get(model.id);
         if (!tested || tested.connectionTest === undefined) return model;
         if (tested.piRuntime?.api !== model.piRuntime?.api) return model;
-        if (tested.connectionTest === model.connectionTest) return model;
+        // Skip the write when the stored verdict already carries the same
+        // outcome for the same connection signature (testedAt alone differs).
+        const storedTest = model.connectionTest;
+        const testedTest = tested.connectionTest;
+        if (
+          storedTest &&
+          storedTest.status === testedTest.status &&
+          storedTest.signature === testedTest.signature &&
+          storedTest.failureKind === testedTest.failureKind
+        ) {
+          return model;
+        }
         changed = true;
-        return { ...model, connectionTest: tested.connectionTest };
+        return { ...model, connectionTest: testedTest };
       });
 
       let nextModels = mergedModels;
-      if (options.appendMissing === true) {
+      if (options.appendDiscovered) {
+        const discoveredById = new Map(options.appendDiscovered.map(model => [model.id, model]));
         const knownIds = new Set(mergedModels.map(model => model.id));
         for (const tested of testedModels) {
           if (knownIds.has(tested.id) || tested.connectionTest === undefined) continue;
+          const discovered = discoveredById.get(tested.id);
+          // Models that exist only in the form draft (manual additions or
+          // unsaved edits) are not persisted here; the save button owns those.
+          if (!discovered) continue;
           knownIds.add(tested.id);
           changed = true;
-          nextModels = [...nextModels, { ...tested }];
+          nextModels = [
+            ...nextModels,
+            { ...createDiscoveredProviderModel(discovered), connectionTest: tested.connectionTest },
+          ];
         }
       }
 
@@ -180,7 +204,7 @@ export function useConnectionTest({
 
   const completeSuccessfulConnectionTest = async (
     provider: ProviderType,
-    model: Pick<NonNullable<ProviderConfig['models']>[number], 'id' | 'name'>,
+    model: NonNullable<ProviderConfig['models']>[number],
     outcomes: ReadonlyArray<{
       modelId: string;
       success: boolean;
@@ -540,7 +564,7 @@ export function useConnectionTest({
         );
         try {
           await persistTestedProviderModels(provider, testedModels, isCurrent, {
-            appendMissing: true,
+            appendDiscovered: discoveredModels,
           });
           if (!isCurrent()) return;
           if (successCount > 0 && provider !== ProviderName.LlamaCpp) enableProvider(provider);

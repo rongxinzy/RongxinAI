@@ -171,6 +171,14 @@ test('editing a configured but disabled provider flips it enabled in the form', 
   expect(result.current.providers.moonshot.enabled).toBe(true);
 });
 
+test('renaming a configured but disabled provider leaves it disabled', async () => {
+  const { result } = await renderController(ProviderName.Moonshot, { enabled: false });
+  act(() =>
+    result.current.handleProviderConfigChange(ProviderName.Moonshot, 'displayName', 'Friendly'),
+  );
+  expect(result.current.providers.moonshot.enabled).toBe(false);
+});
+
 test('editing a provider without auth configured leaves it disabled', async () => {
   const { result } = await renderController(ProviderName.Moonshot, {
     enabled: false,

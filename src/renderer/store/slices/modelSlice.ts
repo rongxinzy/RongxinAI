@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { LlamaCppAgentEligibility } from '../../../shared/llamacpp';
-import { type ModelCapabilities, ProviderRegistry } from '../../../shared/providers';
+import { type ModelCapabilities, ProviderName, ProviderRegistry } from '../../../shared/providers';
 import { defaultConfig, getProviderDisplayName } from '../../config';
 import { resolveAgentModelRef } from '../../utils/agentModelRef';
 
@@ -149,6 +149,27 @@ const modelSlice = createSlice({
       }
       syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
     },
+    // Drop selections whose model is gone from the stored config entirely
+    // (deleted model or provider). Hidden-but-configured models keep their
+    // selection via syncSelectedModelByAgent; selections backed by dynamic
+    // sources (llama.cpp runtime, managed pool) or no provider key are not
+    // governed by the stored config and are always kept.
+    pruneUnconfiguredSelectedModels: (state, action: PayloadAction<readonly string[]>) => {
+      const configuredKeys = new Set(action.payload);
+      for (const agentId of Object.keys(state.selectedModelByAgent)) {
+        const agentModel = state.selectedModelByAgent[agentId];
+        if (
+          !agentModel.providerKey ||
+          agentModel.providerKey === ProviderName.LlamaCpp ||
+          agentModel.providerKey === ProviderName.Zhiyuan
+        ) {
+          continue;
+        }
+        if (!configuredKeys.has(getModelIdentityKey(agentModel))) {
+          delete state.selectedModelByAgent[agentId];
+        }
+      }
+    },
   },
 });
 
@@ -157,5 +178,6 @@ export const {
   setDefaultSelectedModel,
   clearAgentSelectedModel,
   setAvailableModels,
+  pruneUnconfiguredSelectedModels,
 } = modelSlice.actions;
 export default modelSlice.reducer;

@@ -112,7 +112,7 @@ function applyDiscoveredMetadata(
   return changed ? next : current;
 }
 
-function createDiscoveredProviderModel(discovered: DiscoveredProviderModel): ProviderModel {
+export function createDiscoveredProviderModel(discovered: DiscoveredProviderModel): ProviderModel {
   const imageCapability = discovered.capabilities?.imageInput;
   return {
     id: discovered.id,

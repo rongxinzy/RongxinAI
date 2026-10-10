@@ -29,6 +29,7 @@ import { defaultConfig } from './config';
 import { agentService } from './services/agent';
 import {
   collectAvailableModels,
+  collectConfiguredModelKeys,
   getManagedProviderAccessPolicy,
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
   notifyLlamaCppRunningModelsChanged,
@@ -53,7 +54,11 @@ import {
   selectPendingPermissionForSession,
 } from './store/selectors/coworkSelectors';
 import { setDraftPrompt } from './store/slices/coworkSlice';
-import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
+import {
+  pruneUnconfiguredSelectedModels,
+  setAvailableModels,
+  setDefaultSelectedModel,
+} from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from './store/slices/skillSlice';
 import { WorkMode } from './store/workMode/constants';
@@ -258,6 +263,7 @@ const App: React.FC = () => {
 
         const resolvedModels = await collectAvailableModels(config);
         dispatch(setAvailableModels(resolvedModels));
+        dispatch(pruneUnconfiguredSelectedModels(collectConfiguredModelKeys(config)));
         if (resolvedModels.length > 0) {
           const allModels = store.getState().model.availableModels;
           const preferredModel =
@@ -321,6 +327,7 @@ const App: React.FC = () => {
       const allModels = await collectAvailableModels(config);
       if (requestId !== availableModelsRefreshRequestIdRef.current) return;
       dispatch(setAvailableModels(allModels));
+      dispatch(pruneUnconfiguredSelectedModels(collectConfiguredModelKeys(config)));
     } catch (error) {
       // Keep the previous list on failure, but log it: a silent swallow left
       // the picker showing stale or empty state with no trace.
@@ -763,6 +770,7 @@ const App: React.FC = () => {
         const allModels = await collectAvailableModels(config);
         if (requestId !== availableModelsRefreshRequestIdRef.current) return;
         dispatch(setAvailableModels(allModels));
+        dispatch(pruneUnconfiguredSelectedModels(collectConfiguredModelKeys(config)));
       } catch (error) {
         console.error('[App] failed to refresh available models after leaving settings:', error);
       }

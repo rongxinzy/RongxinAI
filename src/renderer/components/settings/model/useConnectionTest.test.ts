@@ -268,6 +268,55 @@ test('a successful single test does not force enabled or rewrite stored provider
   expect(saved().models?.filter(model => model.connectionTest !== undefined)).toHaveLength(1);
 });
 
+test('a batch persist rebuilds appended models from discovery, not unsaved form edits', async () => {
+  const batch = deferred<ProviderModelConnectionTestEntry[]>();
+  mocks.batch.mockReturnValue(batch.promise);
+  const { result, saved } = renderConnection('custom_0', { models: [] });
+  let pending: Promise<void>;
+  await act(async () => {
+    pending = result.current.handleModelsDiscovered('custom_0', discovered);
+  });
+  // The user edits the freshly discovered model in the form but never saves;
+  // the appended stored entry must come from the discovery payload, so the
+  // unsaved edit does not leak into storage without an explicit save.
+  act(() =>
+    result.current.setProviders(current => ({
+      ...current,
+      custom_0: {
+        ...current.custom_0,
+        models: current.custom_0.models!.map(model =>
+          model.id === 'model-1'
+            ? { ...model, name: 'Unsaved edit', contextWindow: 999_999 }
+            : model,
+        ),
+      },
+    })),
+  );
+  await act(async () => {
+    batch.resolve(initialModels.map(model => ({ model, result: { success: true } })));
+    await pending;
+  });
+  await waitFor(() => expect(mocks.updateConfig).toHaveBeenCalledOnce());
+  const stored = saved().models?.find(model => model.id === 'model-1');
+  expect(stored?.name).toBe('Model 1');
+  expect(stored?.contextWindow).toBeUndefined();
+  expect(stored?.connectionTest?.status).toBe(ProviderModelConnectionTestStatus.Success);
+});
+
+test('re-testing with an unchanged verdict produces no storage write', async () => {
+  const { result } = renderConnection();
+  await act(async () => result.current.handleTestConnection('model-1'));
+  await waitFor(() => expect(mocks.updateConfig).toHaveBeenCalledOnce());
+
+  let secondPatch: unknown = 'unset';
+  mocks.updateConfig.mockImplementation(async update => {
+    secondPatch = typeof update === 'function' ? update(mocks.getConfig()) : update;
+  });
+  await act(async () => result.current.handleTestConnection('model-1'));
+  await waitFor(() => expect(mocks.updateConfig).toHaveBeenCalledTimes(2));
+  expect(secondPatch).toBeUndefined();
+});
+
 test('a stored model removed from storage while testing is not resurrected', async () => {
   const batch = deferred<ProviderModelConnectionTestEntry[]>();
   mocks.batch.mockReturnValue(batch.promise);

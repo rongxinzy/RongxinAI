@@ -178,6 +178,27 @@ export function mergeAvailableModels(
   return merged;
 }
 
+// Identity keys (`providerKey::modelId`) of every model present in the stored
+// config, ignoring enabled/test gates. Selections pointing at keys absent from
+// this set belong to models deleted from storage for good and can be pruned;
+// temporarily hidden models (provider disabled, pending connection test) keep
+// theirs. llama.cpp and the managed pool are dynamic sources not governed by
+// the stored model list, so they are excluded.
+export function collectConfiguredModelKeys(config: AppConfig): string[] {
+  const keys: string[] = [];
+  if (!config.providers) return keys;
+
+  Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
+    if (providerName === ProviderName.LlamaCpp || providerName === ProviderName.Zhiyuan) return;
+    const configuredModels = resolveConfiguredProviderModels(providerName, providerConfig);
+    configuredModels?.forEach(model => {
+      keys.push(`${providerName}::${model.id}`);
+    });
+  });
+
+  return keys;
+}
+
 async function buildHiddenConfiguredModelKeys(
   config: AppConfig,
   allowedProviderKeys?: ReadonlySet<string>,
