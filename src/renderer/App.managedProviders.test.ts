@@ -8,10 +8,11 @@ const appSource = readFileSync(fileURLToPath(new URL('./App.tsx', import.meta.ur
 // App is not render-mounted in unit tests; these assertions pin the exclusive managed
 // provider wiring so regressions in the effect guards are caught.
 test('refreshes available models when the managed provider projection changes', () => {
-  const handlerStart = appSource.indexOf('const handleManagedProvidersChanged = () => {');
-  expect(handlerStart).toBeGreaterThanOrEqual(0);
-  const handlerBody = appSource.slice(handlerStart, handlerStart + 200);
-  expect(handlerBody).toContain('void refreshAvailableModels();');
+  const handlerMatch = appSource.match(
+    /const handleManagedProvidersChanged = \(\) => \{[\s\S]*?\};/,
+  );
+  expect(handlerMatch).not.toBeNull();
+  expect(handlerMatch?.[0]).toContain('void refreshAvailableModels();');
   expect(appSource).toContain('window.electron.managedProviders.onChanged(');
   expect(appSource).toContain('unsubscribeManagedProviders();');
 });

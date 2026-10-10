@@ -29,14 +29,14 @@ import {
 // Fields that define how the provider is reached. Editing one signals intent
 // to use the provider (the form flips it enabled) and invalidates previous
 // connection-test verdicts; label-only fields such as displayName do neither.
-const CONNECTION_INPUT_FIELDS: ReadonlySet<string> = new Set([
+const CONNECTION_INPUT_FIELDS: ReadonlySet<string> = new Set<string>([
   'apiKey',
   'baseUrl',
   'apiFormat',
   'codingPlanEnabled',
   'authType',
   'oauthAccessToken',
-]);
+] satisfies (keyof ProviderConfig)[]);
 
 interface UseProvidersControllerParams {
   initialProvider?: ProviderType;

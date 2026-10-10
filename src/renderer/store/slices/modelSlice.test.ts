@@ -137,6 +137,33 @@ describe('pruneUnconfiguredSelectedModels', () => {
     expect(state.selectedModelByAgent['agent-2']).toEqual(managed);
     expect(state.selectedModelByAgent['agent-3']).toEqual(legacy);
   });
+
+  test('resets a dangling defaultSelectedModel when its provider is deleted', () => {
+    // The default feeds every agent without an override, so a deleted provider
+    // must not leave it pointing at a phantom model for the rest of the session.
+    let state = makeState({
+      availableModels: [modelA, modelB],
+      defaultSelectedModel: modelB,
+    });
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels(['openai::gpt-4o']));
+
+    expect(state.defaultSelectedModel).toEqual(modelA);
+  });
+
+  test('keeps a hidden-but-configured defaultSelectedModel', () => {
+    let state = makeState({
+      availableModels: [modelA],
+      defaultSelectedModel: modelB,
+    });
+
+    state = modelReducer(
+      state,
+      pruneUnconfiguredSelectedModels(['openai::gpt-4o', 'zhipu::glm-5.1']),
+    );
+
+    expect(state.defaultSelectedModel).toEqual(modelB);
+  });
 });
 
 describe('selectAgentSelectedModel', () => {

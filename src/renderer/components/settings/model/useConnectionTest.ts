@@ -72,7 +72,10 @@ export function useConnectionTest({
   // ref synchronously and mirror it into React state, so asynchronous test
   // continuations always read the latest draft instead of a stale render
   // snapshot. Writing the ref and the state separately lets an edit in
-  // between fork the two and drop updates.
+  // between fork the two and drop updates. The ref write must stay
+  // synchronous: a functional setProviders updater only runs at render time
+  // (under act/concurrent React that can be arbitrarily later), while
+  // continuations between dispatch and render already read the ref.
   const updateProviders = useCallback(
     (updater: (current: ProvidersConfig) => ProvidersConfig) => {
       const next = updater(providersRef.current);

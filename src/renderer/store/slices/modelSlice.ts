@@ -153,21 +153,31 @@ const modelSlice = createSlice({
     // (deleted model or provider). Hidden-but-configured models keep their
     // selection via syncSelectedModelByAgent; selections backed by dynamic
     // sources (llama.cpp runtime, managed pool) or no provider key are not
-    // governed by the stored config and are always kept.
+    // governed by the stored config and are always kept. The default feeds
+    // every agent without an override, so it is reset as well; the payload is
+    // the configured key set, not the visibility-gated list, so transient
+    // hiding cannot trigger the reset.
     pruneUnconfiguredSelectedModels: (state, action: PayloadAction<readonly string[]>) => {
       const configuredKeys = new Set(action.payload);
+      const isConfigManaged = (model: Model): boolean =>
+        Boolean(model.providerKey) &&
+        model.providerKey !== ProviderName.LlamaCpp &&
+        model.providerKey !== ProviderName.Zhiyuan;
       for (const agentId of Object.keys(state.selectedModelByAgent)) {
         const agentModel = state.selectedModelByAgent[agentId];
-        if (
-          !agentModel.providerKey ||
-          agentModel.providerKey === ProviderName.LlamaCpp ||
-          agentModel.providerKey === ProviderName.Zhiyuan
-        ) {
+        if (!isConfigManaged(agentModel)) {
           continue;
         }
         if (!configuredKeys.has(getModelIdentityKey(agentModel))) {
           delete state.selectedModelByAgent[agentId];
         }
+      }
+      if (
+        isConfigManaged(state.defaultSelectedModel) &&
+        !configuredKeys.has(getModelIdentityKey(state.defaultSelectedModel)) &&
+        state.availableModels.length > 0
+      ) {
+        state.defaultSelectedModel = state.availableModels[0];
       }
     },
   },
