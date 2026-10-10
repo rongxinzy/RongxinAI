@@ -55,7 +55,13 @@ function applyDiscoveredMetadata(
         : ProviderModelOrigin.Discovered,
   };
 
-  if (discovered.contextWindow !== undefined && next.contextWindow !== discovered.contextWindow) {
+  // A context length the user entered by hand (origin "user") is never
+  // overwritten by discovery metadata, matching the capability verdicts below.
+  if (
+    current.origin !== ProviderModelOrigin.User &&
+    discovered.contextWindow !== undefined &&
+    next.contextWindow !== discovered.contextWindow
+  ) {
     next.contextWindow = discovered.contextWindow;
     changed = true;
   }
@@ -106,7 +112,7 @@ function applyDiscoveredMetadata(
   return changed ? next : current;
 }
 
-function createDiscoveredProviderModel(discovered: DiscoveredProviderModel): ProviderModel {
+export function createDiscoveredProviderModel(discovered: DiscoveredProviderModel): ProviderModel {
   const imageCapability = discovered.capabilities?.imageInput;
   return {
     id: discovered.id,
