@@ -208,9 +208,9 @@ export function useModelEditor({
       origin: ProviderModelOrigin.User,
       ...(contextWindow ? { contextWindow } : {}),
       ...(maxTokens ? { maxTokens } : {}),
-      ...(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama
-        ? { capabilities: newModelCapabilities }
-        : {}),
+      // Remember the form values so reopening the editor shows them.
+      // Catalog resolution is unchanged and still decides runtime behavior.
+      capabilities: newModelCapabilities,
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
         : {}),

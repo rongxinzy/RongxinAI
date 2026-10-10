@@ -107,6 +107,60 @@ test.each(Object.values(ProviderModelPiApi))(
   },
 );
 
+test.each([ProviderName.Moonshot, ProviderName.OpenAI] as ProviderType[])(
+  '%s keeps an explicit capability edit on a catalog model',
+  async provider => {
+    const catalogModel: Model = {
+      id: provider === ProviderName.Moonshot ? 'kimi-k3' : 'gpt-4o',
+      name: 'Catalog model',
+      supportsImage: true,
+      contextWindow: 128_000,
+      maxTokens: 16_000,
+    };
+    const { result } = renderEditor(provider);
+    act(() => {
+      result.current.setProviders(current => ({
+        ...current,
+        [provider]: { ...current[provider], models: [catalogModel] },
+      }));
+    });
+    act(() =>
+      result.current.handleEditModel(
+        catalogModel.id,
+        catalogModel.name,
+        catalogModel.supportsImage,
+        undefined,
+        undefined,
+        catalogModel.contextWindow,
+        catalogModel.maxTokens,
+      ),
+    );
+    act(() =>
+      result.current.handleModelEditorDraftChange({
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Unsupported,
+          imageInput: ModelCapabilityStatus.Unsupported,
+          videoInput: ModelCapabilityStatus.Supported,
+          audioInput: ModelCapabilityStatus.Unsupported,
+          documentInput: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      }),
+    );
+    await act(async () => result.current.handleSaveNewModel());
+    expect(result.current.providers[provider].models?.[0]).toMatchObject({
+      capabilities: {
+        toolCalling: ModelCapabilityStatus.Unsupported,
+        imageInput: ModelCapabilityStatus.Unsupported,
+        videoInput: ModelCapabilityStatus.Supported,
+        audioInput: ModelCapabilityStatus.Unsupported,
+        documentInput: ModelCapabilityStatus.Supported,
+        reasoning: ModelCapabilityStatus.Supported,
+      },
+    });
+  },
+);
+
 test('capacity and capability edits keep the current ID verification', async () => {
   const { result } = renderEditor();
   act(() => result.current.handleRowModelEdit(verifiedModel));
