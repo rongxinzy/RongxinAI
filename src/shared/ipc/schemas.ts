@@ -249,12 +249,13 @@ export const WindowStateChangedSchema = {
 
 // ─── Cowork Session ─────────────────────────────────────────────────────────
 
+// path is intentionally absent. Zod strips it, so the main process copies the
+// bytes into userData/cowork-images. Keeping a temp or workspace path makes
+// the thumbnail and later model turns point at a file that gets cleaned up.
 const ImageAttachmentSchema = z.object({
   name: z.string(),
   mimeType: z.string(),
   base64Data: z.string(),
-  // Kept so the stored image and the prompt's "输入文件" line refer to one file.
-  path: z.string().min(1).optional(),
 });
 const FileAttachmentSchema = z.object({
   name: z.string(),

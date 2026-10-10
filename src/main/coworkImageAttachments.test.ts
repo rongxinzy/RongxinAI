@@ -39,22 +39,6 @@ describe('cowork image attachments', () => {
     expect(JSON.stringify(stored)).not.toContain(png.toString('base64'));
   });
 
-  it('keeps an existing source path instead of copying the bytes again', () => {
-    const root = makeRoot();
-    const source = path.join(root, 'source.jpg');
-    fs.writeFileSync(source, Buffer.from('jpg-bytes'));
-    const stored = persistCoworkImageAttachments(root, 'session-1', [
-      {
-        name: 'source.jpg',
-        mimeType: 'image/jpeg',
-        base64Data: Buffer.from('jpg-bytes').toString('base64'),
-        path: source,
-      },
-    ]);
-
-    expect(stored).toEqual([{ name: 'source.jpg', mimeType: 'image/jpeg', path: source }]);
-  });
-
   it('reuses the same file when the same bytes are saved again', () => {
     const root = makeRoot();
     const attachment = {

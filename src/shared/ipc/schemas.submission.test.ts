@@ -12,7 +12,7 @@ test.each(['', ' \n\t', '\u200b\u200d\ufeff'])(
   },
 );
 
-test('keeps the source path on an image attachment', () => {
+test('strips a source path so image bytes are copied into app storage', () => {
   const image = {
     name: 'example.png',
     mimeType: 'image/png',
@@ -23,14 +23,22 @@ test('keeps the source path on an image attachment', () => {
     prompt: '看这张图',
     imageAttachments: [image],
   });
-  expect(parsed.imageAttachments?.[0]?.path).toBe(image.path);
+  expect(parsed.imageAttachments?.[0]).toEqual({
+    name: image.name,
+    mimeType: image.mimeType,
+    base64Data: image.base64Data,
+  });
   expect(
     CoworkSessionContinueSchema.input.parse({
       sessionId: 'session',
       prompt: '看这张图',
       imageAttachments: [image],
-    }).imageAttachments?.[0]?.path,
-  ).toBe(image.path);
+    }).imageAttachments?.[0],
+  ).toEqual({
+    name: image.name,
+    mimeType: image.mimeType,
+    base64Data: image.base64Data,
+  });
 });
 
 test('both IPC entry points allow image-only submissions', () => {
