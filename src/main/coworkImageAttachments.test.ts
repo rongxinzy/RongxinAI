@@ -52,9 +52,7 @@ describe('cowork image attachments', () => {
       },
     ]);
 
-    expect(stored).toEqual([
-      { name: 'source.jpg', mimeType: 'image/jpeg', path: source },
-    ]);
+    expect(stored).toEqual([{ name: 'source.jpg', mimeType: 'image/jpeg', path: source }]);
   });
 
   it('reuses the same file when the same bytes are saved again', () => {
