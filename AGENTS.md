@@ -11,18 +11,18 @@
 ## 命令
 
 ```bash
-npm run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
-npm run build              # 生产构建（TS + Vite）
-npm run lint               # oxlint，含 theme:check / theme:audit
-npm run format             # oxfmt；提交前 bun run format:check
-npm test                   # Vitest；npm test -- <name> 过滤
-npm run compile:electron   # 仅主进程
-npm run dist:mac|dist:win|dist:linux
+bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
+bun run build              # 生产构建（TS + Vite）
+bun run lint               # oxlint，含 theme:check / theme:audit
+bun run format             # oxfmt；提交前 bun run format:check
+bun run test               # Vitest；bun run test -- <name> 过滤
+bun run compile:electron   # 仅主进程
+bun run dist:mac|dist:win|dist:linux
 bun run theme:generate     # 改 token/recipe/生成器后必跑
-npm run rebuild:electron-native   # 原生模块依赖变更后
+bun run rebuild:electron-native   # 原生模块依赖变更后
 ```
 
-Node >=24 <25，Bun >=1.3。包管理只用 Bun（`bun install`、`bun.lock`），npm 只跑脚本。Windows 构建需 PortableGit（见 README.md）。
+Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 
 ## 产品与品牌
 
@@ -135,7 +135,7 @@ Node >=24 <25，Bun >=1.3。包管理只用 Bun（`bun install`、`bun.lock`）�
 1. **改前**：列出涉及的 DESIGN.md 章节、复用组件、token/recipe 入口、受影响页面/状态。
 2. **委派**：传递规范、范例与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
 3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」，每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
-4. **实际渲染**（`npm run electron:dev`）：light/dark；适用状态（hover/pressed/selected/disabled/invalid/open）；键盘焦点；窄窗口、长文本、动态内容、portal；reduced-motion；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留；检查实际尺寸与溢出。
+4. **实际渲染**（`bun run electron:dev`）：light/dark；适用状态（hover/pressed/selected/disabled/invalid/open）；键盘焦点；窄窗口、长文本、动态内容、portal；reduced-motion；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留；检查实际尺寸与溢出。
 5. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
 
 截图、测试、lint 各证明不同事项，互不替代；自动检查不覆盖设计判断。纯文档改动只做一致性与链接检查，不宣称 UI 验收。
@@ -178,16 +178,16 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 ### 依赖
 
-只在必要时新增，先确认仓库内无现成能力；精确锁版本，用 `bun install`；`bun.lock` 变更视同代码评审。含原生模块（better-sqlite3、node-pty）的变更后跑 `npm run rebuild:electron-native`。
+只在必要时新增，先确认仓库内无现成能力；精确锁版本，用 `bun install`；`bun.lock` 变更视同代码评审。含原生模块（better-sqlite3、node-pty）的变更后跑 `bun run rebuild:electron-native`。
 
 ## 测试与验证
 
-- 代码改动后跑 `npm run lint` 并清零警告；提交前 `bun run format:check`。
-- 改 token/recipe/生成器：`bun run theme:generate`。改共享契约/主题引擎：另跑 `npx vitest run src/renderer src/shared`、`npm run build`、`npm run test:bundle-budget`。
+- 代码改动后跑 `bun run lint` 并清零警告；提交前 `bun run format:check`。
+- 改 token/recipe/生成器：`bun run theme:generate`。改共享契约/主题引擎：另跑 `bunx vitest run src/renderer src/shared`、`bun run build`、`bun run test:bundle-budget`。
 - 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
 - 全量测试有少量环境相关存量失败（skill smoke、release manifest 等）。遇失败用 `git stash` 对照 HEAD 判断是否由你引入。
-- **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> npx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
-- UI 改动在 `npm run electron:dev` 验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。
+- **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> bunx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
+- UI 改动在 `bun run electron:dev` 验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。
 
 ## Git 与 PR
 
@@ -215,7 +215,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 ## 外部 Skills
 
-- 产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 DESIGN.md + 共享组件 + `rongxinai-ui-adapter` 为准，不套营销页默认。landing/营销/品牌页用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。可选 `shadcn/ui`、`vercel/ai-elements`、impeccable（`npx impeccable install`，`/impeccable`）。
+- 产品界面（Work/Chat/Settings/MCP/Skills/本地推理等）以 DESIGN.md + 共享组件 + `rongxinai-ui-adapter` 为准，不套营销页默认。landing/营销/品牌页用 `design-taste-frontend`；明确需要高级视觉或复杂动效才读 `high-end-visual-design`。可选 `shadcn/ui`、`vercel/ai-elements`、impeccable（`bunx impeccable install`，`/impeccable`）。
 - 任何 skill 只补充本文件，不能取消设计自查或绕过已验收基准。
 
 ## 跨仓协作规范

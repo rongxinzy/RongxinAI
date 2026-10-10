@@ -352,6 +352,6 @@ Codex 基准 `--zy-radius` 为 10px；各派生 token 按下表确定，不依�
 - [ ] 窄窗口、长标题、中文/英文、动态内容、包装组件与 portal 无遮挡、截断失控或溢出。
 - [ ] light/dark 与运行中热切换均验证，新 recipe 确实生效；草稿、焦点、选中、弹层、滚动及任务状态保留。
 - [ ] 品牌资产完整、蓝点未被主题改色；用户内容与隔离预览未被主题重着色。
-- [ ] 修改 token/recipe/生成器后执行 `bun run theme:generate`；代码改动执行 `npm run lint`（含 theme:check/audit），提交前执行 `bun run format:check`。
-- [ ] 共享契约/引擎改动执行 `npx vitest run src/renderer src/shared`、`npm run build`、`npm run test:bundle-budget`；新增/修改测试实际运行通过。
-- [ ] UI 改动通过 `npm run electron:dev` 验证相关 Cowork、权限、停止、Artifacts、主题/语言切换流程，记录实际覆盖范围，不以编译或截图代替行为验证。
+- [ ] 修改 token/recipe/生成器后执行 `bun run theme:generate`；代码改动执行 `bun run lint`（含 theme:check/audit），提交前执行 `bun run format:check`。
+- [ ] 共享契约/引擎改动执行 `bunx vitest run src/renderer src/shared`、`bun run build`、`bun run test:bundle-budget`；新增/修改测试实际运行通过。
+- [ ] UI 改动通过 `bun run electron:dev` 验证相关 Cowork、权限、停止、Artifacts、主题/语言切换流程，记录实际覆盖范围，不以编译或截图代替行为验证。

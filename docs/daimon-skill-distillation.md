@@ -63,7 +63,7 @@
 
 ## 当前不变量与验证
 
-- 82 个知远内置 Skill 的 frontmatter 由 `npm run validate:skills` 检查，并在 PR CI 执行。
+- 82 个知远内置 Skill 的 frontmatter 由 `bun run validate:skills` 检查，并在 PR CI 执行。
 - PPT、Word、网站、表格和深度研究快捷入口都必须记录可验证交付物；前四类还必须有真实 raster 预览。
 - QA/预览记录必须引用已注册交付物，不能用无关文件凑证据。
 - 研究还要求多个角度、已完成的研究委派、可访问来源和跨域来源分布。
