@@ -166,6 +166,64 @@
 ; branded header strip across the freed area, down to the top of the inner
 ; dialog, so no stock artwork or gray background shows through.
 ; ---------------------------------------------------------------------------
+; ---------------------------------------------------------------------------
+; ZY_SetImage CONTROL PATH — LoadAndSetImage /STRINGID /RESIZETOFIT
+; replacement. electron-builder's bundled NSIS (3.0.4.1) predates the
+; built-in LoadAndSetImage command, and a plain SS_BITMAP static does not
+; scale — it clips the bitmap at native size (the generated art is 2x).
+; So: load the bitmap, StretchBlt it onto a bitmap sized to the control's
+; client rect (HALFTONE for downscaling quality), hand that to the static.
+; Clobbers nothing: all registers are saved and restored.
+; ---------------------------------------------------------------------------
+!macro ZY_SetImage CONTROL PATH
+  Push $R0
+  Push $R1
+  Push $R2
+  Push $R3
+  Push $R4
+  Push $R5
+  Push $R6
+  Push $R7
+  Push $R8
+  Push $R9
+  StrCpy $R9 ${CONTROL}
+  System::Call 'user32::LoadImageW(i 0, t "${PATH}", i ${IMAGE_BITMAP}, i 0, i 0, i ${LR_LOADFROMFILE}) i .R1'
+  System::Alloc 16
+  Pop $R2
+  System::Call 'user32::GetClientRect(i R9, p R2)'
+  System::Call '*$R2(i, i, i .R3, i .R4)'
+  System::Free $R2
+  System::Call 'user32::GetDC(i R9) i .R5'
+  System::Call 'gdi32::CreateCompatibleDC(i R5) i .R6'
+  System::Call 'gdi32::CreateCompatibleBitmap(i R5, i R3, i R4) i .R7'
+  System::Call 'gdi32::SelectObject(i R6, i R7) i .R2'
+  System::Call 'user32::ReleaseDC(i R9, i R5)'
+  System::Alloc 24
+  Pop $R8
+  System::Call 'gdi32::GetObjectW(i R1, i 24, p R8)'
+  System::Call '*$R8(i, i .R0, i .R5)'
+  System::Free $R8
+  System::Call 'gdi32::CreateCompatibleDC(i 0) i .R8'
+  System::Call 'gdi32::SelectObject(i R8, i R1) i'
+  System::Call 'gdi32::SetStretchBltMode(i R6, i 4)'
+  System::Call 'gdi32::StretchBlt(i R6, i 0, i 0, i R3, i R4, i R8, i 0, i 0, i R0, i R5, i 0x00CC0020)'
+  System::Call 'gdi32::DeleteDC(i R8)'
+  System::Call 'gdi32::DeleteObject(i R1)'
+  System::Call 'gdi32::SelectObject(i R6, i R2)'
+  System::Call 'gdi32::DeleteDC(i R6)'
+  SendMessage $R9 ${STM_SETIMAGE} ${IMAGE_BITMAP} $R7
+  Pop $R9
+  Pop $R8
+  Pop $R7
+  Pop $R6
+  Pop $R5
+  Pop $R4
+  Pop $R3
+  Pop $R2
+  Pop $R1
+  Pop $R0
+!macroend
+
 !macro ZY_BrandHeader
   GetDlgItem $0 $HWNDPARENT 1034
   ShowWindow $0 ${SW_HIDE}

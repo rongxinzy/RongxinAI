@@ -474,7 +474,7 @@ Function ZYProgressShow
 
   ; Background art covering the whole inner dialog area.
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $R2, i $R3, i $4, i $5, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
-  LoadAndSetImage /STRINGID /RESIZETOFIT $R6 ${IMAGE_BITMAP} ${LR_LOADFROMFILE} "${ZY_ASSET_BG}" $R7
+  !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BG}"
 
   ; Title and phase text sit in the bitmap's flat zone (the art band occupies
   ; the top 34%): title at 40%, phase line 40px below, bar at 68%.
@@ -504,18 +504,18 @@ Function ZYProgressShow
 
   ; Track, fill, mask, then the complete bar, stacked in creation order.
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
-  LoadAndSetImage /STRINGID /RESIZETOFIT $R6 ${IMAGE_BITMAP} ${LR_LOADFROMFILE} "${ZY_ASSET_BAR_TRACK}" $R7
+  !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_TRACK}"
 
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
-  LoadAndSetImage /STRINGID /RESIZETOFIT $R6 ${IMAGE_BITMAP} ${LR_LOADFROMFILE} "${ZY_ASSET_BAR_FILL}" $R7
+  !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_FILL}"
   StrCpy $zyFill $R6
 
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
-  LoadAndSetImage /STRINGID /RESIZETOFIT $R6 ${IMAGE_BITMAP} ${LR_LOADFROMFILE} "${ZY_ASSET_BAR_TRACK}" $R7
+  !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_TRACK}"
   StrCpy $zyMask $R6
 
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
-  LoadAndSetImage /STRINGID /RESIZETOFIT $R6 ${IMAGE_BITMAP} ${LR_LOADFROMFILE} "${ZY_ASSET_BAR_DONE}" $R7
+  !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_DONE}"
   ShowWindow $R6 ${SW_HIDE}
   StrCpy $zyComplete $R6
 
