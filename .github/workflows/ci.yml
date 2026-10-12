@@ -178,6 +178,8 @@ jobs:
         run: bun run build:enterprise
       - name: Verify enterprise extension bundle
         run: bun run verify:enterprise:bundle
+      - name: Verify enterprise packaging config
+        run: bun run verify:enterprise:packaging-config
 
   memory-leak:
     needs: changes

@@ -85,6 +85,7 @@ Node >=24 <25，Bun >=1.3。包管理只用 Bun（`bun install`、`bun.lock`）�
 - `enterprise/` 是知远企业客户端扩展（自 zhiyuanAaaS 仓库迁入，源提交 `7adec4a`）：企业会话、托管模型投影、Agent 控制循环、托管 Skill 与企业设置渲染器。迁移代码保持原仓库结构（`enterprise/src/`），不适用本仓 renderer 的主题与设计体系。
 - 独立构建：`bun run build:enterprise` 产出 `enterprise/dist/extension.cjs`（tsup 单文件 CJS）与 `enterprise/dist/ui/`；测试 `bun run test:enterprise`，类型检查 `bun run typecheck:enterprise`，包体验证 `bun run verify:enterprise:bundle`。根 `npm test` 的 include 不覆盖 `enterprise/`。
 - 宿主经 `src/main/enterpriseExtension` 契约加载：打包产物位于 `resources/zhiyuan-enterprise/extension.cjs`，开发覆盖用 `ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH` 指向本地 bundle。UI bundle 是独立 document，不进入主渲染器主题系统。
+- 企业版 Windows 打包走手动 workflow「Build Zhiyuan Enterprise Windows package (manual)」（输入 version 与 aep_base_url），overlay 配置是 `electron-builder.enterprise.cjs`（社区流程 `electron-builder.json` 不加载它），本地入口 `bun run dist:win:enterprise`。打包产物有意不含 Admin Console bundle（控制台仍是 zhiyuanAaaS 的 Web 部署应用）。
 
 ## 前端设计规则（P0）
 
