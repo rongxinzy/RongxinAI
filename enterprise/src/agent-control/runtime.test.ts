@@ -165,6 +165,73 @@ describe('Agent control runtime', () => {
     }
   });
 
+  test('drops refused telemetry so one bad event cannot block the outbox', async () => {
+    const state = createState();
+    state.enqueueTelemetry({ eventId: 'poison', type: '' });
+    state.enqueueTelemetry({ eventId: 'later', type: 'skill.sync.completed' });
+    const uploadTelemetry = vi.fn(async () => ({
+      accepted: [],
+      rejected: [{ eventId: 'poison', code: 'INVALID_TYPE' }],
+    }));
+    const onError = vi.fn();
+    const runtime = createRuntime(
+      clientFixture({ uploadEventBatch: uploadTelemetry }),
+      state,
+      undefined,
+      onError,
+    );
+    try {
+      await runtime.flushTelemetry();
+      expect(state.listTelemetry()).toEqual([{ eventId: 'later', type: 'skill.sync.completed' }]);
+      expect(onError).toHaveBeenCalledOnce();
+      expect(String(onError.mock.calls[0]?.[0])).toContain('poison (INVALID_TYPE)');
+    } finally {
+      state.close();
+    }
+  });
+
+  test('removes accepted and refused telemetry from the same batch', async () => {
+    const state = createState();
+    state.enqueueTelemetry({ eventId: 'ok', type: 'skill.sync.completed' });
+    state.enqueueTelemetry({ eventId: 'poison', type: '' });
+    const uploadTelemetry = vi.fn(async () => ({
+      accepted: ['ok'],
+      rejected: [{ eventId: 'poison', code: 'INVALID_TYPE' }],
+    }));
+    const runtime = createRuntime(clientFixture({ uploadEventBatch: uploadTelemetry }), state);
+    try {
+      await runtime.flushTelemetry();
+      expect(state.listTelemetry()).toEqual([]);
+    } finally {
+      state.close();
+    }
+  });
+
+  test('keeps telemetry after a transient or unknown rejection', async () => {
+    const state = createState();
+    state.enqueueTelemetry({ eventId: 'transient', type: 'skill.sync.failed' });
+    state.enqueueTelemetry({ eventId: 'future', type: 'skill.sync.completed' });
+    const uploadTelemetry = vi.fn(async () => ({
+      accepted: [],
+      rejected: [
+        { eventId: 'transient', code: 'INTERNAL_ERROR' },
+        { eventId: 'future', code: 'SOME_FUTURE_CODE' },
+      ],
+    }));
+    const runtime = createRuntime(clientFixture({ uploadEventBatch: uploadTelemetry }), state);
+    try {
+      await runtime.flushTelemetry();
+      expect(
+        state
+          .listTelemetry()
+          .map(item => item.eventId)
+          .sort(),
+      ).toEqual(['future', 'transient']);
+    } finally {
+      state.close();
+    }
+  });
+
   test('coalesces concurrent cycles so control work cannot overlap', async () => {
     const state = createState();
     let releaseHeartbeat: () => void = () => {};
@@ -194,6 +261,7 @@ function createRuntime(
   client: AgentControlClient,
   state: AgentControlState,
   reconciler = reconcilerFixture(),
+  onError?: (error: unknown) => void,
 ): AgentControlRuntime {
   return new AgentControlRuntime({
     client,
@@ -203,6 +271,7 @@ function createRuntime(
     platform: 'windows',
     now: () => now,
     createEventId: () => 'telemetry-1',
+    ...(onError ? { onError } : {}),
   });
 }
 
