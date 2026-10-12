@@ -3,32 +3,32 @@
 !include "nsDialogs.nsh"
 
 ; Fully custom-drawn installer UI (palette, drawing helpers, page functions
-; and string table). The theme file carries the include guard; both files
-; resolve relative to this script's directory.
-!include "installer-ui\zy-theme.nsh"
-!include "installer-ui\zy-pages.nsh"
+; and string table). The theme file carries the include guard. electron-builder
+; compiles this file from its own NSIS staging directory (the header prepends
+; it ahead of installer.nsi), so relative sibling includes would resolve
+; against that staging directory and fail; PROJECT_DIR (always passed via -D)
+; anchors them to the repository. The relative fallback serves direct local
+; makensis runs from this script's directory.
+; These two globals must be declared before the UI includes: ZYHeroLeave reads
+; $installLocalInference and the PrepareExistingInstallForExtraction insertion
+; expands $preparedInstallRoot while zy-pages.nsh is still being processed.
+!ifndef BUILD_UNINSTALLER
+Var /GLOBAL installLocalInference
+Var /GLOBAL preparedInstallRoot
+!endif
 
-; electron-builder defines this from allowToChangeInstallationDirectory; the
-; native directory page is replaced by the install-location row on the custom
-; hero page, so the define is withdrawn before the assisted template runs.
-!undef allowToChangeInstallationDirectory
-
-; MUI consumes MUI_PAGE_CUSTOMFUNCTION_* defines at each page insertion and
-; undefs them afterwards, so the SHOW hook has to be (re-)defined at every
-; insertion point: here for the install-mode page, inside
-; customPageAfterChangeDir for MUI_PAGE_INSTFILES, and inside
-; customUninstallPage for MUI_UNPAGE_FINISH.
-!define MUI_PAGE_CUSTOMFUNCTION_SHOW ${ZY_UNPREFIX}ZY_MuiPageShow
-
-; The native uninstaller finish page is the only remaining MUI welcome/finish
-; surface; give it the branded side art instead of the stock wizard bitmap.
-!define MUI_UNWELCOMEFINISHPAGE_BITMAP "${PROJECT_DIR}\build\installer-assets\zy-side.bmp"
-
-!define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
-!define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+; ---------------------------------------------------------------------------
+; Macros consumed by the UI includes below. NSIS macros must be defined
+; before their first insertion point: ZYHeroLeave (in zy-pages.nsh) inserts
+; PrepareExistingInstallForExtraction while that file is still being
+; processed, so these live ahead of the includes. StopAppProcesses,
+; CountInstallDirProcesses and ForgetOldInstallRegistry stay available to
+; the uninstaller pass; the timing-log helper and the extraction itself
+; are installer-only.
+; ---------------------------------------------------------------------------
 
 ; PrepareExistingInstallForExtraction is inserted from ZYHeroLeave (in the
-; installer-ui/zy-pages.nsh include above) — ahead of multiUser.nsh, where
+; installer-ui/zy-pages.nsh include below) — ahead of multiUser.nsh, where
 ; electron-builder defines these keys with the same /ifndef fallback values.
 ; Mirror the defaults here so registry macros expand correctly at that
 ; earlier point.
@@ -106,46 +106,11 @@
   ForgetOldInstallRegistry_Done_${TOKEN}:
 !macroend
 
-; Safety net for any path where electron-builder still runs the previous
-; uninstaller (e.g. it lives in a different install directory). The stock
-; handler quits the whole installation on a non-zero exit code after showing
-; the "cannot be closed" dialog — even when the failure is a locked file,
-; not a running process. Files the old uninstaller could not remove are
-; overwritten in place by the extraction that follows, so a failed legacy
-; uninstall must never abort the install.
-!macro customUnInstallCheck
-  IfErrors 0 +3
-    DetailPrint "[Installer] Previous uninstaller could not be launched; continuing with in-place upgrade"
-    Return
-  ${if} $R0 != 0
-    DetailPrint "[Installer] Previous uninstaller exited with code $R0; continuing with in-place upgrade"
-    !insertmacro OpenTimingLogForAppend $8
-    FileWrite $8 "phase=previous-uninstall-ignored exit=$R0$\r$\n"
-    FileClose $8
-  ${endIf}
-  Return
-!macroend
-
-!macro customUnInstallCheckCurrentUser
-  !insertmacro customUnInstallCheck
-!macroend
-
-; electron-builder compiles the uninstaller before the installer. Its assisted
-; template does not insert installation pages while BUILD_UNINSTALLER is set,
-; so keep the page state and callbacks out of that compilation pass.
 !ifndef BUILD_UNINSTALLER
-Var /GLOBAL installLocalInference
-Var /GLOBAL preparedInstallRoot
-
 !macro OpenTimingLogForAppend HANDLE
   ; NSIS append mode preserves existing data but starts at offset zero.
   FileOpen ${HANDLE} "$APPDATA\ZhiYuanAgent\install-timing.log" a
   FileSeek ${HANDLE} 0 END
-!macroend
-
-!macro ExtractElevatedActionScript
-  SetOutPath "$PLUGINSDIR"
-  File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
 !macroend
 
 ; Destructive pre-extraction steps: stop the running application, migrate
@@ -244,6 +209,83 @@ Var /GLOBAL preparedInstallRoot
     !insertmacro ForgetOldInstallRegistry ${TOKEN}
   ${EndIf}
 !macroend
+!endif
+
+!ifdef PROJECT_DIR
+  !include "${PROJECT_DIR}\scripts\installer-ui\zy-theme.nsh"
+  !include "${PROJECT_DIR}\scripts\installer-ui\zy-pages.nsh"
+!else
+  !include "installer-ui\zy-theme.nsh"
+  !include "installer-ui\zy-pages.nsh"
+!endif
+
+; electron-builder defines this from allowToChangeInstallationDirectory; the
+; native directory page is replaced by the install-location row on the custom
+; hero page, so the define is withdrawn before the assisted template runs.
+!undef allowToChangeInstallationDirectory
+
+; MUI consumes MUI_PAGE_CUSTOMFUNCTION_* defines at each MUI page insertion
+; and undefs them afterwards, so the SHOW hook has to be (re-)defined at
+; every insertion point. Uninstaller pass only: MUI_UNPAGE_INSTFILES consumes
+; this one (it brands the native uninstaller instfiles page) before
+; customUninstallPage re-defines the hook for MUI_UNPAGE_FINISH. In the
+; installer pass nothing consumes a define this early — the install-mode page
+; is a raw PageEx custom and the native directory page is disabled above — so
+; an early define would collide with customPageAfterChangeDir's re-definition
+; (NSIS errors on !define of an existing symbol) and must not be set here.
+!ifdef BUILD_UNINSTALLER
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ${ZY_UNPREFIX}ZY_MuiPageShow
+!endif
+
+; The native uninstaller finish page is the only remaining MUI welcome/finish
+; surface; give it the branded side art instead of the stock wizard bitmap.
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "${PROJECT_DIR}\build\installer-assets\zy-side.bmp"
+
+!define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
+!define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+
+
+
+
+
+; Safety net for any path where electron-builder still runs the previous
+; uninstaller (e.g. it lives in a different install directory). The stock
+; handler quits the whole installation on a non-zero exit code after showing
+; the "cannot be closed" dialog — even when the failure is a locked file,
+; not a running process. Files the old uninstaller could not remove are
+; overwritten in place by the extraction that follows, so a failed legacy
+; uninstall must never abort the install.
+!macro customUnInstallCheck
+  IfErrors 0 +3
+    DetailPrint "[Installer] Previous uninstaller could not be launched; continuing with in-place upgrade"
+    Return
+  ${if} $R0 != 0
+    DetailPrint "[Installer] Previous uninstaller exited with code $R0; continuing with in-place upgrade"
+    !insertmacro OpenTimingLogForAppend $8
+    FileWrite $8 "phase=previous-uninstall-ignored exit=$R0$\r$\n"
+    FileClose $8
+  ${endIf}
+  Return
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  !insertmacro customUnInstallCheck
+!macroend
+
+; electron-builder compiles the uninstaller before the installer. Its assisted
+; template does not insert installation pages while BUILD_UNINSTALLER is set,
+; so keep the page state and callbacks out of that compilation pass.
+; ($installLocalInference/$preparedInstallRoot are declared above the UI
+; includes, where ZYHeroLeave and the PrepareExistingInstallForExtraction
+; insertion can see them.)
+!ifndef BUILD_UNINSTALLER
+
+
+!macro ExtractElevatedActionScript
+  SetOutPath "$PLUGINSDIR"
+  File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
+!macroend
+
 
 !macro RunElevatedAction TOKEN ACTION TARGET
   Delete "$PLUGINSDIR\${ELEVATED_ACTION_RESULT}"

@@ -622,8 +622,14 @@ FunctionEnd
 !endif ; !BUILD_UNINSTALLER
 
 ; ---------------------------------------------------------------------------
-; Uninstaller confirmation.
+; Uninstaller confirmation. These callbacks are referenced from
+; customUnWelcomePage, which only the assisted template's uninstaller branch
+; inserts, so they are compiled exclusively in the BUILD_UNINSTALLER pass;
+; compiling them into the installer pass as well would trip makensis'
+; unreferenced-function warning (6010), promoted to an error by
+; electron-builder's -WX.
 ; ---------------------------------------------------------------------------
+!ifdef BUILD_UNINSTALLER
 Function ${ZY_UNPREFIX}ZYUnWelcomeCreate
 !ifdef ZY_PREVIEW
   ; Preview-only staging: File data inside uninstaller page functions is not
@@ -673,3 +679,4 @@ FunctionEnd
 Function ${ZY_UNPREFIX}ZYUnWelcomeLeave
   Return
 FunctionEnd
+!endif ; BUILD_UNINSTALLER

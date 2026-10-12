@@ -97,13 +97,14 @@ Function .onInit
   ; Reference every page function so the compiler's unreferenced-function
   ; zeroing (which shifts Call targets of later functions) never kicks in for
   ; --from variants that skip pages. This branch never executes.
+  ; ZYUnWelcomeCreate/ZYUnWelcomeLeave are BUILD_UNINSTALLER-only since the
+  ; custom welcome page replaced the stock MUI uninstaller welcome; the
+  ; uninstaller preview compiles them via /DBUILD_UNINSTALLER.
   ${If} 1 == 2
     Call ZYHeroCreate
     Call ZYHeroLeave
     Call ZYFinishCreate
     Call ZYFinishLeave
-    Call ZYUnWelcomeCreate
-    Call ZYUnWelcomeLeave
     Call ZY_MuiPageShow
     Call ZY_MuiPageLeave
   ${EndIf}
