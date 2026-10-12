@@ -218,8 +218,6 @@ const summarizePiHistory = (messages: readonly CoworkMessage[]) => {
 // ── Types ──
 
 const PiChatRuntimeLimit = {
-  /** Keep chat restores bounded even when the selected model has a huge window. */
-  ContextWindowTokens: 32_768,
   HistoryChars: 16_000,
   MaxOutputTokens: 8_192,
 } as const;
@@ -1135,7 +1133,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
       this.applyPiCompactionOverrides(
         settingsManager,
-        this.resolvePiContextWindowTokens(contextWindowTokens, resourceState.chatMode),
+        contextWindowTokens,
         resolvedModel.modelCompactionOverride,
       );
       if (codemodeEnabled && settingsManager) {
@@ -1803,10 +1801,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.applyPiShellOverride(active.settingsManager);
         this.applyPiCompactionOverrides(
           active.settingsManager,
-          this.resolvePiContextWindowTokens(
-            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-            active.resourceState.chatMode,
-          ),
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
           active.modelCompactionOverride,
         );
         active.requestedSystemPrompt = nextSystemPrompt;
@@ -2034,10 +2029,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.applyPiShellOverride(active.settingsManager);
         this.applyPiCompactionOverrides(
           active.settingsManager,
-          this.resolvePiContextWindowTokens(
-            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-            active.resourceState.chatMode,
-          ),
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
           active.modelCompactionOverride,
         );
       }
@@ -2740,30 +2732,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     });
   }
 
-  private resolvePiContextWindowTokens(
-    contextWindowTokens: number | undefined,
-    chatMode: boolean,
-  ): number | undefined {
-    if (!chatMode) return contextWindowTokens;
-    const resolved =
-      Number.isFinite(contextWindowTokens) && (contextWindowTokens ?? 0) > 0
-        ? Math.floor(contextWindowTokens!)
-        : PiChatRuntimeLimit.ContextWindowTokens;
-    return Math.min(resolved, PiChatRuntimeLimit.ContextWindowTokens);
-  }
-
   private resolvePiSessionModel(
     model: Record<string, unknown>,
     chatMode: boolean,
   ): Record<string, unknown> {
     if (!chatMode) return model;
-    const contextWindow = this.resolvePiContextWindowTokens(
-      typeof model.contextWindow === 'number' ? model.contextWindow : undefined,
-      true,
-    );
     return {
       ...model,
-      ...(contextWindow ? { contextWindow } : {}),
       ...(typeof model.maxTokens === 'number'
         ? { maxTokens: Math.min(model.maxTokens, PiChatRuntimeLimit.MaxOutputTokens) }
         : {}),
@@ -2776,7 +2751,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     chatMode: boolean,
   ): number {
     const calculated = calculatePiConversationHistoryCharLimit(
-      this.resolvePiContextWindowTokens(contextWindowTokens, chatMode),
+      contextWindowTokens,
       maxOutputTokens,
     );
     return chatMode ? Math.min(calculated, PiChatRuntimeLimit.HistoryChars) : calculated;
@@ -3949,10 +3924,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       const usage = hasValidContextUsage
         ? (() => {
-            const configuredContextWindow = Math.round(contextUsage!.contextWindow);
-            const contextWindowTokens = active?.resourceState.chatMode
-              ? Math.min(configuredContextWindow, PiChatRuntimeLimit.ContextWindowTokens)
-              : configuredContextWindow;
+            const contextWindowTokens = Math.round(contextUsage!.contextWindow);
             return {
               usedTokens: Math.min(Math.round(contextUsage!.tokens!), contextWindowTokens),
               contextWindowTokens,

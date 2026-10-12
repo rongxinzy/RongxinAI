@@ -784,18 +784,24 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
 
-    it('caps Chat compaction for models with a larger context window', async () => {
+    it('passes the model context window through to Chat Pi sessions and caps compaction at fixed ceilings', async () => {
+      mockGetModel.mockImplementationOnce(() => undefined);
       await adapter.startSession('chat-context-limit', 'First', {
         sessionMode: 'chat',
         modelOverride: 'openai/gpt-5.2',
       });
 
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        model?: { contextWindow?: number };
+      };
+      expect(sessionOptions.model?.contextWindow).toBe(272_000);
+
       const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
       expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
         compaction: {
           enabled: true,
-          reserveTokens: 8_192,
-          keepRecentTokens: 16_384,
+          reserveTokens: 16_384,
+          keepRecentTokens: 20_000,
         },
       });
     });
