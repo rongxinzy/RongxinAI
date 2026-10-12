@@ -11,15 +11,44 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        // Silent uninstall runs headless: no window, no WebView2, engine events
-        // mirrored to the same JSONL log the UI path writes. Unknown arguments
-        // are ignored everywhere (ARP passes /S, --updated, etc.).
-        if (SetupForm.IsUninstallMode(args) && args.Contains("--silent"))
+        // Single-instance guard, same intent as electron-builder's
+        // ALLOW_ONLY_ONE_INSTALLER_INSTANCE: a second setup process would
+        // sweep the first one's live %TEMP%\zhiyuan-setup-* payload dir during
+        // self-extraction. The mutex name is scoped per mode; a duplicate UI
+        // instance activates the running window instead, a duplicate silent
+        // uninstall exits non-zero (another uninstall is in progress).
+        var uninstallMode = SetupForm.IsUninstallMode(args);
+        var mutexName = "ZhiYuanAgentSetup-" + InstallerEngine.AppGuid + (uninstallMode ? "-uninstall" : "");
+        var mutex = new Mutex(initiallyOwned: true, name: mutexName, out var createdNew);
+        if (!createdNew)
         {
-            Environment.ExitCode = SetupForm.RunSilentUninstall(args);
+            try { mutex.Dispose(); } catch { }
+            if (args.Contains("--silent"))
+            {
+                Environment.ExitCode = 1;
+                return;
+            }
+            SetupForm.ActivateExistingWindow(uninstallMode);
             return;
         }
-        Application.Run(new SetupForm(args));
+        try
+        {
+            // Silent uninstall runs headless: no window, no WebView2, engine
+            // events mirrored to the same JSONL log the UI path writes.
+            // Unknown arguments are ignored everywhere (ARP passes /S,
+            // --updated, etc.).
+            if (uninstallMode && args.Contains("--silent"))
+            {
+                Environment.ExitCode = SetupForm.RunSilentUninstall(args);
+                return;
+            }
+            Application.Run(new SetupForm(args));
+        }
+        finally
+        {
+            try { mutex.ReleaseMutex(); } catch { /* already released */ }
+            mutex.Dispose();
+        }
     }
 }
 
@@ -57,7 +86,6 @@ public sealed class SetupForm : Form
     private readonly string[] rawArgs;
     private bool selfTestClose;
 
-    private readonly InstallerEngine engine;
     private readonly CancellationTokenSource installCts = new();
     private readonly string eventsLogPath;
     private string installState = "idle";
@@ -76,6 +104,27 @@ public sealed class SetupForm : Form
     private const int HTCAPTION = 0x2;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     private const int DWMWCP_ROUNDED = 2;
+    private const int SW_RESTORE = 9;
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr FindWindow(string? className, string? windowName);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int command);
+
+    /// <summary>Second-instance handoff: bring the running shell window to the
+    /// front (the window title is unique per mode and set in the ctor).</summary>
+    public static void ActivateExistingWindow(bool uninstallMode)
+    {
+        var title = uninstallMode ? "知远智能体 卸载程序" : "知远智能体 安装程序";
+        var handle = FindWindow(null, title);
+        if (handle == IntPtr.Zero) return;
+        ShowWindow(handle, SW_RESTORE);
+        SetForegroundWindow(handle);
+    }
 
     public SetupForm(string[] args)
     {
@@ -107,18 +156,6 @@ public sealed class SetupForm : Form
         BackColor = Color.White;
         ShowInTaskbar = true;
         MaximizeBox = false;
-
-        // The engine orchestrates the shared scripts; progress events are
-        // forwarded to the page (and mirrored to a JSONL log for headless
-        // verification of the event sequence). Without --payload the engine
-        // self-extracts the zip appended to this exe (SFX, Milestone B).
-        engine = new InstallerEngine(
-            payloadDir,
-            forcedInstallDir ?? DefaultInstallDir(),
-            runtimeRootOverride,
-            appDataRootOverride,
-            registerInstall: !skipRegistration,
-            new Progress<EngineEvent>(OnEngineEvent));
 
         webView.Dock = DockStyle.Fill;
         webView.DefaultBackgroundColor = Color.White;
@@ -184,6 +221,19 @@ public sealed class SetupForm : Form
             catch (Exception ex)
             {
                 DebugLog($"EnsureCoreWebView2 failed: {ex}");
+                // Without the runtime the page never renders and the user would
+                // stare at a blank window — say exactly what is missing.
+                var chinese = System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+                MessageBox.Show(
+                    this,
+                    chinese
+                        ? "无法加载 Microsoft Edge WebView2 运行环境，安装界面无法显示。\n\n知远智能体需要 WebView2 Runtime，请从微软官网安装后重新运行安装程序。"
+                        : "Microsoft Edge WebView2 Runtime is required to show the setup UI but could not be loaded.\n\nInstall Microsoft Edge WebView2 Runtime from Microsoft and run the setup again.",
+                    chinese ? "知远智能体 安装程序" : "ZhiYuan Agent Setup",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                BeginInvoke(Close);
+                return;
             }
             if (Environment.OSVersion.Version.Build >= 22000)
             {
@@ -397,15 +447,21 @@ public sealed class SetupForm : Form
         {
             try { BeginInvoke(() => core.PostWebMessageAsJson("{\"type\":\"install-started\"}")); } catch { }
         }
+        // The engine pins its install dir at construction, so build it here
+        // from the page-supplied path: a Browse-confirmed directory takes
+        // effect exactly as displayed on the hero page.
+        var runEngine = new InstallerEngine(
+            payloadDir,
+            engineInstallDir,
+            runtimeRootOverride,
+            appDataRootOverride,
+            registerInstall: !skipRegistration,
+            new Progress<EngineEvent>(OnEngineEvent));
         _ = Task.Run(async () =>
         {
             try
             {
-                // The engine instance pins its install dir at construction;
-                // a mismatched page-supplied dir restarts the run with a
-                // fresh engine is overkill for v1 — the page reads the
-                // default from GetDefaultInstallDir().
-                await engine.RunAsync(localInference, installCts.Token);
+                await runEngine.RunAsync(localInference, installCts.Token);
             }
             catch
             {
@@ -415,6 +471,23 @@ public sealed class SetupForm : Form
     }
 
     internal void CancelInstall() => installCts.Cancel();
+
+    /// <summary>Native folder picker behind the hero page's 「更改…」: returns
+    /// the confirmed directory, or null when the user cancels. Runs on the UI
+    /// thread because host-object calls arrive on a WebView2 worker thread.</summary>
+    internal string? BrowseInstallDir(string currentPath)
+    {
+        if (IsDisposed) return null;
+        return (string?)Invoke(new Func<string?>(() =>
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                SelectedPath = currentPath,
+                Description = "选择安装目录",
+            };
+            return dialog.ShowDialog(this) == DialogResult.OK ? dialog.SelectedPath : null;
+        }));
+    }
 
     internal void StartUninstall()
     {
@@ -499,6 +572,8 @@ public sealed class ShellBridge
     public string GetInstallState() => form.CurrentInstallState;
 
     public string GetDefaultInstallDir() => SetupForm.DefaultInstallDir();
+
+    public string? BrowseInstallDir(string currentPath) => form.BrowseInstallDir(currentPath);
 
     public void LaunchApp() => form.LaunchApp();
 }

@@ -480,8 +480,17 @@ function toggleLicense() {
 licenseCheck.addEventListener('click', toggleLicense);
 licenseCheck.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleLicense(); } });
 document.getElementById('btnBrowse').addEventListener('click', () => {
-  const path = prompt(lang === 'zh' ? '安装目录（演示）' : 'Install directory (demo)', document.getElementById('installPath').textContent);
-  if (path) document.getElementById('installPath').textContent = path;
+  const installPath = document.getElementById('installPath');
+  if (inShell) {
+    // Real folder picker hosted by the shell; the confirmed path is what
+    // StartInstall receives on Install click.
+    window.chrome.webview.hostObjects.shell.BrowseInstallDir(installPath.textContent).then(dir => {
+      if (dir) installPath.textContent = dir;
+    });
+    return;
+  }
+  const path = prompt(lang === 'zh' ? '安装目录' : 'Install directory', installPath.textContent);
+  if (path) installPath.textContent = path;
 });
 document.getElementById('toggleInference').addEventListener('change', e => {
   inferenceOn = e.target.checked;
@@ -621,12 +630,15 @@ document.getElementById('btnDone').addEventListener('click', () => {
 });
 document.getElementById('btnLaunch').addEventListener('click', () => {
   if (inShell) { window.chrome.webview.hostObjects.shell.LaunchApp(); return; }
-  alert(lang === 'zh' ? '（演示）将启动 知远智能体' : '(demo) Would launch ZhiYuan Agent');
+  alert(lang === 'zh' ? '将启动 知远智能体' : 'Launching ZhiYuan Agent');
 });
-document.getElementById('btnCancelHero').addEventListener('click', () => alert(lang === 'zh' ? '（演示）退出安装' : '(demo) Quit setup'));
+document.getElementById('btnCancelHero').addEventListener('click', () => {
+  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  showPage('hero');
+});
 document.getElementById('btnCancelUninstall').addEventListener('click', () => {
   if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
-  alert(lang === 'zh' ? '（演示）取消卸载' : '(demo) Cancel uninstall');
+  showPage('hero');
 });
 document.getElementById('btnConfirmUninstall').addEventListener('click', () => {
   showPage('progress');
