@@ -65,6 +65,14 @@ public sealed class UninstallerEngine
                 Type: "error", Message: ex.Message, Detail: (ex as EngineException)?.Detail ?? ex.GetType().Name));
             throw;
         }
+        catch (Exception ex)
+        {
+            // Catch-all mirroring the install engine: any unexpected failure
+            // still lands on the failure UI instead of a stuck progress page.
+            progress.Report(new EngineEvent(
+                Type: "error", Message: ex.Message, Detail: ex.GetType().Name));
+            throw;
+        }
     }
 
     /// <summary>Same kill-by-install-root-path-prefix rule as the install
@@ -130,19 +138,25 @@ public sealed class UninstallerEngine
         progress.Report(new EngineEvent(Type: "progress", Percent: 40));
     }
 
-    /// <summary>Start-menu shortcut (the one the installer created) plus both
-    /// HKCU registration keys, in the exact shape electron-updater reads.</summary>
+    /// <summary>The start-menu and desktop shortcuts (the ones the installer
+    /// creates) plus both HKCU registration keys, in the exact shape
+    /// electron-updater reads.</summary>
     private void StepRemoveShortcutAndRegistry()
     {
         ReportPhase("正在移除卸载信息");
         if (!skipCleanup.Contains("shortcuts"))
         {
-            var linkPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Programs),
-                InstallerEngine.DisplayName + ".lnk");
-            if (File.Exists(linkPath))
+            foreach (var folder in new[]
             {
-                try { File.Delete(linkPath); } catch { /* a pinned copy must not block uninstall */ }
+                Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            })
+            {
+                var linkPath = Path.Combine(folder, InstallerEngine.DisplayName + ".lnk");
+                if (File.Exists(linkPath))
+                {
+                    try { File.Delete(linkPath); } catch { /* a pinned copy must not block uninstall */ }
+                }
             }
         }
         if (!skipCleanup.Contains("registry"))

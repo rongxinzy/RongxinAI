@@ -124,7 +124,8 @@ public sealed class InstallerEngine
             if (registerInstall)
             {
                 StepRegisterUninstall();
-                CreateStartMenuShortcut();
+                CreateShortcut(Environment.GetFolderPath(Environment.SpecialFolder.Programs));
+                CreateShortcut(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
             }
             progress.Report(new EngineEvent(Type: "done", InstallDir: installDir, LaunchPath: LaunchPath));
         }
@@ -142,6 +143,16 @@ public sealed class InstallerEngine
                 Type: "error", Message: ex.Message, Detail: (ex as EngineException)?.Detail ?? ex.GetType().Name));
             throw;
         }
+        catch (Exception ex)
+        {
+            // Catch-all so unexpected failures (e.g. dynamic COM exceptions from
+            // shortcut creation) still reach the failure UI instead of leaving
+            // the progress page stuck on "installing".
+            await RollbackAsync(ex.Message);
+            progress.Report(new EngineEvent(
+                Type: "error", Message: ex.Message, Detail: ex.GetType().Name));
+            throw;
+        }
         finally
         {
             // The self-extracted payload is scratch space: delete it on every
@@ -152,9 +163,10 @@ public sealed class InstallerEngine
                 catch { /* a locked file must not mask the install outcome */ }
             }
             // workDir is per-run scratch (staged components, elevated-action
-            // results). It is NOT removed on the rollback path (kept for
-            // diagnostics), so the success path must remove it here —
-            // otherwise every install leaks a %TEMP%\zy-setup-* directory.
+            // results); the finally block removes it on every exit path —
+            // success, failure and cancellation alike — so no %TEMP%\zy-setup-*
+            // directory leaks. (RollbackAsync also tries; the finally here is
+            // the authoritative cleanup.)
             try { if (Directory.Exists(workDir)) Directory.Delete(workDir, recursive: true); }
             catch { /* diagnostics are best-effort */ }
         }
@@ -199,7 +211,7 @@ public sealed class InstallerEngine
             // Leftovers from a crashed run would shadow the fresh extraction.
             try { Directory.Delete(stale, recursive: true); } catch { }
         }
-        var extractDir = Path.Combine(extractRoot, "zhiyuan-setup-" + Environment.ProcessId);
+        var extractDir = Path.GetFullPath(Path.Combine(extractRoot, "zhiyuan-setup-" + Environment.ProcessId));
         Directory.CreateDirectory(extractDir);
         extractedPayloadDir = extractDir;
 
@@ -208,10 +220,19 @@ public sealed class InstallerEngine
             new OffsetStream(fileStream, zipSize), System.IO.Compression.ZipArchiveMode.Read);
         var totalBytes = zip.Entries.Sum(entry => entry.Length);
         long doneBytes = 0;
+        var skippedEntries = 0;
         foreach (var entry in zip.Entries)
         {
             ct.ThrowIfCancellationRequested();
-            var targetPath = Path.Combine(extractDir, entry.FullName);
+            // Zip-slip guard: the combined path must stay inside extractDir
+            // (separator-terminated prefix), otherwise a crafted archive entry
+            // like "../x" or an absolute name would write outside the sandbox.
+            var targetPath = Path.GetFullPath(Path.Combine(extractDir, entry.FullName));
+            if (!targetPath.StartsWith(extractDir + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                skippedEntries++;
+                continue;
+            }
             if (entry.FullName.EndsWith("/", StringComparison.Ordinal) || entry.FullName.EndsWith("\\", StringComparison.Ordinal))
             {
                 Directory.CreateDirectory(targetPath);
@@ -232,7 +253,9 @@ public sealed class InstallerEngine
             }
         }
         progress.Report(new EngineEvent(
-            Type: "phase", Label: "安装包已就绪", Detail: extractDir));
+            Type: "phase",
+            Label: "安装包已就绪",
+            Detail: skippedEntries > 0 ? $"{extractDir} (skipped {skippedEntries} unsafe entries)" : extractDir));
         payloadDir = extractDir;
     }
 
@@ -616,18 +639,35 @@ public sealed class InstallerEngine
     {
         try
         {
-            return Directory.EnumerateFiles(installDir, "*", SearchOption.AllDirectories)
-                .Sum(path => new FileInfo(path).Length);
+            return EstimateDirectorySize(installDir);
         }
         catch { return 0; }
     }
 
-    private void CreateStartMenuShortcut()
+    /// <summary>Recursive size walk that never follows junctions/symlinks: by
+    /// step 9 &lt;install&gt;\resources holds junctions into the shared runtime
+    /// cache, and walking them would both stall the install tail and inflate
+    /// EstimatedSize by the whole cache.</summary>
+    private static long EstimateDirectorySize(string root)
     {
-        var programs = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
-        var linkPath = Path.Combine(programs, DisplayName + ".lnk");
+        long total = 0;
+        foreach (var file in Directory.EnumerateFiles(root))
+        {
+            try { total += new FileInfo(file).Length; } catch { /* a locked file must not fail the estimate */ }
+        }
+        foreach (var dir in Directory.EnumerateDirectories(root))
+        {
+            if ((File.GetAttributes(dir) & FileAttributes.ReparsePoint) != 0) continue;
+            try { total += EstimateDirectorySize(dir); } catch { /* best-effort estimate */ }
+        }
+        return total;
+    }
+
+    private void CreateShortcut(string folder)
+    {
+        var linkPath = Path.Combine(folder, DisplayName + ".lnk");
         var shellType = Type.GetTypeFromProgID("WScript.Shell")
-            ?? throw new EngineException("无法创建开始菜单快捷方式");
+            ?? throw new EngineException("无法创建快捷方式");
         dynamic shell = Activator.CreateInstance(shellType)!;
         try
         {
