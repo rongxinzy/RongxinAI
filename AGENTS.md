@@ -80,6 +80,12 @@ Node >=24 <25，Bun >=1.3。包管理只用 Bun（`bun install`、`bun.lock`）�
 - **Skills**：`SKILLs/` 是 Pi 运行时的内置 skill（经 `skills.config.json`），不是 IDE/agent 插件 skill。
 - **llama.cpp**：服务级选项管 `llama-server` 进程，模型级选项在加载/运行时传入。
 
+### 企业扩展（enterprise/）
+
+- `enterprise/` 是知远企业客户端扩展（自 zhiyuanAaaS 仓库迁入，源提交 `7adec4a`）：企业会话、托管模型投影、Agent 控制循环、托管 Skill 与企业设置渲染器。迁移代码保持原仓库结构（`enterprise/src/`），不适用本仓 renderer 的主题与设计体系。
+- 独立构建：`bun run build:enterprise` 产出 `enterprise/dist/extension.cjs`（tsup 单文件 CJS）与 `enterprise/dist/ui/`；测试 `bun run test:enterprise`，类型检查 `bun run typecheck:enterprise`，包体验证 `bun run verify:enterprise:bundle`。根 `npm test` 的 include 不覆盖 `enterprise/`。
+- 宿主经 `src/main/enterpriseExtension` 契约加载：打包产物位于 `resources/zhiyuan-enterprise/extension.cjs`，开发覆盖用 `ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH` 指向本地 bundle。UI bundle 是独立 document，不进入主渲染器主题系统。
+
 ## 前端设计规则（P0）
 
 适用于全部前端工作，不因改动小、赶时间、委派或使用组件库豁免。
