@@ -1,6 +1,6 @@
 {
   "appId": "com.zhiyuanagent.app",
-  "productName": "知远",
+  "productName": "知远智能体 (ZhiYuan Agent)",
   "executableName": "知远",
   "directories": {
     "output": "release"
