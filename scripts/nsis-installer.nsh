@@ -755,6 +755,12 @@ Var /GLOBAL preparedInstallRoot
 !macro customUnInit
   ; The uninstaller confirmation page uses the same branded background art.
   !insertmacro ZY_StageUiAssets
+  ; This is a fresh uninstaller process with a fresh $PLUGINSDIR: the shared
+  ; cleanup script is only extracted during the installer's customInstall,
+  ; which this compilation pass never runs, so stage it here — without it
+  ; component junctions and the runtime cache would be left behind.
+  SetOutPath "$PLUGINSDIR"
+  File /oname=uninstall-cleanup.ps1 "${PROJECT_DIR}\scripts\installer\uninstall-cleanup.ps1"
   DetailPrint "[Uninstaller] Stopping running 知远 processes"
   !insertmacro StopAppProcesses
 !macroend
