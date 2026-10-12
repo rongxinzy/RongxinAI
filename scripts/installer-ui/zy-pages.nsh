@@ -615,7 +615,10 @@ Function ZYFinishLeave
 !ifdef ZY_PREVIEW
     DetailPrint "preview launch: $INSTDIR\${APP_EXECUTABLE_FILENAME} $0"
 !else
-    ${StdUtils.ExecShellAsUser} $1 "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "open" "$0"
+  ; APP_EXECUTABLE_FILENAME is only defined later (common.nsh), after this
+  ; include has been processed; PRODUCT_FILENAME arrives via -D, so derive
+  ; the exe name the same way common.nsh does.
+  ${StdUtils.ExecShellAsUser} $1 "$INSTDIR\${PRODUCT_FILENAME}.exe" "open" "$0"
 !endif
   ${EndIf}
 FunctionEnd
