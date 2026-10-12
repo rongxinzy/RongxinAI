@@ -5,20 +5,21 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const enterpriseSourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repositoryRoot = path.resolve(enterpriseSourceRoot, '..');
 const packageRoot = path.resolve(
-  process.env.ZHIYUAN_ELECTRON_PACKAGE_DIR ??
-    path.join(root, '..', 'zhiyuan-dev', 'dist', 'win-unpacked'),
+  process.env.ZHIYUAN_ELECTRON_PACKAGE_DIR ?? path.join(repositoryRoot, 'release', 'win-unpacked'),
 );
 const enterpriseRoot = path.join(packageRoot, 'resources', 'zhiyuan-enterprise');
+// The packaged application deliberately ships no admin console bundle; the
+// console remains a web-deployed app in the zhiyuanAaaS repository.
 const source = {
-  extension: path.join(root, 'dist', 'extension.cjs'),
-  renderer: path.join(root, 'dist', 'ui'),
-  admin: path.join(root, 'dist', 'admin'),
-  notices: path.join(root, 'THIRD_PARTY_NOTICES.md'),
+  extension: path.join(enterpriseSourceRoot, 'dist', 'extension.cjs'),
+  renderer: path.join(enterpriseSourceRoot, 'dist', 'ui'),
+  notices: path.join(enterpriseSourceRoot, 'THIRD_PARTY_NOTICES.md'),
   config: path.resolve(
     process.env.ZHIYUAN_ENTERPRISE_CONFIG_FILE ??
-      path.join(root, 'build', 'enterprise-config.example.json'),
+      path.join(repositoryRoot, 'resources', 'zhiyuan-enterprise', 'config.json'),
   ),
 };
 
@@ -41,7 +42,7 @@ const packagedRenderer = await collectFiles(path.join(enterpriseRoot, 'ui'));
 assert.deepEqual(
   packagedRenderer.map(file => file.relative),
   sourceRenderer.filter(file => !file.relative.endsWith('.map')).map(file => file.relative),
-  'Packaged Renderer files do not match the AaaS build output.',
+  'Packaged Renderer files do not match the enterprise build output.',
 );
 for (const file of sourceRenderer.filter(file => !file.relative.endsWith('.map'))) {
   checks.push(
@@ -49,22 +50,6 @@ for (const file of sourceRenderer.filter(file => !file.relative.endsWith('.map')
       path.join(source.renderer, file.relative),
       path.join(enterpriseRoot, 'ui', file.relative),
       `Renderer asset ${file.relative}`,
-    ),
-  );
-}
-const sourceAdmin = await collectFiles(source.admin);
-const packagedAdmin = await collectFiles(path.join(enterpriseRoot, 'admin'));
-assert.deepEqual(
-  packagedAdmin.map(file => file.relative),
-  sourceAdmin.filter(file => !file.relative.endsWith('.map')).map(file => file.relative),
-  'Packaged Admin Console files do not match the AaaS build output.',
-);
-for (const file of sourceAdmin.filter(file => !file.relative.endsWith('.map'))) {
-  checks.push(
-    await compareFile(
-      path.join(source.admin, file.relative),
-      path.join(enterpriseRoot, 'admin', file.relative),
-      `Admin asset ${file.relative}`,
     ),
   );
 }

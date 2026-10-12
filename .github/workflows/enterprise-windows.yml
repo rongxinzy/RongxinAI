@@ -1,0 +1,253 @@
+name: Build Zhiyuan Enterprise Windows package (manual)
+
+# In-repo enterprise packaging: builds the enterprise plugin from enterprise/,
+# overlays it into the installer through electron-builder.enterprise.cjs
+# (unsigned locally; Certum-signed here in one pass), verifies the result, and
+# uploads the installer artifact. The community packaging flow never loads the
+# enterprise overlay config.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Enterprise version (must be vX.Y.Z, for example v1.0.0)
+        required: true
+        type: string
+      aep_base_url:
+        description: AEP base URL baked into resources/zhiyuan-enterprise/config.json of the package
+        required: true
+        type: string
+        default: 'http://172.18.5.188:30196'
+      source_ref:
+        description: 'Commit, tag, or branch reachable from main'
+        required: true
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-windows-package-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  package:
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+
+      - name: Validate version and source commit
+        id: identity
+        shell: bash
+        env:
+          RAW_ENTERPRISE_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          raw="$(printf '%s' "$RAW_ENTERPRISE_VERSION" | tr -d '[:space:]')"
+          if [[ ! "$raw" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Invalid enterprise version '$raw'. Expected vX.Y.Z, for example v1.0.0." >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          source_commit="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "$source_commit" origin/main; then
+            echo 'source_ref must resolve to a commit reachable from origin/main' >&2
+            exit 1
+          fi
+          echo "version=${raw#v}" >> "$GITHUB_OUTPUT"
+          echo "commit=$source_commit" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            resources/PortableGit-*.7z.exe
+            resources/uv-win-runtime.zip
+            resources/mingit
+            resources/uv-win
+            resources/python-win
+            resources/skill-python
+            vendor/engram-runtime
+            vendor/channel-runtime
+          key: enterprise-packaging-windows-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            enterprise-packaging-windows-node24-bun1.4.0-
+
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+
+      - name: Run enterprise quality gates
+        run: |
+          bun run lint
+          bun run typecheck:enterprise
+          bun run test:enterprise
+          bun run build:enterprise
+          bun run verify:enterprise:bundle
+
+      - name: Render enterprise AEP config
+        shell: pwsh
+        env:
+          INPUT_AEP_BASE_URL: ${{ inputs.aep_base_url }}
+        run: |
+          $baseUrl = "$env:INPUT_AEP_BASE_URL".Trim()
+          if ($baseUrl.Length -eq 0) {
+            throw 'aep_base_url is required for an enterprise package.'
+          }
+          node enterprise/scripts/render-enterprise-config.mjs --base-url $baseUrl --output build/.enterprise-config.generated.json
+          if ($LASTEXITCODE -ne 0) {
+            throw "render-enterprise-config.mjs failed with exit code $LASTEXITCODE."
+          }
+          'ZHIYUAN_ENTERPRISE_CONFIG_FILE=build/.enterprise-config.generated.json' >> $env:GITHUB_ENV
+
+      - name: Set up Windows runtimes
+        run: |
+          bun run setup:mingit
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+
+      - name: Connect Certum SimplySign
+        id: certum-signing
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+
+      - name: Build enterprise installer
+        # Keep a stuck packager observable and fail it before the job-level
+        # timeout so the diagnostics upload below still gets a chance to run.
+        timeout-minutes: 65
+        shell: pwsh
+        env:
+          APP_BUILD_VERSION: ${{ steps.identity.outputs.version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+        run: |
+          & .\scripts\ci\run-with-heartbeat.ps1 `
+            -FilePath 'bun' `
+            -ArgumentList @('run', 'dist:win:enterprise') `
+            -TimeoutMinutes 55 `
+            -HeartbeatSeconds 60
+
+      - name: Verify packaged enterprise version
+        shell: bash
+        run: node scripts/ci/verify-packaged-app-version.mjs '${{ steps.identity.outputs.version }}'
+
+      - name: Verify injected enterprise package
+        env:
+          ZHIYUAN_ELECTRON_PACKAGE_DIR: release/win-unpacked
+        run: node enterprise/scripts/verify-electron-package.mjs
+
+      - name: Verify Electron release candidate contract
+        env:
+          ZHIYUAN_ELECTRON_PACKAGE_DIR: release/win-unpacked
+          ZHIYUAN_REQUIRE_ELECTRON_PACKAGE: '1'
+          ZHIYUAN_ELECTRON_RC_EVIDENCE_FILE: release/electron-rc-evidence.json
+        run: node enterprise/scripts/verify-electron-rc.mjs
+
+      - name: Verify Windows Authenticode signatures
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/verify-windows-authenticode.ps1
+          -ProjectRoot '${{ github.workspace }}'
+          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+          -ExecutableName '知远企业版'
+
+      - name: Verify Windows installer size and packaged runtimes
+        shell: powershell
+        env:
+          ZHIYUAN_ELECTRON_EXECUTABLE_NAME: 知远企业版
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+
+      - name: Qualify Windows compression
+        uses: ./.github/actions/verify-windows-compression
+
+      - name: Verify Windows cold install, cache-hit upgrade, and uninstall
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-installer-smoke.ps1
+          -ProjectRoot '${{ github.workspace }}'
+
+      - name: Write installer checksums
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem release -Filter '*.exe' -File)
+          if ($installers.Count -eq 0) {
+            throw 'No Windows installer was generated.'
+          }
+          $lines = foreach ($installer in $installers) {
+            $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($installer.Name)"
+          }
+          $lines | Set-Content release/SHA256SUMS.txt -Encoding utf8NoBOM
+          $lines
+
+      - name: Verify installer checksums
+        env:
+          ZHIYUAN_RELEASE_DIR: release
+        run: node enterprise/scripts/verify-release-artifacts.mjs
+
+      - name: Upload enterprise installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: zhiyuan-enterprise-windows-${{ steps.identity.outputs.version }}-${{ github.run_number }}
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+            release/electron-rc-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload packaging diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: zhiyuan-enterprise-windows-diagnostics-${{ steps.identity.outputs.version }}-${{ github.run_number }}
+          path: |
+            release/*.exe
+            ${{ runner.temp }}/zhiyuan-build-logs
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Publish enterprise package summary
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ steps.identity.outputs.version }}
+          SOURCE_COMMIT: ${{ steps.identity.outputs.commit }}
+          AEP_BASE_URL: ${{ inputs.aep_base_url }}
+        run: |
+          aep_host="$(node -e "console.log(new URL(process.argv[1]).host)" "$AEP_BASE_URL")"
+          {
+            echo '### Enterprise package'
+            echo
+            echo "- version: \`$PACKAGE_VERSION\`"
+            echo "- source commit: \`$SOURCE_COMMIT\`"
+            echo "- AEP base URL host: \`$aep_host\`"
+            echo "- run: \`$GITHUB_RUN_ID\`"
+          } >> "$GITHUB_STEP_SUMMARY"
