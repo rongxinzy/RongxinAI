@@ -319,7 +319,7 @@ cat SKILLs/web-search/.server.log
 # Reinstall dependencies
 cd SKILLs/web-search
 npm install
-npm run build
+bun run build
 ```
 
 ### Chrome Not Found
