@@ -239,6 +239,11 @@ Var /GLOBAL preparedInstallRoot
 
 ; The native uninstaller finish page is the only remaining MUI welcome/finish
 ; surface; give it the branded side art instead of the stock wizard bitmap.
+; electron-builder passes its default wizard bitmap for this key via -D, so
+; withdraw it before defining our own (NSIS errors on redefinition).
+!ifdef MUI_UNWELCOMEFINISHPAGE_BITMAP
+  !undef MUI_UNWELCOMEFINISHPAGE_BITMAP
+!endif
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "${PROJECT_DIR}\build\installer-assets\zy-side.bmp"
 
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
