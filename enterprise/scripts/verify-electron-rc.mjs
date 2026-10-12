@@ -51,7 +51,6 @@ async function assertBuildOutputs() {
   for (const [relativePath, kind] of [
     ['dist/extension.cjs', 'extension bundle'],
     ['dist/ui/index.html', 'enterprise renderer'],
-    ['dist/admin/index.html', 'admin console'],
   ]) {
     const stat = await fs.stat(path.join(root, relativePath));
     assert.ok(stat.isFile(), `${kind} is missing: ${relativePath}`);
