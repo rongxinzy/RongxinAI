@@ -5,6 +5,8 @@ build/win-full/*
 release/
 !scripts/release/
 !scripts/release/**
+!enterprise/src/release/
+!enterprise/src/release/**
 node_modules
 dist
 dist-electron
