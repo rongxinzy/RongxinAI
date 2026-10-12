@@ -168,7 +168,6 @@
     "theme:audit": "bun src/renderer/theme/scripts/audit-styles.ts"
   },
   "dependencies": {
-    "@aep/sdk-node": "https://github.com/rongxinzy/Agent-Enterprise-Protocol/releases/download/sdk-node-v0.3.0/aep-sdk-node-0.3.0.tgz",
     "@agentclientprotocol/claude-agent-acp": "0.70.0",
     "@agentclientprotocol/codex-acp": "1.6.2",
     "@agentclientprotocol/sdk": "1.4.0",
@@ -186,8 +185,7 @@
     "node-pty": "1.1.0",
     "npm": "^11.11.0",
     "pako": "^1.0.11",
-    "utf-8-validate": "^6.0.6",
-    "yauzl": "3.2.0"
+    "utf-8-validate": "^6.0.6"
   },
   "overrides": {
     "@electron/osx-sign": {
@@ -196,6 +194,7 @@
   },
   "devDependencies": {
     "7zip-bin": "^5.2.0",
+    "@aep/sdk-node": "https://github.com/rongxinzy/Agent-Enterprise-Protocol/releases/download/sdk-node-v0.3.0/aep-sdk-node-0.3.0.tgz",
     "@ai-sdk/react": "^3.0.220",
     "@babel/core": "8.0.1",
     "@babel/plugin-transform-runtime": "8.0.1",
@@ -339,6 +338,7 @@
     "vitest": "^4.1.10",
     "wait-on": "^7.2.0",
     "xlsx": "^0.18.5",
+    "yauzl": "3.2.0",
     "yazl": "^3.3.1",
     "zod": "^4.3.6"
   },
