@@ -256,7 +256,7 @@
   System::Call '*$R1(i .R6, i .R7, i .R8, i .R9)'
   System::Free $R1
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i 0, i 0, i $R8, i $R3, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
-  LoadAndSetImage /STRINGID /RESIZETOFIT $R6 ${IMAGE_BITMAP} ${LR_LOADFROMFILE} "${ZY_ASSET_BAND}" $R7
+  !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAND}"
   zy_header_done:
 !macroend
 
