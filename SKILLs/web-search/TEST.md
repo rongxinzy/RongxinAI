@@ -19,7 +19,7 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 1. Start ZhiYuan Agent in development mode:
 
    ```bash
-   npm run electron:dev
+   bun run electron:dev
    ```
 
 2. Check the console output for:
@@ -289,7 +289,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 
 ```bash
 cat SKILLs/web-search/.server.log
-npm run build --prefix SKILLs/web-search
+bun --cwd SKILLs/web-search run build
 ```
 
 ### Issue 2: Chrome Not Found
