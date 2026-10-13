@@ -14,6 +14,7 @@ import {
   buildConfiguredAvailableModels,
   buildLlamaCppRunningModels,
   collectAvailableModels,
+  collectConfiguredModelKeys,
 } from './availableModels';
 
 function createConfig(): AppConfig {
@@ -467,6 +468,17 @@ test('hides stale connection metadata', async () => {
       model => model.providerKey === ProviderName.DeepSeek && model.id === 'deepseek-chat',
     ),
   ).toBe(false);
+});
+
+test('collectConfiguredModelKeys lists stored models regardless of gates, skipping dynamic sources', () => {
+  const keys = collectConfiguredModelKeys(createConfig());
+
+  // deepseek is enabled but untested: the key is present because pruning only
+  // targets models deleted from storage, not temporarily hidden ones.
+  expect(keys).toContain(`${ProviderName.DeepSeek}::deepseek-chat`);
+  // llama.cpp running models and the managed pool are dynamic sources.
+  expect(keys.some(key => key.startsWith(`${ProviderName.LlamaCpp}::`))).toBe(false);
+  expect(keys.some(key => key.startsWith(`${ProviderName.Zhiyuan}::`))).toBe(false);
 });
 
 test('hides provider-level failures', async () => {

@@ -81,7 +81,7 @@ Run the narrowest relevant verification first:
 
 - `git diff --check`
 - The co-located Vitest test for the changed component or module.
-- `npm run lint` and `npm run build` when the change is broad enough to justify them.
+- `bun run lint` and `bun run build` when the change is broad enough to justify them.
 - For UI changes, inspect the affected flow manually or use the project's browser/dev server tooling when available. Check desktop and narrow layouts, light and dark themes, and focus/disabled states when relevant.
 
 Report passed checks and any verification that could not be run. Do not claim visual verification without actually performing it.

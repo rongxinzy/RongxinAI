@@ -133,8 +133,8 @@ bash SKILLs/your-skill/scripts/your-script.sh  # ❌ Won't work in production
 **Solution**: Ensure Electron app is recompiled after changes to `coworkUtil.ts`
 
 ```bash
-npm run build
-npm run electron:dev
+bun run build
+bun run electron:dev
 ```
 
 **Problem**: Scripts not found in production

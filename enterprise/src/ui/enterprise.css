@@ -1,0 +1,147 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import './zhiyuan-theme.css';
+
+@source './components';
+@custom-variant dark (&:is(.dark *));
+
+/* The host supplies its active theme tokens at the document boundary.
+   Standalone/older hosts fall back to the bundled Zhiyuan theme, never Tea. */
+:root {
+  --background: var(--zy-background);
+  --foreground: var(--zy-foreground);
+  --card: var(--zy-surface);
+  --card-foreground: var(--zy-surface-foreground);
+  --popover: var(--zy-surface-overlay);
+  --popover-foreground: var(--zy-surface-foreground);
+  --surface: var(--zy-surface);
+  --surface-raised: var(--zy-surface-raised);
+  --surface-inset: var(--zy-surface-raised);
+  --border-subtle: var(--zy-border-subtle);
+  --primary: var(--zy-primary-strong, var(--zy-primary));
+  --primary-hover: var(--zy-primary-hover);
+  --primary-active: var(--zy-primary-hover);
+  --primary-focus: var(--zy-ring);
+  --primary-soft: var(--zy-primary-muted);
+  --primary-border-soft: var(--zy-border);
+  --primary-foreground: var(--zy-primary-foreground);
+  --secondary: var(--zy-surface-raised);
+  --secondary-hover: var(--zy-surface-tertiary);
+  --secondary-foreground: var(--zy-surface-foreground);
+  --muted: var(--zy-surface-raised);
+  --muted-foreground: var(--zy-text-secondary);
+  --tertiary-foreground: var(--zy-text-muted);
+  --accent: var(--zy-accent);
+  --accent-foreground: var(--zy-accent-foreground);
+  --success: var(--zy-success);
+  --success-soft: var(--zy-surface-raised);
+  --success-border: var(--zy-border);
+  --warning: var(--zy-warning);
+  --warning-soft: var(--zy-surface-raised);
+  --warning-border: var(--zy-border);
+  --info: var(--zy-primary);
+  --info-soft: var(--zy-primary-muted);
+  --info-border: var(--zy-border);
+  --destructive: var(--zy-destructive);
+  --destructive-soft: var(--zy-surface-raised);
+  --destructive-hover: var(--zy-destructive);
+  --destructive-border-focus: var(--zy-border);
+  --destructive-ring: var(--zy-ring);
+  --border: var(--zy-border);
+  --input: var(--zy-input-border);
+  --ring: var(--zy-ring);
+  --radius: var(--zy-radius);
+}
+
+@theme inline {
+  --font-sans: var(--zy-style-font-sans, system-ui, sans-serif);
+  --font-heading: var(--zy-style-font-heading, var(--font-sans));
+  --font-mono: var(--zy-style-font-mono, ui-monospace, monospace);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-border-soft: var(--primary-border-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-destructive-hover: var(--destructive-hover);
+  --color-destructive-border-focus: var(--destructive-border-focus);
+  --color-destructive-ring: var(--destructive-ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground text-sm;
+    margin: 0;
+    line-height: 1.6;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* Match the native renderer scrollbar; no separate white iframe track. */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--zy-scroll-thumb);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--zy-scroll-thumb-hover);
+}

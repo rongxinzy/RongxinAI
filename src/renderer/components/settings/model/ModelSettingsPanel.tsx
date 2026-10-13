@@ -96,7 +96,12 @@ export default function ModelSettingsPanel({
     setProviderModelConnectionStatuses,
   });
 
-  const editor = useModelEditor({ providers, setProviders, activeProvider });
+  const editor = useModelEditor({
+    providers,
+    setProviders,
+    activeProvider,
+    enableProviderIfConfigured: controller.enableProviderIfConfigured,
+  });
 
   const importExport = useProviderImportExport({
     providers,

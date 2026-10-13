@@ -192,4 +192,28 @@ describe('UserBubble', () => {
     expect(screen.getByText('这张图里是什么')).toBeInTheDocument();
     expect(screen.queryByText(/输入文件:/)).not.toBeInTheDocument();
   });
+
+  test('renders one chip when the stored image copy no longer matches the prompt path', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content:
+            '输入文件: C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\zhiyuan\\attachments\\img_v3_0216b-z8uxkb.jpg',
+          metadata: {
+            imageAttachments: [
+              {
+                name: 'img_v3_0216b-z8uxkb.jpg',
+                mimeType: 'image/jpeg',
+                path: 'C:\\Users\\Administrator\\AppData\\Roaming\\ZhiYuanAgent\\cowork-images\\session\\aaab999d.jpg',
+              },
+            ],
+          },
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getAllByAltText('img_v3_0216b-z8uxkb.jpg')).toHaveLength(1);
+  });
 });

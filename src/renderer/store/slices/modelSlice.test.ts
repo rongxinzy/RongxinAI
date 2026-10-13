@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import type { Model } from './modelSlice';
 import modelReducer, {
   clearAgentSelectedModel,
+  pruneUnconfiguredSelectedModels,
   selectAgentSelectedModel,
   setAvailableModels,
   setDefaultSelectedModel,
@@ -69,13 +70,17 @@ describe('setAvailableModels', () => {
     expect(state.selectedModelByAgent['agent-1'].name).toBe('GPT-4o (Updated)');
   });
 
-  test('removes per-agent model when it is no longer available', () => {
+  test('keeps the per-agent model when it is temporarily unavailable', () => {
     let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: modelA }));
 
-    // Update available models — modelA removed
+    // A refresh where modelA disappears (e.g. hidden by the connection test
+    // gate) must not drop the user's selection: it is restored once the model
+    // is back in the list.
     state = modelReducer(state, setAvailableModels([modelB, modelC]));
+    expect(state.selectedModelByAgent['agent-1']).toEqual(modelA);
 
-    expect(state.selectedModelByAgent['agent-1']).toBeUndefined();
+    state = modelReducer(state, setAvailableModels([modelA, modelB]));
+    expect(state.selectedModelByAgent['agent-1']).toEqual(modelA);
   });
 
   test('re-matches defaultSelectedModel', () => {
@@ -84,6 +89,80 @@ describe('setAvailableModels', () => {
     state = modelReducer(state, setAvailableModels([updatedModelA, modelB]));
 
     expect(state.defaultSelectedModel.supportsImage).toBe(true);
+  });
+
+  test('keeps defaultSelectedModel when it is temporarily missing from the list', () => {
+    let state = modelReducer(undefined, setDefaultSelectedModel(modelA));
+
+    state = modelReducer(state, setAvailableModels([modelB, modelC]));
+    expect(state.defaultSelectedModel).toEqual(modelA);
+
+    // The default is re-matched (with fresh metadata) once the model returns.
+    const updatedModelA: Model = { ...modelA, supportsImage: true };
+    state = modelReducer(state, setAvailableModels([updatedModelA, modelB]));
+    expect(state.defaultSelectedModel).toEqual(updatedModelA);
+  });
+});
+
+describe('pruneUnconfiguredSelectedModels', () => {
+  test('drops selections whose model was deleted from the stored config', () => {
+    let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: modelA }));
+    state = modelReducer(state, setSelectedModel({ agentId: 'agent-2', model: modelB }));
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels(['zhipu::glm-5.1']));
+
+    expect(state.selectedModelByAgent['agent-1']).toBeUndefined();
+    expect(state.selectedModelByAgent['agent-2']).toEqual(modelB);
+  });
+
+  test('keeps hidden-but-configured selections', () => {
+    let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: modelA }));
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels(['openai::gpt-4o']));
+
+    expect(state.selectedModelByAgent['agent-1']).toEqual(modelA);
+  });
+
+  test('keeps selections backed by dynamic sources or no provider key', () => {
+    const local: Model = { id: 'qwen3-32b', name: 'Qwen3 32B', providerKey: 'llamacpp' };
+    const managed: Model = { id: 'free-model', name: 'Free', providerKey: 'zhiyuan' };
+    const legacy: Model = { id: 'legacy-model', name: 'Legacy' };
+    let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: local }));
+    state = modelReducer(state, setSelectedModel({ agentId: 'agent-2', model: managed }));
+    state = modelReducer(state, setSelectedModel({ agentId: 'agent-3', model: legacy }));
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels([]));
+
+    expect(state.selectedModelByAgent['agent-1']).toEqual(local);
+    expect(state.selectedModelByAgent['agent-2']).toEqual(managed);
+    expect(state.selectedModelByAgent['agent-3']).toEqual(legacy);
+  });
+
+  test('resets a dangling defaultSelectedModel when its provider is deleted', () => {
+    // The default feeds every agent without an override, so a deleted provider
+    // must not leave it pointing at a phantom model for the rest of the session.
+    let state = makeState({
+      availableModels: [modelA, modelB],
+      defaultSelectedModel: modelB,
+    });
+
+    state = modelReducer(state, pruneUnconfiguredSelectedModels(['openai::gpt-4o']));
+
+    expect(state.defaultSelectedModel).toEqual(modelA);
+  });
+
+  test('keeps a hidden-but-configured defaultSelectedModel', () => {
+    let state = makeState({
+      availableModels: [modelA],
+      defaultSelectedModel: modelB,
+    });
+
+    state = modelReducer(
+      state,
+      pruneUnconfiguredSelectedModels(['openai::gpt-4o', 'zhipu::glm-5.1']),
+    );
+
+    expect(state.defaultSelectedModel).toEqual(modelB);
   });
 });
 

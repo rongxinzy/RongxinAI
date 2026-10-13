@@ -102,17 +102,22 @@ export const UserBubble: React.FC<{
       ),
     [imageAttachments],
   );
+  const imageAttachmentNames = useMemo(
+    () => new Set(imageAttachments.map(image => image.name).filter(name => name.length > 0)),
+    [imageAttachments],
+  );
   const fileAttachments = useMemo(() => {
     const persisted = ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
       []) as CoworkFileAttachment[];
-    // 正文里的「输入文件: 路径」行只作为旧消息的回退来源;路径已由图片或文件
-    // 附件元数据承载时跳过,否则同一张图会同时出现在两类附件里渲染两次。
+    // 正文里的「输入文件: 路径」行只作为旧消息的回退来源。图片落盘后路径可能
+    // 换成副本，文件名仍相同；路径或文件名已由图片附件承载时都跳过。
     const knownPaths = new Set([...persisted.map(file => file.path), ...imageAttachmentPaths]);
-    const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
-      file => !knownPaths.has(file.path),
-    );
+    const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(file => {
+      if (knownPaths.has(file.path)) return false;
+      return !(file.isImage && imageAttachmentNames.has(file.name));
+    });
     return [...persisted, ...fallbacks];
-  }, [imageAttachmentPaths, message.content, message.metadata]);
+  }, [imageAttachmentNames, imageAttachmentPaths, message.content, message.metadata]);
   const textContent = useMemo(() => {
     const contentWithoutFallbacks = removePromptAttachmentFallbacks(displayContent);
     const attachmentPaths = new Set([
