@@ -10,12 +10,9 @@ function validatePr(pr) {
     }
     return errors;
   }
-  if (
-    !/^(feat|fix|docs|refactor|test|perf|build|ci|chore|revert)(\([a-z0-9][a-z0-9._/-]*\))?!?: [a-z][^\n]*$/.test(
-      pr.title || '',
-    )
-  ) {
-    errors.push('Title must use type(scope): summary with an English lowercase summary.');
+  // Code freeze policy: only fix PRs are allowed to merge during the freeze period.
+  if (!/^fix(\([a-z0-9][a-z0-9._/-]*\))?!?: [a-z][^\n]*$/.test(pr.title || '')) {
+    errors.push('Repository is currently in code freeze. Only bug fix PRs (title starting with "fix") are allowed to merge.');
   }
   let body = (pr.body || '').replace(/\r/g, '');
   while (body.includes('<!--')) {
