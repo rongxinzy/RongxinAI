@@ -1,6 +1,8 @@
 import type { Workspace } from '../../shared/workspace';
 import { WorkspaceDefault } from '../../shared/workspace';
 import { store } from '../store';
+import { WORKSPACE_SIDEBAR_STATE_KEY } from '../components/agentSidebar/useWorkspaceSidebarState';
+import type { WorkspaceSidebarPreferenceState } from '../components/agentSidebar/types';
 import { isScratchWorkspacePath } from '../utils/path';
 import { clearSessionArtifacts } from '../store/slices/artifactSlice';
 import {
@@ -38,6 +40,12 @@ type LegacyCompatibleCoworkApi = {
     id: string,
     name: string,
   ) => Promise<{ success: boolean; workspace?: Workspace }>;
+  updateWorkspace?: (options: {
+    id: string;
+    name?: string;
+    primaryPath?: string;
+    folders?: string[];
+  }) => Promise<{ success: boolean; workspace?: Workspace; error?: string }>;
   deleteWorkspace?: (
     id: string,
   ) => Promise<{ success: boolean; deletedSessionIds?: string[]; error?: string }>;
@@ -298,6 +306,81 @@ class WorkspaceService {
     }
     store.dispatch(setWorkspaces(nextWorkspaces));
     return nextRenamedWorkspace;
+  }
+
+  /**
+   * Updates an existing workspace: display name, primary path (sessions are
+   * migrated to the new path), and/or attached folders. Mirrors the
+   * rename/replace id-migration bookkeeping of `renameWorkspace`.
+   */
+  async updateWorkspace(options: {
+    id: string;
+    name?: string;
+    primaryPath?: string;
+    folders?: string[];
+  }): Promise<Workspace | null> {
+    const cowork = getCompatibleCoworkApi();
+    if (!this.workspaceApiAvailable || typeof cowork?.updateWorkspace !== 'function') return null;
+
+    const result = await cowork.updateWorkspace(options);
+    const updatedWorkspace = result.success ? result.workspace : undefined;
+    if (!updatedWorkspace) {
+      if (result.error) console.warn('[WorkspaceService] updateWorkspace failed:', result.error);
+      return null;
+    }
+
+    const { currentWorkspaceId, workspaces } = store.getState().workspace;
+    const originalWorkspace = workspaces.find(item => item.id === options.id);
+    const nextWorkspace = {
+      ...updatedWorkspace,
+      pinned: originalWorkspace?.pinned ?? false,
+    };
+    const originalIndex = workspaces.findIndex(item => item.id === options.id);
+    const workspacesWithoutUpdated = workspaces.filter(
+      item => item.id !== options.id && item.id !== updatedWorkspace.id,
+    );
+    const insertionIndex =
+      originalIndex < 0
+        ? workspacesWithoutUpdated.length
+        : workspaces.slice(0, originalIndex).filter(item => item.id !== updatedWorkspace.id).length;
+    const nextWorkspaces = [
+      ...workspacesWithoutUpdated.slice(0, insertionIndex),
+      nextWorkspace,
+      ...workspacesWithoutUpdated.slice(insertionIndex),
+    ];
+
+    if (options.id !== updatedWorkspace.id) {
+      const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+      const nextPinnedIds = pinnedIds.filter(id => id !== options.id && id !== updatedWorkspace.id);
+      if (originalWorkspace?.pinned) nextPinnedIds.push(updatedWorkspace.id);
+      await localStore.setItem(PINNED_WORKSPACES_KEY, nextPinnedIds);
+
+      // The sidebar persists expanded workspace ids; carry them to the
+      // replacement id so the tree state survives a relocation.
+      const sidebarState = await localStore.getItem<WorkspaceSidebarPreferenceState>(
+        WORKSPACE_SIDEBAR_STATE_KEY,
+      );
+      if (sidebarState) {
+        const migrateIds = (ids: string[] = []): string[] =>
+          ids.map(item => (item === options.id ? updatedWorkspace.id : item));
+        await localStore.setItem(WORKSPACE_SIDEBAR_STATE_KEY, {
+          ...sidebarState,
+          expandedWorkspaceIds: migrateIds(sidebarState.expandedWorkspaceIds),
+          expandedTaskListWorkspaceIds: migrateIds(sidebarState.expandedTaskListWorkspaceIds),
+          scheduledExpandedWorkspaceIds: migrateIds(sidebarState.scheduledExpandedWorkspaceIds),
+          scheduledExpandedTaskListWorkspaceIds: migrateIds(
+            sidebarState.scheduledExpandedTaskListWorkspaceIds,
+          ),
+        });
+      }
+    }
+
+    if (currentWorkspaceId === options.id) {
+      store.dispatch(setCurrentWorkspaceId(updatedWorkspace.id));
+      await localStore.setItem(CURRENT_WORKSPACE_KEY, updatedWorkspace.id);
+    }
+    store.dispatch(setWorkspaces(nextWorkspaces));
+    return nextWorkspace;
   }
 
   /**

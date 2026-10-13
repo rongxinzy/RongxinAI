@@ -30,7 +30,7 @@ import {
   mergeSessionsIntoWorkspacePreviews,
 } from './workspaceSessionPreviews';
 
-const WORKSPACE_SIDEBAR_STATE_KEY = 'workspaceSidebar.state';
+export const WORKSPACE_SIDEBAR_STATE_KEY = 'workspaceSidebar.state';
 
 const modeMatches = (session: CoworkSessionSummary, workMode: WorkModeType) =>
   workMode === WorkMode.Chat
@@ -321,6 +321,7 @@ export const useWorkspaceSidebarState = (
               ? i18nService.t('defaultConversation')
               : workspace.name,
             path: workspace.path,
+            folders: workspace.folders ?? [],
             pinned: workspace.pinned,
             isExpanded: expanded,
             isTaskListExpanded: taskExpanded,

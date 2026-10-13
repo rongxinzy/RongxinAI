@@ -91,6 +91,15 @@ function setupDb(): void {
   `);
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS workspace_folders (
+      workspace_id TEXT NOT NULL,
+      path TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (workspace_id, path)
+    );
+  `);
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS cowork_messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -444,6 +453,78 @@ test('relocateWorkspace preserves session ownership under the renamed directory'
   });
   expect(store.countSessions(undefined, oldWorkspace.id)).toBe(0);
   expect(store.countSessions(undefined, renamedWorkspace!.id)).toBe(1);
+});
+
+test('listWorkspaces and getWorkspace include attached folders', () => {
+  const workspace = store.createWorkspace('/tmp/workspace-folders', 'folders');
+  store.setWorkspaceFolders(workspace.id, ['/tmp/a', '/tmp/b']);
+
+  expect(store.getWorkspace(workspace.id)!.folders).toEqual(['/tmp/a', '/tmp/b']);
+  expect(store.listWorkspaces().find(item => item.id === workspace.id)!.folders).toEqual([
+    '/tmp/a',
+    '/tmp/b',
+  ]);
+});
+
+test('deleteWorkspace removes attached folders', () => {
+  db.exec(`
+    CREATE TABLE user_memories (id INTEGER PRIMARY KEY, is_explicit INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'created', updated_at INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE user_memory_sources (memory_id INTEGER NOT NULL, session_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1);
+  `);
+  const workspace = store.createWorkspace('/tmp/workspace-delete-folders', 'delete-me');
+  store.setWorkspaceFolders(workspace.id, ['/tmp/a']);
+
+  store.deleteWorkspace(workspace.id);
+
+  expect(store.getWorkspace(workspace.id)).toBeNull();
+  expect(
+    db
+      .prepare('SELECT COUNT(*) AS count FROM workspace_folders WHERE workspace_id = ?')
+      .get(workspace.id),
+  ).toEqual({ count: 0 });
+});
+
+test('relocateWorkspace transfers folders and migrates project memory scope', () => {
+  db.exec(`
+    CREATE TABLE memory_links (id TEXT PRIMARY KEY, project_id TEXT NOT NULL);
+    CREATE TABLE memory_candidates (id TEXT PRIMARY KEY, project_id TEXT NOT NULL DEFAULT '');
+  `);
+  const beforePath = path.join(process.cwd(), 'workspace-memory-before');
+  const afterPath = path.join(process.cwd(), 'workspace-memory-after');
+  const session = store.createSession('memory session', beforePath);
+  const oldWorkspace = store.getWorkspace(session.workspaceId)!;
+  store.setWorkspaceFolders(oldWorkspace.id, ['/tmp/extra']);
+  db.prepare('INSERT INTO memory_links (id, project_id) VALUES (?, ?)').run(
+    'link-1',
+    oldWorkspace.id,
+  );
+  db.prepare('INSERT INTO memory_candidates (id, project_id) VALUES (?, ?)').run(
+    'candidate-1',
+    oldWorkspace.id,
+  );
+
+  const relocated = store.relocateWorkspace(oldWorkspace.id, afterPath, 'workspace-memory-after');
+
+  expect(relocated).not.toBeNull();
+  expect(store.getWorkspace(relocated!.id)!.folders).toEqual(['/tmp/extra']);
+  expect(db.prepare('SELECT project_id FROM memory_links WHERE id = ?').get('link-1')).toEqual({
+    project_id: relocated!.id,
+  });
+  expect(
+    db.prepare('SELECT project_id FROM memory_candidates WHERE id = ?').get('candidate-1'),
+  ).toEqual({ project_id: relocated!.id });
+});
+
+test('relocateWorkspace rejects while a session is running', () => {
+  const session = store.createSession('running session', path.join(process.cwd(), 'workspace-run'));
+  const workspace = store.getWorkspace(session.workspaceId)!;
+  db.prepare("UPDATE cowork_sessions SET status = 'running' WHERE id = ?").run(session.id);
+
+  expect(() =>
+    store.relocateWorkspace(workspace.id, path.join(process.cwd(), 'workspace-run-2'), 'run-2'),
+  ).toThrow('running');
+
+  expect(store.getWorkspace(workspace.id)!.path).toBe(workspace.path);
 });
 
 test('listSessions filters by mode without mixing work and chat history', () => {

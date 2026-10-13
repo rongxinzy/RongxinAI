@@ -471,6 +471,12 @@ export const COMPONENT_SELECTORS = {
   'page-ask-user-question-card-textarea-1': '.theme-page-ask-user-question-card-textarea-1',
   'page-cowork-prompt-input-button-1': '.theme-page-cowork-prompt-input-button-1',
   'page-create-project-dialog-input-1': '.theme-page-create-project-dialog-input-1',
+  'page-edit-project-dialog-list-1': '.theme-page-edit-project-dialog-list-1',
+  'page-edit-project-dialog-row-1': '.theme-page-edit-project-dialog-row-1',
+  'page-edit-project-dialog-badge-1': '.theme-page-edit-project-dialog-badge-1',
+  'page-edit-project-dialog-add-1': '.theme-page-edit-project-dialog-add-1',
+  'page-edit-project-dialog-icon-1': '.theme-page-edit-project-dialog-icon-1',
+  'page-edit-project-dialog-label-1': '.theme-page-edit-project-dialog-label-1',
   'page-embedding-settings-section-button-1': '.theme-page-embedding-settings-section-button-1',
   'page-image-preview-modal-button-1': '.theme-page-image-preview-modal-button-1',
   'page-session-expert-picker-popover-content-1':
