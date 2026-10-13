@@ -5,6 +5,10 @@ const electronMocks = vi.hoisted(() => ({
   fetch: vi.fn(),
 }));
 
+const intranetMocks = vi.hoisted(() => ({
+  probe: vi.fn(async () => false),
+}));
+
 vi.mock('electron', () => ({
   app: { isPackaged: false },
   ipcMain: {
@@ -15,9 +19,19 @@ vi.mock('electron', () => ({
   session: { defaultSession: { fetch: electronMocks.fetch } },
 }));
 
+vi.mock('./libs/zhiyuanIntranet', () => ({
+  probeZhiyuanIntranet: intranetMocks.probe,
+  warmZhiyuanIntranetProbe: () => undefined,
+  zhiyuanIntranetApiKey: () => 'intranet-api-key',
+}));
+
 import { ModelPoolIpc } from '../shared/ipc/channels';
 import { ModelPoolStreamSchema } from '../shared/ipc/schemas';
-import { ZhiyuanModelPoolHeader, ZhiyuanModelPoolWorkload } from '../shared/modelPool/constants';
+import {
+  ZhiyuanModelPool,
+  ZhiyuanModelPoolHeader,
+  ZhiyuanModelPoolWorkload,
+} from '../shared/modelPool/constants';
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 
@@ -31,6 +45,8 @@ function createSessionManager() {
 beforeEach(() => {
   electronMocks.handlers.clear();
   electronMocks.fetch.mockReset();
+  intranetMocks.probe.mockReset();
+  intranetMocks.probe.mockResolvedValue(false);
   vi.stubEnv(
     'ZHIYUAN_MODEL_POOL_BASE_URL',
     'https://zhiyuan-model-pool-staging.windflyme5.workers.dev',
@@ -203,5 +219,64 @@ describe('Model Pool IPC', () => {
         [ZhiyuanModelPoolHeader.ConversationId]: 'conversation-1',
       });
     }
+  });
+
+  test('prefers the intranet gateway for streaming when it is reachable', async () => {
+    intranetMocks.probe.mockResolvedValue(true);
+    const sessionManager = createSessionManager();
+    electronMocks.fetch.mockResolvedValue(
+      new Response('data: [DONE]\n\n', {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      }),
+    );
+    registerModelPoolIpcHandlers(sessionManager);
+    const handler = electronMocks.handlers.get(ModelPoolIpc.Stream);
+    const send = vi.fn();
+
+    await expect(
+      handler?.(
+        { sender: { send } },
+        {
+          requestId: 'intranet-1',
+          conversationId: 'conversation-1',
+          body: { messages: [{ role: 'user', content: 'hello' }] },
+        },
+      ),
+    ).resolves.toMatchObject({ ok: true, status: 200 });
+    await vi.waitFor(() =>
+      expect(send).toHaveBeenCalledWith(ModelPoolIpc.streamDone('intranet-1')),
+    );
+
+    const [url, init] = electronMocks.fetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://172.18.5.188:3000/v1/chat/completions');
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer intranet-api-key' });
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      model: ZhiyuanModelPool.IntranetModelId,
+      stream: true,
+    });
+    expect(sessionManager.getModelPoolAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not refresh community credentials for an intranet authentication rejection', async () => {
+    intranetMocks.probe.mockResolvedValue(true);
+    const sessionManager = createSessionManager();
+    electronMocks.fetch.mockResolvedValue(new Response('unauthorized', { status: 401 }));
+    registerModelPoolIpcHandlers(sessionManager);
+    const handler = electronMocks.handlers.get(ModelPoolIpc.Stream);
+
+    await expect(
+      handler?.(
+        { sender: { send: vi.fn() } },
+        {
+          requestId: 'intranet-2',
+          conversationId: 'conversation-1',
+          body: { messages: [{ role: 'user', content: 'hello' }] },
+        },
+      ),
+    ).resolves.toMatchObject({ ok: false, status: 401 });
+
+    expect(sessionManager.getModelPoolAccessToken).toHaveBeenCalledTimes(1);
+    expect(electronMocks.fetch).toHaveBeenCalledTimes(1);
   });
 });
