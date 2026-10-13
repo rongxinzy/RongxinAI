@@ -735,6 +735,17 @@ describe('NSIS custom installer UI wiring', () => {
       }
       expect(block).toContain('!insertmacro ZY_StageUiAssets');
     }
+    // Staging must leave $OUTDIR (and with it the process CWD) at $PLUGINSDIR:
+    // customInit runs before PrepareExistingInstallForExtraction, and a
+    // SetOutPath $INSTDIR there would create-and-lock the install root, which
+    // trips the detach check on cold installs ("$INSTDIR\*.*" matches an
+    // empty directory) and breaks the detach rename (CI cold-install exit 2).
+    const stageMacro = themeScript.slice(
+      themeScript.indexOf('!macro ZY_StageUiAssets'),
+      themeScript.indexOf('!macroend', themeScript.indexOf('!macro ZY_StageUiAssets')),
+    );
+    expect(stageMacro).toContain('SetOutPath "$PLUGINSDIR"');
+    expect(stageMacro).not.toContain('SetOutPath $INSTDIR');
     // The phase macro itself no-ops under /S (it lives in the theme file).
     expect(themeScript).toContain('${IfNot} ${Silent}');
     // The license text is guarded at compile time and the link degrades to a

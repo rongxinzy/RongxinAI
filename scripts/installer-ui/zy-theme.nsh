@@ -157,7 +157,11 @@
   !else
     StrCpy $zyLicenseAvailable "0"
   !endif
-  SetOutPath $INSTDIR
+  ; Do not "restore" the output path to $INSTDIR here: this macro runs in
+  ; customInit, ahead of PrepareExistingInstallForExtraction. SetOutPath
+  ; creates the target directory and makes it the process CWD, which would
+  ; both trip the detach check on a cold install ("$INSTDIR\*.*" matches an
+  ; empty directory) and lock $INSTDIR against the detach rename.
 !macroend
 
 ; ---------------------------------------------------------------------------

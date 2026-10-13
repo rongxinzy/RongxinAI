@@ -76,7 +76,9 @@ Var /GLOBAL zyDeleteRealAppData
 !macro CountInstallDirProcesses RESULT
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$root = (\"$INSTDIR\".TrimEnd([char]0x27) + [char]0x27); $$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith($$root, \"CurrentCultureIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
   Pop ${RESULT}
-  Pop $R0
+  ; Discard the captured stdout without clobbering ${RESULT}: the only caller
+  ; passes $R0, and popping stdout into $R0 would overwrite the count.
+  Pop $R8
 !macroend
 
 ; electron-builder's uninstallOldVersion launches the previous uninstaller and
