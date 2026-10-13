@@ -809,7 +809,9 @@ describe('NSIS custom installer UI wiring', () => {
     // fallback below resolves differently from electron-builder's absolute
     // registration). Standalone preview compiles have no electron-builder
     // header, so they register the vendored bundle behind ZY_PREVIEW, before
-    // the first plugin call.
+    // the first plugin call. This ordering alone does not make packaged builds
+    // safe — electron-builder's own registration races the include of this
+    // file; see the body-time emission test below.
     const firstPluginCall = Math.min(
       pagesScript.indexOf('${if} ${isUpdated}'),
       pagesScript.indexOf('${StdUtils.ExecShellAsUser} $1'),
@@ -824,6 +826,45 @@ describe('NSIS custom installer UI wiring', () => {
     expect(
       fs.existsSync(path.resolve('build/nsis-resources/plugins/x86-unicode/StdUtils.dll')),
     ).toBe(true);
+  });
+
+  test('emits the only plugin-calling page callback from body-time code', () => {
+    // ZYFinishLeave is the only page callback that reaches the StdUtils plugin
+    // (${isUpdated} and ${StdUtils.ExecShellAsUser}). electron-builder
+    // registers that plugin's directory from a task concurrent with the
+    // header-time !include of zy-pages.nsh (NsisTarget.js
+    // computeCommonInstallerScriptHeader), so the !addplugindir line can land
+    // after this file has been compiled and makensis aborts the packaged build
+    // with "Plugin not found, cannot call StdUtils::TestParameter".
+    // Re-registering the vendored bundle from here is not an option (duplicate
+    // plugin directory), so the definition must be emitted through
+    // customFinishPage — installer body, once the header is complete. That is
+    // where electron-builder defines its own equivalent StartApp function.
+    const code = pagesScript.replace(/^\s*;.*$/gm, '');
+    const macroStart = code.indexOf('!macro ZY_DefineFinishLeave');
+    const functionStart = code.indexOf('Function ZYFinishLeave');
+    const macroEnd = code.indexOf('!macroend', functionStart);
+    expect(macroStart).toBeGreaterThanOrEqual(0);
+    expect(functionStart).toBeGreaterThan(macroStart);
+    expect(macroEnd).toBeGreaterThan(functionStart);
+    // No header-time plugin call may survive anywhere above the macro.
+    for (const marker of ['${StdUtils.', '${if} ${isUpdated}']) {
+      expect(code.indexOf(marker)).toBeGreaterThan(macroStart);
+    }
+
+    const hookStart = installerScript.indexOf('!macro customFinishPage');
+    const hookEnd = installerScript.indexOf('!macroend', hookStart);
+    const insertion = installerScript.indexOf('!insertmacro ZY_DefineFinishLeave');
+    const page = installerScript.indexOf('Page custom ZYFinishCreate ZYFinishLeave');
+    expect(hookStart).toBeGreaterThanOrEqual(0);
+    expect(insertion).toBeGreaterThan(hookStart);
+    expect(page).toBeGreaterThan(insertion);
+    expect(page).toBeLessThan(hookEnd);
+
+    // The preview harness mirrors the production insertion sequence.
+    expect(fs.readFileSync(path.resolve('scripts/installer-ui/preview.nsi'), 'utf8')).toContain(
+      '!insertmacro ZY_DefineFinishLeave',
+    );
   });
 
   test('drops the legacy MUI chrome bitmaps from the packaging config', () => {

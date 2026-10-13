@@ -67,6 +67,14 @@ Var /GLOBAL installLocalInference
 !include "zy-theme.nsh"
 !include "zy-pages.nsh"
 
+; Production emits this from nsis-installer.nsh's customFinishPage hook so that
+; ZYFinishLeave is compiled after the header registered the StdUtils plugin
+; directory. The preview stubs that plugin (above), so it can define the
+; callback straight away — before the .onInit reference below.
+!ifndef BUILD_UNINSTALLER
+  !insertmacro ZY_DefineFinishLeave
+!endif
+
 Function .onInit
   InitPluginsDir
   StrCpy $INSTDIR "$PROGRAMFILES64\ZhiYuan Agent"

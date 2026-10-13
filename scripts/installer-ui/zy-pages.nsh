@@ -15,18 +15,25 @@
 
 ; ---------------------------------------------------------------------------
 ; StdUtils ships in electron-builder's plugin bundle, not with makensis
-; itself. electron-builder assembles the shared script header — including the
-; !addplugindir for that bundle — from concurrent generator tasks, so the
-; line can land after this file's !include, while ZYFinishLeave already
-; compiles ${isUpdated} (StdUtils::TestParameter) and
-; ${StdUtils.ExecShellAsUser} at include time.
+; itself. electron-builder assembles the shared script header from concurrent
+; generator tasks (NsisTarget.js -> computeCommonInstallerScriptHeader), so
+; the !addplugindir for that bundle races the !include of this file and can
+; land after it. Any plugin call compiled here at include time then aborts the
+; build with "Plugin not found, cannot call StdUtils::TestParameter".
 ;
 ; Registering the repo-vendored bundle in packaged builds does NOT work:
-; makensis 3 aborts with "Plugin command StdUtils::GetAllParameters conflicts
-; with a plugin in another directory" the moment electron-builder's own
-; plugin dir is also registered (assistedInstaller.nsh -> multiUser.nsh ->
-; setInstallModePerAllUsers). The vendored bundle therefore only serves
-; standalone preview compiles, where no electron-builder header exists.
+; makensis 3 aborts with "Plugin command ... conflicts with a plugin in
+; another directory" as soon as the same plugin becomes reachable through two
+; !addplugindir entries, and the uninstaller pass has no PROJECT_DIR to spell
+; an absolute path with. The vendored bundle therefore only serves standalone
+; preview compiles, where no electron-builder header exists.
+;
+; The one page callback that calls into StdUtils, ZYFinishLeave, is therefore
+; not compiled here: it is emitted through the ZY_DefineFinishLeave macro,
+; which scripts/nsis-installer.nsh inserts from its customFinishPage hook —
+; installer-body time, after the header is complete. That is the same place
+; electron-builder defines its own StartApp function, which makes the
+; identical ${isUpdated} / ${StdUtils.ExecShellAsUser} calls.
 ; ---------------------------------------------------------------------------
 !ifdef ZY_PREVIEW
   !ifdef PROJECT_DIR
@@ -642,6 +649,14 @@ Function ZYFinishCloseClick
   !insertmacro ZY_ClickWizardNext
 FunctionEnd
 
+; Deliberately a macro rather than a plain definition: this is the only page
+; callback that calls into the StdUtils plugin, and the header-time !include
+; of this file races electron-builder's !addplugindir for that plugin (see the
+; file header). scripts/nsis-installer.nsh expands this macro from
+; customFinishPage — installer body, after the header — so the plugin is
+; always resolvable. Preview compiles (ZY_PREVIEW) stub the plugin instead and
+; expand it right after the include.
+!macro ZY_DefineFinishLeave
 Function ZYFinishLeave
   ${If} $zyLaunchApp == "1"
     ; Mirror electron-builder's StartApp semantics: relaunch through the
@@ -661,6 +676,7 @@ Function ZYFinishLeave
 !endif
   ${EndIf}
 FunctionEnd
+!macroend
 !endif ; !BUILD_UNINSTALLER
 
 ; ---------------------------------------------------------------------------

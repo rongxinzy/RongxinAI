@@ -406,7 +406,16 @@ Var /GLOBAL zyDeleteRealAppData
   Page custom ZYHeroCreate ZYHeroLeave
 !macroend
 
+; The finish page is the only page whose callbacks touch the StdUtils plugin
+; (${isUpdated} / ${StdUtils.ExecShellAsUser} in ZYFinishLeave). Its definition
+; must therefore be emitted here, in the installer body, rather than from the
+; header-time !include of zy-pages.nsh: electron-builder registers the plugin
+; directory from a task concurrent with that include, so the header may not
+; have declared it yet (makensis then fails with "Plugin not found, cannot call
+; StdUtils::TestParameter"). This mirrors the StartApp function electron-builder
+; itself defines at this exact insertion point.
 !macro customFinishPage
+  !insertmacro ZY_DefineFinishLeave
   Page custom ZYFinishCreate ZYFinishLeave
 !macroend
 
