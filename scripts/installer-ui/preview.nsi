@@ -32,6 +32,9 @@ BrandingText " "
 
 ; --- electron-builder stand-ins -------------------------------------------------
 !define APP_EXECUTABLE_FILENAME "ZhiYuanAgent.exe"
+; APP_FILENAME is package.json `name` in production; ZYHeroBrowse appends it
+; to browsed directories like electron-builder's stock directory page.
+!define APP_FILENAME "zhiyuan-agent"
 
 ; Declared by scripts/nsis-installer.nsh in the production build; the hero
 ; leave callback stores the checkbox state here (installer pass only).
