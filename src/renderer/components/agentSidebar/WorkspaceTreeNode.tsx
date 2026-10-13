@@ -35,6 +35,7 @@ interface WorkspaceTreeNodeProps {
   onSelectWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onCreateTask: (workspace: WorkspaceSidebarNode) => void;
   onEditWorkspace?: (workspace: WorkspaceSidebarNode) => void;
+  onOpenInExplorer?: (workspace: WorkspaceSidebarNode) => void;
   onRemoveWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onToggleWorkspacePin?: (workspace: WorkspaceSidebarNode, pinned: boolean) => Promise<void>;
   onRetryLoadTasks: (workspaceId: string) => void;
@@ -61,6 +62,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   onSelectWorkspace,
   onCreateTask,
   onEditWorkspace,
+  onOpenInExplorer,
   onRemoveWorkspace,
   onToggleWorkspacePin,
   onRetryLoadTasks,
@@ -82,7 +84,8 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const canRemove =
     typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
   const canEdit = typeof onEditWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
-  const canOpenInExplorer = !isScratchWorkspacePath(workspace.path);
+  const canOpenInExplorer =
+    typeof onOpenInExplorer === 'function' && !isScratchWorkspacePath(workspace.path);
   const canManage = canRemove || canEdit || canOpenInExplorer;
 
   useEffect(() => {
@@ -179,18 +182,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                   </DropdownMenuItem>
                 )}
                 {canOpenInExplorer && (
-                  <DropdownMenuItem
-                    onClick={() => {
-                      void window.electron.shell.openPath(workspace.path).then(result => {
-                        if (!result.success) {
-                          console.warn(
-                            '[WorkspaceTreeNode] Failed to open workspace in file explorer:',
-                            result.error,
-                          );
-                        }
-                      });
-                    }}
-                  >
+                  <DropdownMenuItem onClick={() => onOpenInExplorer?.(workspace)}>
                     <FolderOpen className="size-4" />
                     {i18nService.t('openInFileExplorer')}
                   </DropdownMenuItem>

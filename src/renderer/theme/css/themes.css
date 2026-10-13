@@ -2733,6 +2733,52 @@
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
 }
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
   height: auto;
@@ -7442,6 +7488,12 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-ask-user-question-card-textarea-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-cowork-prompt-input-button-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-create-project-dialog-input-1),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-list-1),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-row-1),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-badge-1),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-add-1),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-icon-1),
+:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-edit-project-dialog-label-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-embedding-settings-section-button-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-image-preview-modal-button-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-session-expert-picker-popover-content-1),
@@ -10786,6 +10838,52 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="classic-dark"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -15511,6 +15609,12 @@ to {
 [data-theme="classic-dark"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="classic-dark"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="classic-dark"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="classic-dark"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="classic-dark"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="classic-dark"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="classic-dark"] :where(.theme-page-session-expert-picker-popover-content-1),
@@ -18855,6 +18959,52 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-light"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -23565,6 +23715,12 @@ to {
 [data-theme="daming-light"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="daming-light"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="daming-light"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="daming-light"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="daming-light"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="daming-light"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="daming-light"] :where(.theme-page-session-expert-picker-popover-content-1),
@@ -26909,6 +27065,52 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-dark"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -31634,6 +31836,12 @@ to {
 [data-theme="daming-dark"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="daming-dark"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="daming-dark"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="daming-dark"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="daming-dark"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="daming-dark"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="daming-dark"] :where(.theme-page-session-expert-picker-popover-content-1),
@@ -34980,6 +35188,52 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-light"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -39693,6 +39947,12 @@ to {
 [data-theme="changan-light"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="changan-light"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="changan-light"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="changan-light"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="changan-light"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="changan-light"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="changan-light"] :where(.theme-page-session-expert-picker-popover-content-1),
@@ -43039,6 +43299,52 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-dark"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -47767,6 +48073,12 @@ to {
 [data-theme="changan-dark"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="changan-dark"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="changan-dark"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="changan-dark"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="changan-dark"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="changan-dark"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="changan-dark"] :where(.theme-page-session-expert-picker-popover-content-1),
@@ -51113,6 +51425,52 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-light"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -55826,6 +56184,12 @@ to {
 [data-theme="weiyang-light"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="weiyang-light"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="weiyang-light"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="weiyang-light"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="weiyang-light"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="weiyang-light"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="weiyang-light"] :where(.theme-page-session-expert-picker-popover-content-1),
@@ -59172,6 +59536,52 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-page-create-project-dialog-input-1) {
   color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-list-1) {
+  border-width: 0 1px 1px 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  border-radius: var(--zy-style-radius-lg);
+}
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-row-1) {
+  height: 2.75rem;
+  gap: 0.75rem;
+  padding-inline: 0.75rem;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  font-size: var(--zy-component-text-sm);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
+}
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-badge-1) {
+  height: 1.25rem;
+  border-radius: 9999px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.5rem;
+  font-size: var(--zy-component-text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--zy-component-text-xs--line-height);
+}
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-add-1) {
+  height: 2.75rem;
+  border-radius: 0px;
+  border-width: 1px 0 0 0;
+  border-style: solid;
+  border-color: var(--zy-border);
+  padding-inline: 0.75rem;
+  font-weight: var(--zy-component-font-weight-medium);
+}
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-icon-1) {
+  color: var(--muted-foreground);
+}
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-label-1) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: var(--zy-component-font-weight-medium);
+  color: var(--foreground);
+  line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-embedding-settings-section-button-1) {
   font-size: var(--zy-component-text-xs);
@@ -63900,6 +64310,12 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-page-ask-user-question-card-textarea-1),
 [data-theme="weiyang-dark"] :where(.theme-page-cowork-prompt-input-button-1),
 [data-theme="weiyang-dark"] :where(.theme-page-create-project-dialog-input-1),
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-list-1),
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-row-1),
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-badge-1),
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-add-1),
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-icon-1),
+[data-theme="weiyang-dark"] :where(.theme-page-edit-project-dialog-label-1),
 [data-theme="weiyang-dark"] :where(.theme-page-embedding-settings-section-button-1),
 [data-theme="weiyang-dark"] :where(.theme-page-image-preview-modal-button-1),
 [data-theme="weiyang-dark"] :where(.theme-page-session-expert-picker-popover-content-1),

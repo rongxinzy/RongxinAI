@@ -1,6 +1,8 @@
 import type { Workspace } from '../../shared/workspace';
 import { WorkspaceDefault } from '../../shared/workspace';
 import { store } from '../store';
+import { WORKSPACE_SIDEBAR_STATE_KEY } from '../components/agentSidebar/useWorkspaceSidebarState';
+import type { WorkspaceSidebarPreferenceState } from '../components/agentSidebar/types';
 import { isScratchWorkspacePath } from '../utils/path';
 import { clearSessionArtifacts } from '../store/slices/artifactSlice';
 import {
@@ -352,6 +354,25 @@ class WorkspaceService {
       const nextPinnedIds = pinnedIds.filter(id => id !== options.id && id !== updatedWorkspace.id);
       if (originalWorkspace?.pinned) nextPinnedIds.push(updatedWorkspace.id);
       await localStore.setItem(PINNED_WORKSPACES_KEY, nextPinnedIds);
+
+      // The sidebar persists expanded workspace ids; carry them to the
+      // replacement id so the tree state survives a relocation.
+      const sidebarState = await localStore.getItem<WorkspaceSidebarPreferenceState>(
+        WORKSPACE_SIDEBAR_STATE_KEY,
+      );
+      if (sidebarState) {
+        const migrateIds = (ids: string[] = []): string[] =>
+          ids.map(item => (item === options.id ? updatedWorkspace.id : item));
+        await localStore.setItem(WORKSPACE_SIDEBAR_STATE_KEY, {
+          ...sidebarState,
+          expandedWorkspaceIds: migrateIds(sidebarState.expandedWorkspaceIds),
+          expandedTaskListWorkspaceIds: migrateIds(sidebarState.expandedTaskListWorkspaceIds),
+          scheduledExpandedWorkspaceIds: migrateIds(sidebarState.scheduledExpandedWorkspaceIds),
+          scheduledExpandedTaskListWorkspaceIds: migrateIds(
+            sidebarState.scheduledExpandedTaskListWorkspaceIds,
+          ),
+        });
+      }
     }
 
     if (currentWorkspaceId === options.id) {

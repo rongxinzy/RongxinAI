@@ -748,6 +748,21 @@ export class CoworkStore {
       throw new Error('A workspace already exists for the renamed directory');
     }
 
+    const runningSession = this.getOne<{ id: string }>(
+      "SELECT id FROM cowork_sessions WHERE workspace_id = ? AND status = 'running' LIMIT 1",
+      [id],
+    );
+    if (runningSession) {
+      throw new Error('Cannot relocate a workspace while a session is running');
+    }
+
+    // Project memory scope ids are derived from the path
+    // (workspace-<sha256(cwd)>), so a relocation must carry both tables
+    // alongside the workspace and sessions rows.
+    const previousProjectId = workspaceIdForPath(existingWorkspace.path);
+    const hasMemoryLinks = this.tableExists('memory_links');
+    const hasMemoryCandidates = this.tableExists('memory_candidates');
+
     this.db.transaction(() => {
       this.db
         .prepare('UPDATE cowork_sessions SET workspace_id = ?, cwd = ? WHERE workspace_id = ?')
@@ -756,9 +771,27 @@ export class CoworkStore {
         .prepare('UPDATE workspaces SET id = ?, name = ?, path = ? WHERE id = ?')
         .run(nextId, normalizedName, normalizedPath, id);
       this.workspaceFolders.transferFolders(id, nextId);
+      if (hasMemoryLinks) {
+        this.db
+          .prepare('UPDATE memory_links SET project_id = ? WHERE project_id = ?')
+          .run(nextId, previousProjectId);
+      }
+      if (hasMemoryCandidates) {
+        this.db
+          .prepare('UPDATE memory_candidates SET project_id = ? WHERE project_id = ?')
+          .run(nextId, previousProjectId);
+      }
     })();
 
     return this.getWorkspace(nextId);
+  }
+
+  private tableExists(tableName: string): boolean {
+    const row = this.getOne<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [tableName],
+    );
+    return row !== undefined;
   }
 
   /**

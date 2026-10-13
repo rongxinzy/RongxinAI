@@ -30,7 +30,7 @@ import {
   mergeSessionsIntoWorkspacePreviews,
 } from './workspaceSessionPreviews';
 
-const WORKSPACE_SIDEBAR_STATE_KEY = 'workspaceSidebar.state';
+export const WORKSPACE_SIDEBAR_STATE_KEY = 'workspaceSidebar.state';
 
 const modeMatches = (session: CoworkSessionSummary, workMode: WorkModeType) =>
   workMode === WorkMode.Chat

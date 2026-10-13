@@ -4433,6 +4433,12 @@ if (!gotTheLock) {
         const requestedPath = rawOptions.primaryPath?.trim();
         const pathsEqual = (a: string, b: string): boolean =>
           process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+        // Resolve both sides so trailing separators or relative segments cannot
+        // smuggle a duplicate of the primary path into the attached folders.
+        const resolvedFolders = rawOptions.folders
+          ?.map(folder => folder.trim())
+          .filter(Boolean)
+          .map(folder => path.resolve(folder));
         const pathChanged =
           !!requestedPath && !pathsEqual(path.resolve(requestedPath), path.resolve(workspace.path));
 
@@ -4457,8 +4463,9 @@ if (!gotTheLock) {
           if (rawOptions.folders) {
             coworkStore.setWorkspaceFolders(
               relocated.id,
-              rawOptions.folders.filter(folder => !pathsEqual(folder.trim(), resolvedPath)),
+              (resolvedFolders ?? []).filter(folder => !pathsEqual(folder, resolvedPath)),
             );
+            coworkStore.touchWorkspace(relocated.id);
           }
           return { success: true, workspace: coworkStore.getWorkspace(relocated.id) };
         }
@@ -4476,8 +4483,11 @@ if (!gotTheLock) {
         if (rawOptions.folders) {
           coworkStore.setWorkspaceFolders(
             id,
-            rawOptions.folders.filter(folder => !pathsEqual(folder.trim(), workspace.path)),
+            (resolvedFolders ?? []).filter(
+              folder => !pathsEqual(folder, path.resolve(workspace.path)),
+            ),
           );
+          coworkStore.touchWorkspace(id);
         }
         return { success: true, workspace: coworkStore.getWorkspace(id) };
       } catch (error) {

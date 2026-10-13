@@ -165,21 +165,31 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     setWorkspacePendingEdit(workspace);
   };
 
+  const handleOpenInExplorer = (workspace: WorkspaceSidebarNode) => {
+    void window.electron.shell.openPath(workspace.path).then(result => {
+      if (!result.success) {
+        console.warn(
+          '[MyAgentSidebarTree] Failed to open workspace in file explorer:',
+          result.error,
+        );
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('openFolderFailed') }),
+        );
+      }
+    });
+  };
+
   const handleSaveWorkspace = async (
     id: string,
-    values: { name: string; folders: string[] },
+    values: { name: string; primaryPath?: string; folders: string[] },
   ): Promise<boolean> => {
     const updated = await workspaceService.updateWorkspace({
       id,
       name: values.name,
+      primaryPath: values.primaryPath,
       folders: values.folders,
     });
-    if (!updated) {
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: i18nService.t('editProjectFailed') }),
-      );
-      return false;
-    }
+    if (!updated) return false;
     return true;
   };
 
@@ -294,6 +304,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               onSelectWorkspace={selectedWorkspace => void handleSelectWorkspace(selectedWorkspace)}
               onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
               onEditWorkspace={handleEditWorkspace}
+              onOpenInExplorer={handleOpenInExplorer}
               onToggleWorkspacePin={handleToggleWorkspacePin}
               onRemoveWorkspace={selectedWorkspace => setWorkspacePendingRemoval(selectedWorkspace)}
               onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}

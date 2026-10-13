@@ -9,7 +9,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
-import { Folder, FolderOpen, FolderPlus, LoaderCircle, X } from 'lucide-react';
+import { Folder, FolderInput, FolderOpen, FolderPlus, LoaderCircle, X } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -20,7 +20,10 @@ interface EditProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Returns whether the update was persisted. */
-  onSave: (id: string, values: { name: string; folders: string[] }) => Promise<boolean>;
+  onSave: (
+    id: string,
+    values: { name: string; primaryPath?: string; folders: string[] },
+  ) => Promise<boolean>;
   /** Requests removal; the parent owns the destructive confirm flow. */
   onRemove: (workspace: WorkspaceSidebarNode) => void;
 }
@@ -29,18 +32,22 @@ const showToast = (message: string) => {
   window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
 };
 
+const pathsEqual = (a: string, b: string): boolean =>
+  window.electron.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+
 const openInFileExplorer = (folderPath: string) => {
   void window.electron.shell.openPath(folderPath).then(result => {
     if (!result.success) {
       console.warn('[EditProjectDialog] Failed to open folder in file explorer:', result.error);
+      showToast(i18nService.t('openFolderFailed'));
     }
   });
 };
 
 /**
- * 「编辑项目」dialog: rename the workspace and manage its source folders
- * (primary path stays the session working directory; attached folders are
- * extra roots shown here and openable from the file explorer).
+ * 「编辑项目」dialog: rename the workspace, relocate its primary folder, and
+ * manage attached source folders. Appearance comes from theme page hooks
+ * (theme-page-edit-project-dialog-*); layout only lives here.
  */
 const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
   workspace,
@@ -51,6 +58,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [folders, setFolders] = useState<string[]>([]);
+  const [primaryCandidate, setPrimaryCandidate] = useState('');
   const [nameError, setNameError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -58,24 +66,32 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
     if (!open || !workspace) return;
     setName(workspace.name);
     setFolders(workspace.folders ?? []);
+    setPrimaryCandidate('');
     setNameError('');
     setIsSaving(false);
   }, [open, workspace]);
 
-  const handleAddFolder = useCallback(async () => {
-    try {
-      const result = await window.electron.dialog.selectDirectory();
-      if (!result.success || !result.path) return;
-      const selected = result.path.trim();
-      const pathsEqual = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
-      if (!workspace || pathsEqual(selected, workspace.path)) return;
-      setFolders(current =>
-        current.some(folder => pathsEqual(folder, selected)) ? current : [...current, selected],
-      );
-    } catch (error) {
-      console.error('[EditProjectDialog] Failed to select directory:', error);
-    }
-  }, [workspace]);
+  const handleBrowseFolder = useCallback(
+    async (target: 'primary' | 'attached') => {
+      try {
+        const result = await window.electron.dialog.selectDirectory();
+        if (!result.success || !result.path) return;
+        const selected = result.path.trim();
+        if (!workspace || !selected) return;
+        if (target === 'primary') {
+          if (!pathsEqual(selected, workspace.path)) setPrimaryCandidate(selected);
+          return;
+        }
+        if (pathsEqual(selected, workspace.path)) return;
+        setFolders(current =>
+          current.some(folder => pathsEqual(folder, selected)) ? current : [...current, selected],
+        );
+      } catch (error) {
+        console.error('[EditProjectDialog] Failed to select directory:', error);
+      }
+    },
+    [workspace],
+  );
 
   const handleSave = useCallback(async () => {
     const trimmedName = name.trim();
@@ -87,7 +103,11 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
     setNameError('');
     setIsSaving(true);
     try {
-      const saved = await onSave(workspace.id, { name: trimmedName, folders });
+      const saved = await onSave(workspace.id, {
+        name: trimmedName,
+        primaryPath: primaryCandidate || undefined,
+        folders,
+      });
       if (!saved) {
         showToast(i18nService.t('editProjectFailed'));
         return;
@@ -96,9 +116,9 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
     } finally {
       setIsSaving(false);
     }
-  }, [name, folders, workspace, onSave, onOpenChange]);
+  }, [name, folders, primaryCandidate, workspace, onSave, onOpenChange]);
 
-  const primaryPath = workspace?.path ?? '';
+  const primaryPath = primaryCandidate || (workspace?.path ?? '');
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => !isSaving && onOpenChange(nextOpen)}>
@@ -108,12 +128,18 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
         </DialogHeader>
         <div className="flex flex-col gap-4 py-2">
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-project-name" className="sr-only">
+              {i18nService.t('projectNameLabel')}
+            </Label>
             <Input
               id="edit-project-name"
               value={name}
               onChange={event => {
                 setName(event.target.value);
                 if (nameError) setNameError('');
+              }}
+              onKeyDown={event => {
+                if (event.key === 'Enter') void handleSave();
               }}
               placeholder={i18nService.t('projectNameLabel')}
               disabled={isSaving}
@@ -122,18 +148,31 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
             {nameError && <p className="text-xs text-destructive">{nameError}</p>}
           </div>
           <div className="flex flex-col gap-2">
-            <Label className="text-sm font-medium text-foreground">
+            <Label className="theme-page-edit-project-dialog-label-1">
               {i18nService.t('projectPathLabel')}
             </Label>
-            <div className="overflow-hidden rounded-lg border border-border">
-              <div className="flex h-11 items-center gap-3 border-border px-3">
-                <Folder className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-                <span className="min-w-0 flex-1 truncate text-sm" title={primaryPath}>
+            <div className="theme-page-edit-project-dialog-list-1 overflow-hidden">
+              <div className="theme-page-edit-project-dialog-row-1 flex items-center">
+                <Folder
+                  className="theme-page-edit-project-dialog-icon-1 size-4 shrink-0"
+                  strokeWidth={1.75}
+                />
+                <span className="min-w-0 flex-1 truncate" title={primaryPath}>
                   {primaryPath}
                 </span>
-                <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                <span className="theme-page-edit-project-dialog-badge-1 flex shrink-0 items-center">
                   {i18nService.t('primaryFolder')}
                 </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void handleBrowseFolder('primary')}
+                  disabled={isSaving}
+                  aria-label={i18nService.t('changePrimaryFolder')}
+                >
+                  <FolderInput className="size-4" strokeWidth={1.75} />
+                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -147,10 +186,13 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
               {folders.map(folder => (
                 <div
                   key={folder}
-                  className="flex h-11 items-center gap-3 border-t border-border px-3"
+                  className="theme-page-edit-project-dialog-row-1 flex items-center"
                 >
-                  <Folder className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-                  <span className="min-w-0 flex-1 truncate text-sm" title={folder}>
+                  <Folder
+                    className="theme-page-edit-project-dialog-icon-1 size-4 shrink-0"
+                    strokeWidth={1.75}
+                  />
+                  <span className="min-w-0 flex-1 truncate" title={folder}>
                     {folder}
                   </span>
                   <Button
@@ -158,6 +200,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
                     variant="ghost"
                     size="icon"
                     onClick={() => openInFileExplorer(folder)}
+                    disabled={isSaving}
                     aria-label={i18nService.t('openInFileExplorer')}
                   >
                     <FolderOpen className="size-4" strokeWidth={1.75} />
@@ -177,11 +220,14 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => void handleAddFolder()}
+                onClick={() => void handleBrowseFolder('attached')}
                 disabled={isSaving}
-                className="h-11 w-full justify-start gap-3 rounded-none border-t border-border px-3 text-sm font-medium"
+                className="theme-page-edit-project-dialog-add-1 w-full justify-start gap-3"
               >
-                <FolderPlus className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                <FolderPlus
+                  className="theme-page-edit-project-dialog-icon-1 size-4 shrink-0"
+                  strokeWidth={1.75}
+                />
                 {i18nService.t('addFolder')}
               </Button>
             </div>
