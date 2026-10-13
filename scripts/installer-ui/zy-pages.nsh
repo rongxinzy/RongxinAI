@@ -14,6 +14,23 @@
 ; only non-page additions are File extractions in customInit/customUnInit.
 
 ; ---------------------------------------------------------------------------
+; StdUtils ships in electron-builder's plugin bundle, not with makensis
+; itself. electron-builder assembles the shared script header — including the
+; !addplugindir for that bundle — from concurrent generator tasks, so the
+; line can land after this file's !include, while ZYFinishLeave already
+; compiles ${isUpdated} (StdUtils::TestParameter) and
+; ${StdUtils.ExecShellAsUser} at include time. Register the repo-vendored
+; bundle up front; makensis accepts the directory being registered again
+; when electron-builder's own line lands later.
+; ---------------------------------------------------------------------------
+!ifdef PROJECT_DIR
+  !addplugindir /x86-unicode "${PROJECT_DIR}\build\nsis-resources\plugins\x86-unicode"
+!else
+  ; Relative fallback for direct local makensis runs from scripts/.
+  !addplugindir /x86-unicode "..\build\nsis-resources\plugins\x86-unicode"
+!endif
+
+; ---------------------------------------------------------------------------
 ; Uninstaller builds require un.-prefixed functions; the prefix macro keeps a
 ; single definition per page function.
 ; ---------------------------------------------------------------------------

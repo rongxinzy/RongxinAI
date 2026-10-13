@@ -750,6 +750,26 @@ describe('NSIS custom installer UI wiring', () => {
     expect(pagesScript.match(/!insertmacro ZY_LangString ZY_/g)!.length).toBeGreaterThanOrEqual(25);
   });
 
+  test('registers the vendored StdUtils plugin bundle before the pages compile', () => {
+    // electron-builder emits the shared header's !addplugindir from concurrent
+    // generator tasks, so it can land after this include while ZYFinishLeave
+    // already compiles ${isUpdated} (StdUtils::TestParameter) and
+    // ${StdUtils.ExecShellAsUser} at include time; the pages must register
+    // the repo-vendored bundle themselves, before any plugin call.
+    const firstPluginCall = Math.min(
+      pagesScript.indexOf('${if} ${isUpdated}'),
+      pagesScript.indexOf('${StdUtils.ExecShellAsUser} $1'),
+    );
+    const pluginDir = pagesScript.indexOf(
+      '!addplugindir /x86-unicode "${PROJECT_DIR}\\build\\nsis-resources\\plugins\\x86-unicode"',
+    );
+    expect(pluginDir).toBeGreaterThanOrEqual(0);
+    expect(firstPluginCall).toBeGreaterThan(pluginDir);
+    expect(
+      fs.existsSync(path.resolve('build/nsis-resources/plugins/x86-unicode/StdUtils.dll')),
+    ).toBe(true);
+  });
+
   test('drops the legacy MUI chrome bitmaps from the packaging config', () => {
     const builderConfig = fs.readFileSync(path.resolve('electron-builder.json'), 'utf8');
     expect(builderConfig).not.toContain('installerHeader');
