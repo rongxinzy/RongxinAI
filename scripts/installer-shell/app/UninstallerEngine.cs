@@ -97,7 +97,17 @@ public sealed class UninstallerEngine
 
     private IEnumerable<Process> FindInstallRootProcesses()
     {
-        var roots = new[] { installDir, runtimeRoot };
+        // The match root must be a real application directory: at a drive
+        // root the prefix match would target every process on the machine.
+        // TrimEnd + trailing separator also keeps sibling directories whose
+        // names merely share a prefix (…\app vs …\app-other) from matching.
+        var roots = new[] { installDir, runtimeRoot }
+            .Where(root => !string.IsNullOrWhiteSpace(root))
+            .Select(root => root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Where(trimmed => trimmed.Length > 4 && !(trimmed.Length == 2 && trimmed[1] == ':'))
+            .Select(trimmed => trimmed + Path.DirectorySeparatorChar)
+            .ToArray();
+        if (roots.Length == 0) yield break;
         foreach (var proc in Process.GetProcesses())
         {
             string? path = null;

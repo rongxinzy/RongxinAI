@@ -46,7 +46,7 @@ Var /GLOBAL preparedInstallRoot
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$roots = @(\"$INSTDIR\", \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\");\
     $$selfPid = $9;\
-    $$isTarget = { param($$p) $$p -and ($$p.StartsWith($$roots[0], \"CurrentCultureIgnoreCase\") -or $$p.StartsWith($$roots[1], \"CurrentCultureIgnoreCase\")) };\
+    $$isTarget = { param($$p) $$p -and ($$p.StartsWith(($$roots[0].TrimEnd([char]0x27) + [char]0x27), \"CurrentCultureIgnoreCase\") -or $$p.StartsWith(($$roots[1].TrimEnd([char]0x27) + [char]0x27), \"CurrentCultureIgnoreCase\"))) };\
     $$stopped = 0;\
     foreach ($$proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.ProcessId -ne $$selfPid -and (& $$isTarget $$_.Path) })) {\
       Stop-Process -Id $$proc.ProcessId -Force -ErrorAction SilentlyContinue;\
@@ -67,7 +67,7 @@ Var /GLOBAL preparedInstallRoot
 ; detach this distinguishes "app still running" from "directory held by
 ; another program" — electron-builder reports both as "cannot be closed".
 !macro CountInstallDirProcesses RESULT
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith(\"$INSTDIR\", \"CurrentCultureIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$root = (\"$INSTDIR\".TrimEnd([char]0x27) + [char]0x27); $$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith($$root, \"CurrentCultureIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
   Pop ${RESULT}
   Pop $R0
 !macroend
@@ -125,6 +125,19 @@ Var /GLOBAL preparedInstallRoot
 !macro PrepareExistingInstallForExtraction TOKEN
   ${If} $preparedInstallRoot != $INSTDIR
     StrCpy $preparedInstallRoot $INSTDIR
+
+    ; The custom hero page lets the user type or browse any directory, and
+    ; silent updates carry whatever /D installed into last time. Refuse the
+    ; destructive steps below for roots too shallow to be an application
+    ; directory: at "C:\" the prefix match would target every process on the
+    ; machine and the detach rename would hit a drive root.
+    StrLen $R8 $INSTDIR
+    ${If} $R8 < 6
+      DetailPrint "[Installer] Install root '$INSTDIR' is too shallow; skipping process stop, Skill migration and detach"
+      !insertmacro OpenTimingLogForAppend $8
+      FileWrite $8 "phase=prepare-skipped reason=shallow-root path=$INSTDIR$\r$\n"
+      FileClose $8
+    ${Else}
 
     DetailPrint "[Installer] Stopping running 知远 processes"
     System::Call 'kernel32::GetTickCount()i .r7'
@@ -207,6 +220,7 @@ Var /GLOBAL preparedInstallRoot
     ; registration so electron-builder skips the redundant legacy uninstaller
     ; whose exit code 2 would surface as a bogus "cannot be closed" dialog.
     !insertmacro ForgetOldInstallRegistry ${TOKEN}
+    ${EndIf}
   ${EndIf}
 !macroend
 !endif
@@ -703,6 +717,7 @@ Var /GLOBAL preparedInstallRoot
     StrCmp $0 "0" VcRuntimeReady
     StrCmp $0 "1638" VcRuntimeReady
     StrCmp $0 "3010" VcRuntimeReady
+    StrCmp $0 "1223" VcRuntimeReady
       !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=vc-runtime-install-failed exit=$0 output=$1$\r$\n"
       FileClose $2
@@ -783,4 +798,22 @@ Var /GLOBAL preparedInstallRoot
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\uninstall-cleanup.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes"'
   Pop $0
 
+!macroend
+
+!macro customUnInstallSection
+  ; electron-builder's DELETE_APP_DATA list only covers $APPDATA\<product
+  ; name> variants; the app's real userData directory is %APPDATA%\ZhiYuanAgent
+  ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs). The
+  ; WebView2 shell uninstaller removes that same tree, so honor the identical
+  ; delete-app-data decision here to keep both uninstallers consistent.
+  ; Runs at the end of the uninstall section, after $isDeleteAppData is set.
+  ${if} $isDeleteAppData == "1"
+    ${if} $installMode == "all"
+      SetShellVarContext current
+    ${endif}
+    RMDir /r "$APPDATA\ZhiYuanAgent"
+    ${if} $installMode == "all"
+      SetShellVarContext all
+    ${endif}
+  ${endif}
 !macroend

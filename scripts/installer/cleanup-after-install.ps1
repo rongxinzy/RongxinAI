@@ -31,10 +31,19 @@ Get-ChildItem -Path "$InstallDir.old*" -Directory -ErrorAction SilentlyContinue 
   }
 }
 
-# Background recursive delete of detached previous installs, same command the
-# NSIS installer spawned (async by design: slow disks must not block setup).
-$deleteCommand = 'for /d %D in ("' + $InstallDir + '.old*") do @start "" /b cmd /c rd /s /q "%~fD"'
-& "$env:COMSPEC" /c $deleteCommand | Out-Null
+# Background recursive delete of detached previous installs, same intent as
+# the original async NSIS span (slow disks must not block setup). Enumerate
+# in PowerShell and hand the targets to a detached child via an encoded
+# command + inherited environment variable, so no path characters (cmd
+# metacharacters like "&" are legal in directory names) can inject into a
+# command line.
+$targets = @(Get-ChildItem -Path "$InstallDir.old*" -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+if ($targets.Count -gt 0) {
+  $env:ZY_CLEANUP_TARGETS = $targets -join "`n"
+  $cleanupScript = '$t = $env:ZY_CLEANUP_TARGETS -split "`n"; foreach ($p in $t) { if ($p) { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction SilentlyContinue } }'
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cleanupScript))
+  Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', $encoded | Out-Null
+}
 
 Remove-Item -LiteralPath $OldInstallPathFile -Force -ErrorAction SilentlyContinue
 

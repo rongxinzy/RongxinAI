@@ -179,7 +179,9 @@ public sealed class SetupForm : Form
                 // Let the page settle, then drive the same path as the hero
                 // page Install click: real events, no simulated timing.
                 await Task.Delay(1200);
-                bridge.StartInstall(forcedInstallDir ?? DefaultInstallDir(), false);
+                bridge.StartInstall(
+                    forcedInstallDir ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir(),
+                    false);
             }
             if (autoUninstall && webView.CoreWebView2 is not null)
             {
@@ -269,7 +271,9 @@ public sealed class SetupForm : Form
     {
         var localPrograms = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
-        return Path.Combine(localPrograms, "ZhiYuan Agent");
+        // Must match the NSIS APP_FILENAME (package.json `name`): both
+        // installers default to the same directory.
+        return Path.Combine(localPrograms, "zhiyuan-agent");
     }
 
     /// <summary>Uninstall mode comes from --uninstall or from being the copied
@@ -571,7 +575,8 @@ public sealed class ShellBridge
 
     public string GetInstallState() => form.CurrentInstallState;
 
-    public string GetDefaultInstallDir() => SetupForm.DefaultInstallDir();
+    public string GetDefaultInstallDir() =>
+        InstallerEngine.FindExistingInstallLocation() ?? SetupForm.DefaultInstallDir();
 
     public string? BrowseInstallDir(string currentPath) => form.BrowseInstallDir(currentPath);
 

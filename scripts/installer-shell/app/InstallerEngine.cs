@@ -58,6 +58,44 @@ public sealed class InstallerEngine
     internal static readonly string UninstallRegistryKey =
         $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{AppGuid}";
 
+    /// <summary>The NSIS installer records InstallLocation under this key. An
+    /// existing value means this machine already has an installation (possibly
+    /// per-machine in HKLM), so a shell install into the same directory is an
+    /// upgrade instead of a second copy that would orphan the old one.</summary>
+    internal static string? FindExistingInstallLocation()
+    {
+        using (var hkcu = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64))
+        {
+            var userLocation = ReadInstallLocation(hkcu);
+            if (userLocation is not null) return userLocation;
+        }
+        foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
+        {
+            using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+            var machineLocation = ReadInstallLocation(hklm);
+            if (machineLocation is not null) return machineLocation;
+        }
+        return null;
+    }
+
+    private static string? ReadInstallLocation(RegistryKey hive)
+    {
+        using var key = hive.OpenSubKey(InstallRegistryKey);
+        if (key?.GetValue("InstallLocation") is not string value || string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+        try
+        {
+            var fullPath = Path.GetFullPath(value);
+            return Directory.Exists(fullPath) ? fullPath : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private readonly string? payloadDirArg;
     private string? payloadDir;
     private readonly string workDir;
@@ -331,7 +369,17 @@ public sealed class InstallerEngine
 
     private IEnumerable<Process> FindInstallRootProcesses()
     {
-        var roots = new[] { installDir, runtimeRoot };
+        // The match root must be a real application directory: at a drive
+        // root the prefix match would target every process on the machine.
+        // TrimEnd + trailing separator also keeps sibling directories whose
+        // names merely share a prefix (…\app vs …\app-other) from matching.
+        var roots = new[] { installDir, runtimeRoot }
+            .Where(root => !string.IsNullOrWhiteSpace(root))
+            .Select(root => root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Where(trimmed => trimmed.Length > 4 && !(trimmed.Length == 2 && trimmed[1] == ':'))
+            .Select(trimmed => trimmed + Path.DirectorySeparatorChar)
+            .ToArray();
+        if (roots.Length == 0) yield break;
         foreach (var proc in Process.GetProcesses())
         {
             string? path = null;
@@ -564,17 +612,20 @@ public sealed class InstallerEngine
                 Type: "phase", Label: "Microsoft Visual C++ Runtime 未能自动安装，部分本地组件可能暂时不可用"));
             return;
         }
-        if (exitCode is 0 or 1638 or 3010) return;
+        if (exitCode is 0 or 1638 or 3010 or 1223) return;
         progress.Report(new EngineEvent(
             Type: "phase", Label: "Microsoft Visual C++ Runtime 未能自动安装，部分本地组件可能暂时不可用"));
     }
 
-    /// <summary>Step 12 — the in-app downloader reads this marker on first launch.</summary>
+    /// <summary>Step 12 — the in-app downloader reads this marker on first launch.
+    /// NSIS writes the local-inference component's content-id; the shell does not
+    /// track component ids, so it writes the app's canonical fallback request id
+    /// instead of an arbitrary word.</summary>
     private void StepWritePendingInferenceMarker(bool localInference)
     {
         var marker = Path.Combine(appDataRoot, "pending-local-inference-install");
         if (File.Exists(marker)) File.Delete(marker);
-        if (localInference) File.WriteAllText(marker, "pending");
+        if (localInference) File.WriteAllText(marker, "installer-request");
     }
 
     /// <summary>Step 13 — previous-version teardown plus unused component-version

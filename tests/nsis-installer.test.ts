@@ -253,7 +253,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(15);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(16);
   });
 
   test('records optional local inference intent via an options checkbox instead of a popup', () => {
@@ -315,6 +315,30 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(elevatedActionsScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
   });
 
+  test('refuses destructive prepare steps for shallow install roots', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
+
+    // A browsed drive root must never reach the process-kill / detach steps:
+    // "C:\" would prefix-match every process on the machine.
+    const prepareStart = installerScript.indexOf('!macro PrepareExistingInstallForExtraction');
+    const prepareBlock = installerScript.slice(
+      prepareStart,
+      installerScript.indexOf('!macroend', prepareStart),
+    );
+    expect(prepareBlock).toContain('StrLen $R8 $INSTDIR');
+    expect(prepareBlock).toContain('skipping process stop, Skill migration and detach');
+    expect(prepareBlock).toContain('reason=shallow-root');
+
+    // Mirror electron-builder's stock behavior: a browsed folder becomes the
+    // parent unless it already ends with the product directory.
+    const browseBlock = themeScript.slice(
+      themeScript.indexOf('Function ZYHeroBrowse'),
+      themeScript.indexOf('FunctionEnd', themeScript.indexOf('Function ZYHeroBrowse')),
+    );
+    expect(browseBlock).toContain('StrCpy $INSTDIR "$INSTDIR\\${APP_FILENAME}"');
+  });
+
   test('delays old version cleanup until runtime links are ready', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const cleanupScript = fs.readFileSync(
@@ -350,8 +374,11 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(macroBlock).toContain('Get-CimInstance Win32_Process');
     expect(macroBlock).toContain('$$roots = @(\\"$INSTDIR\\"');
     expect(macroBlock).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes');
-    expect(macroBlock).toContain('StartsWith($$roots[0]');
-    expect(macroBlock).toContain('StartsWith($$roots[1]');
+    // The prefix root is normalized with a trailing separator so sibling
+    // directories that merely share a name prefix cannot match.
+    expect(macroBlock).toContain('TrimEnd([char]0x27) + [char]0x27');
+    expect(macroBlock).toContain('StartsWith(($$roots[0].TrimEnd');
+    expect(macroBlock).toContain('StartsWith(($$roots[1].TrimEnd');
     expect(macroBlock).toContain('CurrentCultureIgnoreCase');
     expect(macroBlock).toContain('Stop-Process -Id $$proc.ProcessId -Force');
     // An in-place uninstaller runs from $INSTDIR and must not kill itself.

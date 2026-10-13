@@ -364,6 +364,21 @@ Function ZYHeroBrowse
   Pop $0
   ${If} $0 != ""
     StrCpy $INSTDIR $0
+    ; Mirror electron-builder's stock directory handling: a browsed folder
+    ; becomes the PARENT unless it already ends with the product directory,
+    ; so picking a drive root or a parent folder can never make the install
+    ; root itself "C:\" or another shallow prefix.
+    StrLen $1 "${APP_FILENAME}"
+    StrLen $2 $INSTDIR
+    IntOp $3 $2 - $1
+    ${If} $3 > 0
+      StrCpy $4 $INSTDIR $1 $3
+    ${Else}
+      StrCpy $4 ""
+    ${EndIf}
+    ${If} $4 != "${APP_FILENAME}"
+      StrCpy $INSTDIR "$INSTDIR\${APP_FILENAME}"
+    ${EndIf}
   ${EndIf}
   SendMessage $heroDirText ${WM_SETTEXT} 0 "STR:$INSTDIR"
 FunctionEnd
