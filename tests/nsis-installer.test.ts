@@ -119,25 +119,63 @@ describe('NSIS offline resource and local inference flow', () => {
 
   test('uses per-user installation and rolls back pointer changes after normal failures', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const activateScript = fs.readFileSync(
+      path.resolve('scripts/installer/activate-components.ps1'),
+      'utf8',
+    );
+    const uninstallCleanupScript = fs.readFileSync(
+      path.resolve('scripts/installer/uninstall-cleanup.ps1'),
+      'utf8',
+    );
 
     expect(installerScript).toContain('RequestExecutionLevel user');
     expect(installerScript).not.toContain('RequestExecutionLevel admin');
-    expect(installerScript).toContain('current.next');
     expect(installerScript).toContain('current.previous');
+    // current.next only remains in the shared uninstall cleanup script.
     expect(installerScript).toContain('component-manifest.json');
     expect(installerScript).not.toContain('component-targets.txt');
-    expect(installerScript).toContain('$$ErrorActionPreference = \\"Stop\\"');
-    expect(installerScript).toContain('Set-StrictMode -Version Latest');
-    expect(installerScript).toContain('Missing prepared component target:');
+    // The switch/link/cleanup PowerShell moved into shared scripts (also used
+    // by the WebView2 shell); the NSIS side only stages and -File-invokes them.
     expect(installerScript).toContain(
+      '-File "$PLUGINSDIR\\activate-components.ps1" -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"',
+    );
+    expect(installerScript).toContain(
+      '-File "$PLUGINSDIR\\link-runtime-junctions.ps1" -ResourceRoot "$INSTDIR\\resources"',
+    );
+    expect(installerScript).toContain(
+      '-File "$PLUGINSDIR\\cleanup-after-install.ps1" -InstallDir "$INSTDIR"',
+    );
+    // The uninstall cleanup PowerShell moved into a shared script (also used
+    // by the WebView2 shell); the NSIS side only stages and -File-invokes it.
+    expect(installerScript).toContain(
+      'File /oname=uninstall-cleanup.ps1 "${PROJECT_DIR}\\scripts\\installer\\uninstall-cleanup.ps1"',
+    );
+    expect(installerScript).toContain(
+      '-File "$PLUGINSDIR\\uninstall-cleanup.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"',
+    );
+    expect(uninstallCleanupScript).toContain('current.next');
+    expect(uninstallCleanupScript).toContain('current.previous');
+    expect(uninstallCleanupScript).toContain('.uninstall.');
+    expect(uninstallCleanupScript).toContain('cmd /d /c rd /s /q');
+    for (const moved of [
+      '$$ErrorActionPreference = \\"Stop\\"',
+      'Set-StrictMode -Version Latest',
+      'Missing prepared component target:',
       'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
-    );
-    expect(installerScript).toContain(
       'New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop',
+    ]) {
+      expect(installerScript, `inline block must no longer contain ${moved}`).not.toContain(moved);
+    }
+    // The rollback protocol itself is unchanged, now in the shared script.
+    expect(activateScript).toContain("$ErrorActionPreference = 'Stop'");
+    expect(activateScript).toContain('Set-StrictMode -Version Latest');
+    expect(activateScript).toContain('Missing prepared component target:');
+    expect(activateScript).toContain(
+      'New-Item -ItemType Junction -Path $next -Target $target -Force -ErrorAction Stop',
     );
+    expect(activateScript).toContain('component-switch-state.txt');
     expect(installerScript).toContain('component-switch-state.txt');
     expect(installerScript).toContain('Keep the journal in the persistent cache');
-    expect(installerScript).toContain('Join-Path $$runtimeRoot \\"component-switch-state.txt\\"');
     expect(installerScript).toContain('^[^=|]+\\\\|(?:True|False)\\\\z');
     expect(installerScript).not.toContain('(?:True|False)$$');
     expect(installerScript).toContain('phase=component-set-rollback');
@@ -154,11 +192,19 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(installerScript).not.toContain('component-targets.txt');
     expect(installerScript).not.toContain('FileWrite $2 "${KEY}|${PREFIX}');
-    expect(installerScript).toContain('Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop');
-    expect(installerScript).toContain('^[0-9a-f]{64}\\z');
-    expect(installerScript).not.toContain('^[0-9a-f]{64}$$');
-    expect(installerScript).toContain(
-      'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
+    // The manifest binding check moved into the shared activation script.
+    const activateScript = fs.readFileSync(
+      path.resolve('scripts/installer/activate-components.ps1'),
+      'utf8',
+    );
+    expect(installerScript).not.toContain(
+      'Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop',
+    );
+    expect(activateScript).toContain('Get-Content -LiteralPath $idPath -Raw -ErrorAction Stop');
+    expect(activateScript).toContain('^[0-9a-f]{64}\\z');
+    expect(activateScript).not.toContain('^[0-9a-f]{64}$');
+    expect(activateScript).toContain(
+      'New-Item -ItemType Junction -Path $next -Target $target -Force -ErrorAction Stop',
     );
     expect(offlineComponents).toEqual([
       {
@@ -207,26 +253,40 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(15);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(16);
   });
 
   test('records optional local inference intent via an options checkbox instead of a popup', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
 
     expect(installerScript).toContain('pending-local-inference-install');
-    expect(installerScript).toContain('${NSD_CreateCheckbox}');
-    expect(installerScript).toContain('LocalInferencePageCreate');
-    expect(installerScript).toContain('LocalInferencePageLeave');
-    expect(installerScript).toContain(
-      'Page custom LocalInferencePageCreate LocalInferencePageLeave',
-    );
     expect(installerScript).toContain('!ifndef BUILD_UNINSTALLER');
+    expect(installerScript).toContain('Var /GLOBAL installLocalInference');
     expect(installerScript.indexOf('!ifndef BUILD_UNINSTALLER')).toBeLessThan(
       installerScript.indexOf('Var /GLOBAL installLocalInference'),
     );
     expect(installerScript).not.toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
     expect(installerScript).not.toContain('install-llamacpp-backend-nsis.cjs');
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
+
+    // The hero page hosts the checkbox; leaving it commits the install and
+    // runs the destructive pre-extraction steps. Layout positions come from
+    // the ZY_HERO_* constants in zy-theme.nsh.
+    expect(themeScript).toContain(
+      '${NSD_CreateCheckbox} ${ZY_ROW_X} ${ZY_HERO_INFER_Y} ${ZY_HERO_INFER_W} ${ZY_HERO_INFER_H} "$(ZY_UI_LOCAL_INFERENCE)"',
+    );
+    expect(themeScript).toContain('Function ZYHeroCreate');
+    expect(themeScript).toContain('Function ZYHeroLeave');
+    const heroLeaveBlock = themeScript.slice(
+      themeScript.indexOf('Function ZYHeroLeave'),
+      themeScript.indexOf('FunctionEnd', themeScript.indexOf('Function ZYHeroLeave')),
+    );
+    expect(heroLeaveBlock).toContain('${NSD_GetState} $heroInference $installLocalInference');
+    expect(heroLeaveBlock).toContain(
+      '!insertmacro PrepareExistingInstallForExtraction INTERACTIVE',
+    );
+    expect(installerScript).toContain('Page custom ZYHeroCreate ZYHeroLeave');
   });
 
   test('does not request or manage Microsoft Defender exclusions', () => {
@@ -255,13 +315,68 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(elevatedActionsScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
   });
 
+  test('refuses destructive prepare steps for shallow install roots', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
+
+    // A browsed drive root must never reach the process-kill / detach steps:
+    // "C:\" would prefix-match every process on the machine.
+    const prepareStart = installerScript.indexOf('!macro PrepareExistingInstallForExtraction');
+    const prepareBlock = installerScript.slice(
+      prepareStart,
+      installerScript.indexOf('!macroend', prepareStart),
+    );
+    expect(prepareBlock).toContain('StrLen $R8 $INSTDIR');
+    expect(prepareBlock).toContain('skipping process stop, Skill migration and detach');
+    expect(prepareBlock).toContain('reason=shallow-root');
+
+    // Mirror electron-builder's stock behavior: a browsed folder becomes the
+    // parent unless it already ends with the product directory.
+    const browseBlock = themeScript.slice(
+      themeScript.indexOf('Function ZYHeroBrowse'),
+      themeScript.indexOf('FunctionEnd', themeScript.indexOf('Function ZYHeroBrowse')),
+    );
+    expect(browseBlock).toContain('StrCpy $INSTDIR "$INSTDIR\\${APP_FILENAME}"');
+  });
+
+  test('uninstall removes the real userData directory with the app-data decision', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    // electron-builder's app-data list only covers product-name variants; the
+    // real userData (%APPDATA%\ZhiYuanAgent) must go through the same
+    // delete-app-data decision as the WebView2 shell uninstaller.
+    const unInstallStart = installerScript.indexOf('!macro customUnInstall\n');
+    const unInstallBlock = installerScript.slice(
+      unInstallStart,
+      installerScript.indexOf('!macroend', unInstallStart),
+    );
+    expect(unInstallBlock).toContain('RMDir /r "$APPDATA\\ZhiYuanAgent"');
+    expect(unInstallBlock).toContain('--delete-app-data');
+    expect(unInstallBlock).toContain('DELETE_APP_DATA_ON_UNINSTALL');
+    // The decision is recomputed because customUnInstall runs before
+    // uninstaller.nsh declares its own $isDeleteAppData variable, and the
+    // macro must not rely on customUnInstallSection (file scope, where
+    // runtime instructions are invalid).
+    expect(installerScript).toContain('Var /GLOBAL zyDeleteRealAppData');
+    expect(installerScript).not.toContain('customUnInstallSection');
+  });
+
   test('delays old version cleanup until runtime links are ready', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const cleanupScript = fs.readFileSync(
+      path.resolve('scripts/installer/cleanup-after-install.ps1'),
+      'utf8',
+    );
 
     expect(installerScript.indexOf('Scheduling previous version cleanup')).toBeGreaterThan(
       installerScript.indexOf('RuntimeLinksReady:'),
     );
-    expect(installerScript).toContain('Get-ChildItem -Path "$INSTDIR.old*"');
+    expect(installerScript).toContain(
+      '-File "$PLUGINSDIR\\cleanup-after-install.ps1" -InstallDir "$INSTDIR"',
+    );
+    expect(installerScript).not.toContain('Get-ChildItem -Path "$$INSTDIR.old*"');
+    expect(installerScript).not.toContain('Get-ChildItem -Path "$INSTDIR.old*"');
+    expect(cleanupScript).toContain('Get-ChildItem -Path "$InstallDir.old*"');
   });
 
   test('stops processes by install-root path prefix so orphaned sidecars cannot block setup', () => {
@@ -281,8 +396,11 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(macroBlock).toContain('Get-CimInstance Win32_Process');
     expect(macroBlock).toContain('$$roots = @(\\"$INSTDIR\\"');
     expect(macroBlock).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes');
-    expect(macroBlock).toContain('StartsWith($$roots[0]');
-    expect(macroBlock).toContain('StartsWith($$roots[1]');
+    // The prefix root is normalized with a trailing separator so sibling
+    // directories that merely share a name prefix cannot match.
+    expect(macroBlock).toContain('TrimEnd([char]0x27) + [char]0x27');
+    expect(macroBlock).toContain('StartsWith(($$roots[0].TrimEnd');
+    expect(macroBlock).toContain('StartsWith(($$roots[1].TrimEnd');
     expect(macroBlock).toContain('CurrentCultureIgnoreCase');
     expect(macroBlock).toContain('Stop-Process -Id $$proc.ProcessId -Force');
     // An in-place uninstaller runs from $INSTDIR and must not kill itself.
@@ -304,10 +422,18 @@ describe('NSIS offline resource and local inference flow', () => {
     // straight from .onInit; interactive installs defer it to the page leave.
     expect(customInitBlock).toContain('${If} ${Silent}');
     expect(customInitBlock).toContain('!insertmacro PrepareExistingInstallForExtraction SILENT');
-    const pageLeaveStart = installerScript.indexOf('Function LocalInferencePageLeave');
-    const pageLeaveBlock = installerScript.slice(
+    const customUnInitBlock = installerScript.slice(
+      installerScript.indexOf('!macro customUnInit'),
+      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customUnInit')),
+    );
+    expect(customUnInitBlock).toContain('!insertmacro StopAppProcesses');
+    // The interactive page leave callback lives in the UI include; it must run
+    // the same committed-work macro.
+    const pagesScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
+    const pageLeaveStart = pagesScript.indexOf('Function ZYHeroLeave');
+    const pageLeaveBlock = pagesScript.slice(
       pageLeaveStart,
-      installerScript.indexOf('FunctionEnd', pageLeaveStart),
+      pagesScript.indexOf('FunctionEnd', pageLeaveStart),
     );
     expect(pageLeaveBlock).toContain(
       '!insertmacro PrepareExistingInstallForExtraction INTERACTIVE',
@@ -315,11 +441,6 @@ describe('NSIS offline resource and local inference flow', () => {
     // Re-preparing only when the directory changed keeps the guard useful when
     // the user goes back, changes $INSTDIR and leaves again.
     expect(prepareMacroBlock).toContain('${If} $preparedInstallRoot != $INSTDIR');
-    const customUnInitBlock = installerScript.slice(
-      installerScript.indexOf('!macro customUnInit'),
-      installerScript.indexOf('!macroend', installerScript.indexOf('!macro customUnInit')),
-    );
-    expect(customUnInitBlock).toContain('!insertmacro StopAppProcesses');
 
     expect(installerScript).not.toContain('Stop-Process -Name 知远');
     expect(installerScript).not.toContain('Get-Process node');
@@ -435,15 +556,31 @@ describe('NSIS offline resource and local inference flow', () => {
     const uninstallBlock = installerScript.slice(
       installerScript.indexOf('!macro customUnInstall\n'),
     );
+    const uninstallCleanupScript = fs.readFileSync(
+      path.resolve('scripts/installer/uninstall-cleanup.ps1'),
+      'utf8',
+    );
 
-    expect(uninstallBlock).toContain('StrCpy $3 "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"');
-    expect(uninstallBlock).toContain('StrCpy $4 "$3.uninstall.$4"');
-    expect(uninstallBlock).toContain('Rename "$3" "$4"');
-    expect(uninstallBlock).toContain('cmd /d /c rd /s /q "$4"');
-    expect(uninstallBlock).not.toContain('Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force');
+    // The NSIS macro now only stages and -File-invokes the shared script.
+    expect(uninstallBlock).toContain(
+      '-File "$PLUGINSDIR\\uninstall-cleanup.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"',
+    );
     expect(uninstallBlock).toContain('SetOutPath "$TEMP"');
+    expect(uninstallBlock).toContain('Pop $0');
     expect(uninstallBlock.indexOf('SetOutPath "$TEMP"')).toBeLessThan(
       uninstallBlock.indexOf("nsExec::ExecToLog 'powershell"),
+    );
+    // Detach semantics moved into the shared script: rename the live cache to
+    // a .uninstall.<tick> name and hand it to a background recursive delete.
+    expect(uninstallCleanupScript).toContain('.uninstall.');
+    expect(uninstallCleanupScript).toContain('Rename-Item');
+    expect(uninstallCleanupScript).toContain('start "" /b cmd /d /c rd /s /q');
+    expect(uninstallCleanupScript).toContain('runtime-packs');
+    expect(uninstallCleanupScript).not.toContain(
+      'Remove-Item -LiteralPath $RuntimeRoot -Recurse -Force',
+    );
+    expect(uninstallCleanupScript).not.toContain(
+      'Remove-Item -LiteralPath $legacyRoot -Recurse -Force',
     );
   });
 
@@ -462,13 +599,297 @@ describe('NSIS offline resource and local inference flow', () => {
 });
 
 describe('NSIS visual assets', () => {
-  test('uses the matching application icon layer for each installer artwork size', () => {
+  test('generates every branded bitmap the custom UI references', () => {
     const brandAssetScript = fs.readFileSync(brandAssetScriptPath, 'utf8');
+    const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-theme.nsh'), 'utf8');
+    const pagesScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
+    const assetDir = path.resolve('build/installer-assets');
 
-    expect(brandAssetScript).toContain('const sidebarIconPath');
-    expect(brandAssetScript).toContain('const headerIconPath');
-    expect(brandAssetScript).toContain('drawAppIcon(side, sidebarIcon, 14, 14, 58)');
-    expect(brandAssetScript).toContain('drawAppIcon(head, headerIcon, 7, 5, 40)');
-    expect(brandAssetScript).not.toContain('drawWordmarkMark');
+    // The generator owns all artwork; no MUI chrome bitmap helpers remain.
+    for (const legacy of ['drawAppIcon(', 'sidebarIconPath', 'headerIconPath']) {
+      expect(brandAssetScript).not.toContain(legacy);
+    }
+    for (const generatorFn of [
+      'drawBackground',
+      'drawBar',
+      'drawWordmark',
+      'drawDoneGlyph',
+      'drawSide',
+      'FLAT_ZONE_TOP',
+    ]) {
+      expect(brandAssetScript).toContain(generatorFn);
+    }
+
+    // Every asset referenced by the theme/pages exists on disk and is
+    // produced by the generator (license.txt is a straight LICENSE copy).
+    const referenced = new Set<string>();
+    for (const script of [themeScript, pagesScript]) {
+      for (const match of script.matchAll(/\$\{ZY_ASSET_([A-Z_]+)\}/g)) {
+        referenced.add(match[1]);
+      }
+    }
+    const fileByKey: Record<string, string> = {
+      BAND: 'zy-band.bmp',
+      BG: 'zy-bg.bmp',
+      WORDMARK: 'zy-wordmark.bmp',
+      BAR_FILL: 'zy-bar-fill.bmp',
+      BAR_DONE: 'zy-bar-complete.bmp',
+      BAR_TRACK: 'zy-bar-track.bmp',
+      DONE: 'zy-done.bmp',
+      LICENSE: 'license.txt',
+    };
+    expect([...referenced].sort()).toEqual(Object.keys(fileByKey).sort());
+    for (const [key, file] of Object.entries(fileByKey)) {
+      expect(fs.existsSync(path.join(assetDir, file)), `${key} -> ${file}`).toBe(true);
+      if (key !== 'LICENSE') {
+        expect(brandAssetScript).toContain(`'${file}'`);
+      }
+    }
+    expect(brandAssetScript).toContain('copyFileSync(licenseSource, licenseTarget)');
+  });
+});
+
+describe('NSIS custom installer UI wiring', () => {
+  const installerScript = fs.readFileSync(path.resolve('scripts/nsis-installer.nsh'), 'utf8');
+  const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-theme.nsh'), 'utf8');
+  const pagesScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
+
+  test('replaces the native directory page and wires the custom pages', () => {
+    // The native directory page is withdrawn; the hero page hosts the
+    // install-location row instead.
+    expect(installerScript).toContain('!undef allowToChangeInstallationDirectory');
+    expect(installerScript).not.toContain('MUI_PAGE_DIRECTORY');
+    expect(installerScript).not.toContain('MUI_PAGE_WELCOME');
+    expect(installerScript).not.toContain('LocalInferencePageCreate');
+
+    // Page hook macros consumed by the assisted template.
+    expect(installerScript).toContain('Page custom ZYHeroCreate ZYHeroLeave');
+    expect(installerScript).toContain('Page custom ZYFinishCreate ZYFinishLeave');
+    // Uninstaller page callbacks carry the un. prefix in the uninstaller
+    // build via ZY_UNPREFIX.
+    expect(installerScript).toContain(
+      'UninstPage custom ${ZY_UNPREFIX}ZYUnWelcomeCreate ${ZY_UNPREFIX}ZYUnWelcomeLeave',
+    );
+    // The old options page is gone; its hook only injects the instfiles
+    // page callbacks now (MUI undefines MUI_PAGE_CUSTOMFUNCTION_* after each
+    // page insertion, so the SHOW/LEAVE defines must be re-created at every
+    // insertion point).
+    const afterChangeDirStart = installerScript.indexOf('!macro customPageAfterChangeDir');
+    const afterChangeDir = installerScript.slice(
+      afterChangeDirStart,
+      installerScript.indexOf('!macroend', afterChangeDirStart),
+    );
+    expect(afterChangeDir).toContain(
+      '!define MUI_PAGE_CUSTOMFUNCTION_SHOW ${ZY_UNPREFIX}ZY_MuiPageShow',
+    );
+    expect(afterChangeDir).toContain('!define MUI_PAGE_CUSTOMFUNCTION_LEAVE ZY_MuiPageLeave');
+    expect(afterChangeDir).not.toContain('Page custom');
+    // Install-mode page: skipped unless a per-machine installation exists.
+    expect(installerScript).toContain('!macro customInstallMode');
+    expect(installerScript).toContain('StrCpy $isForceCurrentInstall "1"');
+    // The native uninstaller finish page gets the branded side art.
+    expect(installerScript).toContain('!define MUI_UNWELCOMEFINISHPAGE_BITMAP');
+    expect(installerScript).toContain('!macro customUninstallPage');
+  });
+
+  test('declares one progress phase per customInstall stage boundary', () => {
+    expect(installerScript.match(/!insertmacro ZY_ProgressPhase /g)).toHaveLength(10);
+    for (const phase of [
+      'VALIDATING',
+      'STAGING',
+      'EXPANDING',
+      'ACTIVATING',
+      'CONNECTING',
+      'VERIFYING',
+      'VC',
+      'CLEANUP',
+      'FINALIZING',
+      'DONE',
+    ]) {
+      expect(installerScript).toContain(`!insertmacro ZY_ProgressPhase ${phase} `);
+      expect(pagesScript).toContain(`ZY_LangString ZY_PHASE_${phase}`);
+    }
+    // The macro no-ops under /S and swaps in the complete art at 100%.
+    const phaseMacro = themeScript.slice(
+      themeScript.indexOf('!macro ZY_ProgressPhase TOKEN TEXT'),
+      themeScript.indexOf('!macroend', themeScript.indexOf('!macro ZY_ProgressPhase TOKEN TEXT')),
+    );
+    expect(phaseMacro).toContain('${IfNot} ${Silent}');
+    expect(phaseMacro).toContain('ShowWindow $zyComplete ${SW_SHOW}');
+  });
+
+  test('keeps UI code out of the silent execution paths', () => {
+    // customInit/customUnInit also run for /S: only file staging is allowed.
+    for (const macro of ['!macro customInit', '!macro customUnInit']) {
+      const start = installerScript.indexOf(macro);
+      const block = installerScript.slice(start, installerScript.indexOf('!macroend', start));
+      for (const gui of [
+        'nsDialogs::Create',
+        'CreateWindowEx',
+        'ZY_BgInit',
+        'BgImage::',
+        'ZY_ProgressPhase',
+        'nsDialogs::Show',
+      ]) {
+        expect(block, `${macro} must not contain ${gui}`).not.toContain(gui);
+      }
+      expect(block).toContain('!insertmacro ZY_StageUiAssets');
+    }
+    // Staging must leave $OUTDIR (and with it the process CWD) at $PLUGINSDIR:
+    // customInit runs before PrepareExistingInstallForExtraction, and a
+    // SetOutPath $INSTDIR there would create-and-lock the install root, which
+    // trips the detach check on cold installs ("$INSTDIR\*.*" matches an
+    // empty directory) and breaks the detach rename (CI cold-install exit 2).
+    const stageMacro = themeScript.slice(
+      themeScript.indexOf('!macro ZY_StageUiAssets'),
+      themeScript.indexOf('!macroend', themeScript.indexOf('!macro ZY_StageUiAssets')),
+    );
+    expect(stageMacro).toContain('SetOutPath "$PLUGINSDIR"');
+    expect(stageMacro).not.toContain('SetOutPath $INSTDIR');
+    // The phase macro itself no-ops under /S (it lives in the theme file).
+    expect(themeScript).toContain('${IfNot} ${Silent}');
+    // The license text is guarded at compile time and the link degrades to a
+    // notice when it was not staged.
+    expect(themeScript).toContain(
+      '!if /fileexists "${PROJECT_DIR}\\build\\installer-assets\\license.txt"',
+    );
+    expect(pagesScript).toContain('$(ZY_LICENSE_MISSING)');
+  });
+
+  test('ships an entry for every bundled language on the new strings', () => {
+    // The string table is emitted through ZY_LangString helpers: three
+    // translated LCIDs inline plus one shared English block that must list
+    // every remaining bundled LCID, so verify the macro bodies instead of
+    // expanded lines.
+    const enBlock = pagesScript.slice(
+      pagesScript.indexOf('!macro ZY_LangStringEn NAME VALUE'),
+      pagesScript.indexOf('!macroend', pagesScript.indexOf('!macro ZY_LangStringEn NAME VALUE')),
+    );
+    const zhBlock = pagesScript.slice(
+      pagesScript.indexOf('!macro ZY_LangString NAME ZHCN ZHTW EN'),
+      pagesScript.indexOf(
+        '!macroend',
+        pagesScript.indexOf('!macro ZY_LangString NAME ZHCN ZHTW EN'),
+      ),
+    );
+    const englishFallbackLcids = [
+      '1033',
+      '1031',
+      '1036',
+      '3082',
+      '1041',
+      '1042',
+      '1040',
+      '1043',
+      '1030',
+      '1053',
+      '1044',
+      '1035',
+      '1049',
+      '2070',
+      '1046',
+      '1045',
+      '1058',
+      '1029',
+      '1038',
+      '1025',
+      '1055',
+      '1054',
+      '1066',
+      '1051',
+    ];
+    for (const lcid of englishFallbackLcids) {
+      expect(enBlock).toContain(`LangString \${NAME} ${lcid} `);
+    }
+    expect(zhBlock).toContain('LangString ${NAME} 2052 ');
+    expect(zhBlock).toContain('LangString ${NAME} 1028 ');
+    // 2052/1028 must not be duplicated in the English fallback block.
+    expect(enBlock).not.toContain('${NAME} 2052 ');
+    expect(enBlock).not.toContain('${NAME} 1028 ');
+    // Every UI key goes through the trilingual macro.
+    expect(pagesScript.match(/!insertmacro ZY_LangString ZY_/g)!.length).toBeGreaterThanOrEqual(25);
+  });
+
+  test('registers the vendored StdUtils plugin bundle only for preview compiles', () => {
+    // Packaged builds (installer AND uninstaller passes) must NOT register the
+    // vendored bundle themselves: electron-builder already pins its plugin dir
+    // to the same bundle via ELECTRON_BUILDER_NSIS_RESOURCES_DIR, and makensis
+    // 3 aborts with "Plugin command ... conflicts with a plugin in another
+    // directory" when StdUtils.dll is reachable through two differently
+    // spelled paths (the uninstaller pass lacks PROJECT_DIR, so the relative
+    // fallback below resolves differently from electron-builder's absolute
+    // registration). Standalone preview compiles have no electron-builder
+    // header, so they register the vendored bundle behind ZY_PREVIEW, before
+    // the first plugin call. This ordering alone does not make packaged builds
+    // safe — electron-builder's own registration races the include of this
+    // file; see the body-time emission test below.
+    const firstPluginCall = Math.min(
+      pagesScript.indexOf('${if} ${isUpdated}'),
+      pagesScript.indexOf('${StdUtils.ExecShellAsUser} $1'),
+    );
+    const pluginDir = pagesScript.indexOf(
+      '!addplugindir /x86-unicode "${PROJECT_DIR}\\build\\nsis-resources\\plugins\\x86-unicode"',
+    );
+    expect(pluginDir).toBeGreaterThanOrEqual(0);
+    expect(firstPluginCall).toBeGreaterThan(pluginDir);
+    expect(pagesScript.indexOf('!ifdef ZY_PREVIEW')).toBeLessThan(pluginDir);
+    expect(pagesScript.indexOf('!endif', pluginDir)).toBeGreaterThan(pluginDir);
+    expect(
+      fs.existsSync(path.resolve('build/nsis-resources/plugins/x86-unicode/StdUtils.dll')),
+    ).toBe(true);
+  });
+
+  test('emits the only plugin-calling page callback from body-time code', () => {
+    // ZYFinishLeave is the only page callback that reaches the StdUtils plugin
+    // (${isUpdated} and ${StdUtils.ExecShellAsUser}). electron-builder
+    // registers that plugin's directory from a task concurrent with the
+    // header-time !include of zy-pages.nsh (NsisTarget.js
+    // computeCommonInstallerScriptHeader), so the !addplugindir line can land
+    // after this file has been compiled and makensis aborts the packaged build
+    // with "Plugin not found, cannot call StdUtils::TestParameter".
+    // Re-registering the vendored bundle from here is not an option (duplicate
+    // plugin directory), so the definition must be emitted through
+    // customFinishPage — installer body, once the header is complete. That is
+    // where electron-builder defines its own equivalent StartApp function.
+    const code = pagesScript.replace(/^\s*;.*$/gm, '');
+    const macroStart = code.indexOf('!macro ZY_DefineFinishLeave');
+    const functionStart = code.indexOf('Function ZYFinishLeave');
+    const macroEnd = code.indexOf('!macroend', functionStart);
+    expect(macroStart).toBeGreaterThanOrEqual(0);
+    expect(functionStart).toBeGreaterThan(macroStart);
+    expect(macroEnd).toBeGreaterThan(functionStart);
+    // No header-time plugin call may survive anywhere above the macro.
+    for (const marker of ['${StdUtils.', '${if} ${isUpdated}']) {
+      expect(code.indexOf(marker)).toBeGreaterThan(macroStart);
+    }
+
+    const hookStart = installerScript.indexOf('!macro customFinishPage');
+    const hookEnd = installerScript.indexOf('!macroend', hookStart);
+    const insertion = installerScript.indexOf('!insertmacro ZY_DefineFinishLeave');
+    const page = installerScript.indexOf('Page custom ZYFinishCreate ZYFinishLeave');
+    expect(hookStart).toBeGreaterThanOrEqual(0);
+    expect(insertion).toBeGreaterThan(hookStart);
+    expect(page).toBeGreaterThan(insertion);
+    expect(page).toBeLessThan(hookEnd);
+
+    // The preview harness mirrors the production insertion sequence.
+    expect(fs.readFileSync(path.resolve('scripts/installer-ui/preview.nsi'), 'utf8')).toContain(
+      '!insertmacro ZY_DefineFinishLeave',
+    );
+  });
+
+  test('drops the legacy MUI chrome bitmaps from the packaging config', () => {
+    const builderConfig = fs.readFileSync(path.resolve('electron-builder.json'), 'utf8');
+    expect(builderConfig).not.toContain('installerHeader');
+    expect(builderConfig).not.toContain('installerSidebar');
+    expect(builderConfig).not.toContain('uninstallerSidebar');
+    expect(builderConfig).toContain('"include": "scripts/nsis-installer.nsh"');
+    for (const legacy of [
+      'installerHeader.bmp',
+      'installerSidebar.bmp',
+      'uninstallerSidebar.bmp',
+    ]) {
+      expect(fs.existsSync(path.resolve('build/installer-assets', legacy))).toBe(false);
+    }
   });
 });
