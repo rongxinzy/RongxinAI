@@ -61,6 +61,13 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Use the repo-vendored NSIS plugin bundle instead of the shared
+          # electron-builder cache: restored CI caches have yielded a
+          # nsis-resources bundle without its plugins directory (makensis then
+          # silently drops the addplugindir and fails at the first plugin
+          # call), and duplicating a plugin dll across two plugin dirs is a
+          # hard "conflicts with a plugin in another directory" error.
+          ELECTRON_BUILDER_NSIS_RESOURCES_DIR: ${{ github.workspace }}/build/nsis-resources
       - name: Check offline installer size
         shell: powershell
         run: >-

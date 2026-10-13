@@ -40,11 +40,13 @@ describe('online update release tools', () => {
 
   function createManifest(version: string, filename = 'installer') {
     const windowsArtifact = path.join(temporaryDirectory, `${filename}.exe`);
+    const macosX64Artifact = path.join(temporaryDirectory, `${filename}-x64.dmg`);
     const macosArtifact = path.join(temporaryDirectory, `${filename}.dmg`);
     const linuxDebArtifact = path.join(temporaryDirectory, `${filename}.deb`);
     const linuxAppImageArtifact = path.join(temporaryDirectory, `${filename}.AppImage`);
     const manifestPath = path.join(temporaryDirectory, `${version}-${filename}.json`);
     fs.writeFileSync(windowsArtifact, 'windows artifact');
+    fs.writeFileSync(macosX64Artifact, 'macos x64 artifact');
     fs.writeFileSync(macosArtifact, 'macos artifact');
     fs.writeFileSync(linuxDebArtifact, 'linux deb artifact');
     fs.writeFileSync(linuxAppImageArtifact, 'linux appimage artifact');
@@ -56,6 +58,7 @@ describe('online update release tools', () => {
         version,
         'a'.repeat(40),
         `${windowsArtifact}:win32:x64:lite`,
+        `${macosX64Artifact}:darwin:x64:default`,
         `${macosArtifact}:darwin:arm64:default`,
         `${linuxDebArtifact}:linux:x64:deb`,
         `${linuxAppImageArtifact}:linux:x64:appimage`,
@@ -101,6 +104,7 @@ describe('online update release tools', () => {
     const version = '2026.7.5';
     const artifacts = [
       ['win32', 'x64', 'lite', 'installer.exe'],
+      ['darwin', 'x64', 'default', 'installer-x64.dmg'],
       ['darwin', 'arm64', 'default', 'installer.dmg'],
       ['linux', 'x64', 'deb', 'installer.deb'],
       ['linux', 'x64', 'appimage', 'installer.AppImage'],
@@ -155,6 +159,7 @@ describe('online update release tools', () => {
     const version = '2026.7.5';
     const artifacts = [
       ['win32', 'x64', 'lite', 'installer.exe'],
+      ['darwin', 'x64', 'default', 'installer-x64.dmg'],
       ['darwin', 'arm64', 'default', 'installer.dmg'],
       ['linux', 'x64', 'deb', 'installer.deb'],
       ['linux', 'x64', 'appimage', 'installer.AppImage'],
@@ -190,8 +195,8 @@ describe('online update release tools', () => {
           ...updaterArtifacts,
           {
             ...artifacts[1],
-            arch: 'x64',
-            key: `releases/${version}/darwin-x64-default/installer.dmg`,
+            arch: 'armv7',
+            key: `releases/${version}/darwin-armv7-default/installer-x64.dmg`,
           },
         ],
         'must contain exactly the required targets',
@@ -393,6 +398,7 @@ describe('online update release tools', () => {
     const version = '2026.7.7';
     const targets = [
       ['win32', 'x64', 'lite', 'latest.yml', 'ZhiYuan.exe'],
+      ['darwin', 'x64', 'default', 'latest-mac.yml', 'ZhiYuan-x64.zip'],
       ['darwin', 'arm64', 'default', 'latest-mac.yml', 'ZhiYuan.zip'],
       ['linux', 'x64', 'appimage', 'latest-linux.yml', 'ZhiYuan.AppImage'],
       ['linux', 'x64', 'deb', 'latest-linux.yml', 'ZhiYuan.deb'],

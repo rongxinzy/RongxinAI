@@ -75,10 +75,14 @@ describe('release candidate manifest', () => {
     );
   });
 
-  test('accepts only a complete three-platform candidate', async () => {
+  test('accepts only a complete multi-architecture candidate', async () => {
     const manifests = [
       {
         target: CandidateTarget.WindowsX64Lite,
+        kinds: ['installer', 'updater', 'blockmap', 'metadata'],
+      },
+      {
+        target: CandidateTarget.MacX64Default,
         kinds: ['installer', 'updater', 'blockmap', 'metadata'],
       },
       {

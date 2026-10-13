@@ -177,6 +177,12 @@ jobs:
             runner: macos-latest
             target: darwin-arm64-default
             runtime_target: mac-arm64
+            arch: arm64
+          - platform: macos
+            runner: macos-15-intel
+            target: darwin-x64-default
+            runtime_target: mac-x64
+            arch: x64
           - platform: linux
             runner: ubuntu-latest
             target: linux-x64-default
@@ -282,7 +288,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Build unsigned macOS release
         if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -290,7 +296,7 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build signed macOS release
         if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -390,16 +396,16 @@ jobs:
           blockmaps=(release/*.zip.blockmap)
           [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one macOS DMG, ZIP, and blockmap' >&2; exit 1; }
           node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-release.outputs.version }}' darwin arm64 default \
+            '${{ needs.prepare-release.outputs.version }}' darwin ${{ matrix.arch }} default \
             release/latest-mac.yml release/electron-updater/latest-mac.yml
           node scripts/release/create-release-candidate.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             '${{ needs.prepare-release.outputs.commit }}' \
-            '${{ github.run_id }}' candidate candidate-darwin-arm64-default.json \
-            "${dmgs[0]}:darwin:arm64:default:installer" \
-            "${zips[0]}:darwin:arm64:default:updater" \
-            "${blockmaps[0]}:darwin:arm64:default:blockmap" \
-            'release/electron-updater/latest-mac.yml:darwin:arm64:default:metadata'
+            '${{ github.run_id }}' candidate candidate-darwin-${{ matrix.arch }}-default.json \
+            "${dmgs[0]}:darwin:${{ matrix.arch }}:default:installer" \
+            "${zips[0]}:darwin:${{ matrix.arch }}:default:updater" \
+            "${blockmaps[0]}:darwin:${{ matrix.arch }}:default:blockmap" \
+            'release/electron-updater/latest-mac.yml:darwin:${{ matrix.arch }}:default:metadata'
       - name: Assemble Linux release payload
         if: ${{ matrix.platform == 'linux' }}
         shell: bash
@@ -455,8 +461,12 @@ jobs:
           name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-lite
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/macos
+          path: candidate/macos-arm64
           name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-default
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/macos-x64
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-default
       - uses: actions/download-artifact@v8
         with:
           path: candidate/linux
@@ -467,7 +477,8 @@ jobs:
           set -euo pipefail
           manifests=(
             candidate/windows/candidate-win32-x64-lite.json
-            candidate/macos/candidate-darwin-arm64-default.json
+            candidate/macos-arm64/candidate-darwin-arm64-default.json
+            candidate/macos-x64/candidate-darwin-x64-default.json
             candidate/linux/candidate-linux-x64.json
           )
           for manifest in "${manifests[@]}"; do
@@ -478,7 +489,7 @@ jobs:
             '${{ needs.prepare-release.outputs.commit }}' \
             '${{ github.run_id }}' \
             "${manifests[@]}" \
-            --payload-roots candidate/windows candidate/macos candidate/linux
+            --payload-roots candidate/windows candidate/macos-arm64 candidate/macos-x64 candidate/linux
       - name: Configure protected R2 access
         shell: bash
         env:
@@ -501,16 +512,17 @@ jobs:
             '${{ github.run_id }}' \
             uploaded-metadata \
             candidate/windows/candidate-win32-x64-lite.json \
-            candidate/macos/candidate-darwin-arm64-default.json \
+            candidate/macos-arm64/candidate-darwin-arm64-default.json \
+            candidate/macos-x64/candidate-darwin-x64-default.json \
             candidate/linux/candidate-linux-x64.json \
-            --payload-roots candidate/windows candidate/macos candidate/linux
+            --payload-roots candidate/windows candidate/macos-arm64 candidate/macos-x64 candidate/linux
       - name: Create signed stable manifest from uploaded release metadata
         run: |
           node scripts/release/publish-update-manifest.mjs \
             manifest/stable.json \
             '${{ needs.prepare-release.outputs.version }}' \
             '${{ needs.prepare-release.outputs.commit }}' \
-            --metadata uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json
+            --metadata uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
@@ -565,7 +577,7 @@ jobs:
         if: steps.version_check.outputs.idempotent != 'true'
         shell: bash
         run: |
-          metadata=(uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json)
+          metadata=(uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json)
           mkdir -p manifest/electron
           while IFS=$'\t' read -r key target filename; do
             target_file="${target//:/-}"
@@ -575,6 +587,7 @@ jobs:
           node scripts/release/verify-electron-updater-generation.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             manifest/electron/win32-x64-lite/latest.yml:win32:x64:lite \
+            manifest/electron/darwin-x64-default/latest-mac.yml:darwin:x64:default \
             manifest/electron/darwin-arm64-default/latest-mac.yml:darwin:arm64:default \
             manifest/electron/linux-x64-appimage/latest-linux.yml:linux:x64:appimage \
             manifest/electron/linux-x64-deb/latest-linux.yml:linux:x64:deb \

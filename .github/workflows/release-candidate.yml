@@ -143,6 +143,12 @@ jobs:
             runner: macos-latest
             target: darwin-arm64-default
             runtime_target: mac-arm64
+            arch: arm64
+          - platform: macos
+            runner: macos-15-intel
+            target: darwin-x64-default
+            runtime_target: mac-x64
+            arch: x64
           - platform: linux
             runner: ubuntu-latest
             target: linux-x64-default
@@ -246,7 +252,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Build unsigned macOS candidate
         if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-candidate.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -254,7 +260,7 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build signed macOS candidate
         if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-candidate.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -362,16 +368,16 @@ jobs:
           blockmaps=(release/*.zip.blockmap)
           [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one macOS DMG, ZIP, and blockmap' >&2; exit 1; }
           node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-candidate.outputs.version }}' darwin arm64 default \
+            '${{ needs.prepare-candidate.outputs.version }}' darwin ${{ matrix.arch }} default \
             release/latest-mac.yml release/electron-updater/latest-mac.yml
           node scripts/release/create-release-candidate.mjs \
             '${{ needs.prepare-candidate.outputs.version }}' \
             '${{ needs.prepare-candidate.outputs.commit }}' \
-            '${{ github.run_id }}' candidate candidate-darwin-arm64-default.json \
-            "${dmgs[0]}:darwin:arm64:default:installer" \
-            "${zips[0]}:darwin:arm64:default:updater" \
-            "${blockmaps[0]}:darwin:arm64:default:blockmap" \
-            'release/electron-updater/latest-mac.yml:darwin:arm64:default:metadata'
+            '${{ github.run_id }}' candidate candidate-darwin-${{ matrix.arch }}-default.json \
+            "${dmgs[0]}:darwin:${{ matrix.arch }}:default:installer" \
+            "${zips[0]}:darwin:${{ matrix.arch }}:default:updater" \
+            "${blockmaps[0]}:darwin:${{ matrix.arch }}:default:blockmap" \
+            'release/electron-updater/latest-mac.yml:darwin:${{ matrix.arch }}:default:metadata'
       - name: Assemble Linux candidate payload
         if: ${{ matrix.platform == 'linux' }}
         shell: bash
@@ -427,7 +433,7 @@ jobs:
         shell: bash
         run: |
           mapfile -t manifests < <(find candidate-manifests -type f -name 'candidate-*.json' | sort)
-          [[ ${#manifests[@]} -eq 3 ]] || { echo 'Expected exactly three platform candidate manifests' >&2; exit 1; }
+          [[ ${#manifests[@]} -eq 4 ]] || { echo 'Expected exactly four platform candidate manifests' >&2; exit 1; }
           node scripts/release/verify-release-candidate.mjs \
             '${{ needs.prepare-candidate.outputs.version }}' \
             '${{ needs.prepare-candidate.outputs.commit }}' \
