@@ -19,15 +19,22 @@
 ; !addplugindir for that bundle — from concurrent generator tasks, so the
 ; line can land after this file's !include, while ZYFinishLeave already
 ; compiles ${isUpdated} (StdUtils::TestParameter) and
-; ${StdUtils.ExecShellAsUser} at include time. Register the repo-vendored
-; bundle up front; makensis accepts the directory being registered again
-; when electron-builder's own line lands later.
+; ${StdUtils.ExecShellAsUser} at include time.
+;
+; Registering the repo-vendored bundle in packaged builds does NOT work:
+; makensis 3 aborts with "Plugin command StdUtils::GetAllParameters conflicts
+; with a plugin in another directory" the moment electron-builder's own
+; plugin dir is also registered (assistedInstaller.nsh -> multiUser.nsh ->
+; setInstallModePerAllUsers). The vendored bundle therefore only serves
+; standalone preview compiles, where no electron-builder header exists.
 ; ---------------------------------------------------------------------------
-!ifdef PROJECT_DIR
-  !addplugindir /x86-unicode "${PROJECT_DIR}\build\nsis-resources\plugins\x86-unicode"
-!else
-  ; Relative fallback for direct local makensis runs from scripts/.
-  !addplugindir /x86-unicode "..\build\nsis-resources\plugins\x86-unicode"
+!ifdef ZY_PREVIEW
+  !ifdef PROJECT_DIR
+    !addplugindir /x86-unicode "${PROJECT_DIR}\build\nsis-resources\plugins\x86-unicode"
+  !else
+    ; Relative fallback for direct local makensis runs from scripts/.
+    !addplugindir /x86-unicode "..\build\nsis-resources\plugins\x86-unicode"
+  !endif
 !endif
 
 ; ---------------------------------------------------------------------------

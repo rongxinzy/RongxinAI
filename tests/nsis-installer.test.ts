@@ -750,12 +750,17 @@ describe('NSIS custom installer UI wiring', () => {
     expect(pagesScript.match(/!insertmacro ZY_LangString ZY_/g)!.length).toBeGreaterThanOrEqual(25);
   });
 
-  test('registers the vendored StdUtils plugin bundle before the pages compile', () => {
-    // electron-builder emits the shared header's !addplugindir from concurrent
-    // generator tasks, so it can land after this include while ZYFinishLeave
-    // already compiles ${isUpdated} (StdUtils::TestParameter) and
-    // ${StdUtils.ExecShellAsUser} at include time; the pages must register
-    // the repo-vendored bundle themselves, before any plugin call.
+  test('registers the vendored StdUtils plugin bundle only for preview compiles', () => {
+    // Packaged builds (installer AND uninstaller passes) must NOT register the
+    // vendored bundle themselves: electron-builder already pins its plugin dir
+    // to the same bundle via ELECTRON_BUILDER_NSIS_RESOURCES_DIR, and makensis
+    // 3 aborts with "Plugin command ... conflicts with a plugin in another
+    // directory" when StdUtils.dll is reachable through two differently
+    // spelled paths (the uninstaller pass lacks PROJECT_DIR, so the relative
+    // fallback below resolves differently from electron-builder's absolute
+    // registration). Standalone preview compiles have no electron-builder
+    // header, so they register the vendored bundle behind ZY_PREVIEW, before
+    // the first plugin call.
     const firstPluginCall = Math.min(
       pagesScript.indexOf('${if} ${isUpdated}'),
       pagesScript.indexOf('${StdUtils.ExecShellAsUser} $1'),
@@ -765,6 +770,8 @@ describe('NSIS custom installer UI wiring', () => {
     );
     expect(pluginDir).toBeGreaterThanOrEqual(0);
     expect(firstPluginCall).toBeGreaterThan(pluginDir);
+    expect(pagesScript.indexOf('!ifdef ZY_PREVIEW')).toBeLessThan(pluginDir);
+    expect(pagesScript.indexOf('!endif', pluginDir)).toBeGreaterThan(pluginDir);
     expect(
       fs.existsSync(path.resolve('build/nsis-resources/plugins/x86-unicode/StdUtils.dll')),
     ).toBe(true);
