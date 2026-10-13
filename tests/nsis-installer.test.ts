@@ -339,6 +339,28 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(browseBlock).toContain('StrCpy $INSTDIR "$INSTDIR\\${APP_FILENAME}"');
   });
 
+  test('uninstall removes the real userData directory with the app-data decision', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    // electron-builder's app-data list only covers product-name variants; the
+    // real userData (%APPDATA%\ZhiYuanAgent) must go through the same
+    // delete-app-data decision as the WebView2 shell uninstaller.
+    const unInstallStart = installerScript.indexOf('!macro customUnInstall\n');
+    const unInstallBlock = installerScript.slice(
+      unInstallStart,
+      installerScript.indexOf('!macroend', unInstallStart),
+    );
+    expect(unInstallBlock).toContain('RMDir /r "$APPDATA\\ZhiYuanAgent"');
+    expect(unInstallBlock).toContain('--delete-app-data');
+    expect(unInstallBlock).toContain('DELETE_APP_DATA_ON_UNINSTALL');
+    // The decision is recomputed because customUnInstall runs before
+    // uninstaller.nsh declares its own $isDeleteAppData variable, and the
+    // macro must not rely on customUnInstallSection (file scope, where
+    // runtime instructions are invalid).
+    expect(installerScript).toContain('Var /GLOBAL zyDeleteRealAppData');
+    expect(installerScript).not.toContain('customUnInstallSection');
+  });
+
   test('delays old version cleanup until runtime links are ready', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const cleanupScript = fs.readFileSync(

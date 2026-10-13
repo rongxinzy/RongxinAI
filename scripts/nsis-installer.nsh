@@ -16,6 +16,9 @@
 Var /GLOBAL installLocalInference
 Var /GLOBAL preparedInstallRoot
 !endif
+; Used by customUnInstall in the uninstaller pass to mirror uninstaller.nsh's
+; delete-app-data decision for the real userData directory.
+Var /GLOBAL zyDeleteRealAppData
 
 ; ---------------------------------------------------------------------------
 ; Macros consumed by the UI includes below. NSIS macros must be defined
@@ -798,16 +801,27 @@ Var /GLOBAL preparedInstallRoot
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\uninstall-cleanup.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes"'
   Pop $0
 
-!macroend
-
-!macro customUnInstallSection
   ; electron-builder's DELETE_APP_DATA list only covers $APPDATA\<product
   ; name> variants; the app's real userData directory is %APPDATA%\ZhiYuanAgent
   ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs). The
-  ; WebView2 shell uninstaller removes that same tree, so honor the identical
-  ; delete-app-data decision here to keep both uninstallers consistent.
-  ; Runs at the end of the uninstall section, after $isDeleteAppData is set.
-  ${if} $isDeleteAppData == "1"
+  ; WebView2 shell uninstaller removes that same tree, so mirror the exact
+  ; delete-app-data decision uninstaller.nsh makes and remove it too. The
+  ; decision has to be recomputed here: customUnInstall runs before
+  ; uninstaller.nsh declares its own $isDeleteAppData variable.
+  StrCpy $zyDeleteRealAppData "0"
+  ClearErrors
+  ${GetParameters} $R0
+  ${GetOptions} $R0 "--delete-app-data" $R1
+  ${if} ${Errors}
+    !ifdef DELETE_APP_DATA_ON_UNINSTALL
+      ${ifNot} ${isUpdated}
+        StrCpy $zyDeleteRealAppData "1"
+      ${endif}
+    !endif
+  ${else}
+    StrCpy $zyDeleteRealAppData "1"
+  ${endif}
+  ${if} $zyDeleteRealAppData == "1"
     ${if} $installMode == "all"
       SetShellVarContext current
     ${endif}
@@ -816,4 +830,5 @@ Var /GLOBAL preparedInstallRoot
       SetShellVarContext all
     ${endif}
   ${endif}
+
 !macroend
