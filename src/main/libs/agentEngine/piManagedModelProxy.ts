@@ -1,8 +1,10 @@
 import { randomUUID } from 'crypto';
 
 import { ProviderModelPiApi, ProviderName } from '../../../shared/providers';
+import { ZhiyuanModelPool } from '../../../shared/modelPool/constants';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
 import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
+import { probeZhiyuanIntranet, zhiyuanIntranetApiKey } from '../zhiyuanIntranet';
 import type { ApiConfigResolution } from '../claudeSettings';
 import type { PiModelApi } from './piModelApi';
 import {
@@ -11,6 +13,17 @@ import {
 } from './piOpenAICompatProxy';
 
 const CUSTOM_PROVIDER_KEY_PREFIX = 'custom_';
+
+// A route switch (cloud pool <-> intranet gateway) must not leave the previous
+// route's token refresher behind: on an intranet 401 the proxy would otherwise
+// refresh a community token and overwrite the fixed intranet key, wedging the
+// upstream until it is re-registered.
+const tokenRefresherReleases = new Map<string, () => void>();
+
+function releaseTokenRefresher(providerName: string): void {
+  tokenRefresherReleases.get(providerName)?.();
+  tokenRefresherReleases.delete(providerName);
+}
 
 /**
  * Per-process capability that authenticates the Pi runtime against the local
@@ -70,9 +83,24 @@ export async function resolvePiCustomModelBaseUrl(
   }
 
   if (providerMetadata.providerName === ProviderName.Zhiyuan) {
+    // On the office intranet the free model is served by the local gateway;
+    // prefer it over the cloud pool whenever it serves the intranet model.
+    if (await probeZhiyuanIntranet()) {
+      releaseTokenRefresher(providerMetadata.providerName);
+      return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
+        baseURL: ZhiyuanModelPool.IntranetBaseUrl,
+        apiKey: zhiyuanIntranetApiKey(),
+        requiredIncomingApiKey: PI_MANAGED_PROXY_API_KEY,
+        upstreamModel: ZhiyuanModelPool.IntranetModelId,
+      });
+    }
     const accessToken = await getModelPoolAccessToken();
-    registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
-      getModelPoolAccessToken({ forceRefresh: true }),
+    releaseTokenRefresher(providerMetadata.providerName);
+    tokenRefresherReleases.set(
+      providerMetadata.providerName,
+      registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
+        getModelPoolAccessToken({ forceRefresh: true }),
+      ),
     );
     return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
       baseURL: config.baseURL,
