@@ -14,6 +14,17 @@ import {
 
 const CUSTOM_PROVIDER_KEY_PREFIX = 'custom_';
 
+// A route switch (cloud pool <-> intranet gateway) must not leave the previous
+// route's token refresher behind: on an intranet 401 the proxy would otherwise
+// refresh a community token and overwrite the fixed intranet key, wedging the
+// upstream until it is re-registered.
+const tokenRefresherReleases = new Map<string, () => void>();
+
+function releaseTokenRefresher(providerName: string): void {
+  tokenRefresherReleases.get(providerName)?.();
+  tokenRefresherReleases.delete(providerName);
+}
+
 /**
  * Per-process capability that authenticates the Pi runtime against the local
  * managed-model loopback proxy for the built-in Zhiyuan provider. Managed
@@ -75,6 +86,7 @@ export async function resolvePiCustomModelBaseUrl(
     // On the office intranet the free model is served by the local gateway;
     // prefer it over the cloud pool whenever it serves the intranet model.
     if (await probeZhiyuanIntranet()) {
+      releaseTokenRefresher(providerMetadata.providerName);
       return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
         baseURL: ZhiyuanModelPool.IntranetBaseUrl,
         apiKey: zhiyuanIntranetApiKey(),
@@ -83,8 +95,12 @@ export async function resolvePiCustomModelBaseUrl(
       });
     }
     const accessToken = await getModelPoolAccessToken();
-    registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
-      getModelPoolAccessToken({ forceRefresh: true }),
+    releaseTokenRefresher(providerMetadata.providerName);
+    tokenRefresherReleases.set(
+      providerMetadata.providerName,
+      registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
+        getModelPoolAccessToken({ forceRefresh: true }),
+      ),
     );
     return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
       baseURL: config.baseURL,

@@ -70,15 +70,20 @@ interface ModelPoolFetchResult {
   usedIntranet: boolean;
 }
 
+type ModelPoolTokenProvider = () => Promise<string>;
+
 async function fetchModelPool(
   body: Record<string, unknown>,
-  token: string,
+  tokenProvider: ModelPoolTokenProvider,
   signal: AbortSignal,
   conversationId: string,
 ): Promise<ModelPoolFetchResult> {
   const baseUrl = await resolveModelPoolBaseUrl();
   const usedIntranet = isIntranetBaseUrl(baseUrl);
-  const authorization = usedIntranet ? zhiyuanIntranetApiKey() : token;
+  // The community token is only needed for the cloud pool: on the intranet the
+  // fixed gateway key authenticates, so token acquisition stays lazy and the
+  // free model keeps working without community connectivity.
+  const authorization = usedIntranet ? zhiyuanIntranetApiKey() : await tokenProvider();
   const response = await retrySessionBusy(
     () =>
       session.defaultSession.fetch(`${baseUrl}/v1/chat/completions`, {
@@ -104,12 +109,14 @@ async function fetchModelPool(
 
 async function fetchModelPoolModels(
   communityAuthSession: CommunityAuthSessionManager,
-): Promise<Response> {
+): Promise<ModelPoolFetchResult> {
   const baseUrl = await resolveModelPoolBaseUrl();
-  if (isIntranetBaseUrl(baseUrl)) {
-    return session.defaultSession.fetch(`${baseUrl}/v1/models`, {
+  const usedIntranet = isIntranetBaseUrl(baseUrl);
+  if (usedIntranet) {
+    const response = await session.defaultSession.fetch(`${baseUrl}/v1/models`, {
       headers: { Authorization: `Bearer ${zhiyuanIntranetApiKey()}` },
     });
+    return { response, usedIntranet };
   }
   const fetchModels = (token: string) =>
     session.defaultSession.fetch(`${baseUrl}/v1/models`, {
@@ -121,7 +128,7 @@ async function fetchModelPoolModels(
     accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
     response = await fetchModels(accessToken);
   }
-  return response;
+  return { response, usedIntranet };
 }
 
 function parseModelIds(value: unknown): string[] {
@@ -141,7 +148,8 @@ export function registerModelPoolIpcHandlers(
   warmZhiyuanIntranetProbe();
   ipcMain.handle(ModelPoolIpc.ListModels, async () => {
     try {
-      const response = await fetchModelPoolModels(communityAuthSession);
+      const fetchResult = await fetchModelPoolModels(communityAuthSession);
+      const response = fetchResult.response;
       if (!response.ok) {
         const result = {
           ok: false,
@@ -151,10 +159,18 @@ export function registerModelPoolIpcHandlers(
         };
         return ModelPoolModelsSchema.output.parse(result);
       }
+      let models = parseModelIds((await response.json()) as unknown);
+      if (fetchResult.usedIntranet) {
+        // The renderer only knows the logical free model id; report the
+        // intranet model under that id instead of the physical gateway name.
+        models = models.map(modelId =>
+          modelId === ZhiyuanModelPool.IntranetModelId ? ZhiyuanModelPool.FreeModelId : modelId,
+        );
+      }
       const result = {
         ok: true,
         status: response.status,
-        models: parseModelIds((await response.json()) as unknown),
+        models,
       };
       return ModelPoolModelsSchema.output.parse(result);
     } catch {
@@ -183,19 +199,23 @@ export function registerModelPoolIpcHandlers(
     };
 
     try {
-      let accessToken = await communityAuthSession.getModelPoolAccessToken();
+      let forceTokenRefresh = false;
+      const tokenProvider: ModelPoolTokenProvider = async () =>
+        forceTokenRefresh
+          ? communityAuthSession.getModelPoolAccessToken({ forceRefresh: true })
+          : communityAuthSession.getModelPoolAccessToken();
       let fetchResult = await fetchModelPool(
         input.body,
-        accessToken,
+        tokenProvider,
         controller.signal,
         input.conversationId,
       );
       if (fetchResult.response.status === 401 && !fetchResult.usedIntranet) {
         await fetchResult.response.body?.cancel();
-        accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
+        forceTokenRefresh = true;
         fetchResult = await fetchModelPool(
           input.body,
-          accessToken,
+          tokenProvider,
           controller.signal,
           input.conversationId,
         );

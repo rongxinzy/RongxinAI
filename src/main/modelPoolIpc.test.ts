@@ -73,6 +73,9 @@ describe('Model Pool IPC', () => {
       { requestId: 'cancel-auth', conversationId: 'session', body: {} },
     );
     expect(electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-auth')).toBe(true);
+    // Token acquisition now happens after route resolution, so wait until the
+    // handler is actually awaiting credentials before releasing the promise.
+    await vi.waitFor(() => expect(manager.getModelPoolAccessToken).toHaveBeenCalled());
     resolveToken('token');
     await expect(pending).resolves.toMatchObject({ ok: false });
     expect(electronMocks.fetch).not.toHaveBeenCalled();
@@ -131,6 +134,29 @@ describe('Model Pool IPC', () => {
       'https://zhiyuan-model-pool-staging.windflyme5.workers.dev/v1/models',
       { headers: { Authorization: 'Bearer model-pool-access-token' } },
     );
+  });
+
+  test('reports the intranet model under the logical free model id', async () => {
+    intranetMocks.probe.mockResolvedValue(true);
+    const sessionManager = createSessionManager();
+    electronMocks.fetch.mockResolvedValue(
+      Response.json({
+        object: 'list',
+        data: [{ id: ZhiyuanModelPool.IntranetModelId, object: 'model' }],
+      }),
+    );
+    registerModelPoolIpcHandlers(sessionManager);
+    const handler = electronMocks.handlers.get(ModelPoolIpc.ListModels);
+
+    await expect(handler?.({})).resolves.toEqual({
+      ok: true,
+      status: 200,
+      models: [ZhiyuanModelPool.FreeModelId],
+    });
+    expect(electronMocks.fetch).toHaveBeenCalledWith('http://172.18.5.188:3000/v1/models', {
+      headers: { Authorization: 'Bearer intranet-api-key' },
+    });
+    expect(sessionManager.getModelPoolAccessToken).not.toHaveBeenCalled();
   });
 
   test('does not expose models when the business policy rejects the account', async () => {
@@ -255,7 +281,7 @@ describe('Model Pool IPC', () => {
       model: ZhiyuanModelPool.IntranetModelId,
       stream: true,
     });
-    expect(sessionManager.getModelPoolAccessToken).toHaveBeenCalledTimes(1);
+    expect(sessionManager.getModelPoolAccessToken).not.toHaveBeenCalled();
   });
 
   test('does not refresh community credentials for an intranet authentication rejection', async () => {
@@ -276,7 +302,7 @@ describe('Model Pool IPC', () => {
       ),
     ).resolves.toMatchObject({ ok: false, status: 401 });
 
-    expect(sessionManager.getModelPoolAccessToken).toHaveBeenCalledTimes(1);
+    expect(sessionManager.getModelPoolAccessToken).not.toHaveBeenCalled();
     expect(electronMocks.fetch).toHaveBeenCalledTimes(1);
   });
 });
