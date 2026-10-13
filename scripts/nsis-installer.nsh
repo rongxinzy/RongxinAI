@@ -17,8 +17,12 @@ Var /GLOBAL installLocalInference
 Var /GLOBAL preparedInstallRoot
 !endif
 ; Used by customUnInstall in the uninstaller pass to mirror uninstaller.nsh's
-; delete-app-data decision for the real userData directory.
+; delete-app-data decision for the real userData directory. Uninstaller pass
+; only: in the installer pass the variable would be unused and -WX promotes
+; makensis warning 6001 to an error.
+!ifdef BUILD_UNINSTALLER
 Var /GLOBAL zyDeleteRealAppData
+!endif
 
 ; ---------------------------------------------------------------------------
 ; Macros consumed by the UI includes below. NSIS macros must be defined
