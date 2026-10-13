@@ -39,9 +39,10 @@ export function classicMenu(dark: boolean): MenuAppearances {
     }),
     'menu-item': recipe({
       base: {
-        gap: '0.375rem',
+        'min-height': '2rem',
+        gap: '0.5rem',
         'border-radius': 'var(--zy-style-radius-md)',
-        padding: '0.25rem 0.375rem',
+        padding: '0.375rem 0.5rem',
         'font-size': 'var(--zy-component-text-sm)',
         'outline-style': 'none',
       },
@@ -61,7 +62,7 @@ export function classicMenu(dark: boolean): MenuAppearances {
     'menu-check-item': recipe({ base: { 'padding-inline-end': '2rem' } }),
     'menu-label': recipe({
       base: {
-        padding: '0.25rem 0.375rem',
+        padding: '0.375rem 0.5rem',
         'font-size': 'var(--zy-component-text-xs)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
         color: 'var(--muted-foreground)',

@@ -44,11 +44,12 @@ export function classicSelect(dark: boolean): SelectAppearances {
     }),
     'select-item': recipe({
       base: {
+        'min-height': '2rem',
         'border-radius': 'var(--zy-style-radius-md)',
-        'padding-block': '0.25rem',
-        'padding-inline-start': '0.375rem',
+        'padding-block': '0.375rem',
+        'padding-inline-start': '0.5rem',
         'padding-inline-end': '2rem',
-        gap: '0.375rem',
+        gap: '0.5rem',
         'font-size': 'var(--zy-component-text-sm)',
         'outline-style': 'none',
       },
@@ -59,7 +60,7 @@ export function classicSelect(dark: boolean): SelectAppearances {
     }),
     'select-label': recipe({
       base: {
-        padding: '0.25rem 0.375rem',
+        padding: '0.375rem 0.5rem',
         'font-size': 'var(--zy-component-text-xs)',
         color: 'var(--muted-foreground)',
       },
