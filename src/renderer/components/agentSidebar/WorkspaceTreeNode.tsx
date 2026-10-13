@@ -11,9 +11,9 @@ import {
   Folder,
   FolderOpen,
   MessageCirclePlus,
-  Pencil,
   Pin,
   PinOff,
+  Settings2,
   Trash2,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
@@ -34,7 +34,7 @@ interface WorkspaceTreeNodeProps {
   /** 点击项目名称：切换当前工作区并定位右侧 */
   onSelectWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onCreateTask: (workspace: WorkspaceSidebarNode) => void;
-  onRenameWorkspace?: (workspace: WorkspaceSidebarNode) => void;
+  onEditWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onRemoveWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onToggleWorkspacePin?: (workspace: WorkspaceSidebarNode, pinned: boolean) => Promise<void>;
   onRetryLoadTasks: (workspaceId: string) => void;
@@ -60,7 +60,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   onToggleExpanded,
   onSelectWorkspace,
   onCreateTask,
-  onRenameWorkspace,
+  onEditWorkspace,
   onRemoveWorkspace,
   onToggleWorkspacePin,
   onRetryLoadTasks,
@@ -81,9 +81,9 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const previousExpandedRef = useRef(workspace.isExpanded);
   const canRemove =
     typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
-  const canRename =
-    typeof onRenameWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
-  const canManage = canRemove || canRename;
+  const canEdit = typeof onEditWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
+  const canOpenInExplorer = !isScratchWorkspacePath(workspace.path);
+  const canManage = canRemove || canEdit || canOpenInExplorer;
 
   useEffect(() => {
     let frame = 0;
@@ -142,11 +142,11 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             {workspace.name}
           </span>
         </Button>
-        <div className="flex h-7 shrink-0 items-center gap-0.5 pr-1.5">
+        <div className="flex h-8 shrink-0 items-center gap-0.5 pr-1">
           {showCreateTask && (
             <Button
               variant="ghost"
-              size="icon-xs"
+              size="icon"
               onClick={() => onCreateTask(workspace)}
               className="theme-action-muted"
               aria-label={i18nService.t('myAgentSidebarNewTask')}
@@ -160,7 +160,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 render={
                   <Button
                     variant="ghost"
-                    size="icon-xs"
+                    size="icon"
                     className={cn(
                       'theme-sidebar-row-action pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
                       menuOpen && 'pointer-events-auto',
@@ -171,22 +171,35 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                   </Button>
                 }
               />
-              <DropdownMenuContent align="end" className="min-w-[124px]">
-                {canRename && (
-                  <DropdownMenuItem onClick={() => onRenameWorkspace(workspace)}>
-                    <Pencil className="h-3.5 w-3.5" />
-                    {i18nService.t('renameProject')}
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                {canEdit && (
+                  <DropdownMenuItem onClick={() => onEditWorkspace?.(workspace)}>
+                    <Settings2 className="size-4" />
+                    {i18nService.t('editProject')}
+                  </DropdownMenuItem>
+                )}
+                {canOpenInExplorer && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      void window.electron.shell.openPath(workspace.path).then(result => {
+                        if (!result.success) {
+                          console.warn(
+                            '[WorkspaceTreeNode] Failed to open workspace in file explorer:',
+                            result.error,
+                          );
+                        }
+                      });
+                    }}
+                  >
+                    <FolderOpen className="size-4" />
+                    {i18nService.t('openInFileExplorer')}
                   </DropdownMenuItem>
                 )}
                 {onToggleWorkspacePin && (
                   <DropdownMenuItem
                     onClick={() => void onToggleWorkspacePin(workspace, !workspace.pinned)}
                   >
-                    {workspace.pinned ? (
-                      <PinOff className="h-3.5 w-3.5" />
-                    ) : (
-                      <Pin className="h-3.5 w-3.5" />
-                    )}
+                    {workspace.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
                     {i18nService.t(workspace.pinned ? 'unpinProject' : 'pinProject')}
                   </DropdownMenuItem>
                 )}
@@ -195,7 +208,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                     variant="destructive"
                     onClick={() => onRemoveWorkspace?.(workspace)}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="size-4" />
                     {i18nService.t('removeProject')}
                   </DropdownMenuItem>
                 )}

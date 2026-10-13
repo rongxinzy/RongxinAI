@@ -38,6 +38,12 @@ type LegacyCompatibleCoworkApi = {
     id: string,
     name: string,
   ) => Promise<{ success: boolean; workspace?: Workspace }>;
+  updateWorkspace?: (options: {
+    id: string;
+    name?: string;
+    primaryPath?: string;
+    folders?: string[];
+  }) => Promise<{ success: boolean; workspace?: Workspace; error?: string }>;
   deleteWorkspace?: (
     id: string,
   ) => Promise<{ success: boolean; deletedSessionIds?: string[]; error?: string }>;
@@ -298,6 +304,62 @@ class WorkspaceService {
     }
     store.dispatch(setWorkspaces(nextWorkspaces));
     return nextRenamedWorkspace;
+  }
+
+  /**
+   * Updates an existing workspace: display name, primary path (sessions are
+   * migrated to the new path), and/or attached folders. Mirrors the
+   * rename/replace id-migration bookkeeping of `renameWorkspace`.
+   */
+  async updateWorkspace(options: {
+    id: string;
+    name?: string;
+    primaryPath?: string;
+    folders?: string[];
+  }): Promise<Workspace | null> {
+    const cowork = getCompatibleCoworkApi();
+    if (!this.workspaceApiAvailable || typeof cowork?.updateWorkspace !== 'function') return null;
+
+    const result = await cowork.updateWorkspace(options);
+    const updatedWorkspace = result.success ? result.workspace : undefined;
+    if (!updatedWorkspace) {
+      if (result.error) console.warn('[WorkspaceService] updateWorkspace failed:', result.error);
+      return null;
+    }
+
+    const { currentWorkspaceId, workspaces } = store.getState().workspace;
+    const originalWorkspace = workspaces.find(item => item.id === options.id);
+    const nextWorkspace = {
+      ...updatedWorkspace,
+      pinned: originalWorkspace?.pinned ?? false,
+    };
+    const originalIndex = workspaces.findIndex(item => item.id === options.id);
+    const workspacesWithoutUpdated = workspaces.filter(
+      item => item.id !== options.id && item.id !== updatedWorkspace.id,
+    );
+    const insertionIndex =
+      originalIndex < 0
+        ? workspacesWithoutUpdated.length
+        : workspaces.slice(0, originalIndex).filter(item => item.id !== updatedWorkspace.id).length;
+    const nextWorkspaces = [
+      ...workspacesWithoutUpdated.slice(0, insertionIndex),
+      nextWorkspace,
+      ...workspacesWithoutUpdated.slice(insertionIndex),
+    ];
+
+    if (options.id !== updatedWorkspace.id) {
+      const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+      const nextPinnedIds = pinnedIds.filter(id => id !== options.id && id !== updatedWorkspace.id);
+      if (originalWorkspace?.pinned) nextPinnedIds.push(updatedWorkspace.id);
+      await localStore.setItem(PINNED_WORKSPACES_KEY, nextPinnedIds);
+    }
+
+    if (currentWorkspaceId === options.id) {
+      store.dispatch(setCurrentWorkspaceId(updatedWorkspace.id));
+      await localStore.setItem(CURRENT_WORKSPACE_KEY, updatedWorkspace.id);
+    }
+    store.dispatch(setWorkspaces(nextWorkspaces));
+    return nextWorkspace;
   }
 
   /**

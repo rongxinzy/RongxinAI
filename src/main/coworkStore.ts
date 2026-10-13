@@ -30,6 +30,7 @@ import {
   isDefaultConversationWorkspacePath,
 } from './defaultConversationWorkspace';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
+import { WorkspaceFolderRepository } from './workspaceFolderRepository';
 
 // Default working directory for new users
 const getDefaultWorkingDirectory = (): string => {
@@ -590,10 +591,12 @@ interface CoworkUserMemoryRow {
 export class CoworkStore {
   private db: Database.Database;
   private artifactIndex: CoworkArtifactIndex;
+  private workspaceFolders: WorkspaceFolderRepository;
 
   constructor(db: Database.Database) {
     this.db = db;
     this.artifactIndex = new CoworkArtifactIndex(db);
+    this.workspaceFolders = new WorkspaceFolderRepository(db);
   }
 
   private getOne<T>(sql: string, params: (string | number | null)[] = []): T | undefined {
@@ -627,10 +630,12 @@ export class CoworkStore {
     }>(
       'SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces ORDER BY updated_at DESC, name ASC',
     );
+    const foldersByWorkspace = this.workspaceFolders.listAllByWorkspace();
     return rows.map(row => ({
       id: row.id,
       name: row.name,
       path: row.path,
+      folders: foldersByWorkspace.get(row.id) ?? [],
       isHidden: Boolean(row.is_hidden),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -653,6 +658,7 @@ export class CoworkStore {
       id: row.id,
       name: row.name,
       path: row.path,
+      folders: this.workspaceFolders.listFolders(row.id),
       isHidden: Boolean(row.is_hidden),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -725,6 +731,10 @@ export class CoworkStore {
     this.db.prepare('UPDATE workspaces SET is_hidden = ? WHERE id = ?').run(isHidden ? 1 : 0, id);
   }
 
+  setWorkspaceFolders(id: string, folders: string[]): void {
+    this.workspaceFolders.replaceFolders(id, folders);
+  }
+
   relocateWorkspace(id: string, workspacePath: string, name: string): Workspace | null {
     const existingWorkspace = this.getWorkspace(id);
     if (!existingWorkspace) return null;
@@ -745,6 +755,7 @@ export class CoworkStore {
       this.db
         .prepare('UPDATE workspaces SET id = ?, name = ?, path = ? WHERE id = ?')
         .run(nextId, normalizedName, normalizedPath, id);
+      this.workspaceFolders.transferFolders(id, nextId);
     })();
 
     return this.getWorkspace(nextId);
@@ -770,6 +781,7 @@ export class CoworkStore {
         .run(...sessionIds);
     }
     this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+    this.workspaceFolders.deleteFolders(id);
     this.markOrphanImplicitMemoriesStale();
     return sessionIds;
   }

@@ -143,6 +143,17 @@ export class SqliteStore {
     this.migrateWorkspacePathUniqueness();
     this.db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);');
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workspace_folders (
+        workspace_id TEXT NOT NULL,
+        path TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (workspace_id, path)
+      );
+    `);
+    this.db.exec(
+      'CREATE INDEX IF NOT EXISTS idx_workspace_folders_workspace ON workspace_folders(workspace_id);',
+    );
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS cowork_messages (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,

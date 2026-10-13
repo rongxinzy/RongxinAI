@@ -321,6 +321,7 @@ export const useWorkspaceSidebarState = (
               ? i18nService.t('defaultConversation')
               : workspace.name,
             path: workspace.path,
+            folders: workspace.folders ?? [],
             pinned: workspace.pinned,
             isExpanded: expanded,
             isTaskListExpanded: taskExpanded,

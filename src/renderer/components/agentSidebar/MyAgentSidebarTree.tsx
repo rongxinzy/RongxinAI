@@ -1,12 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogFooterSurface,
-} from '@shared/components/ui/dialog';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
-import { Input } from '@shared/components/ui/input';
 import { FolderPlus } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -29,6 +22,7 @@ import type { CoworkSessionSummary } from '../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import CreateProjectDialog from '../cowork/CreateProjectDialog';
 import { isProjectWorkspaceActive, isSectionWorkspaceActive } from './activeWorkspace';
+import EditProjectDialog from './EditProjectDialog';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
 import WorkspaceTreeNode from './WorkspaceTreeNode';
@@ -156,10 +150,9 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [workspacePendingRemoval, setWorkspacePendingRemoval] =
     useState<WorkspaceSidebarNode | null>(null);
-  const [workspacePendingRename, setWorkspacePendingRename] = useState<WorkspaceSidebarNode | null>(
+  const [workspacePendingEdit, setWorkspacePendingEdit] = useState<WorkspaceSidebarNode | null>(
     null,
   );
-  const [workspaceRenameValue, setWorkspaceRenameValue] = useState('');
 
   const handleConfirmRemoveWorkspace = async () => {
     const workspace = workspacePendingRemoval;
@@ -168,28 +161,30 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     await workspaceService.deleteWorkspace(workspace.id);
   };
 
-  const handleRenameWorkspace = (workspace: WorkspaceSidebarNode) => {
-    setWorkspaceRenameValue(workspace.name);
-    setWorkspacePendingRename(workspace);
+  const handleEditWorkspace = (workspace: WorkspaceSidebarNode) => {
+    setWorkspacePendingEdit(workspace);
+  };
+
+  const handleSaveWorkspace = async (
+    id: string,
+    values: { name: string; folders: string[] },
+  ): Promise<boolean> => {
+    const updated = await workspaceService.updateWorkspace({
+      id,
+      name: values.name,
+      folders: values.folders,
+    });
+    if (!updated) {
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', { detail: i18nService.t('editProjectFailed') }),
+      );
+      return false;
+    }
+    return true;
   };
 
   const handleToggleWorkspacePin = async (workspace: WorkspaceSidebarNode, pinned: boolean) => {
     await workspaceService.toggleWorkspacePin(workspace.id, pinned);
-  };
-
-  const handleConfirmRenameWorkspace = async () => {
-    const workspace = workspacePendingRename;
-    const name = workspaceRenameValue.trim();
-    if (!workspace || !name) return;
-
-    const renamedWorkspace = await workspaceService.renameWorkspace(workspace.id, name);
-    if (!renamedWorkspace) {
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: i18nService.t('renameProjectFailed') }),
-      );
-      return;
-    }
-    setWorkspacePendingRename(null);
   };
 
   const handleCreateWorkspace = () => {
@@ -246,39 +241,15 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         onCancel={() => setWorkspacePendingRemoval(null)}
         onConfirm={() => void handleConfirmRemoveWorkspace()}
       />
-      <Dialog
-        open={workspacePendingRename !== null}
+      <EditProjectDialog
+        workspace={workspacePendingEdit}
+        open={workspacePendingEdit !== null}
         onOpenChange={open => {
-          if (!open) setWorkspacePendingRename(null);
+          if (!open) setWorkspacePendingEdit(null);
         }}
-      >
-        <DialogContent className="max-w-sm">
-          <h2 className="text-base font-semibold">{i18nService.t('renameProject')}</h2>
-          <div className="space-y-2">
-            <Input
-              id="workspace-rename"
-              value={workspaceRenameValue}
-              onChange={event => setWorkspaceRenameValue(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') void handleConfirmRenameWorkspace();
-              }}
-              autoFocus
-            />
-          </div>
-          <DialogFooter surface={DialogFooterSurface.Seamless}>
-            <Button
-              variant="ghost"
-              className="theme-confirm-cancel min-w-16"
-              onClick={() => setWorkspacePendingRename(null)}
-            >
-              {i18nService.t('cancel')}
-            </Button>
-            <Button onClick={() => void handleConfirmRenameWorkspace()}>
-              {i18nService.t('renameProject')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onSave={handleSaveWorkspace}
+        onRemove={workspace => setWorkspacePendingRemoval(workspace)}
+      />
       <div className="theme-sidebar-section sticky top-0 z-30 flex items-center justify-between">
         <h2 className="min-w-0 truncate">{i18nService.t('workspaces')}</h2>
         <Button
@@ -322,7 +293,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               onToggleExpanded={toggleExpanded}
               onSelectWorkspace={selectedWorkspace => void handleSelectWorkspace(selectedWorkspace)}
               onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
-              onRenameWorkspace={handleRenameWorkspace}
+              onEditWorkspace={handleEditWorkspace}
               onToggleWorkspacePin={handleToggleWorkspacePin}
               onRemoveWorkspace={selectedWorkspace => setWorkspacePendingRemoval(selectedWorkspace)}
               onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
