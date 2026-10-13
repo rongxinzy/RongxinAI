@@ -75,6 +75,7 @@ for (const target of targets) {
 
 const electronMetadataNames = new Map([
   ['win32:x64:lite', 'latest.yml'],
+  ['darwin:x64:default', 'latest-mac.yml'],
   ['darwin:arm64:default', 'latest-mac.yml'],
   ['linux:x64:appimage', 'latest-linux.yml'],
   ['linux:x64:deb', 'latest-linux.yml'],
