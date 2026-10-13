@@ -79,8 +79,14 @@ jobs:
         with:
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
-          path: candidate/macos
+          path: candidate/macos-arm64
           name: release-candidate-${{ inputs.release_version }}-darwin-arm64-default
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+          path: candidate/macos-x64
+          name: release-candidate-${{ inputs.release_version }}-darwin-x64-default
       - uses: actions/download-artifact@v8
         with:
           run-id: ${{ inputs.candidate_run_id }}
@@ -95,9 +101,10 @@ jobs:
             '${{ inputs.source_commit }}' \
             '${{ inputs.candidate_run_id }}' \
             candidate/windows/candidate-win32-x64-lite.json \
-            candidate/macos/candidate-darwin-arm64-default.json \
+            candidate/macos-arm64/candidate-darwin-arm64-default.json \
+            candidate/macos-x64/candidate-darwin-x64-default.json \
             candidate/linux/candidate-linux-x64.json \
-            --payload-roots candidate/windows candidate/macos candidate/linux
+            --payload-roots candidate/windows candidate/macos-arm64 candidate/macos-x64 candidate/linux
       - name: Summarize promotion request
         shell: bash
         run: |
@@ -136,8 +143,14 @@ jobs:
         with:
           run-id: ${{ inputs.candidate_run_id }}
           github-token: ${{ github.token }}
-          path: candidate/macos
+          path: candidate/macos-arm64
           name: release-candidate-${{ inputs.release_version }}-darwin-arm64-default
+      - uses: actions/download-artifact@v8
+        with:
+          run-id: ${{ inputs.candidate_run_id }}
+          github-token: ${{ github.token }}
+          path: candidate/macos-x64
+          name: release-candidate-${{ inputs.release_version }}-darwin-x64-default
       - uses: actions/download-artifact@v8
         with:
           run-id: ${{ inputs.candidate_run_id }}
@@ -166,16 +179,17 @@ jobs:
             '${{ inputs.candidate_run_id }}' \
             uploaded-metadata \
             candidate/windows/candidate-win32-x64-lite.json \
-            candidate/macos/candidate-darwin-arm64-default.json \
+            candidate/macos-arm64/candidate-darwin-arm64-default.json \
+            candidate/macos-x64/candidate-darwin-x64-default.json \
             candidate/linux/candidate-linux-x64.json \
-            --payload-roots candidate/windows candidate/macos candidate/linux
+            --payload-roots candidate/windows candidate/macos-arm64 candidate/macos-x64 candidate/linux
       - name: Create signed stable manifest from uploaded candidate metadata
         run: |
           node scripts/release/publish-update-manifest.mjs \
             manifest/stable.json \
             '${{ inputs.release_version }}' \
             '${{ inputs.source_commit }}' \
-            --metadata uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json
+            --metadata uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
@@ -230,7 +244,7 @@ jobs:
         if: steps.version_check.outputs.idempotent != 'true'
         shell: bash
         run: |
-          metadata=(uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json)
+          metadata=(uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json)
           mkdir -p manifest/electron
           while IFS=$'\t' read -r key target filename; do
             target_file="${target//:/-}"
@@ -240,6 +254,7 @@ jobs:
           node scripts/release/verify-electron-updater-generation.mjs \
             '${{ inputs.release_version }}' \
             manifest/electron/win32-x64-lite/latest.yml:win32:x64:lite \
+            manifest/electron/darwin-x64-default/latest-mac.yml:darwin:x64:default \
             manifest/electron/darwin-arm64-default/latest-mac.yml:darwin:arm64:default \
             manifest/electron/linux-x64-appimage/latest-linux.yml:linux:x64:appimage \
             manifest/electron/linux-x64-deb/latest-linux.yml:linux:x64:deb \
@@ -348,7 +363,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          node scripts/release/verify-published-update.mjs '${{ inputs.release_version }}' win32:x64:lite darwin:arm64:default linux:x64:deb linux:x64:appimage
+          node scripts/release/verify-published-update.mjs '${{ inputs.release_version }}' win32:x64:lite darwin:x64:default darwin:arm64:default linux:x64:deb linux:x64:appimage
           smoke_status=$?
           set -e
           if [[ $smoke_status -ne 0 && '${{ steps.publish.outputs.changed }}' == 'true' ]]; then

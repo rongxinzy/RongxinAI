@@ -5,6 +5,7 @@ import path from 'node:path';
 
 export const CandidateTarget = {
   WindowsX64Lite: 'win32-x64-lite',
+  MacX64Default: 'darwin-x64-default',
   MacArm64Default: 'darwin-arm64-default',
   LinuxX64AppImage: 'linux-x64-appimage',
   LinuxX64Deb: 'linux-x64-deb',
@@ -12,6 +13,7 @@ export const CandidateTarget = {
 
 const REQUIRED_KINDS = new Map([
   [CandidateTarget.WindowsX64Lite, ['installer', 'updater', 'blockmap', 'metadata']],
+  [CandidateTarget.MacX64Default, ['installer', 'updater', 'blockmap', 'metadata']],
   [CandidateTarget.MacArm64Default, ['installer', 'updater', 'blockmap', 'metadata']],
   [CandidateTarget.LinuxX64AppImage, ['installer', 'updater', 'metadata']],
   [CandidateTarget.LinuxX64Deb, ['installer', 'updater', 'metadata']],
