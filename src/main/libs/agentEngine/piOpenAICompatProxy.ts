@@ -11,6 +11,8 @@ interface PiOpenAICompatUpstream {
   apiKey?: string;
   requiredIncomingApiKey?: string;
   forwardIncomingAuthorization?: boolean;
+  /** Rewrite the outgoing `model` field, e.g. map a cloud model id to an intranet one. */
+  upstreamModel?: string;
 }
 
 interface PiOpenAICompatUpstreamRegistrationOptions {
@@ -189,6 +191,20 @@ export function remapDeveloperRolesForOpenAICompletions(body: Buffer): Buffer {
     return Buffer.from(JSON.stringify(parsed), 'utf8');
   } catch {
     // Non-JSON or an unexpected payload shape: pass through unchanged.
+    return body;
+  }
+}
+
+/** Point the request at the upstream's own model id when it differs from the advertised one. */
+export function rewriteOpenAICompletionsModel(body: Buffer, upstreamModel?: string): Buffer {
+  const target = upstreamModel?.trim();
+  if (!target) return body;
+  try {
+    const parsed = JSON.parse(body.toString('utf8')) as Record<string, unknown>;
+    if (parsed.model === target) return body;
+    parsed.model = target;
+    return Buffer.from(JSON.stringify(parsed), 'utf8');
+  } catch {
     return body;
   }
 }
@@ -501,8 +517,12 @@ async function handleProxyRequest(
 
   const rawBody = await readRequestBody(request);
   // Anthropic payloads are forwarded byte-identically; the developer-role
-  // remap is an OpenAI-compatibility concern only.
-  const body = openAICompletions ? remapDeveloperRolesForOpenAICompletions(rawBody) : rawBody;
+  // remap and model rewrite are OpenAI-compatibility concerns only.
+  const body = openAICompletions
+    ? remapDeveloperRolesForOpenAICompletions(
+        rewriteOpenAICompletionsModel(rawBody, upstream.upstreamModel),
+      )
+    : rawBody;
   const model = extractRequestModel(body);
   const upstreamURL = openAICompletions
     ? buildOpenAIChatCompletionsURL(upstream.baseURL)
@@ -613,6 +633,7 @@ export async function registerPiOpenAICompatUpstream(
     apiKey: upstream.apiKey,
     requiredIncomingApiKey: upstream.requiredIncomingApiKey,
     forwardIncomingAuthorization: upstream.forwardIncomingAuthorization,
+    upstreamModel: upstream.upstreamModel,
   });
   const loopbackBaseUrl = `http://127.0.0.1:${port}${PI_OPENAI_COMPAT_PROXY_PREFIX}/${encodeURIComponent(
     providerId,

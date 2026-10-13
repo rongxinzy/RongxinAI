@@ -9,6 +9,7 @@ import {
   registerPiOpenAICompatTokenRefresher,
   registerPiOpenAICompatUpstream,
   remapDeveloperRolesForOpenAICompletions,
+  rewriteOpenAICompletionsModel,
   stopPiOpenAICompatProxyForTests,
 } from './piOpenAICompatProxy';
 
@@ -53,6 +54,28 @@ describe('piOpenAICompatProxy', () => {
   it('passes malformed payloads through unchanged', () => {
     const body = Buffer.from('not-json', 'utf8');
     expect(remapDeveloperRolesForOpenAICompletions(body)).toEqual(body);
+  });
+
+  it('rewrites the model field when an upstream model is configured', () => {
+    const body = Buffer.from(
+      JSON.stringify({ model: 'zhiyuan-free', messages: [{ role: 'user', content: 'Hi' }] }),
+      'utf8',
+    );
+
+    const rewritten = rewriteOpenAICompletionsModel(body, 'GLM-5.3-Flash');
+
+    const parsed = JSON.parse(rewritten.toString('utf8')) as {
+      model: string;
+      messages: Array<{ role: string }>;
+    };
+    expect(parsed.model).toBe('GLM-5.3-Flash');
+    expect(parsed.messages.map(message => message.role)).toEqual(['user']);
+  });
+
+  it('passes the model field through when no upstream model is configured', () => {
+    const body = Buffer.from(JSON.stringify({ model: 'zhiyuan-free' }), 'utf8');
+    expect(rewriteOpenAICompletionsModel(body, undefined)).toEqual(body);
+    expect(rewriteOpenAICompletionsModel(body, '  ')).toEqual(body);
   });
   it('detects OpenAI stream finish reasons', () => {
     expect(
