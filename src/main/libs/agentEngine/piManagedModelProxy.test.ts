@@ -1,6 +1,6 @@
 import http from 'http';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   ModelCapabilityStatus,
@@ -8,7 +8,44 @@ import {
   type ResolvedModelEndpoint,
 } from '../../../shared/providers';
 import type { ApiConfigResolution } from '../claudeSettings';
-import { resolvePiCustomModelBaseUrl, shouldUsePiOpenAICompatProxy } from './piManagedModelProxy';
+
+const intranetMocks = vi.hoisted(() => ({
+  probe: vi.fn(async () => false),
+  apiKey: vi.fn(() => 'intranet-api-key'),
+  communityToken: vi.fn(async () => 'community-token'),
+  intranetBaseUrl: 'http://127.0.0.1:9',
+}));
+
+vi.mock('../zhiyuanIntranet', () => ({
+  probeZhiyuanIntranet: intranetMocks.probe,
+  zhiyuanIntranetApiKey: intranetMocks.apiKey,
+}));
+
+vi.mock('../../communityAuthSession', () => ({
+  getModelPoolAccessToken: intranetMocks.communityToken,
+}));
+
+vi.mock('../../../shared/modelPool/constants', async () => {
+  const actual = await vi.importActual<typeof import('../../../shared/modelPool/constants')>(
+    '../../../shared/modelPool/constants',
+  );
+  return {
+    ...actual,
+    ZhiyuanModelPool: {
+      ...actual.ZhiyuanModelPool,
+      // Late-bind so tests can point the intranet route at a local upstream.
+      get IntranetBaseUrl() {
+        return intranetMocks.intranetBaseUrl;
+      },
+    },
+  };
+});
+
+import {
+  PI_MANAGED_PROXY_API_KEY,
+  resolvePiCustomModelBaseUrl,
+  shouldUsePiOpenAICompatProxy,
+} from './piManagedModelProxy';
 import { stopPiOpenAICompatProxyForTests } from './piOpenAICompatProxy';
 
 const MANAGED_PROVIDER = 'custom_enterprise';
@@ -59,6 +96,15 @@ function resolutionFor(input: {
 }
 
 describe('piManagedModelProxy', () => {
+  beforeEach(() => {
+    intranetMocks.probe.mockReset();
+    intranetMocks.probe.mockResolvedValue(false);
+    intranetMocks.apiKey.mockClear();
+    intranetMocks.communityToken.mockReset();
+    intranetMocks.communityToken.mockResolvedValue('community-token');
+    intranetMocks.intranetBaseUrl = 'http://127.0.0.1:9';
+  });
+
   afterEach(async () => {
     await stopPiOpenAICompatProxyForTests();
   });
@@ -162,7 +208,160 @@ describe('piManagedModelProxy', () => {
     expect(baseUrl).toContain(encodeURIComponent(`${MANAGED_PROVIDER}#bench-anthropic`));
     expect(baseUrl.endsWith('/v1')).toBe(false);
   });
+
+  it('routes the zhiyuan provider through the intranet gateway when reachable', async () => {
+    const captured: { url?: string; authorization?: string; body: string } = { body: '' };
+    const gateway = http.createServer((request, response) => {
+      captured.url = request.url;
+      captured.authorization = request.headers.authorization;
+      const chunks: Buffer[] = [];
+      request.on('data', chunk => chunks.push(chunk));
+      request.on('end', () => {
+        captured.body = Buffer.concat(chunks).toString('utf8');
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            choices: [
+              { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+            ],
+          }),
+        );
+      });
+    });
+    const gatewayBaseUrl = await listen(gateway);
+    intranetMocks.intranetBaseUrl = gatewayBaseUrl;
+    intranetMocks.probe.mockResolvedValue(true);
+
+    try {
+      const resolution = resolutionFor({
+        providerName: 'zhiyuan',
+        apiType: 'openai',
+        baseURL: 'https://pool.example.test/v1',
+        model: 'zhiyuan-free',
+      });
+      const loopback = await resolvePiCustomModelBaseUrl(
+        resolution,
+        ProviderModelPiApi.OpenAICompletions,
+        { isManagedProvider: () => false },
+      );
+
+      expect(loopback).toContain('/__pi_openai_compat/zhiyuan/v1');
+
+      const response = await postChatCompletion(loopback);
+      expect(response.ok).toBe(true);
+      expect(captured.url).toBe('/v1/chat/completions');
+      expect(captured.authorization).toBe('Bearer intranet-api-key');
+      expect(JSON.parse(captured.body)).toMatchObject({ model: 'GLM-5.3-Flash' });
+      expect(intranetMocks.communityToken).not.toHaveBeenCalled();
+    } finally {
+      await close(gateway);
+    }
+  });
+
+  it('keeps the community pool route with the logical model id when the intranet is unavailable', async () => {
+    const captured: { url?: string; authorization?: string; body: string } = { body: '' };
+    const pool = http.createServer((request, response) => {
+      captured.url = request.url;
+      captured.authorization = request.headers.authorization;
+      const chunks: Buffer[] = [];
+      request.on('data', chunk => chunks.push(chunk));
+      request.on('end', () => {
+        captured.body = Buffer.concat(chunks).toString('utf8');
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            choices: [
+              { index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' },
+            ],
+          }),
+        );
+      });
+    });
+    const poolBaseUrl = await listen(pool);
+
+    try {
+      const resolution = resolutionFor({
+        providerName: 'zhiyuan',
+        apiType: 'openai',
+        baseURL: `${poolBaseUrl}/v1`,
+        model: 'zhiyuan-free',
+      });
+      const loopback = await resolvePiCustomModelBaseUrl(
+        resolution,
+        ProviderModelPiApi.OpenAICompletions,
+        { isManagedProvider: () => false },
+      );
+
+      const response = await postChatCompletion(loopback);
+      expect(response.ok).toBe(true);
+      expect(captured.url).toBe('/v1/chat/completions');
+      expect(captured.authorization).toBe('Bearer community-token');
+      expect(JSON.parse(captured.body)).toMatchObject({ model: 'zhiyuan-free' });
+      expect(intranetMocks.communityToken).toHaveBeenCalledTimes(1);
+    } finally {
+      await close(pool);
+    }
+  });
+
+  it('releases the community refresher when switching to the intranet route', async () => {
+    intranetMocks.probe.mockResolvedValue(false);
+    const poolResolution = resolutionFor({
+      providerName: 'zhiyuan',
+      apiType: 'openai',
+      baseURL: 'https://pool.example.test/v1',
+      model: 'zhiyuan-free',
+    });
+    await resolvePiCustomModelBaseUrl(poolResolution, ProviderModelPiApi.OpenAICompletions, {
+      isManagedProvider: () => false,
+    });
+    expect(intranetMocks.communityToken).toHaveBeenCalledTimes(1);
+
+    const gateway = http.createServer((_request, response) => {
+      response.writeHead(401, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ error: { message: 'invalid key' } }));
+    });
+    const gatewayBaseUrl = await listen(gateway);
+    intranetMocks.intranetBaseUrl = gatewayBaseUrl;
+    intranetMocks.probe.mockResolvedValue(true);
+
+    try {
+      const intranetResolution = resolutionFor({
+        providerName: 'zhiyuan',
+        apiType: 'openai',
+        baseURL: 'https://pool.example.test/v1',
+        model: 'zhiyuan-free',
+      });
+      const loopback = await resolvePiCustomModelBaseUrl(
+        intranetResolution,
+        ProviderModelPiApi.OpenAICompletions,
+        { isManagedProvider: () => false },
+      );
+
+      const response = await postChatCompletion(loopback);
+      expect(response.status).toBe(401);
+      // Without releasing the refresher, the proxy would refresh the community
+      // token here and retry the intranet gateway with the wrong credential.
+      expect(intranetMocks.communityToken).toHaveBeenCalledTimes(1);
+    } finally {
+      await close(gateway);
+    }
+  });
 });
+
+async function postChatCompletion(loopbackBaseUrl: string): Promise<Response> {
+  return fetch(`${loopbackBaseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${PI_MANAGED_PROXY_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'zhiyuan-free',
+      stream: false,
+      messages: [{ role: 'user', content: 'hello' }],
+    }),
+  });
+}
 
 async function listen(server: http.Server): Promise<string> {
   return new Promise<string>((resolve, reject) => {

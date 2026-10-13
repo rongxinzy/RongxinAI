@@ -11,6 +11,11 @@ import {
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { t } from './i18n';
 import { readModelPoolErrorBody, retrySessionBusy } from './modelPoolRetry';
+import {
+  probeZhiyuanIntranet,
+  warmZhiyuanIntranetProbe,
+  zhiyuanIntranetApiKey,
+} from './libs/zhiyuanIntranet';
 
 const activeModelPoolStreams = new Map<string, AbortController>();
 
@@ -28,6 +33,16 @@ function developmentBaseUrl(): string | null {
 
 function modelPoolBaseUrl(): string {
   return developmentBaseUrl() ?? ZhiyuanModelPool.ProductionBaseUrl;
+}
+
+/** Prefers the office intranet gateway when it is reachable and serving models. */
+async function resolveModelPoolBaseUrl(): Promise<string> {
+  if (await probeZhiyuanIntranet()) return ZhiyuanModelPool.IntranetBaseUrl;
+  return modelPoolBaseUrl();
+}
+
+function isIntranetBaseUrl(baseUrl: string): boolean {
+  return baseUrl === ZhiyuanModelPool.IntranetBaseUrl;
 }
 
 function modelPoolErrorMessage(rawBody: string, status: number): string {
@@ -50,35 +65,61 @@ function modelPoolErrorMessage(rawBody: string, status: number): string {
   return t('modelPoolServiceUnavailable');
 }
 
+interface ModelPoolFetchResult {
+  response: Response;
+  usedIntranet: boolean;
+}
+
+type ModelPoolTokenProvider = () => Promise<string>;
+
 async function fetchModelPool(
   body: Record<string, unknown>,
-  token: string,
+  tokenProvider: ModelPoolTokenProvider,
   signal: AbortSignal,
   conversationId: string,
-): Promise<Response> {
-  return retrySessionBusy(
+): Promise<ModelPoolFetchResult> {
+  const baseUrl = await resolveModelPoolBaseUrl();
+  const usedIntranet = isIntranetBaseUrl(baseUrl);
+  // The community token is only needed for the cloud pool: on the intranet the
+  // fixed gateway key authenticates, so token acquisition stays lazy and the
+  // free model keeps working without community connectivity.
+  const authorization = usedIntranet ? zhiyuanIntranetApiKey() : await tokenProvider();
+  const response = await retrySessionBusy(
     () =>
-      session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/chat/completions`, {
+      session.defaultSession.fetch(`${baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           Accept: 'text/event-stream',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${authorization}`,
           'Content-Type': 'application/json',
           [ZhiyuanModelPoolHeader.ConversationId]: conversationId,
           [ZhiyuanModelPoolHeader.Workload]: ZhiyuanModelPoolWorkload.Chat,
         },
-        body: JSON.stringify({ ...body, model: ZhiyuanModelPool.FreeModelId, stream: true }),
+        body: JSON.stringify({
+          ...body,
+          model: usedIntranet ? ZhiyuanModelPool.IntranetModelId : ZhiyuanModelPool.FreeModelId,
+          stream: true,
+        }),
         signal,
       }),
     signal,
   );
+  return { response, usedIntranet };
 }
 
 async function fetchModelPoolModels(
   communityAuthSession: CommunityAuthSessionManager,
-): Promise<Response> {
+): Promise<ModelPoolFetchResult> {
+  const baseUrl = await resolveModelPoolBaseUrl();
+  const usedIntranet = isIntranetBaseUrl(baseUrl);
+  if (usedIntranet) {
+    const response = await session.defaultSession.fetch(`${baseUrl}/v1/models`, {
+      headers: { Authorization: `Bearer ${zhiyuanIntranetApiKey()}` },
+    });
+    return { response, usedIntranet };
+  }
   const fetchModels = (token: string) =>
-    session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/models`, {
+    session.defaultSession.fetch(`${baseUrl}/v1/models`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   let accessToken = await communityAuthSession.getModelPoolAccessToken();
@@ -87,7 +128,7 @@ async function fetchModelPoolModels(
     accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
     response = await fetchModels(accessToken);
   }
-  return response;
+  return { response, usedIntranet };
 }
 
 function parseModelIds(value: unknown): string[] {
@@ -104,9 +145,11 @@ function parseModelIds(value: unknown): string[] {
 export function registerModelPoolIpcHandlers(
   communityAuthSession: CommunityAuthSessionManager,
 ): void {
+  warmZhiyuanIntranetProbe();
   ipcMain.handle(ModelPoolIpc.ListModels, async () => {
     try {
-      const response = await fetchModelPoolModels(communityAuthSession);
+      const fetchResult = await fetchModelPoolModels(communityAuthSession);
+      const response = fetchResult.response;
       if (!response.ok) {
         const result = {
           ok: false,
@@ -116,10 +159,18 @@ export function registerModelPoolIpcHandlers(
         };
         return ModelPoolModelsSchema.output.parse(result);
       }
+      let models = parseModelIds((await response.json()) as unknown);
+      if (fetchResult.usedIntranet) {
+        // The renderer only knows the logical free model id; report the
+        // intranet model under that id instead of the physical gateway name.
+        models = models.map(modelId =>
+          modelId === ZhiyuanModelPool.IntranetModelId ? ZhiyuanModelPool.FreeModelId : modelId,
+        );
+      }
       const result = {
         ok: true,
         status: response.status,
-        models: parseModelIds((await response.json()) as unknown),
+        models,
       };
       return ModelPoolModelsSchema.output.parse(result);
     } catch {
@@ -148,23 +199,28 @@ export function registerModelPoolIpcHandlers(
     };
 
     try {
-      let accessToken = await communityAuthSession.getModelPoolAccessToken();
-      let response = await fetchModelPool(
+      let forceTokenRefresh = false;
+      const tokenProvider: ModelPoolTokenProvider = async () =>
+        forceTokenRefresh
+          ? communityAuthSession.getModelPoolAccessToken({ forceRefresh: true })
+          : communityAuthSession.getModelPoolAccessToken();
+      let fetchResult = await fetchModelPool(
         input.body,
-        accessToken,
+        tokenProvider,
         controller.signal,
         input.conversationId,
       );
-      if (response.status === 401) {
-        await response.body?.cancel();
-        accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
-        response = await fetchModelPool(
+      if (fetchResult.response.status === 401 && !fetchResult.usedIntranet) {
+        await fetchResult.response.body?.cancel();
+        forceTokenRefresh = true;
+        fetchResult = await fetchModelPool(
           input.body,
-          accessToken,
+          tokenProvider,
           controller.signal,
           input.conversationId,
         );
       }
+      const response = fetchResult.response;
 
       if (!response.ok || !response.body) {
         const error = response.body
