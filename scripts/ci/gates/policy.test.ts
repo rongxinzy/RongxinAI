@@ -13,6 +13,12 @@ test.each([
   'docs/development.md',
   'src/renderer/components/Settings.tsx',
   'src/renderer/theme/themes.css',
+  'src/renderer/components/artifacts/renderers/DxfRenderer.tsx',
+  'src/renderer/components/cowork/components/UserBubble.tsx',
+  'src/renderer/components/cowork/CoworkPromptInput.tsx',
+  'scripts/reset-userdata.mjs',
+  'scripts/find-dev-port.mjs',
+  '.github/workflows/stale.yml',
   'unknown/new-module.ts',
 ])('ordinary and unknown paths retain only baseline checks: %s', file => {
   expect(Object.values(planGates([file], CiEvent.PullRequest, prRef))).toEqual([
