@@ -54,6 +54,30 @@ test('runNpmCommand carries the failure output back to the caller', async () => 
   expect((error as Error).message).toContain('missing script: build');
 });
 
+/**
+ * Whether a killed process is really gone.
+ *
+ * On Windows a terminated process stops existing, so `process.kill(pid, 0)`
+ * throws. On Linux the child we killed stays a zombie until its parent reaps it,
+ * and `kill(pid, 0)` still succeeds, so the state has to come from /proc.
+ */
+const isDead = (pid: number): boolean => {
+  if (process.platform === 'win32') {
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch {
+      return true;
+    }
+  }
+  try {
+    const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(') ') + 2).startsWith('Z');
+  } catch {
+    return true;
+  }
+};
+
 /** Resolves with the pid a child wrote, driven by the filesystem, not a sleep. */
 const waitForPidFile = (file: string): Promise<number> =>
   new Promise((resolve, reject) => {
@@ -91,7 +115,7 @@ test('runNpmCommand kills the child when the caller aborts', async () => {
 
   await expect(pending).rejects.toBeInstanceOf(NpmCommandAbortedError);
   // A stop must not leave npm running in the background.
-  expect(() => process.kill(pid, 0)).toThrow();
+  expect(isDead(pid)).toBe(true);
 });
 
 test('runNpmCommand kills what the child spawned, not just the child', async () => {
@@ -122,6 +146,6 @@ test('runNpmCommand kills what the child spawned, not just the child', async () 
 
   await expect(pending).rejects.toBeInstanceOf(NpmCommandAbortedError);
   // The rejection means the work is gone, not merely that npm stopped waiting.
-  expect(() => process.kill(selfPid, 0)).toThrow();
-  expect(() => process.kill(grandchildPid, 0)).toThrow();
+  expect(isDead(selfPid)).toBe(true);
+  expect(isDead(grandchildPid)).toBe(true);
 });
