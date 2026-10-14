@@ -330,7 +330,16 @@ jobs:
           debs=(release/*.deb)
           [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
           sudo apt-get install -y "$(realpath "${debs[0]}")"
-          node scripts/verify-linux-renderer.mjs '/opt/知远/知远' release/linux-deb-install-smoke.png
+          # The deb installs under `${productName}/${executableName}`: resolve it from
+          # the packaging config instead of a literal path, which a product rename
+          # left pointing at a directory that no longer exists.
+          app_exec="$(node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('electron-builder.json','utf8'));process.stdout.write('/opt/'+c.productName+'/'+(c.executableName||c.productName));")"
+          test -x "$app_exec" || {
+            echo "Installed Linux executable is missing: $app_exec" >&2
+            ls -d /opt/*/ >&2 || true
+            exit 1
+          }
+          node scripts/verify-linux-renderer.mjs "$app_exec" release/linux-deb-install-smoke.png
       - name: Upload Linux candidate startup diagnostics
         if: ${{ always() && matrix.platform == 'linux' }}
         uses: actions/upload-artifact@v6
