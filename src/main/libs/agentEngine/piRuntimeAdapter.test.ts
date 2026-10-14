@@ -1412,7 +1412,7 @@ describe('PiRuntimeAdapter', () => {
       // Pi's in-band note for a non-vision model, mirrored for composer images:
       // the bytes are withheld and the model is told why.
       expect(sentPrompt).toContain('Describe this image');
-      expect(sentPrompt).toContain('were not sent');
+      expect(sentPrompt).toContain('not sent');
       expect(sentPrompt).toContain('cannot read images');
       expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
     });

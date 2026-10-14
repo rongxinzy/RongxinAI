@@ -87,21 +87,27 @@ describe('shouldSendImageInput', () => {
 });
 
 describe('buildImageOmittedNotice', () => {
-  test('lists every persisted path and says the images were not sent', () => {
+  test('lists every persisted path, says the image was not sent, and steers away from tool spelunking', () => {
     const notice = buildImageOmittedNotice([
       { name: 'a.png', path: 'C:\\images\\a.png' },
       { name: 'b.png', path: 'C:\\images\\b.png' },
     ]);
-    expect(notice).toContain('were not sent');
+    expect(notice).toContain('not sent');
+    expect(notice).toContain('cannot read images');
     expect(notice).toContain('C:\\images\\a.png');
     expect(notice).toContain('C:\\images\\b.png');
-    // The model must be told what it can do instead of guessing.
-    expect(notice).toMatch(/local tool|ask the user/i);
+    // Tell the user, then either write a system-OCR script or ask for the text.
+    expect(notice).toContain('tell the user plainly');
+    expect(notice).toMatch(/ask the user to paste/i);
+    // The known dead ends (probing for installed OCR tools, retrying the same
+    // command) cost several turns in the field, so the note rules them out.
+    expect(notice).toMatch(/do not search the machine/i);
+    expect(notice).toMatch(/Windows\.Media\.Ocr/);
   });
 
   test('omits the path list when no persisted path is known', () => {
     const notice = buildImageOmittedNotice([{ name: 'pasted.png' }]);
-    expect(notice).toContain('were not sent');
+    expect(notice).toContain('not sent');
     expect(notice).not.toContain('at:\n');
   });
 
