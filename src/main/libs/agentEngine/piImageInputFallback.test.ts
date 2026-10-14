@@ -87,22 +87,34 @@ describe('shouldSendImageInput', () => {
 });
 
 describe('buildImageOmittedNotice', () => {
-  test('lists every persisted path, says the image was not sent, and steers away from tool spelunking', () => {
-    const notice = buildImageOmittedNotice([
-      { name: 'a.png', path: 'C:\\images\\a.png' },
-      { name: 'b.png', path: 'C:\\images\\b.png' },
-    ]);
+  test('lists every persisted path and points at the bundled OCR helper', () => {
+    const notice = buildImageOmittedNotice(
+      [
+        { name: 'a.png', path: 'C:\\images\\a.png' },
+        { name: 'b.png', path: 'C:\\images\\b.png' },
+      ],
+      path => `powershell -File "C:\\app\\resources\\ocr\\ocr-image.ps1" -Path "${path}"`,
+    );
     expect(notice).toContain('not sent');
     expect(notice).toContain('cannot read images');
     expect(notice).toContain('C:\\images\\a.png');
     expect(notice).toContain('C:\\images\\b.png');
-    // Tell the user, then either write a system-OCR script or ask for the text.
+    // Tell the user first, then run the helper once per image.
     expect(notice).toContain('tell the user plainly');
-    expect(notice).toMatch(/ask the user to paste/i);
-    // The known dead ends (probing for installed OCR tools, retrying the same
-    // command) cost several turns in the field, so the note rules them out.
+    expect(notice).toContain('ocr-image.ps1" -Path "C:\\images\\a.png"');
+    expect(notice).toContain('ocr-image.ps1" -Path "C:\\images\\b.png"');
+    expect(notice).toMatch(/Only if that command fails/i);
+    // With a runnable helper the "invent your own OCR" guidance is not needed.
+    expect(notice).not.toMatch(/do not search the machine/i);
+  });
+
+  test('falls back to self-written OCR guidance when no helper is available', () => {
+    const notice = buildImageOmittedNotice([{ name: 'a.png', path: 'C:\\images\\a.png' }]);
+    expect(notice).toContain('not sent');
     expect(notice).toMatch(/do not search the machine/i);
     expect(notice).toMatch(/Windows\.Media\.Ocr/);
+    expect(notice).toMatch(/ask the user to paste/i);
+    expect(notice).not.toContain('ocr-image.ps1');
   });
 
   test('omits the path list when no persisted path is known', () => {

@@ -210,6 +210,8 @@ test('image rejection is retried as text and reported to the user', async () => 
 
   const textOnly = requests.find(request => !request.hasImage);
   expect(textOnly?.body).toContain('hash.png'); // the model receives the file path
+  // ...together with a runnable command for the bundled OCR helper.
+  expect(textOnly?.body).toContain('ocr-image.ps1');
   expect(errors).toHaveLength(0); // no dead-end error bubble
   const notices = messages.filter(
     message =>

@@ -192,6 +192,7 @@ import type {
   PiStartOptions,
 } from './piRuntimeTypes';
 import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
+import { resolveBundledOcrHelper } from '../ocrHelper';
 import {
   buildImageOmittedNotice,
   imageCapabilityFingerprint,
@@ -549,6 +550,7 @@ function preparePiPrompt(
   text: string,
   attachments: PiStartOptions['imageAttachments'] | undefined,
   sendImages: boolean,
+  ocrCommandFor?: (imagePath: string) => string,
 ): {
   content:
     | string
@@ -583,7 +585,7 @@ function preparePiPrompt(
   // Pi answers a non-vision model's `read` with an in-band note instead of a
   // failed request; Cowork images never pass through `read`, so the same note
   // (plus the file paths) has to travel with the prompt itself.
-  const notice = buildImageOmittedNotice(references);
+  const notice = buildImageOmittedNotice(references, ocrCommandFor);
   return {
     content: text.trim() ? `${text}\n\n${notice}` : notice,
     hasImages: false,
@@ -817,6 +819,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly streamStallRecovery: PiStreamStallRecovery;
   /** Test override for the stall window; production uses per-provider tiers. */
   private readonly streamStallTimeoutOverrideMs?: number;
+  /** Bundled image-text helper; null when the platform/build cannot run it. */
+  private readonly bundledOcrHelper = resolveBundledOcrHelper();
 
   constructor(options?: { streamStallTimeoutMs?: number }) {
     super();
@@ -1660,6 +1664,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         initialPrompt,
         options.imageAttachments,
         this.shouldSendImagesForActive(active),
+        this.bundledOcrHelper?.commandFor,
       );
       // Recorded before the request leaves: the SDK can report the rejection
       // through events that arrive before the send promise settles.
@@ -2028,6 +2033,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         nextPrompt,
         options.imageAttachments,
         this.shouldSendImagesForActive(active),
+        this.bundledOcrHelper?.commandFor,
       );
       this.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
       await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
@@ -2530,6 +2536,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         item.text,
         item.imageAttachments,
         this.shouldSendImagesForActive(active),
+        this.bundledOcrHelper?.commandFor,
       );
       this.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
       await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
@@ -3864,7 +3871,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.turnFailed = false;
     active.isRunning = true;
     this.appendSystemNotice(sessionId, t('coworkImageRetryNotice'));
-    const retryPrompt = [fallback.text, buildImageOmittedNotice(fallback.sentImages)]
+    const retryPrompt = [
+      fallback.text,
+      buildImageOmittedNotice(fallback.sentImages, this.bundledOcrHelper?.commandFor),
+    ]
       .filter(content => content.trim().length > 0)
       .join('\n\n');
     void (async () => {

@@ -105,17 +105,32 @@ export function shouldSendImageInput(
  * just enough environment guidance to converge in a couple of attempts instead
  * of probing the machine for OCR tooling.
  */
-export function buildImageOmittedNotice(attachments: readonly ImageInputAttachmentRef[]): string {
+export function buildImageOmittedNotice(
+  attachments: readonly ImageInputAttachmentRef[],
+  ocrCommandFor?: (imagePath: string) => string,
+): string {
   if (attachments.length === 0) return '';
-  const lines = attachments
+  const paths = attachments
     .map(attachment => attachment.path?.trim())
-    .filter((path): path is string => Boolean(path))
-    .map(path => `  - ${path}`);
+    .filter((path): path is string => Boolean(path));
+  const commands = paths
+    .map(path => (ocrCommandFor ? `  ${ocrCommandFor(path)}` : ''))
+    .filter(Boolean);
+  const lines = paths.map(path => `  - ${path}`);
   const header =
     '[Image not sent: the current model cannot read images, so this request carries no picture. The file stays on this machine';
   const body = [
-    'What to do: tell the user plainly that the image could not be read, then either write a short script that runs the system OCR (on Windows that is powershell.exe + Windows.Media.Ocr) or ask the user to paste the text.',
-    'Do not search the machine for OCR tools (pytesseract, tesseract, ollama, model SDKs …) and do not retry the same failing command: this shell is Windows git-bash, some POSIX tools are missing, and PowerShell is the reliable path. If two attempts do not read the image, stop and ask the user for the text.',
+    'What to do: tell the user plainly that the image could not be read.',
+    ...(commands.length > 0
+      ? [
+          'Then run the bundled OCR helper first — one command per image:',
+          ...commands,
+          'Only if that command fails: do not try other OCR approaches or search the machine for tools — ask the user to paste the text.',
+        ]
+      : [
+          'Then either write a short script that runs the system OCR (on Windows that is powershell.exe + Windows.Media.Ocr), or ask the user to paste the text.',
+          'Do not search the machine for OCR tools (pytesseract, tesseract, ollama, model SDKs …) and do not retry the same failing command: this shell is Windows git-bash, some POSIX tools are missing, and PowerShell is the reliable path. If two attempts do not read the image, stop and ask the user for the text.',
+        ]),
   ].join('\n');
   return lines.length > 0 ? `${header} at:\n${lines.join('\n')}\n${body}]` : `${header}.\n${body}]`;
 }
