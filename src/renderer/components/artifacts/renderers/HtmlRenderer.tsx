@@ -39,7 +39,7 @@ export function ensurePreviewColorScheme(html: string): string {
   }
   const inject =
     '<meta name="color-scheme" content="light">' +
-    '<style data-xiaoruan-preview-color-scheme>:root{color-scheme:light;}</style>';
+    '<style data-zy-preview-color-scheme>:root{color-scheme:light;}</style>';
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/(<head[^>]*>)/i, `$1${inject}`);
   }
@@ -54,9 +54,9 @@ export function ensurePreviewColorScheme(html: string): string {
  * 优先滚到同页锚点/同名区块，否则留在当前页（issue #805）
  */
 export function injectPreviewNavigationGuard(html: string): string {
-  if (html.includes('data-xiaoruan-preview-nav-guard')) return html;
+  if (html.includes('data-zy-preview-nav-guard')) return html;
   const script =
-    '<script data-xiaoruan-preview-nav-guard>' +
+    '<script data-zy-preview-nav-guard>' +
     '(function(){' +
     'document.addEventListener("click",function(e){' +
     'var a=e.target&&e.target.closest?e.target.closest("a"):null;' +
