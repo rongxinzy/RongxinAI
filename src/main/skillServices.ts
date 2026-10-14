@@ -11,6 +11,7 @@ import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
 import { runNpmCommand } from './libs/npmRuntimeExec';
+import { StartupGate } from './libs/startupGate';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
@@ -81,6 +82,8 @@ function buildSkillServiceEnv(): Record<string, string | undefined> {
 
 export class SkillServiceManager {
   private webSearchPid: number | null = null;
+  /** Guards the async search start-up against a stop arriving mid-flight. */
+  private readonly webSearchStart = new StartupGate();
   private skillEnv: Record<string, string | undefined> | null = null;
 
   private hasWebSearchRuntimeScriptSupport(skillPath: string): boolean {
@@ -266,7 +269,7 @@ export class SkillServiceManager {
     }
   }
 
-  private async ensureWebSearchRuntimeReady(skillPath: string): Promise<void> {
+  private async ensureWebSearchRuntimeReady(skillPath: string, startToken: number): Promise<void> {
     if (this.isWebSearchRuntimeHealthy(skillPath)) {
       return;
     }
@@ -292,6 +295,9 @@ export class SkillServiceManager {
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
       await this.runWebSearchNpmStep(npmRuntime, ['install'], skillPath);
     }
+
+    // A stop during the install must not pay for a build that nobody waits for.
+    if (!this.webSearchStart.isCurrent(startToken)) return;
 
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
     if (shouldCompileDist) {
@@ -357,13 +363,24 @@ export class SkillServiceManager {
 
       console.log('[SkillServices] Starting Web Search Bridge Server...');
 
-      await this.startWebSearchServiceProcess(skillPath);
+      const startToken = this.webSearchStart.begin();
+      await this.startWebSearchServiceProcess(skillPath, startToken);
+      if (!this.webSearchStart.isCurrent(startToken)) {
+        console.log('[SkillServices] Web Search startup was cancelled before the server started');
+        return;
+      }
 
       // Poll for pid file instead of a fixed 3 s sleep — typically resolves
       // in < 1 s, saving 2-3 s off the startup path.
       const pidFile = path.join(skillPath, '.server.pid');
       const deadline = Date.now() + 10_000;
       while (Date.now() < deadline) {
+        if (!this.webSearchStart.isCurrent(startToken)) {
+          console.log(
+            '[SkillServices] Web Search startup cancelled while waiting for the pid file',
+          );
+          return;
+        }
         if (fs.existsSync(pidFile)) break;
         await new Promise(r => setTimeout(r, 200));
       }
@@ -380,11 +397,17 @@ export class SkillServiceManager {
     }
   }
 
-  private async startWebSearchServiceProcess(skillPath: string): Promise<void> {
+  private async startWebSearchServiceProcess(skillPath: string, startToken: number): Promise<void> {
     const pidFile = path.join(skillPath, '.server.pid');
     const logFile = path.join(skillPath, '.server.log');
     const serverEntry = path.join(skillPath, 'dist', 'server', 'index.js');
-    await this.ensureWebSearchRuntimeReady(skillPath);
+    await this.ensureWebSearchRuntimeReady(skillPath, startToken);
+    if (!this.webSearchStart.isCurrent(startToken)) {
+      // The runtime is ready, but the app has already stopped: spawning now
+      // would leave a detached server behind that nothing references.
+      console.log('[SkillServices] Web Search startup cancelled, not starting the server');
+      return;
+    }
     const baseEnv = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
     const runtime = this.resolveNodeRuntime(baseEnv);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();
@@ -425,6 +448,9 @@ export class SkillServiceManager {
    */
   async stopWebSearchService(): Promise<void> {
     try {
+      // Cancel before the "nothing is running" early return: during the install
+      // there is no pid yet, and that is exactly when the start must be stopped.
+      this.webSearchStart.cancel();
       const skillPath = this.getWebSearchPath();
       if (!skillPath) {
         return;

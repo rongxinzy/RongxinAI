@@ -6,7 +6,7 @@ import { afterEach, expect, test } from 'vitest';
 
 import {
   EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS,
-  isEventLoopStall,
+  isSuspectSuspend,
   readSqliteDiagnosticsSnapshot,
 } from './sqliteDiagnostics';
 
@@ -45,12 +45,15 @@ test('readSqliteDiagnosticsSnapshot reports database files and cowork row counts
   }
 });
 
-test('isEventLoopStall separates blocked work from a suspended process', () => {
-  expect(isEventLoopStall(249)).toBe(false);
-  expect(isEventLoopStall(250)).toBe(true);
-  expect(isEventLoopStall(60_000)).toBe(true);
-  // A sleeping machine reports hours of "lag": that is a measurement artifact,
-  // and calling it an event-loop stall misleads every later investigation.
-  expect(isEventLoopStall(EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS)).toBe(false);
-  expect(isEventLoopStall(33_607_636)).toBe(false);
+test('isSuspectSuspend separates a sleeping machine from blocked work', () => {
+  // Short gaps are never a suspend verdict; the stall path owns them.
+  expect(isSuspectSuspend(1_000, 0)).toBe(false);
+  expect(isSuspectSuspend(EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS - 1, 0)).toBe(false);
+  // Nine hours with no CPU time is a sleeping machine.
+  expect(isSuspectSuspend(33_607_636, 5_000)).toBe(true);
+  // Two minutes of a busy main thread is a real stall, however long it is.
+  expect(
+    isSuspectSuspend(EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS, EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS),
+  ).toBe(false);
+  expect(isSuspectSuspend(600_000, 240_000)).toBe(false);
 });
