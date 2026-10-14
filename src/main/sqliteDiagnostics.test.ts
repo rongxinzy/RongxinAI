@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, expect, test } from 'vitest';
 
-import { readSqliteDiagnosticsSnapshot } from './sqliteDiagnostics';
+import { formatEventLoopLag, readSqliteDiagnosticsSnapshot } from './sqliteDiagnostics';
 
 const temporaryDirectories: string[] = [];
 
@@ -39,4 +39,17 @@ test('readSqliteDiagnosticsSnapshot reports database files and cowork row counts
   } finally {
     db.close();
   }
+});
+
+test('formatEventLoopLag reports the gap with the CPU time it earned', () => {
+  expect(formatEventLoopLag(1_500, 1_450)).toBe(
+    'event-loop lag 1500ms (CPU time during the gap 1450ms, 96.7%)',
+  );
+  // A sleeping machine and a blocked synchronous wait look the same to the
+  // timer, so the numbers are reported without claiming which one it was:
+  // low CPU is evidence for the reader, not proof of a suspend.
+  expect(formatEventLoopLag(33_607_636, 5_000)).toContain('0.0%');
+  expect(formatEventLoopLag(411, 16)).toBe(
+    'event-loop lag 411ms (CPU time during the gap 16ms, 3.9%)',
+  );
 });

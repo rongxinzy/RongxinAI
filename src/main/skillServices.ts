@@ -2,7 +2,7 @@
  * Skill Services Manager - Manages background services for skills
  */
 
-import { execFileSync, execSync, spawn, spawnSync } from 'child_process';
+import { execSync, spawn, spawnSync } from 'child_process';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -10,6 +10,11 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
+import { NpmCommandAbortedError, runNpmCommand } from './libs/npmRuntimeExec';
+import { settleWithin, StartupGate } from './libs/startupGate';
+
+/** How long a stop waits for a cancelled search start-up to unwind. */
+const WEB_SEARCH_STOP_SETTLE_TIMEOUT_MS = 5_000;
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
@@ -80,6 +85,10 @@ function buildSkillServiceEnv(): Record<string, string | undefined> {
 
 export class SkillServiceManager {
   private webSearchPid: number | null = null;
+  /** Guards the async search start-up against a stop arriving mid-flight. */
+  private readonly webSearchStart = new StartupGate();
+  /** The start-up currently in flight, so a stop can wait for it to unwind. */
+  private webSearchStartTask: Promise<void> | null = null;
   private skillEnv: Record<string, string | undefined> | null = null;
 
   private hasWebSearchRuntimeScriptSupport(skillPath: string): boolean {
@@ -243,7 +252,41 @@ export class SkillServiceManager {
     };
   }
 
-  private ensureWebSearchRuntimeReady(skillPath: string): void {
+  /**
+   * Runs one npm step for the web-search runtime and reports what npm said.
+   *
+   * Never synchronous: this work happens while the app is starting, and a
+   * blocking install froze the whole window for 12-17 s.
+   */
+  private async runWebSearchNpmStep(
+    npmRuntime: NonNullable<ReturnType<typeof resolveBundledNpmRuntime>>,
+    args: string[],
+    skillPath: string,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    try {
+      await runNpmCommand(npmRuntime.command, [...npmRuntime.args, ...args], {
+        cwd: skillPath,
+        env: npmRuntime.env,
+        signal,
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof NpmCommandAbortedError) {
+        // The stop killed the child: report it as a stop, not as a failure.
+        console.log(`[SkillServices] web-search npm ${args.join(' ')} cancelled`);
+        return false;
+      }
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`web-search npm ${args.join(' ')} failed: ${detail}`);
+    }
+  }
+
+  private async ensureWebSearchRuntimeReady(
+    skillPath: string,
+    startToken: number,
+    signal: AbortSignal,
+  ): Promise<void> {
     if (this.isWebSearchRuntimeHealthy(skillPath)) {
       return;
     }
@@ -267,13 +310,11 @@ export class SkillServiceManager {
         );
       }
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
-      execFileSync(npmRuntime.command, [...npmRuntime.args, 'install'], {
-        cwd: skillPath,
-        stdio: 'ignore',
-        env: npmRuntime.env,
-        windowsHide: process.platform === 'win32',
-      });
+      if (!(await this.runWebSearchNpmStep(npmRuntime, ['install'], skillPath, signal))) return;
     }
+
+    // A stop during the install must not pay for a build that nobody waits for.
+    if (!this.webSearchStart.isCurrent(startToken)) return;
 
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
     if (shouldCompileDist) {
@@ -283,12 +324,9 @@ export class SkillServiceManager {
         );
       }
       console.log('[SkillServices] Compiling web-search TypeScript...');
-      execFileSync(npmRuntime.command, [...npmRuntime.args, 'run', 'build'], {
-        cwd: skillPath,
-        stdio: 'ignore',
-        env: npmRuntime.env,
-        windowsHide: process.platform === 'win32',
-      });
+      if (!(await this.runWebSearchNpmStep(npmRuntime, ['run', 'build'], skillPath, signal))) {
+        return;
+      }
     }
 
     if (!this.isWebSearchRuntimeHealthy(skillPath)) {
@@ -329,6 +367,16 @@ export class SkillServiceManager {
    * Start Web Search Bridge Server
    */
   async startWebSearchService(): Promise<void> {
+    const task = this.runWebSearchServiceStart();
+    this.webSearchStartTask = task;
+    try {
+      await task;
+    } finally {
+      if (this.webSearchStartTask === task) this.webSearchStartTask = null;
+    }
+  }
+
+  private async runWebSearchServiceStart(): Promise<void> {
     try {
       const skillPath = this.getWebSearchPath();
       if (!skillPath) {
@@ -344,13 +392,24 @@ export class SkillServiceManager {
 
       console.log('[SkillServices] Starting Web Search Bridge Server...');
 
-      await this.startWebSearchServiceProcess(skillPath);
+      const { token: startToken, signal: startSignal } = this.webSearchStart.begin();
+      await this.startWebSearchServiceProcess(skillPath, startToken, startSignal);
+      if (!this.webSearchStart.isCurrent(startToken)) {
+        console.log('[SkillServices] Web Search startup was cancelled before the server started');
+        return;
+      }
 
       // Poll for pid file instead of a fixed 3 s sleep — typically resolves
       // in < 1 s, saving 2-3 s off the startup path.
       const pidFile = path.join(skillPath, '.server.pid');
       const deadline = Date.now() + 10_000;
       while (Date.now() < deadline) {
+        if (!this.webSearchStart.isCurrent(startToken)) {
+          console.log(
+            '[SkillServices] Web Search startup cancelled while waiting for the pid file',
+          );
+          return;
+        }
         if (fs.existsSync(pidFile)) break;
         await new Promise(r => setTimeout(r, 200));
       }
@@ -367,11 +426,21 @@ export class SkillServiceManager {
     }
   }
 
-  private async startWebSearchServiceProcess(skillPath: string): Promise<void> {
+  private async startWebSearchServiceProcess(
+    skillPath: string,
+    startToken: number,
+    startSignal: AbortSignal,
+  ): Promise<void> {
     const pidFile = path.join(skillPath, '.server.pid');
     const logFile = path.join(skillPath, '.server.log');
     const serverEntry = path.join(skillPath, 'dist', 'server', 'index.js');
-    this.ensureWebSearchRuntimeReady(skillPath);
+    await this.ensureWebSearchRuntimeReady(skillPath, startToken, startSignal);
+    if (!this.webSearchStart.isCurrent(startToken)) {
+      // The runtime is ready, but the app has already stopped: spawning now
+      // would leave a detached server behind that nothing references.
+      console.log('[SkillServices] Web Search startup cancelled, not starting the server');
+      return;
+    }
     const baseEnv = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
     const runtime = this.resolveNodeRuntime(baseEnv);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();
@@ -412,6 +481,16 @@ export class SkillServiceManager {
    */
   async stopWebSearchService(): Promise<void> {
     try {
+      // Cancel before the "nothing is running" early return: during the install
+      // there is no pid yet, and that is exactly when the start must be stopped.
+      this.webSearchStart.cancel();
+      const startTask = this.webSearchStartTask;
+      if (startTask && !(await settleWithin(startTask, WEB_SEARCH_STOP_SETTLE_TIMEOUT_MS))) {
+        // Reported, not thrown: the process must still try to stop what it can.
+        console.warn(
+          '[SkillServices] Web Search startup did not settle while stopping; continuing the stop',
+        );
+      }
       const skillPath = this.getWebSearchPath();
       if (!skillPath) {
         return;
