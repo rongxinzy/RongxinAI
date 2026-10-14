@@ -5,9 +5,8 @@ import {
 } from '@shared/components/ai-elements/conversation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
 import { Button } from '@shared/components/ui/button';
-import { ChevronDown, ChevronUp, Download, Image as ImageIcon } from 'lucide-react';
+import { Download, Image as ImageIcon } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
@@ -87,7 +86,6 @@ import {
 import {
   buildConversationTurns,
   buildDisplayItems,
-  buildTurnRailIndices,
   hasRenderableAssistantContent,
 } from './helpers/messageGrouping';
 import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
@@ -102,7 +100,6 @@ import {
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
-import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
 import {
   COWORK_COMPOSER_INSET_VALUE,
   useCoworkComposerInset,
@@ -149,7 +146,6 @@ interface CoworkSessionDetailProps {
   onCancelTaskResume?: () => void;
 }
 
-const NAV_SCROLL_LOCK_DURATION = 800;
 const ARTIFACT_PANEL_TRANSITION_MS = 200;
 class ArtifactPanelErrorBoundary extends React.Component<
   { children: React.ReactNode; onClose: () => void },
@@ -237,24 +233,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     [onResumeTask],
   );
 
-  // Rail navigation states
-  const [currentRailIndex, setCurrentRailIndex] = useState(-1);
-  const currentRailIndexRef = useRef(-1);
-  const railItemCountRef = useRef(0);
-  // Mapping: turnIndex → { first: firstRailIdx, last: lastRailIdx }
-  const turnToRailRangeRef = useRef<{ first: number; last: number }[]>([]);
-  const isNavigatingRef = useRef(false);
-  const navigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const virtualizedTurnListRef = useRef<VirtualizedTurnListHandle>(null);
-  const railLinesRef = useRef<HTMLDivElement>(null);
-  const [hoveredRailIndex, setHoveredRailIndex] = useState<number | null>(null);
-  const [isRailHovered, setIsRailHovered] = useState(false);
-  const [railTooltip, setRailTooltip] = useState<{
-    label: string;
-    top: number;
-    right: number;
-    isUser: boolean;
-  } | null>(null);
 
   // Export states
   const [isExportingImage, setIsExportingImage] = useState(false);
@@ -566,28 +545,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   }, [sessionId, sessionArtifacts, dispatch, currentSession?.cwd]);
   // ─── End artifact detection ─────────────────────────────────────────
 
-  // Cleanup nav timers on unmount
-  useEffect(() => {
-    return () => {
-      if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
-    };
-  }, []);
-
-  // Reset all rail measurements before the next session paints. This component
-  // stays mounted so artifact renderers can be reused across session switches.
-  useLayoutEffect(() => {
-    setCurrentRailIndex(-1);
-    currentRailIndexRef.current = -1;
-    railItemCountRef.current = 0;
-    turnToRailRangeRef.current = [];
-    isNavigatingRef.current = false;
-    if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
-    railLinesRef.current?.scrollTo({ top: 0 });
-    setHoveredRailIndex(null);
-    setIsRailHovered(false);
-    setRailTooltip(null);
-  }, [sessionId]);
-
   useEffect(() => {
     const handleOpenShareOptions = (event: Event) => {
       const detail = (event as CustomEvent<CoworkOpenShareOptionsEventDetail>).detail;
@@ -888,51 +845,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     });
   };
 
-  const navigateToRailItem = useCallback((railIndex: number) => {
-    if (railIndex < 0 || railIndex >= railItemCountRef.current) return;
-
-    // Find the turn that contains this rail item
-    const ranges = turnToRailRangeRef.current;
-    let targetTurnIdx = -1;
-    for (let t = 0; t < ranges.length; t++) {
-      if (ranges[t] && railIndex >= ranges[t].first && railIndex <= ranges[t].last) {
-        targetTurnIdx = t;
-        break;
-      }
-    }
-
-    isNavigatingRef.current = true;
-    if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
-    navigatingTimerRef.current = setTimeout(() => {
-      isNavigatingRef.current = false;
-    }, NAV_SCROLL_LOCK_DURATION);
-
-    // Try to scroll to the exact data-rail-index element if it's mounted;
-    // otherwise let the virtualizer bring the target turn into view, then
-    // refine to the exact block once it mounts.
-    const container = scrollContainerRef.current;
-    if (container) {
-      const el = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else if (targetTurnIdx >= 0) {
-        virtualizedTurnListRef.current?.scrollToTurn(targetTurnIdx);
-        const refine = (attemptsLeft: number) => {
-          const target = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } else if (attemptsLeft > 0) {
-            window.requestAnimationFrame(() => refine(attemptsLeft - 1));
-          }
-        };
-        window.requestAnimationFrame(() => refine(30));
-      }
-    }
-
-    currentRailIndexRef.current = railIndex;
-    setCurrentRailIndex(railIndex);
-  }, []);
-
   // lastMessageContent and messagesLength are now sourced from memoized
   // selectors (selectLastMessageContent / selectCurrentMessagesLength)
   // so there is no need to derive them from currentSession here.
@@ -1023,56 +935,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // Scope persisted collapsible state to this session. Rendered sessions are
   // shown one at a time, so a render-time namespace assignment is safe.
   setPersistentToggleNamespace(currentSession?.id ?? '');
-  // Rail indices come from data, not DOM, so virtualized (unmounted) turns
-  // keep correct rail numbering.
-  const turnRailIndices = useMemo(() => buildTurnRailIndices(turns), [turns]);
 
   const markInitialHistoryTailPositioned = useSessionHistoryPagination({
     sessionId,
     messagesOffset: currentSession?.messagesOffset ?? 0,
     rootRef: detailRootRef,
   });
-  useConversationRailScrollSync({
-    sessionId,
-    rootRef: detailRootRef,
-    scrollContainerRef,
-    currentRailIndexRef,
-    isNavigatingRef,
-    setCurrentRailIndex,
-  });
-
-  // Sync rail index when turns change or rail first appears ((turns.length > 1) becomes true)
-  useEffect(() => {
-    // After turns/scrollable change, if rail index is uninitialized (-1) or out of bounds,
-    // wait for next frame so render IIFE has updated railItemCountRef, then sync
-    const frameId = requestAnimationFrame(() => {
-      const count = railItemCountRef.current;
-      if (count === 0) return;
-      const idx = currentRailIndexRef.current;
-      if (idx < 0 || idx >= count) {
-        const resolved = count - 1;
-        currentRailIndexRef.current = resolved;
-        setCurrentRailIndex(resolved);
-      }
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [turns, turns.length]);
-
-  // Scroll rail lines container to keep active item visible (without affecting page scroll)
-  useEffect(() => {
-    const container = railLinesRef.current;
-    if (!container || currentRailIndex < 0) return;
-    const activeEl = container.children[currentRailIndex] as HTMLElement | undefined;
-    if (!activeEl) return;
-    // Manual scroll calculation to avoid scrollIntoView bubbling to parent scrollable
-    const elTop = activeEl.offsetTop;
-    const elBottom = elTop + activeEl.offsetHeight;
-    if (elTop < container.scrollTop) {
-      container.scrollTop = elTop;
-    } else if (elBottom > container.scrollTop + container.clientHeight) {
-      container.scrollTop = elBottom - container.clientHeight;
-    }
-  }, [currentRailIndex]);
 
   // StickToBottom (Conversation) handles auto-scroll during streaming
 
@@ -1111,19 +979,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         isStreaming && isLastTurn && !hasRenderableAssistantContent(turn) && !hasActiveToolActivity;
       const showAssistantBlock =
         turn.assistantItems.length > 0 || showTypingIndicator || hasActiveToolActivity;
-      // Rail indices are precomputed from data (virtualized turns may be unmounted)
-      const userRailIdx = turnRailIndices[index]?.user ?? -1;
-      const asstRailIdx = turnRailIndices[index]?.assistant ?? -1;
 
       const turnArtifacts = turnArtifactsMap.get(turn.id) ?? [];
 
       return (
         <div key={turn.id} data-turn-index={index}>
           {turn.userMessage && (
-            <div
-              data-export-role="user-message"
-              {...(userRailIdx >= 0 ? { 'data-rail-index': userRailIdx } : undefined)}
-            >
+            <div data-export-role="user-message">
               <UserBubble
                 message={turn.userMessage}
                 skills={skills}
@@ -1132,10 +994,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             </div>
           )}
           {showAssistantBlock && (
-            <div
-              data-export-role="assistant-block"
-              {...(asstRailIdx >= 0 ? { 'data-rail-index': asstRailIdx } : undefined)}
-            >
+            <div data-export-role="assistant-block">
               <TurnBlock
                 turn={turn}
                 artifacts={turnArtifacts}
@@ -1330,241 +1189,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               className="pointer-events-none absolute inset-x-0 z-[1] h-16 bg-gradient-to-t from-background to-transparent"
               style={{ bottom: COWORK_COMPOSER_INSET_VALUE }}
             />
-
-            {/* Turn navigation rail removed: message content remains scrollable in the conversation. */}
-            {!isSessionSwitching && turns.length > 1 && (
-              <div
-                className="hidden absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
-                style={{ maxHeight: 'calc(100% - 40px)' }}
-                onMouseEnter={() => setIsRailHovered(true)}
-                onMouseLeave={() => {
-                  setIsRailHovered(false);
-                  setHoveredRailIndex(null);
-                  setRailTooltip(null);
-                }}
-              >
-                {/* Up Arrow */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={i18nService.t('coworkQuestionWizardPrevious')}
-                  disabled={
-                    (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
-                  }
-                  onClick={() => {
-                    const resolvedRail =
-                      currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex;
-                    if (resolvedRail <= 0) return;
-                    navigateToRailItem(resolvedRail - 1);
-                  }}
-                  onMouseEnter={() => {
-                    setHoveredRailIndex(null);
-                  }}
-                  className={` theme-page-cowork-session-detail-button-variant-4 mb-2 mr-[-5px] [&_svg]:size-3.5 ${
-                    !isRailHovered
-                      ? 'theme-page-cowork-session-detail-button-variant-1 pointer-events-none'
-                      : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <=
-                          0
-                        ? 'theme-page-cowork-session-detail-button-variant-2 cursor-default'
-                        : 'theme-page-cowork-session-detail-button-variant-3 cursor-pointer'
-                  }`}
-                >
-                  <ChevronUp />
-                </Button>
-
-                {/* Message Lines */}
-                <div
-                  ref={railLinesRef}
-                  className="overflow-y-auto min-h-0 flex-1"
-                  style={{ scrollbarWidth: 'none' }}
-                >
-                  {(() => {
-                    // Build flat list of messages with their content length and turn index
-                    const MIN_W = 6; // px
-                    const MAX_W = 16; // px
-                    // Strip common markdown syntax for tooltip display
-                    const stripMd = (s: string) =>
-                      s
-                        .replace(/^#+\s+/gm, '')
-                        .replace(/```[\s\S]*?```/g, ' ')
-                        .replace(/`[^`]*`/g, ' ')
-                        .replace(/[*_~>]/g, '')
-                        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                    // Get first meaningful text snippet from content
-                    const getLabel = (content: string, fallback: string) => {
-                      const stripped = stripMd(content);
-                      return stripped.slice(0, 50) || fallback;
-                    };
-                    type RailItem = {
-                      key: string;
-                      turnIndex: number;
-                      label: string;
-                      contentLen: number;
-                      isUser: boolean;
-                    };
-                    const items: RailItem[] = [];
-                    for (let i = 0; i < turns.length; i++) {
-                      const turn = turns[i];
-                      if (turn.userMessage) {
-                        const content = turn.userMessage.content ?? '';
-                        items.push({
-                          key: `${turn.id}-user`,
-                          turnIndex: i,
-                          label: getLabel(content, `Turn ${i + 1}`),
-                          contentLen: content.length,
-                          isUser: true,
-                        });
-                      }
-                      // Aggregate all assistant content into one line per turn
-                      let asstContent = '';
-                      for (const item of turn.assistantItems) {
-                        if (item.type === 'assistant' && item.message?.content) {
-                          asstContent += item.message.content;
-                        }
-                      }
-                      if (asstContent) {
-                        items.push({
-                          key: `${turn.id}-asst`,
-                          turnIndex: i,
-                          label: getLabel(asstContent, '知远智能体'),
-                          contentLen: asstContent.length,
-                          isUser: false,
-                        });
-                      }
-                    }
-                    const maxLen = items.reduce((acc, m) => Math.max(acc, m.contentLen), 1);
-                    // Sync rail item count and turn-to-rail mapping
-                    railItemCountRef.current = items.length;
-                    const rangeMap: { first: number; last: number }[] = [];
-                    for (let ri = 0; ri < items.length; ri++) {
-                      const ti = items[ri].turnIndex;
-                      if (!rangeMap[ti]) {
-                        rangeMap[ti] = { first: ri, last: ri };
-                      } else {
-                        rangeMap[ti].last = ri;
-                      }
-                    }
-                    turnToRailRangeRef.current = rangeMap;
-
-                    // Clamp rail index to valid range
-                    const resolvedRailIndex =
-                      currentRailIndex < 0 || currentRailIndex >= items.length
-                        ? items.length - 1
-                        : currentRailIndex;
-
-                    return items.map((msg, idx) => {
-                      const isActive = idx === resolvedRailIndex;
-                      const isHovered = idx === hoveredRailIndex;
-                      const ratio = msg.contentLen / maxLen;
-                      const lineW = Math.round(MIN_W + ratio * (MAX_W - MIN_W));
-                      return (
-                        <Button
-                          key={msg.key}
-                          type="button"
-                          variant="ghost"
-                          aria-label={msg.label}
-                          aria-current={isActive ? 'true' : undefined}
-                          onClick={() => {
-                            navigateToRailItem(idx);
-                          }}
-                          onMouseEnter={e => {
-                            setHoveredRailIndex(idx);
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const top = Math.max(
-                              8,
-                              Math.min(rect.top + rect.height / 2, window.innerHeight - 8),
-                            );
-                            setRailTooltip({
-                              label: msg.label,
-                              top,
-                              right: window.innerWidth - rect.left + 8,
-                              isUser: msg.isUser,
-                            });
-                          }}
-                          onMouseLeave={() => setRailTooltip(null)}
-                          className="theme-control-sizing-12 theme-control-content-height w-5 cursor-pointer justify-end"
-                        >
-                          <div
-                            className={`h-[2px] w-4 origin-right rounded-full transition-[transform,background-color] ${
-                              isActive || isHovered ? 'bg-foreground' : 'bg-border'
-                            }`}
-                            style={{
-                              transform: `scaleX(${(isActive || isHovered ? MAX_W : lineW) / MAX_W})`,
-                            }}
-                          />
-                        </Button>
-                      );
-                    });
-                  })()}
-                </div>
-
-                {/* Down Arrow */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={i18nService.t('coworkQuestionWizardNext')}
-                  disabled={
-                    (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
-                    railItemCountRef.current - 1
-                  }
-                  onClick={() => {
-                    const maxRail = railItemCountRef.current - 1;
-                    const resolvedRail = currentRailIndex < 0 ? maxRail : currentRailIndex;
-                    if (resolvedRail >= maxRail) return;
-                    navigateToRailItem(resolvedRail + 1);
-                  }}
-                  onMouseEnter={() => {
-                    setHoveredRailIndex(null);
-                  }}
-                  className={` theme-page-cowork-session-detail-button-variant-8 mt-2 mr-[-5px] [&_svg]:size-3.5 ${
-                    !isRailHovered
-                      ? 'theme-page-cowork-session-detail-button-variant-5 pointer-events-none'
-                      : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
-                          railItemCountRef.current - 1
-                        ? 'theme-page-cowork-session-detail-button-variant-6 cursor-default'
-                        : 'theme-page-cowork-session-detail-button-variant-7 cursor-pointer'
-                  }`}
-                >
-                  <ChevronDown />
-                </Button>
-              </div>
-            )}
-
-            {!isSessionSwitching &&
-              railTooltip &&
-              createPortal(
-                <div
-                  className={`fixed z-100 px-3.5 py-2 text-sm leading-snug pointer-events-none overflow-hidden
-              max-w-[240px] shadow-lg border border-border bg-surface-overlay text-foreground
-              ${railTooltip.isUser ? 'rounded-xl rounded-br-sm' : 'rounded-xl'}`}
-                  style={{
-                    top: railTooltip.top,
-                    right: railTooltip.right,
-                    transform: 'translateY(-50%)',
-                  }}
-                >
-                  {!railTooltip.isUser && (
-                    <div className="text-xs font-medium mb-0.5 text-foreground">知远智能体：</div>
-                  )}
-                  <div
-                    className="text-muted-foreground"
-                    style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      wordBreak: 'break-all',
-                    }}
-                  >
-                    {railTooltip.label}
-                  </div>
-                </div>,
-                document.body,
-              )}
           </div>
 
           {/* Input Area */}
