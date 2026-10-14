@@ -69,7 +69,7 @@ export function shellSidebarAppearances() {
         'border-width': '0px',
         'box-shadow': 'none',
         'background-color': 'transparent',
-        color: 'var(--muted-foreground)',
+        color: 'var(--sidebar-foreground)',
       },
       hover: { 'background-color': surface(5), color: 'var(--sidebar-foreground)' },
       pressed: { 'background-color': surface(10), translate: '0px 1px' },
@@ -110,7 +110,7 @@ export function shellSidebarAppearances() {
       },
     }),
     'shell-sidebar-task-idle': recipe({
-      base: { 'background-color': 'transparent', color: 'var(--muted-foreground)' },
+      base: { 'background-color': 'transparent', color: 'var(--sidebar-foreground)' },
       hover: { 'background-color': surface(5), color: 'var(--sidebar-foreground)' },
     }),
     'shell-sidebar-task-main': recipe({
@@ -143,7 +143,7 @@ export function shellSidebarAppearances() {
         ...feedback,
         height: '2rem',
         'background-color': 'transparent',
-        color: 'var(--muted-foreground)',
+        color: 'var(--sidebar-foreground)',
         'border-radius': '0px',
         'box-shadow': 'none',
         'font-size': 'var(--zy-component-text-sm)',

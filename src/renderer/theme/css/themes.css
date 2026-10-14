@@ -2453,7 +2453,7 @@
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -4919,7 +4919,7 @@
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -4947,7 +4947,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -4970,7 +4970,7 @@
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -10559,7 +10559,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -13027,7 +13027,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="classic-dark"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -13055,7 +13055,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="classic-dark"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -13078,7 +13078,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -18680,7 +18680,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -21146,7 +21146,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-light"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -21174,7 +21174,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="daming-light"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -21197,7 +21197,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -26786,7 +26786,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -29254,7 +29254,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-dark"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -29282,7 +29282,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="daming-dark"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -29305,7 +29305,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -34909,7 +34909,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -37375,7 +37375,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-light"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -37403,7 +37403,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="changan-light"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -37426,7 +37426,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -43020,7 +43020,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -45488,7 +45488,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-dark"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -45516,7 +45516,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="changan-dark"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -45539,7 +45539,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -51146,7 +51146,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -53612,7 +53612,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-light"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -53640,7 +53640,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -53663,7 +53663,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
@@ -59257,7 +59257,7 @@ to {
   padding-inline: 0.5rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   line-height: var(--zy-component-text-sm--line-height);
@@ -61725,7 +61725,7 @@ to {
   border-width: 0px;
   box-shadow: none;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-dark"] :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]) {
@@ -61753,7 +61753,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-shell-sidebar .theme-surface-agent-idle) {
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
 }
 [data-theme="weiyang-dark"] :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
@@ -61776,7 +61776,7 @@ to {
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   height: 2rem;
   background-color: transparent;
-  color: var(--muted-foreground);
+  color: var(--sidebar-foreground);
   border-radius: 0px;
   box-shadow: none;
   font-size: var(--zy-component-text-sm);
