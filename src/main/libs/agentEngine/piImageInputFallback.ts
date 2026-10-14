@@ -262,7 +262,7 @@ export function buildImageOmittedNotice(
       ? [
           'If the text in the picture matters and the file cannot be opened as an image, the bundled helper extracts it — one command per image:',
           ...commands,
-          'It returns text only: it cannot describe layout, photos, or charts. Ask the user to paste or describe whatever the text does not cover.',
+          'It returns text only: it cannot describe layout, photos, or charts, and it reports on stderr when the image has no machine-readable text — that is a result, not a broken script, so do not go looking for another OCR tool. Ask the user to paste or describe whatever the text does not cover.',
         ]
       : [
           'If the file cannot be opened as an image, ask the user to paste or describe what matters.',

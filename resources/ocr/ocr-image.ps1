@@ -66,7 +66,17 @@ try {
     if ($null -eq $engine) { throw "no OCR engine installed for $Lang (add the language pack)" }
 
     $result = Await ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-    $result.Lines | ForEach-Object { $_.Text }
+    # Force an array: an empty WinRT list projects to $null, whose .Count would
+    # not compare equal to 0 and would hide exactly the case this guards.
+    $lines = @($result.Lines | ForEach-Object { $_.Text } | Where-Object { $_ })
+    if ($lines.Count -eq 0) {
+        # Silence would be indistinguishable from "the helper never ran", which
+        # sends the agent hunting for a broken script instead of concluding that
+        # this image has no machine-readable text (logos, icons, photos, charts).
+        [Console]::Error.WriteLine("ocr-image.ps1: no machine-readable text recognized in $full ($($decoder.PixelWidth)x$($decoder.PixelHeight))")
+        exit 0
+    }
+    $lines | ForEach-Object { $_ }
     exit 0
 } catch {
     [Console]::Error.WriteLine("ocr-image.ps1: $($_.Exception.Message)")
