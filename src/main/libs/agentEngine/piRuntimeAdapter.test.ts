@@ -3811,6 +3811,46 @@ describe('PiRuntimeAdapter', () => {
       expect(systemErrorMessages()).toHaveLength(1);
     });
 
+    it('retries when the rejection arrives before the send promise resolves', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-vision',
+          baseURL: 'https://api.moonshot.cn/v1',
+          model: 'kimi-k2.6',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'moonshot',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      });
+      // The SDK can report a rejected payload through events that land before the
+      // send promise settles; the turn's image state must already be recorded.
+      mockSession.sendUserMessage.mockImplementationOnce(async () => {
+        failedAttempt(
+          '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
+        );
+        listener!({ type: 'agent_settled' });
+      });
+
+      await adapter.startSession('image-retry-race', 'Describe this image', {
+        imageAttachments: [
+          {
+            name: 'example.png',
+            mimeType: 'image/png',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\hash.png',
+          },
+        ],
+      });
+
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
+      const [retryPrompt] = mockSession.prompt.mock.calls[0] as [string];
+      expect(retryPrompt).toContain('C:\\cowork-images\\s\\hash.png');
+    });
+
     it('leaves a non-image capability error on the normal failure path', async () => {
       await adapter.startSession('test', 'Hi');
 
