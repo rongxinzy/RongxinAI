@@ -192,14 +192,16 @@ import type {
   PiStartOptions,
 } from './piRuntimeTypes';
 import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
-import { collectImagePathReferences } from './piImageInputFallback';
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import {
   buildImageOmittedNotice,
+  collectImagePathReferences,
   imageCapabilityFingerprint,
+  ImageInputVerdict,
+  imageInputVerdict,
   isImagePayloadRejection,
   markImageInputRejected,
-  shouldSendImageInput,
+  type ImageCapabilityConfiguration,
   type ImageInputAttachmentRef,
   type ImagePromptPreparation,
 } from './piImageInputFallback';
@@ -329,6 +331,8 @@ interface ActivePiSession {
   /** Whether pi's builtin MCP extension owns this session's MCP tools. */
   mcpNativeBridge: boolean;
   capabilities: ModelCapabilities;
+  /** Endpoint identity behind the current model; scopes image observations. */
+  imageEndpointKey?: string;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
@@ -532,6 +536,8 @@ interface PiModelRuntimeCreateOptions {
 }
 
 type PiResolvedModel = {
+  /** Base URL identity of the endpoint the model was resolved against. */
+  endpointKey: string;
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   maxOutputTokens: number;
@@ -550,7 +556,7 @@ type PiResolvedModel = {
 function preparePiPrompt(
   text: string,
   attachments: PiStartOptions['imageAttachments'] | undefined,
-  sendImages: boolean,
+  verdict: ImageInputVerdict,
   ocrCommandFor?: (imagePath: string) => string,
   pathImageReferences: readonly ImageInputAttachmentRef[] = [],
 ): {
@@ -561,7 +567,11 @@ function preparePiPrompt(
   sentImages: ImageInputAttachmentRef[];
   omittedImages: ImageInputAttachmentRef[];
 } {
-  if (!attachments?.length && pathImageReferences.length === 0) {
+  const sendImages = verdict === ImageInputVerdict.Supported;
+  // A path-only image is only worth explaining when the model cannot open it as
+  // an image: a vision-capable model just reads the file.
+  const pathOnly = sendImages ? [] : pathImageReferences;
+  if (!attachments?.length && pathOnly.length === 0) {
     return { content: text, hasImages: false, sentImages: [], omittedImages: [] };
   }
   const imageAttachments = (attachments ?? []).filter(item => item.mimeType.startsWith('image/'));
@@ -585,11 +595,12 @@ function preparePiPrompt(
     }
   }
   // Pi answers a non-vision model's `read` with an in-band note instead of a
-  // failed request; Cowork images never pass through `read`, so the same note
-  // (plus the file paths) has to travel with the prompt itself. Images that were
-  // withheld and images the UI could only attach by path share one note: in both
-  // cases the model is holding a path instead of pixels.
-  const notice = buildImageOmittedNotice([...references, ...pathImageReferences], ocrCommandFor);
+  // failed request; Cowork images never pass through `read`, so the same facts
+  // (why the picture is absent, plus the file paths) have to travel with the
+  // prompt itself. Images withheld by capability and images the UI could only
+  // attach by path share one note: in both cases the model holds a path, not
+  // pixels.
+  const notice = buildImageOmittedNotice([...references, ...pathOnly], { verdict, ocrCommandFor });
   return {
     content: text.trim() ? `${text}\n\n${notice}` : notice,
     hasImages: false,
@@ -1502,6 +1513,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         modelCompactionOverride: resolvedModel.modelCompactionOverride,
         codemodeEnabled,
         mcpNativeBridge,
+        imageEndpointKey: resolvedModel.endpointKey,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1667,7 +1679,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const initialImagePrompt = preparePiPrompt(
         initialPrompt,
         options.imageAttachments,
-        this.shouldSendImagesForActive(active),
+        this.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(options.fileAttachments),
       );
@@ -2040,7 +2052,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const continuedImagePrompt = preparePiPrompt(
         nextPrompt,
         options.imageAttachments,
-        this.shouldSendImagesForActive(active),
+        this.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(options.fileAttachments),
       );
@@ -2087,6 +2099,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const model = this.resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
       await active.piSession.setModel(model);
       active.model = model;
+      active.imageEndpointKey = resolvedModel.endpointKey;
       active.requestedModelOverride = patch.model;
       active.modelRuntime = resolvedModel.modelRuntime;
       active.modelRequestOptions = resolvedModel.requestOptions;
@@ -2544,7 +2557,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const queuedImagePrompt = preparePiPrompt(
         item.text,
         item.imageAttachments,
-        this.shouldSendImagesForActive(active),
+        this.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(item.fileAttachments),
       );
@@ -3375,8 +3388,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               markImageInputRejected(
                 active.harnessModelProfile.provider,
                 active.harnessModelProfile.model,
-                imageCapabilityFingerprint({ imageInput: active.capabilities.imageInput }),
+                imageCapabilityFingerprint(this.imageCapabilityConfiguration(active)),
               );
+              console.log('[DBG mark]', JSON.stringify(this.imageCapabilityConfiguration(active)));
               if (carriedImages) {
                 active.imageRetryPending = true;
                 active.imageRejectionHandled = true;
@@ -3773,12 +3787,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   // ── Private: image input fallback ──
   /** Whether the current turn may carry image bytes (see piImageInputFallback). */
-  private shouldSendImagesForActive(active: ActivePiSession): boolean {
-    return shouldSendImageInput(
-      active.capabilities,
+  /** Configuration half of the image-capability fingerprint, in one shape. */
+  private imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration {
+    return {
+      imageInput: active.capabilities.imageInput,
+      supportsImage: active.capabilities.imageInput === ModelCapabilityStatus.Supported,
+      endpointKey: active.imageEndpointKey,
+    };
+  }
+
+  private imageInputVerdictForActive(active: ActivePiSession): ImageInputVerdict {
+    return imageInputVerdict(
+      active.capabilities.imageInput,
       active.harnessModelProfile.provider,
       active.harnessModelProfile.model,
-      { imageInput: active.capabilities.imageInput },
+      this.imageCapabilityConfiguration(active),
     );
   }
 
@@ -3795,16 +3818,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   ): void {
     active.imageRetryPending = false;
     active.imageRejectionHandled = false;
+    // Image state is recorded whether or not the turn carried text: an
+    // image-only submission is a normal turn, and the failure path has to be
+    // able to retry it.
     active.lastImagePrompt =
       prepared.sentImages.length > 0 || prepared.omittedImages.length > 0
-        ? text.trim()
-          ? {
-              text,
-              sentImages: prepared.sentImages,
-              omittedImages: prepared.omittedImages,
-              retried: false,
-            }
-          : null
+        ? {
+            text,
+            sentImages: prepared.sentImages,
+            omittedImages: prepared.omittedImages,
+            retried: false,
+          }
         : null;
     if (active.lastImagePrompt && prepared.omittedImages.length > 0) {
       this.appendSystemNotice(sessionId, t('coworkImageNotSentNotice'));
@@ -3883,7 +3907,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.appendSystemNotice(sessionId, t('coworkImageRetryNotice'));
     const retryPrompt = [
       fallback.text,
-      buildImageOmittedNotice(fallback.sentImages, this.bundledOcrHelper?.commandFor),
+      buildImageOmittedNotice(fallback.sentImages, {
+        verdict: ImageInputVerdict.Rejected,
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
+      }),
     ]
       .filter(content => content.trim().length > 0)
       .join('\n\n');
@@ -4740,11 +4767,37 @@ async function resolvePiModel(
     resolution.config.model,
   );
   const useBuiltinModel = canUsePiBuiltinModel(builtinModel, resolution);
-  const resolvedModel =
+  const selectedModel =
     (useBuiltinModel ? builtinModel : null) ??
     (registeredModel && typeof registeredModel === 'object'
       ? (registeredModel as Record<string, unknown>)
       : customModel);
+  // One endpoint identity for the whole image-capability decision: the model
+  // gate here, the host-side attachment gate, and the failure path all have to
+  // agree, or a rejection recorded by one stays invisible to the others.
+  const endpointKey = resolution.endpoint?.baseUrl || resolution.config.baseURL || '';
+  const configuredImageInput =
+    resolution.endpoint?.capabilities?.imageInput ??
+    resolution.providerMetadata.capabilities?.imageInput ??
+    ModelCapabilityStatus.Unknown;
+  const effectiveImageInput = imageInputVerdict(
+    configuredImageInput,
+    resolution.providerMetadata.providerName,
+    resolution.config.model,
+    {
+      supportsImage: configuredImageInput === ModelCapabilityStatus.Supported,
+      imageInput: configuredImageInput,
+      endpointKey,
+    },
+  );
+  // A model that cannot read images must not advertise image input, whatever
+  // source it came from: Pi downgrades every image block — attachments, native
+  // `read` results, replayed history — to a text placeholder for such a model,
+  // so an image can never re-enter a request the server already rejected.
+  const resolvedModel =
+    effectiveImageInput === ImageInputVerdict.Supported
+      ? selectedModel
+      : { ...selectedModel, input: ['text'] as Array<'text' | 'image'> };
   // pi keys compaction.modelOverrides by the model's own provider/id pair, so
   // read both off the final model object (builtin catalog models use pi's
   // provider ids, not our provider names).
@@ -4755,6 +4808,7 @@ async function resolvePiModel(
 
   return {
     model: resolvedModel,
+    endpointKey,
     modelRuntime,
     maxOutputTokens:
       resolution.endpoint?.maxTokens ||

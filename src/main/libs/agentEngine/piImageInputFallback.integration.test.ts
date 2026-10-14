@@ -214,7 +214,7 @@ test('image rejection is retried as text and reported to the user', async () => 
   // ...together with the extraction path: the bundled helper's command where the
   // helper resolves (Windows), the self-written guidance otherwise.
   expect(textOnly?.body).toContain(
-    resolveBundledOcrHelper() ? 'ocr-image.ps1' : 'Windows.Media.Ocr',
+    resolveBundledOcrHelper() ? 'ocr-image.ps1' : 'ask the user to paste',
   );
   expect(errors).toHaveLength(0); // no dead-end error bubble
   const notices = messages.filter(

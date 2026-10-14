@@ -287,6 +287,23 @@ import {
   PiContentBlockType,
 } from './piWriteTokenLimit';
 
+/**
+ * Pi model of a live session, for capability assertions.
+ *
+ * A model that cannot read images must not advertise image input: Pi then
+ * downgrades every image block (attachments, `read` results, history) to a text
+ * placeholder, so no image can re-enter a rejected request.
+ */
+const activePiModel = (
+  target: PiRuntimeAdapter,
+  sessionId: string,
+): Record<string, unknown> | undefined => {
+  const sessions = (
+    target as unknown as { activeSessions: Map<string, { model: Record<string, unknown> }> }
+  ).activeSessions;
+  return sessions.get(sessionId)?.model;
+};
+
 describe('PiRuntimeAdapter', () => {
   let adapter: PiRuntimeAdapter;
   const temporaryWorkspaceRoots = new Set<string>();
@@ -1411,10 +1428,11 @@ describe('PiRuntimeAdapter', () => {
 
       const [sentPrompt] = mockSession.prompt.mock.calls[0] as [string];
       // Pi's in-band note for a non-vision model, mirrored for composer images:
-      // the bytes are withheld and the model is told why.
+      // the bytes are withheld and the model is told why. An unconfigured model
+      // is reported as unconfirmed, not as a confirmed text-only model.
       expect(sentPrompt).toContain('Describe this image');
       expect(sentPrompt).toContain('not sent');
-      expect(sentPrompt).toContain('cannot read images');
+      expect(sentPrompt).toMatch(/not confirmed/i);
       expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
     });
 
@@ -1447,12 +1465,45 @@ describe('PiRuntimeAdapter', () => {
       const [sentPrompt] = mockSession.prompt.mock.calls.at(-1) as [string];
       expect(sentPrompt).toContain('Describe this image');
       expect(sentPrompt).toContain('C:\\cowork-images\\s\\shot.png');
-      expect(sentPrompt).toContain('cannot read images');
+      expect(sentPrompt).toMatch(/not confirmed/i);
       // A text attachment must not be advertised as an image.
       expect(sentPrompt).not.toContain('notes.txt');
       if (resolveBundledOcrHelper()) {
         expect(sentPrompt).toContain('ocr-image.ps1');
       }
+    });
+
+    it('leaves a path-only image alone for a vision-capable model', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-vision',
+          baseURL: 'https://api.moonshot.cn/v1',
+          model: 'kimi-k2.6',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'moonshot',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      });
+
+      await adapter.startSession('vision-file', 'Describe this image', {
+        fileAttachments: [
+          {
+            name: 'shot.png',
+            path: 'C:\\cowork-images\\s\\shot.png',
+            extension: 'PNG',
+            isImage: true,
+          },
+        ],
+      });
+
+      const [sentPrompt] = mockSession.prompt.mock.calls.at(-1) as [string];
+      // A vision-capable model can open the file itself: no capability claim,
+      // no OCR script, no withheld-image notice.
+      expect(sentPrompt).toBe('Describe this image');
     });
 
     it('tells the user when images were withheld from a text-only turn', async () => {
@@ -3834,6 +3885,56 @@ describe('PiRuntimeAdapter', () => {
       expect(retryPrompt).toContain('C:\\cowork-images\\s\\hash.png');
       expect(errors).toHaveLength(0);
       expect(systemErrorMessages()).toHaveLength(1);
+      // The retried session no longer advertises image input to Pi: every image
+      // source (attachments, native `read` results, replayed history) is
+      // downgraded by the SDK, so a `read` cannot re-send the rejected payload.
+      expect(activePiModel(adapter, 'image-retry')?.input).toEqual(['text']);
+    });
+
+    it('retries an image-only turn as text when the server rejects the payload', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-vision',
+          baseURL: 'https://api.moonshot.cn/v1',
+          model: 'kimi-k2.6',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'moonshot',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      });
+
+      // A submission with an image and no text at all is a normal turn.
+      await adapter.startSession('image-only', '', {
+        imageAttachments: [
+          {
+            name: 'example.png',
+            mimeType: 'image/png',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\hash.png',
+          },
+        ],
+      });
+      expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
+
+      listener!({ type: 'turn_start' });
+      failedAttempt(
+        '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
+      );
+      listener!({ type: 'agent_settled' });
+
+      // Without the text dependency the rejection is still classified, so the
+      // turn is retried once with the file path instead of dying.
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
+      const [retryPrompt] = mockSession.prompt.mock.calls[0] as [string];
+      expect(retryPrompt).toContain('C:\\cowork-images\\s\\hash.png');
+      expect(retryPrompt).toContain('not sent');
+      expect(errors).toHaveLength(0);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(activePiModel(adapter, 'image-only')?.input).toEqual(['text']);
     });
 
     it('retries when the rejection arrives before the send promise resolves', async () => {

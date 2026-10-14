@@ -44,17 +44,39 @@ const observationKey = (providerName: string, modelId: string): string =>
   `${providerName.trim()}::${modelId.trim().toLowerCase()}`;
 
 /**
- * Fingerprint of the configured image verdict. A config edit (the user marking
- * the model as text-only, or back to image-capable) invalidates the observation
- * so a stale rejection can never outlive the setting that produced it.
+ * Effective image-input verdict for one model.
+ *
+ * `Rejected` is a runtime observation (the provider refused a payload that
+ * carried images); the other three come from configuration and provider
+ * metadata. Callers must not conflate `Unknown` with a confirmed incapability.
  */
-export function imageCapabilityFingerprint(configured?: {
+export const ImageInputVerdict = {
+  Supported: 'supported',
+  Unknown: 'unknown',
+  Unsupported: 'unsupported',
+  Rejected: 'rejected',
+} as const;
+
+export type ImageInputVerdict = (typeof ImageInputVerdict)[keyof typeof ImageInputVerdict];
+
+export interface ImageCapabilityConfiguration {
   supportsImage?: boolean;
   imageInput?: ModelCapabilityStatus;
-}): string {
-  return `${configured?.supportsImage === true ? 'supports' : 'noSupports'}|${
-    configured?.imageInput ?? ModelCapabilityStatus.Unknown
-  }`;
+  /** Endpoint identity: a rejection belongs to the server that produced it. */
+  endpointKey?: string;
+}
+
+/**
+ * Fingerprint of the configuration a rejection was observed under. Any edit to
+ * the capability verdict, or a different endpoint for the same model, makes the
+ * observation stale so it can never outlive the setup that produced it.
+ */
+export function imageCapabilityFingerprint(configured?: ImageCapabilityConfiguration): string {
+  return [
+    configured?.supportsImage === true ? 'supports' : 'noSupports',
+    configured?.imageInput ?? ModelCapabilityStatus.Unknown,
+    configured?.endpointKey?.trim() || 'noEndpoint',
+  ].join('|');
 }
 
 export function markImageInputRejected(
@@ -75,27 +97,84 @@ export function isImageInputRejected(
   return observed !== undefined && observed.fingerprint === fingerprint;
 }
 
-/** Test/QA helper — also useful when a session is rebuilt from scratch. */
+export function clearImageInputObservation(providerName: string, modelId: string): void {
+  observations.delete(observationKey(providerName, modelId));
+}
+
+/**
+ * Test/QA helper — also used when the user edits provider or model settings:
+ * an explicit config edit is a reason to try images again.
+ */
 export function clearImageInputObservations(): void {
   observations.clear();
 }
 
 /**
- * Whether the current turn may carry image bytes.
+ * What this model can do with images right now, across configuration, provider
+ * metadata, and runtime observations.
  *
- * Unknown is deliberately treated as "do not send": silently shipping an image
- * the model may not accept costs a failed turn, while omitting it costs only a
- * note to the model.
+ * A rejection only downgrades a set that claimed support: it can never upgrade
+ * a model the catalog already knows is text-only.
+ */
+export function imageInputVerdict(
+  configuredStatus: ModelCapabilityStatus | undefined,
+  providerName: string,
+  modelId: string,
+  configured?: ImageCapabilityConfiguration,
+): ImageInputVerdict {
+  if (configuredStatus !== ModelCapabilityStatus.Supported) {
+    return configuredStatus === ModelCapabilityStatus.Unsupported
+      ? ImageInputVerdict.Unsupported
+      : ImageInputVerdict.Unknown;
+  }
+  return isImageInputRejected(providerName, modelId, imageCapabilityFingerprint(configured))
+    ? ImageInputVerdict.Rejected
+    : ImageInputVerdict.Supported;
+}
+
+/**
+ * Whether the current turn may carry image bytes. `Unknown` is deliberately
+ * treated as "do not send": shipping an image the model may not accept costs a
+ * failed turn, while omitting it costs the model a note plus a file path.
  */
 export function shouldSendImageInput(
   capabilities: ModelCapabilities,
   providerName: string,
   modelId: string,
-  configured?: { supportsImage?: boolean; imageInput?: ModelCapabilityStatus },
+  configured?: ImageCapabilityConfiguration,
 ): boolean {
-  if (capabilities.imageInput !== ModelCapabilityStatus.Supported) return false;
-  return !isImageInputRejected(providerName, modelId, imageCapabilityFingerprint(configured));
+  return (
+    imageInputVerdict(capabilities.imageInput, providerName, modelId, configured) ===
+    ImageInputVerdict.Supported
+  );
 }
+
+/**
+ * Wording only a missing/disabled vision path produces. Deliberately narrower
+ * than "the message mentions images": capability verdicts must not be derived
+ * from payload errors.
+ */
+const VISION_CAPABILITY_WORDING = new RegExp(
+  [
+    'mmproj',
+    'vision\\s+encoder',
+    'vision\\s+(?:input|support|capabilit)',
+    'cannot\\s+read\\s+images',
+    "can't\\s+read\\s+images",
+    'image(?:_url)?\\s+(?:input\\s+)?(?:is\\s+)?not\\s+support',
+    'image\\s+input\\s+is\\s+not\\s+support',
+    'not\\s+support(?:ed|s)?\\s+(?:image|vision|multimodal)',
+    'unsupported\\s+(?:image|vision|multimodal)',
+    'only\\s+supported\\s+by\\s+certain\\s+models',
+    '不支持(?:图片|图像|多模态)',
+    '未启用图片',
+  ].join('|'),
+  'i',
+);
+
+/** Wording that describes a bad image payload rather than a missing capability. */
+const IMAGE_INPUT_ERROR_WORDING =
+  /invalid\s+image|image\s+(?:data|bytes|content|size|dimensions|format|decoding)|corrupt|decode|too\s+(?:large|many)|exceeds?\s+\S{0,12}\s*limit/i;
 
 /** Extensions the UI treats as image files when it cannot inline their bytes. */
 const IMAGE_FILE_EXTENSIONS = new Set([
@@ -155,29 +234,38 @@ export function collectImagePathReferences(
  */
 export function buildImageOmittedNotice(
   attachments: readonly ImageInputAttachmentRef[],
-  ocrCommandFor?: (imagePath: string) => string,
+  options: {
+    verdict?: ImageInputVerdict;
+    ocrCommandFor?: (imagePath: string) => string;
+  } = {},
 ): string {
   if (attachments.length === 0) return '';
   const paths = attachments
     .map(attachment => attachment.path?.trim())
     .filter((path): path is string => Boolean(path));
   const commands = paths
-    .map(path => (ocrCommandFor ? `  ${ocrCommandFor(path)}` : ''))
+    .map(path => (options.ocrCommandFor ? `  ${options.ocrCommandFor(path)}` : ''))
     .filter(Boolean);
   const lines = paths.map(path => `  - ${path}`);
-  const header =
-    '[Image not sent: the current model cannot read images, so this request carries no picture. The file stays on this machine';
+  const reason =
+    options.verdict === ImageInputVerdict.Unsupported
+      ? 'the current model cannot read images'
+      : options.verdict === ImageInputVerdict.Rejected
+        ? 'this provider rejected an image request, so images are withheld from it'
+        : options.verdict === ImageInputVerdict.Unknown
+          ? 'image input for this model is not confirmed, so the picture was not sent'
+          : 'the picture bytes could not be attached to this request';
+  const header = `[Image not sent: ${reason}. The file stays on this machine`;
   const body = [
-    'What to do: tell the user plainly that the image could not be read.',
+    'What to do: say plainly that the image was not sent.',
     ...(commands.length > 0
       ? [
-          'Then run the bundled OCR helper first — one command per image:',
+          'If the text in the picture matters and the file cannot be opened as an image, the bundled helper extracts it — one command per image:',
           ...commands,
-          'Only if that command fails: do not try other OCR approaches or search the machine for tools — ask the user to paste the text.',
+          'It returns text only: it cannot describe layout, photos, or charts. Ask the user to paste or describe whatever the text does not cover.',
         ]
       : [
-          'Then either write a short script that runs the system OCR (on Windows that is powershell.exe + Windows.Media.Ocr), or ask the user to paste the text.',
-          'Do not search the machine for OCR tools (pytesseract, tesseract, ollama, model SDKs …) and do not retry the same failing command: this shell is Windows git-bash, some POSIX tools are missing, and PowerShell is the reliable path. If two attempts do not read the image, stop and ask the user for the text.',
+          'If the file cannot be opened as an image, ask the user to paste or describe what matters.',
         ]),
   ].join('\n');
   return lines.length > 0 ? `${header} at:\n${lines.join('\n')}\n${body}]` : `${header}.\n${body}]`;
@@ -197,6 +285,10 @@ export function isImagePayloadRejection(message: string, carriedImages: boolean)
   if (!carriedImages) return false;
   const rejectedAsBadRequest =
     /\b400\b|invalid_request_error|BadRequestError|invalid\s+request/i.test(message);
-  const mentionsImages = /image|vision|mmproj|multimodal|图片|图像/i.test(message);
-  return rejectedAsBadRequest && mentionsImages;
+  if (!rejectedAsBadRequest) return false;
+  // A corrupt or oversized image is the caller's payload problem, not a missing
+  // capability: "400 invalid image data" must not strip images from the model
+  // for every later session.
+  if (IMAGE_INPUT_ERROR_WORDING.test(message)) return false;
+  return VISION_CAPABILITY_WORDING.test(message);
 }

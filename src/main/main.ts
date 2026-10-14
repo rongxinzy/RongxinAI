@@ -226,6 +226,7 @@ import { TodoReminderScheduler } from './todo/reminderScheduler';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
+import { clearImageInputObservations } from './libs/agentEngine/piImageInputFallback';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
   getCurrentApiConfig,
@@ -8044,8 +8045,22 @@ if (!gotTheLock) {
     piModelCatalogRefreshCoordinator = new PiModelCatalogRefreshCoordinator({
       resolveApiKeys: resolveAllProviderApiKeys,
     });
-    getStore().onDidChange<AppConfigSettings>('app_config', () => {
+    getStore().onDidChange<AppConfigSettings>('app_config', (next, previous) => {
       piModelCatalogRefreshCoordinator?.notifyConfigurationChanged();
+      // Provider/model edits are the user's explicit statement about what the
+      // models can do: drop runtime image-capability observations so a corrected
+      // endpoint or a re-enabled switch takes effect without a restart.
+      const modelConfigSection = (value: AppConfigSettings | undefined): string => {
+        const record = value as Record<string, unknown> | undefined;
+        return JSON.stringify([
+          record?.providers ?? null,
+          record?.api ?? null,
+          record?.model ?? null,
+        ]);
+      };
+      if (modelConfigSection(next) !== modelConfigSection(previous)) {
+        clearImageInputObservations();
+      }
     });
     const localInferenceManager = getLlamaCppManager();
     localInferenceManager.initializeModelsDir();
