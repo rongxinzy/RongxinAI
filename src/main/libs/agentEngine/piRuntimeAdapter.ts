@@ -3881,7 +3881,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       await yieldToEventLoop();
       // A run that failed hard leaves its Pi session unable to accept another
       // prompt (the SDK swallows it), so the retry drops the session and lets
-      // continueSession rebuild it from the stored transcript.
+      // continueSession rebuild it from the stored transcript. The rebuild starts
+      // a fresh session, so the session-scoped approval settings travel with it —
+      // otherwise an "allow all" session would start asking for every tool call.
+      const approvalMode = active.approvalMode;
       this.activeSessions.delete(sessionId);
       try {
         await this.continueSession(sessionId, retryPrompt, {
@@ -3889,6 +3892,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           // Same resume path the stream-stall recovery uses: the previous run is
           // already dead, so this must not race its cancellation bookkeeping.
           _streamStallResume: true,
+          approvalMode,
         });
       } catch (error) {
         console.warn(`[PiRuntime] image fallback retry failed for session ${sessionId}:`, error);

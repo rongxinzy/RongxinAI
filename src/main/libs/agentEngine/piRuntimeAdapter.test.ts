@@ -3851,6 +3851,48 @@ describe('PiRuntimeAdapter', () => {
       expect(retryPrompt).toContain('C:\\cowork-images\\s\\hash.png');
     });
 
+    it('keeps the session approval mode when the retry rebuilds the session', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-vision',
+          baseURL: 'https://api.moonshot.cn/v1',
+          model: 'kimi-k2.6',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'moonshot',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      });
+
+      await adapter.startSession('image-retry-approval', 'Describe this image', {
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+        imageAttachments: [
+          {
+            name: 'example.png',
+            mimeType: 'image/png',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\hash.png',
+          },
+        ],
+      });
+
+      // The retry rebuilds the Pi session; "allow all" must travel with it or the
+      // user starts getting permission prompts again mid-task.
+      const continueSpy = vi.spyOn(adapter, 'continueSession');
+      listener!({ type: 'turn_start' });
+      failedAttempt(
+        '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
+      );
+      listener!({ type: 'agent_settled' });
+
+      await vi.waitFor(() => expect(continueSpy).toHaveBeenCalled());
+      const retryOptions = continueSpy.mock.calls.at(-1)?.[2];
+      expect(retryOptions?.approvalMode).toBe(WorkbenchApprovalMode.AllowAll);
+    });
+
     it('leaves a non-image capability error on the normal failure path', async () => {
       await adapter.startSession('test', 'Hi');
 
