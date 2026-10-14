@@ -25,7 +25,6 @@ import { pathToFileURL } from 'url';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
 import { reportPiSessionFailure } from './piSessionFailure';
-import { setPiCapabilityCorrectionStoreGetter } from './libs/agentEngine/piCapabilityCorrection';
 import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
 import { bindCoworkRunBridge } from './coworkRunBridge';
@@ -8042,12 +8041,25 @@ if (!gotTheLock) {
     });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
-    setPiCapabilityCorrectionStoreGetter(() => store);
     piModelCatalogRefreshCoordinator = new PiModelCatalogRefreshCoordinator({
       resolveApiKeys: resolveAllProviderApiKeys,
     });
-    getStore().onDidChange<AppConfigSettings>('app_config', () => {
+    getStore().onDidChange<AppConfigSettings>('app_config', (next, previous) => {
       piModelCatalogRefreshCoordinator?.notifyConfigurationChanged();
+      // Provider/model edits are the user's explicit statement about what the
+      // models can do: drop runtime image-capability observations so a corrected
+      // endpoint or a re-enabled switch takes effect without a restart.
+      const modelConfigSection = (value: AppConfigSettings | undefined): string => {
+        const record = value as Record<string, unknown> | undefined;
+        return JSON.stringify([
+          record?.providers ?? null,
+          record?.api ?? null,
+          record?.model ?? null,
+        ]);
+      };
+      if (modelConfigSection(next) !== modelConfigSection(previous)) {
+        void getPiRuntimeAdapter().resetImageInputCapabilities();
+      }
     });
     const localInferenceManager = getLlamaCppManager();
     localInferenceManager.initializeModelsDir();

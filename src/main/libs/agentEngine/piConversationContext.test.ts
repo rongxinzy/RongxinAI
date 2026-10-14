@@ -147,3 +147,42 @@ test('explicitly marks attachments that cannot be restored', () => {
   expect(prompt).toContain('unavailable after restore');
   expect(prompt).not.toContain('PRIVATE_IMAGE_BYTES');
 });
+
+test('points at the bundled OCR helper when replayed images have paths', () => {
+  const prompt = buildPiConversationPrompt(
+    [
+      message('image', 'user', '', {
+        imageAttachments: [
+          { name: 'shot.png', mimeType: 'image/png', path: '/workspace/shot.png' },
+        ],
+      }),
+      message('file', 'user', '', {
+        fileAttachments: [
+          { name: 'requirements.pdf', path: '/workspace/requirements.pdf', extension: '.pdf' },
+        ],
+      }),
+    ],
+    'What did the screenshot say?',
+    { ocrCommandFor: imagePath => `ocr-image.ps1 -Path "${imagePath}"` },
+  );
+
+  expect(prompt).toContain('ocr-image.ps1 -Path "/workspace/shot.png"');
+  // Non-image attachments get no extraction command.
+  expect(prompt).not.toContain('ocr-image.ps1 -Path "/workspace/requirements.pdf"');
+});
+
+test('replays image references unchanged when no OCR helper is available', () => {
+  const prompt = buildPiConversationPrompt(
+    [
+      message('image', 'user', '', {
+        imageAttachments: [
+          { name: 'shot.png', mimeType: 'image/png', path: '/workspace/shot.png' },
+        ],
+      }),
+    ],
+    'Continue.',
+  );
+
+  expect(prompt).toContain('/workspace/shot.png');
+  expect(prompt).not.toContain('text extraction');
+});
