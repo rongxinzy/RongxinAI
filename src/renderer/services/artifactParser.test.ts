@@ -620,12 +620,12 @@ describe('parseFinalAnswerPathArtifactsForMessage', () => {
 
   test('keeps a real output path named in the final answer', () => {
     const artifacts = parseFinalAnswerPathArtifactsForMessage(
-      finalAnswer('报告已生成：C:\\Users\\me\\.xiaoruan\\scratch\\AI市场调研.md，可直接打开。'),
+      finalAnswer('报告已生成：C:\\Users\\me\\.zhiyuan\\scratch\\AI市场调研.md，可直接打开。'),
       'session-1',
     );
 
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].filePath).toBe('C:\\Users\\me\\.xiaoruan\\scratch\\AI市场调研.md');
+    expect(artifacts[0].filePath).toBe('C:\\Users\\me\\.zhiyuan\\scratch\\AI市场调研.md');
     // Preview candidate only: the delivery gate still needs an explicit declaration.
     expect(artifacts[0].declared).toBe(false);
   });

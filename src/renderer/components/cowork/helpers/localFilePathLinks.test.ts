@@ -13,9 +13,7 @@ import {
 } from './localFilePathLinks';
 
 test('detects windows and file urls as local paths', () => {
-  expect(isLikelyLocalFilePath('C:/Users/Administrator/.xiaoruan/scratch/销售简历.html')).toBe(
-    true,
-  );
+  expect(isLikelyLocalFilePath('C:/Users/Administrator/.zhiyuan/scratch/销售简历.html')).toBe(true);
   expect(isLikelyLocalFilePath('C:\\Users\\a\\b.html')).toBe(true);
   expect(isLikelyLocalFilePath('file:///C:/Users/a/b.html')).toBe(true);
   expect(isLikelyLocalFilePath('https://example.com/a.html')).toBe(false);
@@ -32,9 +30,9 @@ test('toFileHref uses harden-safe https synthetic links, not file://', () => {
 });
 
 test('linkifies inline-code windows paths in markdown', () => {
-  const input = '简历已生成，文件位置：`C:/Users/Administrator/.xiaoruan/scratch/销售简历.html`';
+  const input = '简历已生成，文件位置：`C:/Users/Administrator/.zhiyuan/scratch/销售简历.html`';
   const out = linkifyLocalPathsInMarkdown(input);
-  expect(out).toContain('[C:/Users/Administrator/.xiaoruan/scratch/销售简历.html](');
+  expect(out).toContain('[C:/Users/Administrator/.zhiyuan/scratch/销售简历.html](');
   expect(out).toContain(LocalPathHref.Prefix);
   expect(out).not.toContain('file:///');
 });
