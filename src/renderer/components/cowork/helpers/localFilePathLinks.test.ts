@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest';
 
 import {
+  checkPathExistsCached,
+  clearPathExistsCache,
+  getCachedPathExists,
   hasLikelyFileExtension,
   isLikelyLocalFilePath,
   isWorkspaceFileRef,
@@ -119,4 +122,64 @@ test('resolveOpenableLocalPath resolves bare filenames via callback (cwd join)',
       candidate === '销售简历.html' ? 'D:/project/测试数据/销售简历.html' : null,
     ),
   ).toBe('D:/project/测试数据/销售简历.html');
+});
+
+test('checkPathExistsCached deduplicates concurrent checks and caches results', async () => {
+  clearPathExistsCache();
+  let calls = 0;
+  const anyGlobal = globalThis as unknown as {
+    window?: {
+      electron?: {
+        shell?: { pathExists?: (p: string) => Promise<{ success: boolean; exists: boolean }> };
+      };
+    };
+  };
+  const origElectron = anyGlobal.window?.electron;
+  anyGlobal.window = anyGlobal.window || {};
+  anyGlobal.window.electron = {
+    shell: {
+      pathExists: async (p: string) => {
+        calls++;
+        await new Promise(r => setTimeout(r, 10));
+        return { success: true, exists: p.endsWith('exist.txt') };
+      },
+    },
+  };
+
+  try {
+    expect(getCachedPathExists('/path/to/exist.txt')).toBeUndefined();
+
+    // Trigger 5 concurrent checks for the same path
+    const results = await Promise.all([
+      checkPathExistsCached('/path/to/exist.txt'),
+      checkPathExistsCached('/path/to/exist.txt'),
+      checkPathExistsCached('/path/to/exist.txt'),
+      checkPathExistsCached('/path/to/exist.txt'),
+      checkPathExistsCached('/path/to/exist.txt'),
+    ]);
+
+    expect(results).toEqual([true, true, true, true, true]);
+    expect(calls).toBe(1); // Only 1 IPC call made!
+
+    // Subsequent sync read is cached
+    expect(getCachedPathExists('/path/to/exist.txt')).toBe(true);
+
+    // Subsequent async call returns cached without invoking IPC
+    const nextResult = await checkPathExistsCached('/path/to/exist.txt');
+    expect(nextResult).toBe(true);
+    expect(calls).toBe(1);
+
+    // Negative check
+    const nonExist = await checkPathExistsCached('/path/to/missing.txt');
+    expect(nonExist).toBe(false);
+    expect(calls).toBe(2);
+    expect(getCachedPathExists('/path/to/missing.txt')).toBe(false);
+  } finally {
+    clearPathExistsCache();
+    if (origElectron) {
+      anyGlobal.window.electron = origElectron;
+    } else {
+      delete anyGlobal.window?.electron;
+    }
+  }
 });
