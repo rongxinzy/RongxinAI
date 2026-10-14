@@ -1547,9 +1547,9 @@
   transition-duration: 150ms;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -3253,18 +3253,16 @@
   transition-timing-function: ease-out;
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -4157,12 +4155,9 @@
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -5253,9 +5248,8 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -5714,22 +5708,19 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -5943,11 +5934,8 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -6252,10 +6240,9 @@
   font-weight: var(--zy-component-font-weight-medium);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -9653,9 +9640,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="classic-dark"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="classic-dark"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -11359,18 +11346,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -12265,12 +12250,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="classic-dark"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="classic-dark"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -13361,9 +13343,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -13823,22 +13804,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -14062,11 +14040,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -14371,10 +14346,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="classic-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="classic-dark"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -17774,9 +17748,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="daming-light"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="daming-light"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -19480,18 +19454,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -20384,12 +20356,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-light"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="daming-light"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -21480,9 +21449,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -21941,22 +21909,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -22170,11 +22135,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -22479,10 +22441,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="daming-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="daming-light"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -25880,9 +25841,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="daming-dark"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="daming-dark"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -27586,18 +27547,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -28492,12 +28451,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-dark"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="daming-dark"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -29588,9 +29544,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -30050,22 +30005,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -30289,11 +30241,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -30598,10 +30547,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="daming-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="daming-dark"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -34003,9 +33951,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="changan-light"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="changan-light"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -35709,18 +35657,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -36613,12 +36559,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-light"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="changan-light"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -37709,9 +37652,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -38170,22 +38112,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -38399,11 +38338,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -38708,10 +38644,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="changan-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="changan-light"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -42114,9 +42049,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="changan-dark"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="changan-dark"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -43820,18 +43755,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -44726,12 +44659,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-dark"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="changan-dark"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -45822,9 +45752,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -46284,22 +46213,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -46523,11 +46449,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -46832,10 +46755,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="changan-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="changan-dark"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -50240,9 +50162,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="weiyang-light"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="weiyang-light"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -51946,18 +51868,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -52850,12 +52770,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-light"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="weiyang-light"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -53946,9 +53863,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -54407,22 +54323,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -54636,11 +54549,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -54945,10 +54855,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="weiyang-light"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="weiyang-light"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);
@@ -58351,9 +58260,9 @@ to {
   transition-duration: 150ms;
 }
 [data-theme="weiyang-dark"] :where(.theme-button-navigation) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 200ms;
+  transition-duration: 150ms;
 }
 [data-theme="weiyang-dark"] :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
@@ -60057,18 +59966,16 @@ to {
   transition-timing-function: ease-out;
 }
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
-  color: var(--foreground);
+  color: var(--muted-foreground);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-foreground);
 }
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
@@ -60963,12 +60870,9 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-dark"] :where(.theme-surface-agent-selected) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="weiyang-dark"] :where(.theme-surface-agent-idle) {
   color: var(--muted-foreground);
@@ -62059,9 +61963,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-button-navigation):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -62521,22 +62424,19 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: var(--zy-border);
-  background-color: var(--card);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
   color: var(--zy-foreground);
 }
 }
@@ -62760,11 +62660,8 @@ to {
 }
 @media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-surface-agent-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 6%, transparent);
+  color: var(--sidebar-foreground);
 }
 }
 @media (hover: hover) {
@@ -63069,10 +62966,9 @@ to {
   font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="weiyang-dark"] :where(.theme-button-navigation):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  border-color: var(--border);
-  background-color: var(--card);
-  color: var(--foreground);
-  font-weight: var(--zy-component-font-weight-semibold);
+  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  color: var(--sidebar-foreground);
+  font-weight: var(--zy-component-font-weight-medium);
 }
 [data-theme="weiyang-dark"] :where(.theme-button-appearance):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   border-color: var(--primary);

@@ -2,6 +2,8 @@ import { recipe } from './recipe';
 
 /** Custom rows and overlays keep their selection predicates and event handlers. */
 export function classicInteractiveSurfaces(dark: boolean) {
+  const mix = (token: string, amount: number) =>
+    `color-mix(in oklab, var(--${token}) ${amount}%, transparent)`;
   const transition = {
     'transition-property': 'color, background-color, border-color, box-shadow',
     'transition-duration': '150ms',
@@ -132,24 +134,21 @@ export function classicInteractiveSurfaces(dark: boolean) {
       focus,
       pressed,
     }),
-    // 2026/09/22 lixiang  选中会话用 card 白底+描边+加粗，对齐「新建任务」导航选中，避免灰底不显眼
     'surface-agent-selected': recipe({
       base: {
-        ...border,
-        'background-color': 'var(--card)',
-        color: 'var(--foreground)',
-        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        'background-color': mix('sidebar-foreground', 8),
+        color: 'var(--sidebar-foreground)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
       },
     }),
     'surface-agent-idle': recipe({
       base: { color: 'var(--muted-foreground)' },
-      // 2026/09/22 lixiang  hover 与选中同用 card 白底，避免灰底与白底选中不一致
       hover: {
-        ...border,
-        'background-color': 'var(--card)',
-        color: 'var(--foreground)',
+        'background-color': mix('sidebar-foreground', 6),
+        color: 'var(--sidebar-foreground)',
       },
     }),
+
     'surface-agent-inactive': recipe({
       base: { 'background-color': 'transparent', color: 'var(--zy-text-secondary)' },
     }),
