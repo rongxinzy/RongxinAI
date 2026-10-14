@@ -25,6 +25,7 @@ import {
   classifyCoworkError,
   CoworkErrorKind,
   isTransient,
+  makeCoworkError,
   type CoworkError,
 } from '../../../common/coworkError';
 import {
@@ -191,7 +192,21 @@ import type {
   PiStartOptions,
 } from './piRuntimeTypes';
 import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
-import { disableModelImageInputCapability } from './piCapabilityCorrection';
+import { resolveBundledOcrHelper } from '../ocrHelper';
+import {
+  buildImageOmittedNotice,
+  clearImageInputObservations,
+  collectImagePathReferences,
+  imageCapabilityFingerprint,
+  ImageInputVerdict,
+  imageInputVerdict,
+  isImageCapabilityError,
+  isImagePayloadRejection,
+  markImageInputRejected,
+  type ImageCapabilityConfiguration,
+  type ImageInputAttachmentRef,
+  type ImagePromptPreparation,
+} from './piImageInputFallback';
 import { PiStreamStallWatchdog } from './piStreamStallWatchdog';
 import {
   PiStreamStallRecovery,
@@ -318,6 +333,8 @@ interface ActivePiSession {
   /** Whether pi's builtin MCP extension owns this session's MCP tools. */
   mcpNativeBridge: boolean;
   capabilities: ModelCapabilities;
+  /** Endpoint identity behind the current model; scopes image observations. */
+  imageEndpointKey?: string;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
@@ -403,6 +420,24 @@ interface ActivePiSession {
   lastUsedAt: number;
   /** True when the current turn settled with an unrecoverable Pi error. */
   turnFailed: boolean;
+  /**
+   * Image attachments of the turn currently in flight. Kept so an image-payload
+   * rejection can be retried as text and explained to the user; cleared on every
+   * new user prompt so a stale turn can never drive the fallback.
+   */
+  lastImagePrompt: {
+    text: string;
+    sentImages: ImageInputAttachmentRef[];
+    omittedImages: ImageInputAttachmentRef[];
+    retried: boolean;
+  } | null;
+  /** Set when the failed turn carried images and deserves one text-only retry. */
+  imageRetryPending: boolean;
+  /**
+   * True once this turn's failure has been attributed to an image payload
+   * rejection, so repeated SDK retries cannot resurface it as a generic error.
+   */
+  imageRejectionHandled: boolean;
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
   queueFlushInFlight: boolean;
   /** MCP tool manifest generation captured when this Pi session was created. */
@@ -503,6 +538,8 @@ interface PiModelRuntimeCreateOptions {
 }
 
 type PiResolvedModel = {
+  /** Base URL identity of the endpoint the model was resolved against. */
+  endpointKey: string;
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   maxOutputTokens: number;
@@ -521,17 +558,29 @@ type PiResolvedModel = {
 function preparePiPrompt(
   text: string,
   attachments: PiStartOptions['imageAttachments'] | undefined,
-  capabilities: ModelCapabilities,
+  verdict: ImageInputVerdict,
+  ocrCommandFor?: (imagePath: string) => string,
+  pathImageReferences: readonly ImageInputAttachmentRef[] = [],
 ): {
   content:
     | string
     | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
   hasImages: boolean;
+  sentImages: ImageInputAttachmentRef[];
+  omittedImages: ImageInputAttachmentRef[];
 } {
-  if (!attachments?.length) return { content: text, hasImages: false };
-  if (capabilities.imageInput === ModelCapabilityStatus.Supported) {
-    const images = attachments
-      .filter(item => item.mimeType.startsWith('image/') && (item.base64Data || item.path))
+  const sendImages = verdict === ImageInputVerdict.Supported;
+  // A path-only image is only worth explaining when the model cannot open it as
+  // an image: a vision-capable model just reads the file.
+  const pathOnly = sendImages ? [] : pathImageReferences;
+  if (!attachments?.length && pathOnly.length === 0) {
+    return { content: text, hasImages: false, sentImages: [], omittedImages: [] };
+  }
+  const imageAttachments = (attachments ?? []).filter(item => item.mimeType.startsWith('image/'));
+  const references = imageAttachments.map(item => ({ name: item.name, path: item.path }));
+  if (sendImages) {
+    const images = imageAttachments
+      .filter(item => item.base64Data || item.path)
       .map(item => ({
         type: 'image' as const,
         data: readCoworkImageBase64(item),
@@ -542,22 +591,58 @@ function preparePiPrompt(
       return {
         content: [{ type: 'text', text }, ...images],
         hasImages: true,
+        sentImages: references,
+        omittedImages: [],
       };
     }
   }
-  const hint =
-    '[image attachments were not sent because the selected model has no confirmed image support]';
-  return { content: text.trim() ? `${text}\n\n${hint}` : hint, hasImages: false };
+  // Pi answers a non-vision model's `read` with an in-band note instead of a
+  // failed request; Cowork images never pass through `read`, so the same facts
+  // (why the picture is absent, plus the file paths) have to travel with the
+  // prompt itself. Images withheld by capability and images the UI could only
+  // attach by path share one note: in both cases the model holds a path, not
+  // pixels.
+  const notice = buildImageOmittedNotice([...references, ...pathOnly], { verdict, ocrCommandFor });
+  return {
+    content: text.trim() ? `${text}\n\n${notice}` : notice,
+    hasImages: false,
+    sentImages: [],
+    omittedImages: references,
+  };
 }
 
+/** Yields one macrotask so settling bookkeeping (e.g. a cancelled retry) can run. */
+const yieldToEventLoop = (): Promise<void> => {
+  const { promise, resolve } = Promise.withResolvers<void>();
+  setTimeout(resolve, 0);
+  return promise;
+};
+
+/**
+ * Prompt content prepared for one Pi turn: the text, plus image blocks when the
+ * model may receive them, and the attachment bookkeeping the failure path needs.
+ */
+interface PreparedPiPrompt {
+  content:
+    | string
+    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
+  hasImages: boolean;
+  sentImages: ImageInputAttachmentRef[];
+  omittedImages: ImageInputAttachmentRef[];
+}
+
+/**
+ * Sends a prompt that was already prepared (and recorded) by the caller.
+ *
+ * Preparation is deliberately separated from sending: the SDK can report a
+ * rejected payload through events that land before the send promise settles, so
+ * the turn's image state must be recorded *before* the request leaves.
+ */
 async function sendPiPrompt(
   session: PiSession,
-  text: string,
-  attachments: PiStartOptions['imageAttachments'] | undefined,
-  capabilities: ModelCapabilities,
+  prepared: PreparedPiPrompt,
   streamingBehavior?: 'steer' | 'followUp',
 ): Promise<void> {
-  const prepared = preparePiPrompt(text, attachments, capabilities);
   if (prepared.hasImages) {
     if (!session.sendUserMessage) {
       throw new Error('The installed agent runtime cannot send image attachments.');
@@ -751,6 +836,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly streamStallRecovery: PiStreamStallRecovery;
   /** Test override for the stall window; production uses per-provider tiers. */
   private readonly streamStallTimeoutOverrideMs?: number;
+  /** Bundled image-text helper; null when the platform/build cannot run it. */
+  private readonly bundledOcrHelper = resolveBundledOcrHelper();
 
   constructor(options?: { streamStallTimeoutMs?: number }) {
     super();
@@ -1428,6 +1515,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         modelCompactionOverride: resolvedModel.modelCompactionOverride,
         codemodeEnabled,
         mcpNativeBridge,
+        imageEndpointKey: resolvedModel.endpointKey,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1489,6 +1577,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         isRunning: true,
         lastUsedAt: Date.now(),
         turnFailed: false,
+        lastImagePrompt: null,
+        imageRetryPending: false,
+        imageRejectionHandled: false,
         queueFlushInFlight: false,
         mcpToolManifestGeneration: this.mcpToolManifestGeneration,
       };
@@ -1587,13 +1678,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (abortController.signal.aborted) return;
 
       console.debug(`[PiRuntime] dispatching initial prompt for session ${sessionId}`);
-      await sendPiPrompt(
-        session,
+      const initialImagePrompt = preparePiPrompt(
         initialPrompt,
         options.imageAttachments,
-        active.capabilities,
-        undefined,
+        this.imageInputVerdictForActive(active),
+        this.bundledOcrHelper?.commandFor,
+        collectImagePathReferences(options.fileAttachments),
       );
+      // Recorded before the request leaves: the SDK can report the rejection
+      // through events that arrive before the send promise settles.
+      this.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
+      await sendPiPrompt(session, initialImagePrompt, undefined);
       await active.eventProjection?.drain();
       await active.completionPending;
     } catch (error) {
@@ -1650,6 +1745,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         storedSession?.mode === CoworkSessionMode.Chat;
       const piPrompt = buildPiConversationPrompt(history, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'continue',
@@ -1718,6 +1814,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
           active.resourceState.chatMode,
         ),
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'recreate',
@@ -1762,6 +1859,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
           active.resourceState.chatMode,
         ),
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'skills-change',
@@ -1953,13 +2051,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (!active.resourceState.chatMode) {
         nextPrompt = prependWorkbenchTaskBoundary(nextPrompt, this.workbenchTaskService, sessionId);
       }
-      await sendPiPrompt(
-        active.piSession,
+      const continuedImagePrompt = preparePiPrompt(
         nextPrompt,
         options.imageAttachments,
-        active.capabilities,
-        options._streamingBehavior,
+        this.imageInputVerdictForActive(active),
+        this.bundledOcrHelper?.commandFor,
+        collectImagePathReferences(options.fileAttachments),
       );
+      this.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
+      await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
       await active.eventProjection?.drain();
       await active.completionPending;
     } catch (error) {
@@ -2001,6 +2101,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const model = this.resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
       await active.piSession.setModel(model);
       active.model = model;
+      active.imageEndpointKey = resolvedModel.endpointKey;
       active.requestedModelOverride = patch.model;
       active.modelRuntime = resolvedModel.modelRuntime;
       active.modelRequestOptions = resolvedModel.requestOptions;
@@ -2455,13 +2556,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     }
     try {
-      await sendPiPrompt(
-        active.piSession,
+      const queuedImagePrompt = preparePiPrompt(
         item.text,
         item.imageAttachments,
-        active.capabilities,
-        'steer',
+        this.imageInputVerdictForActive(active),
+        this.bundledOcrHelper?.commandFor,
+        collectImagePathReferences(item.fileAttachments),
       );
+      this.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
+      await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
       this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
       this.pendingMessageQueue.finishDelivery(item.id);
@@ -3250,7 +3353,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             // Persisting/emitting here would produce one error bubble per failed
             // attempt — flushPendingError surfaces the error exactly once when
             // the run settles (auto_retry_end / agent_settled).
-            active.pendingError = { message: errMsg, classified: classifyCoworkError(errMsg) };
+            const classified = classifyCoworkError(errMsg);
+            const carriedImages = (active.lastImagePrompt?.sentImages.length ?? 0) > 0;
+            // A 400-class rejection of a turn that actually carried images is an
+            // image-capability rejection even when the server wording misses the
+            // textual rules (see piImageInputFallback).
+            const imageRejection =
+              classified.kind === CoworkErrorKind.ModelCapabilityUnsupported
+                ? // Only image rejections are corrected: an audio/video capability
+                  // error must not silently strip the model's image-input verdict,
+                  // and a payload problem must not either.
+                  isImageCapabilityError(errMsg)
+                : isImagePayloadRejection(errMsg, carriedImages);
+            active.pendingError = {
+              message: errMsg,
+              classified: imageRejection
+                ? makeCoworkError(CoworkErrorKind.ModelCapabilityUnsupported, errMsg)
+                : classified,
+            };
             active.turnFailed = true;
             // A failed turn leaves its bubble behind too; a retry streams into the
             // same id and flips the flag back on by itself.
@@ -3264,18 +3384,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               // auto_retry_start cancels its newly installed backoff controller.
               active.pendingError.sticky = true;
             }
-            if (
-              active.pendingError.classified.kind === CoworkErrorKind.ModelCapabilityUnsupported &&
-              // Only image rejections are corrected: an audio/video capability
-              // error must not silently strip the model's image-input verdict.
-              /image|mmproj/i.test(errMsg)
-            ) {
-              // The stored capability verdict is wrong; downgrade it so the next
-              // turn registers the model as text-only instead of failing again.
-              disableModelImageInputCapability(
+            if (imageRejection) {
+              // Keep the rejection as a runtime observation instead of rewriting
+              // the user's capability configuration: following turns simply stop
+              // sending images, and the file paths still reach the model as text.
+              markImageInputRejected(
                 active.harnessModelProfile.provider,
                 active.harnessModelProfile.model,
+                imageCapabilityFingerprint(this.imageCapabilityConfiguration(active)),
               );
+              // Other live sessions on the same model must learn this too: their
+              // Pi snapshot still advertises image input, so their own `read`
+              // would send the payload this server just refused.
+              void this.syncImageInputCapability();
+              console.log('[DBG mark]', JSON.stringify(this.imageCapabilityConfiguration(active)));
+              if (carriedImages) {
+                active.imageRetryPending = true;
+                active.imageRejectionHandled = true;
+              }
             }
             return;
           }
@@ -3582,8 +3708,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // Run settled with a deferred or surfaced failure: never complete it.
     // flushPendingError is idempotent after auto_retry_end.
     if (active.pendingError || active.errorSurfaced) {
-      this.flushPendingError(sessionId, active);
-      void this.flushFollowUpQueue(sessionId, active);
+      const retryingWithoutImages = this.flushPendingError(sessionId, active);
+      if (!retryingWithoutImages) void this.flushFollowUpQueue(sessionId, active);
       return;
     }
     if (
@@ -3666,6 +3792,135 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     );
   }
 
+  // ── Private: image input fallback ──
+  /** Whether the current turn may carry image bytes (see piImageInputFallback). */
+  /**
+   * Configured image capability as it stands right now.
+   *
+   * A session's capabilities are a snapshot from the last model resolution, so
+   * after the user edits provider settings they must not be trusted: the next
+   * turn, and any capability sync, have to read the current configuration.
+   * When the configuration cannot be read the snapshot is the best available
+   * answer, and withholding images stays the conservative outcome.
+   */
+  private configuredImageInputForActive(active: ActivePiSession): ModelCapabilityStatus {
+    const modelRef = active.requestedModelOverride?.trim();
+    try {
+      const resolution = modelRef
+        ? resolveRawApiConfigForModelRef(modelRef)
+        : resolveRawApiConfig();
+      const configured = resolution.providerMetadata?.capabilities?.imageInput;
+      if (configured) return configured;
+    } catch {
+      // Fall through to the snapshot.
+    }
+    return active.capabilities.imageInput;
+  }
+
+  /** Configuration half of the image-capability fingerprint, in one shape. */
+  private imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration {
+    const imageInput = this.configuredImageInputForActive(active);
+    return {
+      imageInput,
+      supportsImage: imageInput === ModelCapabilityStatus.Supported,
+      endpointKey: active.imageEndpointKey,
+    };
+  }
+
+  /**
+   * Keep every live Pi session's declared image capability in step with the
+   * effective verdict.
+   *
+   * The verdict can change while sessions are open — a rejection is learned, or
+   * the user edits provider settings — and a stale snapshot would either drop
+   * images the host still sends, or keep sending images the server already
+   * refused. Duplicate work is skipped so an unchanged session is untouched.
+   */
+  private async syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void> {
+    const targets = sessionIds ? [...sessionIds] : [...this.activeSessions.keys()];
+    await Promise.allSettled(
+      targets.map(async sessionId => {
+        const active = this.activeSessions.get(sessionId);
+        if (!active) return;
+        const input: Array<'text' | 'image'> =
+          this.imageInputVerdictForActive(active) === ImageInputVerdict.Supported
+            ? ['text', 'image']
+            : ['text'];
+        const current = Array.isArray(active.model.input) ? active.model.input : [];
+        if (current.length === input.length && current.every((value, i) => value === input[i])) {
+          return;
+        }
+        const model = { ...active.model, input };
+        try {
+          await active.piSession.setModel(model);
+          active.model = model;
+        } catch (error) {
+          console.warn(`[PiRuntime] could not update image input for session ${sessionId}:`, error);
+        }
+      }),
+    );
+  }
+
+  /**
+   * Provider/model settings are the user's statement about what the models can
+   * do: drop the runtime observations and let open sessions follow immediately.
+   */
+  async resetImageInputCapabilities(): Promise<void> {
+    clearImageInputObservations();
+    await this.syncImageInputCapability();
+  }
+
+  private imageInputVerdictForActive(active: ActivePiSession): ImageInputVerdict {
+    return imageInputVerdict(
+      this.configuredImageInputForActive(active),
+      active.harnessModelProfile.provider,
+      active.harnessModelProfile.model,
+      this.imageCapabilityConfiguration(active),
+    );
+  }
+
+  /**
+   * Records what happened to this turn's image attachments, so a failure can be
+   * retried as text, and tells the user when images were withheld: a text-only
+   * turn must never look like the image was delivered.
+   */
+  private recordImagePrompt(
+    sessionId: string,
+    active: ActivePiSession,
+    text: string,
+    prepared: ImagePromptPreparation,
+  ): void {
+    active.imageRetryPending = false;
+    active.imageRejectionHandled = false;
+    // Image state is recorded whether or not the turn carried text: an
+    // image-only submission is a normal turn, and the failure path has to be
+    // able to retry it.
+    active.lastImagePrompt =
+      prepared.sentImages.length > 0 || prepared.omittedImages.length > 0
+        ? {
+            text,
+            sentImages: prepared.sentImages,
+            omittedImages: prepared.omittedImages,
+            retried: false,
+          }
+        : null;
+    if (active.lastImagePrompt && prepared.omittedImages.length > 0) {
+      this.appendSystemNotice(sessionId, t('coworkImageNotSentNotice'));
+    }
+  }
+
+  /** Persist and emit a system message — the surface users actually read. */
+  private appendSystemNotice(sessionId: string, content: string): void {
+    const seed: CoworkMessage = {
+      id: randomUUID(),
+      type: 'system',
+      content,
+      timestamp: Date.now(),
+    };
+    const message = this.store ? this.store.addMessage(sessionId, seed) : seed;
+    this.emit('message', sessionId, message);
+  }
+
   // ── Private: deferred error handling ──
   /**
    * Persist and emit a deferred turn error exactly once.
@@ -3673,20 +3928,113 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    * message_end(stopReason=error) only records the error on the session because
    * Pi may auto-retry the turn; this flush runs on auto_retry_end / agent_settled,
    * when the run has genuinely failed. Idempotent — a second call is a no-op.
+   *
+   * Returns true when it scheduled a text-only retry of an image rejection
+   * instead of surfacing the error; the caller must then skip its own
+   * post-failure work (queue draining, completion).
    */
-  private flushPendingError(sessionId: string, active: ActivePiSession): void {
+  private flushPendingError(sessionId: string, active: ActivePiSession): boolean {
     const pending = active.pendingError;
-    if (!pending) return;
+    if (!pending) return false;
+    const fallback = active.lastImagePrompt;
+    // A turn that carried images whose payload the provider rejected is an image
+    // rejection no matter how often the SDK retried it: the user's capability
+    // setting stays as configured, the model gets the file paths, and a repeated
+    // failure must not resurface as a misleading generic error.
+    const imageTurnError =
+      active.imageRejectionHandled && fallback !== null && fallback.sentImages.length > 0;
+    if (imageTurnError && fallback) {
+      active.pendingError = null;
+      active.imageRetryPending = false;
+      if (!fallback.retried) {
+        this.retryTurnWithoutImages(sessionId, active, fallback);
+        return true;
+      }
+      // Already retried once: the retry replaces this turn's outcome.
+      active.turnFailed = false;
+      active.isRunning = false;
+      return true;
+    }
     active.pendingError = null;
-    active.errorSurfaced = true;
-    active.turnFailed = true;
-    active.isRunning = false;
     if (active.answerText.trim()) {
       this.finalizeMessage(sessionId, active, 'answer', active.answerText);
       active.assistantMessageId = null;
       active.answerText = '';
     }
-    this.workbenchTaskService?.failRun?.(sessionId, { message: pending.message });
+    this.surfaceTurnError(sessionId, active, pending.classified, pending.message);
+    return false;
+  }
+
+  /**
+   * Re-sends the failed turn as text, with the image paths in the prompt, after
+   * an image payload rejection. The capability configuration is untouched.
+   */
+  private retryTurnWithoutImages(
+    sessionId: string,
+    active: ActivePiSession,
+    fallback: NonNullable<ActivePiSession['lastImagePrompt']>,
+  ): void {
+    active.lastImagePrompt = { ...fallback, retried: true };
+    active.errorSurfaced = false;
+    active.turnFailed = false;
+    active.isRunning = true;
+    this.appendSystemNotice(sessionId, t('coworkImageRetryNotice'));
+    const retryPrompt = [
+      fallback.text,
+      buildImageOmittedNotice(fallback.sentImages, {
+        verdict: ImageInputVerdict.Rejected,
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
+      }),
+    ]
+      .filter(content => content.trim().length > 0)
+      .join('\n\n');
+    void (async () => {
+      try {
+        // The SDK may already be aborting its own retry of the rejected payload;
+        // continuing before it settles would race that run. Its failure is
+        // already explained by the notice above, so it must not escape here.
+        await waitForPiRetryCancellation(active.piSession);
+      } catch {
+        // Intentionally ignored: the cancelled attempt's error is not the user's.
+      }
+      // Let the cancellation bookkeeping clear before continuing: continueSession
+      // awaits the same promise and would rethrow this already-failed attempt.
+      await yieldToEventLoop();
+      // A run that failed hard leaves its Pi session unable to accept another
+      // prompt (the SDK swallows it), so the retry drops the session and lets
+      // continueSession rebuild it from the stored transcript. The rebuild starts
+      // a fresh session, so the session-scoped approval settings travel with it —
+      // otherwise an "allow all" session would start asking for every tool call.
+      const approvalMode = active.approvalMode;
+      this.activeSessions.delete(sessionId);
+      try {
+        await this.continueSession(sessionId, retryPrompt, {
+          _skipUserMessage: true,
+          // Same resume path the stream-stall recovery uses: the previous run is
+          // already dead, so this must not race its cancellation bookkeeping.
+          _streamStallResume: true,
+          approvalMode,
+        });
+      } catch (error) {
+        console.warn(`[PiRuntime] image fallback retry failed for session ${sessionId}:`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        const current = this.activeSessions.get(sessionId) ?? active;
+        this.surfaceTurnError(sessionId, current, classifyCoworkError(message), message);
+      }
+    })();
+  }
+
+  /** Persists and emits a turn failure exactly once (bubble + stream error). */
+  private surfaceTurnError(
+    sessionId: string,
+    active: ActivePiSession,
+    classified: CoworkError,
+    rawMessage: string,
+  ): void {
+    active.errorSurfaced = true;
+    active.turnFailed = true;
+    active.isRunning = false;
+    this.workbenchTaskService?.failRun?.(sessionId, { message: rawMessage });
     // Persist a system error message so the error survives session switching
     // and is visible in the message list. The classified kind lets the renderer
     // translate it into a user-friendly i18n message; the raw message is kept
@@ -3696,7 +4044,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       type: 'system',
       content: '',
       timestamp: Date.now(),
-      metadata: { error: pending.message, errorKind: pending.classified.kind },
+      metadata: { error: rawMessage, errorKind: classified.kind },
     };
     let errorMessage = errorMessageSeed;
     if (this.store) {
@@ -3704,7 +4052,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       errorMessage = this.store.addMessage(sessionId, errorMessageSeed);
     }
     this.emit('message', sessionId, errorMessage);
-    this.emit('error', sessionId, pending.classified);
+    this.emit('error', sessionId, classified);
   }
 
   /**
@@ -4493,11 +4841,37 @@ async function resolvePiModel(
     resolution.config.model,
   );
   const useBuiltinModel = canUsePiBuiltinModel(builtinModel, resolution);
-  const resolvedModel =
+  const selectedModel =
     (useBuiltinModel ? builtinModel : null) ??
     (registeredModel && typeof registeredModel === 'object'
       ? (registeredModel as Record<string, unknown>)
       : customModel);
+  // One endpoint identity for the whole image-capability decision: the model
+  // gate here, the host-side attachment gate, and the failure path all have to
+  // agree, or a rejection recorded by one stays invisible to the others.
+  const endpointKey = resolution.endpoint?.baseUrl || resolution.config.baseURL || '';
+  const configuredImageInput =
+    resolution.endpoint?.capabilities?.imageInput ??
+    resolution.providerMetadata.capabilities?.imageInput ??
+    ModelCapabilityStatus.Unknown;
+  const effectiveImageInput = imageInputVerdict(
+    configuredImageInput,
+    resolution.providerMetadata.providerName,
+    resolution.config.model,
+    {
+      supportsImage: configuredImageInput === ModelCapabilityStatus.Supported,
+      imageInput: configuredImageInput,
+      endpointKey,
+    },
+  );
+  // A model that cannot read images must not advertise image input, whatever
+  // source it came from: Pi downgrades every image block — attachments, native
+  // `read` results, replayed history — to a text placeholder for such a model,
+  // so an image can never re-enter a request the server already rejected.
+  const resolvedModel =
+    effectiveImageInput === ImageInputVerdict.Supported
+      ? selectedModel
+      : { ...selectedModel, input: ['text'] as Array<'text' | 'image'> };
   // pi keys compaction.modelOverrides by the model's own provider/id pair, so
   // read both off the final model object (builtin catalog models use pi's
   // provider ids, not our provider names).
@@ -4508,6 +4882,7 @@ async function resolvePiModel(
 
   return {
     model: resolvedModel,
+    endpointKey,
     modelRuntime,
     maxOutputTokens:
       resolution.endpoint?.maxTokens ||

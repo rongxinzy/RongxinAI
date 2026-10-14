@@ -42,7 +42,10 @@ const truncateEntry = (
   return `${normalized.slice(0, Math.max(0, maxChars - suffix.length))}${suffix}`;
 };
 
-const formatHistoryMessage = (message: CoworkMessage): string | null => {
+const formatHistoryMessage = (
+  message: CoworkMessage,
+  ocrCommandFor?: (imagePath: string) => string,
+): string | null => {
   if (message.type === 'assistant') {
     if (message.metadata?.isThinking) return null;
     const content = truncateEntry(message.content);
@@ -50,7 +53,7 @@ const formatHistoryMessage = (message: CoworkMessage): string | null => {
   }
   if (message.type === 'user') {
     const content = truncateEntry(message.content);
-    const attachments = formatConversationAttachments(message);
+    const attachments = formatConversationAttachments(message, ocrCommandFor);
     const entry = [attachments, content].filter(Boolean).join('\n');
     return entry ? `User: ${entry}` : null;
   }
@@ -74,13 +77,15 @@ const formatHistoryMessage = (message: CoworkMessage): string | null => {
 export const buildPiConversationPrompt = (
   messages: CoworkMessage[],
   currentPrompt: string,
-  options: { maxChars?: number } = {},
+  options: { maxChars?: number; ocrCommandFor?: (imagePath: string) => string } = {},
 ): string => {
   const totalChars = Math.min(
     PiConversationContextLimit.TotalChars,
     Math.max(2_000, Math.floor(options.maxChars ?? PiConversationContextLimit.TotalChars)),
   );
-  const entries = messages.map(formatHistoryMessage).filter((entry): entry is string => !!entry);
+  const entries = messages
+    .map(message => formatHistoryMessage(message, options.ocrCommandFor))
+    .filter((entry): entry is string => !!entry);
   // Reserve space for several messages even when one tool observation is huge.
   const entryBudget = Math.min(PiConversationContextLimit.EntryChars, Math.floor(totalChars / 4));
   const selected: string[] = [];

@@ -81,6 +81,10 @@
       "to": "modelscope.tokens.local.json"
     },
     {
+      "from": "resources/ocr",
+      "to": "ocr"
+    },
+    {
       "from": "resources/acp/registry.json",
       "to": "acp/registry.json"
     },
