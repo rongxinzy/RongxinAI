@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 
-import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
+import { loadArtifactFile } from '@/services/artifactFileLoader';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 
-import { dxfPreviewToSvg, parseDxfPreview } from './dxfPreview';
+import { MAX_PREVIEW_DXF_CHARS } from './constants';
+import { dxfPreviewToSvg, parseDxfPreview, sanitizeDxfSvg } from './dxfPreview';
+import type { DxfPreviewWorkerResponse } from './dxfPreview.worker';
 
 const t = (key: string) => i18nService.t(key);
 
@@ -12,41 +14,75 @@ interface DxfRendererProps {
   artifact: Artifact;
 }
 
-function dataUrlToText(dataUrl: string): string {
-  if (!/^data:[^,]*;base64,/i.test(dataUrl)) return dataUrl;
-  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder('utf-8').decode(bytes);
-}
-
 const DxfRenderer: React.FC<DxfRendererProps> = ({ artifact }) => {
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [oversized, setOversized] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    let activeWorker: Worker | null = null;
 
     const load = async () => {
       setLoading(true);
       setError(null);
       setSvg(null);
+      setOversized(false);
 
       try {
         let text = artifact.content;
         if (!text) {
           if (!artifact.filePath) throw new Error(t('artifactDocumentError'));
-          text = dataUrlToText(await loadArtifactDataUrl(artifact.filePath));
+          const loaded = await loadArtifactFile(artifact);
+          text = loaded?.content ?? '';
         }
-        const rendered = dxfPreviewToSvg(parseDxfPreview(text));
+
+        if (text.length > MAX_PREVIEW_DXF_CHARS) {
+          if (!cancelled) {
+            setOversized(true);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const generateSvg = (): Promise<string | null> => {
+          if (typeof window !== 'undefined' && typeof window.Worker === 'function') {
+            return new Promise(resolve => {
+              try {
+                const worker = new Worker(new URL('./dxfPreview.worker.ts', import.meta.url), {
+                  type: 'module',
+                });
+                activeWorker = worker;
+                worker.onmessage = (event: MessageEvent<DxfPreviewWorkerResponse>) => {
+                  worker.terminate();
+                  if (activeWorker === worker) activeWorker = null;
+                  resolve(event.data.svg);
+                };
+                worker.onerror = () => {
+                  worker.terminate();
+                  if (activeWorker === worker) activeWorker = null;
+                  resolve(dxfPreviewToSvg(parseDxfPreview(text)));
+                };
+                worker.postMessage({ text });
+              } catch {
+                resolve(dxfPreviewToSvg(parseDxfPreview(text)));
+              }
+            });
+          }
+          return Promise.resolve(dxfPreviewToSvg(parseDxfPreview(text)));
+        };
+
+        const rendered = await generateSvg();
         if (cancelled) return;
         if (!rendered) {
           setError(t('artifactPreviewUnsupported'));
           return;
         }
-        setSvg(rendered);
+
+        const sanitized = sanitizeDxfSvg(rendered);
+        if (cancelled) return;
+        setSvg(sanitized);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : String(loadError));
@@ -59,8 +95,20 @@ const DxfRenderer: React.FC<DxfRendererProps> = ({ artifact }) => {
     void load();
     return () => {
       cancelled = true;
+      if (activeWorker) {
+        activeWorker.terminate();
+        activeWorker = null;
+      }
     };
-  }, [artifact.content, artifact.filePath]);
+  }, [artifact]);
+
+  if (oversized || (artifact.content?.length ?? 0) > MAX_PREVIEW_DXF_CHARS) {
+    return (
+      <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+        {t('artifactPreviewTooLarge')}
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -81,7 +129,6 @@ const DxfRenderer: React.FC<DxfRendererProps> = ({ artifact }) => {
   return (
     <div
       className="flex h-full w-full items-center justify-center overflow-auto bg-background p-4 text-foreground"
-      // DXF → SVG is generated from trusted local workspace files only.
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
