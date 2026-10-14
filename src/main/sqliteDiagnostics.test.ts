@@ -4,7 +4,11 @@ import os from 'os';
 import path from 'path';
 import { afterEach, expect, test } from 'vitest';
 
-import { readSqliteDiagnosticsSnapshot } from './sqliteDiagnostics';
+import {
+  EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS,
+  isEventLoopStall,
+  readSqliteDiagnosticsSnapshot,
+} from './sqliteDiagnostics';
 
 const temporaryDirectories: string[] = [];
 
@@ -39,4 +43,14 @@ test('readSqliteDiagnosticsSnapshot reports database files and cowork row counts
   } finally {
     db.close();
   }
+});
+
+test('isEventLoopStall separates blocked work from a suspended process', () => {
+  expect(isEventLoopStall(249)).toBe(false);
+  expect(isEventLoopStall(250)).toBe(true);
+  expect(isEventLoopStall(60_000)).toBe(true);
+  // A sleeping machine reports hours of "lag": that is a measurement artifact,
+  // and calling it an event-loop stall misleads every later investigation.
+  expect(isEventLoopStall(EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS)).toBe(false);
+  expect(isEventLoopStall(33_607_636)).toBe(false);
 });

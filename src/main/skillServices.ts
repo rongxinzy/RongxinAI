@@ -2,7 +2,7 @@
  * Skill Services Manager - Manages background services for skills
  */
 
-import { execFileSync, execSync, spawn, spawnSync } from 'child_process';
+import { execSync, spawn, spawnSync } from 'child_process';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -10,6 +10,7 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
+import { runNpmCommand } from './libs/npmRuntimeExec';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
@@ -243,7 +244,29 @@ export class SkillServiceManager {
     };
   }
 
-  private ensureWebSearchRuntimeReady(skillPath: string): void {
+  /**
+   * Runs one npm step for the web-search runtime and reports what npm said.
+   *
+   * Never synchronous: this work happens while the app is starting, and a
+   * blocking install froze the whole window for 12-17 s.
+   */
+  private async runWebSearchNpmStep(
+    npmRuntime: NonNullable<ReturnType<typeof resolveBundledNpmRuntime>>,
+    args: string[],
+    skillPath: string,
+  ): Promise<void> {
+    try {
+      await runNpmCommand(npmRuntime.command, [...npmRuntime.args, ...args], {
+        cwd: skillPath,
+        env: npmRuntime.env,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`web-search npm ${args.join(' ')} failed: ${detail}`);
+    }
+  }
+
+  private async ensureWebSearchRuntimeReady(skillPath: string): Promise<void> {
     if (this.isWebSearchRuntimeHealthy(skillPath)) {
       return;
     }
@@ -267,12 +290,7 @@ export class SkillServiceManager {
         );
       }
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
-      execFileSync(npmRuntime.command, [...npmRuntime.args, 'install'], {
-        cwd: skillPath,
-        stdio: 'ignore',
-        env: npmRuntime.env,
-        windowsHide: process.platform === 'win32',
-      });
+      await this.runWebSearchNpmStep(npmRuntime, ['install'], skillPath);
     }
 
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
@@ -283,12 +301,7 @@ export class SkillServiceManager {
         );
       }
       console.log('[SkillServices] Compiling web-search TypeScript...');
-      execFileSync(npmRuntime.command, [...npmRuntime.args, 'run', 'build'], {
-        cwd: skillPath,
-        stdio: 'ignore',
-        env: npmRuntime.env,
-        windowsHide: process.platform === 'win32',
-      });
+      await this.runWebSearchNpmStep(npmRuntime, ['run', 'build'], skillPath);
     }
 
     if (!this.isWebSearchRuntimeHealthy(skillPath)) {
@@ -371,7 +384,7 @@ export class SkillServiceManager {
     const pidFile = path.join(skillPath, '.server.pid');
     const logFile = path.join(skillPath, '.server.log');
     const serverEntry = path.join(skillPath, 'dist', 'server', 'index.js');
-    this.ensureWebSearchRuntimeReady(skillPath);
+    await this.ensureWebSearchRuntimeReady(skillPath);
     const baseEnv = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
     const runtime = this.resolveNodeRuntime(baseEnv);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();

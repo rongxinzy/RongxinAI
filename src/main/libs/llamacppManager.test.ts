@@ -1123,3 +1123,35 @@ test('installModel refreshes cloud metadata once after a stale download URL retu
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(result.path).toContain('fresh.gguf');
 });
+
+test('listLocalModels reports a repeating router failure once', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-router-failure-'));
+  fs.writeFileSync(path.join(modelsDir, 'qwen-local.gguf'), 'gguf');
+  const manager = new LlamaCppManager(() => ({ modelsDir }));
+  manager.client = async () =>
+    ({
+      listModelsSnapshot: async () => {
+        throw new Error(
+          'llama.cpp /models failed: HTTP 404 {"error":{"message":"Route not found."}}',
+        );
+      },
+    }) as any;
+
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const debug = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+  try {
+    await manager.listLocalModels();
+    await manager.listLocalModels();
+
+    const warnings = warn.mock.calls.filter(call => String(call[0]).includes('router model list'));
+    const repeats = debug.mock.calls.filter(call => String(call[0]).includes('router model list'));
+    // The documented GGUF fallback still runs; its explanation is not repeated
+    // on every refresh, which is what buried the log in stack traces.
+    expect(warnings).toHaveLength(1);
+    expect(repeats).toHaveLength(1);
+    await expect(manager.listLocalModels()).resolves.toHaveLength(1);
+  } finally {
+    warn.mockRestore();
+    debug.mockRestore();
+  }
+});

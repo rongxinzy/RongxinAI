@@ -4,6 +4,8 @@ import type Database from 'better-sqlite3';
 const DEFAULT_INTERVAL_MS = 1000;
 const EVENT_LOOP_LAG_WARN_THRESHOLD_MS = 250;
 const EVENT_LOOP_LAG_LOG_COOLDOWN_MS = 5000;
+/** A timer gap this large means the process was suspended, not blocked. */
+export const EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS = 120_000;
 
 export type SqliteDiagnosticsSnapshot = {
   databaseBytes: number;
@@ -63,6 +65,17 @@ export const readSqliteDiagnosticsSnapshot = (
   };
 };
 
+/**
+ * Whether a timer gap should be reported as an event-loop stall.
+ *
+ * Beyond the suspend threshold the process was asleep (or the wall clock moved):
+ * a gap of hours is a real measurement, but calling it "event-loop stall" sends
+ * every later investigation the wrong way.
+ */
+export function isEventLoopStall(lagMs: number): boolean {
+  return lagMs >= EVENT_LOOP_LAG_WARN_THRESHOLD_MS && lagMs < EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS;
+}
+
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
@@ -103,6 +116,14 @@ export const startSqliteDiagnostics = ({
     const lagMs = now - expectedAt;
     expectedAt = now + intervalMs;
     if (lagMs < EVENT_LOOP_LAG_WARN_THRESHOLD_MS) return;
+    if (!isEventLoopStall(lagMs)) {
+      // Skipped before the cooldown would swallow it, and without paying for a
+      // database snapshot that would not explain anything anyway.
+      console.debug(
+        `[SqliteDiagnostics] timer gap ${Math.round(lagMs)}ms (system suspend or clock jump), not reported as an event-loop stall`,
+      );
+      return;
+    }
     if (now - lastLagLogAt < EVENT_LOOP_LAG_LOG_COOLDOWN_MS) return;
     lastLagLogAt = now;
 
