@@ -2,6 +2,7 @@
  * Minimal DXF geometry extraction for in-app preview.
  * Covers the common text-to-cad / drafting entities: LINE, CIRCLE, ARC, LWPOLYLINE.
  */
+import DOMPurify from 'dompurify';
 
 export type DxfPoint = { x: number; y: number };
 
@@ -224,4 +225,16 @@ export function dxfPreviewToSvg(model: DxfPreviewModel, padding = 16): string | 
     '</g>',
     '</svg>',
   ].join('');
+}
+
+/**
+ * Sanitizes an SVG string using DOMPurify before inserting it into the DOM.
+ * Enforces the AGENTS.md security boundary: SVG must go through DOMPurify.
+ */
+export function sanitizeDxfSvg(svg: string): string {
+  if (!svg) return '';
+  return DOMPurify.sanitize(svg, {
+    USE_PROFILES: { svg: true, svgFilters: true },
+    ADD_TAGS: ['use'],
+  });
 }

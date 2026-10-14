@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import MarkdownContent from '@/components/MarkdownContent';
-import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
+import { loadArtifactFile } from '@/services/artifactFileLoader';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 
@@ -9,15 +9,6 @@ const t = (key: string) => i18nService.t(key);
 
 interface MarkdownRendererProps {
   artifact: Artifact;
-}
-
-function dataUrlToText(dataUrl: string): string {
-  if (!/^data:[^,]*;base64,/i.test(dataUrl)) return dataUrl;
-  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder('utf-8').decode(bytes);
 }
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ artifact }) => {
@@ -44,10 +35,10 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ artifact }) => {
     setLoading(true);
     setError(null);
 
-    loadArtifactDataUrl(artifact.filePath)
-      .then(dataUrl => {
+    loadArtifactFile(artifact)
+      .then(loaded => {
         if (cancelled) return;
-        setContent(dataUrlToText(dataUrl));
+        setContent(loaded?.content ?? '');
       })
       .catch(loadError => {
         if (!cancelled) {
@@ -61,7 +52,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ artifact }) => {
     return () => {
       cancelled = true;
     };
-  }, [artifact.content, artifact.filePath]);
+  }, [artifact]);
 
   if (loading) {
     return (

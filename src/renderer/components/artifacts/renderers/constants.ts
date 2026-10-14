@@ -21,3 +21,10 @@ export const MAX_PREVIEW_HTML_CHARS = 1_000_000;
 
 /** Upper bound for the local resources inlined into a path-backed preview. */
 export const MAX_INLINE_PREVIEW_RESOURCES = 24;
+
+/**
+ * Upper bound for in-app DXF preview (in characters).
+ * Large CAD drawings should not be parsed on the UI thread or rendered directly
+ * to prevent event loop lag or runaway memory usage.
+ */
+export const MAX_PREVIEW_DXF_CHARS = 2_000_000;
