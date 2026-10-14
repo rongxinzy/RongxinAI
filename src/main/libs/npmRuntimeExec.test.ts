@@ -93,3 +93,35 @@ test('runNpmCommand kills the child when the caller aborts', async () => {
   // A stop must not leave npm running in the background.
   expect(() => process.kill(pid, 0)).toThrow();
 });
+
+test('runNpmCommand kills what the child spawned, not just the child', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-exec-tree-'));
+  const selfPidFile = path.join(dir, 'self.pid');
+  const childPidFile = path.join(dir, 'child.pid');
+  // Mirrors `npm run build`: npm spawns the script, the script spawns the compiler.
+  const script = `
+    const fs = require('fs');
+    const { spawn } = require('child_process');
+    const [selfFile, childFile] = process.argv.slice(1);
+    fs.writeFileSync(selfFile, String(process.pid));
+    const grandchild = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 20000)'], {
+      stdio: 'ignore',
+    });
+    fs.writeFileSync(childFile, String(grandchild.pid));
+    setTimeout(() => {}, 20000);
+  `;
+  const controller = new AbortController();
+  const pending = runNpmCommand(process.execPath, ['-e', script, selfPidFile, childPidFile], {
+    cwd: dir,
+    signal: controller.signal,
+  });
+
+  const selfPid = await waitForPidFile(selfPidFile);
+  const grandchildPid = await waitForPidFile(childPidFile);
+  controller.abort();
+
+  await expect(pending).rejects.toBeInstanceOf(NpmCommandAbortedError);
+  // The rejection means the work is gone, not merely that npm stopped waiting.
+  expect(() => process.kill(selfPid, 0)).toThrow();
+  expect(() => process.kill(grandchildPid, 0)).toThrow();
+});
