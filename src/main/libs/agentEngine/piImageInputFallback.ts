@@ -285,10 +285,19 @@ export function isImagePayloadRejection(message: string, carriedImages: boolean)
   if (!carriedImages) return false;
   const rejectedAsBadRequest =
     /\b400\b|invalid_request_error|BadRequestError|invalid\s+request/i.test(message);
-  if (!rejectedAsBadRequest) return false;
-  // A corrupt or oversized image is the caller's payload problem, not a missing
-  // capability: "400 invalid image data" must not strip images from the model
-  // for every later session.
+  return rejectedAsBadRequest && isImageCapabilityError(message);
+}
+
+/**
+ * Whether an error is about image-input capability at all — as opposed to a
+ * problem with the image payload itself.
+ *
+ * Every branch that may record a capability verdict must go through this: a
+ * refused format ("this model does not support image format image/webp") or a
+ * corrupt file says nothing about whether the model can read images in general,
+ * and one such message must not strip images from the model everywhere.
+ */
+export function isImageCapabilityError(message: string): boolean {
   if (IMAGE_INPUT_ERROR_WORDING.test(message)) return false;
   return VISION_CAPABILITY_WORDING.test(message);
 }

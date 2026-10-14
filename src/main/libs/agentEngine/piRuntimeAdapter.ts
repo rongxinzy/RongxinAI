@@ -195,10 +195,12 @@ import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import {
   buildImageOmittedNotice,
+  clearImageInputObservations,
   collectImagePathReferences,
   imageCapabilityFingerprint,
   ImageInputVerdict,
   imageInputVerdict,
+  isImageCapabilityError,
   isImagePayloadRejection,
   markImageInputRejected,
   type ImageCapabilityConfiguration,
@@ -3359,8 +3361,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             const imageRejection =
               classified.kind === CoworkErrorKind.ModelCapabilityUnsupported
                 ? // Only image rejections are corrected: an audio/video capability
-                  // error must not silently strip the model's image-input verdict.
-                  /image|mmproj/i.test(errMsg)
+                  // error must not silently strip the model's image-input verdict,
+                  // and a payload problem must not either.
+                  isImageCapabilityError(errMsg)
                 : isImagePayloadRejection(errMsg, carriedImages);
             active.pendingError = {
               message: errMsg,
@@ -3390,6 +3393,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 active.harnessModelProfile.model,
                 imageCapabilityFingerprint(this.imageCapabilityConfiguration(active)),
               );
+              // Other live sessions on the same model must learn this too: their
+              // Pi snapshot still advertises image input, so their own `read`
+              // would send the payload this server just refused.
+              void this.syncImageInputCapability();
               console.log('[DBG mark]', JSON.stringify(this.imageCapabilityConfiguration(active)));
               if (carriedImages) {
                 active.imageRetryPending = true;
@@ -3794,6 +3801,49 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       supportsImage: active.capabilities.imageInput === ModelCapabilityStatus.Supported,
       endpointKey: active.imageEndpointKey,
     };
+  }
+
+  /**
+   * Keep every live Pi session's declared image capability in step with the
+   * effective verdict.
+   *
+   * The verdict can change while sessions are open — a rejection is learned, or
+   * the user edits provider settings — and a stale snapshot would either drop
+   * images the host still sends, or keep sending images the server already
+   * refused. Duplicate work is skipped so an unchanged session is untouched.
+   */
+  private async syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void> {
+    const targets = sessionIds ? [...sessionIds] : [...this.activeSessions.keys()];
+    await Promise.allSettled(
+      targets.map(async sessionId => {
+        const active = this.activeSessions.get(sessionId);
+        if (!active) return;
+        const input: Array<'text' | 'image'> =
+          this.imageInputVerdictForActive(active) === ImageInputVerdict.Supported
+            ? ['text', 'image']
+            : ['text'];
+        const current = Array.isArray(active.model.input) ? active.model.input : [];
+        if (current.length === input.length && current.every((value, i) => value === input[i])) {
+          return;
+        }
+        const model = { ...active.model, input };
+        try {
+          await active.piSession.setModel(model);
+          active.model = model;
+        } catch (error) {
+          console.warn(`[PiRuntime] could not update image input for session ${sessionId}:`, error);
+        }
+      }),
+    );
+  }
+
+  /**
+   * Provider/model settings are the user's statement about what the models can
+   * do: drop the runtime observations and let open sessions follow immediately.
+   */
+  async resetImageInputCapabilities(): Promise<void> {
+    clearImageInputObservations();
+    await this.syncImageInputCapability();
   }
 
   private imageInputVerdictForActive(active: ActivePiSession): ImageInputVerdict {

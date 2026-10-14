@@ -5,6 +5,7 @@ import {
   buildImageOmittedNotice,
   clearImageInputObservations,
   collectImagePathReferences,
+  isImageCapabilityError,
   imageCapabilityFingerprint,
   ImageInputVerdict,
   imageInputVerdict,
@@ -222,6 +223,24 @@ describe('isImagePayloadRejection', () => {
     expect(
       isImagePayloadRejection('400 invalid_request_error: audio input is not supported', true),
     ).toBe(false);
+  });
+});
+
+describe('isImageCapabilityError wording boundaries', () => {
+  test('separates a refused format or payload from a missing capability', () => {
+    // A refused container says nothing about the model's vision in general.
+    expect(isImageCapabilityError('400 this model does not support image format image/webp')).toBe(
+      false,
+    );
+    expect(isImageCapabilityError('400 invalid image data')).toBe(false);
+    expect(isImageCapabilityError('400 image too large')).toBe(false);
+    // Real capability wording still counts.
+    expect(
+      isImageCapabilityError(
+        "400 this server was started without the vision encoder (run setup again and choose 'vision'), so it cannot read images",
+      ),
+    ).toBe(true);
+    expect(isImageCapabilityError('400 image input is not supported - hint: mmproj')).toBe(true);
   });
 });
 

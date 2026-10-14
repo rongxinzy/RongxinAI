@@ -226,7 +226,6 @@ import { TodoReminderScheduler } from './todo/reminderScheduler';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
-import { clearImageInputObservations } from './libs/agentEngine/piImageInputFallback';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
   getCurrentApiConfig,
@@ -8059,7 +8058,7 @@ if (!gotTheLock) {
         ]);
       };
       if (modelConfigSection(next) !== modelConfigSection(previous)) {
-        clearImageInputObservations();
+        void getPiRuntimeAdapter().resetImageInputCapabilities();
       }
     });
     const localInferenceManager = getLlamaCppManager();

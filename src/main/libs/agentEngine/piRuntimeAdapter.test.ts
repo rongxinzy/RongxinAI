@@ -264,7 +264,11 @@ vi.mock('../coworkUtil', async importOriginal => {
 });
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
-import { clearImageInputObservations } from './piImageInputFallback';
+import {
+  clearImageInputObservations,
+  imageCapabilityFingerprint,
+  isImageInputRejected,
+} from './piImageInputFallback';
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import { AGENT_SETTLE_FALLBACK_MS } from './piAgentSettleFallback';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
@@ -302,6 +306,22 @@ const activePiModel = (
     target as unknown as { activeSessions: Map<string, { model: Record<string, unknown> }> }
   ).activeSessions;
   return sessions.get(sessionId)?.model;
+};
+
+/** A vision-capable provider resolution, reused by the session-sync cases. */
+const VISION_MODEL_RESOLUTION = {
+  config: {
+    apiKey: 'sk-vision',
+    baseURL: 'https://api.moonshot.cn/v1',
+    model: 'kimi-k2.6',
+    apiType: 'openai' as const,
+  },
+  providerMetadata: {
+    providerName: 'moonshot',
+    codingPlanEnabled: false,
+    supportsImage: true,
+    capabilities: { imageInput: ModelCapabilityStatus.Supported },
+  },
 };
 
 describe('PiRuntimeAdapter', () => {
@@ -3935,6 +3955,106 @@ describe('PiRuntimeAdapter', () => {
       expect(errors).toHaveLength(0);
       expect(systemErrorMessages()).toHaveLength(1);
       expect(activePiModel(adapter, 'image-only')?.input).toEqual(['text']);
+    });
+
+    it('lets an open session follow a capability reset', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+
+      await adapter.startSession('live-image', 'Describe this image', {
+        imageAttachments: [
+          {
+            name: 'example.png',
+            mimeType: 'image/png',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\hash.png',
+          },
+        ],
+      });
+      listener!({ type: 'turn_start' });
+      failedAttempt(
+        '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
+      );
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
+      expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text']);
+
+      // The user fixed the server and edited provider settings: the live session
+      // must stop downgrading images, not just the observation map.
+      await adapter.resetImageInputCapabilities();
+      expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
+    });
+
+    it('applies a recorded rejection to other open sessions of the same model', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+
+      await adapter.startSession('peer-a', 'Describe this image', {
+        imageAttachments: [
+          {
+            name: 'a.png',
+            mimeType: 'image/png',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\a.png',
+          },
+        ],
+      });
+      // The mock's subscribe hands every session the same listener, so the last
+      // session created owns the events the failure is driven through.
+      await adapter.startSession('peer-b', 'Describe this image', {
+        imageAttachments: [
+          {
+            name: 'b.png',
+            mimeType: 'image/png',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\b.png',
+          },
+        ],
+      });
+      listener!({ type: 'turn_start' });
+      failedAttempt(
+        '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
+      );
+      listener!({ type: 'agent_settled' });
+
+      // peer-a never sent anything wrong, but its Pi snapshot still advertised
+      // image input, so its own `read` would re-send the refused payload.
+      await vi.waitFor(() => expect(activePiModel(adapter, 'peer-a')?.input).toEqual(['text']));
+    });
+
+    it('does not treat a refused image format as a capability verdict', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+      await adapter.startSession('format-issue', 'Describe this image', {
+        imageAttachments: [
+          {
+            name: 'example.webp',
+            mimeType: 'image/webp',
+            base64Data: 'aW1hZ2U=',
+            path: 'C:\\cowork-images\\s\\hash.webp',
+          },
+        ],
+      });
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('400 this model does not support image format image/webp');
+      listener!({ type: 'agent_settled' });
+
+      // The image turn went out once and was not retried as text.
+      expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
+      expect(mockSession.prompt).not.toHaveBeenCalled();
+      expect(errors.length).toBeGreaterThan(0);
+      // No capability verdict was recorded: normal PNG/JPEG still ships.
+      expect(
+        isImageInputRejected(
+          'moonshot',
+          'kimi-k2.6',
+          imageCapabilityFingerprint({
+            supportsImage: true,
+            imageInput: ModelCapabilityStatus.Supported,
+            endpointKey: 'https://api.moonshot.cn/v1',
+          }),
+        ),
+      ).toBe(false);
     });
 
     it('retries when the rejection arrives before the send promise resolves', async () => {
