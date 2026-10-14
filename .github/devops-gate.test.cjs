@@ -17,7 +17,7 @@ test('valid bug description passes; missing trigger and blank template fail', ()
 test('aggregation fails closed for failed CI, changed head and incomplete file lists', async () => {
   const pr = {
     number: 1,
-    title: 'ci: enforce gates',
+    title: 'fix(ci): enforce gates',
     body,
     changed_files: 1,
     head: { sha: 'abc' },
