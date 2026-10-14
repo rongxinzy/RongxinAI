@@ -3,6 +3,14 @@ import { execFile } from 'child_process';
 /** Output kept for one npm step; large enough for an install log, small enough to hold in memory. */
 const OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024;
 
+/** A cancelled npm invocation: the child was killed, nothing failed on its own. */
+export class NpmCommandAbortedError extends Error {
+  constructor(command: string) {
+    super(`${command} was cancelled`);
+    this.name = 'NpmCommandAbortedError';
+  }
+}
+
 /** A failed npm invocation that keeps the output explaining it. */
 export class NpmCommandError extends Error {
   readonly stdout: string;
@@ -30,6 +38,8 @@ export interface NpmCommandOptions {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  /** Aborting kills the npm child, so a stop does not leave it running. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -54,11 +64,16 @@ export function runNpmCommand(
         env: options.env,
         maxBuffer: OUTPUT_LIMIT_BYTES,
         ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
+        ...(options.signal ? { signal: options.signal } : {}),
         windowsHide: process.platform === 'win32',
       },
       (error, stdout, stderr) => {
         if (!error) {
           resolve({ stdout, stderr });
+          return;
+        }
+        if (error.name === 'AbortError') {
+          reject(new NpmCommandAbortedError(`${command} ${args.join(' ')}`));
           return;
         }
         const detail = npmOutputTail(stderr) || npmOutputTail(stdout);

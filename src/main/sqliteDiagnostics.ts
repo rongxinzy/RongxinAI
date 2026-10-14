@@ -4,10 +4,6 @@ import type Database from 'better-sqlite3';
 const DEFAULT_INTERVAL_MS = 1000;
 const EVENT_LOOP_LAG_WARN_THRESHOLD_MS = 250;
 const EVENT_LOOP_LAG_LOG_COOLDOWN_MS = 5000;
-/** A timer gap this large cannot be explained by ordinary blocking alone. */
-export const EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS = 120_000;
-/** Share of the gap that must be CPU time for the process to count as busy. */
-const SUSPECT_SUSPEND_CPU_SHARE = 0.2;
 
 export type SqliteDiagnosticsSnapshot = {
   databaseBytes: number;
@@ -68,16 +64,15 @@ export const readSqliteDiagnosticsSnapshot = (
 };
 
 /**
- * Whether a long timer gap looks like a suspended machine rather than blocked work.
+ * How a timer gap is reported.
  *
- * Duration alone cannot tell the two apart: a two-minute freeze is exactly the
- * event-loop stall this diagnostic exists to catch, and hiding those behind a
- * "suspend" verdict would remove the signal. CPU time is the discriminator - a
- * process that was asleep earns almost none of the gap - and the finding stays a
- * warning either way, labelled with the measurement that produced it.
+ * A long gap with almost no CPU time can mean the machine was asleep, but a main
+ * thread blocked on a synchronous wait burns no CPU either, so the numbers are
+ * reported without a verdict: a low share is evidence for the reader, not proof.
  */
-export function isSuspectSuspend(lagMs: number, cpuMs: number): boolean {
-  return lagMs >= EVENT_LOOP_LAG_SUSPEND_THRESHOLD_MS && cpuMs < lagMs * SUSPECT_SUSPEND_CPU_SHARE;
+export function formatEventLoopLag(lagMs: number, cpuMs: number): string {
+  const share = lagMs > 0 ? (cpuMs / lagMs) * 100 : 0;
+  return `event-loop lag ${Math.round(lagMs)}ms (CPU time during the gap ${Math.round(cpuMs)}ms, ${share.toFixed(1)}%)`;
 }
 
 const formatBytes = (bytes: number): string => {
@@ -91,8 +86,9 @@ const logSnapshot = (
   snapshot: SqliteDiagnosticsSnapshot,
   lagMs?: number,
   queryMs?: number,
+  cpuMs = 0,
 ): void => {
-  const lag = lagMs === undefined ? '' : `, event-loop lag ${Math.round(lagMs)}ms`;
+  const lag = lagMs === undefined ? '' : `, ${formatEventLoopLag(lagMs, cpuMs)}`;
   const query = queryMs === undefined ? '' : `, diagnostics query ${Math.round(queryMs)}ms`;
   const message = `[SqliteDiagnostics] ${label}: database ${formatBytes(snapshot.databaseBytes)}, WAL ${formatBytes(snapshot.walBytes)}, SHM ${formatBytes(snapshot.shmBytes)}, ${snapshot.coworkMessages} messages across ${snapshot.coworkSessions} sessions, journal ${snapshot.journalMode}, synchronous=${snapshot.synchronous}, ${snapshot.pageCount} pages (${snapshot.freelistPages} free)${lag}${query}`;
   if (lagMs === undefined) {
@@ -126,20 +122,11 @@ export const startSqliteDiagnostics = ({
     if (lagMs < EVENT_LOOP_LAG_WARN_THRESHOLD_MS) return;
     if (now - lastLagLogAt < EVENT_LOOP_LAG_LOG_COOLDOWN_MS) return;
     lastLagLogAt = now;
-    if (isSuspectSuspend(lagMs, cpuMs)) {
-      // Still a warning: the gap is real and worth seeing. The label keeps it
-      // from reading as a blocked main thread, and the snapshot is skipped
-      // because database state cannot explain a sleeping machine.
-      console.warn(
-        `[SqliteDiagnostics] timer gap ${Math.round(lagMs)}ms with ${((cpuMs / lagMs) * 100).toFixed(1)}% CPU time - the process was not running (system suspend or clock jump), not a blocked event loop`,
-      );
-      return;
-    }
 
     const queryStartedAt = performance.now();
     try {
       const snapshot = readSqliteDiagnosticsSnapshot(db, dbPath);
-      logSnapshot('event-loop stall', snapshot, lagMs, performance.now() - queryStartedAt);
+      logSnapshot('event-loop stall', snapshot, lagMs, performance.now() - queryStartedAt, cpuMs);
     } catch (error) {
       console.warn('[SqliteDiagnostics] Stall snapshot failed:', error);
     }

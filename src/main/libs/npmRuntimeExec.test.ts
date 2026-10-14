@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import { expect, test } from 'vitest';
 
-import { NpmCommandError, runNpmCommand } from './npmRuntimeExec';
+import { NpmCommandAbortedError, NpmCommandError, runNpmCommand } from './npmRuntimeExec';
 
 const runNode = (script: string, ...args: string[]): ReturnType<typeof runNpmCommand> =>
   runNpmCommand(process.execPath, ['-e', script, ...args], { cwd: os.tmpdir() });
@@ -52,4 +52,44 @@ test('runNpmCommand carries the failure output back to the caller', async () => 
   expect((error as NpmCommandError).stderr).toContain('missing script: build');
   // The reason travels in the message: the caller only logs the error.
   expect((error as Error).message).toContain('missing script: build');
+});
+
+/** Resolves with the pid a child wrote, driven by the filesystem, not a sleep. */
+const waitForPidFile = (file: string): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const read = (): boolean => {
+      try {
+        resolve(Number(fs.readFileSync(file, 'utf8')));
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    if (read()) return;
+    const watcher = fs.watch(path.dirname(file), () => {
+      if (read()) watcher.close();
+    });
+    watcher.on('error', reject);
+  });
+
+test('runNpmCommand kills the child when the caller aborts', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-exec-abort-'));
+  const pidFile = path.join(dir, 'child.pid');
+  const script = `
+    const fs = require('fs');
+    fs.writeFileSync(process.argv[1], String(process.pid));
+    setTimeout(() => {}, 10000);
+  `;
+  const controller = new AbortController();
+  const pending = runNpmCommand(process.execPath, ['-e', script, pidFile], {
+    cwd: dir,
+    signal: controller.signal,
+  });
+
+  const pid = await waitForPidFile(pidFile);
+  controller.abort();
+
+  await expect(pending).rejects.toBeInstanceOf(NpmCommandAbortedError);
+  // A stop must not leave npm running in the background.
+  expect(() => process.kill(pid, 0)).toThrow();
 });
