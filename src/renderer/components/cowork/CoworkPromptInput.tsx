@@ -416,21 +416,21 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       void syncSkills();
     }, [syncSkills, workMode]);
 
-    // 2026/09/23 切换工作/对话模式时清空输入、首页草稿与已挂载 skill（两端共用 __home__ 键，否则会残留）
+    // 切换工作/对话模式时：仅在首页 (__home__) 时清空输入、首页草稿与已挂载 skill；
+    // 真实会话 (draftKey !== '__home__') 中保留用户草稿与附件，严禁误清。
     const prevWorkModeForDraftRef = useRef(workMode);
     useEffect(() => {
       if (prevWorkModeForDraftRef.current === workMode) return;
       prevWorkModeForDraftRef.current = workMode;
-      setValue('');
-      setImageVisionHint(false);
-      dispatch(setDraftPrompt({ sessionId: '__home__', draft: '' }));
-      dispatch(clearDraftAttachments('__home__'));
-      if (draftKey !== '__home__') {
-        dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
-        dispatch(clearDraftAttachments(draftKey));
+
+      if (draftKey === '__home__') {
+        setValue('');
+        setImageVisionHint(false);
+        dispatch(setDraftPrompt({ sessionId: '__home__', draft: '' }));
+        dispatch(clearDraftAttachments('__home__'));
+        dispatch(clearActiveSkills());
+        dispatch(clearSelection());
       }
-      dispatch(clearActiveSkills());
-      dispatch(clearSelection());
     }, [workMode, dispatch, draftKey]);
 
     useEffect(() => {
