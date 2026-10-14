@@ -1,5 +1,3 @@
-// 2026/09/17 lixiang  开发环境用页面 fetch 发 API，DevTools Network 可见；生产仍走主进程 IPC（避 CORS / 保留 Copilot 重试）
-
 type ApiFetchOptions = {
   url: string;
   method: string;
@@ -8,64 +6,16 @@ type ApiFetchOptions = {
   timeoutMs?: number;
 };
 
-/** Vite DEV：请求在页面发起，会出现在调试器 Network。 */
+/**
+ * 统一 API 传输：无论是开发环境还是生产环境，API 请求一律通过 window.electron.api.fetch 走主进程代理，
+ * 避免底层网络协议栈行为不一致并保留主进程统一的证书校验、CORS 绕过、重试以及代理配置。
+ * 如需在 DevTools 中观测主进程网络请求，依赖现有的 devNetworkBeacon 机制。
+ */
 export function shouldExposeApiInDevtoolsNetwork(): boolean {
-  // Vitest also runs with DEV=true under Vite. Unit tests stub window.electron.api
-  // and must keep the production IPC transport; otherwise mocks never fire and
-  // page-level fetch hits real URLs (e.g. example.com) in CI.
-  if (import.meta.env.MODE === 'test') {
-    return false;
-  }
-  return import.meta.env.DEV === true;
-}
-
-function logTransportPath(kind: 'page-fetch' | 'ipc', detail: string): void {
-  if (!shouldExposeApiInDevtoolsNetwork()) return;
-  console.debug(`[visibleApiTransport] ${kind}: ${detail}`);
-}
-
-function parseResponseData(contentType: string, text: string): string | object {
-  if (contentType.includes('application/json')) {
-    try {
-      return JSON.parse(text) as object;
-    } catch {
-      return text;
-    }
-  }
-  return text;
+  return false;
 }
 
 export async function apiFetch(options: ApiFetchOptions) {
-  if (!shouldExposeApiInDevtoolsNetwork()) {
-    logTransportPath('ipc', `${options.method} ${options.url}`);
-    return window.electron.api.fetch(options);
-  }
-
-  logTransportPath('page-fetch', `${options.method} ${options.url}`);
-  try {
-    const response = await fetch(options.url, {
-      method: options.method,
-      headers: options.headers,
-      body: options.body,
-      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
-    });
-    const contentType = response.headers.get('content-type') || '';
-    const text = await response.text();
-    return {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-      data: parseResponseData(contentType, text),
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      statusText: error instanceof Error ? error.message : 'Network error',
-      headers: {},
-      data: null,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
+  console.debug(`[visibleApiTransport] ipc: ${options.method} ${options.url}`);
+  return window.electron.api.fetch(options);
 }

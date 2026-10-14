@@ -40,9 +40,12 @@ export const extractUserFacingErrorMessage = (raw: string): string => {
   if (fromJson) return fromJson;
 
   // Support JSON embedded after a prefix, e.g. "xxx: {...}"
-  const jsonMatch = value.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    const fromEmbedded = tryExtractMessageFromJson(jsonMatch[0]);
+  // Avoid greedy cross-line regex /\{[\s\S]*\}/ to prevent catastrophic backtracking.
+  const firstBrace = value.indexOf('{');
+  const lastBrace = value.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace && lastBrace - firstBrace <= 100_000) {
+    const candidate = value.slice(firstBrace, lastBrace + 1);
+    const fromEmbedded = tryExtractMessageFromJson(candidate);
     if (fromEmbedded) return fromEmbedded;
   }
 

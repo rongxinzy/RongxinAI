@@ -122,3 +122,8 @@ test('allows an empty amendment only while an explicit task resume context is ac
   expect(source).toContain('!trimmedValue && attachments.length === 0 && !resumeTaskActive');
   expect(source).toContain('<ResumeTaskContextBadge onCancel={onCancelTaskResume} />');
 });
+
+test('preserves session drafts on mode switch and only clears home drafts', () => {
+  expect(source).toContain("if (draftKey === '__home__') {");
+  expect(source).not.toContain("if (draftKey !== '__home__') {");
+});
