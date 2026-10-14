@@ -63,6 +63,18 @@ export const readSqliteDiagnosticsSnapshot = (
   };
 };
 
+/**
+ * How a timer gap is reported.
+ *
+ * A long gap with almost no CPU time can mean the machine was asleep, but a main
+ * thread blocked on a synchronous wait burns no CPU either, so the numbers are
+ * reported without a verdict: a low share is evidence for the reader, not proof.
+ */
+export function formatEventLoopLag(lagMs: number, cpuMs: number): string {
+  const share = lagMs > 0 ? (cpuMs / lagMs) * 100 : 0;
+  return `event-loop lag ${Math.round(lagMs)}ms (CPU time during the gap ${Math.round(cpuMs)}ms, ${share.toFixed(1)}%)`;
+}
+
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
@@ -74,8 +86,9 @@ const logSnapshot = (
   snapshot: SqliteDiagnosticsSnapshot,
   lagMs?: number,
   queryMs?: number,
+  cpuMs = 0,
 ): void => {
-  const lag = lagMs === undefined ? '' : `, event-loop lag ${Math.round(lagMs)}ms`;
+  const lag = lagMs === undefined ? '' : `, ${formatEventLoopLag(lagMs, cpuMs)}`;
   const query = queryMs === undefined ? '' : `, diagnostics query ${Math.round(queryMs)}ms`;
   const message = `[SqliteDiagnostics] ${label}: database ${formatBytes(snapshot.databaseBytes)}, WAL ${formatBytes(snapshot.walBytes)}, SHM ${formatBytes(snapshot.shmBytes)}, ${snapshot.coworkMessages} messages across ${snapshot.coworkSessions} sessions, journal ${snapshot.journalMode}, synchronous=${snapshot.synchronous}, ${snapshot.pageCount} pages (${snapshot.freelistPages} free)${lag}${query}`;
   if (lagMs === undefined) {
@@ -98,10 +111,14 @@ export const startSqliteDiagnostics = ({
 
   let expectedAt = performance.now() + intervalMs;
   let lastLagLogAt = 0;
+  let lastCpu = process.cpuUsage();
   const timer = setInterval(() => {
     const now = performance.now();
     const lagMs = now - expectedAt;
     expectedAt = now + intervalMs;
+    const cpu = process.cpuUsage(lastCpu);
+    lastCpu = process.cpuUsage();
+    const cpuMs = (cpu.user + cpu.system) / 1000;
     if (lagMs < EVENT_LOOP_LAG_WARN_THRESHOLD_MS) return;
     if (now - lastLagLogAt < EVENT_LOOP_LAG_LOG_COOLDOWN_MS) return;
     lastLagLogAt = now;
@@ -109,7 +126,7 @@ export const startSqliteDiagnostics = ({
     const queryStartedAt = performance.now();
     try {
       const snapshot = readSqliteDiagnosticsSnapshot(db, dbPath);
-      logSnapshot('event-loop stall', snapshot, lagMs, performance.now() - queryStartedAt);
+      logSnapshot('event-loop stall', snapshot, lagMs, performance.now() - queryStartedAt, cpuMs);
     } catch (error) {
       console.warn('[SqliteDiagnostics] Stall snapshot failed:', error);
     }

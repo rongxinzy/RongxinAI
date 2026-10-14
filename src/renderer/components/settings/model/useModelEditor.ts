@@ -25,9 +25,15 @@ interface UseModelEditorParams {
   providers: ProvidersConfig;
   setProviders: React.Dispatch<React.SetStateAction<ProvidersConfig>>;
   activeProvider: ProviderType;
+  enableProviderIfConfigured: (provider: ProviderType) => void;
 }
 
-export function useModelEditor({ providers, setProviders, activeProvider }: UseModelEditorParams) {
+export function useModelEditor({
+  providers,
+  setProviders,
+  activeProvider,
+  enableProviderIfConfigured,
+}: UseModelEditorParams) {
   // State for model editing
   const [isAddingModel, setIsAddingModel] = useState(false);
   const [isEditingModel, setIsEditingModel] = useState(false);
@@ -202,9 +208,9 @@ export function useModelEditor({ providers, setProviders, activeProvider }: UseM
       origin: ProviderModelOrigin.User,
       ...(contextWindow ? { contextWindow } : {}),
       ...(maxTokens ? { maxTokens } : {}),
-      ...(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama
-        ? { capabilities: newModelCapabilities }
-        : {}),
+      // Remember the form values so reopening the editor shows them.
+      // Catalog resolution is unchanged and still decides runtime behavior.
+      capabilities: newModelCapabilities,
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
         : {}),
@@ -229,6 +235,7 @@ export function useModelEditor({ providers, setProviders, activeProvider }: UseM
             : [...(prev[activeProvider].models ?? []), nextModel],
       },
     }));
+    enableProviderIfConfigured(activeProvider);
 
     setIsAddingModel(false);
     setIsEditingModel(false);

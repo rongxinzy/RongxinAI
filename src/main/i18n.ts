@@ -208,6 +208,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     workbenchStreamStallResumeGoal: '流中断后自动续跑',
 
+    // Image input fallback (see libs/agentEngine/piImageInputFallback.ts)
+    coworkImageNotSentNotice:
+      '本条消息包含图片，但图片未发送给模型。已把图片文件路径交给模型，它会尝试用本机工具读取其中的文字。若该模型支持图片输入，可在模型设置中开启。',
+    coworkImageRetryNotice: '该模型拒绝了图片输入，已自动改为纯文本重试本次请求。',
+
     // Exec approval continuation
     execApprovalApproved: '用户已确认执行该命令，请检查执行结果并继续。',
     execApprovalDenied: '用户已拒绝执行该命令。',
@@ -629,6 +634,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imErrorUnknown: 'Error processing message: {error}. Please try again.',
 
     workbenchStreamStallResumeGoal: 'Automatic resume after stream interruption',
+
+    // Image input fallback (see libs/agentEngine/piImageInputFallback.ts)
+    coworkImageNotSentNotice:
+      'This message included an image, but it was not sent to the model. The model received the image file path and will try local tools to read any text in it. If the model supports images, you can enable image input in the model settings.',
+    coworkImageRetryNotice:
+      'This model refused the image payload, so the request was retried as text only.',
 
     // Exec approval continuation
     execApprovalApproved:

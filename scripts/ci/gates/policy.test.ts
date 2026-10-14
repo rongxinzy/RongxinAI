@@ -161,7 +161,11 @@ test('candidate checks bind the source commit and block packaging before memory 
   const payload = steps.findIndex(step => step.name === 'Assemble Linux candidate payload');
   expect(install).toBeGreaterThan(-1);
   expect(payload).toBeGreaterThan(install);
-  expect(steps[install].run).toContain("'/opt/知远/知远'");
+  // The smoke test must resolve the installed executable from the packaging
+  // config: a literal path went stale on the 知远智能体 rename and failed the
+  // whole candidate run before any artifact was uploaded.
+  expect(steps[install].run).toContain('electron-builder.json');
+  expect(steps[install].run).not.toContain("'/opt/知远/知远'");
   expect(workflow('memory-leak-nightly.yml').jobs[HeavyJob.Memory].uses).toBe(memoryJob.uses);
   expect(workflow('memory-leak-nightly.yml').jobs[HeavyJob.Memory].with?.['analyze-heap']).toBe(
     true,

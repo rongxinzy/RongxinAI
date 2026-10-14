@@ -2,13 +2,43 @@
 !include "LogicLib.nsh"
 !include "nsDialogs.nsh"
 
-!define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
-!define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+; Fully custom-drawn installer UI (palette, drawing helpers, page functions
+; and string table). The theme file carries the include guard. electron-builder
+; compiles this file from its own NSIS staging directory (the header prepends
+; it ahead of installer.nsi), so relative sibling includes would resolve
+; against that staging directory and fail; PROJECT_DIR (always passed via -D)
+; anchors them to the repository. The relative fallback serves direct local
+; makensis runs from this script's directory.
+; These two globals must be declared before the UI includes: ZYHeroLeave reads
+; $installLocalInference and the PrepareExistingInstallForExtraction insertion
+; expands $preparedInstallRoot while zy-pages.nsh is still being processed.
+!ifndef BUILD_UNINSTALLER
+Var /GLOBAL installLocalInference
+Var /GLOBAL preparedInstallRoot
+!endif
+; Used by customUnInstall in the uninstaller pass to mirror uninstaller.nsh's
+; delete-app-data decision for the real userData directory. Uninstaller pass
+; only: in the installer pass the variable would be unused and -WX promotes
+; makensis warning 6001 to an error.
+!ifdef BUILD_UNINSTALLER
+Var /GLOBAL zyDeleteRealAppData
+!endif
 
-; PrepareExistingInstallForExtraction is inserted from LocalInferencePageLeave,
-; which lives in this include file — ahead of multiUser.nsh, where electron-
-; builder defines these keys with the same /ifndef fallback values. Mirror the
-; defaults here so registry macros expand correctly at that earlier point.
+; ---------------------------------------------------------------------------
+; Macros consumed by the UI includes below. NSIS macros must be defined
+; before their first insertion point: ZYHeroLeave (in zy-pages.nsh) inserts
+; PrepareExistingInstallForExtraction while that file is still being
+; processed, so these live ahead of the includes. StopAppProcesses,
+; CountInstallDirProcesses and ForgetOldInstallRegistry stay available to
+; the uninstaller pass; the timing-log helper and the extraction itself
+; are installer-only.
+; ---------------------------------------------------------------------------
+
+; PrepareExistingInstallForExtraction is inserted from ZYHeroLeave (in the
+; installer-ui/zy-pages.nsh include below) — ahead of multiUser.nsh, where
+; electron-builder defines these keys with the same /ifndef fallback values.
+; Mirror the defaults here so registry macros expand correctly at that
+; earlier point.
 !define /ifndef INSTALL_REGISTRY_KEY "Software\${APP_GUID}"
 !define /ifndef UNINSTALL_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${UNINSTALL_APP_KEY}"
 
@@ -23,7 +53,7 @@
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$roots = @(\"$INSTDIR\", \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\");\
     $$selfPid = $9;\
-    $$isTarget = { param($$p) $$p -and ($$p.StartsWith($$roots[0], \"CurrentCultureIgnoreCase\") -or $$p.StartsWith($$roots[1], \"CurrentCultureIgnoreCase\")) };\
+    $$isTarget = { param($$p) $$p -and ($$p.StartsWith(($$roots[0].TrimEnd([char]0x27) + [char]0x27), \"CurrentCultureIgnoreCase\") -or $$p.StartsWith(($$roots[1].TrimEnd([char]0x27) + [char]0x27), \"CurrentCultureIgnoreCase\"))) };\
     $$stopped = 0;\
     foreach ($$proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.ProcessId -ne $$selfPid -and (& $$isTarget $$_.Path) })) {\
       Stop-Process -Id $$proc.ProcessId -Force -ErrorAction SilentlyContinue;\
@@ -44,9 +74,11 @@
 ; detach this distinguishes "app still running" from "directory held by
 ; another program" — electron-builder reports both as "cannot be closed".
 !macro CountInstallDirProcesses RESULT
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith(\"$INSTDIR\", \"CurrentCultureIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$root = (\"$INSTDIR\".TrimEnd([char]0x27) + [char]0x27); $$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith($$root, \"CurrentCultureIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
   Pop ${RESULT}
-  Pop $R0
+  ; Discard the captured stdout without clobbering ${RESULT}: the only caller
+  ; passes $R0, and popping stdout into $R0 would overwrite the count.
+  Pop $R8
 !macroend
 
 ; electron-builder's uninstallOldVersion launches the previous uninstaller and
@@ -83,49 +115,11 @@
   ForgetOldInstallRegistry_Done_${TOKEN}:
 !macroend
 
-; Safety net for any path where electron-builder still runs the previous
-; uninstaller (e.g. it lives in a different install directory). The stock
-; handler quits the whole installation on a non-zero exit code after showing
-; the "cannot be closed" dialog — even when the failure is a locked file,
-; not a running process. Files the old uninstaller could not remove are
-; overwritten in place by the extraction that follows, so a failed legacy
-; uninstall must never abort the install.
-!macro customUnInstallCheck
-  IfErrors 0 +3
-    DetailPrint "[Installer] Previous uninstaller could not be launched; continuing with in-place upgrade"
-    Return
-  ${if} $R0 != 0
-    DetailPrint "[Installer] Previous uninstaller exited with code $R0; continuing with in-place upgrade"
-    !insertmacro OpenTimingLogForAppend $8
-    FileWrite $8 "phase=previous-uninstall-ignored exit=$R0$\r$\n"
-    FileClose $8
-  ${endIf}
-  Return
-!macroend
-
-!macro customUnInstallCheckCurrentUser
-  !insertmacro customUnInstallCheck
-!macroend
-
-; electron-builder compiles the uninstaller before the installer. Its assisted
-; template does not insert installation pages while BUILD_UNINSTALLER is set,
-; so keep the page state and callbacks out of that compilation pass.
 !ifndef BUILD_UNINSTALLER
-Var /GLOBAL installLocalInference
-Var /GLOBAL localInferenceDialog
-Var /GLOBAL localInferenceCheckbox
-Var /GLOBAL localInferenceLabel
-Var /GLOBAL preparedInstallRoot
-
 !macro OpenTimingLogForAppend HANDLE
   ; NSIS append mode preserves existing data but starts at offset zero.
   FileOpen ${HANDLE} "$APPDATA\ZhiYuanAgent\install-timing.log" a
   FileSeek ${HANDLE} 0 END
-!macroend
-
-!macro ExtractElevatedActionScript
-  SetOutPath "$PLUGINSDIR"
-  File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
 !macroend
 
 ; Destructive pre-extraction steps: stop the running application, migrate
@@ -140,6 +134,19 @@ Var /GLOBAL preparedInstallRoot
 !macro PrepareExistingInstallForExtraction TOKEN
   ${If} $preparedInstallRoot != $INSTDIR
     StrCpy $preparedInstallRoot $INSTDIR
+
+    ; The custom hero page lets the user type or browse any directory, and
+    ; silent updates carry whatever /D installed into last time. Refuse the
+    ; destructive steps below for roots too shallow to be an application
+    ; directory: at "C:\" the prefix match would target every process on the
+    ; machine and the detach rename would hit a drive root.
+    StrLen $R8 $INSTDIR
+    ${If} $R8 < 6
+      DetailPrint "[Installer] Install root '$INSTDIR' is too shallow; skipping process stop, Skill migration and detach"
+      !insertmacro OpenTimingLogForAppend $8
+      FileWrite $8 "phase=prepare-skipped reason=shallow-root path=$INSTDIR$\r$\n"
+      FileClose $8
+    ${Else}
 
     DetailPrint "[Installer] Stopping running 知远 processes"
     System::Call 'kernel32::GetTickCount()i .r7'
@@ -222,8 +229,91 @@ Var /GLOBAL preparedInstallRoot
     ; registration so electron-builder skips the redundant legacy uninstaller
     ; whose exit code 2 would surface as a bogus "cannot be closed" dialog.
     !insertmacro ForgetOldInstallRegistry ${TOKEN}
+    ${EndIf}
   ${EndIf}
 !macroend
+!endif
+
+!ifdef PROJECT_DIR
+  !include "${PROJECT_DIR}\scripts\installer-ui\zy-theme.nsh"
+  !include "${PROJECT_DIR}\scripts\installer-ui\zy-pages.nsh"
+!else
+  !include "installer-ui\zy-theme.nsh"
+  !include "installer-ui\zy-pages.nsh"
+!endif
+
+; electron-builder defines this from allowToChangeInstallationDirectory; the
+; native directory page is replaced by the install-location row on the custom
+; hero page, so the define is withdrawn before the assisted template runs.
+!undef allowToChangeInstallationDirectory
+
+; MUI consumes MUI_PAGE_CUSTOMFUNCTION_* defines at each MUI page insertion
+; and undefs them afterwards, so the SHOW hook has to be (re-)defined at
+; every insertion point. Uninstaller pass only: MUI_UNPAGE_INSTFILES consumes
+; this one (it brands the native uninstaller instfiles page) before
+; customUninstallPage re-defines the hook for MUI_UNPAGE_FINISH. In the
+; installer pass nothing consumes a define this early — the install-mode page
+; is a raw PageEx custom and the native directory page is disabled above — so
+; an early define would collide with customPageAfterChangeDir's re-definition
+; (NSIS errors on !define of an existing symbol) and must not be set here.
+!ifdef BUILD_UNINSTALLER
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW ${ZY_UNPREFIX}ZY_MuiPageShow
+!endif
+
+; The native uninstaller finish page is the only remaining MUI welcome/finish
+; surface; give it the branded side art instead of the stock wizard bitmap.
+; electron-builder passes its default wizard bitmap for this key via -D, so
+; withdraw it before defining our own (NSIS errors on redefinition).
+!ifdef MUI_UNWELCOMEFINISHPAGE_BITMAP
+  !undef MUI_UNWELCOMEFINISHPAGE_BITMAP
+!endif
+!define MUI_UNWELCOMEFINISHPAGE_BITMAP "${PROJECT_DIR}\build\installer-assets\zy-side.bmp"
+
+!define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
+!define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+
+
+
+
+
+; Safety net for any path where electron-builder still runs the previous
+; uninstaller (e.g. it lives in a different install directory). The stock
+; handler quits the whole installation on a non-zero exit code after showing
+; the "cannot be closed" dialog — even when the failure is a locked file,
+; not a running process. Files the old uninstaller could not remove are
+; overwritten in place by the extraction that follows, so a failed legacy
+; uninstall must never abort the install.
+!macro customUnInstallCheck
+  IfErrors 0 +3
+    DetailPrint "[Installer] Previous uninstaller could not be launched; continuing with in-place upgrade"
+    Return
+  ${if} $R0 != 0
+    DetailPrint "[Installer] Previous uninstaller exited with code $R0; continuing with in-place upgrade"
+    !insertmacro OpenTimingLogForAppend $8
+    FileWrite $8 "phase=previous-uninstall-ignored exit=$R0$\r$\n"
+    FileClose $8
+  ${endIf}
+  Return
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  !insertmacro customUnInstallCheck
+!macroend
+
+; electron-builder compiles the uninstaller before the installer. Its assisted
+; template does not insert installation pages while BUILD_UNINSTALLER is set,
+; so keep the page state and callbacks out of that compilation pass.
+; ($installLocalInference/$preparedInstallRoot are declared above the UI
+; includes, where ZYHeroLeave and the PrepareExistingInstallForExtraction
+; insertion can see them.)
+!ifndef BUILD_UNINSTALLER
+
+
+!macro ExtractElevatedActionScript
+  SetOutPath "$PLUGINSDIR"
+  File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
+!macroend
+
 
 !macro RunElevatedAction TOKEN ACTION TARGET
   Delete "$PLUGINSDIR\${ELEVATED_ACTION_RESULT}"
@@ -314,55 +404,70 @@ Var /GLOBAL preparedInstallRoot
   LangString ZY_DIR_OCCUPIED 1066 "The installation directory cannot be updated because it is in use by another program.$\r$\n$\r$\nNo running ZhiYuan process was detected. The most common cause is a File Explorer window browsing this directory:$\r$\n$INSTDIR$\r$\n$\r$\nClose the window or program using this directory, then click Retry."
 !macroend
 
+; Welcome, install options and license agreement live on a single custom
+; hero page (ZYHeroCreate/Leave in installer-ui/zy-pages.nsh), replacing the
+; stock MUI welcome page, the native directory page and the old local
+; inference options page.
 !macro customWelcomePage
-  !define MUI_WELCOMEPAGE_TITLE "欢迎使用知远智能体"
-  !define MUI_WELCOMEPAGE_TEXT "安装程序将在本地准备离线运行环境，完成后即可使用。本地推理组件可在首次启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
-  !insertmacro MUI_PAGE_WELCOME
+  Page custom ZYHeroCreate ZYHeroLeave
 !macroend
 
-Function LocalInferencePageCreate
-  ; electron-builder prepends this script before installer.nsi includes
-  ; MUI2.nsh, so the MUI_HEADER_TEXT macro is undefined at compile time.
-  ; Set the standard MUI header controls (IDs 1037/1038) directly instead.
-  GetDlgItem $0 $HWNDPARENT 1037
-  SendMessage $0 ${WM_SETTEXT} 0 "STR:本地推理组件"
-  GetDlgItem $0 $HWNDPARENT 1038
-  SendMessage $0 ${WM_SETTEXT} 0 "STR:按需启用本地模型推理"
-  nsDialogs::Create 1018
-  Pop $localInferenceDialog
-  ${If} $localInferenceDialog == error
-    Abort
-  ${EndIf}
+; The finish page is the only page whose callbacks touch the StdUtils plugin
+; (${isUpdated} / ${StdUtils.ExecShellAsUser} in ZYFinishLeave). Its definition
+; must therefore be emitted here, in the installer body, rather than from the
+; header-time !include of zy-pages.nsh: electron-builder registers the plugin
+; directory from a task concurrent with that include, so the header may not
+; have declared it yet (makensis then fails with "Plugin not found, cannot call
+; StdUtils::TestParameter"). This mirrors the StartApp function electron-builder
+; itself defines at this exact insertion point.
+!macro customFinishPage
+  !insertmacro ZY_DefineFinishLeave
+  Page custom ZYFinishCreate ZYFinishLeave
+!macroend
 
-  ${NSD_CreateLabel} 0 0 100% 32u "开启后，首次启动时会根据你的硬件下载 CPU 或 NVIDIA CUDA 后端（约 16 MB–621 MB）。"
-  Pop $localInferenceLabel
-
-  ${NSD_CreateLabel} 0 36u 100% 16u "不勾选不会影响其他功能。"
-  Pop $localInferenceLabel
-
-  ${NSD_CreateCheckbox} 0 80u 100% 12u "安装本地推理组件"
-  Pop $localInferenceCheckbox
-  ; Preserve the previous MessageBox default (No) by leaving the box unchecked.
-  ${NSD_SetState} $localInferenceCheckbox ${BST_UNCHECKED}
-
-  nsDialogs::Show
-FunctionEnd
-
-Function LocalInferencePageLeave
-  ${NSD_GetState} $localInferenceCheckbox $installLocalInference
-  ; Leaving the options page commits the user to installing, so the
-  ; destructive pre-extraction steps run here rather than in .onInit.
-  !insertmacro PrepareExistingInstallForExtraction INTERACTIVE
-FunctionEnd
-
+; The old options page used to sit here and ran
+; PrepareExistingInstallForExtraction from its leave callback; that duty moved
+; to ZYHeroLeave. The hook itself is kept as the only template insertion
+; point between PAGE_INSTALL_MODE and MUI_PAGE_INSTFILES, which is where the
+; instfiles page callbacks must be defined: MUI undefines
+; MUI_PAGE_CUSTOMFUNCTION_* right after consuming them.
 !macro customPageAfterChangeDir
-  Page custom LocalInferencePageCreate LocalInferencePageLeave
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW ${ZY_UNPREFIX}ZY_MuiPageShow
+  !define MUI_PAGE_CUSTOMFUNCTION_LEAVE ZY_MuiPageLeave
 !macroend
 !endif
+
+; The application and its runtime cache are per-user, so the install-mode
+; page is skipped unless a per-machine installation actually exists (its
+; upgrade/uninstall path needs the all-users flow and elevation). multiUserUi
+; consults this macro in both the installer and the uninstaller build, so it
+; lives outside the !ifndef BUILD_UNINSTALLER block above.
+!macro customInstallMode
+  ${if} $hasPerMachineInstallation != "1"
+    StrCpy $isForceCurrentInstall "1"
+  ${endIf}
+!macroend
+
+; Injection point between MUI_UNPAGE_INSTFILES and MUI_UNPAGE_FINISH: the
+; uninstaller's native finish page gets the branded background via the SHOW
+; hook (consumed there and undefined by MUI).
+!macro customUninstallPage
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW ${ZY_UNPREFIX}ZY_MuiPageShow
+!macroend
+
+; Branded uninstaller confirmation in place of the stock MUI welcome page.
+!macro customUnWelcomePage
+  ; Uninstaller page callbacks must be un.-prefixed in the uninstaller build.
+  UninstPage custom ${ZY_UNPREFIX}ZYUnWelcomeCreate ${ZY_UNPREFIX}ZYUnWelcomeLeave
+!macroend
 
 !macro customInit
   SetDetailsPrint textonly
   CreateDirectory "$APPDATA\ZhiYuanAgent"
+  ; Stage the branded UI bitmaps (and license text) the wizard pages load.
+  ; File extraction only: this macro also runs for silent installs, where no
+  ; page callback ever fires, so no GUI calls are allowed here.
+  !insertmacro ZY_StageUiAssets
   System::Call 'kernel32::GetTickCount()i .r9'
   FileOpen $8 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" w
   FileWrite $8 "$9"
@@ -442,6 +547,9 @@ FunctionEnd
   FileWrite $2 "phase=custom-install-start app_files_ms=$R6$\r$\n"
   FileClose $2
   CustomInstallStartMarked:
+  ; First custom progress phase: the 7za hash check and the cache validation
+  ; below run inside this span.
+  !insertmacro ZY_ProgressPhase VALIDATING "$(ZY_PHASE_VALIDATING)"
   SetOutPath "$PLUGINSDIR"
   !insertmacro ExtractElevatedActionScript
   File /oname=7za.exe "${PROJECT_DIR}\node_modules\7zip-bin\win\x64\7za.exe"
@@ -449,6 +557,13 @@ FunctionEnd
   File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
   File /oname=recover-component-switch.ps1 "${PROJECT_DIR}\scripts\installer\recover-component-switch.ps1"
   File /oname=validate-offline-components.ps1 "${PROJECT_DIR}\scripts\installer\validate-offline-components.ps1"
+  ; The component switch/link/cleanup logic is shared with the WebView2 setup
+  ; shell: single sources of truth under scripts\installer, staged here and
+  ; invoked with -File below.
+  File /oname=activate-components.ps1 "${PROJECT_DIR}\scripts\installer\activate-components.ps1"
+  File /oname=link-runtime-junctions.ps1 "${PROJECT_DIR}\scripts\installer\link-runtime-junctions.ps1"
+  File /oname=cleanup-after-install.ps1 "${PROJECT_DIR}\scripts\installer\cleanup-after-install.ps1"
+  File /oname=uninstall-cleanup.ps1 "${PROJECT_DIR}\scripts\installer\uninstall-cleanup.ps1"
   ; Embed the routing table as a compile-time asset. Building it incrementally
   ; with NSIS FileWrite can split the skill-python key on Windows runners.
   File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
@@ -470,6 +585,8 @@ FunctionEnd
   Pop $1
   StrCmp $0 "0" 0 OfflineComponentInstallFailed
 
+  ; Stage the per-component metadata before deciding which archives to queue.
+  !insertmacro ZY_ProgressPhase STAGING "$(ZY_PHASE_STAGING)"
   !insertmacro StageOfflineComponentMetadata "channel-runtime"
   !insertmacro StageOfflineComponentMetadata "skills"
   !insertmacro StageOfflineComponentMetadata "mcps"
@@ -501,6 +618,7 @@ FunctionEnd
   ; hits fast while eliminating a PowerShell startup per component; the
   ; per-component phases land in the timing log via -TimingLogPath.
   DetailPrint "[Installer] Validating and expanding offline components"
+  !insertmacro ZY_ProgressPhase EXPANDING "$(ZY_PHASE_EXPANDING)"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode expand -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe" -TimingLogPath "$APPDATA\ZhiYuanAgent\install-timing.log"'
   Pop $0
   Pop $1
@@ -534,74 +652,8 @@ FunctionEnd
   !insertmacro RecordOfflineComponentReady "uv"
 
   DetailPrint "[Installer] Activating offline components"
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$ErrorActionPreference = \"Stop\";\
-    Set-StrictMode -Version Latest;\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
-    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
-    $$targets = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
-    $$rows = @($$targets | ForEach-Object {\
-      $$targetRow = $$_;\
-      if ($$targetRow.key -notmatch \"^[a-z0-9-]+\z\" -or $$targetRow.prefix -notmatch \"^[A-Za-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$targetRow.key + \".version\");\
-      $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$targetRow.key };\
-      $$manifestEntry = @($$manifest.components | Where-Object { $$_.key -eq $$targetRow.key });\
-      if ($$manifestEntry.Count -ne 1 -or $$manifestEntry[0].prefix -ne $$targetRow.prefix -or $$manifestEntry[0].contentId -ne $$id) { throw \"Component manifest mismatch: $$($$targetRow.key)\" };\
-      [pscustomobject]@{ Key = [string]$$targetRow.key; Prefix = [string]$$targetRow.prefix; Id = $$id }\
-    });\
-    $$prepared = @();\
-    $$switched = @();\
-    try {\
-      if ($$rows.Count -ne 7) { throw \"Invalid component manifest: expected 7 components, got $$($$rows.Count)\" };\
-      if (@($$rows.Key | Sort-Object -Unique).Count -ne 7) { throw \"Invalid component manifest: duplicate component key\" };\
-      foreach ($$row in $$rows) {\
-        $$root = Join-Path $$runtimeRoot $$row.Key;\
-        $$target = Join-Path $$root $$row.Id;\
-        $$complete = Join-Path $$target \".complete\";\
-        if (-not (Test-Path -LiteralPath $$target) -or -not (Test-Path -LiteralPath $$complete)) { throw \"Missing prepared component target: $$target\" };\
-        $$completeId = (Get-Content -LiteralPath $$complete -Raw).Substring(0, 64);\
-        if ($$completeId -ne $$row.Id) { throw \"Prepared component id mismatch: $$($$row.Key)\" };\
-        $$current = Join-Path $$root \"current\";\
-        $$next = Join-Path $$root \"current.next\";\
-        $$previous = Join-Path $$root \"current.previous\";\
-        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" -ErrorAction Stop };\
-        foreach ($$stale in @($$next, $$previous)) {\
-          if (Test-Path -LiteralPath $$stale) {\
-            $$item = Get-Item -LiteralPath $$stale -Force;\
-            if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) { throw \"Unsafe component pointer: $$stale\" };\
-            [IO.Directory]::Delete($$stale)\
-          }\
-        };\
-        New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop | Out-Null;\
-        if (-not (Test-Path -LiteralPath $$next)) { throw \"Failed to prepare component junction: $$next\" };\
-        $$prepared += [pscustomobject]@{ Row = $$row; Current = $$current; Next = $$next; Previous = $$previous }\
-      };\
-      foreach ($$entry in $$prepared) {\
-        $$hadCurrent = Test-Path -LiteralPath $$entry.Current;\
-        Add-Content -LiteralPath $$statePath -Value ($$entry.Row.Key + \"|\" + $$hadCurrent);\
-        $$switched += [pscustomobject]@{ Entry = $$entry; HadCurrent = $$hadCurrent };\
-        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" -ErrorAction Stop };\
-        Rename-Item -LiteralPath $$entry.Next -NewName \"current\" -ErrorAction Stop\
-      }\
-    } catch {\
-      foreach ($$entry in $$prepared) {\
-        if (Test-Path -LiteralPath $$entry.Next) { [IO.Directory]::Delete($$entry.Next) }\
-      };\
-      [array]::Reverse($$switched);\
-      foreach ($$switch in $$switched) {\
-        $$entry = $$switch.Entry;\
-        if (Test-Path -LiteralPath $$entry.Previous) {\
-          if (Test-Path -LiteralPath $$entry.Current) { [IO.Directory]::Delete($$entry.Current) };\
-          Rename-Item -LiteralPath $$entry.Previous -NewName \"current\"\
-        } elseif (-not $$switch.HadCurrent -and (Test-Path -LiteralPath $$entry.Current)) {\
-          [IO.Directory]::Delete($$entry.Current)\
-        }\
-      };\
-      Remove-Item -LiteralPath $$statePath -Force -ErrorAction SilentlyContinue;\
-      throw\
-    }"'
+  !insertmacro ZY_ProgressPhase ACTIVATING "$(ZY_PHASE_ACTIVATING)"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\activate-components.ps1" -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ManifestPath "$PLUGINSDIR\component-manifest.json" -TargetsPath "$PLUGINSDIR\component-targets.json" -StatePath "$LOCALAPPDATA\ZhiYuanAgent\runtimes\component-switch-state.txt"'
   Pop $0
   Pop $1
   StrCmp $0 "0" ComponentPointersReady
@@ -610,28 +662,9 @@ FunctionEnd
   ComponentPointersReady:
 
   DetailPrint "[Installer] Connecting bundled runtimes"
+  !insertmacro ZY_ProgressPhase CONNECTING "$(ZY_PHASE_CONNECTING)"
   SetOutPath "$INSTDIR"
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$ErrorActionPreference = \"Stop\";\
-    Set-StrictMode -Version Latest;\
-    $$resourceRoot = \"$INSTDIR\resources\";\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
-    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Prefix = [string]$$_.prefix } });\
-    foreach ($$row in $$rows) {\
-      $$link = Join-Path $$resourceRoot $$row.Prefix;\
-      $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
-      if (-not (Test-Path -LiteralPath $$target)) { throw \"Missing component target: $$target\" };\
-      if (Test-Path $$link) {\
-        $$existing = Get-Item -LiteralPath $$link -Force;\
-        if (($$existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {\
-          [IO.Directory]::Delete($$link);\
-        } else {\
-          Remove-Item -LiteralPath $$link -Recurse -Force;\
-        }\
-      };\
-      New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop | Out-Null;\
-    }"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\link-runtime-junctions.ps1" -ResourceRoot "$INSTDIR\resources" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ManifestPath "$PLUGINSDIR\component-manifest.json"'
   Pop $0
   Pop $1
   StrCmp $0 "0" RuntimeLinksReady
@@ -643,6 +676,7 @@ FunctionEnd
   RuntimeLinksReady:
 
   DetailPrint "[Installer] Verifying bundled runtimes"
+  !insertmacro ZY_ProgressPhase VERIFYING "$(ZY_PHASE_VERIFYING)"
   IfFileExists "$INSTDIR\resources\python-win\python.exe" 0 InstalledRuntimeVerificationFailed
   IfFileExists "$INSTDIR\resources\uv-win\uv.exe" 0 InstalledRuntimeVerificationFailed
   IfFileExists "$INSTDIR\resources\channel-runtime\cc-connect-sidecar.exe" 0 InstalledRuntimeVerificationFailed
@@ -688,6 +722,7 @@ FunctionEnd
   ; The VC runtime is bundled for offline installation, but upgrades skip it
   ; when the supported x64 redistributable is already registered.
   DetailPrint "[Installer] Checking Microsoft Visual C++ Runtime"
+  !insertmacro ZY_ProgressPhase VC "$(ZY_PHASE_VC)"
   SetRegView 64
   ClearErrors
   ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
@@ -700,6 +735,7 @@ FunctionEnd
     StrCmp $0 "0" VcRuntimeReady
     StrCmp $0 "1638" VcRuntimeReady
     StrCmp $0 "3010" VcRuntimeReady
+    StrCmp $0 "1223" VcRuntimeReady
       !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=vc-runtime-install-failed exit=$0 output=$1$\r$\n"
       FileClose $2
@@ -719,51 +755,12 @@ FunctionEnd
   ; Cleanup begins only after core application and runtime links are ready, so
   ; it no longer competes with resource expansion on slow disks.
   DetailPrint "[Installer] Scheduling previous version cleanup"
+  !insertmacro ZY_ProgressPhase CLEANUP "$(ZY_PHASE_CLEANUP)"
   ; Remove known junctions explicitly before recursive deletion. This prevents
   ; an old installation cleanup from ever walking into an immutable shared pack.
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$names = @("channel-runtime", "SKILLs", "MCPs", "mingit", "python-win", "skill-python", "uv-win");\
-    Get-ChildItem -Path "$INSTDIR.old*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {\
-      $$oldResources = Join-Path $$_.FullName "resources";\
-      foreach ($$name in $$names) {\
-        $$link = Join-Path $$oldResources $$name;\
-        if (Test-Path -LiteralPath $$link) {\
-          $$item = Get-Item -LiteralPath $$link -Force;\
-          if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {\
-            [IO.Directory]::Delete($$link)\
-          }\
-        }\
-      }\
-    }"'
-  Pop $0
-  nsExec::ExecToLog 'cmd /c for /d %D in ("$INSTDIR.old*") do @start "" /b cmd /c rd /s /q "%~fD"'
-  Pop $0
-  Delete "$APPDATA\ZhiYuanAgent\old-install-path.txt"
-
   DetailPrint "[Installer] Cleaning unused offline component versions"
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
-    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Id = [string]$$_.contentId } });\
-    foreach ($$row in $$rows) {\
-      $$root = Join-Path $$runtimeRoot $$row.Key;\
-      foreach ($$pointerName in @(\"current.previous\", \"current.next\")) {\
-        $$pointer = Join-Path $$root $$pointerName;\
-        if (Test-Path -LiteralPath $$pointer) {\
-          $$item = Get-Item -LiteralPath $$pointer -Force;\
-          if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
-        }\
-      };\
-      Get-ChildItem -LiteralPath $$root -Directory -ErrorAction SilentlyContinue | Where-Object { $$_.Name -ne $$row.Id -and $$_.Name -ne \"current\" } | ForEach-Object {\
-        if (($$_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$_.FullName) } else { Remove-Item -LiteralPath $$_.FullName -Recurse -Force }\
-      }\
-    };\
-    $$legacy = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
-    if (Test-Path -LiteralPath $$legacy) {\
-      $$legacyItem = Get-Item -LiteralPath $$legacy -Force;\
-      if (($$legacyItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$legacy) } else { Remove-Item -LiteralPath $$legacy -Recurse -Force }\
-    }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\cleanup-after-install.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ManifestPath "$PLUGINSDIR\component-manifest.json" -OldInstallPathFile "$APPDATA\ZhiYuanAgent\old-install-path.txt"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
@@ -772,6 +769,7 @@ FunctionEnd
   FileClose $2
   Delete "$LOCALAPPDATA\ZhiYuanAgent\runtimes\component-switch-state.txt"
 
+  !insertmacro ZY_ProgressPhase FINALIZING "$(ZY_PHASE_FINALIZING)"
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
   IfErrors InstallTimingDone
   FileRead $2 $R5
@@ -784,68 +782,68 @@ FunctionEnd
   Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"
   InstallTimingDone:
   DetailPrint "Installation complete"
+  ; Final phase: fills the bar to 100% and swaps in the complete artwork.
+  !insertmacro ZY_ProgressPhase DONE "$(ZY_PHASE_DONE)"
 !macroend
 
+; Counts processes whose image path starts with $INSTDIR (the count is the
+; PowerShell exit code, so no stdout parsing is needed). After a failed
+; detach this distinguishes "app still running" from "directory held by
+; another program" — electron-builder reports both as "cannot be closed".
 !macro customUnInit
+  ; The uninstaller confirmation page uses the same branded background art.
+  !insertmacro ZY_StageUiAssets
+  ; This is a fresh uninstaller process with a fresh $PLUGINSDIR: the shared
+  ; cleanup script is only extracted during the installer's customInstall,
+  ; which this compilation pass never runs, so stage it here — without it
+  ; component junctions and the runtime cache would be left behind.
+  SetOutPath "$PLUGINSDIR"
+  File /oname=uninstall-cleanup.ps1 "${PROJECT_DIR}\scripts\installer\uninstall-cleanup.ps1"
   DetailPrint "[Uninstaller] Stopping running 知远 processes"
   !insertmacro StopAppProcesses
 !macroend
 
 !macro customUnInstall
-  ; Remove component junctions before detaching application-owned immutable
-  ; data. User-created Skills and models remain under userData. Deleting the
+  ; Remove component junctions and detach application-owned immutable data.
+  ; User-created Skills and models remain under userData. Deleting the
   ; expanded runtime tree synchronously can take longer than the uninstaller
-  ; itself, so rename it atomically and reclaim it in the background.
-  ; Keep both the uninstaller and spawned cleanup commands outside $INSTDIR so
-  ; electron-builder's final RMDir can remove the now-empty application root.
+  ; itself, so the shared script renames it atomically and reclaims it in the
+  ; background. Keep both the uninstaller and spawned cleanup commands outside
+  ; $INSTDIR so electron-builder's final RMDir can remove the now-empty
+  ; application root. The component junction/link/detach logic is shared with
+  ; the WebView2 setup shell via scripts\installer\uninstall-cleanup.ps1.
   SetOutPath "$TEMP"
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    if (Test-Path -LiteralPath $$runtimeRoot) {\
-      Get-ChildItem -LiteralPath $$runtimeRoot -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {\
-        foreach ($$pointerName in @(\"current\", \"current.next\", \"current.previous\")) {\
-          $$pointer = Join-Path $$_.FullName $$pointerName;\
-          if (Test-Path -LiteralPath $$pointer) {\
-            $$pointerItem = Get-Item -LiteralPath $$pointer -Force;\
-            if (($$pointerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
-          }\
-        }\
-      }\
-    }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\uninstall-cleanup.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes"'
   Pop $0
 
-  nsExec::ExecToLog 'cmd /c for /d %D in ("$LOCALAPPDATA\ZhiYuanAgent\runtimes.uninstall.*") do @start "" /b cmd /d /c rd /s /q "%~fD"'
-  Pop $0
-  StrCpy $3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-  IfFileExists "$3\*.*" 0 RuntimeCleanupDone
-    System::Call 'kernel32::GetTickCount()i .r4'
-    StrCpy $4 "$3.uninstall.$4"
-    ClearErrors
-    Rename "$3" "$4"
-    IfErrors RuntimeCleanupDetachFailed
-      nsExec::ExecToLog 'cmd /c start "" /b cmd /d /c rd /s /q "$4"'
-      Pop $0
-      Goto RuntimeCleanupDone
-    RuntimeCleanupDetachFailed:
-      DetailPrint "[Uninstaller] Could not detach the offline runtime cache"
-  RuntimeCleanupDone:
-  RMDir "$3"
-
-  nsExec::ExecToLog 'cmd /c for /d %D in ("$LOCALAPPDATA\ZhiYuanAgent\runtime-packs.uninstall.*") do @start "" /b cmd /d /c rd /s /q "%~fD"'
-  Pop $0
-  StrCpy $3 "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs"
-  IfFileExists "$3\*.*" 0 LegacyRuntimeCleanupDone
-    System::Call 'kernel32::GetTickCount()i .r4'
-    StrCpy $4 "$3.uninstall.$4"
-    ClearErrors
-    Rename "$3" "$4"
-    IfErrors LegacyRuntimeCleanupDetachFailed
-      nsExec::ExecToLog 'cmd /c start "" /b cmd /d /c rd /s /q "$4"'
-      Pop $0
-      Goto LegacyRuntimeCleanupDone
-    LegacyRuntimeCleanupDetachFailed:
-      DetailPrint "[Uninstaller] Could not detach the legacy runtime cache"
-  LegacyRuntimeCleanupDone:
-  RMDir "$3"
+  ; electron-builder's DELETE_APP_DATA list only covers $APPDATA\<product
+  ; name> variants; the app's real userData directory is %APPDATA%\ZhiYuanAgent
+  ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs). The
+  ; WebView2 shell uninstaller removes that same tree, so mirror the exact
+  ; delete-app-data decision uninstaller.nsh makes and remove it too. The
+  ; decision has to be recomputed here: customUnInstall runs before
+  ; uninstaller.nsh declares its own $isDeleteAppData variable.
+  StrCpy $zyDeleteRealAppData "0"
+  ClearErrors
+  ${GetParameters} $R0
+  ${GetOptions} $R0 "--delete-app-data" $R1
+  ${if} ${Errors}
+    !ifdef DELETE_APP_DATA_ON_UNINSTALL
+      ${ifNot} ${isUpdated}
+        StrCpy $zyDeleteRealAppData "1"
+      ${endif}
+    !endif
+  ${else}
+    StrCpy $zyDeleteRealAppData "1"
+  ${endif}
+  ${if} $zyDeleteRealAppData == "1"
+    ${if} $installMode == "all"
+      SetShellVarContext current
+    ${endif}
+    RMDir /r "$APPDATA\ZhiYuanAgent"
+    ${if} $installMode == "all"
+      SetShellVarContext all
+    ${endif}
+  ${endif}
 
 !macroend

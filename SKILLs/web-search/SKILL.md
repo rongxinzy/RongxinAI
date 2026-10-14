@@ -457,7 +457,7 @@ bash scripts/stop-server.sh
 rm -f .connection .server.pid .server.log
 
 # Rebuild
-npm run build
+bun run build
 
 # Restart
 bash scripts/start-server.sh

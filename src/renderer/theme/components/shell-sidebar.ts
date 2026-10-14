@@ -142,19 +142,19 @@ export function shellSidebarAppearances() {
       base: {
         ...feedback,
         height: '2rem',
-        'background-color': 'var(--sidebar)',
+        'background-color': 'transparent',
         color: 'var(--muted-foreground)',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
+        'border-radius': '0px',
         'box-shadow': 'none',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
       },
       hover: {
-        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 5%, var(--sidebar))',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 5%, transparent)',
         color: 'var(--sidebar-foreground)',
       },
       selected: {
-        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 8%, var(--sidebar))',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 8%, transparent)',
         color: 'var(--sidebar-foreground)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },

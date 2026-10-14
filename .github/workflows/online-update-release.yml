@@ -114,6 +114,12 @@ jobs:
             runner: macos-latest
             artifact: darwin-arm64-default
             runtime_target: mac-arm64
+            arch: arm64
+          - platform: macos
+            runner: macos-15-intel
+            artifact: darwin-x64-default
+            runtime_target: mac-x64
+            arch: x64
           - platform: linux
             runner: ubuntu-latest
             artifact: linux-x64-default
@@ -241,7 +247,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Build unsigned macOS package
         if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -249,7 +255,7 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build signed macOS package
         if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
@@ -346,15 +352,15 @@ jobs:
           blockmaps=(release/*.zip.blockmap)
           [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected exactly one macOS DMG, update ZIP, and ZIP blockmap' >&2; exit 1; }
           node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-release.outputs.version }}' darwin arm64 default \
+            '${{ needs.prepare-release.outputs.version }}' darwin ${{ matrix.arch }} default \
             release/latest-mac.yml release/electron-updater/latest-mac.yml
           node scripts/release/upload-update-artifacts.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             update-artifacts.json \
-            "${dmgs[0]}:darwin:arm64:default:installer" \
-            "${zips[0]}:darwin:arm64:default:updater" \
-            "${blockmaps[0]}:darwin:arm64:default:blockmap" \
-            "release/electron-updater/latest-mac.yml:darwin:arm64:default:metadata"
+            "${dmgs[0]}:darwin:${{ matrix.arch }}:default:installer" \
+            "${zips[0]}:darwin:${{ matrix.arch }}:default:updater" \
+            "${blockmaps[0]}:darwin:${{ matrix.arch }}:default:blockmap" \
+            "release/electron-updater/latest-mac.yml:darwin:${{ matrix.arch }}:default:metadata"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -413,8 +419,8 @@ jobs:
       - name: Resolve uploaded artifact metadata
         run: |
           mapfile -t metadata < <(find artifacts -type f -name update-artifacts.json | sort)
-          if [[ ${#metadata[@]} -ne 3 ]]; then
-            echo 'Expected exactly three platform artifact metadata files' >&2
+          if [[ ${#metadata[@]} -ne 4 ]]; then
+            echo 'Expected exactly four platform artifact metadata files' >&2
             exit 1
           fi
           jq -e 'all(.artifacts[]; .key and .size and .sha256 and .sha512 and .kind)' "${metadata[@]}" > /dev/null
@@ -543,6 +549,7 @@ jobs:
           node scripts/release/verify-electron-updater-generation.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             manifest/electron/win32-x64-lite/latest.yml:win32:x64:lite \
+            manifest/electron/darwin-x64-default/latest-mac.yml:darwin:x64:default \
             manifest/electron/darwin-arm64-default/latest-mac.yml:darwin:arm64:default \
             manifest/electron/linux-x64-appimage/latest-linux.yml:linux:x64:appimage \
             manifest/electron/linux-x64-deb/latest-linux.yml:linux:x64:deb \
@@ -735,6 +742,7 @@ jobs:
           node scripts/release/verify-published-update.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             win32:x64:lite \
+            darwin:x64:default \
             darwin:arm64:default \
             linux:x64:deb \
             linux:x64:appimage

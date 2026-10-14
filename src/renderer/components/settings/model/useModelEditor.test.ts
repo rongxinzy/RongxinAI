@@ -32,7 +32,8 @@ const verifiedModel: Model = {
 };
 
 function renderEditor(provider: ProviderType = 'custom_0') {
-  return renderHook(() => {
+  const enableProviderIfConfigured = vi.fn();
+  const hook = renderHook(() => {
     const [providers, setProviders] = useState<ProvidersConfig>({
       ...defaultConfig.providers,
       [provider]: {
@@ -46,9 +47,15 @@ function renderEditor(provider: ProviderType = 'custom_0') {
     return {
       providers,
       setProviders,
-      ...useModelEditor({ providers, setProviders, activeProvider: provider }),
+      ...useModelEditor({
+        providers,
+        setProviders,
+        activeProvider: provider,
+        enableProviderIfConfigured,
+      }),
     };
   });
+  return { ...hook, enableProviderIfConfigured };
 }
 
 beforeEach(() => vi.restoreAllMocks());
@@ -100,6 +107,60 @@ test.each(Object.values(ProviderModelPiApi))(
   },
 );
 
+test.each([ProviderName.Moonshot, ProviderName.OpenAI] as ProviderType[])(
+  '%s keeps an explicit capability edit on a catalog model',
+  async provider => {
+    const catalogModel: Model = {
+      id: provider === ProviderName.Moonshot ? 'kimi-k3' : 'gpt-4o',
+      name: 'Catalog model',
+      supportsImage: true,
+      contextWindow: 128_000,
+      maxTokens: 16_000,
+    };
+    const { result } = renderEditor(provider);
+    act(() => {
+      result.current.setProviders(current => ({
+        ...current,
+        [provider]: { ...current[provider], models: [catalogModel] },
+      }));
+    });
+    act(() =>
+      result.current.handleEditModel(
+        catalogModel.id,
+        catalogModel.name,
+        catalogModel.supportsImage,
+        undefined,
+        undefined,
+        catalogModel.contextWindow,
+        catalogModel.maxTokens,
+      ),
+    );
+    act(() =>
+      result.current.handleModelEditorDraftChange({
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Unsupported,
+          imageInput: ModelCapabilityStatus.Unsupported,
+          videoInput: ModelCapabilityStatus.Supported,
+          audioInput: ModelCapabilityStatus.Unsupported,
+          documentInput: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      }),
+    );
+    await act(async () => result.current.handleSaveNewModel());
+    expect(result.current.providers[provider].models?.[0]).toMatchObject({
+      capabilities: {
+        toolCalling: ModelCapabilityStatus.Unsupported,
+        imageInput: ModelCapabilityStatus.Unsupported,
+        videoInput: ModelCapabilityStatus.Supported,
+        audioInput: ModelCapabilityStatus.Unsupported,
+        documentInput: ModelCapabilityStatus.Supported,
+        reasoning: ModelCapabilityStatus.Supported,
+      },
+    });
+  },
+);
+
 test('capacity and capability edits keep the current ID verification', async () => {
   const { result } = renderEditor();
   act(() => result.current.handleRowModelEdit(verifiedModel));
@@ -129,6 +190,22 @@ test('a new model starts unverified and preserves the other model entries', asyn
   expect(models[0]).toEqual(verifiedModel);
   expect(models[2]).toMatchObject({ id: 'new-model', origin: ProviderModelOrigin.User });
   expect(models[2].connectionTest).toBeUndefined();
+});
+
+test('saving a model marks the provider as intended for use', async () => {
+  const { result, enableProviderIfConfigured } = renderEditor();
+  act(() => result.current.handleAddModel());
+  act(() => result.current.handleModelEditorDraftChange({ id: 'new-model', name: 'New model' }));
+  await act(async () => result.current.handleSaveNewModel());
+  expect(enableProviderIfConfigured).toHaveBeenCalledWith('custom_0');
+});
+
+test('rejected drafts do not mark the provider as intended for use', async () => {
+  const { result, enableProviderIfConfigured } = renderEditor();
+  act(() => result.current.handleAddModel());
+  act(() => result.current.handleModelEditorDraftChange({ id: '', name: 'Name' }));
+  await act(async () => result.current.handleSaveNewModel());
+  expect(enableProviderIfConfigured).not.toHaveBeenCalled();
 });
 
 test.each([

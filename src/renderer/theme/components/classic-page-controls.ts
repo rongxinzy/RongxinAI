@@ -355,6 +355,59 @@ export function classicPageControls(dark: boolean) {
       hover: { 'background-color': 'transparent' },
     }),
     'page-create-project-dialog-input-1': recipe({ base: { color: 'var(--muted-foreground)' } }),
+    'page-edit-project-dialog-list-1': recipe({
+      base: {
+        // No top border: the first row's border-top forms the top edge, so
+        // every row can share the same separator style.
+        'border-width': '0 1px 1px 1px',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'border-radius': 'var(--zy-style-radius-lg)',
+      },
+    }),
+    'page-edit-project-dialog-row-1': recipe({
+      base: {
+        height: '2.75rem',
+        gap: '0.75rem',
+        'padding-inline': '0.75rem',
+        'border-width': '1px 0 0 0',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'font-size': 'var(--zy-component-text-sm)',
+        color: 'var(--foreground)',
+      },
+    }),
+    'page-edit-project-dialog-badge-1': recipe({
+      base: {
+        height: '1.25rem',
+        'border-radius': '9999px',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'padding-inline': '0.5rem',
+        'font-size': 'var(--zy-component-text-xs)',
+        color: 'var(--muted-foreground)',
+      },
+    }),
+    'page-edit-project-dialog-add-1': recipe({
+      base: {
+        height: '2.75rem',
+        'border-radius': '0px',
+        'border-width': '1px 0 0 0',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'padding-inline': '0.75rem',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
+      },
+    }),
+    'page-edit-project-dialog-icon-1': recipe({ base: { color: 'var(--muted-foreground)' } }),
+    'page-edit-project-dialog-label-1': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-sm)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
+        color: 'var(--foreground)',
+      },
+    }),
     'page-embedding-settings-section-button-1': recipe({
       base: { 'font-size': 'var(--zy-component-text-xs)', height: 'auto', padding: '0rem' },
     }),

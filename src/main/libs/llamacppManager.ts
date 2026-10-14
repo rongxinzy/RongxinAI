@@ -149,6 +149,8 @@ export class LlamaCppManager extends EventEmitter {
   private readonly marketplaceService: MarketplaceService;
   private readonly storage?: LlamaCppManagerStorage;
   private backendListCache: LlamaCppBackendListCacheEntry | null = null;
+  /** Message of the last router-listing failure; repeats stay at debug level. */
+  private routerListFailure: string | null = null;
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
@@ -1176,8 +1178,21 @@ export class LlamaCppManager extends EventEmitter {
         typeof client.listModelsSnapshot === 'function'
           ? await client.listModelsSnapshot(2_000)
           : await client.listModels();
+      // Recovered: a later failure deserves its own explanation.
+      this.routerListFailure = null;
     } catch (error) {
-      console.warn('[LlamaCpp] failed to list router models, using local GGUF scan:', error);
+      // The router API is optional: a single-model server answers 404 on every
+      // refresh. Report each distinct failure once with its stack, then keep the
+      // documented GGUF fallback quiet instead of stacking a trace per poll.
+      const signature = error instanceof Error ? error.message : String(error);
+      if (this.routerListFailure === signature) {
+        console.debug(`[LlamaCpp] router model list still unavailable: ${signature}`);
+      } else {
+        this.routerListFailure = signature;
+        console.warn(
+          `[LlamaCpp] router model list unavailable, using local GGUF scan: ${signature}`,
+        );
+      }
     }
     const scannedPathSet = new Set(
       scannedModels

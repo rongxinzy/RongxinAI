@@ -44,7 +44,7 @@ npm install
 ### 2. Build
 
 ```bash
-npm run build
+bun run build
 ```
 
 ### 3. Start Server
@@ -256,7 +256,7 @@ cat .server.log
 lsof -i :8923
 
 # Rebuild
-npm run build
+bun run build
 ```
 
 ### Chrome Not Found

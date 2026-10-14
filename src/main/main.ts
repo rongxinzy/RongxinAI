@@ -25,7 +25,6 @@ import { pathToFileURL } from 'url';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import { parseCoworkExecutionMode } from '../shared/cowork/executionMode';
 import { reportPiSessionFailure } from './piSessionFailure';
-import { setPiCapabilityCorrectionStoreGetter } from './libs/agentEngine/piCapabilityCorrection';
 import { createPiUiEventBatcher } from './piUiEventBatcher';
 import { persistCoworkTerminalError } from './coworkTerminalErrorPersistence';
 import { bindCoworkRunBridge } from './coworkRunBridge';
@@ -4416,6 +4415,89 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle(
+    WorkspaceIpc.Update,
+    async (
+      _event,
+      rawOptions: { id?: string; name?: string; primaryPath?: string; folders?: string[] },
+    ) => {
+      try {
+        const id = rawOptions?.id?.trim();
+        if (!id) return { success: false, error: 'Workspace id is required' };
+        const coworkStore = getCoworkStore();
+        const workspace = coworkStore.getWorkspace(id);
+        if (!workspace) return { success: false, error: 'Workspace not found' };
+
+        const requestedName = rawOptions.name?.trim();
+        const requestedPath = rawOptions.primaryPath?.trim();
+        const pathsEqual = (a: string, b: string): boolean =>
+          process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+        // Resolve both sides so trailing separators or relative segments cannot
+        // smuggle a duplicate of the primary path into the attached folders.
+        const resolvedFolders = rawOptions.folders
+          ?.map(folder => folder.trim())
+          .filter(Boolean)
+          .map(folder => path.resolve(folder));
+        const pathChanged =
+          !!requestedPath && !pathsEqual(path.resolve(requestedPath), path.resolve(workspace.path));
+
+        if (pathChanged) {
+          if (isDefaultConversationWorkspacePath(workspace.path)) {
+            return {
+              success: false,
+              error: 'The default conversation workspace path cannot be changed',
+            };
+          }
+          const resolvedPath = path.resolve(requestedPath!);
+          const stat = await fs.promises.stat(resolvedPath).catch((): null => null);
+          if (!stat?.isDirectory()) {
+            return { success: false, error: 'Workspace path is not a directory' };
+          }
+          const relocated = coworkStore.relocateWorkspace(
+            id,
+            resolvedPath,
+            requestedName || workspace.name,
+          );
+          if (!relocated) return { success: false, error: 'Workspace not found' };
+          if (rawOptions.folders) {
+            coworkStore.setWorkspaceFolders(
+              relocated.id,
+              (resolvedFolders ?? []).filter(folder => !pathsEqual(folder, resolvedPath)),
+            );
+            coworkStore.touchWorkspace(relocated.id);
+          }
+          return { success: true, workspace: coworkStore.getWorkspace(relocated.id) };
+        }
+
+        if (requestedName && requestedName !== workspace.name) {
+          if (isDefaultConversationWorkspacePath(workspace.path)) {
+            return {
+              success: false,
+              error: 'The default conversation workspace cannot be renamed',
+            };
+          }
+          const renamed = coworkStore.renameWorkspace(id, requestedName);
+          if (!renamed) return { success: false, error: 'Workspace not found' };
+        }
+        if (rawOptions.folders) {
+          coworkStore.setWorkspaceFolders(
+            id,
+            (resolvedFolders ?? []).filter(
+              folder => !pathsEqual(folder, path.resolve(workspace.path)),
+            ),
+          );
+          coworkStore.touchWorkspace(id);
+        }
+        return { success: true, workspace: coworkStore.getWorkspace(id) };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to update workspace',
+        };
+      }
+    },
+  );
+
   ipcMain.handle(WorkspaceIpc.Delete, async (_event, id: string) => {
     try {
       if (typeof id !== 'string' || !id.trim()) {
@@ -6963,7 +7045,7 @@ if (!gotTheLock) {
   );
 
   // Shell handlers - 打开文件/文件夹
-  ipcMain.handle('shell:openPath', async (_event, filePath: string) => {
+  ipcMain.handle(ShellIpc.OpenPath, async (_event, filePath: string) => {
     try {
       const normalizedPath = normalizeWindowsShellPath(filePath);
       const result = await shell.openPath(normalizedPath);
@@ -6977,7 +7059,7 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('shell:showItemInFolder', async (_event, filePath: string) => {
+  ipcMain.handle(ShellIpc.ShowItemInFolder, async (_event, filePath: string) => {
     try {
       const normalizedPath = normalizeWindowsShellPath(filePath);
       shell.showItemInFolder(normalizedPath);
@@ -7959,12 +8041,25 @@ if (!gotTheLock) {
     });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
-    setPiCapabilityCorrectionStoreGetter(() => store);
     piModelCatalogRefreshCoordinator = new PiModelCatalogRefreshCoordinator({
       resolveApiKeys: resolveAllProviderApiKeys,
     });
-    getStore().onDidChange<AppConfigSettings>('app_config', () => {
+    getStore().onDidChange<AppConfigSettings>('app_config', (next, previous) => {
       piModelCatalogRefreshCoordinator?.notifyConfigurationChanged();
+      // Provider/model edits are the user's explicit statement about what the
+      // models can do: drop runtime image-capability observations so a corrected
+      // endpoint or a re-enabled switch takes effect without a restart.
+      const modelConfigSection = (value: AppConfigSettings | undefined): string => {
+        const record = value as Record<string, unknown> | undefined;
+        return JSON.stringify([
+          record?.providers ?? null,
+          record?.api ?? null,
+          record?.model ?? null,
+        ]);
+      };
+      if (modelConfigSection(next) !== modelConfigSection(previous)) {
+        void getPiRuntimeAdapter().resetImageInputCapabilities();
+      }
     });
     const localInferenceManager = getLlamaCppManager();
     localInferenceManager.initializeModelsDir();

@@ -30,6 +30,7 @@ import {
   isDefaultConversationWorkspacePath,
 } from './defaultConversationWorkspace';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
+import { WorkspaceFolderRepository } from './workspaceFolderRepository';
 
 // Default working directory for new users
 const getDefaultWorkingDirectory = (): string => {
@@ -590,10 +591,12 @@ interface CoworkUserMemoryRow {
 export class CoworkStore {
   private db: Database.Database;
   private artifactIndex: CoworkArtifactIndex;
+  private workspaceFolders: WorkspaceFolderRepository;
 
   constructor(db: Database.Database) {
     this.db = db;
     this.artifactIndex = new CoworkArtifactIndex(db);
+    this.workspaceFolders = new WorkspaceFolderRepository(db);
   }
 
   private getOne<T>(sql: string, params: (string | number | null)[] = []): T | undefined {
@@ -627,10 +630,12 @@ export class CoworkStore {
     }>(
       'SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces ORDER BY updated_at DESC, name ASC',
     );
+    const foldersByWorkspace = this.workspaceFolders.listAllByWorkspace();
     return rows.map(row => ({
       id: row.id,
       name: row.name,
       path: row.path,
+      folders: foldersByWorkspace.get(row.id) ?? [],
       isHidden: Boolean(row.is_hidden),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -653,6 +658,7 @@ export class CoworkStore {
       id: row.id,
       name: row.name,
       path: row.path,
+      folders: this.workspaceFolders.listFolders(row.id),
       isHidden: Boolean(row.is_hidden),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -725,6 +731,10 @@ export class CoworkStore {
     this.db.prepare('UPDATE workspaces SET is_hidden = ? WHERE id = ?').run(isHidden ? 1 : 0, id);
   }
 
+  setWorkspaceFolders(id: string, folders: string[]): void {
+    this.workspaceFolders.replaceFolders(id, folders);
+  }
+
   relocateWorkspace(id: string, workspacePath: string, name: string): Workspace | null {
     const existingWorkspace = this.getWorkspace(id);
     if (!existingWorkspace) return null;
@@ -738,6 +748,21 @@ export class CoworkStore {
       throw new Error('A workspace already exists for the renamed directory');
     }
 
+    const runningSession = this.getOne<{ id: string }>(
+      "SELECT id FROM cowork_sessions WHERE workspace_id = ? AND status = 'running' LIMIT 1",
+      [id],
+    );
+    if (runningSession) {
+      throw new Error('Cannot relocate a workspace while a session is running');
+    }
+
+    // Project memory scope ids are derived from the path
+    // (workspace-<sha256(cwd)>), so a relocation must carry both tables
+    // alongside the workspace and sessions rows.
+    const previousProjectId = workspaceIdForPath(existingWorkspace.path);
+    const hasMemoryLinks = this.tableExists('memory_links');
+    const hasMemoryCandidates = this.tableExists('memory_candidates');
+
     this.db.transaction(() => {
       this.db
         .prepare('UPDATE cowork_sessions SET workspace_id = ?, cwd = ? WHERE workspace_id = ?')
@@ -745,9 +770,28 @@ export class CoworkStore {
       this.db
         .prepare('UPDATE workspaces SET id = ?, name = ?, path = ? WHERE id = ?')
         .run(nextId, normalizedName, normalizedPath, id);
+      this.workspaceFolders.transferFolders(id, nextId);
+      if (hasMemoryLinks) {
+        this.db
+          .prepare('UPDATE memory_links SET project_id = ? WHERE project_id = ?')
+          .run(nextId, previousProjectId);
+      }
+      if (hasMemoryCandidates) {
+        this.db
+          .prepare('UPDATE memory_candidates SET project_id = ? WHERE project_id = ?')
+          .run(nextId, previousProjectId);
+      }
     })();
 
     return this.getWorkspace(nextId);
+  }
+
+  private tableExists(tableName: string): boolean {
+    const row = this.getOne<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [tableName],
+    );
+    return row !== undefined;
   }
 
   /**
@@ -770,6 +814,7 @@ export class CoworkStore {
         .run(...sessionIds);
     }
     this.db.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+    this.workspaceFolders.deleteFolders(id);
     this.markOrphanImplicitMemoriesStale();
     return sessionIds;
   }

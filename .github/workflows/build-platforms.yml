@@ -42,7 +42,9 @@ jobs:
           separator=''
 
           if [[ "$BUILD_MACOS" == "true" ]]; then
-            matrix+='{"platform":"macos","runner":"macos-latest","artifact":"macos-build","runtime_target":"mac-arm64"}'
+            matrix+='{"platform":"macos","runner":"macos-latest","artifact":"macos-arm64-build","runtime_target":"mac-arm64","arch":"arm64"}'
+            separator=','
+            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-15-intel\",\"artifact\":\"macos-x64-build\",\"runtime_target\":\"mac-x64\",\"arch\":\"x64\"}"
             separator=','
           fi
           if [[ "$BUILD_WINDOWS" == "true" ]]; then
@@ -116,7 +118,7 @@ jobs:
           bun run engram:runtime:${{ matrix.runtime_target }}
       - name: Build macOS
         if: ${{ matrix.platform == 'macos' }}
-        run: bun run dist:mac
+        run: bun run dist:mac:${{ matrix.arch }}
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

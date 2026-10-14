@@ -25,7 +25,7 @@ const APP_BUILDER_PATH = path.join(
   'x64',
   'app-builder.exe',
 );
-const PRODUCT_NAME = '知远';
+const PRODUCT_NAME = '知远智能体 (ZhiYuan Agent)';
 const forcePatch =
   process.argv.includes('--force') || process.env.FORCE_PATCH_ELECTRON_ICON === '1';
 

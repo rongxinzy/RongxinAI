@@ -5,6 +5,8 @@ build/win-full/*
 release/
 !scripts/release/
 !scripts/release/**
+!enterprise/src/release/
+!enterprise/src/release/**
 node_modules
 dist
 dist-electron
@@ -114,3 +116,8 @@ reasonix.toml
 /cowork/
 /logs/
 /artifacts/memory-leak/
+
+# Installer shell build output (WebView2 host)
+/scripts/installer-shell/out/
+/scripts/installer-shell/app/bin/
+/scripts/installer-shell/app/obj/

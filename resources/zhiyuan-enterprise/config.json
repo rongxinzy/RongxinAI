@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "aepBaseUrl": "http://127.0.0.1:8080",
+  "allowInsecureHttp": true
+}

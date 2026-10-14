@@ -44,8 +44,9 @@ export function classicCommand(): CommandAppearances {
     'command-item': recipe({
       base: {
         ...small,
+        'min-height': '2rem',
         gap: '0.5rem',
-        'border-radius': 'var(--zy-style-radius-sm)',
+        'border-radius': 'var(--zy-style-radius-md)',
         padding: '0.375rem 0.5rem',
         'outline-style': 'none',
       },
@@ -54,7 +55,11 @@ export function classicCommand(): CommandAppearances {
       disabled: { opacity: '0.5' },
     }),
     'command-item-selector': recipe({
-      base: { 'border-radius': 'var(--zy-style-radius-lg)', 'padding-block': '0.5rem' },
+      base: {
+        'min-height': '2.5rem',
+        'border-radius': 'var(--zy-style-radius-lg)',
+        'padding-block': '0.5rem',
+      },
       selected: highlight,
     }),
     'command-item-palette': recipe({

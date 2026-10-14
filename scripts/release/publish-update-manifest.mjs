@@ -19,6 +19,7 @@ if (!/^(?:local|[1-9][0-9]*)$/.test(pipelineId)) {
 
 const REQUIRED_RELEASE_TARGETS = new Set([
   'win32:x64:lite',
+  'darwin:x64:default',
   'darwin:arm64:default',
   'linux:x64:deb',
   'linux:x64:appimage',

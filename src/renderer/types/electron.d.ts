@@ -763,6 +763,16 @@ interface IElectronAPI {
       workspace?: import('../../shared/workspace').Workspace;
       error?: string;
     }>;
+    updateWorkspace: (options: {
+      id: string;
+      name?: string;
+      primaryPath?: string;
+      folders?: string[];
+    }) => Promise<{
+      success: boolean;
+      workspace?: import('../../shared/workspace').Workspace;
+      error?: string;
+    }>;
     deleteWorkspace: (id: string) => Promise<{
       success: boolean;
       deletedSessionIds?: string[];
