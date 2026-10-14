@@ -163,6 +163,7 @@ vi.mock('../claudeSettings', () => {
   };
 });
 
+import { resolveBundledOcrHelper } from '../ocrHelper';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 
 const fakeStore = {
@@ -210,8 +211,11 @@ test('image rejection is retried as text and reported to the user', async () => 
 
   const textOnly = requests.find(request => !request.hasImage);
   expect(textOnly?.body).toContain('hash.png'); // the model receives the file path
-  // ...together with a runnable command for the bundled OCR helper.
-  expect(textOnly?.body).toContain('ocr-image.ps1');
+  // ...together with the extraction path: the bundled helper's command where the
+  // helper resolves (Windows), the self-written guidance otherwise.
+  expect(textOnly?.body).toContain(
+    resolveBundledOcrHelper() ? 'ocr-image.ps1' : 'Windows.Media.Ocr',
+  );
   expect(errors).toHaveLength(0); // no dead-end error bubble
   const notices = messages.filter(
     message =>

@@ -97,6 +97,54 @@ export function shouldSendImageInput(
   return !isImageInputRejected(providerName, modelId, imageCapabilityFingerprint(configured));
 }
 
+/** Extensions the UI treats as image files when it cannot inline their bytes. */
+const IMAGE_FILE_EXTENSIONS = new Set([
+  'PNG',
+  'JPG',
+  'JPEG',
+  'GIF',
+  'WEBP',
+  'BMP',
+  'ICO',
+  'TIF',
+  'TIFF',
+]);
+
+/**
+ * Image references that reach the model as bare paths.
+ *
+ * Two surfaces produce these: attachments the renderer could not inline (the
+ * model gets an `input file: <path>` line and nothing else), and historical
+ * attachments replayed when a session is rebuilt from the transcript. Both hand
+ * the model an image it cannot open as bytes, so both deserve the same pointer
+ * to the bundled OCR helper.
+ */
+export function collectImagePathReferences(
+  attachments:
+    | readonly {
+        name?: string;
+        path?: string;
+        extension?: string;
+        isImage?: boolean;
+      }[]
+    | undefined,
+): ImageInputAttachmentRef[] {
+  const references: ImageInputAttachmentRef[] = [];
+  for (const attachment of attachments ?? []) {
+    const attachmentPath = attachment.path?.trim();
+    if (!attachmentPath || attachmentPath.startsWith('inline:')) continue;
+    const dotIndex = attachmentPath.lastIndexOf('.');
+    const extension = (
+      attachment.extension ?? (dotIndex >= 0 ? attachmentPath.slice(dotIndex + 1) : '')
+    )
+      .replace(/^\./, '')
+      .toUpperCase();
+    if (attachment.isImage !== true && !IMAGE_FILE_EXTENSIONS.has(extension)) continue;
+    references.push({ name: attachment.name?.trim() || attachmentPath, path: attachmentPath });
+  }
+  return references;
+}
+
 /**
  * Model-facing note used whenever images were present but not sent.
  *

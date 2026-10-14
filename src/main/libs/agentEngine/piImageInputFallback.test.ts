@@ -4,6 +4,7 @@ import { ModelCapabilityStatus, type ModelCapabilities } from '../../../shared/p
 import {
   buildImageOmittedNotice,
   clearImageInputObservations,
+  collectImagePathReferences,
   imageCapabilityFingerprint,
   isImageInputRejected,
   isImagePayloadRejection,
@@ -125,6 +126,31 @@ describe('buildImageOmittedNotice', () => {
 
   test('returns an empty string without attachments', () => {
     expect(buildImageOmittedNotice([])).toBe('');
+  });
+});
+
+describe('collectImagePathReferences', () => {
+  test('keeps flagged images and image extensions, drops everything else', () => {
+    expect(
+      collectImagePathReferences([
+        { name: 'shot.png', path: 'C:\\a\\shot.png' },
+        { name: 'scan', path: 'C:\\a\\scan.JPEG' },
+        { name: 'clip.png', path: 'inline:pasted', isImage: true },
+        { name: 'notes.txt', path: 'C:\\a\\notes.txt' },
+        { name: 'mystery', path: 'C:\\a\\mystery' },
+        { name: 'ref.bin', path: 'C:\\a\\ref.bin', isImage: true },
+        { name: 'noPath.png' },
+      ]),
+    ).toEqual([
+      { name: 'shot.png', path: 'C:\\a\\shot.png' },
+      { name: 'scan', path: 'C:\\a\\scan.JPEG' },
+      { name: 'ref.bin', path: 'C:\\a\\ref.bin' },
+    ]);
+  });
+
+  test('returns nothing for missing attachment lists', () => {
+    expect(collectImagePathReferences(undefined)).toEqual([]);
+    expect(collectImagePathReferences([])).toEqual([]);
   });
 });
 

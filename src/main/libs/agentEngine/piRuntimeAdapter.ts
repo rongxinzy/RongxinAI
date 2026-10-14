@@ -192,6 +192,7 @@ import type {
   PiStartOptions,
 } from './piRuntimeTypes';
 import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
+import { collectImagePathReferences } from './piImageInputFallback';
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import {
   buildImageOmittedNotice,
@@ -551,6 +552,7 @@ function preparePiPrompt(
   attachments: PiStartOptions['imageAttachments'] | undefined,
   sendImages: boolean,
   ocrCommandFor?: (imagePath: string) => string,
+  pathImageReferences: readonly ImageInputAttachmentRef[] = [],
 ): {
   content:
     | string
@@ -559,10 +561,10 @@ function preparePiPrompt(
   sentImages: ImageInputAttachmentRef[];
   omittedImages: ImageInputAttachmentRef[];
 } {
-  if (!attachments?.length) {
+  if (!attachments?.length && pathImageReferences.length === 0) {
     return { content: text, hasImages: false, sentImages: [], omittedImages: [] };
   }
-  const imageAttachments = attachments.filter(item => item.mimeType.startsWith('image/'));
+  const imageAttachments = (attachments ?? []).filter(item => item.mimeType.startsWith('image/'));
   const references = imageAttachments.map(item => ({ name: item.name, path: item.path }));
   if (sendImages) {
     const images = imageAttachments
@@ -584,8 +586,10 @@ function preparePiPrompt(
   }
   // Pi answers a non-vision model's `read` with an in-band note instead of a
   // failed request; Cowork images never pass through `read`, so the same note
-  // (plus the file paths) has to travel with the prompt itself.
-  const notice = buildImageOmittedNotice(references, ocrCommandFor);
+  // (plus the file paths) has to travel with the prompt itself. Images that were
+  // withheld and images the UI could only attach by path share one note: in both
+  // cases the model is holding a path instead of pixels.
+  const notice = buildImageOmittedNotice([...references, ...pathImageReferences], ocrCommandFor);
   return {
     content: text.trim() ? `${text}\n\n${notice}` : notice,
     hasImages: false,
@@ -1665,6 +1669,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         options.imageAttachments,
         this.shouldSendImagesForActive(active),
         this.bundledOcrHelper?.commandFor,
+        collectImagePathReferences(options.fileAttachments),
       );
       // Recorded before the request leaves: the SDK can report the rejection
       // through events that arrive before the send promise settles.
@@ -1726,6 +1731,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         storedSession?.mode === CoworkSessionMode.Chat;
       const piPrompt = buildPiConversationPrompt(history, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'continue',
@@ -1794,6 +1800,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
           active.resourceState.chatMode,
         ),
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'recreate',
@@ -1838,6 +1845,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
           active.resourceState.chatMode,
         ),
+        ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'skills-change',
@@ -2034,6 +2042,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         options.imageAttachments,
         this.shouldSendImagesForActive(active),
         this.bundledOcrHelper?.commandFor,
+        collectImagePathReferences(options.fileAttachments),
       );
       this.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
       await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
@@ -2537,6 +2546,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         item.imageAttachments,
         this.shouldSendImagesForActive(active),
         this.bundledOcrHelper?.commandFor,
+        collectImagePathReferences(item.fileAttachments),
       );
       this.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
       await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');

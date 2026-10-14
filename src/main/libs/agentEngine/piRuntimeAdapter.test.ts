@@ -265,6 +265,7 @@ vi.mock('../coworkUtil', async importOriginal => {
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { clearImageInputObservations } from './piImageInputFallback';
+import { resolveBundledOcrHelper } from '../ocrHelper';
 import { AGENT_SETTLE_FALLBACK_MS } from './piAgentSettleFallback';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { t } from '../../i18n';
@@ -1428,6 +1429,30 @@ describe('PiRuntimeAdapter', () => {
       // The path is what lets the model act instead of guessing.
       expect(sentPrompt).toContain('C:\\cowork-images\\s\\hash.png');
       expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
+    });
+
+    it('points a text-only model at the bundled OCR helper when an image arrives as a path', async () => {
+      await adapter.startSession('text-only-file', 'Describe this image', {
+        fileAttachments: [
+          {
+            name: 'shot.png',
+            path: 'C:\\cowork-images\\s\\shot.png',
+            extension: 'PNG',
+            isImage: true,
+          },
+          { name: 'notes.txt', path: 'C:\\docs\\notes.txt', extension: 'TXT' },
+        ],
+      });
+
+      const [sentPrompt] = mockSession.prompt.mock.calls.at(-1) as [string];
+      expect(sentPrompt).toContain('Describe this image');
+      expect(sentPrompt).toContain('C:\\cowork-images\\s\\shot.png');
+      expect(sentPrompt).toContain('cannot read images');
+      // A text attachment must not be advertised as an image.
+      expect(sentPrompt).not.toContain('notes.txt');
+      if (resolveBundledOcrHelper()) {
+        expect(sentPrompt).toContain('ocr-image.ps1');
+      }
     });
 
     it('tells the user when images were withheld from a text-only turn', async () => {
