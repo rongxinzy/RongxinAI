@@ -3794,11 +3794,35 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   // ── Private: image input fallback ──
   /** Whether the current turn may carry image bytes (see piImageInputFallback). */
+  /**
+   * Configured image capability as it stands right now.
+   *
+   * A session's capabilities are a snapshot from the last model resolution, so
+   * after the user edits provider settings they must not be trusted: the next
+   * turn, and any capability sync, have to read the current configuration.
+   * When the configuration cannot be read the snapshot is the best available
+   * answer, and withholding images stays the conservative outcome.
+   */
+  private configuredImageInputForActive(active: ActivePiSession): ModelCapabilityStatus {
+    const modelRef = active.requestedModelOverride?.trim();
+    try {
+      const resolution = modelRef
+        ? resolveRawApiConfigForModelRef(modelRef)
+        : resolveRawApiConfig();
+      const configured = resolution.providerMetadata?.capabilities?.imageInput;
+      if (configured) return configured;
+    } catch {
+      // Fall through to the snapshot.
+    }
+    return active.capabilities.imageInput;
+  }
+
   /** Configuration half of the image-capability fingerprint, in one shape. */
   private imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration {
+    const imageInput = this.configuredImageInputForActive(active);
     return {
-      imageInput: active.capabilities.imageInput,
-      supportsImage: active.capabilities.imageInput === ModelCapabilityStatus.Supported,
+      imageInput,
+      supportsImage: imageInput === ModelCapabilityStatus.Supported,
       endpointKey: active.imageEndpointKey,
     };
   }
@@ -3848,7 +3872,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   private imageInputVerdictForActive(active: ActivePiSession): ImageInputVerdict {
     return imageInputVerdict(
-      active.capabilities.imageInput,
+      this.configuredImageInputForActive(active),
       active.harnessModelProfile.provider,
       active.harnessModelProfile.model,
       this.imageCapabilityConfiguration(active),

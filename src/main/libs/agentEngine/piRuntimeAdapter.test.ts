@@ -298,6 +298,21 @@ import {
  * downgrades every image block (attachments, `read` results, history) to a text
  * placeholder, so no image can re-enter a rejected request.
  */
+/**
+ * Pin the resolution every capability read sees, and return a restore function.
+ *
+ * Capability reads happen at several points (model resolution, send gates,
+ * capability sync), so counting `mockReturnValueOnce` values would make these
+ * cases depend on call order.
+ */
+const stubRawApiConfig = (resolution: object): (() => void) => {
+  const previous = mockResolveRawApiConfig.getMockImplementation();
+  mockResolveRawApiConfig.mockReturnValue(resolution);
+  return () => {
+    if (previous) mockResolveRawApiConfig.mockImplementation(previous);
+  };
+};
+
 const activePiModel = (
   target: PiRuntimeAdapter,
   sessionId: string,
@@ -307,6 +322,42 @@ const activePiModel = (
   ).activeSessions;
   return sessions.get(sessionId)?.model;
 };
+
+/** A configuration whose image input is unknown, for capability-change cases. */
+const UNKNOWN_MODEL_RESOLUTION = {
+  config: {
+    apiKey: 'sk-unknown',
+    baseURL: 'https://api.moonshot.cn/v1',
+    model: 'kimi-k2.6',
+    apiType: 'openai' as const,
+  },
+  providerMetadata: {
+    providerName: 'moonshot',
+    codingPlanEnabled: false,
+    supportsImage: false,
+    capabilities: { imageInput: ModelCapabilityStatus.Unknown },
+  },
+};
+
+/** A configuration the user explicitly marked as text-only. */
+const TEXT_ONLY_MODEL_RESOLUTION = {
+  config: {
+    apiKey: 'sk-text',
+    baseURL: 'https://api.moonshot.cn/v1',
+    model: 'kimi-k2.6',
+    apiType: 'openai' as const,
+  },
+  providerMetadata: {
+    providerName: 'moonshot',
+    codingPlanEnabled: false,
+    supportsImage: false,
+    capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
+  },
+};
+
+/** The gateway's rejection of a request whose payload carried an image. */
+const VISION_400 =
+  '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}';
 
 /** A vision-capable provider resolution, reused by the session-sync cases. */
 const VISION_MODEL_RESOLUTION = {
@@ -3957,69 +4008,149 @@ describe('PiRuntimeAdapter', () => {
       expect(activePiModel(adapter, 'image-only')?.input).toEqual(['text']);
     });
 
-    it('lets an open session follow a capability reset', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
-      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+    it('restores image input on open sessions when the capability is cleared', async () => {
+      const restore = stubRawApiConfig(VISION_MODEL_RESOLUTION);
+      try {
+        await adapter.startSession('live-image', 'Describe this image', {
+          imageAttachments: [
+            {
+              name: 'example.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\hash.png',
+            },
+          ],
+        });
+        listener!({ type: 'turn_start' });
+        failedAttempt(VISION_400);
+        listener!({ type: 'agent_settled' });
+        await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
+        expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text']);
 
-      await adapter.startSession('live-image', 'Describe this image', {
-        imageAttachments: [
-          {
-            name: 'example.png',
-            mimeType: 'image/png',
-            base64Data: 'aW1hZ2U=',
-            path: 'C:\\cowork-images\\s\\hash.png',
-          },
-        ],
-      });
-      listener!({ type: 'turn_start' });
-      failedAttempt(
-        '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
-      );
-      listener!({ type: 'agent_settled' });
-      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
-      expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text']);
-
-      // The user fixed the server and edited provider settings: the live session
-      // must stop downgrading images, not just the observation map.
-      await adapter.resetImageInputCapabilities();
-      expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
+        // The user fixed the server and edited provider settings: the live
+        // session must stop downgrading images, not just the observation map.
+        await adapter.resetImageInputCapabilities();
+        expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
+        expect(mockSession.setModel).toHaveBeenCalled();
+      } finally {
+        restore();
+      }
     });
 
     it('applies a recorded rejection to other open sessions of the same model', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
-      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+      const restore = stubRawApiConfig(VISION_MODEL_RESOLUTION);
+      try {
+        await adapter.startSession('peer-a', 'Describe this image', {
+          imageAttachments: [
+            {
+              name: 'a.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\a.png',
+            },
+          ],
+        });
+        // The mock's subscribe hands every session the same listener, so the
+        // last session created owns the events the failure is driven through.
+        await adapter.startSession('peer-b', 'Describe this image', {
+          imageAttachments: [
+            {
+              name: 'b.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\b.png',
+            },
+          ],
+        });
 
-      await adapter.startSession('peer-a', 'Describe this image', {
-        imageAttachments: [
-          {
-            name: 'a.png',
-            mimeType: 'image/png',
-            base64Data: 'aW1hZ2U=',
-            path: 'C:\\cowork-images\\s\\a.png',
-          },
-        ],
-      });
-      // The mock's subscribe hands every session the same listener, so the last
-      // session created owns the events the failure is driven through.
-      await adapter.startSession('peer-b', 'Describe this image', {
-        imageAttachments: [
-          {
-            name: 'b.png',
-            mimeType: 'image/png',
-            base64Data: 'aW1hZ2U=',
-            path: 'C:\\cowork-images\\s\\b.png',
-          },
-        ],
-      });
-      listener!({ type: 'turn_start' });
-      failedAttempt(
-        '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}',
-      );
-      listener!({ type: 'agent_settled' });
+        listener!({ type: 'turn_start' });
+        failedAttempt(VISION_400);
+        listener!({ type: 'agent_settled' });
 
-      // peer-a never sent anything wrong, but its Pi snapshot still advertised
-      // image input, so its own `read` would re-send the refused payload.
-      await vi.waitFor(() => expect(activePiModel(adapter, 'peer-a')?.input).toEqual(['text']));
+        // peer-a never sent anything wrong, but its Pi snapshot still advertised
+        // image input, so its own `read` would re-send the refused payload.
+        await vi.waitFor(() => expect(activePiModel(adapter, 'peer-a')?.input).toEqual(['text']));
+      } finally {
+        restore();
+      }
+    });
+
+    it('starts sending images on open sessions once the capability is enabled', async () => {
+      const restore = stubRawApiConfig(UNKNOWN_MODEL_RESOLUTION);
+      try {
+        await adapter.startSession('cfg-enabled', 'Describe this image', {
+          imageAttachments: [
+            {
+              name: 'example.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\hash.png',
+            },
+          ],
+        });
+        expect(mockSession.sendUserMessage).not.toHaveBeenCalled();
+        expect(activePiModel(adapter, 'cfg-enabled')?.input).toEqual(['text']);
+
+        // The user enables image input on this model in the settings.
+        stubRawApiConfig(VISION_MODEL_RESOLUTION);
+        await adapter.resetImageInputCapabilities();
+        expect(activePiModel(adapter, 'cfg-enabled')?.input).toEqual(['text', 'image']);
+
+        await adapter.continueSession('cfg-enabled', '再看一张', {
+          imageAttachments: [
+            {
+              name: 'second.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\second.png',
+            },
+          ],
+        });
+        // The bytes travel again without a new session or an app restart.
+        expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
+      } finally {
+        restore();
+      }
+    });
+
+    it('stops sending images on open sessions once the capability is disabled', async () => {
+      const restore = stubRawApiConfig(VISION_MODEL_RESOLUTION);
+      try {
+        await adapter.startSession('cfg-disabled', 'Describe this image', {
+          imageAttachments: [
+            {
+              name: 'example.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\hash.png',
+            },
+          ],
+        });
+        expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
+
+        // The user marks the model as text-only (or moves it to a server
+        // without a vision encoder) and saves.
+        stubRawApiConfig(TEXT_ONLY_MODEL_RESOLUTION);
+        await adapter.resetImageInputCapabilities();
+        expect(activePiModel(adapter, 'cfg-disabled')?.input).toEqual(['text']);
+
+        await adapter.continueSession('cfg-disabled', '再看一张', {
+          imageAttachments: [
+            {
+              name: 'second.png',
+              mimeType: 'image/png',
+              base64Data: 'aW1hZ2U=',
+              path: 'C:\\cowork-images\\s\\second.png',
+            },
+          ],
+        });
+        // The session keeps its context, but the image stays out of the request.
+        expect(mockSession.sendUserMessage).toHaveBeenCalledTimes(1);
+        const [sentPrompt] = mockSession.prompt.mock.calls.at(-1) as [string];
+        expect(sentPrompt).toContain('C:\\cowork-images\\s\\second.png');
+      } finally {
+        restore();
+      }
     });
 
     it('does not treat a refused image format as a capability verdict', async () => {
