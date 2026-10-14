@@ -11,7 +11,10 @@ import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
 import { NpmCommandAbortedError, runNpmCommand } from './libs/npmRuntimeExec';
-import { StartupGate } from './libs/startupGate';
+import { settleWithin, StartupGate } from './libs/startupGate';
+
+/** How long a stop waits for a cancelled search start-up to unwind. */
+const WEB_SEARCH_STOP_SETTLE_TIMEOUT_MS = 5_000;
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
@@ -84,6 +87,8 @@ export class SkillServiceManager {
   private webSearchPid: number | null = null;
   /** Guards the async search start-up against a stop arriving mid-flight. */
   private readonly webSearchStart = new StartupGate();
+  /** The start-up currently in flight, so a stop can wait for it to unwind. */
+  private webSearchStartTask: Promise<void> | null = null;
   private skillEnv: Record<string, string | undefined> | null = null;
 
   private hasWebSearchRuntimeScriptSupport(skillPath: string): boolean {
@@ -362,6 +367,16 @@ export class SkillServiceManager {
    * Start Web Search Bridge Server
    */
   async startWebSearchService(): Promise<void> {
+    const task = this.runWebSearchServiceStart();
+    this.webSearchStartTask = task;
+    try {
+      await task;
+    } finally {
+      if (this.webSearchStartTask === task) this.webSearchStartTask = null;
+    }
+  }
+
+  private async runWebSearchServiceStart(): Promise<void> {
     try {
       const skillPath = this.getWebSearchPath();
       if (!skillPath) {
@@ -469,6 +484,13 @@ export class SkillServiceManager {
       // Cancel before the "nothing is running" early return: during the install
       // there is no pid yet, and that is exactly when the start must be stopped.
       this.webSearchStart.cancel();
+      const startTask = this.webSearchStartTask;
+      if (startTask && !(await settleWithin(startTask, WEB_SEARCH_STOP_SETTLE_TIMEOUT_MS))) {
+        // Reported, not thrown: the process must still try to stop what it can.
+        console.warn(
+          '[SkillServices] Web Search startup did not settle while stopping; continuing the stop',
+        );
+      }
       const skillPath = this.getWebSearchPath();
       if (!skillPath) {
         return;
