@@ -452,3 +452,12 @@ test('DOCX smoke validator accepts the bundled Markdown converter output', () =>
     rmSync(workspace, { recursive: true, force: true });
   }
 });
+
+test('macOS notarization is delegated to afterSign with staple retry', () => {
+  const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
+    afterSign?: string;
+    mac?: { notarize?: boolean };
+  };
+  assert.equal(config.afterSign, 'scripts/notarize.js');
+  assert.equal(config.mac?.notarize, false);
+});
