@@ -31,6 +31,10 @@ function Write-ActionResult {
 }
 
 try {
+  # ShellExecute/runas cannot receive a custom child environment. Bind this
+  # helper's only module dependency to its own trusted host, not a pwsh parent's
+  # PSModulePath. Do not change the caller's or user's persistent module path.
+  Import-Module -Name ([IO.Path]::Combine($PSHOME, 'Modules', 'Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Management.psd1')) -ErrorAction Stop
   $exitCode = 0
 
   switch ($Action) {

@@ -20,14 +20,63 @@ test('uses real visible controls and waits for completion without clicking hidde
     script.indexOf('function Wait-ForProgressAndFinish'),
     script.indexOf('function Wait-InstallerExit'),
   );
-  expect(progress).toContain('$_.ControlId -eq 1201 -and $_.Visible');
-  expect(progress).toContain('$_.ControlId -ge 1200 -and $_.ControlId -le 1206');
+  expect(progress).toContain('::HasBrandedProgress($script:wizard.Handle, $expectedTitle)');
+  expect(progress).toContain('::AssertProgressRemoved($script:wizard.Handle)');
+  expect(progress).not.toContain('$_.ControlId');
   expect(progress).toContain('automatic transition from progress to actionable finish page');
   expect(progress).not.toContain('::Click(');
   expect(helper).toContain('!control.Visible || !control.Enabled');
   expect(helper).toContain('PostMessage(window, 0x00F5');
   expect(helper).not.toContain('0x0111');
 });
+
+test('scopes progress identity to wizard-owned controls instead of reused nsDialogs IDs', () => {
+  expect(helper).toContain('ParentHandle = GetParent(window).ToInt64()');
+  expect(helper).toContain(
+    'control.ParentHandle == wizard && control.ControlId >= 1200 && control.ControlId <= 1206',
+  );
+  expect(helper).toContain('controls.Length != 7');
+  expect(helper).toContain('control.ClassName != "Static" || !ids.Add(control.ControlId)');
+  expect(helper).toContain('control.Visible && control.Text == expectedTitle');
+  const removal = helper.slice(
+    helper.indexOf('public static void AssertProgressRemoved('),
+    helper.indexOf('public static int Checked('),
+  );
+  expect(removal).toContain('ProgressControls(wizard)');
+  expect(removal).toContain('controls.Length != 0');
+  expect(removal).not.toMatch(/if\s*\([^)]*Visible/);
+  const pages = readFileSync('scripts/installer-ui/zy-pages.nsh', 'utf8');
+  for (let id = 1200; id <= 1206; id++) {
+    expect(pages).toContain(`i $HWNDPARENT, i ${id},`);
+  }
+  expect(script).toContain("'正在安装知远智能体' } else { 'Installing ZhiYuan Agent'");
+});
+
+test.skipIf(process.platform !== 'win32')(
+  'distinguishes real cross-process page ID reuse and rejects visible or hidden progress residue',
+  () => {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(__dirname, 'windows-installer-progress-regression.ps1'),
+        '-ProjectRoot',
+        path.resolve('.'),
+      ],
+      { encoding: 'utf8', timeout: 90_000 },
+    );
+    expect(result.error, result.stderr).toBeUndefined();
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain(
+      'PASS: real page-scoped IDs distinguish hero, progress and finish; visible and hidden progress residue fail',
+    );
+  },
+  100_000,
+);
 
 test('requires actual windows, screenshots, real DPI and usable actions', () => {
   for (const marker of [

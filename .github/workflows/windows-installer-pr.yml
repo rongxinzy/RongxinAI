@@ -48,7 +48,7 @@ jobs:
       - name: Validate real Windows interaction drivers
         # These suites spawn real PowerShell processes and a C# compiler. Avoid
         # cross-suite CPU contention on the hosted runner; retain every timeout.
-        run: bunx vitest run --maxWorkers=1 scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
+        run: bunx vitest run --maxWorkers=1 scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer-shell/preview-ui.test.ts scripts/installer-shell/powershell-environment.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
       - name: Set up offline Windows runtimes
         run: |
           bun run setup:uv-runtime

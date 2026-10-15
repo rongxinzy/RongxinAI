@@ -170,10 +170,9 @@ public sealed class UninstallerEngine
                 Type: "phase", Label: "未找到卸载清理脚本，已跳过运行环境清理"));
             return;
         }
-        await ShellProcessRunner.RunAsync(
-            "powershell.exe",
-            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{script}\" " +
-                $"-InstallDir \"{cleanupRoot}\" -RuntimeRoot \"{runtimeRoot}\"",
+        await ShellProcessRunner.RunPowerShellAsync(
+            script,
+            $"-InstallDir \"{cleanupRoot}\" -RuntimeRoot \"{runtimeRoot}\"",
             ct,
             failureMessage: null);
         progress.Report(new EngineEvent(Type: "progress", Percent: 40));
@@ -231,14 +230,9 @@ public sealed class UninstallerEngine
             "[IO.Directory]::Delete($p) }; " +
             "for ($i=0; $i -lt 60; $i++) { try { Remove-Tree $env:ZY_UNINSTALL_TREE; break } catch { Start-Sleep -Seconds 1 } }";
         var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(cleanup));
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}",
-            WorkingDirectory = Path.GetTempPath(),
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
+        var startInfo = ShellProcessRunner.CreatePowerShellStartInfo(
+            $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}");
+        startInfo.WorkingDirectory = Path.GetTempPath();
         startInfo.Environment["ZY_UNINSTALL_TREE"] = detachedInstallDir;
         startInfo.Environment["ZY_UNINSTALL_PID"] = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         using var detached = Process.Start(startInfo);

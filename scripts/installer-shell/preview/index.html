@@ -502,8 +502,10 @@ btnInstall.addEventListener('click', () => {
   showPage('progress');
   if (inShell) {
     resetProgressView();
-    window.chrome.webview.hostObjects.shell.StartInstall(
-      document.getElementById('installPath').textContent, inferenceOn);
+    // HostObjectAsyncProxy is awaitable; normalize it before using Promise.catch.
+    Promise.resolve(window.chrome.webview.hostObjects.shell.StartInstall(
+      document.getElementById('installPath').textContent, inferenceOn))
+      .catch(error => handleEngineEvent({ type: 'error', message: String(error) }));
   } else {
     runInstall();
   }
@@ -642,7 +644,7 @@ document.getElementById('btnLaunch').addEventListener('click', () => {
   if (inShell) {
     const button = document.getElementById('btnLaunch');
     button.disabled = true;
-    window.chrome.webview.hostObjects.shell.LaunchApp().then(started => {
+    Promise.resolve(window.chrome.webview.hostObjects.shell.LaunchApp()).then(started => {
       if (started) window.chrome.webview.postMessage({ type: 'close' });
       else button.disabled = false;
     }).catch(() => { button.disabled = false; });

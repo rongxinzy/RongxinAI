@@ -154,8 +154,9 @@ function Begin-Installation {
 
 function Wait-ForProgressAndFinish {
   param([string]$Name)
+  $expectedTitle = if ($script:language -eq 2052) { '正在安装知远智能体' } else { 'Installing ZhiYuan Agent' }
   $null = Wait-Until {
-    Get-Controls | Where-Object { $_.ControlId -eq 1201 -and $_.Visible }
+    [ZhiYuan.Acceptance.InstallerUi]::HasBrandedProgress($script:wizard.Handle, $expectedTitle)
   } 'real branded installation progress' $TimeoutSeconds
   Save-Page "$Name-progress"
   # Never click Next here. The completed progress page must advance itself;
@@ -165,9 +166,7 @@ function Wait-ForProgressAndFinish {
     $launch = Get-Button -Label '^(启动知远智能体|啟動知遠智能體|Launch ZhiYuan Agent)$'
     if ($button -and $button.Enabled -and $launch -and $launch.Enabled) { return $button }
   } 'automatic transition from progress to actionable finish page' $TimeoutSeconds
-  if (@(Get-Controls | Where-Object { $_.ControlId -ge 1200 -and $_.ControlId -le 1206 }).Count) {
-    throw 'The progress page is still visible over the finish page'
-  }
+  [ZhiYuan.Acceptance.InstallerUi]::AssertProgressRemoved($script:wizard.Handle)
   $launch = Get-Button -Label '^(启动知远智能体|啟動知遠智能體|Launch ZhiYuan Agent)$'
   $expectedLaunch = if ($script:language -eq 2052) { '启动知远智能体' } else { 'Launch ZhiYuan Agent' }
   if ((Normalize-Label $launch.Text) -ne $expectedLaunch) { throw 'Finish page language differs from the selected language' }

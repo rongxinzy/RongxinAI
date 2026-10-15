@@ -609,7 +609,7 @@ public sealed class InstallerEngine
         var helper = Path.Combine(ScriptsDir, "elevated-actions.ps1");
         var startInfo = new ProcessStartInfo
         {
-            FileName = "powershell.exe",
+            FileName = ShellProcessRunner.PowerShellExecutablePath,
             Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{helper}\" " +
                 $"-Action install-vc-runtime -Target \"{redist}\" -ResultPath \"{resultPath}\"",
             UseShellExecute = true,
@@ -818,12 +818,7 @@ public sealed class InstallerEngine
     private void ReportPhase(string label) => progress.Report(new EngineEvent(Type: "phase", Label: label));
 
     private Task RunPowerShellAsync(string script, string arguments, CancellationToken ct, string? failureMessage)
-    {
-        var quoted = $"\"{script}\" {arguments}";
-        return ShellProcessRunner.RunAsync("powershell.exe",
-            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File {quoted}", ct,
-            failureMessage: failureMessage);
-    }
+        => ShellProcessRunner.RunPowerShellAsync(script, arguments, ct, failureMessage);
     internal static void CopyDirectory(string source, string destination)
     {
         // A prior interrupted copy may have created only part of the target.

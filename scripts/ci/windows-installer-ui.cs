@@ -18,6 +18,7 @@ namespace ZhiYuan.Acceptance {
 
   public sealed class WindowInfo {
     public long Handle;
+    public long ParentHandle;
     public long OwnerHandle;
     public int ProcessId;
     public int ControlId;
@@ -55,6 +56,7 @@ namespace ZhiYuan.Acceptance {
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out Rect rect);
     [DllImport("user32.dll")] private static extern int MapWindowPoints(IntPtr from, IntPtr to, ref Rect rect, uint points);
     [DllImport("user32.dll")] private static extern int GetDlgCtrlID(IntPtr window);
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
     [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern bool IsWindowEnabled(IntPtr window);
@@ -112,6 +114,7 @@ namespace ZhiYuan.Acceptance {
       if (!GetWindowRect(window, out bounds)) throw new Win32Exception();
       return new WindowInfo {
         Handle = window.ToInt64(), ProcessId = (int)processId,
+        ParentHandle = GetParent(window).ToInt64(),
         OwnerHandle = GetWindow(window, 4).ToInt64(),
         ControlId = GetDlgCtrlID(window), ClassName = className.ToString(),
         Text = text.ToString(), Visible = IsWindowVisible(window),
@@ -137,6 +140,41 @@ namespace ZhiYuan.Acceptance {
         return true;
       }, IntPtr.Zero);
       return controls.ToArray();
+    }
+
+    public static WindowInfo[] ProgressControls(long wizard) {
+      // ZYProgressShow creates these statics directly on $HWNDPARENT.
+      // nsDialogs restarts IDs at 1200 inside every hero/finish child dialog,
+      // so descendant IDs alone do not identify a progress control.
+      var controls = new List<WindowInfo>();
+      foreach (var control in Controls(wizard)) {
+        if (control.ParentHandle == wizard && control.ControlId >= 1200 && control.ControlId <= 1206)
+          controls.Add(control);
+      }
+      return controls.ToArray();
+    }
+
+    public static bool HasBrandedProgress(long wizard, string expectedTitle) {
+      var controls = ProgressControls(wizard);
+      if (controls.Length != 7) return false;
+      var ids = new HashSet<int>();
+      bool titleVisible = false;
+      foreach (var control in controls) {
+        if (control.ClassName != "Static" || !ids.Add(control.ControlId)) return false;
+        if (control.ControlId == 1201)
+          titleVisible = control.Visible && control.Text == expectedTitle;
+      }
+      return titleVisible;
+    }
+
+    public static void AssertProgressRemoved(long wizard) {
+      var controls = ProgressControls(wizard);
+      if (controls.Length != 0) {
+        var first = controls[0];
+        // Hidden controls still leak wizard-owned resources and must be gone.
+        throw new InvalidOperationException("Wizard-owned progress controls were not destroyed: " +
+          controls.Length + "; first id=" + first.ControlId + "; visible=" + first.Visible + "; text=" + first.Text);
+      }
     }
 
     public static int Checked(long handle) {
