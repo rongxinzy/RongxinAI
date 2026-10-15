@@ -1012,9 +1012,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 // 流式或恢复中禁用继续执行按钮
                 resumeDisabled={resumeDisabled || isStreaming}
                 onResumeTask={onResumeTask ? handleResumeTask : undefined}
-                hideDefaultAssistantHeader={
-                  isStreamingOnly ? hideDefaultAssistantHeader : undefined
-                }
+                hideDefaultAssistantHeader={hideDefaultAssistantHeader}
                 // 仅末轮需要工具授权，避免历史轮次误挂授权按钮
                 pendingPermission={isLastTurn ? inlinePermission : null}
                 onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}

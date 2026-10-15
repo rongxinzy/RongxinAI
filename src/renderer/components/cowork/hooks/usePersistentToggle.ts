@@ -21,20 +21,32 @@ export const setPersistentToggleNamespace = (namespace: string): void => {
 
 const scopedKey = (key: string): string => `${currentNamespace}:${key}`;
 
+const persistValue = (scoped: string, next: boolean): void => {
+  expansionMemory.delete(scoped); // refresh recency
+  expansionMemory.set(scoped, next);
+  if (expansionMemory.size > EXPANSION_MEMORY_LIMIT) {
+    const oldest = expansionMemory.keys().next().value;
+    if (oldest !== undefined) expansionMemory.delete(oldest);
+  }
+};
+
 export const usePersistentToggle = (
   key: string,
   defaultValue: boolean,
 ): [boolean, (next: boolean) => void] => {
-  const [value, setValue] = useState(() => expansionMemory.get(scopedKey(key)) ?? defaultValue);
+  const [value, setValue] = useState(() => {
+    const scoped = scopedKey(key);
+    const existing = expansionMemory.get(scoped);
+    if (existing !== undefined) return existing;
+    if (defaultValue) {
+      persistValue(scoped, defaultValue);
+    }
+    return defaultValue;
+  });
   const setPersistedValue = useCallback(
     (next: boolean) => {
       const scoped = scopedKey(key);
-      expansionMemory.delete(scoped); // refresh recency
-      expansionMemory.set(scoped, next);
-      if (expansionMemory.size > EXPANSION_MEMORY_LIMIT) {
-        const oldest = expansionMemory.keys().next().value;
-        if (oldest !== undefined) expansionMemory.delete(oldest);
-      }
+      persistValue(scoped, next);
       setValue(next);
     },
     [key],

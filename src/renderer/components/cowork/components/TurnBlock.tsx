@@ -77,12 +77,12 @@ export const isTerminalErrorItem = (item: AssistantTurnItem): boolean =>
  * generation shows elapsed time instead of looking frozen.
  */
 const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ activity }) => {
-  const [firstSeen, setFirstSeen] = React.useState({
+  const firstSeenRef = React.useRef({
     toolCallId: activity.toolCallId,
     at: activity.updatedAt,
   });
-  if (firstSeen.toolCallId !== activity.toolCallId) {
-    setFirstSeen({ toolCallId: activity.toolCallId, at: activity.updatedAt });
+  if (firstSeenRef.current.toolCallId !== activity.toolCallId) {
+    firstSeenRef.current = { toolCallId: activity.toolCallId, at: activity.updatedAt };
   }
   const [now, setNow] = React.useState(() => Date.now());
 
@@ -92,7 +92,7 @@ const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ ac
   }, []);
 
   const statusText = getExecutionStatusText(getToolActivityExecutionStatus(activity));
-  const elapsedSeconds = Math.max(0, Math.floor((now - firstSeen.at) / 1000));
+  const elapsedSeconds = Math.max(0, Math.floor((now - firstSeenRef.current.at) / 1000));
 
   return (
     <p role="status" className="text-sm text-muted-foreground">
@@ -119,7 +119,7 @@ const TurnBlockComponent: React.FC<{
   onResumeTask?: (interruption: CoworkSessionInterruption) => void;
   hideDefaultAssistantHeader?: boolean;
   pendingPermission?: CoworkPermissionRequest | null;
-  onRespondToPermission?: (result: CoworkPermissionResult) => void;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void | Promise<void>;
   /** Expand long tool results fully for image export. */
   expandToolResults?: boolean;
   beforeCopySlot?: React.ReactNode;
@@ -223,9 +223,13 @@ const TurnBlockComponent: React.FC<{
                 )
                 .replace('{seconds}', String(displayDuration ?? 0));
               if (streaming) {
-                return <Shimmer duration={1.5}>{text}</Shimmer>;
+                return (
+                  <Shimmer as="span" duration={1.5}>
+                    {text}
+                  </Shimmer>
+                );
               }
-              return <p>{text}</p>;
+              return <span>{text}</span>;
             }}
           />
           <ReasoningContent>{content}</ReasoningContent>
