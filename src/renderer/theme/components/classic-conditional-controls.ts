@@ -163,43 +163,36 @@ export function classicConditionalControls(dark: boolean) {
         'transition-timing-function': 'ease-out',
       },
       hover: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 6%, transparent)',
         color: 'var(--zy-foreground)',
       },
     }),
     'page-chat-skill-shortcuts-button-variant-2': recipe({
       base: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
-        // 2026/09/22 lixiang  选中快捷技能加粗，与侧栏导航选中态一致
-        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 8%, transparent)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
         color: 'var(--zy-foreground)',
       },
       hover: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 10%, transparent)',
         color: 'var(--zy-foreground)',
       },
     }),
     'page-chat-skill-shortcuts-button-variant-3': recipe({
-      // 2026/09/22 lixiang  快捷技能未选中项文字用正文色，与侧栏导航一致
-      base: { color: 'var(--foreground)' },
+      base: { color: 'var(--muted-foreground)' },
     }),
-    // Same selected surface as chat skill shortcuts: card on surface-raised sidebar.
     'page-sidebar-navigation-button-selected': recipe({
       base: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
-        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 8%, transparent)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
         color: 'var(--zy-foreground)',
       },
       hover: {
-        'border-color': 'var(--zy-border)',
-        'background-color': 'var(--card)',
+        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 10%, transparent)',
         color: 'var(--zy-foreground)',
       },
     }),
+
     'page-coding-workspace-sidebar-button-variant-1': recipe({
       base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
       parentHover: { opacity: '0.3' },

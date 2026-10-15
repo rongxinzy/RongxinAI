@@ -314,7 +314,17 @@ jobs:
           app_path="$(find release -maxdepth 3 -type d -name '*.app' -print -quit)"
           [[ -n "$app_path" ]] || { echo 'Packaged macOS app was not found' >&2; exit 1; }
           codesign --verify --deep --strict --verbose=2 "$app_path"
-          xcrun stapler validate "$app_path"
+          # stapler validate asks Apple for the ticket, and hits the same
+          # intermittent CloudKit drop as the staple step itself
+          # (NSURLErrorDomain -1005): retry before failing the candidate.
+          for attempt in 1 2 3; do
+            if xcrun stapler validate "$app_path"; then break; fi
+            if [[ "$attempt" == 3 ]]; then
+              echo 'macOS notarization ticket validation failed after 3 attempts' >&2
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Build Linux release
         if: ${{ matrix.platform == 'linux' }}

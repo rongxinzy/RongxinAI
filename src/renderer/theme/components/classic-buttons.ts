@@ -11,12 +11,6 @@ const mix = (token: string, amount: number) =>
 export function classicButtons(dark: boolean): ButtonAppearances {
   const hover = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
   const raised = { 'background-color': 'var(--zy-surface-raised)' };
-  // Match chat quick-skill / session-row selected: card on surface-raised sidebar.
-  const selected = {
-    'border-color': 'var(--border)',
-    'background-color': 'var(--card)',
-    color: 'var(--foreground)',
-  };
   const small = { 'border-radius': 'var(--zy-style-radius-md)' };
   return {
     button: recipe({
@@ -73,15 +67,21 @@ export function classicButtons(dark: boolean): ButtonAppearances {
     }),
     'button-navigation': recipe({
       base: {
-        // 2026/09/22 lixiang  侧栏导航未选中也用正文色（用户要求接近黑色，不用次文本灰）
-        color: 'var(--foreground)',
+        color: 'var(--muted-foreground)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
-        'transition-duration': '200ms',
+        'transition-duration': '150ms',
       },
-      hover: selected,
-      // 2026/09/22 lixiang  选中项加粗（DESIGN：激活项用 semibold）
-      selected: { ...selected, 'font-weight': 'var(--zy-component-font-weight-semibold)' },
+      hover: {
+        'background-color': mix('sidebar-foreground', 6),
+        color: 'var(--sidebar-foreground)',
+      },
+      selected: {
+        'background-color': mix('sidebar-foreground', 8),
+        color: 'var(--sidebar-foreground)',
+        'font-weight': 'var(--zy-component-font-weight-medium)',
+      },
     }),
+
     'button-toolbar': recipe({
       base: { color: 'var(--muted-foreground)' },
       hover: { ...raised, color: 'var(--foreground)' },

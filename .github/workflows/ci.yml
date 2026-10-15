@@ -155,30 +155,60 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Check if enterprise checks are required
+        id: gate
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "$PR_BASE_SHA" ] && [ -n "$PR_HEAD_SHA" ]; then
+            CHANGED=$(git diff --name-only --no-renames "$PR_BASE_SHA...$PR_HEAD_SHA" 2>/dev/null || true)
+            if echo "$CHANGED" | grep -qE '^(enterprise/|src/main/enterpriseExtension|package\.json|bun\.lock|electron-builder)'; then
+              echo "required=true" >> "$GITHUB_OUTPUT"
+              echo "Enterprise extension changes detected; executing enterprise checks."
+            else
+              echo "required=false" >> "$GITHUB_OUTPUT"
+              echo "No enterprise changes in PR diff; skipping heavy enterprise build."
+            fi
+          else
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v6
+        if: steps.gate.outputs.required == 'true'
         with:
           node-version: '24.x'
       - uses: oven-sh/setup-bun@v2
+        if: steps.gate.outputs.required == 'true'
         with:
           bun-version: '1.4.0'
       - name: Restore Bun package cache
+        if: steps.gate.outputs.required == 'true'
         uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: enterprise-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
           restore-keys: |
             enterprise-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+      - if: steps.gate.outputs.required == 'true'
+        run: bun install --frozen-lockfile --ignore-scripts
+      - if: steps.gate.outputs.required == 'true'
+        run: bun run apply:patches
       - name: Typecheck enterprise extension
+        if: steps.gate.outputs.required == 'true'
         run: bun run typecheck:enterprise
       - name: Run enterprise extension tests
+        if: steps.gate.outputs.required == 'true'
         run: bun run test:enterprise
       - name: Build enterprise extension bundle and renderer
+        if: steps.gate.outputs.required == 'true'
         run: bun run build:enterprise
       - name: Verify enterprise extension bundle
+        if: steps.gate.outputs.required == 'true'
         run: bun run verify:enterprise:bundle
       - name: Verify enterprise packaging config
+        if: steps.gate.outputs.required == 'true'
         run: bun run verify:enterprise:packaging-config
 
   memory-leak:

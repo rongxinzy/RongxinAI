@@ -1,18 +1,18 @@
 /**
  * Author: lixiang
  * Date: 2026/09/17
- * Description: 清除 XiaoruanAgent 用户数据，下次启动等同全新安装（不动 node_modules/dist/release）
+ * Description: 清除 ZhiYuanAgent 用户数据，下次启动等同全新安装（不动 node_modules/dist/release）
  *
  * Usage:
  *   node scripts/reset-userdata.mjs
- *   npm run reset:userdata
- *   npm run electron:dev:fresh
+ *   bun run reset:userdata
+ *   bun run electron:dev:fresh
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const APP_DATA_DIR_NAME = 'XiaoruanAgent';
+const APP_DATA_DIR_NAMES = ['知远', 'ZhiYuanAgent', 'zhiyuan'];
 
 function roamingAppDataRoots() {
   switch (process.platform) {
@@ -46,10 +46,10 @@ function removePath(target) {
   return true;
 }
 
-const targets = [
-  ...roamingAppDataRoots().map(root => path.join(root, APP_DATA_DIR_NAME)),
-  ...localAppDataRoots().map(root => path.join(root, APP_DATA_DIR_NAME)),
-];
+const targets = APP_DATA_DIR_NAMES.flatMap(name => [
+  ...roamingAppDataRoots().map(root => path.join(root, name)),
+  ...localAppDataRoots().map(root => path.join(root, name)),
+]);
 
 let removed = 0;
 for (const target of targets) {
