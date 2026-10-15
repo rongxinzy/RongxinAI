@@ -162,6 +162,7 @@ import {
   slimImageAttachmentsForIpc,
   slimQueuedMessagesForIpc,
 } from './coworkImageAttachments';
+import { isAllowedLocalfilePath } from './localfilePathValidation';
 import { resolveCoworkContinuationSkillState } from './coworkSessionSkills';
 import {
   type CoworkMessageMetadata,
@@ -778,6 +779,35 @@ const materializeSessionImages = (
     );
     message.metadata = next.metadata;
   }
+};
+
+const scheduleBackgroundMaterialize = (
+  sessionId: string,
+  messages: Array<{ id: string; metadata?: unknown }>,
+): void => {
+  const hasInlineImages = messages.some(
+    m =>
+      m.metadata &&
+      typeof m.metadata === 'object' &&
+      Array.isArray((m.metadata as Record<string, unknown>).imageAttachments) &&
+      ((m.metadata as Record<string, unknown>).imageAttachments as unknown[]).some(img =>
+        Boolean(
+          img &&
+          typeof img === 'object' &&
+          'base64Data' in img &&
+          (img as { base64Data?: string }).base64Data,
+        ),
+      ),
+  );
+  if (!hasInlineImages) return;
+
+  setImmediate(() => {
+    try {
+      materializeSessionImages(sessionId, messages);
+    } catch (error) {
+      console.warn('[CoworkImages] background materialize failed for session:', sessionId, error);
+    }
+  });
 };
 
 const listAllMatchingSessionIds = (filter: {
@@ -5320,7 +5350,7 @@ if (!gotTheLock) {
             ? store.getSession(sessionId, options.messageLimit)
             : store.getSession(sessionId);
         if (!session) return { success: true, session: null };
-        materializeSessionImages(sessionId, session.messages);
+        scheduleBackgroundMaterialize(sessionId, session.messages);
 
         const reconciledSession = reconcileWorkSessionRuntimeState(
           session,
@@ -5406,7 +5436,7 @@ if (!gotTheLock) {
         const store = getCoworkStore();
         const total = store.countSessionMessages(sessionId);
         const messages = store.getPagedSessionMessages(sessionId, limit, offset);
-        materializeSessionImages(sessionId, messages);
+        scheduleBackgroundMaterialize(sessionId, messages);
         return {
           success: true,
           messages: messages.map(message => slimCoworkMessageForIpc(message)),
@@ -7873,11 +7903,31 @@ if (!gotTheLock) {
     }
     console.log('[Main] initApp: default project dir ensured');
 
-    // 注册 localfile:// 自定义协议，用于安全加载本地文件（图片等）
+    // 注册 localfile:// 自定义协议，用于安全加载本地图片
     protocol.handle('localfile', request => {
-      const url = new URL(request.url);
-      const filePath = decodeURIComponent(url.pathname);
-      return net.fetch(`file://${filePath}`);
+      try {
+        const url = new URL(request.url);
+        let targetPath = decodeURIComponent(url.pathname);
+        if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(targetPath)) {
+          targetPath = targetPath.slice(1);
+        }
+        const resolvedPath = path.resolve(targetPath);
+        const allowedImageRoot = getCoworkImageRoot();
+
+        if (!isAllowedLocalfilePath(resolvedPath, allowedImageRoot)) {
+          console.warn('[LocalfileProtocol] Blocked unauthorized file access attempt:', targetPath);
+          return new Response('Forbidden', { status: 403 });
+        }
+
+        if (!fs.existsSync(resolvedPath)) {
+          return new Response('Not Found', { status: 404 });
+        }
+
+        return net.fetch(pathToFileURL(resolvedPath).toString());
+      } catch (error) {
+        console.error('[LocalfileProtocol] Failed to handle localfile request:', error);
+        return new Response('Bad Request', { status: 400 });
+      }
     });
     // 2026/09/17 lixiang  仅开发态挂 Network 镜像，避免生产 clone 响应体
     if (isDev) {
