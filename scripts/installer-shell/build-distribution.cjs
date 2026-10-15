@@ -5,6 +5,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { writeSetupManifest } = require('./sfx-format.cjs');
+const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const signed = process.argv.includes('--signed');
@@ -35,7 +36,9 @@ function sign(file) {
 // electron-builder has already produced and signed the app and NSIS updater.
 // Preserve latest.yml / its blockmap unchanged: electron-updater requires NSIS.
 run(process.execPath, [path.join(__dirname, 'build-shell.cjs')]);
-if (signed) sign(uninstall);
+// NSIS's official !finalize hook retained the exact native uninstaller after
+// electron-builder signed it. Do not overwrite or re-sign that copy.
+verifyRetainedHost(root, uninstall);
 run(process.execPath, [
   path.join(__dirname, 'pack-setup.cjs'),
   '--app-dir',

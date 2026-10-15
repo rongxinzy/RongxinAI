@@ -1,6 +1,9 @@
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 !include "nsDialogs.nsh"
+!ifdef PROJECT_DIR
+!include "${PROJECT_DIR}\scripts\installer-shell\retain-uninstaller.nsh"
+!endif
 
 ; Fully custom-drawn installer UI (palette, drawing helpers, page functions
 ; and string table). The theme file carries the include guard. electron-builder
@@ -842,22 +845,15 @@ Var /GLOBAL zyDeleteRealAppData
 
   ; electron-builder's DELETE_APP_DATA list only covers $APPDATA\<product
   ; name> variants; the app's real userData directory is %APPDATA%\ZhiYuanAgent
-  ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs). The
-  ; WebView2 shell uninstaller removes that same tree, so mirror the exact
-  ; delete-app-data decision uninstaller.nsh makes and remove it too. The
-  ; decision has to be recomputed here: customUnInstall runs before
-  ; uninstaller.nsh declares its own $isDeleteAppData variable.
+  ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs).
+  ; Normal uninstallation preserves this tree. Only the explicit destructive
+  ; --delete-app-data option may remove it; a packaging default must not opt
+  ; the user into losing their conversations, settings, or created Skills.
   StrCpy $zyDeleteRealAppData "0"
   ClearErrors
   ${GetParameters} $R0
   ${GetOptions} $R0 "--delete-app-data" $R1
-  ${if} ${Errors}
-    !ifdef DELETE_APP_DATA_ON_UNINSTALL
-      ${ifNot} ${isUpdated}
-        StrCpy $zyDeleteRealAppData "1"
-      ${endif}
-    !endif
-  ${else}
+  ${ifNot} ${Errors}
     StrCpy $zyDeleteRealAppData "1"
   ${endif}
   ${if} $zyDeleteRealAppData == "1"

@@ -92,8 +92,12 @@ test('uninstall preserves personal data and frees the old path before updater cl
 
 test('uninstaller preserves the separately signed host bytes', () => {
   expect(installer).toContain('Path.Combine(payloadDir!, "uninstall.exe")');
+  expect(installer).toContain('Path.Combine(installDir, "Uninstall " + DisplayName + ".exe")');
   expect(installer).toContain('File.Copy(uninstallerHost, uninstallExe, overwrite: true)');
   expect(installer).not.toContain('CopyUninstallerHost');
+  expect(installer).toContain('QuietUninstallString');
+  expect(installer).toContain('\\\"{uninstallExe}\\\" /S');
+  expect(installer).toContain('Path.Combine(installDir, "resources", "vc_redist.x64.exe")');
 });
 
 test('silent NSIS uninstall arguments work without a WebView2 or automatic launch', () => {

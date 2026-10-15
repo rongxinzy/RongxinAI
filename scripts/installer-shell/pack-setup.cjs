@@ -20,7 +20,13 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { appendPayload, writeSetupManifest } = require('./sfx-format.cjs');
+const {
+  appendPayload,
+  writeSetupManifest,
+  MAX_SETUP_BYTES,
+  FOOTER_BYTES,
+} = require('./sfx-format.cjs');
+const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
 const { sha256File } = require('../windows-resource-pack.cjs');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
@@ -61,6 +67,7 @@ function sha256(buffer) {
 }
 
 let payloadZip;
+let componentArchiveBytes = null;
 const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'zy-pack-'));
 
 try {
@@ -75,6 +82,9 @@ try {
     if (!componentsDir || !fs.existsSync(componentsDir)) {
       fail('--components-dir <build-tar/windows-components> is required and must exist');
     }
+    const installedVcRedist = path.join(appDir, 'resources', 'vc_redist.x64.exe');
+    if (!fs.existsSync(installedVcRedist)) fail('app resources must contain vc_redist.x64.exe');
+    verifyRetainedHost(projectRoot, uninstallHost);
     const payloadDir = path.join(staging, 'payload');
     for (const dir of ['tools', 'components', 'scripts']) {
       fs.mkdirSync(path.join(payloadDir, dir), { recursive: true });
@@ -87,6 +97,9 @@ try {
       encoding: 'utf8',
     });
     if (pack.status !== 0) fail(`7za failed packing app dir:\n${pack.stdout}\n${pack.stderr}`);
+    console.log(
+      `[pack-setup] app.7z: ${fs.statSync(appArchive).size} bytes (includes VC++ redistributable)`,
+    );
 
     // Tools.
     const sevenZipBytes = fs.readFileSync(sevenZip);
@@ -105,6 +118,7 @@ try {
     if (!Array.isArray(manifest.components) || manifest.components.length !== targets.length) {
       fail('component manifest must contain every bundled Windows component');
     }
+    componentArchiveBytes = 0;
     for (const target of targets) {
       const matches = manifest.components.filter(component => component.key === target.key);
       if (matches.length !== 1 || matches[0].prefix !== target.prefix) {
@@ -112,12 +126,14 @@ try {
       }
       const component = matches[0];
       const archive = path.join(componentsDir, `${target.key}.7z`);
+      console.log(`[pack-setup] component ${target.key}: ${fs.statSync(archive).size} bytes`);
       if (
         sha256File(archive) !== component.archiveSha256 ||
         fs.statSync(archive).size !== component.archiveSizeBytes
       ) {
         fail(`component archive integrity mismatch: ${target.key}`);
       }
+      componentArchiveBytes += component.archiveSizeBytes;
       for (const [suffix, expected] of [
         ['version', component.contentId],
         ['sha256', component.archiveSha256],
@@ -156,15 +172,13 @@ try {
       path.join(projectRoot, 'scripts', 'nsis-elevated-actions.ps1'),
       path.join(payloadDir, 'scripts', 'elevated-actions.ps1'),
     );
-    fs.copyFileSync(
-      path.join(projectRoot, 'resources', 'vc_redist.x64.exe'),
-      path.join(payloadDir, 'vc_redist.x64.exe'),
-    );
+    // The engine runs the original redistributable from the extracted app's
+    // resources directory. A second root-level copy wasted ~18 MiB per setup.
     fs.writeFileSync(path.join(payloadDir, 'version.txt'), packageVersion);
-    // A separate signed host preserves the uninstaller's Authenticode bytes.
-    // Trimming a signed SFX to recover its host invalidates the signature.
-    if (!fs.existsSync(uninstallHost)) fail(`uninstall host missing: ${uninstallHost}`);
+    // Preserve the native uninstaller already signed by electron-builder.
+    // It has no duplicate self-contained .NET runtime and is never re-signed.
     fs.copyFileSync(uninstallHost, path.join(payloadDir, 'uninstall.exe'));
+    console.log(`[pack-setup] native uninstall.exe: ${fs.statSync(uninstallHost).size} bytes`);
 
     // Zip the payload directory.
     payloadZip = path.join(staging, 'payload.zip');
@@ -176,6 +190,45 @@ try {
     console.log(`[pack-setup] assembled payload (${fs.statSync(payloadZip).size} bytes)`);
   }
 
+  const shellBytes = fs.statSync(shellExe).size;
+  const payloadBytes = fs.statSync(payloadZip).size;
+  const alignmentBytes = (8 - ((shellBytes + payloadBytes + FOOTER_BYTES) % 8)) % 8;
+  const unsignedSetupBytes = shellBytes + payloadBytes + alignmentBytes + FOOTER_BYTES;
+  const config = JSON.parse(
+    fs.readFileSync(path.join(projectRoot, 'electron-builder.json'), 'utf8'),
+  );
+  const updater = path.join(
+    projectRoot,
+    'release',
+    `${config.productName}-Setup-${packageVersion}.exe`,
+  );
+  const nsisUpdaterBytes = fs.existsSync(updater) ? fs.statSync(updater).size : null;
+  const sizeReport = {
+    shellBytes,
+    payloadBytes,
+    footerBytes: FOOTER_BYTES,
+    alignmentBytes,
+    unsignedSetupBytes,
+    componentArchiveBytes,
+    nonComponentBytes:
+      componentArchiveBytes === null ? null : unsignedSetupBytes - componentArchiveBytes,
+    nsisUpdaterBytes,
+    nsisNonComponentBytes:
+      componentArchiveBytes === null || nsisUpdaterBytes === null
+        ? null
+        : nsisUpdaterBytes - componentArchiveBytes,
+    maxSetupBytes: MAX_SETUP_BYTES,
+    remainingSigningBytes: MAX_SETUP_BYTES - unsignedSetupBytes,
+    // Existing NSIS gate values are reported for comparison, never increased.
+    legacyBudgetSource: 'scripts/ci/windows-installer-size-smoke.ps1',
+    legacyComponentCeilingBytes: 300 * 1024 * 1024,
+    legacyNonComponentCeilingBytes: 150 * 1024 * 1024,
+  };
+  console.log(`[pack-setup] budget ${JSON.stringify(sizeReport)}`);
+  fs.writeFileSync(
+    path.join(path.dirname(shellExe), 'setup-size.json'),
+    `${JSON.stringify(sizeReport, null, 2)}\n`,
+  );
   const outPath = path.resolve(outArg || `ZhiYuanAgent-Setup-${packageVersion}.exe`);
   appendPayload(shellExe, payloadZip, outPath);
   const report = writeSetupManifest(outPath, packageVersion);

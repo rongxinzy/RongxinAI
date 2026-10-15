@@ -156,6 +156,10 @@ jobs:
           node scripts/verify-linux-renderer.mjs
           release/linux-unpacked
           release/linux-render-smoke.png
+      - name: Prepare isolated native uninstall acceptance
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
       - name: Verify the final WebView2 installer interactively
         if: ${{ matrix.platform == 'windows' }}
         shell: pwsh
@@ -167,12 +171,16 @@ jobs:
           $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
           node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
           if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid.' }
+      - name: Verify native uninstall preserves user data
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify
       - name: Upload shell acceptance evidence
         if: ${{ always() && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
         with:
           name: shell-acceptance-${{ github.run_id }}
-          path: acceptance-diagnostics/shell-interactive
+          path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v6

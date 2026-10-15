@@ -603,7 +603,7 @@ public sealed class InstallerEngine
         ct.ThrowIfCancellationRequested();
         using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64");
         if (key?.GetValue("Installed") is int installed && installed == 1) return;
-        var redist = Path.Combine(payloadDir!, "vc_redist.x64.exe");
+        var redist = Path.Combine(installDir, "resources", "vc_redist.x64.exe");
         if (!File.Exists(redist)) return;
         var resultPath = Path.Combine(workDir, "elevated-action-result.txt");
         var helper = Path.Combine(ScriptsDir, "elevated-actions.ps1");
@@ -666,13 +666,13 @@ public sealed class InstallerEngine
 
     /// <summary>Step 14 — registry keys in the exact electron-builder shape so
     /// electron-updater locates this install exactly like an NSIS one. Also
-    /// ships the uninstall entry point: this shell without its SFX payload (it boots
-    /// into uninstall mode when named uninstall.exe) plus the shared cleanup
-    /// script that the uninstall engine -File-invokes.</summary>
+    /// ships the independently signed NSIS uninstaller produced by the same
+    /// electron-builder run. Copy its exact bytes and preserve its /S quiet
+    /// contract; the WebView2 host is not duplicated in the payload.</summary>
     private void StepRegisterUninstall()
     {
         ReportPhase("正在写入卸载信息");
-        var uninstallExe = Path.Combine(installDir, "uninstall.exe");
+        var uninstallExe = Path.Combine(installDir, "Uninstall " + DisplayName + ".exe");
         var uninstallerHost = Path.Combine(payloadDir!, "uninstall.exe");
         if (!File.Exists(uninstallerHost)) throw new EngineException("安装包缺少卸载程序，请重新下载安装包。");
         File.Copy(uninstallerHost, uninstallExe, overwrite: true);
@@ -694,7 +694,7 @@ public sealed class InstallerEngine
         uninstallKey.SetValue("DisplayIcon", LaunchPath + ",0");
         uninstallKey.SetValue("InstallLocation", installDir);
         uninstallKey.SetValue("UninstallString", $"\"{uninstallExe}\"");
-        uninstallKey.SetValue("QuietUninstallString", $"\"{uninstallExe}\" --silent");
+        uninstallKey.SetValue("QuietUninstallString", $"\"{uninstallExe}\" /S");
         uninstallKey.SetValue("Publisher", Publisher);
         uninstallKey.SetValue("NoModify", 1, RegistryValueKind.DWord);
         uninstallKey.SetValue("NoRepair", 1, RegistryValueKind.DWord);

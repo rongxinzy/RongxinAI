@@ -326,6 +326,14 @@ jobs:
       - name: Qualify Windows compression before candidate assembly
         if: ${{ matrix.platform == 'windows' }}
         uses: ./.github/actions/verify-windows-compression
+      - name: Prepare isolated native uninstall acceptance
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        env:
+          ZHIYUAN_SOURCE_COMMIT: ${{ needs.prepare-candidate.outputs.commit }}
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-shell-uninstall.ps1 -Action prepare
       - name: Verify Windows cold install, cache-hit upgrade, and uninstall
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
@@ -376,12 +384,21 @@ jobs:
           $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
           node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
           if ($LASTEXITCODE -ne 0) { throw 'Signed shell evidence is invalid.' }
+      - name: Verify signed native uninstall preserves user data
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        env:
+          ZHIYUAN_SOURCE_COMMIT: ${{ needs.prepare-candidate.outputs.commit }}
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-shell-uninstall.ps1 -Action verify
+          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
       - name: Upload signed shell acceptance evidence
         if: ${{ always() && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
         with:
           name: signed-shell-acceptance-${{ github.run_id }}
-          path: acceptance-diagnostics/shell-interactive
+          path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7
       - name: Assemble Windows candidate payload

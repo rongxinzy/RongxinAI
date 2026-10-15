@@ -358,7 +358,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(browseBlock).toContain('StrCpy $INSTDIR "$INSTDIR\\${APP_FILENAME}"');
   });
 
-  test('uninstall removes the real userData directory with the app-data decision', () => {
+  test('uninstall preserves userData unless deletion is explicitly requested', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
     // electron-builder's app-data list only covers product-name variants; the
@@ -371,7 +371,10 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(unInstallBlock).toContain('RMDir /r "$APPDATA\\ZhiYuanAgent"');
     expect(unInstallBlock).toContain('--delete-app-data');
-    expect(unInstallBlock).toContain('DELETE_APP_DATA_ON_UNINSTALL');
+    expect(unInstallBlock).not.toContain('DELETE_APP_DATA_ON_UNINSTALL');
+    expect(unInstallBlock).toContain('${ifNot} ${Errors}');
+    const config = JSON.parse(fs.readFileSync(path.resolve('electron-builder.json'), 'utf8'));
+    expect(config.nsis.deleteAppDataOnUninstall).toBe(false);
     // The decision is recomputed because customUnInstall runs before
     // uninstaller.nsh declares its own $isDeleteAppData variable, and the
     // macro must not rely on customUnInstallSection (file scope, where
