@@ -147,9 +147,7 @@ public sealed class UninstallerEngine
 
     private void ValidateInstallOwnership()
     {
-        if (!File.Exists(Path.Combine(installDir, InstallerEngine.AppExeName)) ||
-            !File.Exists(Path.Combine(installDir, "resources", "app.asar")))
-            throw new EngineException("所选目录不是知远安装目录，未删除任何文件。");
+        new InstallDirectoryTransaction(installDir).ValidateOwnership(requireInstalled: true);
     }
 
     /// <summary>The shared cleanup script staged next to the app by the

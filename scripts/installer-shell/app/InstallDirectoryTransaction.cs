@@ -22,21 +22,25 @@ internal sealed class InstallDirectoryTransaction
     public bool IsCommitted => ReadState()?.Committed == true;
     public string? BackupDir => state?.BackupDir;
 
-    public void ValidateOwnership()
+    public void ValidateOwnership(bool requireInstalled = false)
     {
         // Reading a journal validates its directory binding without mutation.
         // It also permits an interrupted partial extraction to be recovered.
-        if (ReadState() is not null) return;
-        if (Directory.Exists(installDir) && Directory.EnumerateFileSystemEntries(installDir).Any())
+        if (!requireInstalled && ReadState() is not null) return;
+        if (requireInstalled || (Directory.Exists(installDir) && Directory.EnumerateFileSystemEntries(installDir).Any()))
+            ValidatePhysicalInstallation(installDir);
+    }
+
+    private static void ValidatePhysicalInstallation(string directory)
+    {
+        var resources = Path.Combine(directory, "resources");
+        foreach (var path in new[] { directory, resources, Path.Combine(directory, InstallerEngine.AppExeName),
+            Path.Combine(resources, "app.asar") })
         {
-            var resources = Path.Combine(installDir, "resources");
-            foreach (var path in new[] { resources, Path.Combine(installDir, InstallerEngine.AppExeName),
-                Path.Combine(resources, "app.asar") })
-            {
-                if ((path == resources ? !Directory.Exists(path) : !File.Exists(path)) ||
-                    (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-                    throw new EngineException("所选目录包含其他文件或链接，请选择空目录或已有的知远安装目录。");
-            }
+            var isDirectory = path == directory || path == resources;
+            if ((isDirectory ? !Directory.Exists(path) : !File.Exists(path)) ||
+                (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new EngineException("所选目录包含其他文件或链接，请选择空目录或已有的知远安装目录。");
         }
     }
 
@@ -96,6 +100,21 @@ internal sealed class InstallDirectoryTransaction
              (!pending.BackupDir.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase) ||
               !Guid.TryParseExact(pending.BackupDir[expectedPrefix.Length..], "n", out _))))
             throw new EngineException("安装恢复记录不属于所选目录，未修改任何安装文件。");
+        if (!pending.Committed && pending.BackupDir is not null)
+        {
+            try
+            {
+                var attributes = File.GetAttributes(pending.BackupDir);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new EngineException("安装备份不能是目录链接。");
+                if ((attributes & FileAttributes.Directory) == 0)
+                    throw new EngineException("安装备份必须是文件夹。");
+                if (Directory.EnumerateFileSystemEntries(pending.BackupDir).Any())
+                    ValidatePhysicalInstallation(pending.BackupDir);
+            }
+            catch (FileNotFoundException) { /* Rename may not have happened yet. */ }
+            catch (DirectoryNotFoundException) { /* Rename may not have happened yet. */ }
+        }
         state = pending;
         return state;
     }

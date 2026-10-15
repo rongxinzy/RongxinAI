@@ -169,6 +169,25 @@ test.skipIf(process.platform !== 'win32')(
   },
 );
 
+test('process regression retains native handles and verifies nonzero exit-status capture', () => {
+  const regression = readFileSync(
+    path.join(__dirname, 'windows-installer-process-regression.ps1'),
+    'utf8',
+  );
+  const helper = regression.split('function Invoke-BoundedHelper {')[1]?.split('\nfunction ')[0];
+  expect(helper).toContain('New-Object System.Diagnostics.Process');
+  expect(helper).toContain('$helper.StartInfo.UseShellExecute = $false');
+  expect(helper).toContain('$helper.get_ExitCode()');
+  expect(helper).toContain('$null -eq $exitCode');
+  expect(helper).toContain('$helper.StandardOutput.ReadToEndAsync()');
+  expect(helper).toContain('$helper.StandardError.ReadToEndAsync()');
+  expect(helper).toContain('$helper.WaitForExit(20000)');
+  expect(helper).toContain('$helper.Dispose()');
+  expect(helper).not.toMatch(/^\s*\$helper\s*=\s*Start-Process/m);
+  expect(regression).toContain('foreach ($code in @(0, 3, 200))');
+  expect(regression).toContain('Format-ProcessFailure $countBefore');
+});
+
 test.skipIf(process.platform !== 'win32')(
   'parses production process helpers and stops only bounded real app, sidecar and runtime children',
   () => {
@@ -188,6 +207,9 @@ test.skipIf(process.platform !== 'win32')(
     );
     expect(result.error, result.stderr).toBeUndefined();
     expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain(
+      'PASS: real bounded helper preserves exit codes 0, 3, 200 and both output streams',
+    );
     expect(result.stdout).toContain(
       'PASS: production NSIS commands parse and stop only real owned processes',
     );

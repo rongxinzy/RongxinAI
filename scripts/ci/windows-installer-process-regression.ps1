@@ -47,21 +47,63 @@ function Assert-NoErrorStream {
   throw "Production $Name failed: $Text"
 }
 
+function Invoke-BoundedHelper {
+  param([string]$Name, [string]$Arguments)
+  # Own the native handle from creation through get_ExitCode(). Windows
+  # PowerShell 5.1 Start-Process -PassThru can return a Process whose handle
+  # was not retained, yielding a null ExitCode after the child has exited.
+  $helper = New-Object System.Diagnostics.Process
+  $helper.StartInfo.FileName = "$PSHOME/powershell.exe"
+  $helper.StartInfo.Arguments = $Arguments
+  $helper.StartInfo.UseShellExecute = $false
+  $helper.StartInfo.CreateNoWindow = $true
+  $helper.StartInfo.RedirectStandardOutput = $true
+  $helper.StartInfo.RedirectStandardError = $true
+  $started = $false
+  try {
+    $started = $helper.Start()
+    if (-not $started) { throw "Could not start $Name; arguments=$Arguments" }
+    $null = $helper.Handle
+    $stdout = $helper.StandardOutput.ReadToEndAsync()
+    $stderr = $helper.StandardError.ReadToEndAsync()
+    if (-not $helper.WaitForExit(20000)) {
+      throw "$Name timed out; pid=$($helper.Id); arguments=$Arguments"
+    }
+    if (-not $stdout.Wait(5000) -or -not $stderr.Wait(5000)) {
+      throw "$Name output pipes did not close; pid=$($helper.Id); arguments=$Arguments"
+    }
+    # Call the getter explicitly so an invalid handle throws instead of a
+    # PowerShell property-adapter failure being mistaken for an empty count.
+    $exitCode = $helper.get_ExitCode()
+    if ($null -eq $exitCode) {
+      throw "$Name returned no exit code; pid=$($helper.Id); stdout=$($stdout.Result); stderr=$($stderr.Result)"
+    }
+    [pscustomobject]@{ exitCode = $exitCode; output = $stdout.Result; errorOutput = $stderr.Result; processId = $helper.Id }
+  } finally {
+    if ($started -and -not $helper.HasExited) {
+      $helper.Kill()
+      $null = $helper.WaitForExit(5000)
+    }
+    $helper.Dispose()
+  }
+}
+
 function Invoke-ProductionHelper {
   param([string]$Name, [string]$Mode, [int]$ExcludedProcessId)
   $path = Get-ProductionHelper $Name $Mode
-  $stdout = Join-Path $fixture "$Name.out"
-  $stderr = Join-Path $fixture "$Name.err"
   $arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $path + '" -Mode ' + $Mode + ' -InstallDir "' + $installRoot + '" -RuntimeRoot "' + $runtimeRoot + '" -SelfPid ' + $ExcludedProcessId
-  $helper = Start-Process -FilePath "$PSHOME/powershell.exe" -ArgumentList $arguments -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
-  try {
-    if (-not $helper.WaitForExit(20000)) { throw "Production $Name timed out" }
-    $errors = Get-Content -LiteralPath $stderr -Raw
-    Assert-NoErrorStream $errors $Name
-    [pscustomobject]@{ exitCode = $helper.ExitCode; output = (Get-Content -LiteralPath $stdout -Raw) }
-  } finally {
-    if (-not $helper.HasExited) { Stop-Process -Id $helper.Id -Force -ErrorAction SilentlyContinue }
-  }
+  $result = Invoke-BoundedHelper $Name $arguments
+  Assert-NoErrorStream $result.errorOutput "$Name (pid=$($result.processId), exit=$($result.exitCode), stdout=$($result.output))"
+  return $result
+}
+
+function Format-ProcessFailure {
+  param([object]$Result)
+  $states = @($processes | ForEach-Object {
+    $_.Refresh()
+    [pscustomobject]@{ processId = $_.Id; exited = $_.HasExited }
+  })
+  return ([pscustomobject]@{ result = $Result; installRoot = $installRoot; runtimeRoot = $runtimeRoot; children = $states } | ConvertTo-Json -Depth 5 -Compress)
 }
 
 try {
@@ -76,6 +118,17 @@ try {
     if (-not $rejected) { throw 'A real error stream was ignored as progress' }
   }
   foreach ($directory in @($installRoot,$runtimeRoot,$siblingRoot)) { [IO.Directory]::CreateDirectory($directory) | Out-Null }
+  # A real short-lived child proves the wrapper preserves zero AND nonzero
+  # statuses. Never cast a missing status to 0 or infer success from stdout.
+  $exitFixture = Join-Path $fixture 'exit-status.ps1'
+  [IO.File]::WriteAllText($exitFixture, 'param([int]$Code) [Console]::Out.Write("exit-fixture=$Code"); [Console]::Error.Write("stderr-fixture=$Code"); exit $Code')
+  foreach ($code in @(0, 3, 200)) {
+    $probe = Invoke-BoundedHelper 'exit-status fixture' ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $exitFixture + '" -Code ' + $code)
+    if ($probe.exitCode -ne $code -or $probe.output -cne "exit-fixture=$code" -or $probe.errorOutput -cne "stderr-fixture=$code") {
+      throw "Native exit-status/output capture regression: $($probe | ConvertTo-Json -Compress)"
+    }
+  }
+  Write-Output 'PASS: real bounded helper preserves exit codes 0, 3, 200 and both output streams'
   $executable = Join-Path $installRoot 'app.exe'
   # Compile without loading the output into this harness, which would retain
   # an assembly file handle and interfere with the real process-only cleanup.
@@ -95,10 +148,10 @@ try {
   }
   $excluded = $processes[3].Id
   $countBefore = Invoke-ProductionHelper 'CountInstallDirProcesses' 'count' $PID
-  if ($countBefore.exitCode -ne 3) { throw "Expected three real processes under the Unicode install root, got $($countBefore.exitCode)" }
+  if ($countBefore.exitCode -ne 3) { throw "Expected three real processes under the Unicode install root: $(Format-ProcessFailure $countBefore)" }
   $stopped = Invoke-ProductionHelper 'StopAppProcesses' 'stop' $excluded
   if ($stopped.exitCode -ne 0 -or $stopped.output -notmatch 'stopped=3 remaining=0') {
-    throw "Production process stop did not report success: exit=$($stopped.exitCode) output=$($stopped.output)"
+    throw "Production process stop did not report success: $(Format-ProcessFailure $stopped)"
   }
   foreach ($process in $processes[0..2]) {
     if (-not $process.WaitForExit(5000)) { throw "Production helper did not stop app/sidecar/runtime process $($process.Id)" }
@@ -108,9 +161,9 @@ try {
     if ($process.HasExited) { throw 'Production helper killed the excluded installer or similarly named sibling installation' }
   }
   $countAfter = Invoke-ProductionHelper 'CountInstallDirProcesses' 'count' $PID
-  if ($countAfter.exitCode -ne 1) { throw 'The process counter did not retain the excluded installer at its actual path' }
+  if ($countAfter.exitCode -ne 1) { throw "The process counter did not retain the excluded installer: $(Format-ProcessFailure $countAfter)" }
   $countWithoutSelf = Invoke-ProductionHelper 'CountInstallDirProcesses' 'count' $excluded
-  if ($countWithoutSelf.exitCode -ne 0) { throw 'The process counter did not exclude the current uninstaller' }
+  if ($countWithoutSelf.exitCode -ne 0) { throw "The process counter did not exclude the current uninstaller: $(Format-ProcessFailure $countWithoutSelf)" }
   Write-Output 'PASS: production NSIS commands parse and stop only real owned processes'
 } finally {
   foreach ($process in $processes) {

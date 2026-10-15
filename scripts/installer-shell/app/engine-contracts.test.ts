@@ -56,7 +56,7 @@ test('install and uninstall reject foreign directories before stopping any proce
     uninstaller.indexOf('await StepStopAppProcesses('),
   );
   const ownership = transaction.slice(
-    transaction.indexOf('public void ValidateOwnership()'),
+    transaction.indexOf('public void ValidateOwnership('),
     transaction.indexOf('public void Begin()'),
   );
   expect(ownership).toContain('ReadState()');
@@ -194,6 +194,14 @@ try {
     Check(!File.Exists(Path.Combine(install, "partial.txt")), "partial upgrade survived rollback");
     Check(File.ReadAllText(Path.Combine(data, "sessions.sqlite")) == "personal", "personal data changed");
 
+    var emptyInstall = Path.Combine(root, "empty-install");
+    Directory.CreateDirectory(emptyInstall);
+    new InstallDirectoryTransaction(emptyInstall).Begin();
+    Directory.CreateDirectory(emptyInstall);
+    File.WriteAllText(Path.Combine(emptyInstall, "partial"), "new");
+    new InstallDirectoryTransaction(emptyInstall).Rollback();
+    Check(Directory.Exists(emptyInstall) && !Directory.EnumerateFileSystemEntries(emptyInstall).Any(), "empty original directory was not restored");
+
     var fresh = Path.Combine(root, "fresh");
     var freshTransaction = new InstallDirectoryTransaction(fresh);
     freshTransaction.Begin();
@@ -225,6 +233,26 @@ try {
     refused = false;
     try { new InstallDirectoryTransaction(data).ValidateOwnership(); } catch (EngineException) { refused = true; }
     Check(refused && File.ReadAllText(Path.Combine(data, "sessions.sqlite")) == "personal", "foreign directory was not rejected without mutation");
+
+    refused = false;
+    try { new InstallDirectoryTransaction(Path.Combine(root, "missing-app")).ValidateOwnership(requireInstalled: true); } catch (EngineException) { refused = true; }
+    Check(refused, "uninstall accepted a missing owned installation");
+    var linkedInstall = Path.Combine(root, "linked-app");
+    Directory.CreateDirectory(linkedInstall);
+    File.WriteAllText(Path.Combine(linkedInstall, InstallerEngine.AppExeName), "app");
+    var linkedResources = Path.Combine(linkedInstall, "resources");
+    if (OperatingSystem.IsWindows()) {
+        var linkStart = new System.Diagnostics.ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "/d", "/c", "mklink", "/J", linkedResources, data }) linkStart.ArgumentList.Add(argument);
+        using var linkProcess = System.Diagnostics.Process.Start(linkStart)!;
+        linkProcess.WaitForExit();
+        Check(linkProcess.ExitCode == 0, "could not create junction fixture");
+    } else Directory.CreateSymbolicLink(linkedResources, data);
+    File.WriteAllText(Path.Combine(data, "app.asar"), "foreign");
+    refused = false;
+    try { new InstallDirectoryTransaction(linkedInstall).ValidateOwnership(requireInstalled: true); } catch (EngineException) { refused = true; }
+    Check(refused, "uninstall accepted linked resources");
+    Directory.Delete(linkedResources);
 
     var skills = Path.Combine(root, "skills-source");
     var migrated = Path.Combine(root, "skills-target");
