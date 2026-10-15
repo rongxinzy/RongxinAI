@@ -173,12 +173,16 @@ export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger> & 
 
 const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+    return (
+      <Shimmer as="span" duration={1}>
+        Thinking...
+      </Shimmer>
+    );
   }
   if (duration === undefined) {
-    return <p>Thought for a few seconds</p>;
+    return <span>Thought for a few seconds</span>;
   }
-  return <p>Thought for {duration} seconds</p>;
+  return <span>Thought for {duration} seconds</span>;
 };
 
 export const ReasoningTrigger = memo(
@@ -230,6 +234,7 @@ const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { isStreaming, showConnector } = useReasoning();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
 
   const text = typeof children === 'string' ? children : '';
   const { committed, tail } = useStreamingTextSegments(text, isStreaming);
@@ -237,7 +242,26 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
 
   useEffect(() => {
-    if (isStreaming && scrollRef.current) {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const handleScroll = () => {
+      const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+      userScrolledUpRef.current = distanceToBottom > 32;
+    };
+
+    element.addEventListener('scroll', handleScroll, { passive: true });
+    return () => element.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      userScrolledUpRef.current = false;
+    }
+  }, [isStreaming]);
+
+  useEffect(() => {
+    if (isStreaming && scrollRef.current && !userScrolledUpRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [children, isStreaming]);

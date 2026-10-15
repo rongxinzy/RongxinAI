@@ -29,7 +29,7 @@ export const ToolCard: React.FC<{
   mapDisplayText?: (value: string) => string;
   forceExpand?: boolean;
   pendingPermission?: CoworkPermissionRequest | null;
-  onRespondToPermission?: (result: CoworkPermissionResult) => void;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void | Promise<void>;
 }> = ({
   group,
   mapDisplayText,
