@@ -62,6 +62,7 @@ Var /GLOBAL zyBgBitmap           ; background bitmap control handle
 Var /GLOBAL zyBgImage            ; loaded background bitmap handle
 Var /GLOBAL zyFont               ; latest CreateFont handle
 Var /GLOBAL zyDialog             ; current nsDialogs dialog handle
+Var /GLOBAL zyHeaderBitmap       ; wizard-owned header, replaced on page change
 !ifndef BUILD_UNINSTALLER
 Var /GLOBAL zyLaunchApp          ; finish page: launch the app on leave
 Var /GLOBAL heroDirText          ; read-only $INSTDIR display
@@ -80,6 +81,10 @@ Var /GLOBAL zyBarX               ; bar left edge, pixels
 Var /GLOBAL zyBarY               ; bar top edge, pixels
 Var /GLOBAL zyCurFill            ; current fill width, pixels
 Var /GLOBAL zyPhaseCount         ; phases already announced
+Var /GLOBAL zyProgressBackground
+Var /GLOBAL zyProgressTitle
+Var /GLOBAL zyProgressTrack
+Var /GLOBAL zyFinishTitle
 !endif ; !BUILD_UNINSTALLER
 
 ; ---------------------------------------------------------------------------
@@ -163,7 +168,7 @@ Var /GLOBAL zyPhaseCount         ; phases already announced
 !insertmacro ZY_LangString ZY_UI_LICENSE_AGREE \
   "已阅读并同意" \
   "已閱讀並同意" \
-  "I have read and agree to the"
+  "I agree to the"
 !insertmacro ZY_LangString ZY_UI_LICENSE_LINK \
   "《许可协议》" \
   "《授權協議》" \
@@ -192,6 +197,10 @@ Var /GLOBAL zyPhaseCount         ; phases already announced
   "启动知远智能体" \
   "啟動知遠智能體" \
   "Launch ZhiYuan Agent"
+!insertmacro ZY_LangString ZY_UI_LAUNCH_FAILED \
+  "未能启动应用。请重试，或关闭安装器后从开始菜单启动。" \
+  "無法啟動應用程式。請重試，或關閉安裝程式後從開始功能表啟動。" \
+  "The app could not be started. Retry, or close setup and use the Start menu."
 !insertmacro ZY_LangString ZY_UI_UNINSTALL_TITLE \
   "确定要卸载知远智能体吗？" \
   "確定要解除安裝知遠智能體嗎？" \
@@ -417,6 +426,11 @@ Function ZYInstallClick
 FunctionEnd
 
 Function ZYHeroLeave
+  ; Keyboard navigation must enforce the same agreement as the custom button.
+  ${NSD_GetState} $heroLicense $0
+  ${If} $0 != ${BST_CHECKED}
+    Abort
+  ${EndIf}
   ${NSD_GetState} $heroInference $installLocalInference
   ; Leaving the hero page commits the user to installing, so the destructive
   ; pre-extraction steps run here rather than in .onInit.
@@ -470,14 +484,18 @@ FunctionEnd
 
 !ifndef BUILD_UNINSTALLER
 Function ZY_MuiPageLeave
-  System::Call 'kernel32::GetTickCount()i .R8'
-
-  ; The instfiles dialog (and its controls) is destroyed on page leave;
-  ; forget the handles so later phases cannot message stale windows.
+  ; These controls belong to the wizard, not the inner instfiles dialog.
+  ; Destroy them before the finish page is shown; forgetting handles leaves
+  ; the old progress bitmap covering the new page's actions.
+  !insertmacro ZY_DestroyBitmap $zyProgressBackground
+  !insertmacro ZY_DestroyBitmap $zyProgressTrack
+  !insertmacro ZY_DestroyBitmap $zyFill
+  !insertmacro ZY_DestroyBitmap $zyMask
+  !insertmacro ZY_DestroyBitmap $zyComplete
+  System::Call 'user32::DestroyWindow(p $zyProgressTitle)'
+  System::Call 'user32::DestroyWindow(p $zyPhaseLabel)'
+  StrCpy $zyProgressTitle ""
   StrCpy $zyPhaseLabel ""
-  StrCpy $zyFill ""
-  StrCpy $zyMask ""
-  StrCpy $zyComplete ""
   StrCpy $zyCurFill 0
   StrCpy $zyPhaseCount 0
 FunctionEnd
@@ -494,6 +512,9 @@ FunctionEnd
 ; ---------------------------------------------------------------------------
 !ifndef BUILD_UNINSTALLER
 Function ZYProgressShow
+  ; The native Next button is hidden. Let NSIS advance only after successful
+  ; section completion; never post Next from a progress phase or timer.
+  SetAutoClose true
 
   ; Hide the native controls: header text 1006, progress 1004, details 1016,
   ; show-log button 1027.
@@ -519,22 +540,24 @@ Function ZYProgressShow
   IntOp $5 $R5 - $R3
 
   ; Background art covering the whole inner dialog area.
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $R2, i $R3, i $4, i $5, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $R2, i $R3, i $4, i $5, i $HWNDPARENT, i 1200, i 0, i 0) i .R6'
   !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BG}"
+  StrCpy $zyProgressBackground $R6
 
   ; Title and phase text sit in the bitmap's flat zone (the art band occupies
   ; the top 34%): title at 40%, phase line 40px below, bar at 68%.
   IntOp $R8 $5 * ${ZY_PROG_TITLE_Y}
   IntOp $R8 $R8 / 100
   IntOp $R8 $R8 + $R3
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "$(ZY_UI_INSTALLING_TITLE)", i 0x50000001, i $R2, i $R8, i $4, i 30, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "$(ZY_UI_INSTALLING_TITLE)", i 0x50000001, i $R2, i $R8, i $4, i 30, i $HWNDPARENT, i 1201, i 0, i 0) i .R6'
+  StrCpy $zyProgressTitle $R6
   CreateFont $zyFont "${ZY_FONT_FAMILY}" ${ZY_FONT_TITLE_SIZE} ${ZY_FONT_TITLE_WT}
   SendMessage $R6 ${WM_SETFONT} $zyFont 1
   SetCtlColors $R6 "${ZY_COLOR_TEXT}" "transparent"
 
   ; Phase text under the title.
   IntOp $R8 $R8 + ${ZY_PROG_PHASE_DY}
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x50000001, i $R2, i $R8, i $4, i 22, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x50000001, i $R2, i $R8, i $4, i 22, i $HWNDPARENT, i 1202, i 0, i 0) i .R6'
   CreateFont $zyFont "${ZY_FONT_FAMILY}" ${ZY_FONT_BODY_SIZE} ${ZY_FONT_BODY_WT}
   SendMessage $R6 ${WM_SETFONT} $zyFont 1
   SetCtlColors $R6 "${ZY_COLOR_MUTED}" "transparent"
@@ -549,18 +572,19 @@ Function ZYProgressShow
   IntOp $zyBarX $zyBarX + $R2
 
   ; Track, fill, mask, then the complete bar, stacked in creation order.
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 1203, i 0, i 0) i .R6'
   !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_TRACK}"
+  StrCpy $zyProgressTrack $R6
 
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 1204, i 0, i 0) i .R6'
   !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_FILL}"
   StrCpy $zyFill $R6
 
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 1205, i 0, i 0) i .R6'
   !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_TRACK}"
   StrCpy $zyMask $R6
 
-  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
+  System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i $zyBarX, i $zyBarY, i ${ZY_BAR_W}, i ${ZY_BAR_H}, i $HWNDPARENT, i 1206, i 0, i 0) i .R6'
   !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAR_DONE}"
   ShowWindow $R6 ${SW_HIDE}
   StrCpy $zyComplete $R6
@@ -612,6 +636,7 @@ Function ZYFinishCreate
     IntOp $R6 $R6 * ${ZY_FINISH_TITLE_H}
     IntOp $R6 $R6 / 140          ; row height
     System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "$(ZY_UI_FINISH_TITLE)", i 0x50000001, i $R2, i $R7, i $R8, i $R6, i $HWNDPARENT, i 0, i 0, i 0) i .R9'
+    StrCpy $zyFinishTitle $R9
     CreateFont $zyFont "${ZY_FONT_FAMILY}" ${ZY_FONT_TITLE_SIZE} ${ZY_FONT_TITLE_WT}
     SendMessage $R9 ${WM_SETFONT} $zyFont 1
     SetCtlColors $R9 "${ZY_COLOR_TEXT}" "transparent"
@@ -646,6 +671,7 @@ Function ZYFinishLaunchClick
 FunctionEnd
 
 Function ZYFinishCloseClick
+  StrCpy $zyLaunchApp "0"
   !insertmacro ZY_ClickWizardNext
 FunctionEnd
 
@@ -659,6 +685,7 @@ FunctionEnd
 !macro ZY_DefineFinishLeave
 Function ZYFinishLeave
   ${If} $zyLaunchApp == "1"
+    StrCpy $zyLaunchApp "0"
     ; Mirror electron-builder's StartApp semantics: relaunch through the
     ; non-elevated user token with the --updated flag when upgrading.
     ${if} ${isUpdated}
@@ -673,8 +700,15 @@ Function ZYFinishLeave
   ; include has been processed; PRODUCT_FILENAME arrives via -D, so derive
   ; the exe name the same way common.nsh does.
   ${StdUtils.ExecShellAsUser} $1 "$INSTDIR\${PRODUCT_FILENAME}.exe" "open" "$0"
+    ${If} $1 != "ok"
+    ${AndIf} $1 != "fallback"
+      MessageBox MB_OK|MB_ICONEXCLAMATION "$(ZY_UI_LAUNCH_FAILED)"
+      Abort
+    ${EndIf}
 !endif
   ${EndIf}
+  System::Call 'user32::DestroyWindow(p $zyFinishTitle)'
+  StrCpy $zyFinishTitle ""
 FunctionEnd
 !macroend
 !endif ; !BUILD_UNINSTALLER

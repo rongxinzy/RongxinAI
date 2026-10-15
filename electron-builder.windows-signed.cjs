@@ -12,6 +12,7 @@ if (!/^[0-9A-F]{40}$/.test(certificateThumbprint)) {
 
 module.exports = {
   ...baseConfig,
+  forceCodeSigning: true,
   win: {
     ...baseConfig.win,
     signtoolOptions: {

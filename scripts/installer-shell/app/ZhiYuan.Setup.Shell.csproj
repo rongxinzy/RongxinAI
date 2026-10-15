@@ -22,6 +22,7 @@
          directory: the page and its two brand assets ship as embedded
          resources and are materialized next to the self-extracted payload. -->
     <EmbeddedResource Include="..\preview\index.html" LogicalName="ui.index.html" />
+    <EmbeddedResource Include="..\..\..\LICENSE" LogicalName="ui.license" />
     <EmbeddedResource Include="..\..\..\public\zhiyuan-logo-light-1600.png" LogicalName="ui.assets.logo" />
     <EmbeddedResource Include="..\..\..\build\icons\png\256x256.png" LogicalName="ui.assets.icon" />
   </ItemGroup>

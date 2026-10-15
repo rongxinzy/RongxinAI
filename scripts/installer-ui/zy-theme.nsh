@@ -228,7 +228,23 @@
   Pop $R0
 !macroend
 
+; Release the bitmap as well as its wizard-owned static before changing pages.
+!macro ZY_DestroyBitmap CONTROL
+  Push $R0
+  ${If} ${CONTROL} != ""
+    SendMessage ${CONTROL} ${STM_SETIMAGE} ${IMAGE_BITMAP} 0 $R0
+    System::Call 'user32::DestroyWindow(p ${CONTROL})'
+    ${If} $R0 != 0
+      System::Call 'gdi32::DeleteObject(p R0)'
+    ${EndIf}
+    StrCpy ${CONTROL} ""
+  ${EndIf}
+  Pop $R0
+!macroend
+
 !macro ZY_BrandHeader
+  ; The header is parented to the wizard and outlives every inner page.
+  !insertmacro ZY_DestroyBitmap $zyHeaderBitmap
   GetDlgItem $0 $HWNDPARENT 1034
   ShowWindow $0 ${SW_HIDE}
   GetDlgItem $0 $HWNDPARENT 1036
@@ -261,6 +277,7 @@
   System::Free $R1
   System::Call 'user32::CreateWindowExW(i 0, t "STATIC", t "", i 0x5000000E, i 0, i 0, i $R8, i $R3, i $HWNDPARENT, i 0, i 0, i 0) i .R6'
   !insertmacro ZY_SetImage $R6 "${ZY_ASSET_BAND}"
+  StrCpy $zyHeaderBitmap $R6
   zy_header_done:
 !macroend
 

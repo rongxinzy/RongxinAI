@@ -124,6 +124,15 @@ try {
   // machines with the redistributable registered the engine skips it anyway.
   fs.writeFileSync(path.join(outDir, 'vc_redist.x64.exe'), sevenZipBytes);
   fs.writeFileSync(path.join(outDir, 'version.txt'), '0.0.0-test');
+  const uninstallHost = path.join(
+    projectRoot,
+    'scripts',
+    'installer-shell',
+    'out',
+    'ZhiYuanUninstall.exe',
+  );
+  if (!fs.existsSync(uninstallHost)) fail('Build the shell before creating the test payload');
+  fs.copyFileSync(uninstallHost, path.join(outDir, 'uninstall.exe'));
 
   console.log(`[test-payload] payload written to ${outDir}`);
 } finally {

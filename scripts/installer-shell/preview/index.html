@@ -263,7 +263,7 @@
         <img id="wordmarkImg" data-asset="wordmark" alt="知远">
       </div>
       <div class="hero-title"><span data-i18n="product"></span> <span class="en" data-i18n="productEn"></span></div>
-      <div class="hero-tag" data-i18n="tagline"></div>
+      <div class="hero-tag" id="heroStatus" data-i18n="tagline" role="status"></div>
 
       <div class="options">
         <div class="opt-row">
@@ -497,6 +497,8 @@ document.getElementById('toggleInference').addEventListener('change', e => {
 });
 let inferenceOn = false;
 btnInstall.addEventListener('click', () => {
+  if (btnInstall.disabled) return;
+  btnInstall.disabled = true;
   showPage('progress');
   if (inShell) {
     resetProgressView();
@@ -548,8 +550,16 @@ function handleEngineEvent(evt) {
     }
     setTimeout(() => showPage('complete'), 400);
   } else if (evt.type === 'error') {
-    phaseLabel.textContent = evt.message || (lang === 'zh' ? '安装失败' : 'Installation failed');
+    showPage(uninstallMode ? 'uninstall' : 'hero');
+    btnInstall.disabled = licenseCheck.getAttribute('aria-checked') !== 'true';
+    const status = document.getElementById('heroStatus');
+    status.setAttribute('role', 'alert');
+    status.textContent = evt.message || (lang === 'zh' ? '安装失败，请重试。' : 'Installation failed. Please retry.');
+  } else if (evt.type === 'launch-error') {
+    document.getElementById('completeSub').textContent = evt.message || (lang === 'zh' ? '启动失败，请重试。' : 'Launch failed. Please retry.');
+    document.getElementById('btnLaunch').disabled = false;
   }
+
 }
 
 function buildTips() {
@@ -629,7 +639,15 @@ document.getElementById('btnDone').addEventListener('click', () => {
   showPage('hero');
 });
 document.getElementById('btnLaunch').addEventListener('click', () => {
-  if (inShell) { window.chrome.webview.hostObjects.shell.LaunchApp(); return; }
+  if (inShell) {
+    const button = document.getElementById('btnLaunch');
+    button.disabled = true;
+    window.chrome.webview.hostObjects.shell.LaunchApp().then(started => {
+      if (started) window.chrome.webview.postMessage({ type: 'close' });
+      else button.disabled = false;
+    }).catch(() => { button.disabled = false; });
+    return;
+  }
   alert(lang === 'zh' ? '将启动 知远智能体' : 'Launching ZhiYuan Agent');
 });
 document.getElementById('btnCancelHero').addEventListener('click', () => {
