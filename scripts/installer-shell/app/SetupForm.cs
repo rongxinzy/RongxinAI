@@ -84,8 +84,8 @@ public sealed class SetupForm : Form
     private readonly string[] rawArgs;
     private bool selfTestClose;
 
-    private CancellationTokenSource installCts = new();
-    private bool operationActive;
+    private readonly SetupOperation operation = new();
+    private bool operationActive => operation.IsActive;
     private bool closeRequested;
     private bool launchStarted;
     private bool completedUpgrade;
@@ -221,14 +221,14 @@ public sealed class SetupForm : Form
             e.Cancel = true;
             closeRequested = true;
             RecordLifecycle("form-close-deferred");
-            installCts.Cancel();
+            operation.Cancel();
             OnEngineEvent(new EngineEvent(Type: "phase", Label: "正在安全结束，请稍候"));
         };
         FormClosed += (_, _) =>
         {
             RecordLifecycle("form-closed");
             webView.Dispose();
-            installCts.Dispose();
+            operation.Dispose();
             foreach (var dir in new[] { materializedUiDir, webViewDataDir })
                 if (dir is not null)
                     try { InstallDirectoryTransaction.DeleteTreeWithoutFollowingLinks(dir); } catch { }
@@ -511,12 +511,16 @@ public sealed class SetupForm : Form
 
     internal void StartInstall(string engineInstallDir, bool localInference)
     {
-        if (InvokeRequired) { BeginInvoke(() => StartInstall(engineInstallDir, localInference)); return; }
-        if (operationActive || uninstallMode || installState == "done") return;
-        installCts.Dispose();
-        installCts = new CancellationTokenSource();
-        operationActive = true;
+        // The host-object Promise acknowledges admission, not engine completion.
+        // Never return while the UI admission is still queued: Cancel awaits this
+        // acknowledgement and must see the exact token captured below.
+        if (InvokeRequired) { Invoke(new Action(() => StartInstall(engineInstallDir, localInference))); return; }
+        if (uninstallMode || installState == "done") return;
+        // A retry during the previous worker's final cleanup must reject its
+        // admission Promise, rather than report success without starting work.
+        var cancellationToken = operation.Begin();
         installState = "installing";
+        RecordLifecycle("operation-admitted");
         var core = webView.CoreWebView2;
         if (core is not null)
         {
@@ -537,7 +541,7 @@ public sealed class SetupForm : Form
             {
                 var runEngine = new InstallerEngine(payloadDir, engineInstallDir,
                     runtimeRootOverride, appDataRootOverride, !skipRegistration, progress);
-                await runEngine.RunAsync(localInference, installCts.Token);
+                await runEngine.RunAsync(localInference, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -551,7 +555,7 @@ public sealed class SetupForm : Form
 
     private void FinishOperation()
     {
-        operationActive = false;
+        operation.Complete();
         RecordLifecycle("operation-finished");
         if (closeRequested) Close();
     }
@@ -574,7 +578,13 @@ public sealed class SetupForm : Form
             Detail: $"operationActive={operationActive}; closeRequested={closeRequested}"));
     }
 
-    internal void CancelInstall() => installCts.Cancel();
+    internal void CancelInstall()
+    {
+        if (InvokeRequired) { Invoke(new Action(CancelInstall)); return; }
+        RecordLifecycle("cancel-received");
+        if (!operationActive || installState == "done") return;
+        operation.Cancel();
+    }
 
     /// <summary>Native folder picker behind the hero page's 「更改…」: returns
     /// the confirmed directory, or null when the user cancels. Runs on the UI
@@ -595,12 +605,11 @@ public sealed class SetupForm : Form
 
     internal void StartUninstall()
     {
-        if (InvokeRequired) { BeginInvoke(StartUninstall); return; }
-        if (operationActive || !uninstallMode || installState == "done") return;
-        installCts.Dispose();
-        installCts = new CancellationTokenSource();
-        operationActive = true;
+        if (InvokeRequired) { Invoke(new Action(StartUninstall)); return; }
+        if (!uninstallMode || installState == "done") return;
+        var cancellationToken = operation.Begin();
         installState = "uninstalling";
+        RecordLifecycle("operation-admitted");
         var core = webView.CoreWebView2;
         if (core is not null)
         {
@@ -618,7 +627,7 @@ public sealed class SetupForm : Form
             {
                 var uninstaller = new UninstallerEngine(UninstallInstallDir(rawArgs),
                     runtimeRootOverride, appDataRootOverride, skipCleanupOf, progress);
-                await uninstaller.UninstallAsync(installCts.Token);
+                await uninstaller.UninstallAsync(cancellationToken);
             }
             catch (Exception ex)
             {

@@ -165,7 +165,13 @@ test('launch failure remains recoverable and successful launch has an explicit r
 });
 
 test('retry gets a fresh cancellation token and closing waits for the engine to stop', () => {
-  expect(form.match(/installCts = new CancellationTokenSource\(\);/g)).toHaveLength(2);
+  expect(form).toContain('private readonly SetupOperation operation = new();');
+  expect(form).toContain('private bool operationActive => operation.IsActive;');
+  expect(form.match(/var cancellationToken = operation.Begin\(\);/g)).toHaveLength(2);
+  expect(form).toContain('await runEngine.RunAsync(localInference, cancellationToken);');
+  expect(form).toContain('await uninstaller.UninstallAsync(cancellationToken);');
+  expect(form).toContain('operation.Complete();');
+  expect(form).not.toContain('installCts');
   expect(form).toContain('if (!operationActive) return;');
   expect(form).toContain('e.Cancel = true;');
   expect(form).toContain('closeRequested = true;');
@@ -173,6 +179,39 @@ test('retry gets a fresh cancellation token and closing waits for the engine to 
   expect(form).not.toContain(
     'Directory.EnumerateDirectories(Path.GetTempPath(), "zhiyuan-setup-*")',
   );
+});
+
+test('start acknowledges UI admission before cancel and never waits for an engine or browser callback', () => {
+  const startInstall = form.slice(
+    form.indexOf('internal void StartInstall('),
+    form.indexOf('private void FinishOperation()'),
+  );
+  const startUninstall = form.slice(
+    form.indexOf('internal void StartUninstall()'),
+    form.indexOf('internal bool LaunchApp()'),
+  );
+  expect(startInstall).toContain(
+    'Invoke(new Action(() => StartInstall(engineInstallDir, localInference)))',
+  );
+  expect(startUninstall).toContain('Invoke(new Action(StartUninstall))');
+  expect(startInstall).toContain('if (uninstallMode || installState == "done") return;');
+  expect(startUninstall).toContain('if (!uninstallMode || installState == "done") return;');
+  for (const start of [startInstall, startUninstall]) {
+    expect(start).not.toContain('if (operationActive');
+    expect(start.indexOf('var cancellationToken = operation.Begin();')).toBeLessThan(
+      start.indexOf('_ = Task.Run('),
+    );
+    expect(start).not.toMatch(/\.Wait\(|\.Result|GetAwaiter|ExecuteScriptAsync/);
+  }
+  const cancel = form.slice(
+    form.indexOf('internal void CancelInstall()'),
+    form.indexOf('internal string? BrowseInstallDir('),
+  );
+  expect(cancel).toContain('Invoke(new Action(CancelInstall))');
+  expect(cancel).toContain('if (!operationActive || installState == "done") return;');
+  expect(cancel).toContain('operation.Cancel();');
+  expect(form).toContain('RecordLifecycle("operation-admitted")');
+  expect(form).toContain('RecordLifecycle("cancel-received")');
 });
 
 test('host close queues the normal rollback lifecycle and keeps diagnostic output bounded', () => {
@@ -190,7 +229,7 @@ test('host close queues the normal rollback lifecycle and keeps diagnostic outpu
     'if (!operationActive) return;',
     'e.Cancel = true;',
     'closeRequested = true;',
-    'installCts.Cancel();',
+    'operation.Cancel();',
   ])
     expect(formClosing).toContain(marker);
   expect(form).toContain('if (closeRequested) Close();');
@@ -239,6 +278,7 @@ test.skipIf(!dotnetAvailable)(
         'ShellProcessRunner.cs',
         'WindowsShellLink.cs',
         'UninstallerEngine.cs',
+        'SetupOperation.cs',
       ];
       fs.writeFileSync(
         path.join(root, 'Contracts.csproj'),
@@ -253,6 +293,50 @@ static void Check(bool condition, string message) { if (!condition) throw new Ex
 var root = Path.Combine(Path.GetTempPath(), "zy-engine-behavior-" + Guid.NewGuid().ToString("n"));
 Directory.CreateDirectory(root);
 try {
+    using (var operation = new SetupOperation()) {
+        operation.Cancel();
+        var admittedToken = operation.Begin();
+        Check(operation.IsActive && !admittedToken.IsCancellationRequested, "idle cancel poisoned admission");
+        var originalCulture = System.Globalization.CultureInfo.CurrentUICulture;
+        try {
+            foreach (var culture in new[] { "zh-CN", "en-US" }) {
+                System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo(culture);
+                var busyRejected = false;
+                try { operation.Begin(); } catch (InvalidOperationException ex) {
+                    busyRejected = true;
+                    Check(ex.Message.Contains(culture == "zh-CN" ? "请稍候重试" : "Please try again shortly"), "busy admission message did not follow the UI culture");
+                }
+                Check(busyRejected && operation.IsActive, "busy admission silently succeeded or ended the original operation");
+            }
+        } finally { System.Globalization.CultureInfo.CurrentUICulture = originalCulture; }
+        using var startWorker = new ManualResetEventSlim();
+        var queuedWorker = Task.Run(() => {
+            startWorker.Wait();
+            return admittedToken.IsCancellationRequested;
+        });
+        operation.Cancel();
+        startWorker.Set();
+        Check(queuedWorker.GetAwaiter().GetResult(), "cancel between admission and worker start was lost");
+        Check(operation.IsActive, "cancel incorrectly completed the operation before rollback");
+        operation.Complete();
+        Check(!operation.IsActive, "worker completion did not release operation");
+        operation.Cancel();
+        var retryToken = operation.Begin();
+        Check(!retryToken.IsCancellationRequested && retryToken != admittedToken, "retry reused a cancelled token");
+        Check(admittedToken.IsCancellationRequested, "retry changed the previous worker token");
+        operation.Cancel();
+        Check(retryToken.IsCancellationRequested, "active retry cancellation was lost");
+        operation.Complete();
+        var successToken = operation.Begin();
+        operation.Complete();
+        operation.Cancel();
+        Check(!successToken.IsCancellationRequested, "late cancellation changed a completed operation");
+        var nextToken = operation.Begin();
+        Check(!nextToken.IsCancellationRequested, "late cancellation poisoned the next operation");
+        operation.Complete();
+    }
+    Console.WriteLine("PASS: admission cancellation reaches the queued worker; rollback stays active; retries and completed operations are isolated");
+
     var payloadEvents = new List<EngineEvent>();
     var payloadProgress = new ContractProgress(payloadEvents.Add);
     var lastPercent = -1;
@@ -447,6 +531,7 @@ sealed class ContractProgress(Action<EngineEvent> report) : IProgress<EngineEven
       );
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(result.stdout).toContain('PASS: transaction recovery');
+      expect(result.stdout).toContain('PASS: admission cancellation reaches the queued worker');
       expect(result.stdout).toContain('PASS: 100000 payload reads produce 101 ordered updates');
       if (process.platform === 'win32') {
         expect(result.stdout).toContain(
