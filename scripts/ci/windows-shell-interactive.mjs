@@ -21,7 +21,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { shellScreenshots, observeDetachedUpgrade } from './windows-shell-evidence.mjs';
-import { Cdp } from './windows-shell-browser-evidence.mjs';
+import { Cdp, snapshotExpression } from './windows-shell-browser-evidence.mjs';
 
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -95,35 +95,6 @@ async function availablePort() {
   await new Promise(resolve => server.close(resolve));
   return port;
 }
-
-// Read-only DOM evidence. No showPage(), simulated engine messages, preview
-// freeze parameter, host-object invocations or JavaScript .click() are used.
-const snapshotExpression = `(() => {
-  const selectors = ['#licenseCheck', '#btnInstall', '#btnCancelHero', '#btnCancelProgress',
-    '#btnDone', '#btnLaunch', '.win-btn.close', '.switch'];
-  return {
-    hosted: !!window.chrome?.webview && document.body.classList.contains('shell'),
-    url: location.href, language: document.documentElement.lang, userAgent: navigator.userAgent,
-    page: document.querySelector('.page.active')?.id,
-    width: innerWidth, height: innerHeight, dpr: devicePixelRatio,
-    installPath: document.querySelector('#installPath')?.textContent,
-    text: document.querySelector('.page.active')?.innerText,
-    licenseChecked: document.querySelector('#licenseCheck')?.getAttribute('aria-checked'),
-    localInference: document.querySelector('#toggleInference')?.checked,
-    error: document.querySelector('[role=alert]')?.textContent,
-    actions: selectors.map(selector => {
-      const el = document.querySelector(selector);
-      if (!el) return { selector, visible: false };
-      const r = el.getBoundingClientRect(); const css = getComputedStyle(el);
-      const visible = r.width > 0 && r.height > 0 && css.visibility !== 'hidden' && css.display !== 'none';
-      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-      return { selector, text: el.innerText, visible, enabled: !el.disabled,
-        x: r.x, y: r.y, width: r.width, height: r.height,
-        textFits: el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1,
-        hit: top === el || el.contains(top) };
-    })
-  };
-})()`;
 
 async function native(action, options = {}) {
   const args = [

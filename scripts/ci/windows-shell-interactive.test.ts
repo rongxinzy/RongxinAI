@@ -17,11 +17,90 @@ import {
   Cdp,
   browserObservation,
   clickObserverExpression,
+  snapshotExpression,
 } from './windows-shell-browser-evidence.mjs';
 
 const script = readFileSync('scripts/ci/windows-shell-interactive.mjs', 'utf8');
 const native = readFileSync('scripts/ci/windows-shell-native.ps1', 'utf8');
 const workflow = readFileSync('.github/workflows/windows-installer-pr.yml', 'utf8');
+
+test('waits through a loading document without a body and observes the later real DOM', () => {
+  const dom = new JSDOM('<!doctype html><html lang="en"><head></head><body></body></html>', {
+    url: 'file:///setup/index.html?shell=1&lang=en',
+    runScripts: 'outside-only',
+  });
+  try {
+    const { document } = dom.window;
+    Object.defineProperty(dom.window, 'chrome', { value: { webview: {} } });
+    expect(document.readyState).toBe('loading');
+    document.body.remove();
+    expect(document.body).toBeNull();
+    expect(dom.window.eval(snapshotExpression)).toEqual({ hosted: false });
+
+    const body = document.createElement('body');
+    body.innerHTML =
+      '<section class="page active" id="page-hero"><span id="installPath">C:\\安装路径</span></section>';
+    document.documentElement.append(body);
+    expect(dom.window.eval(snapshotExpression).hosted).toBe(false);
+    body.classList.add('shell');
+    expect(dom.window.eval(snapshotExpression)).toMatchObject({
+      hosted: true,
+      page: 'page-hero',
+      installPath: 'C:\\安装路径',
+      language: 'en',
+    });
+    expect(script).toContain('snapshot.hosted &&');
+    expect(script).toContain("snapshot.page === 'page-hero'");
+    expect(script).toContain('snapshot.installPath?.toLowerCase() === installRoot.toLowerCase()');
+    expect(script).toContain("language === 'zh' ? 'zh-CN' : 'en'");
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('returns not-ready for an absent document element but never suppresses an unrelated DOM error', () => {
+  const dom = new JSDOM('<body class="shell"></body>', { runScripts: 'outside-only' });
+  try {
+    const { document } = dom.window;
+    Object.defineProperty(document, 'querySelector', {
+      configurable: true,
+      value: () => {
+        throw new Error('Unexpected DOM failure');
+      },
+    });
+    expect(() => dom.window.eval(snapshotExpression)).toThrow('Unexpected DOM failure');
+    document.documentElement.remove();
+    expect(dom.window.eval(snapshotExpression)).toEqual({ hosted: false });
+  } finally {
+    dom.window.close();
+  }
+});
+
+test.each(['exception', 'disconnect'])(
+  'CDP readiness evaluation still rejects a real %s',
+  async failure => {
+    const socket = new EventTarget();
+    Object.assign(socket, {
+      send(payload: string) {
+        const request = JSON.parse(payload);
+        if (failure === 'disconnect') socket.dispatchEvent(new Event('close'));
+        else
+          socket.dispatchEvent(
+            new MessageEvent('message', {
+              data: JSON.stringify({
+                id: request.id,
+                result: { exceptionDetails: { text: 'Unexpected page exception' } },
+              }),
+            }),
+          );
+      },
+    });
+    const cdp = new Cdp(socket);
+    await expect(cdp.evaluate(snapshotExpression)).rejects.toThrow(
+      failure === 'disconnect' ? 'WebView2 disconnected' : 'Unexpected page exception',
+    );
+  },
+);
 
 function identity() {
   const expected = {

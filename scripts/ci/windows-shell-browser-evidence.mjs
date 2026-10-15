@@ -2,6 +2,37 @@ import assert from 'node:assert/strict';
 
 const clickBinding = '__zhiyuanAcceptanceObservedClick';
 
+// Read-only DOM evidence. No showPage(), simulated engine messages, preview
+// freeze parameter, host-object invocations or JavaScript .click() are used.
+export const snapshotExpression = `(() => {
+  // CDP can connect before navigation has constructed the document body.
+  if (!document.documentElement || !document.body) return { hosted: false };
+  const selectors = ['#licenseCheck', '#btnInstall', '#btnCancelHero', '#btnCancelProgress',
+    '#btnDone', '#btnLaunch', '.win-btn.close', '.switch'];
+  return {
+    hosted: !!window.chrome?.webview && document.body.classList.contains('shell'),
+    url: location.href, language: document.documentElement.lang, userAgent: navigator.userAgent,
+    page: document.querySelector('.page.active')?.id,
+    width: innerWidth, height: innerHeight, dpr: devicePixelRatio,
+    installPath: document.querySelector('#installPath')?.textContent,
+    text: document.querySelector('.page.active')?.innerText,
+    licenseChecked: document.querySelector('#licenseCheck')?.getAttribute('aria-checked'),
+    localInference: document.querySelector('#toggleInference')?.checked,
+    error: document.querySelector('[role=alert]')?.textContent,
+    actions: selectors.map(selector => {
+      const el = document.querySelector(selector);
+      if (!el) return { selector, visible: false };
+      const r = el.getBoundingClientRect(); const css = getComputedStyle(el);
+      const visible = r.width > 0 && r.height > 0 && css.visibility !== 'hidden' && css.display !== 'none';
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { selector, text: el.innerText, visible, enabled: !el.disabled,
+        x: r.x, y: r.y, width: r.width, height: r.height,
+        textFits: el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1,
+        hit: top === el || el.contains(top) };
+    })
+  };
+})()`;
+
 // Observation only: no DOM writes, event cancellation or synthetic UI input.
 export const clickObserverExpression = `document.addEventListener('click', event => {
   try {
