@@ -287,6 +287,9 @@ import {
 } from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
+import { getBranding } from '../shared/branding';
+import { AISphere, AISphereIpc } from '../shared/aisphere';
+import { aisphereService, startAISphereGateway } from './extensions/aisphere';
 
 import { registerDevNetworkProtocol, trackDevNetworkRequest } from './devNetworkLog';
 import { truncateNetworkBody } from '../shared/devNetworkLog';
@@ -3408,13 +3411,39 @@ if (!gotTheLock) {
   ipcMain.handle(EnterpriseRendererIpc.SettingsPages, () =>
     zhiyuanEnterpriseRendererBridge.settingsPages(),
   );
-  ipcMain.handle(ManagedProviderIpc.Policy, () => zhiyuanManagedProviderBridge.accessPolicy());
-  ipcMain.handle(ManagedProviderIpc.Catalog, () => zhiyuanManagedProviderBridge.catalog());
-  zhiyuanManagedProviderBridge.onDidChange(() => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(ManagedProviderIpc.Changed);
-    }
-  });
+  if (getBranding().features.enableAISphere) {
+    ipcMain.handle(AISphereIpc.Snapshot, () => aisphereService.snapshot());
+    ipcMain.handle(AISphereIpc.Connect, (_event, address: unknown) =>
+      aisphereService.connect(address),
+    );
+    ipcMain.handle(AISphereIpc.Refresh, async () => {
+      await aisphereService.refresh();
+      return aisphereService.snapshot();
+    });
+    ipcMain.handle(ManagedProviderIpc.Policy, () => aisphereService.policy());
+    ipcMain.handle(ManagedProviderIpc.Catalog, () =>
+      aisphereService.snapshot().models.map((model, index) => ({
+        ...model,
+        displayName: model.name,
+        providerKey: AISphere.Provider,
+        providerDisplayName: 'AISphere',
+        isDefault: index === 0,
+      })),
+    );
+    aisphereService.onChanged(() => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(ManagedProviderIpc.Changed);
+      }
+    });
+  } else {
+    ipcMain.handle(ManagedProviderIpc.Policy, () => zhiyuanManagedProviderBridge.accessPolicy());
+    ipcMain.handle(ManagedProviderIpc.Catalog, () => zhiyuanManagedProviderBridge.catalog());
+    zhiyuanManagedProviderBridge.onDidChange(() => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(ManagedProviderIpc.Changed);
+      }
+    });
+  }
 
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
   ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
@@ -3620,7 +3649,9 @@ if (!gotTheLock) {
 
   // ── Community auth IPC handlers ──
   const communityAuthSession = configureCommunityAuthSession(getStore);
-  registerModelPoolIpcHandlers(communityAuthSession);
+  if (getBranding().features.enableCommunityFreeModels) {
+    registerModelPoolIpcHandlers(communityAuthSession);
+  }
 
   ipcMain.handle(CommunityAuthIpc.GetCommunityUser, async () => {
     const user = communityAuthSession.getUser();
@@ -7982,6 +8013,20 @@ if (!gotTheLock) {
       dbPath: path.join(app.getPath('userData'), DB_FILENAME),
     });
     zhiyuanManagedProviderBridge.attachStore(store);
+    if (getBranding().features.enableAISphere) {
+      try {
+        const aisphereGateway = await startAISphereGateway();
+        await aisphereService.initialize(store, aisphereGateway.baseUrl);
+        aisphereService.busy = () =>
+          Boolean(piRuntimeAdapter?.hasRunningSessions() || activeStreamControllers.size);
+        app.once('before-quit', () => {
+          void aisphereGateway.close();
+        });
+        console.log('[Main] initApp: AISphere gateway initialized at', aisphereGateway.baseUrl);
+      } catch (error) {
+        console.error('[Main] initApp: Failed to initialize AISphere gateway:', error);
+      }
+    }
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
     try {

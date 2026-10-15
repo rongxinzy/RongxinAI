@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 960" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="gold" cx="100%" cy="0%" r="85%">
+      <stop stop-color="#b58b49" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#b58b49" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="red" cx="0%" cy="100%" r="75%">
+      <stop stop-color="#bf321c" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#bf321c" stop-opacity="0"/>
+    </radialGradient>
+    <path id="cloud" d="M-70 178C26 178 28 106 107 106C175 106 191 153 153 166C120 177 102 145 126 132C149 119 179 146 214 131C255 113 239 71 288 62C329 54 343 80 374 66M-48 201C45 205 45 131 107 132C138 132 148 150 134 151M25 234C103 236 117 191 180 195C252 201 278 146 325 142C362 139 385 156 414 142"/>
+  </defs>
+  <path fill="url(#gold)" d="M0 0h1440v960H0z"/>
+  <path fill="url(#red)" d="M0 0h1440v960H0z"/>
+  <g fill="none" stroke="#b58b49" stroke-opacity=".24" stroke-width="1.2" stroke-linecap="round">
+    <use href="#cloud" transform="translate(1440 0) scale(-1 1)"/>
+    <use href="#cloud" transform="translate(0 960) scale(1 -1)"/>
+  </g>
+</svg>

@@ -1591,6 +1591,9 @@ interface IElectronAPI {
       readonly import('../../shared/managedProviders').ManagedProviderCatalogModel[]
     >;
     onChanged: (callback: () => void) => () => void;
+    aisphereSnapshot: () => Promise<import('../../shared/aisphere').AISphereSnapshot>;
+    aisphereConnect: (address: string) => Promise<import('../../shared/aisphere').AISphereSnapshot>;
+    aisphereRefresh: () => Promise<import('../../shared/aisphere').AISphereSnapshot>;
   };
   networkStatus: {
     send: (status: 'online' | 'offline') => void;

@@ -1,4 +1,5 @@
 import { weiyangLight, weiyangDark } from './weiyang';
+import { xiaoruanLight, xiaoruanDark } from './xiaoruan';
 import { changanLight, changanDark } from './changan';
 import { damingLight, damingDark } from './daming';
 import { validateComponentAppearances } from '../components/contract';
@@ -81,6 +82,12 @@ export const themePlugins = defineThemePlugins([
     id: 'weiyang',
     name: { zh: '未央金石', en: 'Weiyang Jinshi' },
     appearances: { light: weiyangLight, dark: weiyangDark },
+  },
+  {
+    version: THEME_PLUGIN_VERSION,
+    id: 'xiaoruan',
+    name: { zh: '晓软红', en: 'Xiaoruan Red' },
+    appearances: { light: xiaoruanLight, dark: xiaoruanDark },
   },
 ]);
 

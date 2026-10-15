@@ -18,6 +18,7 @@ import {
 import { type AppConfig, getProviderDisplayName } from '../config';
 import type { Model } from '../store/slices/modelSlice';
 import { getRunningModelAgentEligibility } from '../utils/llamacppAgentEligibility';
+import { getBranding } from '../../shared/branding';
 import { ZhiyuanModelPool } from '../../shared/modelPool/constants';
 import { i18nService } from './i18n';
 
@@ -268,13 +269,15 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
   if (policy.mode === ManagedProviderAccessMode.Exclusive) return configuredModels;
 
   let zhiyuanModels: Model[] = [];
-  try {
-    const models = await window.electron.modelPool?.listModels();
-    if (models?.ok && models.models.includes(ZhiyuanModelPool.FreeModelId)) {
-      zhiyuanModels = buildZhiyuanManagedModels();
+  if (getBranding().features.enableCommunityFreeModels) {
+    try {
+      const models = await window.electron.modelPool?.listModels();
+      if (models?.ok && models.models.includes(ZhiyuanModelPool.FreeModelId)) {
+        zhiyuanModels = buildZhiyuanManagedModels();
+      }
+    } catch {
+      // Model Pool availability is optional; user-configured and local models remain usable.
     }
-  } catch {
-    // Model Pool availability is optional; user-configured and local models remain usable.
   }
 
   try {
