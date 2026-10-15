@@ -17,7 +17,7 @@ describe('devNetworkLog', () => {
   test('buildDevNetworkBeaconUrl encodes request metadata', () => {
     const url = buildDevNetworkBeaconUrl({
       id: '1',
-      source: 'aisphere',
+      source: 'api-fetch',
       method: 'GET',
       url: 'https://platform.example/v1/agent/models',
       status: 200,
@@ -27,14 +27,14 @@ describe('devNetworkLog', () => {
     expect(url.startsWith('xr-net://log/?')).toBe(true);
     expect(url).toContain('method=GET');
     expect(url).toContain('status=200');
-    expect(url).toContain('source=aisphere');
+    expect(url).toContain('source=api-fetch');
     expect(url).toContain(encodeURIComponent('https://platform.example/v1/agent/models'));
   });
 
   test('beacon payload includes responseBody for Network Response tab', () => {
     const payload = buildDevNetworkBeaconPayload({
       id: '1',
-      source: 'aisphere',
+      source: 'api-fetch',
       method: 'GET',
       url: 'https://platform.example/v1/agent/models',
       status: 200,

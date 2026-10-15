@@ -283,12 +283,7 @@ import {
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
 
-import { setPlatformFetchNetworkLogger } from './aisphere/transport';
-import {
-  registerDevNetworkProtocol,
-  trackDevNetworkRequest,
-  publishDevNetworkLog,
-} from './devNetworkLog';
+import { registerDevNetworkProtocol, trackDevNetworkRequest } from './devNetworkLog';
 import { truncateNetworkBody } from '../shared/devNetworkLog';
 import { ZhiyuanEnterpriseSkillBridge } from './enterpriseExtension/skillBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
@@ -7932,7 +7927,6 @@ if (!gotTheLock) {
     // 2026/09/17 lixiang  仅开发态挂 Network 镜像，避免生产 clone 响应体
     if (isDev) {
       registerDevNetworkProtocol();
-      setPlatformFetchNetworkLogger(publishDevNetworkLog);
     }
 
     profiler.mark('initStore');

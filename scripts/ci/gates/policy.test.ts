@@ -16,7 +16,7 @@ test.each([
   'src/renderer/components/artifacts/renderers/DxfRenderer.tsx',
   'src/renderer/components/cowork/components/UserBubble.tsx',
   'src/renderer/components/cowork/CoworkPromptInput.tsx',
-  'scripts/reset-userdata.mjs',
+  'scripts/ensure-build-version.js',
   'scripts/find-dev-port.mjs',
   '.github/workflows/stale.yml',
   'unknown/new-module.ts',
