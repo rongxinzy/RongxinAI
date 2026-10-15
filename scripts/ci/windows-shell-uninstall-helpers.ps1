@@ -1,4 +1,13 @@
 # Side-effect-free definitions used by the disposable-runner acceptance driver.
+function Initialize-AcceptanceModules {
+  # A pwsh parent can pass its incompatible PSModulePath to powershell.exe.
+  # Resolve only the current host's inbox modules, never a caller search path.
+  foreach ($name in @('Microsoft.PowerShell.Management', 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Security', 'CimCmdlets')) {
+    $manifest = [IO.Path]::Combine($PSHOME, 'Modules', $name, ($name + '.psd1'))
+    Import-Module -Name $manifest -Global -ErrorAction Stop
+  }
+}
+
 function Get-NormalizedAcceptancePath([string]$Path) {
   return [IO.Path]::GetFullPath($Path).TrimEnd([char]0x5c, [char]0x2f)
 }
@@ -44,7 +53,15 @@ function Restore-AcceptanceRuntime([string]$Quarantine, [string]$RuntimeRoot) {
 }
 
 function Get-AcceptanceSha256([string]$Path) {
-  return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+  $stream = $null
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $stream = [IO.File]::OpenRead($Path)
+    return [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+  } finally {
+    if ($null -ne $stream) { $stream.Dispose() }
+    $sha256.Dispose()
+  }
 }
 
 function Assert-NativeHostIdentity {

@@ -1,16 +1,17 @@
 param(
   [Parameter(Mandatory = $true)][ValidateSet('prepare', 'verify')][string]$Action,
-  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
+  [string]$ProjectRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '../..')),
   [string]$ExpectedThumbprint = '',
   [switch]$OwnedAcceptanceContext
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-. (Join-Path $PSScriptRoot 'windows-shell-uninstall-helpers.ps1')
+. ([IO.Path]::Combine($PSScriptRoot, 'windows-shell-uninstall-helpers.ps1'))
 if ($env:OS -ne 'Windows_NT' -or -not $env:RUNNER_TEMP -or
     ($env:GITHUB_ACTIONS -cne 'true' -and -not $OwnedAcceptanceContext)) {
   throw 'Native uninstall acceptance requires a fresh Windows CI runner or explicit owned acceptance context'
 }
+Initialize-AcceptanceModules
 $commit = if ($env:ZHIYUAN_SOURCE_COMMIT) { $env:ZHIYUAN_SOURCE_COMMIT } else { $env:GITHUB_SHA }
 $runId = $env:GITHUB_RUN_ID
 if ($commit -cnotmatch '^[0-9a-f]{40}$' -or $runId -cnotmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$') { throw 'Exact acceptance build and run identity is required' }
@@ -75,7 +76,7 @@ $version = (Get-Content -LiteralPath (Join-Path $ProjectRoot 'package.json') -Ra
 if ($hostManifest.version -cne $version) { throw 'Captured uninstall host version does not match this build' }
 $installedHost = Join-Path $installRoot $hostManifest.installedFileName
 Assert-NativeHostIdentity $hostManifest $capturedHost $installedHost $commit
-$signature = Get-AuthenticodeSignature -LiteralPath $installedHost
+$signature = Microsoft.PowerShell.Security\Get-AuthenticodeSignature -LiteralPath $installedHost
 if ($setupManifest.signed -eq $true -or $ExpectedThumbprint) {
   $thumbprint = ($ExpectedThumbprint -replace '[^a-fA-F0-9]', '').ToUpperInvariant()
   if ($thumbprint -notmatch '^[0-9A-F]{40}$' -or $signature.Status -ne 'Valid' -or

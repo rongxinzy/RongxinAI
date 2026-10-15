@@ -8,6 +8,19 @@ import { expect, test } from 'vitest';
 const scriptPath = path.join(__dirname, 'windows-shell-uninstall.ps1');
 const helperPath = path.join(__dirname, 'windows-shell-uninstall-helpers.ps1');
 const driver = fs.readFileSync(scriptPath, 'utf8');
+const helpers = fs.readFileSync(helperPath, 'utf8');
+
+test('hashing streams bytes and host modules cannot depend on inherited pwsh search paths', () => {
+  expect(helpers).not.toContain('Get-FileHash');
+  expect(helpers).toContain('[IO.File]::OpenRead($Path)');
+  expect(helpers).toContain('$sha256.ComputeHash($stream)');
+  expect(helpers).toContain('$stream.Dispose()');
+  expect(helpers).toContain('$sha256.Dispose()');
+  expect(helpers).toContain("[IO.Path]::Combine($PSHOME, 'Modules', $name, ($name + '.psd1'))");
+  expect(helpers).toContain('Import-Module -Name $manifest -Global -ErrorAction Stop');
+  expect(driver).toContain('Initialize-AcceptanceModules');
+  expect(driver).toContain('Microsoft.PowerShell.Security\\Get-AuthenticodeSignature');
+});
 
 test('native uninstall gate runs only after real shell evidence and protects the earlier native cache', () => {
   const workflow = loadYaml(
@@ -79,6 +92,20 @@ foreach ($file in @(${quote(scriptPath)}, ${quote(helperPath)})) {
 }
 . ${quote(helperPath)}
 $root = ${quote(fixture)}
+$env:PSModulePath = [IO.Path]::Combine($root, 'no-module-search-path')
+Initialize-AcceptanceModules
+$hashFixture = Join-Path $root 'hash [literal] $x.bin'
+[IO.File]::WriteAllBytes($hashFixture, [Text.Encoding]::ASCII.GetBytes('abc'))
+if ((Get-AcceptanceSha256 $hashFixture) -cne 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad') { throw 'SHA256 abc known-answer mismatch' }
+[IO.File]::WriteAllBytes($hashFixture, [byte[]]@())
+if ((Get-AcceptanceSha256 $hashFixture) -cne 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855') { throw 'SHA256 empty-file known-answer mismatch' }
+$hashLock = [IO.File]::Open($hashFixture, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+$hashLock.Dispose()
+if ((Get-Command Microsoft.PowerShell.Security\\Get-AuthenticodeSignature).ModuleName -cne 'Microsoft.PowerShell.Security') { throw 'Real host Security module did not load' }
+if ((Microsoft.PowerShell.Security\\Get-AuthenticodeSignature -LiteralPath $PSCommandPath).Status -ne 'NotSigned') { throw 'Real unsigned Authenticode verification failed' }
+if ((Get-Command CimCmdlets\\Get-CimInstance).ModuleName -cne 'CimCmdlets') { throw 'Real host CIM module did not load' }
+if ($null -eq (CimCmdlets\\Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $PID))) { throw 'Real CIM query failed without inherited module search paths' }
+Write-Output 'PASS: standard SHA256 vectors and real Security/CIM modules with no module search path'
 $runtime = Join-Path $root 'runtime [literal] $x'
 $backup = Join-Path $root 'quarantine'
 $lease = [pscustomobject]@{ kind='native-uninstall-runtime-lease'; version=1; initiallyAbsent=$true; commit='abc'; runId='1'; runtimeRoot=$runtime; runnerRoot=$root }
@@ -136,6 +163,9 @@ Write-Output 'PASS: actual leases, literal paths, host identity and non-destruct
       expect(result.status, result.stderr || result.stdout).toBe(0);
       expect(result.stdout).toContain(
         'PASS: actual leases, literal paths, host identity and non-destructive restore conflicts',
+      );
+      expect(result.stdout).toContain(
+        'PASS: standard SHA256 vectors and real Security/CIM modules with no module search path',
       );
     } finally {
       fs.rmSync(fixture, { recursive: true, force: true });
