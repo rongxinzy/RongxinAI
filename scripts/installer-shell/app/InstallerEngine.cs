@@ -735,23 +735,36 @@ public sealed class InstallerEngine
         return total;
     }
 
-    private void CreateShortcut(string folder)
+    // Keep method names and HRESULTs for failures in native Windows APIs, but
+    // omit source paths, exception messages and payload/argument values.
+    internal static string DescribeFailure(Exception exception) =>
+        $"{exception.GetType().FullName} (0x{exception.HResult:X8})\n{new StackTrace(exception, fNeedFileInfo: false)}";
+
+    internal void CreateShortcut(string folder)
     {
         var linkPath = Path.Combine(folder, DisplayName + ".lnk");
-        var shellType = Type.GetTypeFromProgID("WScript.Shell")
-            ?? throw new EngineException("无法创建快捷方式");
-        dynamic shell = Activator.CreateInstance(shellType)!;
+        IShellLinkW? shortcut = null;
+        var operation = "IShellLinkW.Activate";
         try
         {
-            dynamic shortcut = shell.CreateShortcut(linkPath);
-            shortcut.TargetPath = LaunchPath;
-            shortcut.WorkingDirectory = installDir;
-            shortcut.IconLocation = LaunchPath + ",0";
-            shortcut.Save();
+            shortcut = (IShellLinkW)new ShellLinkComObject();
+            operation = "IShellLinkW.SetPath";
+            shortcut.SetPath(LaunchPath);
+            operation = "IShellLinkW.SetWorkingDirectory";
+            shortcut.SetWorkingDirectory(installDir);
+            operation = "IShellLinkW.SetIconLocation";
+            shortcut.SetIconLocation(LaunchPath, 0);
+            operation = "IPersistFile.Save";
+            ((System.Runtime.InteropServices.ComTypes.IPersistFile)shortcut).Save(linkPath, true);
+        }
+        catch (Exception ex)
+        {
+            throw new EngineException("无法创建快捷方式", $"{operation}\n{DescribeFailure(ex)}");
         }
         finally
         {
-            try { System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell); } catch { }
+            if (shortcut is not null)
+                try { System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut); } catch { }
         }
     }
 

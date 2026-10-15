@@ -48,6 +48,24 @@ test('mandatory registration finishes before commit and destructive cleanup', ()
   );
 });
 
+test('shortcuts use explicit Unicode COM with bounded native failure diagnostics', () => {
+  for (const operation of [
+    'IShellLinkW.Activate',
+    'IShellLinkW.SetPath',
+    'IShellLinkW.SetWorkingDirectory',
+    'IShellLinkW.SetIconLocation',
+    'IPersistFile.Save',
+  ]) {
+    expect(installer).toContain(`operation = "${operation}"`);
+  }
+  expect(installer).not.toContain('WScript.Shell');
+  expect(installer).toContain('exception.HResult:X8');
+  expect(installer).toContain('new StackTrace(exception, fNeedFileInfo: false)');
+  expect(installer).toContain('Marshal.FinalReleaseComObject(shortcut)');
+  expect(read('WindowsShellLink.cs')).toContain('000214F9-0000-0000-C000-000000000046');
+  expect(read('WindowsShellLink.cs')).toContain('UnmanagedType.LPWStr');
+});
+
 test('install and uninstall reject foreign directories before stopping any process', () => {
   expect(installer.indexOf('transaction.ValidateOwnership();')).toBeLessThan(
     installer.indexOf('await StepStopAppProcesses('),
@@ -166,6 +184,7 @@ test.skipIf(!dotnetAvailable)(
         'InstallDirectoryTransaction.cs',
         'InstallRegistrationSnapshot.cs',
         'ShellProcessRunner.cs',
+        'WindowsShellLink.cs',
         'UninstallerEngine.cs',
       ];
       fs.writeFileSync(
@@ -267,6 +286,43 @@ try {
     Check(File.ReadAllText(Path.Combine(migrated, "a")) == "user-newer", "migration overwrote user changes");
     Check(File.ReadAllText(Path.Combine(migrated, "b")) == "missing", "migration retry skipped missing file");
 
+    if (OperatingSystem.IsWindows()) {
+        // Match SetupForm's Task.Run apartment and real Unicode install path,
+        // without touching the user's registry, Desktop or Start Menu.
+        var shortcutInstall = Path.Combine(root, "安装 路径");
+        Directory.CreateDirectory(Path.Combine(shortcutInstall, "resources"));
+        File.WriteAllText(Path.Combine(shortcutInstall, "resources", "app.asar"), "shortcut-asar");
+        File.WriteAllText(Path.Combine(shortcutInstall, InstallerEngine.AppExeName), "shortcut-target");
+        var shortcutEngine = new InstallerEngine(null, shortcutInstall, Path.Combine(root, "runtime"), data, false, new Progress<EngineEvent>());
+        foreach (var folderName in new[] { "开始菜单", "桌面" }) {
+            var shortcutFolder = Path.Combine(root, folderName);
+            Directory.CreateDirectory(shortcutFolder);
+            Task.Run(() => {
+                Check(Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA, "shortcut test must match the engine's MTA worker");
+                try { shortcutEngine.CreateShortcut(shortcutFolder); }
+                catch (EngineException ex) { Console.Error.WriteLine(ex.Detail); throw; }
+                var linkPath = Path.Combine(shortcutFolder, InstallerEngine.DisplayName + ".lnk");
+                Check(File.Exists(linkPath), "shortcut file was not saved");
+                var link = (IShellLinkW)new ShellLinkComObject();
+                try {
+                    ((System.Runtime.InteropServices.ComTypes.IPersistFile)link).Load(linkPath, 0);
+                    var target = new System.Text.StringBuilder(32768);
+                    link.GetPath(target, target.Capacity, IntPtr.Zero, 4);
+                    Check(target.ToString() == shortcutEngine.LaunchPath, "shortcut lost its Unicode executable path");
+                    var workingDirectory = new System.Text.StringBuilder(32768);
+                    link.GetWorkingDirectory(workingDirectory, workingDirectory.Capacity);
+                    Check(workingDirectory.ToString() == shortcutInstall, "shortcut lost its Unicode working directory");
+                    var icon = new System.Text.StringBuilder(32768);
+                    link.GetIconLocation(icon, icon.Capacity, out var iconIndex);
+                    Check(icon.ToString() == shortcutEngine.LaunchPath && iconIndex == 0, "shortcut lost its Unicode icon path");
+                } finally {
+                    System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);
+                }
+            }).GetAwaiter().GetResult();
+        }
+        Console.WriteLine("PASS: actual Unicode shortcut creation and target readback on MTA worker");
+    }
+
     // Minimal PE32+ envelope with both unsigned and certificate-bearing forms.
     byte[] Sfx(bool signed) {
         var bytes = new byte[signed ? 576 : 560];
@@ -312,6 +368,11 @@ try {
       );
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(result.stdout).toContain('PASS: transaction recovery');
+      if (process.platform === 'win32') {
+        expect(result.stdout).toContain(
+          'PASS: actual Unicode shortcut creation and target readback on MTA worker',
+        );
+      }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
