@@ -51,3 +51,12 @@ test('keeps token removal available by click and keyboard', () => {
     'if (activeSkillIds.includes(skillId)) {\n          dispatch(toggleActiveSkill(skillId));',
   );
 });
+
+test('guards focus and prevents unconditional focus stealing when value changes', () => {
+  expect(source).not.toContain('2026/09/22 lixiang');
+  expect(source).toContain('const isEditorFocused =');
+  expect(source).toContain(
+    'document.activeElement === editor || editor.contains(document.activeElement)',
+  );
+  expect(source).toContain('if (isEditorFocused) {');
+});
