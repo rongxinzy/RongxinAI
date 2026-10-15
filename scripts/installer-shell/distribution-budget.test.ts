@@ -10,9 +10,13 @@ const { MAX_SETUP_BYTES } = require('./sfx-format.cjs');
 const {
   MAX_COMPONENT_BYTES,
   MAX_NON_COMPONENT_BYTES,
+  MAX_NSIS_BYTES,
+  MAX_NSIS_NON_COMPONENT_BYTES,
   assertSetupBudget,
+  assertNsisBudget,
   readComponentArchiveBytes,
   assertPayloadDeduplication,
+  verifyFinalNsisBudget,
 } = require('./distribution-budget.cjs');
 const targets = require('../nsis-offline-components.json');
 const MiB = 1024 * 1024;
@@ -47,6 +51,47 @@ test('the real Windows build fits and signature bytes consume the remaining budg
   expect(() => assertSetupBudget(preSignatureBytes, componentBytes)).not.toThrow();
   expect(() => assertSetupBudget(preSignatureBytes + 16, componentBytes)).toThrow(/500 MiB/);
   expect(() => assertSetupBudget(220 * MiB + 100 + 16, 100)).toThrow(/220 MiB/);
+});
+
+test('NSIS keeps its original 450/150 MiB limits independently of WebView2', () => {
+  expect(MAX_NSIS_BYTES).toBe(450 * MiB);
+  expect(MAX_NSIS_NON_COMPONENT_BYTES).toBe(150 * MiB);
+  expect(assertNsisBudget(450 * MiB, 300 * MiB)).toMatchObject({
+    installerBytes: 450 * MiB,
+    componentArchiveBytes: 300 * MiB,
+    nonComponentBytes: 150 * MiB,
+    maxSetupBytes: 450 * MiB,
+    maxNonComponentBytes: 150 * MiB,
+  });
+  expect(() => assertNsisBudget(450 * MiB + 1, 300 * MiB)).toThrow(/450 MiB/);
+  expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1)).toThrow(/150 MiB/);
+  expect(() => assertNsisBudget(400 * MiB, 300 * MiB + 1)).toThrow(/300 MiB/);
+  expect(assertNsisBudget(439_171_500, 288_626_662).nonComponentBytes).toBe(150_544_838);
+  expect(() => assertNsisBudget(491_244_872, 288_626_662)).toThrow(/450 MiB/);
+  expect(() => assertSetupBudget(491_244_872, 288_626_662)).not.toThrow();
+});
+
+test('the NSIS final gate reads the sole updater without modifying its bytes', () => {
+  const dir = root();
+  const bytes = Buffer.from('final signed NSIS updater fixture');
+  const name = 'Fixture-Setup-2026.7.16.exe';
+  writeFileSync(path.join(dir, name), bytes);
+  writeFileSync(path.join(dir, 'ZhiYuanAgent-Setup-2026.7.16.exe'), 'webview shell');
+  writeFileSync(path.join(dir, 'Uninstall Fixture.exe'), 'uninstall host');
+  mkdirSync(path.join(dir, 'directory.exe'));
+  expect(verifyFinalNsisBudget(dir, 8)).toMatchObject({
+    file: name,
+    installerBytes: bytes.length,
+    componentArchiveBytes: 8,
+    nonComponentBytes: bytes.length - 8,
+    maxSetupBytes: 450 * MiB,
+  });
+  expect(readFileSync(path.join(dir, name))).toEqual(bytes);
+  writeFileSync(path.join(dir, 'stale-updater.exe'), bytes);
+  expect(() => verifyFinalNsisBudget(dir, 8)).toThrow(/exactly one NSIS/);
+  rmSync(path.join(dir, 'stale-updater.exe'));
+  rmSync(path.join(dir, name));
+  expect(() => verifyFinalNsisBudget(dir, 8)).toThrow(/found 0/);
 });
 
 test.each([

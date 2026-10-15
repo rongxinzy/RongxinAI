@@ -22,6 +22,10 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
     build.indexOf('const finalBudget = verifyFinalSetupBudget'),
   );
   expect(build.indexOf('const finalBudget = verifyFinalSetupBudget')).toBeLessThan(
+    build.indexOf('const nsisBudget = verifyFinalNsisBudget'),
+  );
+  expect(build).toContain('finalBudget.componentArchiveBytes');
+  expect(build.indexOf('const nsisBudget = verifyFinalNsisBudget')).toBeLessThan(
     build.indexOf('const report = writeSetupManifest'),
   );
   expect(read('electron-builder.windows-signed.cjs')).toContain('forceCodeSigning: true');

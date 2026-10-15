@@ -8,8 +8,16 @@ const targets = require('../nsis-offline-components.json');
 
 const MAX_COMPONENT_BYTES = 300 * 1024 * 1024;
 const MAX_NON_COMPONENT_BYTES = 220 * 1024 * 1024;
+const MAX_NSIS_BYTES = 450 * 1024 * 1024;
+const MAX_NSIS_NON_COMPONENT_BYTES = 150 * 1024 * 1024;
 
-function assertSetupBudget(installerBytes, componentArchiveBytes) {
+function assertBudget(
+  installerBytes,
+  componentArchiveBytes,
+  maximumBytes,
+  maximumNonComponentBytes,
+  label,
+) {
   if (
     !Number.isSafeInteger(installerBytes) ||
     !Number.isSafeInteger(componentArchiveBytes) ||
@@ -22,20 +30,42 @@ function assertSetupBudget(installerBytes, componentArchiveBytes) {
   if (componentArchiveBytes > MAX_COMPONENT_BYTES) {
     throw new Error('Component archives exceed the unchanged 300 MiB budget');
   }
-  if (installerBytes > MAX_SETUP_BYTES) {
-    throw new Error('Final setup exceeds the 500 MiB WebView2 installer budget');
+  if (installerBytes > maximumBytes) {
+    throw new Error(`Final ${label} exceeds the ${maximumBytes / 1024 / 1024} MiB budget`);
   }
-  if (nonComponentBytes > MAX_NON_COMPONENT_BYTES) {
-    throw new Error('Final setup non-component bytes exceed the 220 MiB WebView2 budget');
+  if (nonComponentBytes > maximumNonComponentBytes) {
+    throw new Error(
+      `Final ${label} non-component bytes exceed the ${maximumNonComponentBytes / 1024 / 1024} MiB budget`,
+    );
   }
   return {
     installerBytes,
     componentArchiveBytes,
     nonComponentBytes,
-    maxSetupBytes: MAX_SETUP_BYTES,
+    maxSetupBytes: maximumBytes,
     maxComponentBytes: MAX_COMPONENT_BYTES,
-    maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
+    maxNonComponentBytes: maximumNonComponentBytes,
   };
+}
+
+function assertSetupBudget(installerBytes, componentArchiveBytes) {
+  return assertBudget(
+    installerBytes,
+    componentArchiveBytes,
+    MAX_SETUP_BYTES,
+    MAX_NON_COMPONENT_BYTES,
+    'WebView2 installer',
+  );
+}
+
+function assertNsisBudget(installerBytes, componentArchiveBytes) {
+  return assertBudget(
+    installerBytes,
+    componentArchiveBytes,
+    MAX_NSIS_BYTES,
+    MAX_NSIS_NON_COMPONENT_BYTES,
+    'NSIS updater',
+  );
 }
 
 function readComponentArchiveBytes(componentsDir) {
@@ -71,6 +101,27 @@ function verifyFinalSetupBudget(setup, componentsDir) {
   return assertSetupBudget(final.installerBytes, readComponentArchiveBytes(componentsDir));
 }
 
+function verifyFinalNsisBudget(releaseDir, componentArchiveBytes) {
+  const updaters = fs
+    .readdirSync(releaseDir, { withFileTypes: true })
+    .filter(
+      entry =>
+        entry.isFile() &&
+        /\.exe$/i.test(entry.name) &&
+        !/^ZhiYuanAgent-Setup-/i.test(entry.name) &&
+        !/Uninstall/i.test(entry.name),
+    );
+  if (updaters.length !== 1)
+    throw new Error(`Expected exactly one NSIS updater; found ${updaters.length}`);
+  const updater = path.join(releaseDir, updaters[0].name);
+  // electron-builder already completed any required signing before this
+  // distribution entry point. Count final bytes without modifying the file.
+  return {
+    file: updaters[0].name,
+    ...assertNsisBudget(fs.statSync(updater).size, componentArchiveBytes),
+  };
+}
+
 function assertPayloadDeduplication(payloadDir, retainedHost) {
   if (fs.existsSync(path.join(payloadDir, 'vc_redist.x64.exe'))) {
     throw new Error('Duplicate VC++ redistributable: use the copy already inside app.7z');
@@ -98,8 +149,12 @@ function assertPayloadDeduplication(payloadDir, retainedHost) {
 module.exports = {
   MAX_COMPONENT_BYTES,
   MAX_NON_COMPONENT_BYTES,
+  MAX_NSIS_BYTES,
+  MAX_NSIS_NON_COMPONENT_BYTES,
   assertSetupBudget,
+  assertNsisBudget,
   readComponentArchiveBytes,
   verifyFinalSetupBudget,
+  verifyFinalNsisBudget,
   assertPayloadDeduplication,
 };

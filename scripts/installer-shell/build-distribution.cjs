@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { writeSetupManifest } = require('./sfx-format.cjs');
 const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
-const { verifyFinalSetupBudget } = require('./distribution-budget.cjs');
+const { verifyFinalSetupBudget, verifyFinalNsisBudget } = require('./distribution-budget.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const signed = process.argv.includes('--signed');
@@ -57,6 +57,11 @@ const finalBudget = verifyFinalSetupBudget(
   path.join(root, 'build-tar', 'windows-components'),
 );
 console.log(`[installer-shell] final signed-byte budget ${JSON.stringify(finalBudget)}`);
+const nsisBudget = verifyFinalNsisBudget(
+  path.join(root, 'release'),
+  finalBudget.componentArchiveBytes,
+);
+console.log(`[installer-shell] final NSIS updater budget ${JSON.stringify(nsisBudget)}`);
 // The report must describe the final signed bytes, never the pre-signing file.
 const report = writeSetupManifest(setup, version);
 if (report.signed !== signed) throw new Error('Unexpected setup signature state');
