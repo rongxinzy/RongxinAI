@@ -152,6 +152,36 @@ jobs:
             [[ -e "$batch" ]] || continue
             aws s3api delete-objects --bucket "$R2_BUCKET" --delete "file://$batch"
           done
+      - name: Read xiaoruan release inventory
+        id: xiaoruan_inventory
+        env:
+          XIAORUAN_BUCKET: xiaoruan-releases
+        run: |
+          mkdir -p manifest/cleanup-xiaoruan
+          set +e
+          aws s3api list-objects-v2 --bucket "$XIAORUAN_BUCKET" --prefix builds/ --max-keys 1000 \
+            > manifest/cleanup-xiaoruan/objects.json 2> manifest/cleanup-xiaoruan/list.err
+          list_status=$?
+          set -e
+          if [[ $list_status -eq 0 ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Skipping xiaoruan cleanup: unable to list bucket (status $list_status)"
+            cat manifest/cleanup-xiaoruan/list.err >&2
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Plan and delete expired xiaoruan objects
+        if: steps.xiaoruan_inventory.outputs.enabled == 'true'
+        env:
+          XIAORUAN_BUCKET: xiaoruan-releases
+        run: |
+          node scripts/release/plan-xiaoruan-cleanup.mjs \
+            manifest/cleanup-xiaoruan/objects.json \
+            manifest/cleanup-xiaoruan
+          for batch in manifest/cleanup-xiaoruan/delete-*.json; do
+            [[ -e "$batch" ]] || continue
+            aws s3api delete-objects --bucket "$XIAORUAN_BUCKET" --delete "file://$batch"
+          done
 
   github-artifacts:
     runs-on: ubuntu-latest
