@@ -230,21 +230,26 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
       const editor = editorRef.current;
       if (!editor || value === emittedValueRef.current) return;
 
+      const isEditorFocused =
+        document.activeElement === editor || editor.contains(document.activeElement);
+
       if (pendingRestoreValueRef.current === value && contentSnapshotRef.current) {
         editor.replaceChildren(contentSnapshotRef.current.cloneNode(true));
         emittedValueRef.current = value;
         pendingRestoreValueRef.current = null;
         contentSnapshotRef.current = null;
-        requestAnimationFrame(() => {
-          editor.focus();
-          const range = document.createRange();
-          range.selectNodeContents(editor);
-          range.collapse(false);
-          const selection = window.getSelection();
-          selection?.removeAllRanges();
-          selection?.addRange(range);
-          selectionRef.current = range.cloneRange();
-        });
+        if (isEditorFocused) {
+          requestAnimationFrame(() => {
+            if (editorRef.current !== editor) return;
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            selectionRef.current = range.cloneRange();
+          });
+        }
         return;
       }
 
@@ -264,18 +269,19 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
       textNodes.forEach(node => node.remove());
       if (value) editor.append(document.createTextNode(value));
       emittedValueRef.current = value;
-      // 2026/09/22 lixiang  外部 setValue（如消息再编辑）后把光标放到末尾
-      requestAnimationFrame(() => {
-        if (editorRef.current !== editor) return;
-        editor.focus();
-        const range = document.createRange();
-        range.selectNodeContents(editor);
-        range.collapse(false);
-        const selection = window.getSelection();
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-        selectionRef.current = range.cloneRange();
-      });
+
+      if (isEditorFocused) {
+        requestAnimationFrame(() => {
+          if (editorRef.current !== editor) return;
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          const selection = window.getSelection();
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+          selectionRef.current = range.cloneRange();
+        });
+      }
     }, [value]);
 
     const handleInput = useCallback(() => {
