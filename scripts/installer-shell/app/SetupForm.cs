@@ -95,6 +95,7 @@ public sealed class SetupForm : Form
     private readonly string eventsLogPath;
     private string installState = "idle";
     private string? lastLaunchPath;
+    private int lifecycleEvents;
 
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
@@ -215,19 +216,23 @@ public sealed class SetupForm : Form
 
         FormClosing += (_, e) =>
         {
+            RecordLifecycle("form-closing");
             if (!operationActive) return;
             e.Cancel = true;
             closeRequested = true;
+            RecordLifecycle("form-close-deferred");
             installCts.Cancel();
             OnEngineEvent(new EngineEvent(Type: "phase", Label: "正在安全结束，请稍候"));
         };
         FormClosed += (_, _) =>
         {
+            RecordLifecycle("form-closed");
             webView.Dispose();
             installCts.Dispose();
             foreach (var dir in new[] { materializedUiDir, webViewDataDir })
                 if (dir is not null)
                     try { InstallDirectoryTransaction.DeleteTreeWithoutFollowingLinks(dir); } catch { }
+            RecordLifecycle("form-cleanup-finished");
         };
 
         Load += async (_, _) =>
@@ -442,6 +447,7 @@ public sealed class SetupForm : Form
 
     private void OnEngineEvent(EngineEvent evt)
     {
+        if (InvokeRequired) { BeginInvoke(() => OnEngineEvent(evt)); return; }
         if (evt.Type == "done") { installState = "done"; lastLaunchPath = evt.LaunchPath; completedUpgrade = evt.IsUpgrade == true; }
         else if (evt.Type == "error") { installState = "error"; }
         var json = evt.ToJson();
@@ -455,22 +461,9 @@ public sealed class SetupForm : Form
         if (core is null) return;
         try
         {
-            if (IsHandleCreated)
-            {
-                BeginInvoke(() =>
-                {
-                    try
-                    {
-                        core.PostWebMessageAsJson(json);
-                    }
-                    catch (Exception postEx)
-                    {
-                        DebugLog($"post to webview failed: {postEx}");
-                    }
-                });
-            }
+            core.PostWebMessageAsJson(json);
         }
-        catch (Exception invokeEx) { DebugLog($"beginInvoke failed: {invokeEx}"); }
+        catch (Exception postEx) { DebugLog($"post to webview failed: {postEx}"); }
     }
 
     private void OnWebViewReady(object? sender, CoreWebView2InitializationCompletedEventArgs e)
@@ -536,7 +529,7 @@ public sealed class SetupForm : Form
         var progress = new InlineProgress(evt =>
         {
             if (evt.Type == "error") errorReported = true;
-            BeginInvoke(() => OnEngineEvent(evt));
+            OnEngineEvent(evt);
         });
         _ = Task.Run(async () =>
         {
@@ -559,7 +552,26 @@ public sealed class SetupForm : Form
     private void FinishOperation()
     {
         operationActive = false;
+        RecordLifecycle("operation-finished");
         if (closeRequested) Close();
+    }
+
+    // Use the same host-object transport as StartInstall. Queue shutdown outside
+    // the COM callback; FormClosing still cancels active work and waits for
+    // FinishOperation/rollback before the window may close.
+    internal void RequestClose() => BeginInvoke(() =>
+    {
+        RecordLifecycle("bridge-close-dispatched");
+        Close();
+    });
+
+    // Fixed metadata only, bounded per process. Never send diagnostics back to
+    // the WebView or include paths, message payloads, or user content.
+    private void RecordLifecycle(string stage)
+    {
+        if (lifecycleEvents++ >= 64) return;
+        AppendEvent(eventsLogPath, new EngineEvent(Type: "lifecycle", Label: stage,
+            Detail: $"operationActive={operationActive}; closeRequested={closeRequested}"));
     }
 
     internal void CancelInstall() => installCts.Cancel();
@@ -598,7 +610,7 @@ public sealed class SetupForm : Form
         var progress = new InlineProgress(evt =>
         {
             if (evt.Type == "error") errorReported = true;
-            BeginInvoke(() => OnEngineEvent(evt));
+            OnEngineEvent(evt);
         });
         _ = Task.Run(async () =>
         {
@@ -692,7 +704,7 @@ public sealed class ShellBridge
 
     public ShellBridge(SetupForm form) => this.form = form;
 
-    public void CloseWindow() => form.BeginInvoke(form.Close);
+    public void RequestClose() => form.RequestClose();
 
     public void MinimizeWindow() => form.BeginInvoke(() =>
     {

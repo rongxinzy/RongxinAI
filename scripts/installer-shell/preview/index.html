@@ -635,9 +635,18 @@ function runInstall() {
 
 document.getElementById('demoReplay').addEventListener('click', () => { showPage('progress'); runInstall(); });
 document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { simToken++; showPage(b.dataset.goto); }));
+async function requestShellClose() {
+  try {
+    await Promise.resolve(window.chrome.webview.hostObjects.shell.RequestClose());
+  } catch (error) {
+    console.error('[Setup] Close request failed:', error);
+    const completed = document.getElementById('page-complete').classList.contains('active');
+    if (completed) handleEngineEvent({ type: 'launch-error', message: String(error) });
+  }
+}
 document.getElementById('btnDone').addEventListener('click', () => {
   simToken++;
-  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  if (inShell) { requestShellClose(); return; }
   showPage('hero');
 });
 document.getElementById('btnLaunch').addEventListener('click', () => {
@@ -645,7 +654,7 @@ document.getElementById('btnLaunch').addEventListener('click', () => {
     const button = document.getElementById('btnLaunch');
     button.disabled = true;
     Promise.resolve(window.chrome.webview.hostObjects.shell.LaunchApp()).then(started => {
-      if (started) window.chrome.webview.postMessage({ type: 'close' });
+      if (started) requestShellClose();
       else button.disabled = false;
     }).catch(() => { button.disabled = false; });
     return;
@@ -653,11 +662,11 @@ document.getElementById('btnLaunch').addEventListener('click', () => {
   alert(lang === 'zh' ? '将启动 知远智能体' : 'Launching ZhiYuan Agent');
 });
 document.getElementById('btnCancelHero').addEventListener('click', () => {
-  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  if (inShell) { requestShellClose(); return; }
   showPage('hero');
 });
 document.getElementById('btnCancelUninstall').addEventListener('click', () => {
-  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  if (inShell) { requestShellClose(); return; }
   showPage('hero');
 });
 document.getElementById('btnConfirmUninstall').addEventListener('click', () => {
@@ -717,7 +726,7 @@ document.querySelectorAll('img[data-asset]').forEach(img => {
 if (inShell) {
   document.body.classList.add('shell');
   document.querySelector('.win-btn.close').addEventListener('click', () => {
-    window.chrome.webview.postMessage({ type: 'close' });
+    requestShellClose();
   });
   document.querySelector('.titlebar').addEventListener('pointerdown', e => {
     if (e.button === 0 && !e.target.closest('.win-btn')) {

@@ -23,6 +23,26 @@ test('engine checks extraction and retains all main repository runtime features'
   expect(form).toContain('public void StartInstall(string installPath, bool localInference)');
 });
 
+test('payload progress is bounded at its source and UI delivery has only one marshal', () => {
+  expect(installer).toContain('if (percent <= lastReportedPercent) return;');
+  expect(installer).toContain(
+    'ReportPayloadProgress(progress, doneBytes, totalBytes, ref lastReportedPercent);',
+  );
+  expect(installer).toContain(
+    'ReportPayloadProgress(progress, totalBytes, totalBytes, ref lastReportedPercent);',
+  );
+  const onEvent = form.slice(
+    form.indexOf('private void OnEngineEvent('),
+    form.indexOf('private void OnWebViewReady('),
+  );
+  expect(onEvent.match(/BeginInvoke\(/g)).toHaveLength(1);
+  expect(onEvent).toContain(
+    'if (InvokeRequired) { BeginInvoke(() => OnEngineEvent(evt)); return; }',
+  );
+  expect(onEvent).toContain('core.PostWebMessageAsJson(json);');
+  expect(form.match(/BeginInvoke\(\(\) => OnEngineEvent\(evt\)\)/g)).toHaveLength(1);
+});
+
 test('mandatory registration finishes before commit and destructive cleanup', () => {
   const run = installer.slice(
     installer.indexOf('public async Task RunAsync'),
@@ -155,6 +175,39 @@ test('retry gets a fresh cancellation token and closing waits for the engine to 
   );
 });
 
+test('host close queues the normal rollback lifecycle and keeps diagnostic output bounded', () => {
+  expect(form).toContain('public void RequestClose() => form.RequestClose();');
+  const close = form.slice(
+    form.indexOf('internal void RequestClose()'),
+    form.indexOf('private void RecordLifecycle('),
+  );
+  expect(close).toContain('BeginInvoke(() =>');
+  expect(close).toContain('RecordLifecycle("bridge-close-dispatched")');
+  expect(close).toContain('Close();');
+  expect(close).not.toMatch(/Environment\.Exit|Application\.Exit|Dispose\(|operationActive\s*=/);
+  const formClosing = form.slice(form.indexOf('FormClosing +='), form.indexOf('FormClosed +='));
+  for (const marker of [
+    'if (!operationActive) return;',
+    'e.Cancel = true;',
+    'closeRequested = true;',
+    'installCts.Cancel();',
+  ])
+    expect(formClosing).toContain(marker);
+  expect(form).toContain('if (closeRequested) Close();');
+  expect(form).toContain('if (lifecycleEvents++ >= 64) return;');
+  for (const stage of [
+    'form-closing',
+    'form-close-deferred',
+    'form-closed',
+    'form-cleanup-finished',
+    'operation-finished',
+  ])
+    expect(form).toContain(`RecordLifecycle("${stage}")`);
+  // This fix uses the working host-object transport, not a second subscription.
+  expect(form).toContain('webView.WebMessageReceived += OnWebMessage;');
+  expect(form).not.toContain('webView.CoreWebView2.WebMessageReceived += OnWebMessage;');
+});
+
 test('license is embedded and acceptance debugging is opt-in, loopback-only and isolated', () => {
   expect(read('ZhiYuan.Setup.Shell.csproj')).toContain('LogicalName="ui.license"');
   expect(form).toContain('GetManifestResourceStream("ui.license")');
@@ -200,6 +253,29 @@ static void Check(bool condition, string message) { if (!condition) throw new Ex
 var root = Path.Combine(Path.GetTempPath(), "zy-engine-behavior-" + Guid.NewGuid().ToString("n"));
 Directory.CreateDirectory(root);
 try {
+    var payloadEvents = new List<EngineEvent>();
+    var payloadProgress = new ContractProgress(payloadEvents.Add);
+    var lastPercent = -1;
+    const int reads = 100_000;
+    for (var bytes = 0; bytes <= reads; bytes++)
+        InstallerEngine.ReportPayloadProgress(payloadProgress, bytes, reads, ref lastPercent);
+    InstallerEngine.ReportPayloadProgress(payloadProgress, reads, reads, ref lastPercent);
+    Check(payloadEvents.Count == 101, "payload queued more than one event per visible percentage");
+    Check(payloadEvents.Select(evt => evt.Percent).SequenceEqual(Enumerable.Range(0, 101).Select(value => (int?)value)), "payload percentages were not monotonic and complete");
+    Check(payloadEvents[^1].BytesDone == reads && payloadEvents[^1].BytesTotal == reads, "payload final byte count was lost");
+    foreach (var terminal in new[] { "done", "error" }) {
+        payloadProgress.Report(new EngineEvent(Type: "phase", Label: "ready"));
+        payloadProgress.Report(new EngineEvent(Type: terminal));
+        InstallerEngine.ReportPayloadProgress(payloadProgress, reads / 2, reads, ref lastPercent);
+        Check(payloadEvents[^2].Type == "phase" && payloadEvents[^1].Type == terminal, "stale progress overtook a phase or terminal event");
+    }
+    var emptyEvents = new List<EngineEvent>();
+    var emptyProgress = new ContractProgress(emptyEvents.Add);
+    lastPercent = -1;
+    InstallerEngine.ReportPayloadProgress(emptyProgress, 0, 0, ref lastPercent);
+    Check(emptyEvents.Count == 1 && emptyEvents[0].Percent == 100, "empty payload did not report completion");
+    Console.WriteLine("PASS: 100000 payload reads produce 101 ordered updates and no stale progress after completion");
+
     var install = Path.Combine(root, "app");
     var data = Path.Combine(root, "user-data");
     Directory.CreateDirectory(data);
@@ -349,6 +425,9 @@ try {
     Check(refused, "corrupt certificate offset accepted");
     Console.WriteLine("PASS: transaction recovery, retention, path guards");
 } finally { Directory.Delete(root, recursive: true); }
+sealed class ContractProgress(Action<EngineEvent> report) : IProgress<EngineEvent> {
+    public void Report(EngineEvent value) => report(value);
+}
 `,
       );
       const result = spawnSync(
@@ -368,6 +447,7 @@ try {
       );
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(result.stdout).toContain('PASS: transaction recovery');
+      expect(result.stdout).toContain('PASS: 100000 payload reads produce 101 ordered updates');
       if (process.platform === 'win32') {
         expect(result.stdout).toContain(
           'PASS: actual Unicode shortcut creation and target readback on MTA worker',

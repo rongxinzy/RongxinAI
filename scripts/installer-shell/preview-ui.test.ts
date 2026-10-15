@@ -10,22 +10,27 @@ function thenOnly<T>(result: Promise<T>): PromiseLike<T> {
   return { then: (resolve, reject) => thenOnly(result.then(resolve, reject)) };
 }
 
-function mount() {
+function mount(query = '?lang=en', hosted = true) {
   const start = vi.fn<(path: string, inference: boolean) => PromiseLike<void>>(() =>
     thenOnly(Promise.resolve()),
   );
   const launch = vi.fn<() => PromiseLike<boolean>>(() => thenOnly(Promise.resolve(false)));
+  const close = vi.fn<() => PromiseLike<void>>(() => thenOnly(Promise.resolve()));
+  const cancel = vi.fn();
   const post = vi.fn();
   const errors: Error[] = [];
+  const diagnostics: unknown[][] = [];
   let engine: (event: { data: unknown }) => void = () => {};
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', error => errors.push(error));
+  virtualConsole.on('error', (...args) => diagnostics.push(args));
   const dom = new JSDOM(html, {
-    url: 'https://setup.local/index.html?lang=en',
+    url: `https://setup.local/index.html${query}`,
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     virtualConsole,
     beforeParse(window) {
+      if (!hosted) return;
       Object.defineProperty(window, 'chrome', {
         value: {
           webview: {
@@ -33,6 +38,8 @@ function mount() {
               shell: {
                 StartInstall: start,
                 LaunchApp: launch,
+                RequestClose: close,
+                CancelInstall: cancel,
                 GetDefaultInstallDir: () => thenOnly(Promise.resolve('C:\\知远\\Application')),
               },
             },
@@ -52,8 +59,11 @@ function mount() {
     document,
     start,
     launch,
+    close,
+    cancel,
     post,
     errors,
+    diagnostics,
     click: (selector: string) => (document.querySelector(selector) as HTMLElement).click(),
     event: (data: unknown) => engine({ data }),
   };
@@ -62,6 +72,89 @@ function mount() {
 afterEach(() => windows.splice(0).forEach(dom => dom.window.close()));
 
 describe('hosted installer Promise bridge (not Windows acceptance)', () => {
+  it.each([
+    ['#btnDone', 'complete'],
+    ['#btnCancelHero', 'hero'],
+    ['#btnCancelUninstall', 'uninstall'],
+    ['.win-btn.close', 'hero'],
+  ])('requests host close from %s without simulating window exit', async (selector, page) => {
+    const ui = mount(page === 'uninstall' ? '?page=uninstall' : undefined);
+    if (page === 'complete') {
+      ui.event({ type: 'done' });
+      await vi.waitFor(() =>
+        expect(ui.document.querySelector('.page.active')?.id).toBe('page-complete'),
+      );
+    }
+    const proxy = thenOnly(Promise.resolve());
+    const then = vi.spyOn(proxy, 'then');
+    ui.close.mockReturnValue(proxy);
+    ui.click(selector);
+    expect(ui.close).toHaveBeenCalledExactlyOnceWith();
+    await vi.waitFor(() => expect(then).toHaveBeenCalledOnce());
+    expect(ui.document.querySelector('.page.active')?.id).toBe(`page-${page}`);
+    expect(ui.launch).not.toHaveBeenCalled();
+    expect(ui.post).not.toHaveBeenCalled();
+    expect(ui.errors).toEqual([]);
+  });
+
+  it('keeps progress visible until the engine confirms cancellation or rollback', async () => {
+    const ui = mount();
+    ui.click('#licenseCheck');
+    ui.click('#btnInstall');
+    ui.click('.win-btn.close');
+    expect(ui.close).toHaveBeenCalledOnce();
+    expect(ui.document.querySelector('.page.active')?.id).toBe('page-progress');
+    ui.click('#btnCancelProgress');
+    expect(ui.cancel).toHaveBeenCalledOnce();
+    expect(ui.document.querySelector('.page.active')?.id).toBe('page-progress');
+    ui.event({ type: 'error', message: 'Cancelled after rollback' });
+    expect(ui.document.querySelector('.page.active')?.id).toBe('page-hero');
+    expect(ui.document.querySelector('#heroStatus')?.textContent).toBe('Cancelled after rollback');
+    expect(ui.post).not.toHaveBeenCalled();
+  });
+
+  it.each(['progress', 'complete'])(
+    'does not turn close rejection into install failure on %s',
+    async page => {
+      const ui = mount();
+      ui.click('#licenseCheck');
+      ui.click('#btnInstall');
+      if (page === 'complete') {
+        ui.event({ type: 'done', installDir: 'C:\\知远\\Application' });
+        await vi.waitFor(() =>
+          expect(ui.document.querySelector('.page.active')?.id).toBe('page-complete'),
+        );
+      }
+      const status = ui.document.querySelector('#heroStatus')?.textContent;
+      ui.close.mockReturnValue(thenOnly(Promise.reject(new Error('Close request rejected'))));
+      ui.click(page === 'complete' ? '#btnDone' : '.win-btn.close');
+      await vi.waitFor(() => expect(ui.diagnostics).toHaveLength(1));
+      expect(ui.document.querySelector('.page.active')?.id).toBe(`page-${page}`);
+      expect(ui.document.querySelector('#heroStatus')?.textContent).toBe(status);
+      if (page === 'complete') {
+        expect(ui.document.querySelector('#completeSub')?.textContent).toContain(
+          'Close request rejected',
+        );
+        expect((ui.document.querySelector('#btnLaunch') as HTMLButtonElement).disabled).toBe(false);
+      } else
+        expect((ui.document.querySelector('#btnInstall') as HTMLButtonElement).disabled).toBe(true);
+      expect(ui.errors).toEqual([]);
+      expect(ui.post).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['#btnDone', 'complete'],
+    ['#btnCancelHero', 'hero'],
+    ['#btnCancelUninstall', 'uninstall'],
+  ])('keeps standalone preview navigation for %s', (selector, page) => {
+    const ui = mount(`?page=${page}`, false);
+    ui.click(selector);
+    expect(ui.document.querySelector('.page.active')?.id).toBe('page-hero');
+    expect(ui.close).not.toHaveBeenCalled();
+    expect(ui.errors).toEqual([]);
+  });
+
   it.each([false, true])('retains consent and the local-inference choice (%s)', async inference => {
     const ui = mount();
     await vi.waitFor(() =>
@@ -131,22 +224,23 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
       await vi.waitFor(() => expect(then).toHaveBeenCalledTimes(1));
       expect(then.mock.calls[0].map(callback => typeof callback)).toEqual(['function', 'function']);
       if (outcome === 'started') {
-        await vi.waitFor(() => expect(ui.post).toHaveBeenCalledExactlyOnceWith({ type: 'close' }));
+        await vi.waitFor(() => expect(ui.close).toHaveBeenCalledExactlyOnceWith());
       } else {
         await vi.waitFor(() =>
           expect((ui.document.querySelector('#btnLaunch') as HTMLButtonElement).disabled).toBe(
             false,
           ),
         );
-        expect(ui.post).not.toHaveBeenCalled();
+        expect(ui.close).not.toHaveBeenCalled();
         expect(ui.document.querySelector('#page-complete')?.classList.contains('active')).toBe(
           true,
         );
       }
       expect(ui.errors).toEqual([]);
-      ui.post.mockClear();
+      expect(ui.post).not.toHaveBeenCalled();
+      ui.close.mockClear();
       ui.click('#btnDone');
-      expect(ui.post).toHaveBeenCalledExactlyOnceWith({ type: 'close' });
+      expect(ui.close).toHaveBeenCalledExactlyOnceWith();
     },
   );
 });

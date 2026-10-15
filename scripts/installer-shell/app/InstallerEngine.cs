@@ -268,6 +268,7 @@ public sealed class InstallerEngine
             new OffsetStream(fileStream, zipSize), System.IO.Compression.ZipArchiveMode.Read);
         var totalBytes = zip.Entries.Sum(entry => entry.Length);
         long doneBytes = 0;
+        var lastReportedPercent = -1;
         foreach (var entry in zip.Entries)
         {
             ct.ThrowIfCancellationRequested();
@@ -293,16 +294,28 @@ public sealed class InstallerEngine
             {
                 await output.WriteAsync(buffer.AsMemory(0, read), ct);
                 doneBytes += read;
-                progress.Report(new EngineEvent(
-                    Type: "progress", Percent: (int)(doneBytes * 100 / Math.Max(totalBytes, 1)),
-                    BytesDone: doneBytes, BytesTotal: totalBytes));
+                ReportPayloadProgress(progress, doneBytes, totalBytes, ref lastReportedPercent);
             }
         }
+        ReportPayloadProgress(progress, totalBytes, totalBytes, ref lastReportedPercent);
         progress.Report(new EngineEvent(
             Type: "phase",
             Label: "安装包已就绪",
             Detail: extractDir));
         payloadDir = extractDir;
+    }
+
+    // The UI displays whole percentages. Reporting every decompressor read
+    // flooded its message queue with tens of thousands of redundant updates.
+    // Emit at most 101 ordered updates per payload, independent of chunk size.
+    internal static void ReportPayloadProgress(IProgress<EngineEvent> progress,
+        long doneBytes, long totalBytes, ref int lastReportedPercent)
+    {
+        var percent = totalBytes == 0 ? 100 : (int)(doneBytes * 100m / totalBytes);
+        if (percent <= lastReportedPercent) return;
+        lastReportedPercent = percent;
+        progress.Report(new EngineEvent(Type: "progress", Percent: percent,
+            BytesDone: doneBytes, BytesTotal: totalBytes));
     }
 
     /// <summary>Reads exactly <paramref name="length"/> bytes from an
