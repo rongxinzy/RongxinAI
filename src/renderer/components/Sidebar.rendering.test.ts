@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement, type ComponentProps } from 'react';
 import { Provider } from 'react-redux';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -9,15 +9,19 @@ import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { store } from '../store';
 import {
   setCurrentSessionId,
+  setChatSessions,
   setSessions,
   updateSessionStatus,
   updateSessionTitle,
 } from '../store/slices/coworkSlice';
 import { setCurrentWorkspaceId, setWorkspaces } from '../store/slices/workspaceSlice';
 import { WorkMode } from '../store/workMode/constants';
+import { setWorkMode } from '../store/workMode/workModeSlice';
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../types/cowork';
 import { AgentSidebarIndicator } from './agentSidebar/constants';
 import type WorkspaceTreeNode from './agentSidebar/WorkspaceTreeNode';
+import type AgentTaskRow from './agentSidebar/AgentTaskRow';
+import type { SidebarNavigationControls } from './SidebarNavigationControls';
 import { consumeScheduledTaskCreateRequest } from './scheduledTasks/createRequest';
 import Sidebar from './Sidebar';
 
@@ -35,7 +39,7 @@ vi.mock('../services/cowork', () => ({
 }));
 vi.mock('../services/agent', () => ({ agentService: {} }));
 vi.mock('../services/workspace', () => ({ workspaceService: {} }));
-vi.mock('../services/config', () => ({ configService: {} }));
+vi.mock('../services/config', () => ({ configService: { updateConfig: vi.fn() } }));
 vi.mock('../services/store', () => ({
   localStore: { getItem: async () => null, setItem: async () => {} },
 }));
@@ -49,7 +53,29 @@ vi.mock('../services/i18n', () => ({
     },
   },
 }));
-vi.mock('./SidebarNavigationControls', () => ({ SidebarNavigationControls: () => null }));
+vi.mock('./SidebarNavigationControls', () => ({
+  SidebarNavigationControls: (props: ComponentProps<typeof SidebarNavigationControls>) =>
+    createElement(
+      'button',
+      {
+        onClick: () => props.onWorkModeChange(props.workMode !== WorkMode.Chat),
+      },
+      'switch mode',
+    ),
+}));
+vi.mock('./agentSidebar/AgentTaskRow', () => ({
+  default: (props: ComponentProps<typeof AgentTaskRow>) =>
+    createElement(
+      'div',
+      { 'data-testid': props.task.id },
+      createElement(
+        'output',
+        null,
+        JSON.stringify({ batch: props.isBatchMode, selected: props.isSelected }),
+      ),
+      createElement('button', { onClick: props.onEnterBatchMode }, 'chat batch'),
+    ),
+}));
 vi.mock('./LoginButton', () => ({ default: () => null }));
 vi.mock('./chat/ChatSkillShortcuts', () => ({ default: () => null }));
 vi.mock('./coding/CodingWorkspaceSidebar', () => ({ CodingWorkspaceSidebar: () => null }));
@@ -158,7 +184,14 @@ beforeEach(() => {
   store.dispatch(setWorkspaces([workspace]));
   store.dispatch(setCurrentWorkspaceId(null));
   store.dispatch(setCurrentSessionId(null));
+  store.dispatch(setWorkMode(WorkMode.Work));
   store.dispatch(setSessions([session]));
+  store.dispatch(
+    setChatSessions([
+      { ...session, id: 'chat-one', mode: WorkMode.Chat },
+      { ...session, id: 'chat-two', mode: WorkMode.Chat },
+    ]),
+  );
   consumeScheduledTaskCreateRequest();
   window.electron = { platform: 'win32' } as typeof window.electron;
 });
@@ -232,4 +265,107 @@ test('batch selection and replacement callbacks reach the memoized tree', async 
   expect(onShowScheduledTasks).toHaveBeenCalledOnce();
   expect(view.handlers.onShowScheduledTasks).not.toHaveBeenCalled();
   expect(consumeScheduledTaskCreateRequest()).toEqual({ workspaceId: workspace.id });
+});
+
+test('bidirectional mode switches skip unchanged work history and keep expansion and previews', async () => {
+  await mountSidebar();
+  const renders = mocks.renderWorkspace.mock.calls.length;
+  const row = screen.getByTestId(session.id);
+  const expanded = row.textContent;
+  for (let i = 0; i < 4; i++) fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  expect(store.getState().workMode.mode).toBe(WorkMode.Work);
+  expect(mocks.renderWorkspace).toHaveBeenCalledTimes(renders);
+  expect(mocks.listPreviews).toHaveBeenCalledTimes(2);
+  expect(screen.getByTestId(session.id)).toBe(row);
+  expect(row.textContent).toBe(expanded);
+});
+
+test('mode switches exit batch selection and keep work and chat select-all scopes separate', async () => {
+  await mountSidebar();
+  fireEvent.click(screen.getAllByRole('button', { name: 'batch' })[0]);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'en:batchSelectAll' }));
+  expect(screen.getByTestId(session.id)).toHaveTextContent('"selected":["history","scheduled"]');
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  expect(screen.queryByRole('checkbox', { name: 'en:batchSelectAll' })).toBeNull();
+  fireEvent.click(screen.getAllByRole('button', { name: 'chat batch' })[0]);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'en:batchSelectAll' }));
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"selected":true');
+  expect(screen.getByTestId('chat-two')).toHaveTextContent('"selected":true');
+  expect(screen.getByTestId(session.id)).toHaveTextContent('"selected":["chat-one","chat-two"]');
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  expect(screen.getByTestId(session.id)).toHaveTextContent('"batch":false');
+  expect(screen.getByTestId(session.id)).toHaveTextContent('"selected":[]');
+  fireEvent.click(screen.getAllByRole('button', { name: 'batch' })[0]);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'en:batchSelectAll' }));
+  expect(screen.getByTestId(session.id)).toHaveTextContent('"selected":["history","scheduled"]');
+});
+
+test('hidden asynchronous work preview updates cannot overwrite chat select-all', async () => {
+  await mountSidebar();
+  const late = { ...session, id: 'late-work', workspaceId: 'late-project' };
+  let resolvePreview!: (value: {
+    success: boolean;
+    sessions: CoworkSessionSummary[];
+    hasMore: boolean;
+  }) => void;
+  mocks.listPreviews.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        resolvePreview = resolve;
+      }),
+  );
+  act(() => store.dispatch(setWorkspaces([workspace, { ...workspace, id: 'late-project' }])));
+  await waitFor(() => expect(resolvePreview).toBeTypeOf('function'));
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'chat batch' })[0]);
+  await act(async () => resolvePreview({ success: true, sessions: [late], hasMore: false }));
+  await waitFor(() => expect(screen.getByTestId(late.id)).toBeTruthy());
+  fireEvent.click(screen.getByRole('checkbox', { name: 'en:batchSelectAll' }));
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"selected":true');
+  expect(screen.getByTestId('chat-two')).toHaveTextContent('"selected":true');
+  expect(screen.getByRole('checkbox', { name: 'en:batchSelectAll' })).toBeChecked();
+  expect(within(screen.getByTestId(late.id)).getByRole('status')).toHaveTextContent(
+    '"selected":["chat-one","chat-two"]',
+  );
+  fireEvent.click(screen.getByRole('checkbox', { name: 'en:batchSelectAll' }));
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"selected":false');
+  expect(screen.getByTestId('chat-two')).toHaveTextContent('"selected":false');
+});
+
+test('hidden work history still responds to current session, stream, unread, title and language', async () => {
+  await mountSidebar();
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  act(() => store.dispatch(setCurrentSessionId(session.id)));
+  expect(screen.getByTestId(session.id)).toHaveTextContent('"isSelected":true');
+  act(() =>
+    store.dispatch(updateSessionTitle({ sessionId: session.id, title: 'Background rename' })),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId(session.id)).toHaveTextContent('Background rename'),
+  );
+  act(() =>
+    store.dispatch(
+      updateSessionStatus({ sessionId: session.id, status: CoworkSessionStatusValue.Running }),
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId(session.id)).toHaveTextContent(AgentSidebarIndicator.Running),
+  );
+  act(() => store.dispatch(setCurrentSessionId(null)));
+  act(() =>
+    store.dispatch(
+      updateSessionStatus({ sessionId: session.id, status: CoworkSessionStatusValue.Completed }),
+    ),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId(session.id)).toHaveTextContent(AgentSidebarIndicator.CompletedUnread),
+  );
+  act(() => {
+    mocks.language = 'zh';
+    mocks.languageListeners.forEach(listener => listener());
+  });
+  expect(screen.getByRole('tree', { hidden: true })).toHaveAttribute('aria-label', 'zh:workspaces');
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  expect(screen.getByTestId(session.id)).toHaveTextContent('Background rename');
+  expect(mocks.listPreviews).toHaveBeenCalledTimes(2);
 });

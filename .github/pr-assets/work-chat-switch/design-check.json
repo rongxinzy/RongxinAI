@@ -1,0 +1,105 @@
+{
+  "original": {
+    "theme": "light",
+    "style": "changan",
+    "mode": "work",
+    "view": "cowork",
+    "selectedSession": true
+  },
+  "checks": [
+    {
+      "width": 1280,
+      "height": 800,
+      "appearance": "light",
+      "mode": "work",
+      "themeId": "changan-light",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 64
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "appearance": "light",
+      "mode": "chat",
+      "themeId": "changan-light",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 20
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "appearance": "dark",
+      "mode": "work",
+      "themeId": "changan-dark",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 64
+    },
+    {
+      "width": 1280,
+      "height": 800,
+      "appearance": "dark",
+      "mode": "chat",
+      "themeId": "changan-dark",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 20
+    },
+    {
+      "width": 900,
+      "height": 700,
+      "appearance": "light",
+      "mode": "work",
+      "themeId": "changan-light",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 64
+    },
+    {
+      "width": 900,
+      "height": 700,
+      "appearance": "light",
+      "mode": "chat",
+      "themeId": "changan-light",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 20
+    },
+    {
+      "width": 900,
+      "height": 700,
+      "appearance": "dark",
+      "mode": "work",
+      "themeId": "changan-dark",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 64
+    },
+    {
+      "width": 900,
+      "height": 700,
+      "appearance": "dark",
+      "mode": "chat",
+      "themeId": "changan-dark",
+      "horizontalOverflow": false,
+      "focusVisible": true,
+      "sidebarWidth": 260,
+      "rows": 20
+    }
+  ],
+  "restored": {
+    "mode": "work",
+    "sessionRestored": true,
+    "viewRestored": true,
+    "theme": "light"
+  }
+}

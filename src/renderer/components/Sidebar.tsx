@@ -131,7 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         onShowCowork();
       }
       setIsBatchMode(false);
-      setSelectedIds(new Set());
+      setSelectedIds(previous => (previous.size === 0 ? previous : new Set()));
       setShowBatchDeleteConfirm(false);
       void configService.updateConfig({ workMode: mode });
     },
@@ -164,7 +164,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const agentScrollContainerRef = useRef<HTMLDivElement>(null);
   // 保存侧边栏树中所有可见 session ID（跨所有 Agent 聚合），
   // 供批量模式"全选"使用，避免因 Redux sessions 被限定到单个 Agent 而导致全选范围错误
-  const allVisibleSessionIdsRef = useRef<string[]>([]);
+  const workVisibleSessionIdsRef = useRef<string[]>([]);
+  const chatVisibleSessionIds = React.useMemo(
+    () => chatTaskNodes.map(task => task.id),
+    [chatTaskNodes],
+  );
+  const visibleSessionIds =
+    workMode === WorkMode.Chat ? chatVisibleSessionIds : workVisibleSessionIdsRef.current;
   const isMac = window.electron.platform === 'darwin';
 
   useEffect(() => {
@@ -273,7 +279,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const handleVisibleSessionsChange = useCallback((ids: string[]) => {
-    allVisibleSessionIdsRef.current = ids;
+    // The work tree stays mounted in chat mode. Its asynchronous preview loads
+    // must update only the work selection scope, never the chat scope.
+    workVisibleSessionIdsRef.current = ids;
   }, []);
 
   const handleDismissSearch = useCallback(() => {
@@ -288,15 +296,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     [onShowScheduledTasks],
   );
 
-  useEffect(() => {
-    if (workMode !== WorkMode.Chat) return;
-    handleVisibleSessionsChange(chatTaskNodes.map(task => task.id));
-  }, [chatTaskNodes, handleVisibleSessionsChange, workMode]);
-
   const handleSelectAll = useCallback(() => {
-    const allIds = allVisibleSessionIdsRef.current;
+    const allIds =
+      workMode === WorkMode.Chat ? chatVisibleSessionIds : workVisibleSessionIdsRef.current;
     setSelectedIds(prev => toggleVisibleBatchSelection(prev, allIds));
-  }, []);
+  }, [chatVisibleSessionIds, workMode]);
 
   const handleBatchDeleteClick = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -477,9 +481,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   onShowCowork={onShowCowork}
                   onToggleSelection={handleToggleSelection}
                   onEnterBatchMode={handleEnterBatchMode}
-                  onVisibleSessionsChange={
-                    workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
-                  }
+                  onVisibleSessionsChange={handleVisibleSessionsChange}
                   onDismissSearch={handleDismissSearch}
                   onCreateScheduledTask={handleCreateScheduledTask}
                   workMode={WorkMode.Work}
@@ -587,8 +589,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
                 <Checkbox
                   checked={
-                    selectedIds.size === allVisibleSessionIdsRef.current.length &&
-                    allVisibleSessionIdsRef.current.length > 0
+                    visibleSessionIds.length > 0 &&
+                    visibleSessionIds.every(id => selectedIds.has(id))
                   }
                   onCheckedChange={handleSelectAll}
                 />

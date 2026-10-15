@@ -1,0 +1,2559 @@
+{
+  "baseCommit": "4240f54ca0e5d51d202950a745e66bb63d970e63",
+  "prerequisite": "PR #999 merged",
+  "environment": "Windows, Node 24.16.0, same Electron/Vite development instance on 5175/9222, StrictMode unchanged, same existing database and expanded history, CDP focus emulation enabled for both stages, no CPU throttle or CPU/React profiler",
+  "metric": "Capture-phase actual click to MutationObserver confirming Redux mode, sidebar work-tree visibility, corresponding home caption mode and sidebar content rows. Separate next requestAnimationFrame is not screen presentation.",
+  "protocol": "After each source HMR settle 3 seconds, clear and save original selected session, show Cowork and settle 5 seconds. Four warm-up switches then 16 measured switches (8 per direction). Wait 1200ms between interactions, outside the measured interval. Restore original session/mode/view. No requests sent or sessions deleted. No lint/tests/build during measured stages.",
+  "limitations": [
+    "Sequential A/B on a shared desktop; OS load is uncontrolled, no randomized trial or production-build benchmark.",
+    "HMR resets in-memory preview pagination: controlled stages both use 53 work rows and 20 chat rows; final selected-session restoration returns to 64 work rows.",
+    "Warm empty-session Cowork page. Clearing an incompatible selected session and live stream/unread changes legitimately update work history; those paths have regression coverage but no performance claim.",
+    "Chat history still mounts on entry and model configuration broadcasts remain unchanged; remaining latency is not attributed without separate measurements."
+  ],
+  "excludedExploratoryStages": {
+    "before": "64 work rows, different work load; initial diagnostics only",
+    "stable-inputs": "53 rows, focus conditions not controlled",
+    "before-controlled": "background throttling and a work-data/row change mid-run",
+    "before-focused": "64 work rows",
+    "after-focused": "53 rows; exploratory, before content-mode endpoint was added"
+  },
+  "before": {
+    "summary": {
+      "count": 16,
+      "minMs": 731.7,
+      "medianMs": 880.4,
+      "p95NearestRankMs": 1126.8,
+      "maxMs": 1126.8
+    },
+    "workToChat": {
+      "count": 8,
+      "minMs": 731.7,
+      "medianMs": 844.9,
+      "p95NearestRankMs": 1126.8,
+      "maxMs": 1126.8
+    },
+    "chatToWork": {
+      "count": 8,
+      "minMs": 818.5,
+      "medianMs": 884,
+      "p95NearestRankMs": 1125.6,
+      "maxMs": 1125.6
+    },
+    "nextRaf": {
+      "count": 16,
+      "minMs": 751.9,
+      "medianMs": 932.8,
+      "p95NearestRankMs": 1339.9,
+      "maxMs": 1339.9
+    },
+    "reusedTreeChildProps": 0,
+    "stage": "before-final",
+    "focusEmulation": true,
+    "warmupSamples": 4,
+    "measuredSamples": [
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3229727,
+        "delay": 797.8999999761581,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 818.1999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3231828.899999976,
+        "delay": 853.7000000178814,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 906.7000000178814
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3233997.599999994,
+        "delay": 847.5999999940395,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 885.6999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3236218.399999976,
+        "delay": 885.8000000119209,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 935.5
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3238436.899999976,
+        "delay": 833.1000000238419,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 869
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3240555.599999994,
+        "delay": 878.6999999880791,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 930
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3242754.799999982,
+        "delay": 842.2000000178814,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 877.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3244872.099999994,
+        "delay": 882.0999999940395,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 945.2999999821186
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3246145.799999982,
+        "delay": 731.7000000178814,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 751.9000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3248161.5,
+        "delay": 818.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 872.8999999761581
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3250279.299999982,
+        "delay": 1108.300000011921,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1280
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3252918.699999988,
+        "delay": 1051.199999988079,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1231.800000011921
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3255406.5,
+        "delay": 928.0999999940395,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 952
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3257854.799999982,
+        "delay": 1125.5999999940395,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1339.9000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3260458.299999982,
+        "delay": 1126.800000011921,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1313.5999999940395
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3263225.5,
+        "delay": 953.6999999880791,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1185.3999999761581
+      }
+    ],
+    "setup": {
+      "mode": "work",
+      "view": "cowork",
+      "visibility": "visible",
+      "focused": true,
+      "contentMode": null,
+      "rows": 53,
+      "visibleRows": 53,
+      "currentSession": true,
+      "streaming": 0,
+      "loading": false,
+      "treeWrapper": "",
+      "domElements": 1761
+    },
+    "results": [
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3221192,
+        "delay": 852.6999999880791,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 887
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3223321.899999976,
+        "delay": 805,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 855.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3225411.299999982,
+        "delay": 805.9000000059605,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 828.5
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3227508.799999982,
+        "delay": 919.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 969.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3229727,
+        "delay": 797.8999999761581,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 818.1999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3231828.899999976,
+        "delay": 853.7000000178814,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 906.7000000178814
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3233997.599999994,
+        "delay": 847.5999999940395,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 885.6999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3236218.399999976,
+        "delay": 885.8000000119209,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 935.5
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3238436.899999976,
+        "delay": 833.1000000238419,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 869
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3240555.599999994,
+        "delay": 878.6999999880791,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 930
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3242754.799999982,
+        "delay": 842.2000000178814,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 877.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3244872.099999994,
+        "delay": 882.0999999940395,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 945.2999999821186
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3246145.799999982,
+        "delay": 731.7000000178814,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 751.9000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3248161.5,
+        "delay": 818.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 872.8999999761581
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3250279.299999982,
+        "delay": 1108.300000011921,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1280
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3252918.699999988,
+        "delay": 1051.199999988079,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1231.800000011921
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3255406.5,
+        "delay": 928.0999999940395,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 952
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3257854.799999982,
+        "delay": 1125.5999999940395,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1339.9000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3260458.299999982,
+        "delay": 1126.800000011921,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1313.5999999940395
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3263225.5,
+        "delay": 953.6999999880791,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [
+          "selectedIds",
+          "onVisibleSessionsChange"
+        ],
+        "sameTreeChildProps": false,
+        "frame": 1185.3999999761581
+      }
+    ],
+    "restoration": {
+      "mode": "work",
+      "view": "cowork",
+      "visibility": "visible",
+      "focused": true,
+      "contentMode": null,
+      "rows": 64,
+      "visibleRows": 64,
+      "sessionRestored": true
+    }
+  },
+  "after": {
+    "summary": {
+      "count": 16,
+      "minMs": 197.5,
+      "medianMs": 359.5,
+      "p95NearestRankMs": 589.7,
+      "maxMs": 589.7
+    },
+    "workToChat": {
+      "count": 8,
+      "minMs": 289.2,
+      "medianMs": 422.8,
+      "p95NearestRankMs": 589.7,
+      "maxMs": 589.7
+    },
+    "chatToWork": {
+      "count": 8,
+      "minMs": 197.5,
+      "medianMs": 343.9,
+      "p95NearestRankMs": 470.4,
+      "maxMs": 470.4
+    },
+    "nextRaf": {
+      "count": 16,
+      "minMs": 282.6,
+      "medianMs": 528.1,
+      "p95NearestRankMs": 727.7,
+      "maxMs": 727.7
+    },
+    "reusedTreeChildProps": 16,
+    "stage": "after-final",
+    "focusEmulation": true,
+    "warmupSamples": 4,
+    "measuredSamples": [
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3330011.5,
+        "delay": 289.19999998807907,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 359.09999999403954
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3331609.899999976,
+        "delay": 197.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 282.60000002384186
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3332863.699999988,
+        "delay": 361.59999999403954,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 450.69999998807907
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3334593.299999982,
+        "delay": 373.59999999403954,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 540
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3336381.599999994,
+        "delay": 523.2999999821186,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 669.6999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3338301.399999976,
+        "delay": 330.7000000178814,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 493
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3339902.899999976,
+        "delay": 581.3000000119209,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 724.8000000119209
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3341951.599999994,
+        "delay": 310,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 511
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3343223.099999994,
+        "delay": 589.6999999880791,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 727.6999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3345205.899999976,
+        "delay": 470.40000000596046,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 663.2000000178814
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3347209.099999994,
+        "delay": 433.59999999403954,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 587
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3349041.799999982,
+        "delay": 357.09999999403954,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 529.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3350291.599999994,
+        "delay": 412.09999999403954,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 526.7999999821186
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3352076.799999982,
+        "delay": 274.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 394.5
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3353345.199999988,
+        "delay": 331.5,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 469.09999999403954
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3355078.099999994,
+        "delay": 357.40000000596046,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 550.1999999880791
+      }
+    ],
+    "setup": {
+      "mode": "work",
+      "view": "cowork",
+      "visibility": "visible",
+      "focused": true,
+      "contentMode": null,
+      "rows": 53,
+      "visibleRows": 53,
+      "currentSession": true,
+      "streaming": 0,
+      "loading": false,
+      "treeWrapper": "",
+      "domElements": 1761
+    },
+    "results": [
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3323125.799999982,
+        "delay": 478.7000000178814,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 598.7000000178814
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3325021.799999982,
+        "delay": 349.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 518
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3326286.399999976,
+        "delay": 515.1000000238419,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 636.7000000178814
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3328215.099999994,
+        "delay": 367.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 531.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3330011.5,
+        "delay": 289.19999998807907,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 359.09999999403954
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3331609.899999976,
+        "delay": 197.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 282.60000002384186
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3332863.699999988,
+        "delay": 361.59999999403954,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 450.69999998807907
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3334593.299999982,
+        "delay": 373.59999999403954,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 540
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3336381.599999994,
+        "delay": 523.2999999821186,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 669.6999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3338301.399999976,
+        "delay": 330.7000000178814,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 493
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3339902.899999976,
+        "delay": 581.3000000119209,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 724.8000000119209
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3341951.599999994,
+        "delay": 310,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 511
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3343223.099999994,
+        "delay": 589.6999999880791,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 727.6999999880791
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3345205.899999976,
+        "delay": 470.40000000596046,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 663.2000000178814
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3347209.099999994,
+        "delay": 433.59999999403954,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 587
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3349041.799999982,
+        "delay": 357.09999999403954,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 529.4000000059605
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3350291.599999994,
+        "delay": 412.09999999403954,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 526.7999999821186
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3352076.799999982,
+        "delay": 274.5,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 394.5
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "click": 3353345.199999988,
+        "delay": 331.5,
+        "after": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 469.09999999403954
+      },
+      {
+        "kind": "mode",
+        "label": "work/chat",
+        "before": {
+          "mode": "chat",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "chat",
+          "rows": 73,
+          "visibleRows": 20
+        },
+        "click": 3355078.099999994,
+        "delay": 357.40000000596046,
+        "after": {
+          "mode": "work",
+          "view": "cowork",
+          "visibility": "visible",
+          "focused": true,
+          "contentMode": "work",
+          "rows": 53,
+          "visibleRows": 53
+        },
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTree": true,
+        "samePreview": true,
+        "sameExpanded": true,
+        "changedTreeProps": [],
+        "sameTreeChildProps": true,
+        "frame": 550.1999999880791
+      }
+    ],
+    "restoration": {
+      "mode": "work",
+      "view": "cowork",
+      "visibility": "visible",
+      "focused": true,
+      "contentMode": null,
+      "rows": 64,
+      "visibleRows": 64,
+      "sessionRestored": true
+    }
+  },
+  "improvementPercent": 59.2,
+  "workToChatImprovementPercent": 50,
+  "chatToWorkImprovementPercent": 61.1
+}
