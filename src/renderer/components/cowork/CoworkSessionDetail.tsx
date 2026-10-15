@@ -86,7 +86,7 @@ import {
 import {
   buildConversationTurns,
   buildDisplayItems,
-  hasRenderableAssistantContent,
+  hasActiveTurnStreamingContent,
 } from './helpers/messageGrouping';
 import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
@@ -976,7 +976,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const isLastTurn = index === turns.length - 1;
       const hasActiveToolActivity = isStreaming && isLastTurn && toolActivities.length > 0;
       const showTypingIndicator =
-        isStreaming && isLastTurn && !hasRenderableAssistantContent(turn) && !hasActiveToolActivity;
+        isStreaming &&
+        isLastTurn &&
+        !hasActiveTurnStreamingContent(turn, toolActivities, inlinePermission);
       const showAssistantBlock =
         turn.assistantItems.length > 0 || showTypingIndicator || hasActiveToolActivity;
 
