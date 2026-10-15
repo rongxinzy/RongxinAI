@@ -198,6 +198,7 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
   expect(workflow).toContain('actions/setup-dotnet@v5');
   expect(workflow).toContain("dotnet-version: '8.0.x'");
   expect(workflow).not.toContain('continue-on-error');
+  expect(workflow).toContain('bunx vitest run --maxWorkers=1');
 });
 
 test('drives real visible pointer input and screenshots without synthetic completion', () => {
