@@ -161,13 +161,15 @@ Function .onInit
   StrCpy $0 "register-zero"
   StrCpy $1 "register-one"
   !insertmacro ApplyRequestedInstallerLanguage
+FunctionEnd
+; NSIS resolves the new language table only after .onInit returns. Like the
+; real wizard, inspect translated strings after that lifecycle boundary.
+; https://nsis.sourceforge.io/Reference/LangString
+Section
   FileOpen $2 "${output}" w
   FileWriteUTF16LE /BOM $2 "$LANGUAGE|$(Choice)|$0|$1|$INSTDIR"
   FileClose $2
   SetErrorLevel 0
-  Quit
-FunctionEnd
-Section
 SectionEnd
 `,
         'utf8',

@@ -159,10 +159,26 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
   const config = loadYaml(workflow) as {
     jobs: Record<
       string,
-      { steps: Array<{ name?: string; if?: string; run?: string; uses?: string }> }
+      { steps: Array<{ id?: string; name?: string; if?: string; run?: string; uses?: string }> }
     >;
   };
   const { steps } = config.jobs['package-and-install'];
+  const independentConditions: Record<string, string> = {
+    'node scripts/ci/windows-shell-interactive.mjs':
+      "${{ !cancelled() && steps.offline-build.outcome == 'success' && steps.acceptance-ownership.outcome == 'success' }}",
+    'node scripts/ci/windows-shell-evidence.mjs':
+      "${{ !cancelled() && steps.shell-interaction.outcome == 'success' }}",
+    './scripts/ci/windows-shell-uninstall.ps1 -Action verify':
+      "${{ !cancelled() && steps.shell-evidence.outcome == 'success' }}",
+  };
+  expect(steps.find(step => step.id === 'offline-build')?.run).toContain('dist:win:offline');
+  expect(steps.find(step => step.id === 'acceptance-ownership')?.run).toContain('-Action prepare');
+  expect(steps.find(step => step.id === 'shell-interaction')?.run).toContain(
+    'windows-shell-interactive.mjs',
+  );
+  expect(steps.find(step => step.id === 'shell-evidence')?.run).toContain(
+    'windows-shell-evidence.mjs',
+  );
   let previous = -1;
   for (const command of [
     "'dist:win:offline'",
@@ -172,10 +188,11 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
     './scripts/ci/windows-installer-interactive.ps1',
     'node scripts/ci/windows-shell-interactive.mjs',
     'node scripts/ci/windows-shell-evidence.mjs',
+    './scripts/ci/windows-shell-uninstall.ps1 -Action verify',
   ]) {
     const index = steps.findIndex(step => step.run?.includes(command));
     expect(index, command).toBeGreaterThan(previous);
-    expect(steps[index].if, command).toBeUndefined();
+    expect(steps[index].if, command).toBe(independentConditions[command]);
     previous = index;
   }
   expect(workflow).toContain('actions/setup-dotnet@v5');
