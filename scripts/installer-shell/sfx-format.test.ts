@@ -1,11 +1,14 @@
 import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const { appendPayload, inspectSetup, writeSetupManifest } = require('./sfx-format.cjs');
+const { verifyFinalSetupBudget } = require('./distribution-budget.cjs');
+const targets = require('../nsis-offline-components.json');
 const roots: string[] = [];
 const peOffset = 128;
 const optionalOffset = peOffset + 24;
@@ -86,6 +89,29 @@ test('final manifest hashes signed bytes and rejects signing before payload asse
   });
   appendCertificate(files.shell);
   expect(() => appendPayload(files.shell, files.zip, files.output)).toThrow(/before signing/);
+});
+
+test('the final distribution gate reads certificate bytes and verified component files', () => {
+  const files = fixture();
+  const before = appendPayload(files.shell, files.zip, files.output);
+  const componentsDir = path.join(path.dirname(files.shell), 'components');
+  mkdirSync(componentsDir);
+  const components = targets.map((target: { key: string; prefix: string }) => {
+    const bytes = Buffer.from(target.key);
+    writeFileSync(path.join(componentsDir, `${target.key}.7z`), bytes);
+    return {
+      ...target,
+      archiveSizeBytes: bytes.length,
+      archiveSha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+  });
+  writeFileSync(path.join(componentsDir, 'manifest.json'), JSON.stringify({ components }));
+  const unsigned = verifyFinalSetupBudget(files.output, componentsDir);
+  appendCertificate(files.output);
+  const signed = verifyFinalSetupBudget(files.output, componentsDir);
+  expect(signed.installerBytes).toBe(before.installerBytes + 1024);
+  expect(signed.componentArchiveBytes).toBe(unsigned.componentArchiveBytes);
+  expect(signed.nonComponentBytes).toBe(unsigned.nonComponentBytes + 1024);
 });
 
 test.each([

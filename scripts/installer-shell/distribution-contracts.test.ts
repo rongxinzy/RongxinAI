@@ -19,6 +19,9 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
     build.indexOf("'pack-setup.cjs'"),
   );
   expect(build.indexOf('if (signed) sign(setup)')).toBeLessThan(
+    build.indexOf('const finalBudget = verifyFinalSetupBudget'),
+  );
+  expect(build.indexOf('const finalBudget = verifyFinalSetupBudget')).toBeLessThan(
     build.indexOf('const report = writeSetupManifest'),
   );
   expect(read('electron-builder.windows-signed.cjs')).toContain('forceCodeSigning: true');
@@ -37,6 +40,12 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
     "path.join(payloadDir, 'vc_redist.x64.exe')",
   );
   expect(read('scripts/installer-shell/pack-setup.cjs')).toContain('remainingSigningBytes');
+  expect(read('scripts/installer-shell/pack-setup.cjs')).toContain(
+    'maxNonComponentBytes: MAX_NON_COMPONENT_BYTES',
+  );
+  expect(read('scripts/installer-shell/pack-setup.cjs')).toContain(
+    'assertPayloadDeduplication(payloadDir, uninstallHost)',
+  );
   const hook = read('scripts/installer-shell/retain-uninstaller.nsh');
   expect(hook).toContain('!ifdef BUILD_UNINSTALLER');
   expect(hook).toContain('reset "${PROJECT_DIR}"\' = 0');

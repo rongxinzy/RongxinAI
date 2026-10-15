@@ -4,7 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { sha256File } = require('../windows-resource-pack.cjs');
 
-const MAX_SETUP_BYTES = 450 * 1024 * 1024;
+// WebView2's self-contained .NET shell has its own approved distribution
+// budget. The separate NSIS updater retains its 450 MiB limit.
+const MAX_SETUP_BYTES = 500 * 1024 * 1024;
 const FOOTER_BYTES = 24;
 const MAGIC = 'ZYP2';
 
@@ -66,7 +68,8 @@ function inspectPe(fd, size) {
 
 function inspectSetup(file) {
   const size = fs.statSync(file).size;
-  if (size > MAX_SETUP_BYTES) throw new Error('Final setup exceeds the 450 MiB installer budget');
+  if (size > MAX_SETUP_BYTES)
+    throw new Error('Final setup exceeds the 500 MiB WebView2 installer budget');
   const fd = fs.openSync(file, 'r');
   try {
     const pe = inspectPe(fd, size);
@@ -120,7 +123,7 @@ function appendPayload(shell, zip, output) {
   const payloadBytes = fs.statSync(zip).size;
   const padding = (8 - ((shellBytes + payloadBytes + FOOTER_BYTES) % 8)) % 8;
   if (shellBytes + payloadBytes + padding + FOOTER_BYTES > MAX_SETUP_BYTES) {
-    throw new Error('Final setup exceeds the 450 MiB installer budget');
+    throw new Error('Final setup exceeds the 500 MiB WebView2 installer budget');
   }
   const shellFd = fs.openSync(shell, 'r');
   try {

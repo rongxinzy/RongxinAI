@@ -27,6 +27,12 @@ const {
   FOOTER_BYTES,
 } = require('./sfx-format.cjs');
 const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
+const {
+  MAX_COMPONENT_BYTES,
+  MAX_NON_COMPONENT_BYTES,
+  assertSetupBudget,
+  assertPayloadDeduplication,
+} = require('./distribution-budget.cjs');
 const { sha256File } = require('../windows-resource-pack.cjs');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
@@ -179,6 +185,7 @@ try {
     // It has no duplicate self-contained .NET runtime and is never re-signed.
     fs.copyFileSync(uninstallHost, path.join(payloadDir, 'uninstall.exe'));
     console.log(`[pack-setup] native uninstall.exe: ${fs.statSync(uninstallHost).size} bytes`);
+    assertPayloadDeduplication(payloadDir, uninstallHost);
 
     // Zip the payload directory.
     payloadZip = path.join(staging, 'payload.zip');
@@ -218,9 +225,12 @@ try {
         ? null
         : nsisUpdaterBytes - componentArchiveBytes,
     maxSetupBytes: MAX_SETUP_BYTES,
+    maxComponentBytes: MAX_COMPONENT_BYTES,
+    maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
     remainingSigningBytes: MAX_SETUP_BYTES - unsignedSetupBytes,
     // Existing NSIS gate values are reported for comparison, never increased.
     legacyBudgetSource: 'scripts/ci/windows-installer-size-smoke.ps1',
+    legacyInstallerCeilingBytes: 450 * 1024 * 1024,
     legacyComponentCeilingBytes: 300 * 1024 * 1024,
     legacyNonComponentCeilingBytes: 150 * 1024 * 1024,
   };
@@ -229,6 +239,7 @@ try {
     path.join(path.dirname(shellExe), 'setup-size.json'),
     `${JSON.stringify(sizeReport, null, 2)}\n`,
   );
+  if (componentArchiveBytes !== null) assertSetupBudget(unsignedSetupBytes, componentArchiveBytes);
   const outPath = path.resolve(outArg || `ZhiYuanAgent-Setup-${packageVersion}.exe`);
   appendPayload(shellExe, payloadZip, outPath);
   const report = writeSetupManifest(outPath, packageVersion);

@@ -46,7 +46,7 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
       - name: Validate real Windows interaction drivers
-        run: bunx vitest run scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
+        run: bunx vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
       - name: Set up offline Windows runtimes
         run: |
           bun run setup:uv-runtime

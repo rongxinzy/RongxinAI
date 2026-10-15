@@ -5,7 +5,11 @@ param(
   # independent non-component ceiling below.
   [int64]$MaximumInstallerBytes = 450MB,
   [int64]$MaximumComponentBytes = 300MB,
-  [int64]$MaximumNonComponentBytes = 150MB
+  [int64]$MaximumNonComponentBytes = 150MB,
+  # WebView2 adds one self-contained .NET host. Keep the legacy NSIS limits
+  # unchanged and bound that separately measured overhead by artifact kind.
+  [int64]$MaximumShellBytes = 500MB,
+  [int64]$MaximumShellNonComponentBytes = 220MB
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,6 +45,23 @@ if ($installerBytes -gt $MaximumInstallerBytes) {
   throw "Windows installer is unexpectedly large: $installerBytes bytes (maximum $MaximumInstallerBytes bytes; component archive bytes $componentBytes)"
 }
 
+$shells = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'release') -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
+if ($shells.Count -gt 1) { throw 'Expected at most one WebView2 installer' }
+$shellSummary = @()
+if ($shells.Count -eq 1) {
+  $shellBytes = [int64]$shells[0].Length
+  $shellNonComponentBytes = $shellBytes - $componentBytes
+  if ($shellBytes -gt $MaximumShellBytes -or $shellNonComponentBytes -gt $MaximumShellNonComponentBytes) {
+    throw "WebView2 installer exceeds its kind-specific budget: total=$shellBytes (maximum $MaximumShellBytes), non-component=$shellNonComponentBytes (maximum $MaximumShellNonComponentBytes)"
+  }
+  $shellSummary = @(
+    "- WebView2 installer bytes (including final signature): $shellBytes",
+    "- WebView2 non-component bytes: $shellNonComponentBytes",
+    "- WebView2 total ceiling: $MaximumShellBytes",
+    "- WebView2 non-component ceiling: $MaximumShellNonComponentBytes"
+  )
+}
+
 $componentSummary = @($manifest.components | ForEach-Object {
   "- component ``$($_.key)``: $([int64]$_.archiveSizeBytes) bytes ($($_.archiveCompression))"
 })
@@ -55,7 +76,7 @@ $summary = @(
   "- component ceiling: $MaximumComponentBytes",
   "- non-component ceiling: $MaximumNonComponentBytes",
   ''
-) + $componentSummary
+) + $componentSummary + $shellSummary
 $summary = $summary -join [Environment]::NewLine
 Write-Host $summary
 if ($env:GITHUB_STEP_SUMMARY) {

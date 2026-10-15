@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { writeSetupManifest } = require('./sfx-format.cjs');
 const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
+const { verifyFinalSetupBudget } = require('./distribution-budget.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const signed = process.argv.includes('--signed');
@@ -51,6 +52,11 @@ run(process.execPath, [
   setup,
 ]);
 if (signed) sign(setup);
+const finalBudget = verifyFinalSetupBudget(
+  setup,
+  path.join(root, 'build-tar', 'windows-components'),
+);
+console.log(`[installer-shell] final signed-byte budget ${JSON.stringify(finalBudget)}`);
 // The report must describe the final signed bytes, never the pre-signing file.
 const report = writeSetupManifest(setup, version);
 if (report.signed !== signed) throw new Error('Unexpected setup signature state');

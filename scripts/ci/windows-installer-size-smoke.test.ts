@@ -91,3 +91,73 @@ describe.skipIf(process.platform !== 'win32')('Windows installer size smoke chec
     expect(result.stderr).toContain(message);
   });
 });
+
+test('installer budgets distinguish required WebView2 overhead without widening NSIS or components', () => {
+  const source = fs.readFileSync(scriptPath, 'utf8');
+  for (const contract of [
+    '$MaximumInstallerBytes = 450MB',
+    '$MaximumNonComponentBytes = 150MB',
+    '$MaximumComponentBytes = 300MB',
+    '$MaximumShellBytes = 500MB',
+    '$MaximumShellNonComponentBytes = 220MB',
+    '$shellBytes -gt $MaximumShellBytes',
+    '$shellNonComponentBytes -gt $MaximumShellNonComponentBytes',
+  ])
+    expect(source).toContain(contract);
+});
+
+test.skipIf(process.platform !== 'win32')(
+  'real size gate accepts separate kinds and rejects either total or non-component overflow',
+  () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'installer-budget-'));
+    try {
+      fs.mkdirSync(path.join(root, 'release'));
+      fs.mkdirSync(path.join(root, 'build-tar/windows-components'), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, 'build-tar/windows-components/manifest.json'),
+        JSON.stringify({
+          components: [{ key: 'fixture', archiveSizeBytes: 100, archiveCompression: '7z' }],
+        }),
+      );
+      const nsis = path.join(root, 'release/Fixture-Setup.exe');
+      const shell = path.join(root, 'release/ZhiYuanAgent-Setup-fixture.exe');
+      fs.writeFileSync(nsis, Buffer.alloc(200));
+      fs.writeFileSync(shell, Buffer.alloc(300));
+      const run = (shellNonComponentLimit = 220) =>
+        spawnSync(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            scriptPath,
+            '-ProjectRoot',
+            root,
+            '-MaximumInstallerBytes',
+            '250',
+            '-MaximumNonComponentBytes',
+            '150',
+            '-MaximumComponentBytes',
+            '120',
+            '-MaximumShellBytes',
+            '350',
+            '-MaximumShellNonComponentBytes',
+            String(shellNonComponentLimit),
+          ],
+          { encoding: 'utf8' },
+        );
+      expect(run().status).toBe(0);
+      fs.writeFileSync(nsis, Buffer.alloc(251));
+      expect(run().status).not.toBe(0);
+      fs.writeFileSync(nsis, Buffer.alloc(200));
+      fs.writeFileSync(shell, Buffer.alloc(321));
+      expect(run().status).not.toBe(0);
+      fs.writeFileSync(shell, Buffer.alloc(351));
+      expect(run(500).status).not.toBe(0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
