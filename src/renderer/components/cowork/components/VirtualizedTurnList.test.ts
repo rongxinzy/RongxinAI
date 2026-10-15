@@ -121,10 +121,24 @@ test('does not retry internal anchor adjustments while the user scrolls upward',
     scrollToFn: (
       offset: number,
       options: { adjustments?: number; behavior?: ScrollBehavior },
-      instance: { scrollElement: HTMLElement },
+      instance: {
+        scrollElement: HTMLElement;
+        elementsCache: Map<React.Key, HTMLElement>;
+        getTotalSize: () => number;
+        getVirtualItems: () => [];
+      },
     ) => void;
   };
-  options.scrollToFn(1_000, { adjustments: 200 }, { scrollElement });
+  options.scrollToFn(
+    1_000,
+    { adjustments: 200 },
+    {
+      scrollElement,
+      elementsCache: new Map(),
+      getTotalSize: () => 2_000,
+      getVirtualItems: () => [],
+    },
+  );
 
   expect(mocks.elementScroll).toHaveBeenCalledOnce();
   expect(requestFrame).not.toHaveBeenCalled();

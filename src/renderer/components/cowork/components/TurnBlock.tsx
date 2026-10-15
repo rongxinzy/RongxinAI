@@ -105,6 +105,7 @@ const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ ac
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
   artifacts?: Artifact[];
+  pendingArtifacts?: Artifact[];
   resolveLocalFilePath?: (href: string, text: string) => string | null;
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
@@ -124,6 +125,7 @@ const TurnBlockComponent: React.FC<{
 }> = ({
   turn,
   artifacts,
+  pendingArtifacts,
   resolveLocalFilePath,
   mapDisplayText,
   showTypingIndicator = false,
@@ -272,10 +274,10 @@ const TurnBlockComponent: React.FC<{
     item => item.type === CoworkDisplayItemType.ToolGroup && !item.group.toolResult,
   );
   const showTransportStatus = Boolean(!isTurnComplete && latestActivity && !hasActiveTool);
-  const deliverables =
-    artifacts?.filter(
-      artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
-    ) ?? [];
+  const deliverables = [...(artifacts ?? []), ...(pendingArtifacts ?? [])].filter(
+    artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
+  );
+  const pendingArtifactIds = new Set(pendingArtifacts?.map(artifact => artifact.id));
   const copyContent = showCopyButtons
     ? [...items]
         .reverse()
@@ -313,7 +315,11 @@ const TurnBlockComponent: React.FC<{
               {deliverables.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {deliverables.map(artifact => (
-                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                    <ArtifactPreviewCard
+                      key={artifact.id}
+                      artifact={artifact}
+                      disabled={pendingArtifactIds.has(artifact.id)}
+                    />
                   ))}
                 </div>
               )}
