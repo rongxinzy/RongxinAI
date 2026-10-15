@@ -10,7 +10,7 @@
  *   app.7z (fake app tree) · tools/7za.exe + .sha256 · components/<key>.7z with
  *   .version/.sha256/.sentinel-sha256 · component-manifest.json ·
  *   component-targets.json · scripts/*.ps1 (shared repo sources) ·
- *   vc_redist.x64.exe placeholder · version.txt
+ *   uninstall.exe (retained native host) · version.txt
  */
 const { spawnSync } = require('node:child_process');
 const crypto = require('node:crypto');
@@ -57,6 +57,8 @@ try {
   fs.mkdirSync(path.join(appRoot, 'resources'), { recursive: true });
   fs.writeFileSync(path.join(appRoot, '知远.exe'), 'fake application executable\n');
   fs.writeFileSync(path.join(appRoot, 'resources', 'app.asar'), 'fake asar\n');
+  // Harmless placeholder in the same installed location as the real payload.
+  fs.copyFileSync(sevenZip, path.join(appRoot, 'resources', 'vc_redist.x64.exe'));
   fs.writeFileSync(path.join(appRoot, 'LICENSE.txt'), 'synthetic payload\n');
   runSevenZip(['a', path.join(outDir, 'app.7z'), '知远.exe', 'resources', 'LICENSE.txt'], appRoot);
 
@@ -119,10 +121,6 @@ try {
     path.join(outDir, 'scripts', 'elevated-actions.ps1'),
   );
 
-  // --- VC++ redistributable placeholder ------------------------------------
-  // A valid, quick-exiting exe so an elevation-path run stays harmless; on
-  // machines with the redistributable registered the engine skips it anyway.
-  fs.writeFileSync(path.join(outDir, 'vc_redist.x64.exe'), sevenZipBytes);
   fs.writeFileSync(path.join(outDir, 'version.txt'), '0.0.0-test');
   const uninstallHost = path.join(
     projectRoot,
@@ -131,7 +129,7 @@ try {
     'out',
     'ZhiYuanUninstall.exe',
   );
-  if (!fs.existsSync(uninstallHost)) fail('Build the shell before creating the test payload');
+  if (!fs.existsSync(uninstallHost)) fail('Build the NSIS target before creating the test payload');
   fs.copyFileSync(uninstallHost, path.join(outDir, 'uninstall.exe'));
 
   console.log(`[test-payload] payload written to ${outDir}`);

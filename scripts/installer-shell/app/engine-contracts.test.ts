@@ -14,17 +14,9 @@ const argumentsSource = read('SetupArguments.cs');
 
 test('engine checks extraction and retains all main repository runtime features', () => {
   expect(installer).toContain('failureMessage: "应用程序解包失败"');
-  expect(installer).toContain('"mingit", "cmd", "git.exe"');
-  for (const sentinel of [
-    'git.exe',
-    'libiconv-2.dll',
-    'libintl-8.dll',
-    'libpcre2-8-0.dll',
-    'libwinpthread-1.dll',
-    'zlib1.dll',
-  ]) {
-    expect(installer).toContain(`"mingit", "mingw64", "bin", "${sentinel}"`);
-  }
+  expect(installer).toContain('File.ReadAllText(TargetsPath)');
+  expect(installer).toContain('targets.RootElement.GetArrayLength() != 7');
+  expect(installer).toContain('target.GetProperty("sentinel")');
   expect(installer).toContain('"resources", "app.asar"');
   expect(installer).toContain('StepWritePendingInferenceMarker(localInference)');
   expect(installer).toContain('StepMigrateUserSkills(cancellationToken)');
@@ -64,7 +56,7 @@ test('install and uninstall reject foreign directories before stopping any proce
     uninstaller.indexOf('await StepStopAppProcesses('),
   );
   const ownership = transaction.slice(
-    transaction.indexOf('public void ValidateOwnership()'),
+    transaction.indexOf('public void ValidateOwnership('),
     transaction.indexOf('public void Begin()'),
   );
   expect(ownership).toContain('ReadState()');
@@ -100,8 +92,12 @@ test('uninstall preserves personal data and frees the old path before updater cl
 
 test('uninstaller preserves the separately signed host bytes', () => {
   expect(installer).toContain('Path.Combine(payloadDir!, "uninstall.exe")');
+  expect(installer).toContain('Path.Combine(installDir, "Uninstall " + DisplayName + ".exe")');
   expect(installer).toContain('File.Copy(uninstallerHost, uninstallExe, overwrite: true)');
   expect(installer).not.toContain('CopyUninstallerHost');
+  expect(installer).toContain('QuietUninstallString');
+  expect(installer).toContain('\\\"{uninstallExe}\\\" /S');
+  expect(installer).toContain('Path.Combine(installDir, "resources", "vc_redist.x64.exe")');
 });
 
 test('silent NSIS uninstall arguments work without a WebView2 or automatic launch', () => {
@@ -202,6 +198,14 @@ try {
     Check(!File.Exists(Path.Combine(install, "partial.txt")), "partial upgrade survived rollback");
     Check(File.ReadAllText(Path.Combine(data, "sessions.sqlite")) == "personal", "personal data changed");
 
+    var emptyInstall = Path.Combine(root, "empty-install");
+    Directory.CreateDirectory(emptyInstall);
+    new InstallDirectoryTransaction(emptyInstall).Begin();
+    Directory.CreateDirectory(emptyInstall);
+    File.WriteAllText(Path.Combine(emptyInstall, "partial"), "new");
+    new InstallDirectoryTransaction(emptyInstall).Rollback();
+    Check(Directory.Exists(emptyInstall) && !Directory.EnumerateFileSystemEntries(emptyInstall).Any(), "empty original directory was not restored");
+
     var fresh = Path.Combine(root, "fresh");
     var freshTransaction = new InstallDirectoryTransaction(fresh);
     freshTransaction.Begin();
@@ -233,6 +237,26 @@ try {
     refused = false;
     try { new InstallDirectoryTransaction(data).ValidateOwnership(); } catch (EngineException) { refused = true; }
     Check(refused && File.ReadAllText(Path.Combine(data, "sessions.sqlite")) == "personal", "foreign directory was not rejected without mutation");
+
+    refused = false;
+    try { new InstallDirectoryTransaction(Path.Combine(root, "missing-app")).ValidateOwnership(requireInstalled: true); } catch (EngineException) { refused = true; }
+    Check(refused, "uninstall accepted a missing owned installation");
+    var linkedInstall = Path.Combine(root, "linked-app");
+    Directory.CreateDirectory(linkedInstall);
+    File.WriteAllText(Path.Combine(linkedInstall, InstallerEngine.AppExeName), "app");
+    var linkedResources = Path.Combine(linkedInstall, "resources");
+    if (OperatingSystem.IsWindows()) {
+        var linkStart = new System.Diagnostics.ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "/d", "/c", "mklink", "/J", linkedResources, data }) linkStart.ArgumentList.Add(argument);
+        using var linkProcess = System.Diagnostics.Process.Start(linkStart)!;
+        linkProcess.WaitForExit();
+        Check(linkProcess.ExitCode == 0, "could not create junction fixture");
+    } else Directory.CreateSymbolicLink(linkedResources, data);
+    File.WriteAllText(Path.Combine(data, "app.asar"), "foreign");
+    refused = false;
+    try { new InstallDirectoryTransaction(linkedInstall).ValidateOwnership(requireInstalled: true); } catch (EngineException) { refused = true; }
+    Check(refused, "uninstall accepted linked resources");
+    Directory.Delete(linkedResources);
 
     var skills = Path.Combine(root, "skills-source");
     var migrated = Path.Combine(root, "skills-target");

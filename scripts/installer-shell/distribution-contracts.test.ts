@@ -14,10 +14,18 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
   }
   expect(scripts['dist:win:signed']).toMatch(/build-distribution\.cjs --signed$/);
   const build = read('scripts/installer-shell/build-distribution.cjs');
-  expect(build.indexOf('if (signed) sign(uninstall)')).toBeLessThan(
+  expect(build).not.toContain('sign(uninstall)');
+  expect(build.indexOf('verifyRetainedHost(root, uninstall)')).toBeLessThan(
     build.indexOf("'pack-setup.cjs'"),
   );
   expect(build.indexOf('if (signed) sign(setup)')).toBeLessThan(
+    build.indexOf('const finalBudget = verifyFinalSetupBudget'),
+  );
+  expect(build.indexOf('const finalBudget = verifyFinalSetupBudget')).toBeLessThan(
+    build.indexOf('const nsisBudget = verifyFinalNsisBudget'),
+  );
+  expect(build).toContain('finalBudget.componentArchiveBytes');
+  expect(build.indexOf('const nsisBudget = verifyFinalNsisBudget')).toBeLessThan(
     build.indexOf('const report = writeSetupManifest'),
   );
   expect(read('electron-builder.windows-signed.cjs')).toContain('forceCodeSigning: true');
@@ -31,6 +39,22 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
   expect(read('scripts/installer-shell/pack-setup.cjs')).toContain(
     "path.join(payloadDir, 'uninstall.exe')",
   );
+  expect(read('scripts/installer-shell/build-shell.cjs')).not.toContain('ZhiYuanUninstall.exe');
+  expect(read('scripts/installer-shell/pack-setup.cjs')).not.toContain(
+    "path.join(payloadDir, 'vc_redist.x64.exe')",
+  );
+  expect(read('scripts/installer-shell/pack-setup.cjs')).toContain('remainingSigningBytes');
+  expect(read('scripts/installer-shell/pack-setup.cjs')).toContain(
+    'maxNonComponentBytes: MAX_NON_COMPONENT_BYTES',
+  );
+  expect(read('scripts/installer-shell/pack-setup.cjs')).toContain(
+    'assertPayloadDeduplication(payloadDir, uninstallHost)',
+  );
+  const hook = read('scripts/installer-shell/retain-uninstaller.nsh');
+  expect(hook).toContain('!ifdef BUILD_UNINSTALLER');
+  expect(hook).toContain('reset "${PROJECT_DIR}"\' = 0');
+  expect(hook).toContain('!finalize');
+  expect(hook).toContain('"${UNINSTALLER_OUT_FILE}"\' = 0');
 });
 
 test.each(['daily-release.yml', 'release-candidate.yml', 'online-update-release.yml'])(
@@ -47,11 +71,22 @@ test.each(['daily-release.yml', 'release-candidate.yml', 'online-update-release.
     const signature = workflow.indexOf('verify-windows-authenticode.ps1');
     const acceptance = workflow.indexOf('node scripts/ci/windows-shell-interactive.mjs');
     const evidence = workflow.indexOf('node scripts/ci/windows-shell-evidence.mjs');
+    const prepareUninstall = workflow.indexOf('windows-shell-uninstall.ps1 -Action prepare');
+    const verifyUninstall = workflow.indexOf('windows-shell-uninstall.ps1 -Action verify');
     const assembly = workflow.indexOf('installers=(release/ZhiYuanAgent-Setup-*.exe)');
     expect(signature).toBeGreaterThan(signed);
     expect(acceptance).toBeGreaterThan(signature);
     expect(evidence).toBeGreaterThan(acceptance);
-    expect(assembly).toBeGreaterThan(evidence);
+    expect(prepareUninstall).toBeGreaterThan(signature);
+    expect(prepareUninstall).toBeLessThan(acceptance);
+    const nativeSmoke = workflow.indexOf('-File scripts/ci/windows-installer-smoke.ps1');
+    if (nativeSmoke >= 0) expect(prepareUninstall).toBeLessThan(nativeSmoke);
+    expect(verifyUninstall).toBeGreaterThan(evidence);
+    expect(assembly).toBeGreaterThan(verifyUninstall);
+    expect(workflow.slice(verifyUninstall, assembly)).toContain(
+      "-ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'",
+    );
+    expect(workflow).toContain('path: acceptance-diagnostics\n');
   },
 );
 

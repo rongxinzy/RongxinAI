@@ -330,7 +330,7 @@
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "runAfterFinish": true,
-    "deleteAppDataOnUninstall": true,
+    "deleteAppDataOnUninstall": false,
     "include": "scripts/nsis-installer.nsh",
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },

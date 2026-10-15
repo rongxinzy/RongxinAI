@@ -213,10 +213,26 @@ describe('NSIS offline resource and local inference flow', () => {
         prefix: 'channel-runtime',
         sentinel: 'channel-runtime\\cc-connect-sidecar.exe',
       },
-      { key: 'skills', prefix: 'SKILLs', sentinel: 'SKILLs\\skills.config.json' },
-      { key: 'mcps', prefix: 'MCPs', sentinel: 'MCPs\\compatibility-review.md' },
-      { key: 'portable-git', prefix: 'mingit', sentinel: 'mingit\\usr\\bin\\bash.exe' },
-      { key: 'python', prefix: 'python-win', sentinel: 'python-win\\python.exe' },
+      {
+        key: 'skills',
+        prefix: 'SKILLs',
+        sentinel: 'SKILLs\\skills.config.json',
+      },
+      {
+        key: 'mcps',
+        prefix: 'MCPs',
+        sentinel: 'MCPs\\compatibility-review.md',
+      },
+      {
+        key: 'portable-git',
+        prefix: 'mingit',
+        sentinel: 'mingit\\usr\\bin\\bash.exe',
+      },
+      {
+        key: 'python',
+        prefix: 'python-win',
+        sentinel: 'python-win\\python.exe',
+      },
       {
         key: 'skill-python',
         prefix: 'skill-python',
@@ -254,7 +270,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(16);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(15);
   });
 
   test('records optional local inference intent via an options checkbox instead of a popup', () => {
@@ -316,7 +332,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(elevatedActionsScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
   });
 
-  test('refuses destructive prepare steps for shallow install roots', () => {
+  test('refuses destructive prepare steps before root safety and ownership validation', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
 
@@ -327,9 +343,11 @@ describe('NSIS offline resource and local inference flow', () => {
       prepareStart,
       installerScript.indexOf('!macroend', prepareStart),
     );
-    expect(prepareBlock).toContain('StrLen $R8 $INSTDIR');
-    expect(prepareBlock).toContain('skipping process stop, Skill migration and detach');
-    expect(prepareBlock).toContain('reason=shallow-root');
+    expect(prepareBlock).toContain('!insertmacro ValidateInstallRoot install');
+    expect(prepareBlock.indexOf('!insertmacro ValidateInstallRoot install')).toBeLessThan(
+      prepareBlock.indexOf('!insertmacro StopAppProcesses'),
+    );
+    expect(prepareBlock).not.toContain('StrLen $R8 $INSTDIR');
 
     // Mirror electron-builder's stock behavior: a browsed folder becomes the
     // parent unless it already ends with the product directory.
@@ -340,7 +358,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(browseBlock).toContain('StrCpy $INSTDIR "$INSTDIR\\${APP_FILENAME}"');
   });
 
-  test('uninstall removes the real userData directory with the app-data decision', () => {
+  test('uninstall preserves userData unless deletion is explicitly requested', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
     // electron-builder's app-data list only covers product-name variants; the
@@ -353,7 +371,10 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(unInstallBlock).toContain('RMDir /r "$APPDATA\\ZhiYuanAgent"');
     expect(unInstallBlock).toContain('--delete-app-data');
-    expect(unInstallBlock).toContain('DELETE_APP_DATA_ON_UNINSTALL');
+    expect(unInstallBlock).not.toContain('DELETE_APP_DATA_ON_UNINSTALL');
+    expect(unInstallBlock).toContain('${ifNot} ${Errors}');
+    const config = JSON.parse(fs.readFileSync(path.resolve('electron-builder.json'), 'utf8'));
+    expect(config.nsis.deleteAppDataOnUninstall).toBe(false);
     // The decision is recomputed because customUnInstall runs before
     // uninstaller.nsh declares its own $isDeleteAppData variable, and the
     // macro must not rely on customUnInstallSection (file scope, where
@@ -384,6 +405,31 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(cleanupScript).toContain('Remove-TreeWithoutFollowingLinks $target');
   });
 
+  test('stages resumable user-Skill migration and stops before detach if preservation fails', () => {
+    const installer = fs.readFileSync(installerScriptPath, 'utf8');
+    const prepareStart = installer.indexOf('!macro PrepareExistingInstallForExtraction');
+    const prepare = installer.slice(prepareStart, installer.indexOf('!macroend', prepareStart));
+    const migration = prepare.indexOf('-File "$PLUGINSDIR\\migrate-user-skills.ps1"');
+    const detach = prepare.indexOf('Detaching previous application version');
+    expect(migration).toBeGreaterThan(0);
+    expect(detach).toBeGreaterThan(migration);
+    expect(prepare.slice(migration, detach)).toContain('${If} $0 != "0"');
+    expect(prepare.slice(migration, detach)).toContain('SetErrorLevel 1');
+    expect(prepare.slice(migration, detach)).toContain('Quit');
+    expect(prepare).not.toContain('Copy-Item');
+    expect(prepare).toContain(
+      '-Source "$INSTDIR\\resources\\SKILLs" -Destination "$APPDATA\\ZhiYuanAgent\\SKILLs"',
+    );
+    const init = installer.slice(
+      installer.indexOf('!macro customInit'),
+      installer.indexOf('!macro StageOfflineComponentMetadata'),
+    );
+    expect(init.indexOf('File /oname=migrate-user-skills.ps1')).toBeGreaterThan(0);
+    expect(init.indexOf('File /oname=migrate-user-skills.ps1')).toBeLessThan(
+      init.indexOf('!insertmacro PrepareExistingInstallForExtraction SILENT'),
+    );
+  });
+
   test('stops processes by install-root path prefix so orphaned sidecars cannot block setup', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
@@ -391,27 +437,28 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript.indexOf('!macro StopAppProcesses')).toBeLessThan(
       installerScript.indexOf('!macro customInit'),
     );
-    expect(installerScript.match(/!insertmacro StopAppProcesses/g)).toHaveLength(3);
+    expect(installerScript.match(/!insertmacro StopAppProcesses/g)).toHaveLength(4);
 
     const macroStart = installerScript.indexOf('!macro StopAppProcesses');
     const macroBlock = installerScript.slice(
       macroStart,
       installerScript.indexOf('!macroend', macroStart),
     );
-    expect(macroBlock).toContain('Get-CimInstance Win32_Process');
-    expect(macroBlock).toContain('$$roots = @(\\"$INSTDIR\\"');
+    expect(macroBlock).toContain('-File "$PLUGINSDIR\\manage-install-processes.ps1"');
+    expect(macroBlock).toContain('-InstallDir "$INSTDIR"');
     expect(macroBlock).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes');
-    // The prefix root is normalized with a trailing separator so sibling
-    // directories that merely share a name prefix cannot match.
-    expect(macroBlock).toContain('TrimEnd([char]0x5c) + [char]0x5c');
-    expect(macroBlock).not.toContain('[char]0x27');
-    expect(macroBlock).toContain('StartsWith(($$roots[0].TrimEnd');
-    expect(macroBlock).toContain('StartsWith(($$roots[1].TrimEnd');
-    expect(macroBlock).toContain('OrdinalIgnoreCase');
-    expect(macroBlock).toContain('Stop-Process -Id $$proc.ProcessId -Force');
-    // An in-place uninstaller runs from $INSTDIR and must not kill itself.
+    expect(macroBlock).not.toContain('-Command');
     expect(macroBlock).toContain('GetCurrentProcessId');
-    expect(macroBlock).toContain('$$_.ProcessId -ne $$selfPid');
+    expect(macroBlock).toContain('-SelfPid $9 -Mode stop');
+    const processScript = fs.readFileSync(
+      path.resolve('scripts/installer/manage-install-processes.ps1'),
+      'utf8',
+    );
+    expect(processScript).toContain('Get-CimInstance Win32_Process');
+    expect(processScript).toContain('TrimEnd([char]0x5c) + [char]0x5c');
+    expect(processScript).toContain('OrdinalIgnoreCase');
+    expect(processScript).toContain('Stop-Process -Id $process.ProcessId -Force');
+    expect(processScript).toContain('$_.ProcessId -ne $SelfPid');
 
     const customInitBlock = installerScript.slice(
       installerScript.indexOf('!macro customInit'),
@@ -432,7 +479,8 @@ describe('NSIS offline resource and local inference flow', () => {
       installerScript.indexOf('!macro customUnInit'),
       installerScript.indexOf('!macroend', installerScript.indexOf('!macro customUnInit')),
     );
-    expect(customUnInitBlock).toContain('!insertmacro StopAppProcesses');
+    expect(customUnInitBlock).toContain('!insertmacro ValidateInstallRoot uninstall');
+    expect(customUnInitBlock).not.toContain('!insertmacro StopAppProcesses');
     // The interactive page leave callback lives in the UI include; it must run
     // the same committed-work macro.
     const pagesScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');

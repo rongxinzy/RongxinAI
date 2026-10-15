@@ -202,11 +202,15 @@ if ($exe) {
       }
     }
     $env:RUNNER_TEMP = $acceptanceRoot
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-shell-uninstall.ps1 -Action prepare -OwnedAcceptanceContext
+    if ($LASTEXITCODE -ne 0) { throw 'Native uninstall acceptance requires a fresh runtime and owned context; upload is blocked. Existing runtime data was not removed.' }
     & node scripts/ci/windows-shell-interactive.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Shell interactive acceptance failed; upload is blocked.' }
     $installed = Join-Path $acceptanceRoot 'zhiyuan-shell-acceptance\安装路径\知远.exe'
     & node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $exe.FullName $installed
     if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid; upload is blocked.' }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-shell-uninstall.ps1 -Action verify -OwnedAcceptanceContext
+    if ($LASTEXITCODE -ne 0) { throw 'Native uninstall acceptance failed; upload is blocked.' }
   } finally {
     $env:ZHIYUAN_SOURCE_COMMIT = $previousSourceCommit
     $env:GITHUB_RUN_ID = $previousRunId

@@ -1,6 +1,9 @@
 !include "FileFunc.nsh"
 !include "LogicLib.nsh"
 !include "nsDialogs.nsh"
+!ifdef PROJECT_DIR
+!include "${PROJECT_DIR}\scripts\installer-shell\retain-uninstaller.nsh"
+!endif
 
 ; Fully custom-drawn installer UI (palette, drawing helpers, page functions
 ; and string table). The theme file carries the include guard. electron-builder
@@ -48,37 +51,58 @@ Var /GLOBAL zyDeleteRealAppData
 ; install-root/runtime-cache path prefix instead of by process name; otherwise
 ; orphaned sidecars keep the "cannot be closed" retry dialog up forever.
 ; The caller itself is excluded: an in-place uninstaller runs from $INSTDIR.
-!macro StopAppProcesses
-  System::Call 'kernel32::GetCurrentProcessId()i .r9'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$roots = @(\"$INSTDIR\", \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\");\
-    $$selfPid = $9;\
-    $$isTarget = { param($$p) $$p -and ($$p.StartsWith(($$roots[0].TrimEnd([char]0x5c) + [char]0x5c), \"OrdinalIgnoreCase\") -or $$p.StartsWith(($$roots[1].TrimEnd([char]0x5c) + [char]0x5c), \"OrdinalIgnoreCase\"))) };\
-    $$stopped = 0;\
-    foreach ($$proc in @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.ProcessId -ne $$selfPid -and (& $$isTarget $$_.Path) })) {\
-      Stop-Process -Id $$proc.ProcessId -Force -ErrorAction SilentlyContinue;\
-      $$stopped += 1;\
-    };\
-    $$remaining = @();\
-    for ($$i = 0; $$i -lt 20; $$i++) {\
-      $$remaining = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.ProcessId -ne $$selfPid -and (& $$isTarget $$_.Path) });\
-      if ($$remaining.Count -eq 0) { break };\
-      Start-Sleep -Milliseconds 500;\
-    };\
-    Write-Output \"stopped=$$stopped remaining=$$($$remaining.Count)\""'
-  Pop $0
+!macro StageInstallSafetyScripts
+  InitPluginsDir
+  SetOutPath "$PLUGINSDIR"
+  File /oname=validate-install-root.ps1 "${PROJECT_DIR}\scripts\installer\validate-install-root.ps1"
+  File /oname=manage-install-processes.ps1 "${PROJECT_DIR}\scripts\installer\manage-install-processes.ps1"
 !macroend
 
-; Counts processes whose image path starts with $INSTDIR (the count is the
-; PowerShell exit code, so no stdout parsing is needed). After a failed
-; detach this distinguishes "app still running" from "directory held by
-; another program" — electron-builder reports both as "cannot be closed".
+!macro ValidateInstallRoot MODE
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-install-root.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -AppDataRoot "$APPDATA\ZhiYuanAgent" -Mode ${MODE}'
+  Pop $0
+  Pop $1
+  ${If} $0 != "0"
+    IfSilent +2
+      MessageBox MB_OK|MB_ICONSTOP "$(ZY_INSTALL_ROOT_INVALID)$\r$\n$1"
+    SetErrorLevel 1
+    Quit
+  ${EndIf}
+!macroend
+
+!macro StopAppProcesses
+  System::Call 'kernel32::GetCurrentProcessId()i .r9'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\manage-install-processes.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -SelfPid $9 -Mode stop'
+  Pop $0
+  Pop $1
+  DetailPrint "$1"
+  ${If} $0 != "0"
+    IfSilent +2
+      MessageBox MB_OK|MB_ICONSTOP "$(ZY_PROCESS_STOP_FAILED)$\r$\n$1"
+    SetErrorLevel 1
+    Quit
+  ${EndIf}
+!macroend
+
+; Exit status is the bounded process count; no stdout parsing is needed.
 !macro CountInstallDirProcesses RESULT
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$root = (\"$INSTDIR\".TrimEnd([char]0x5c) + [char]0x5c); $$c = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $$_.Path -and $$_.Path.StartsWith($$root, \"OrdinalIgnoreCase\") }).Count; if ($$c -gt 200) { $$c = 200 }; exit $$c"'
+  System::Call 'kernel32::GetCurrentProcessId()i .r9'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\manage-install-processes.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -SelfPid $9 -Mode count'
   Pop ${RESULT}
-  ; Discard the captured stdout without clobbering ${RESULT}: the only caller
-  ; passes $R0, and popping stdout into $R0 would overwrite the count.
   Pop $R8
+!macroend
+
+; Replace stock CHECK_APP_RUNNING: its raw prefix/inline PowerShell path
+; handling is unsafe. Silent un.onInit calls this before customUnInit, so it
+; must stage its own helpers and validate before touching any process.
+!macro customCheckAppRunning
+  !insertmacro StageInstallSafetyScripts
+  !ifdef BUILD_UNINSTALLER
+    !insertmacro ValidateInstallRoot uninstall
+  !else
+    !insertmacro ValidateInstallRoot install
+  !endif
+  !insertmacro StopAppProcesses
 !macroend
 
 ; electron-builder's uninstallOldVersion launches the previous uninstaller and
@@ -133,20 +157,10 @@ Var /GLOBAL zyDeleteRealAppData
 ; re-runs the steps when the target directory actually changed.
 !macro PrepareExistingInstallForExtraction TOKEN
   ${If} $preparedInstallRoot != $INSTDIR
+    ; Ownership and filesystem boundaries are checked before any process is
+    ; stopped, migration starts, or the existing directory is detached.
+    !insertmacro ValidateInstallRoot install
     StrCpy $preparedInstallRoot $INSTDIR
-
-    ; The custom hero page lets the user type or browse any directory, and
-    ; silent updates carry whatever /D installed into last time. Refuse the
-    ; destructive steps below for roots too shallow to be an application
-    ; directory: at "C:\" the prefix match would target every process on the
-    ; machine and the detach rename would hit a drive root.
-    StrLen $R8 $INSTDIR
-    ${If} $R8 < 6
-      DetailPrint "[Installer] Install root '$INSTDIR' is too shallow; skipping process stop, Skill migration and detach"
-      !insertmacro OpenTimingLogForAppend $8
-      FileWrite $8 "phase=prepare-skipped reason=shallow-root path=$INSTDIR$\r$\n"
-      FileClose $8
-    ${Else}
 
     DetailPrint "[Installer] Stopping running 知远 processes"
     System::Call 'kernel32::GetTickCount()i .r7'
@@ -159,22 +173,7 @@ Var /GLOBAL zyDeleteRealAppData
 
     DetailPrint "[Installer] Migrating user-created Skills"
     System::Call 'kernel32::GetTickCount()i .r7'
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-      $$source = \"$INSTDIR\resources\SKILLs\";\
-      $$destination = \"$APPDATA\ZhiYuanAgent\SKILLs\";\
-      $$config = Join-Path $$source \"skills.config.json\";\
-      if (Test-Path $$source) {\
-        New-Item -ItemType Directory -Path $$destination -Force | Out-Null;\
-        $$bundled = @(try {\
-          if (Test-Path $$config) {\
-            (Get-Content $$config -Raw | ConvertFrom-Json).defaults.PSObject.Properties.Name\
-          }\
-        } catch { });\
-        Get-ChildItem -Path $$source -Directory | Where-Object { $$bundled -notcontains $$_.Name } | ForEach-Object {\
-          $$target = Join-Path $$destination $$_.Name;\
-          if (-not (Test-Path $$target)) { Copy-Item -Path $$_.FullName -Destination $$target -Recurse -Force }\
-        };\
-      }"'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\migrate-user-skills.ps1" -Source "$INSTDIR\resources\SKILLs" -Destination "$APPDATA\ZhiYuanAgent\SKILLs"'
     Pop $0
     Pop $1
     System::Call 'kernel32::GetTickCount()i .r6'
@@ -182,6 +181,14 @@ Var /GLOBAL zyDeleteRealAppData
     !insertmacro OpenTimingLogForAppend $8
     FileWrite $8 "phase=skill-migration-complete elapsed_ms=$5 exit=$0 output=$1$\r$\n"
     FileClose $8
+    ${If} $0 != "0"
+      ; Do not detach or unregister the old application until every missing
+      ; user-created Skill file has been preserved. Retrying resumes safely.
+      IfSilent +2
+        MessageBox MB_OK|MB_ICONSTOP "$(ZY_SKILL_MIGRATION_FAILED)$\r$\n$1"
+      SetErrorLevel 1
+      Quit
+    ${EndIf}
 
     ; Rename the old application quickly. Its directory junctions do not copy the
     ; shared resource pack, and physical cleanup is delayed until installation ends.
@@ -230,7 +237,6 @@ Var /GLOBAL zyDeleteRealAppData
     ; registration so electron-builder skips the redundant legacy uninstaller
     ; whose exit code 2 would surface as a bogus "cannot be closed" dialog.
     !insertmacro ForgetOldInstallRegistry ${TOKEN}
-    ${EndIf}
   ${EndIf}
 !macroend
 !endif
@@ -241,6 +247,21 @@ Var /GLOBAL zyDeleteRealAppData
 !else
   !include "installer-ui\zy-theme.nsh"
   !include "installer-ui\zy-pages.nsh"
+!endif
+
+!insertmacro ZY_LangString ZY_INSTALL_ROOT_INVALID \
+  "所选目录不安全或不属于知远。操作已停止，未更改该目录。" \
+  "所選目錄不安全或不屬於知遠。操作已停止，未變更該目錄。" \
+  "This directory is unsafe or does not belong to ZhiYuan. The operation stopped without changing it."
+!insertmacro ZY_LangString ZY_PROCESS_STOP_FAILED \
+  "无法安全关闭应用进程。请退出知远后重试。" \
+  "無法安全關閉應用程式。請結束知遠後重試。" \
+  "Application processes could not be stopped safely. Exit ZhiYuan and try again."
+!ifndef BUILD_UNINSTALLER
+!insertmacro ZY_LangString ZY_SKILL_MIGRATION_FAILED \
+  "未能保留用户创建的 Skills。安装已停止，原安装目录保持不变。请检查访问权限后重新运行安装器。" \
+  "無法保留使用者建立的 Skills。安裝已停止，原安裝目錄保持不變。請檢查存取權限後重新執行安裝程式。" \
+  "User-created Skills could not be preserved. Setup stopped without changing the existing installation directory. Check access permissions and run setup again."
 !endif
 
 ; electron-builder defines this from allowToChangeInstallationDirectory; the
@@ -463,12 +484,14 @@ Var /GLOBAL zyDeleteRealAppData
 !macroend
 
 !macro customInit
+  !insertmacro StageInstallSafetyScripts
   SetDetailsPrint textonly
   CreateDirectory "$APPDATA\ZhiYuanAgent"
   ; Stage the branded UI bitmaps (and license text) the wizard pages load.
   ; File extraction only: this macro also runs for silent installs, where no
   ; page callback ever fires, so no GUI calls are allowed here.
   !insertmacro ZY_StageUiAssets
+  File /oname=migrate-user-skills.ps1 "${PROJECT_DIR}\scripts\installer\migrate-user-skills.ps1"
   System::Call 'kernel32::GetTickCount()i .r9'
   FileOpen $8 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" w
   FileWrite $8 "$9"
@@ -792,6 +815,8 @@ Var /GLOBAL zyDeleteRealAppData
 ; detach this distinguishes "app still running" from "directory held by
 ; another program" — electron-builder reports both as "cannot be closed".
 !macro customUnInit
+  !insertmacro StageInstallSafetyScripts
+  !insertmacro ValidateInstallRoot uninstall
   ; The uninstaller confirmation page uses the same branded background art.
   !insertmacro ZY_StageUiAssets
   ; This is a fresh uninstaller process with a fresh $PLUGINSDIR: the shared
@@ -800,11 +825,12 @@ Var /GLOBAL zyDeleteRealAppData
   ; component junctions and the runtime cache would be left behind.
   SetOutPath "$PLUGINSDIR"
   File /oname=uninstall-cleanup.ps1 "${PROJECT_DIR}\scripts\installer\uninstall-cleanup.ps1"
-  DetailPrint "[Uninstaller] Stopping running 知远 processes"
-  !insertmacro StopAppProcesses
 !macroend
 
 !macro customUnInstall
+  ; Revalidate after the confirmation page, immediately before cleanup.
+  !insertmacro ValidateInstallRoot uninstall
+  !insertmacro StopAppProcesses
   ; Remove component junctions and detach application-owned immutable data.
   ; User-created Skills and models remain under userData. Deleting the
   ; expanded runtime tree synchronously can take longer than the uninstaller
@@ -819,22 +845,15 @@ Var /GLOBAL zyDeleteRealAppData
 
   ; electron-builder's DELETE_APP_DATA list only covers $APPDATA\<product
   ; name> variants; the app's real userData directory is %APPDATA%\ZhiYuanAgent
-  ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs). The
-  ; WebView2 shell uninstaller removes that same tree, so mirror the exact
-  ; delete-app-data decision uninstaller.nsh makes and remove it too. The
-  ; decision has to be recomputed here: customUnInstall runs before
-  ; uninstaller.nsh declares its own $isDeleteAppData variable.
+  ; (APP_DATA_DIR_NAME — sessions, memory projection, migrated SKILLs).
+  ; Normal uninstallation preserves this tree. Only the explicit destructive
+  ; --delete-app-data option may remove it; a packaging default must not opt
+  ; the user into losing their conversations, settings, or created Skills.
   StrCpy $zyDeleteRealAppData "0"
   ClearErrors
   ${GetParameters} $R0
   ${GetOptions} $R0 "--delete-app-data" $R1
-  ${if} ${Errors}
-    !ifdef DELETE_APP_DATA_ON_UNINSTALL
-      ${ifNot} ${isUpdated}
-        StrCpy $zyDeleteRealAppData "1"
-      ${endif}
-    !endif
-  ${else}
+  ${ifNot} ${Errors}
     StrCpy $zyDeleteRealAppData "1"
   ${endif}
   ${if} $zyDeleteRealAppData == "1"

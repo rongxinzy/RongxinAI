@@ -22,15 +22,26 @@ internal sealed class InstallDirectoryTransaction
     public bool IsCommitted => ReadState()?.Committed == true;
     public string? BackupDir => state?.BackupDir;
 
-    public void ValidateOwnership()
+    public void ValidateOwnership(bool requireInstalled = false)
     {
         // Reading a journal validates its directory binding without mutation.
         // It also permits an interrupted partial extraction to be recovered.
-        if (ReadState() is not null) return;
-        if (Directory.Exists(installDir) && Directory.EnumerateFileSystemEntries(installDir).Any() &&
-            (!File.Exists(Path.Combine(installDir, InstallerEngine.AppExeName)) ||
-             !File.Exists(Path.Combine(installDir, "resources", "app.asar"))))
-            throw new EngineException("所选目录包含其他文件，请选择空目录或已有的知远安装目录。");
+        if (!requireInstalled && ReadState() is not null) return;
+        if (requireInstalled || (Directory.Exists(installDir) && Directory.EnumerateFileSystemEntries(installDir).Any()))
+            ValidatePhysicalInstallation(installDir);
+    }
+
+    private static void ValidatePhysicalInstallation(string directory)
+    {
+        var resources = Path.Combine(directory, "resources");
+        foreach (var path in new[] { directory, resources, Path.Combine(directory, InstallerEngine.AppExeName),
+            Path.Combine(resources, "app.asar") })
+        {
+            var isDirectory = path == directory || path == resources;
+            if ((isDirectory ? !Directory.Exists(path) : !File.Exists(path)) ||
+                (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new EngineException("所选目录包含其他文件或链接，请选择空目录或已有的知远安装目录。");
+        }
     }
 
     public void Begin()
@@ -89,6 +100,21 @@ internal sealed class InstallDirectoryTransaction
              (!pending.BackupDir.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase) ||
               !Guid.TryParseExact(pending.BackupDir[expectedPrefix.Length..], "n", out _))))
             throw new EngineException("安装恢复记录不属于所选目录，未修改任何安装文件。");
+        if (!pending.Committed && pending.BackupDir is not null)
+        {
+            try
+            {
+                var attributes = File.GetAttributes(pending.BackupDir);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new EngineException("安装备份不能是目录链接。");
+                if ((attributes & FileAttributes.Directory) == 0)
+                    throw new EngineException("安装备份必须是文件夹。");
+                if (Directory.EnumerateFileSystemEntries(pending.BackupDir).Any())
+                    ValidatePhysicalInstallation(pending.BackupDir);
+            }
+            catch (FileNotFoundException) { /* Rename may not have happened yet. */ }
+            catch (DirectoryNotFoundException) { /* Rename may not have happened yet. */ }
+        }
         state = pending;
         return state;
     }
@@ -96,9 +122,17 @@ internal sealed class InstallDirectoryTransaction
     private void WriteState()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(journalPath)!);
-        var temporary = journalPath + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(state));
-        File.Move(temporary, journalPath, overwrite: true);
+        var temporary = journalPath + ".tmp." + Guid.NewGuid().ToString("n");
+        try
+        {
+            using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                JsonSerializer.Serialize(file, state);
+                file.Flush(flushToDisk: true);
+            }
+            File.Move(temporary, journalPath, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     internal static void ValidateRoots(string installDir, string runtimeRoot, string appDataRoot)
@@ -117,11 +151,18 @@ internal sealed class InstallDirectoryTransaction
         {
         if (Path.GetFullPath(checkedRoot).TrimEnd(Path.DirectorySeparatorChar) == Path.GetPathRoot(checkedRoot)?.TrimEnd(Path.DirectorySeparatorChar))
             throw new EngineException("安装与数据目录不能是磁盘根目录。");
+        foreach (var folder in new[] { Environment.SpecialFolder.Windows,
+            Environment.SpecialFolder.System, Environment.SpecialFolder.SystemX86 })
+        {
+            var systemRoot = Environment.GetFolderPath(folder);
+            if (!string.IsNullOrEmpty(systemRoot) && ContainsPath(systemRoot, checkedRoot))
+                throw new EngineException("安装与数据目录不能位于 Windows 系统目录内。");
+        }
         foreach (var folder in new[] { Environment.SpecialFolder.UserProfile,
             Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolder.MyDocuments,
             Environment.SpecialFolder.ApplicationData, Environment.SpecialFolder.LocalApplicationData,
             Environment.SpecialFolder.Windows, Environment.SpecialFolder.ProgramFiles,
-            Environment.SpecialFolder.ProgramFilesX86 })
+            Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.CommonApplicationData })
         {
             var protectedRoot = Environment.GetFolderPath(folder);
             if (!string.IsNullOrEmpty(protectedRoot) && ContainsPath(checkedRoot, protectedRoot))
@@ -131,8 +172,14 @@ internal sealed class InstallDirectoryTransaction
         foreach (var root in new[] { full, runtimeRoot, appDataRoot })
         for (var dir = new DirectoryInfo(root); dir is not null; dir = dir.Parent)
         {
-            if (dir.Exists && (dir.Attributes & FileAttributes.ReparsePoint) != 0)
+            FileAttributes attributes;
+            try { attributes = File.GetAttributes(dir.FullName); }
+            catch (FileNotFoundException) { continue; }
+            catch (DirectoryNotFoundException) { continue; }
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
                 throw new EngineException("安装目录不能通过目录链接指向其他位置。");
+            if ((attributes & FileAttributes.Directory) == 0)
+                throw new EngineException("安装路径的上级必须是文件夹。");
         }
     }
 

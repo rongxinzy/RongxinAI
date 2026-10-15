@@ -74,7 +74,7 @@ fs.copyFileSync(
 console.log(`[installer-shell] staged UI at ${uiDir}`);
 
 const exe = path.join(outDir, 'ZhiYuanSetupShell.exe');
-fs.copyFileSync(exe, path.join(outDir, 'ZhiYuanUninstall.exe'));
+console.log(`[installer-shell] compressed self-contained shell: ${fs.statSync(exe).size} bytes`);
 if (process.argv.includes('--run')) {
   const child = spawnSync('cmd.exe', ['/c', 'start', '', exe], { cwd: outDir, stdio: 'ignore' });
   if (child.error) {

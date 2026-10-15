@@ -67,6 +67,8 @@ test('keeps a failed launch on the usable finish page and resets launch intent',
 
 test('matches directory boundaries correctly and preserves Unicode backup paths', () => {
   expect(installer).not.toContain('[char]0x27');
-  expect(installer).toContain('TrimEnd([char]0x5c) + [char]0x5c');
+  const processes = readFileSync('scripts/installer/manage-install-processes.ps1', 'utf8');
+  expect(processes).toContain('TrimEnd([char]0x5c) + [char]0x5c');
+  expect(installer).toContain('-File "$PLUGINSDIR\\manage-install-processes.ps1"');
   expect(installer).toContain('FileWriteUTF16LE /BOM $8 "$3"');
 });
