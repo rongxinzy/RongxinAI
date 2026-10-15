@@ -367,4 +367,6 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   );
 };
 
-export default MyAgentSidebarTree;
+// Navigation changes do not affect history. Keep local state and Redux updates live
+// while skipping parent renders whose tree inputs have not changed.
+export default React.memo(MyAgentSidebarTree);

@@ -1,0 +1,246 @@
+{
+  "baseCommit": "072068ff861498041097457bc8248dd4b1215782",
+  "environment": "Windows Electron development mode, warm modules, CDP attached, no CPU throttling or CPU/React profiler",
+  "metric": "Capture-phase click timestamp to target view DOM mutation; next requestAnimationFrame is recorded separately and does not establish screen presentation time",
+  "before": {
+    "summary": {
+      "count": 8,
+      "minMs": 717.1,
+      "maxMs": 808.2,
+      "medianMs": 772.3,
+      "unchangedTreeChildProps": 0
+    },
+    "samples": [
+      {
+        "target": "待办",
+        "rows": 53,
+        "clickToDomMs": 763.8,
+        "clickToNextRafMs": 765.8,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "自动化",
+        "rows": 53,
+        "clickToDomMs": 717.1,
+        "clickToNextRafMs": 719.1,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "活动",
+        "rows": 53,
+        "clickToDomMs": 774.6,
+        "clickToNextRafMs": 777.3,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "专家",
+        "rows": 53,
+        "clickToDomMs": 770.1,
+        "clickToNextRafMs": 772.7,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "待办",
+        "rows": 53,
+        "clickToDomMs": 783.9,
+        "clickToNextRafMs": 785.6,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "自动化",
+        "rows": 53,
+        "clickToDomMs": 777.2,
+        "clickToNextRafMs": 779.4,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "活动",
+        "rows": 53,
+        "clickToDomMs": 808.2,
+        "clickToNextRafMs": 809.9,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      },
+      {
+        "target": "专家",
+        "rows": 53,
+        "clickToDomMs": 763.3,
+        "clickToNextRafMs": 766.3,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": false
+      }
+    ]
+  },
+  "after": {
+    "summary": {
+      "count": 8,
+      "minMs": 130.1,
+      "maxMs": 275,
+      "medianMs": 155.3,
+      "unchangedTreeChildProps": 8
+    },
+    "samples": [
+      {
+        "target": "待办",
+        "rows": 53,
+        "clickToDomMs": 275,
+        "clickToNextRafMs": 276.8,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "自动化",
+        "rows": 53,
+        "clickToDomMs": 140.1,
+        "clickToNextRafMs": 142.2,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "活动",
+        "rows": 53,
+        "clickToDomMs": 159.9,
+        "clickToNextRafMs": 161.9,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "专家",
+        "rows": 53,
+        "clickToDomMs": 157.6,
+        "clickToNextRafMs": 161.4,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "待办",
+        "rows": 53,
+        "clickToDomMs": 179.8,
+        "clickToNextRafMs": 181.4,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "自动化",
+        "rows": 53,
+        "clickToDomMs": 130.1,
+        "clickToNextRafMs": 131.6,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "活动",
+        "rows": 53,
+        "clickToDomMs": 151.1,
+        "clickToNextRafMs": 152.9,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      },
+      {
+        "target": "专家",
+        "rows": 53,
+        "clickToDomMs": 153,
+        "clickToNextRafMs": 156.5,
+        "sameWorkData": true,
+        "sameChatData": true,
+        "sameTreeChildProps": true
+      }
+    ]
+  },
+  "previousLatestMain": {
+    "workRows": 64,
+    "summary": {
+      "count": 8,
+      "minMs": 364.2,
+      "maxMs": 627.8,
+      "medianMs": 434.3
+    },
+    "samples": [
+      {
+        "target": "待办",
+        "rows": 64,
+        "clickToDomMs": 381,
+        "clickToNextRafMs": 391.1,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "自动化",
+        "rows": 64,
+        "clickToDomMs": 418.4,
+        "clickToNextRafMs": 429.2,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "活动",
+        "rows": 64,
+        "clickToDomMs": 364.2,
+        "clickToNextRafMs": 375.3,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "专家",
+        "rows": 64,
+        "clickToDomMs": 434.5,
+        "clickToNextRafMs": 447.2,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "待办",
+        "rows": 64,
+        "clickToDomMs": 627.8,
+        "clickToNextRafMs": 655.9,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "自动化",
+        "rows": 64,
+        "clickToDomMs": 532.6,
+        "clickToNextRafMs": 545.7,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "活动",
+        "rows": 64,
+        "clickToDomMs": 531.1,
+        "clickToNextRafMs": 545.4,
+        "sameWorkData": true,
+        "sameChatData": true
+      },
+      {
+        "target": "专家",
+        "rows": 64,
+        "clickToDomMs": 434,
+        "clickToNextRafMs": 446.2,
+        "sameWorkData": true,
+        "sameChatData": true
+      }
+    ]
+  }
+}
