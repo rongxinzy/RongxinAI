@@ -96,9 +96,14 @@ const installViewport = (): HTMLElement => {
     offsetWidth: { configurable: true, value: 900 },
     scrollHeight: {
       configurable: true,
-      get: () =>
-        Number.parseFloat((viewport.firstElementChild as HTMLElement | null)?.style.height ?? '') ||
-        0,
+      get: () => {
+        const sizer = viewport.firstElementChild as HTMLElement | null;
+        const rowEnds = Array.from(
+          viewport.querySelectorAll<HTMLElement>('[data-index]'),
+          row => Number.parseFloat(row.style.top) + row.offsetHeight,
+        );
+        return Math.max(Number.parseFloat(sizer?.style.height ?? '') || 0, ...rowEnds);
+      },
     },
     scrollTop: {
       configurable: true,
@@ -327,6 +332,109 @@ test('preserves the visible turn and viewport offset when older turns are prepen
     expect(Number.parseFloat(anchoredRow?.style.top ?? '0') - viewport.scrollTop).toBe(
       anchorOffset,
     );
+  });
+});
+
+test('keeps the tail anchored in the same observer delivery when an existing history turn grows', async () => {
+  const viewport = installViewport();
+  const turns = makeTurns(4);
+  const heights = new Map(turns.map(turn => [turn.id, 400]));
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      turns,
+      renderAll: false,
+      renderTurn: (turn: ConversationTurn) =>
+        React.createElement('div', {
+          'data-turn-height': String(heights.get(turn.id)),
+          'data-turn-id': turn.id,
+        }),
+    }),
+    { container: viewport },
+  );
+  await flushResizeObservers();
+
+  const tail = viewport.querySelector<HTMLElement>('[data-index="3"]')!;
+  const tailOffset = Number.parseFloat(tail.style.top) - viewport.scrollTop;
+  const first = view.container.querySelector<HTMLElement>('[data-turn-id="turn-0"]')!;
+  // A history page fills a previously truncated turn without remounting its row.
+  first.dataset.turnHeight = '1376';
+
+  await act(async () => {
+    TestResizeObserver.flush();
+    // Assert before React commits or an animation-frame retry can hide a jump.
+    expect(viewport.scrollTop).toBe(viewport.scrollHeight - VIEWPORT_HEIGHT);
+    expect(Number.parseFloat(tail.style.top) - viewport.scrollTop).toBe(tailOffset);
+    await Promise.resolve();
+  });
+});
+
+test('measures retained rows before painting a history prepend with overflowing content', async () => {
+  const viewport = installViewport();
+  const turns = makeTurns(1);
+  let tailHeight = 1370;
+  const renderTurn = (turn: ConversationTurn) =>
+    React.createElement('div', {
+      'data-turn-height': String(turn.id === turns[0].id ? tailHeight : 100),
+      'data-turn-id': turn.id,
+    });
+  const view = render(
+    React.createElement(VirtualizedTurnList, { turns, renderAll: false, renderTurn }),
+    { container: viewport },
+  );
+  await flushResizeObservers();
+  tailHeight = 2275;
+
+  view.rerender(
+    React.createElement(VirtualizedTurnList, {
+      turns: [...makeTurns(2, 'older'), ...turns],
+      renderAll: false,
+      renderTurn,
+    }),
+  );
+
+  // The growing retained row can overflow the cached sizer before its observer fires.
+  expect(viewport.firstElementChild).toHaveStyle({ height: '2475px' });
+  expect(viewport.scrollTop).toBe(viewport.scrollHeight - VIEWPORT_HEIGHT);
+  const tail = viewport.querySelector<HTMLElement>('[data-turn-id="turn-0"]')!;
+  expect(tail.getAttribute('data-turn-height')).toBe('2275');
+});
+
+test('compensates a resize above a scrolled-up viewport before the next frame', async () => {
+  const viewport = installViewport();
+  render(
+    React.createElement(VirtualizedTurnList, {
+      turns: makeTurns(10),
+      renderAll: false,
+      renderTurn: (turn: ConversationTurn) =>
+        React.createElement('div', {
+          'data-turn-height': '400',
+          'data-turn-id': turn.id,
+        }),
+    }),
+    { container: viewport },
+  );
+  await flushResizeObservers();
+  await act(async () => {
+    viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }));
+    viewport.scrollTop = 2800;
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  await flushResizeObservers();
+
+  const anchor = viewport.querySelector<HTMLElement>('[data-index="7"]')!;
+  const anchorOffset = Number.parseFloat(anchor.style.top) - viewport.scrollTop;
+  const first = viewport.querySelector<HTMLElement>('[data-turn-id="turn-0"]')!;
+  // Forward scroll permits remeasurement compensation while still away from the tail.
+  await act(async () => {
+    viewport.scrollTop = 2900;
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  first.dataset.turnHeight = '500';
+  await act(async () => {
+    TestResizeObserver.flush();
+    expect(Number.parseFloat(anchor.style.top) - viewport.scrollTop).toBe(anchorOffset - 100);
+    expect(viewport.scrollTop).toBeLessThan(viewport.scrollHeight - VIEWPORT_HEIGHT);
+    await Promise.resolve();
   });
 });
 

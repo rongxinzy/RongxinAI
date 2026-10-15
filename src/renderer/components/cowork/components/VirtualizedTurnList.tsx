@@ -1,4 +1,4 @@
-import { elementScroll, useVirtualizer } from '@tanstack/react-virtual';
+import { elementScroll, useVirtualizer, type Virtualizer } from '@tanstack/react-virtual';
 import React, {
   useCallback,
   useEffect,
@@ -28,6 +28,19 @@ interface VirtualizedTurnListProps {
 const INITIAL_VIEWPORT_HEIGHT_PX = 1200;
 const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
 const TURN_OVERSCAN = 8;
+
+const syncMeasuredTurnLayout = <TScrollElement extends Element, TItemElement extends Element>(
+  instance: Virtualizer<TScrollElement, TItemElement>,
+  sizer: HTMLDivElement | null,
+) => {
+  if (!sizer) return;
+
+  sizer.style.height = `${instance.getTotalSize()}px`;
+  for (const item of instance.getVirtualItems()) {
+    const element = instance.elementsCache.get(item.key) as HTMLElement | undefined;
+    if (element) element.style.top = `${item.start}px`;
+  }
+};
 
 /**
  * Renders only the visible window of conversation turns (issue #141
@@ -82,12 +95,16 @@ export const VirtualizedTurnList = React.forwardRef<
     const wasAtTail = scrollElement ? Math.abs(scrollElement.scrollTop - maxScroll) < 1 : false;
     const requestedOffset = offset + (options.adjustments ?? 0);
 
+    // TanStack updates its size cache before requesting scroll compensation,
+    // but notifies onChange afterwards. Grow the DOM first so the browser does
+    // not clamp that compensation to the previous height for one painted frame.
+    syncMeasuredTurnLayout(instance, virtualSizerRef.current);
     elementScroll(offset, options, instance);
     if (!scrollElement || !targetWindow) return;
 
     // Upward anchor adjustments stay short of the end and must not schedule a
-    // later scroll write. A clamped tail write still needs a retry: the sizer
-    // grows in the same turn, after this scrollTop assignment.
+    // later scroll write. Initial row refs can run before the sizer ref attaches,
+    // so a clamped tail write during mounting still needs a retry.
     const seeksTail = wasAtTail || requestedOffset >= maxScroll - 1;
     if (!seeksTail && options.behavior === undefined) return;
     const clampedOffset = scrollElement.scrollTop;
@@ -121,18 +138,8 @@ export const VirtualizedTurnList = React.forwardRef<
     followOnAppend: true,
     scrollToFn,
     onChange: instance => {
-      // ResizeObserver corrections happen before React can commit the new
-      // virtual positions. Apply the sizer height and mounted row offsets in
-      // that same callback so the corrected scrollTop and layout reach the
-      // browser together instead of painting a transient frame.
-      const sizer = virtualSizerRef.current;
-      if (!sizer) return;
-
-      sizer.style.height = `${instance.getTotalSize()}px`;
-      for (const item of instance.getVirtualItems()) {
-        const element = instance.elementsCache.get(item.key) as HTMLElement | undefined;
-        if (element) element.style.top = `${item.start}px`;
-      }
+      // Also synchronize measurements that do not require a scroll adjustment.
+      syncMeasuredTurnLayout(instance, virtualSizerRef.current);
     },
   });
   const getMeasureElementRef = useCallback(
@@ -210,15 +217,20 @@ export const VirtualizedTurnList = React.forwardRef<
       const key = row.dataset.turnKey;
       if (!key) continue;
 
+      const height = row.offsetHeight;
       const previousSize = internallyPrependedTurnSizes.get(key);
       if (previousSize !== undefined && virtualizer.scrollDirection === 'backward') {
-        const delta = row.offsetHeight - previousSize;
+        const delta = height - previousSize;
         const rowStart = Number.parseFloat(row.style.top);
         if (delta > 0 && rowStart <= scrollElement.scrollTop) {
           scrollElement.scrollTop += delta;
         }
       }
-      measuredTurnSizesRef.current.set(key, row.offsetHeight);
+      // A retained row's ref does not run again when a history page fills it.
+      // Measure it in this commit, before new-row corrections and tail alignment
+      // can leave an overflowing row outside the virtualizer's cached geometry.
+      virtualizer.resizeItem(virtualizer.indexFromElement(row), height);
+      measuredTurnSizesRef.current.set(key, height);
     }
     previousMessageIdsByTurnRef.current = nextMessageIdsByTurn;
   }, [internallyPrependedTurnSizes, nextMessageIdsByTurn, scrollRef, turns, virtualizer]);
@@ -265,7 +277,13 @@ export const VirtualizedTurnList = React.forwardRef<
     <div
       data-virtualized-turn-list
       ref={virtualSizerRef}
-      style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
+      style={{
+        height: virtualizer.getTotalSize(),
+        position: 'relative',
+        width: '100%',
+        // Geometry must be immediate even under global reduced-motion resets.
+        transitionProperty: 'none',
+      }}
     >
       {virtualizer.getVirtualItems().map(virtualItem => (
         <div
@@ -278,6 +296,7 @@ export const VirtualizedTurnList = React.forwardRef<
             top: virtualItem.start,
             left: 0,
             width: '100%',
+            transitionProperty: 'none',
           }}
         >
           {renderTurn(turns[virtualItem.index], virtualItem.index)}
