@@ -932,6 +932,27 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     rootRef: detailRootRef,
   });
 
+  // Automatically ensure interactive prompt/permission cards stay in view
+  useEffect(() => {
+    if (inlineQuestionPermission || (inlinePermission && !hasInlineToolPermissionCard)) {
+      const scrollElement = scrollContainerRef.current?.closest(
+        '.cowork-conversation-scroll',
+      ) as HTMLElement | null;
+      if (scrollElement) {
+        requestAnimationFrame(() => {
+          scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
+        });
+      }
+    }
+  }, [inlineQuestionPermission, inlinePermission, hasInlineToolPermissionCard]);
+
+  const effectiveTurns = useMemo(() => {
+    if (turns.length === 0 && isStreaming) {
+      return [{ id: 'streaming-only', userMessage: null, assistantItems: [] }];
+    }
+    return turns;
+  }, [turns, isStreaming]);
+
   // StickToBottom (Conversation) handles auto-scroll during streaming
 
   if (!currentSession) {
@@ -941,36 +962,25 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const hideDefaultAssistantHeader = currentSession.mode === CoworkSessionMode.Chat;
 
   const renderConversationTurns = () => {
-    if (turns.length === 0) {
-      if (!isStreaming) return null;
-      return (
-        <div data-export-role="assistant-block">
-          <TurnBlock
-            turn={{
-              id: 'streaming-only',
-              userMessage: null,
-              assistantItems: [],
-            }}
-            resolveLocalFilePath={resolveLocalFilePath}
-            showTypingIndicator={toolActivities.length === 0}
-            toolActivities={toolActivities}
-            showCopyButtons={!isStreaming}
-            isTurnComplete={false}
-            hideDefaultAssistantHeader={hideDefaultAssistantHeader}
-          />
-        </div>
-      );
+    if (effectiveTurns.length === 0) {
+      return null;
     }
 
-    const renderTurn = (turn: (typeof turns)[number], index: number) => {
-      const isLastTurn = index === turns.length - 1;
+    const renderTurn = (turn: (typeof effectiveTurns)[number], index: number) => {
+      const isStreamingOnly = turn.id === 'streaming-only';
+      const isLastTurn = index === effectiveTurns.length - 1;
       const hasActiveToolActivity = isStreaming && isLastTurn && toolActivities.length > 0;
       const showTypingIndicator =
         isStreaming &&
         isLastTurn &&
-        !hasActiveTurnStreamingContent(turn, toolActivities, inlinePermission);
+        (isStreamingOnly
+          ? toolActivities.length === 0
+          : !hasActiveTurnStreamingContent(turn, toolActivities, inlinePermission));
       const showAssistantBlock =
-        turn.assistantItems.length > 0 || showTypingIndicator || hasActiveToolActivity;
+        isStreamingOnly ||
+        turn.assistantItems.length > 0 ||
+        showTypingIndicator ||
+        hasActiveToolActivity;
 
       const turnArtifacts = turnArtifactsMap.get(turn.id) ?? [];
 
@@ -1002,6 +1012,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 // 流式或恢复中禁用继续执行按钮
                 resumeDisabled={resumeDisabled || isStreaming}
                 onResumeTask={onResumeTask ? handleResumeTask : undefined}
+                hideDefaultAssistantHeader={
+                  isStreamingOnly ? hideDefaultAssistantHeader : undefined
+                }
                 // 仅末轮需要工具授权，避免历史轮次误挂授权按钮
                 pendingPermission={isLastTurn ? inlinePermission : null}
                 onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
@@ -1023,7 +1036,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <VirtualizedTurnList
         key={sessionId}
         ref={virtualizedTurnListRef}
-        turns={turns}
+        turns={effectiveTurns}
         onInitialTailPositioned={markInitialHistoryTailPositioned}
         renderTurn={renderTurn}
         renderAll={isExportingImage}
@@ -1227,7 +1240,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onCancelTaskResume={onCancelTaskResume}
                   sessionId={displayedSessionId ?? currentSession?.id}
                 />
-                <p className="text-center text-xs text-muted opacity-85 mt-2 mb-[-8px] select-none">
+                <p className="text-center text-xs text-muted-foreground mt-2 select-none">
                   {i18nService.t('aiGeneratedDisclaimer')}
                 </p>
               </div>

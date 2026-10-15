@@ -1,5 +1,6 @@
 import { CoworkMessageType, CoworkDisplayItemType } from '../../../../shared/cowork/constants';
 import { ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
+import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { ToolOutput } from '@shared/components/ai-elements/tool';
 import { Alert, AlertDescription } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
@@ -203,24 +204,29 @@ const TurnBlockComponent: React.FC<{
           key={item.message.id}
           persistKey={`reasoning-${item.message.id}`}
           isStreaming={isStreaming}
-          defaultOpen={false}
+          defaultOpen={isStreaming}
           autoClose={false}
           duration={durationSeconds}
         >
           <ReasoningTrigger
-            getThinkingMessage={() =>
-              i18nService
+            getThinkingMessage={(streaming, duration) => {
+              const displayDuration = duration ?? durationSeconds;
+              const text = i18nService
                 .t(
                   isComplete
-                    ? durationSeconds
+                    ? displayDuration
                       ? 'localInferenceThoughtForSeconds'
                       : 'codingAgentReasoningComplete'
-                    : isStreaming
+                    : streaming
                       ? 'codingAgentReasoningActive'
                       : 'reasoning',
                 )
-                .replace('{seconds}', String(durationSeconds ?? 0))
-            }
+                .replace('{seconds}', String(displayDuration ?? 0));
+              if (streaming) {
+                return <Shimmer duration={1.5}>{text}</Shimmer>;
+              }
+              return <p>{text}</p>;
+            }}
           />
           <ReasoningContent>{content}</ReasoningContent>
         </PersistentReasoning>
