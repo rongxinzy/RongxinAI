@@ -434,6 +434,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
               type="button"
               variant="outline"
               size="icon-sm"
+              disabled={!stepDraft.trim()}
               onClick={() => void addStep()}
               aria-label={i18nService.t('todoAddStep')}
             >

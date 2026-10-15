@@ -1,6 +1,5 @@
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { cn } from '@shared/lib/utils';
 import {
   CalendarDays,
   CheckCircle2,
@@ -87,11 +86,7 @@ const TodoNavigationPanel: React.FC<TodoNavigationPanelProps> = ({
             variant={isActive ? 'secondary' : 'ghost'}
             data-active={isActive ? 'true' : undefined}
             onClick={() => onSelectView(item.value)}
-            className={cn(
-              'w-full justify-start gap-2',
-              // 选中态：卡片底 + 描边 + 字重，避免在 muted 侧栏里看不清
-              isActive && 'border border-border bg-card font-medium text-foreground shadow-subtle',
-            )}
+            className="w-full justify-start gap-2"
             aria-current={isActive ? 'page' : undefined}
           >
             <Icon />
@@ -138,11 +133,7 @@ const TodoNavigationPanel: React.FC<TodoNavigationPanelProps> = ({
                 variant={isActive ? 'secondary' : 'ghost'}
                 data-active={isActive ? 'true' : undefined}
                 onClick={() => onSelectList(list.id)}
-                className={cn(
-                  'min-w-0 flex-1 justify-start gap-2',
-                  isActive &&
-                    'border border-border bg-card font-medium text-foreground shadow-subtle',
-                )}
+                className="min-w-0 flex-1 justify-start gap-2"
                 aria-current={isActive ? 'page' : undefined}
               >
                 <ListTodo />
