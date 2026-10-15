@@ -322,7 +322,9 @@ test.skipIf(process.platform !== 'win32')(
     const step = config.jobs['package-and-install'].steps.find(
       item => item.id === 'shell-evidence',
     )!;
-    const fixture = fs.mkdtempSync(path.join(tmpdir(), 'shell-evidence-encoding-'));
+    const fixture = fs.realpathSync.native(
+      fs.mkdtempSync(path.join(tmpdir(), 'shell-evidence-encoding-')),
+    );
     const probe = path.join(fixture, 'workflow.ps1');
     const output = path.join(fixture, 'arguments.json');
     const setup = path.join(fixture, 'release/ZhiYuanAgent-Setup-fixture.exe');
