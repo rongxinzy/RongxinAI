@@ -59,6 +59,12 @@ describe('cowork image attachments', () => {
     ).toEqual([{ name: 'shot.png', mimeType: 'image/png', path: 'D:/img/a.png' }]);
   });
 
+  it('preserves base64 when path is missing to avoid data loss before materialization', () => {
+    expect(
+      slimImageAttachmentsForIpc([{ name: 'shot.png', mimeType: 'image/png', base64Data: 'aaaa' }]),
+    ).toEqual([{ name: 'shot.png', mimeType: 'image/png', path: '', base64Data: 'aaaa' }]);
+  });
+
   it('rewrites message metadata when inline images are present', () => {
     const root = makeRoot();
     const result = persistMessageImageMetadata(root, 'session-1', {

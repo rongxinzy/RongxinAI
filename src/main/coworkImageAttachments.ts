@@ -16,6 +16,7 @@ export interface PersistedCoworkImageAttachment {
   name: string;
   mimeType: string;
   path: string;
+  base64Data?: string;
 }
 
 export const coworkImageRoot = (userDataDir: string): string =>
@@ -142,7 +143,14 @@ export function slimImageAttachmentsForIpc(
       const name = typeof item.name === 'string' ? item.name : '';
       const mimeType = typeof item.mimeType === 'string' ? item.mimeType : '';
       const filePath = typeof item.path === 'string' ? item.path : '';
-      return filePath ? { name, mimeType, path: filePath } : null;
+      if (filePath) {
+        return { name, mimeType, path: filePath };
+      }
+      const base64Data = typeof item.base64Data === 'string' ? item.base64Data : '';
+      if (base64Data) {
+        return { name, mimeType, path: '', base64Data };
+      }
+      return null;
     })
     .filter((item): item is PersistedCoworkImageAttachment => item !== null);
   return slim.length > 0 ? slim : undefined;
