@@ -146,7 +146,10 @@ Expect-Rejection { Assert-NativeHostIdentity $manifest $captured $installed 'oth
 [IO.File]::AppendAllText($installed, 'tamper')
 Expect-Rejection { Assert-NativeHostIdentity $manifest $captured $installed 'abc' }
 $linked = Join-Path $root 'linked'
-New-Item -ItemType Junction -Path $linked -Target $runtime | Out-Null
+$env:ZY_ACCEPTANCE_LINK = $linked
+$env:ZY_ACCEPTANCE_TARGET = $runtime
+& $env:COMSPEC /d /c 'mklink /J "%ZY_ACCEPTANCE_LINK%" "%ZY_ACCEPTANCE_TARGET%"' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Could not create literal-path junction fixture' }
 Expect-Rejection { Assert-PhysicalAcceptancePath $linked }
 Expect-Rejection { Assert-PhysicalAcceptancePath (Join-Path $linked 'child') }
 [IO.Directory]::Delete($linked)
