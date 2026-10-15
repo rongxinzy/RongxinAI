@@ -3258,11 +3258,6 @@
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -5715,12 +5710,6 @@
 }
 }
 @media (hover: hover) {
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -7555,7 +7544,6 @@ to {
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-:where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-sidebar-navigation-button-selected),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -11347,11 +11335,6 @@ to {
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -13807,12 +13790,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -15659,7 +15636,6 @@ to {
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="classic-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="classic-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="classic-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -19451,11 +19427,6 @@ to {
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -21908,12 +21879,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -23748,7 +23713,6 @@ to {
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="daming-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="daming-light"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="daming-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -27540,11 +27504,6 @@ to {
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -30000,12 +29959,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -31852,7 +31805,6 @@ to {
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="daming-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="daming-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="daming-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -35646,11 +35598,6 @@ to {
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -38103,12 +38050,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -39946,7 +39887,6 @@ to {
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="changan-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="changan-light"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="changan-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -43740,11 +43680,6 @@ to {
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -46200,12 +46135,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -48055,7 +47984,6 @@ to {
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="changan-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="changan-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="changan-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -51849,11 +51777,6 @@ to {
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -54306,12 +54229,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -56149,7 +56066,6 @@ to {
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="weiyang-light"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="weiyang-light"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="weiyang-light"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),
@@ -59943,11 +59859,6 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3) {
   color: var(--muted-foreground);
 }
-[data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
-  font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-foreground);
-}
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1) {
   opacity: 0;
   transition-property: opacity;
@@ -62403,12 +62314,6 @@ to {
 }
 }
 @media (hover: hover) {
-[data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 10%, transparent);
-  color: var(--zy-foreground);
-}
-}
-@media (hover: hover) {
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: transparent;
 }
@@ -64258,7 +64163,6 @@ to {
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-1),
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-2),
 [data-theme="weiyang-dark"] :where(.theme-page-chat-skill-shortcuts-button-variant-3),
-[data-theme="weiyang-dark"] :where(.theme-page-sidebar-navigation-button-selected),
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-1),
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-2),
 [data-theme="weiyang-dark"] :where(.theme-page-coding-workspace-sidebar-button-variant-3),

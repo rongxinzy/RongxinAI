@@ -181,17 +181,6 @@ export function classicConditionalControls(dark: boolean) {
     'page-chat-skill-shortcuts-button-variant-3': recipe({
       base: { color: 'var(--muted-foreground)' },
     }),
-    'page-sidebar-navigation-button-selected': recipe({
-      base: {
-        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 8%, transparent)',
-        'font-weight': 'var(--zy-component-font-weight-medium)',
-        color: 'var(--zy-foreground)',
-      },
-      hover: {
-        'background-color': 'color-mix(in oklab, var(--sidebar-foreground) 10%, transparent)',
-        color: 'var(--zy-foreground)',
-      },
-    }),
 
     'page-coding-workspace-sidebar-button-variant-1': recipe({
       base: { opacity: '0', 'transition-property': 'opacity', 'transition-duration': '150ms' },
