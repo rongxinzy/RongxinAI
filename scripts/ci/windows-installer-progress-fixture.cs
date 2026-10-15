@@ -11,8 +11,23 @@ internal static class ProgressFixture {
     int x, int y, int width, int height, IntPtr parent, IntPtr id, IntPtr instance, IntPtr parameter);
   [DllImport("user32.dll")] private static extern bool DestroyWindow(IntPtr window);
   [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
-  [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
-  private static extern int SetWindowLong(IntPtr window, int index, int value);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  private static extern bool SetWindowText(IntPtr window, string text);
+
+  private sealed class FixtureForm : Form {
+    public IntPtr AdvanceButton;
+    public Action Advance;
+
+    protected override void WndProc(ref Message message) {
+      // The real native Button sends WM_COMMAND / BN_CLICKED to its parent.
+      if (message.Msg == 0x0111 && message.LParam == AdvanceButton &&
+          AdvanceButton != IntPtr.Zero && ((message.WParam.ToInt64() >> 16) & 0xffff) == 0) {
+        Advance();
+        return;
+      }
+      base.WndProc(ref message);
+    }
+  }
 
   private static IntPtr Add(IntPtr parent, int id, string className, string text) {
     var result = CreateWindowEx(0, className, text, 0x50000000,
@@ -25,7 +40,7 @@ internal static class ProgressFixture {
   private static void Main(string[] args) {
     var mode = args[0];
     Application.EnableVisualStyles();
-    using (var form = new Form()) {
+    using (var form = new FixtureForm()) {
       form.Text = "ZhiYuan progress ownership fixture";
       form.ClientSize = new Size(450, 350);
       var wizard = form.Handle;
@@ -37,8 +52,13 @@ internal static class ProgressFixture {
         Add(page, id, "Static", id == 1201 ? "ZhiYuan Agent" : "Hero content");
       var progress = new List<IntPtr>();
       int stage = 0;
-      var advance = new Button { Text = "Advance fixture", Left = 10, Top = 280, Width = 150 };
-      advance.Click += (sender, value) => {
+      // WinForms Button uses WindowsForms10.BUTTON..., whereas the production
+      // driver deliberately accepts only the native Button class used by NSIS.
+      var advance = CreateWindowEx(0, "Button", "Advance fixture", 0x50010000,
+        10, 280, 150, 23, wizard, new IntPtr(1100), IntPtr.Zero, IntPtr.Zero);
+      if (advance == IntPtr.Zero) throw new InvalidOperationException("Fixture advance creation failed");
+      form.AdvanceButton = advance;
+      form.Advance = () => {
         if (stage == 0) {
           if (!DestroyWindow(page)) throw new InvalidOperationException("Fixture hero destruction failed");
           page = IntPtr.Zero;
@@ -49,7 +69,7 @@ internal static class ProgressFixture {
             if (id == 1206) ShowWindow(control, 0); // completed bar starts hidden
           }
           stage = 1;
-          advance.Text = "Finish fixture";
+          if (!SetWindowText(advance, "Finish fixture")) throw new InvalidOperationException("Fixture progress acknowledgement failed");
         } else if (stage == 1) {
           for (int index = 0; index < progress.Count; index++) {
             if (index == 1 && (mode == "visible-residue" || mode == "hidden-residue")) {
@@ -66,11 +86,9 @@ internal static class ProgressFixture {
           Add(page, 1202, "Button", "Finish");
           Add(page, 1203, "Static", "Finish background");
           stage = 2;
-          advance.Text = "Fixture finished";
+          if (!SetWindowText(advance, "Fixture finished")) throw new InvalidOperationException("Fixture finish acknowledgement failed");
         }
       };
-      form.Controls.Add(advance);
-      SetWindowLong(advance.Handle, -12, 1100);
       using (var timeout = new Timer()) {
         timeout.Interval = 30000;
         timeout.Tick += (sender, value) => form.Close();

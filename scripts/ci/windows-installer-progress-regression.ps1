@@ -60,6 +60,9 @@ try {
       $advance = Wait-Fixture {
         [ZhiYuan.Acceptance.InstallerUi]::Controls($window.Handle) | Where-Object { $_.Visible -and $_.Text -eq 'Advance fixture' }
       } 'hero controls'
+      if ($advance.ClassName -ne 'Button' -or -not $advance.Enabled -or $advance.ParentHandle -ne $window.Handle -or $advance.ControlId -ne 1100) {
+        throw "Expected enabled native fixture Button owned by wizard: $($advance | ConvertTo-Json -Compress)"
+      }
       $heroIds = @([ZhiYuan.Acceptance.InstallerUi]::Controls($window.Handle) | Where-Object { $_.ControlId -ge 1200 -and $_.ControlId -le 1206 })
       if ($heroIds.Count -ne 7) { throw 'Fixture must reproduce all seven reused hero IDs' }
       if ([ZhiYuan.Acceptance.InstallerUi]::HasBrandedProgress($window.Handle, 'Installing ZhiYuan Agent')) { throw 'Hero IDs were mistaken for branded progress' }

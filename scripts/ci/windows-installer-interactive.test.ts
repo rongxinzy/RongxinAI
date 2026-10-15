@@ -78,6 +78,18 @@ test.skipIf(process.platform !== 'win32')(
   100_000,
 );
 
+test('uses a real native Button and its parent notification in the progress fixture', () => {
+  const fixture = readFileSync(
+    path.join(__dirname, 'windows-installer-progress-fixture.cs'),
+    'utf8',
+  );
+  expect(fixture).toContain('CreateWindowEx(0, "Button", "Advance fixture"');
+  expect(fixture).toContain('message.Msg == 0x0111 && message.LParam == AdvanceButton');
+  expect(fixture).toContain('((message.WParam.ToInt64() >> 16) & 0xffff) == 0');
+  expect(fixture).not.toContain('new Button');
+  expect(helper).toContain('control.ClassName != "Button"');
+});
+
 test('requires actual windows, screenshots, real DPI and usable actions', () => {
   for (const marker of [
     'PrintWindow(window, dc, 2)',
