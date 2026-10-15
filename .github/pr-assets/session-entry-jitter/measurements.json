@@ -1,0 +1,307 @@
+{
+  "setup": {
+    "width": 1280,
+    "height": 800,
+    "mode": "work",
+    "view": "cowork",
+    "theme": "light",
+    "style": "changan"
+  },
+  "results": [
+    {
+      "key": "light-1280-session-1",
+      "width": 1280,
+      "height": 800,
+      "appearance": "light",
+      "session": 1,
+      "samples": 383,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-1280-session-2",
+      "width": 1280,
+      "height": 800,
+      "appearance": "light",
+      "session": 2,
+      "samples": 340,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-1280-session-3",
+      "width": 1280,
+      "height": 800,
+      "appearance": "light",
+      "session": 3,
+      "samples": 291,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.25,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-1280-session-4",
+      "width": 1280,
+      "height": 800,
+      "appearance": "light",
+      "session": 4,
+      "samples": 327,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.25,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-1280-session-1",
+      "width": 1280,
+      "height": 800,
+      "appearance": "dark",
+      "session": 1,
+      "samples": 308,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-1280-session-2",
+      "width": 1280,
+      "height": 800,
+      "appearance": "dark",
+      "session": 2,
+      "samples": 338,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-1280-session-3",
+      "width": 1280,
+      "height": 800,
+      "appearance": "dark",
+      "session": 3,
+      "samples": 349,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.25,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-1280-session-4",
+      "width": 1280,
+      "height": 800,
+      "appearance": "dark",
+      "session": 4,
+      "samples": 297,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.25,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-900-session-1",
+      "width": 900,
+      "height": 700,
+      "appearance": "light",
+      "session": 1,
+      "samples": 318,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-900-session-2",
+      "width": 900,
+      "height": 700,
+      "appearance": "light",
+      "session": 2,
+      "samples": 295,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-900-session-3",
+      "width": 900,
+      "height": 700,
+      "appearance": "light",
+      "session": 3,
+      "samples": 309,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.25,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "light-900-session-4",
+      "width": 900,
+      "height": 700,
+      "appearance": "light",
+      "session": 4,
+      "samples": 314,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.5,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-light",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-900-session-1",
+      "width": 900,
+      "height": 700,
+      "appearance": "dark",
+      "session": 1,
+      "samples": 335,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-900-session-2",
+      "width": 900,
+      "height": 700,
+      "appearance": "dark",
+      "session": 2,
+      "samples": 336,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-900-session-3",
+      "width": 900,
+      "height": 700,
+      "appearance": "dark",
+      "session": 3,
+      "samples": 292,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.25,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    },
+    {
+      "key": "dark-900-session-4",
+      "width": 900,
+      "height": 700,
+      "appearance": "dark",
+      "session": 4,
+      "samples": 330,
+      "firstMessages": 30,
+      "lastMessages": 80,
+      "maxGap": 0,
+      "maxAnchorJump": 0.5,
+      "geometry": {
+        "overflow": false,
+        "theme": "changan-dark",
+        "focusVisible": false,
+        "scrollOverflow": false
+      }
+    }
+  ],
+  "errors": [],
+  "restored": {
+    "sameSession": true,
+    "mode": "work",
+    "view": "cowork",
+    "theme": "light"
+  }
+}
