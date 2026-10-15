@@ -139,7 +139,7 @@ export function slimImageAttachmentsForIpc(
   const slim = attachments
     .filter(isRecord)
     .slice(0, 40)
-    .map(item => {
+    .map((item): PersistedCoworkImageAttachment | null => {
       const name = typeof item.name === 'string' ? item.name : '';
       const mimeType = typeof item.mimeType === 'string' ? item.mimeType : '';
       const filePath = typeof item.path === 'string' ? item.path : '';
