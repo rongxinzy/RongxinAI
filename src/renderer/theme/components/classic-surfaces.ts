@@ -1,4 +1,3 @@
-import { modalOverlayScrim } from './modal-overlay-style';
 import { recipe } from './recipe';
 import type { AppearanceStyle, ComponentAppearances } from './contract';
 type SurfaceAppearances = Pick<
@@ -92,7 +91,8 @@ export function classicSurfaces(): SurfaceAppearances {
     }),
     'dialog-overlay': recipe({
       base: {
-        ...modalOverlayScrim,
+        'background-color':
+          'color-mix(in oklab, var(--zy-component-palette-black) 10%, transparent)',
         opacity: '1',
         'transition-property': 'opacity',
         'transition-duration': '100ms',
