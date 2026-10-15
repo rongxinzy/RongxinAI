@@ -5,249 +5,137 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>知远智能体 · 安装器设计原型</title>
 <style>
+  /* Standalone setup palette, aligned with the approved website reference.
+     No website runtime, remote assets, fonts, or renderer theme dependencies. */
   :root {
-    --brand: #0F6BF2;
-    --brand-strong: #0A5AD6;
-    --brand-soft: #EFF6FF;
-    --text: #111827;
-    --text-2: #4B5563;
-    --text-3: #9CA3AF;
-    --border: #E5E7EB;
-    --surface: #FFFFFF;
-    --tint: #F5F9FF;
-    --danger: #DC2626;
-    --danger-soft: #FEF2F2;
-    --radius: 10px;
-    --shadow-window: 0 24px 64px -16px rgba(17, 24, 39, .28), 0 4px 16px -4px rgba(17, 24, 39, .12);
+    --brand: #090d16;
+    --brand-strong: #263349;
+    --brand-soft: #eef4fa;
+    --text: #182335;
+    --text-2: #525c71;
+    --text-3: #616d7f;
+    --border: #dce3ea;
+    --surface: #fff;
+    --tint: #f5f8fb;
+    --danger: #b4232c;
+    --danger-soft: #fff0f0;
+    --radius: 12px;
     --font: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    --serif: "Songti SC", "Noto Serif CJK SC", "SimSun", Georgia, serif;
     --ease-out: cubic-bezier(.22, .8, .32, 1);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
-  body {
-    font-family: var(--font);
-    color: var(--text);
-    background: #E9EDF3;
-    display: flex; align-items: center; justify-content: center;
-    overflow: hidden;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  /* ============ window ============ */
+  body { font-family: var(--font); color: var(--text); background: #edf1f5; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   .window {
-    width: 860px; height: 560px;
-    background: var(--surface);
-    border-radius: 12px;
-    box-shadow: var(--shadow-window);
-    display: flex; flex-direction: column;
-    overflow: hidden;
-    position: relative;
+    width: min(860px, 100vw); height: min(560px, 100vh);
+    background: linear-gradient(to bottom, #ffffff00 0%, #ffffff38 26%, #fff 65%), url("data:image/webp;base64,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") center top / cover no-repeat, #fff;
+    border-radius: 12px; box-shadow: 0 24px 64px -16px #18233530;
+    display: flex; flex-direction: column; overflow: hidden; position: relative;
   }
-  .titlebar {
-    height: 44px; flex: none;
-    display: flex; align-items: center;
-    padding: 0 8px 0 18px;
-    user-select: none;
-  }
-  .titlebar .app-title { font-size: 12px; color: var(--text-3); letter-spacing: .02em; }
-  .titlebar .spacer { flex: 1; }
-  .win-btn {
-    width: 40px; height: 32px; border: 0; background: transparent;
-    border-radius: 6px; color: var(--text-2); cursor: default;
-    display: flex; align-items: center; justify-content: center;
-    transition: background .12s var(--ease-out);
-  }
-  .win-btn:hover { background: #F3F4F6; }
-  .win-btn.close:hover { background: #E81123; color: #fff; }
-
-  .pages { flex: 1; position: relative; }
-
-  /* ============ page transition ============ */
-  .page {
-    position: absolute; inset: 0;
-    display: none; flex-direction: column;
-    padding: 8px 56px 28px;
-  }
+  .titlebar { height: 64px; flex: none; display: flex; align-items: center; gap: 18px; padding: 0 16px 0 32px; user-select: none; }
+  .titlebar .app-title { font-size: 12px; color: var(--text-2); }
+  .spacer { flex: 1; }
+  .win-btn { width: 40px; height: 32px; border: 0; background: transparent; border-radius: 6px; color: var(--text-2); cursor: default; display: flex; align-items: center; justify-content: center; }
+  .win-btn:hover { background: #ffffffa6; }
+  .win-btn.close:hover { background: #b4232c; color: #fff; }
+  .pages { flex: 1; min-height: 0; position: relative; }
+  .page { position: absolute; inset: 0; display: none; flex-direction: column; padding: 24px 56px 28px; overflow: auto; }
   .page.active { display: flex; }
-  .page.enter { animation: pageIn .28s var(--ease-out); }
-  @keyframes pageIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ============ shared controls ============ */
-  .btn {
-    height: 40px; padding: 0 22px;
-    border-radius: var(--radius);
-    font: 600 13.5px/1 var(--font);
-    border: 1px solid transparent;
-    cursor: pointer;
-    transition: background .12s var(--ease-out), border-color .12s, transform .06s, box-shadow .12s;
-  }
-  .btn:active { transform: scale(.975); }
-  .btn:focus-visible { outline: 2px solid rgba(15,107,242,.45); outline-offset: 2px; }
-  .btn-primary { background: var(--brand); color: #fff; box-shadow: 0 1px 2px rgba(15,107,242,.35); }
+  .page.enter { animation: pageIn .2s var(--ease-out); }
+  @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
+  .btn { min-height: 44px; flex-shrink: 0; padding: 0 26px; border-radius: 999px; font: 600 14px/1.3 var(--font); border: 1px solid transparent; cursor: pointer; transition: background .12s, border-color .12s; }
+  .btn:focus-visible, .link:focus-visible, .checkbox:focus-visible, .win-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+  .btn-primary { background: var(--brand); color: #fff; }
   .btn-primary:hover:not(:disabled) { background: var(--brand-strong); }
-  .btn-primary:disabled { background: #DCE7FA; color: #8FA9D8; box-shadow: none; cursor: not-allowed; }
-  .btn-ghost { background: transparent; border-color: var(--border); color: var(--text-2); }
-  .btn-ghost:hover { background: #F9FAFB; color: var(--text); }
+  .btn:active:not(:disabled) { transition: none; }
+  .btn-primary:active:not(:disabled) { background: #334155; box-shadow: inset 0 1px 2px #0003; }
+  .btn-ghost:active:not(:disabled), .btn-text:active:not(:disabled) { background: #e7ecf2; border-color: #9aa8b8; }
+  #btnLaunch:disabled { background: #dce2e9; color: #525c71; cursor: progress; transition: none; }
+  .btn-primary:disabled { background: #e1e6ec; color: #667184; cursor: not-allowed; }
+  .btn-ghost, .btn-text { background: #ffffffc9; border-color: var(--border); color: var(--text-2); }
+  .btn-ghost:hover, .btn-text:hover { background: #fff; border-color: #aebac8; color: var(--text); }
   .btn-danger { background: var(--danger); color: #fff; }
-  .btn-danger:hover { background: #B91C1C; }
-  .btn-text { background: transparent; color: var(--text-3); border: 0; }
-  .btn-text:hover { color: var(--text-2); }
-
-  .footer {
-    flex: none; margin-top: auto;
-    display: flex; align-items: center; gap: 10px;
-    padding-top: 20px;
-  }
-  .footer .spacer { flex: 1; }
-
-  /* ============ hero ============ */
-  .brand-row { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
-  .brand-row img { height: 46px; display: block; }
-  .hero-title { font-size: 15px; font-weight: 600; color: var(--text); }
-  .hero-title .en { font-weight: 400; color: var(--text-3); }
-  .hero-tag { margin-top: 6px; font-size: 13px; color: var(--text-2); }
-
-  .options { margin-top: 34px; display: flex; flex-direction: column; }
-  .opt-row {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 2px;
-    border-top: 1px solid var(--border);
-  }
+  .btn-danger:hover { background: #8f1c24; }
+  .footer { flex: none; margin-top: auto; display: flex; align-items: center; gap: 12px; padding-top: 20px; }
+  .brand-row { display: flex; align-items: center; flex: none; }
+  .brand-row img { height: 26px; display: block; }
+  .hero-title { font: 600 32px/1.3 var(--serif); letter-spacing: .02em; text-align: center; }
+  .hero-tag { margin-top: 12px; font-size: 14px; line-height: 1.5; color: var(--text-2); text-align: center; }
+  .hero-tag[role="alert"] { color: var(--danger); }
+  .options { margin-top: 32px; display: flex; flex-direction: column; }
+  .opt-row { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid var(--border); }
   .opt-row:last-child { border-bottom: 1px solid var(--border); }
-  .opt-icon {
-    width: 34px; height: 34px; flex: none;
-    border-radius: 9px; background: var(--tint);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--brand);
-  }
+  .opt-icon { width: 24px; height: 28px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
   .opt-body { flex: 1; min-width: 0; }
-  .opt-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .opt-desc { font-size: 12px; color: var(--text-3); margin-top: 3px; }
-  .opt-path {
-    font-size: 12px; color: var(--text-2);
-    font-family: Consolas, "SF Mono", monospace;
-    background: var(--tint); border-radius: 6px;
-    padding: 4px 10px; margin-right: 10px;
-    max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .link {
-    background: none; border: 0; padding: 0;
-    color: var(--brand); font: 500 12.5px var(--font);
-    cursor: pointer; border-radius: 4px;
-  }
-  .link:hover { color: var(--brand-strong); text-decoration: underline; }
-  .link:focus-visible { outline: 2px solid rgba(15,107,242,.45); }
-
-  /* toggle switch */
-  .switch { position: relative; width: 40px; height: 22px; flex: none; cursor: pointer; display: inline-block; }
-  .switch input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; appearance: none; -webkit-appearance: none; }
-  .switch .track {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 999px;
-    background: #D1D5DB; transition: background .18s var(--ease-out);
-  }
-  .switch .thumb {
-    position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
-    border-radius: 50%; background: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,.25);
-    transition: transform .18s var(--ease-out);
-  }
-  .switch input:checked ~ .track { background: var(--brand); }
-  .switch input:checked ~ .thumb { transform: translateX(18px); }
-  .switch input:focus-visible ~ .track { outline: 2px solid rgba(15,107,242,.45); outline-offset: 2px; }
-
-  .license-row { margin-top: 18px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
-  .checkbox {
-    width: 16px; height: 16px; border-radius: 5px;
-    border: 1.5px solid #CBD5E1; background: #fff;
-    display: inline-flex; align-items: center; justify-content: center;
-    cursor: pointer; flex: none;
-    transition: background .12s, border-color .12s;
-  }
-  .checkbox svg { opacity: 0; transform: scale(.5); transition: all .12s var(--ease-out); }
+  .opt-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .opt-desc { font-size: 14px; line-height: 1.5; color: var(--text-2); margin-top: 4px; }
+  .opt-path { display: block; margin-top: 8px; font: 14px/1.5 var(--font); color: var(--text); max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+  .link { background: none; border: 0; padding: 4px 0; color: var(--text); font: 500 14px/1.5 var(--font); cursor: pointer; border-radius: 4px; flex-shrink: 0; text-underline-offset: 3px; }
+  .link:hover { text-decoration: underline; }
+  .license-row { margin-top: 18px; display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+  .checkbox { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #8c9aab; background: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+  .checkbox svg { opacity: 0; }
   .checkbox.on { background: var(--brand); border-color: var(--brand); }
-  .checkbox.on svg { opacity: 1; transform: scale(1); }
-
-  /* ============ progress ============ */
-  .page-progress { align-items: center; justify-content: center; text-align: center; }
-  .loader { position: relative; width: 84px; height: 84px; margin-bottom: 26px; }
-  .loader img.mark { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 6px 18px -6px rgba(15,107,242,.4); }
-  .loader .ring {
-    position: absolute; inset: -10px; border-radius: 50%;
-    border: 2px solid transparent;
-    border-top-color: var(--brand);
-    border-right-color: rgba(15,107,242,.25);
-    animation: spin 1.1s linear infinite;
-  }
+  .checkbox.on svg { opacity: 1; }
+  .switch { position: relative; width: 40px; height: 24px; flex: none; cursor: pointer; display: inline-block; }
+  .switch input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; appearance: none; -webkit-appearance: none; }
+  .switch .track { position: absolute; inset: 0; border-radius: 999px; background: #cbd3dc; pointer-events: none; }
+  .switch .thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; pointer-events: none; transition: transform .12s; }
+  .switch input:checked ~ .track { background: var(--brand); }
+  .switch input:checked ~ .thumb { transform: translateX(16px); }
+  .switch input:focus-visible ~ .track { outline: 2px solid var(--text); outline-offset: 3px; }
+  .page-progress, .page-complete { align-items: center; justify-content: center; text-align: center; }
+  .loader { position: relative; width: 64px; height: 64px; margin-bottom: 28px; }
+  .loader img.mark { display: none; }
+  .loader .ring { position: absolute; inset: 4px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--text); animation: spin 1.1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  .progress-title { font-size: 17px; font-weight: 600; }
-  .phase { font-size: 12.5px; color: var(--text-3); margin-top: 8px; height: 18px; transition: opacity .2s; }
+  .progress-title, .complete-title, .uninstall-title { font: 600 28px/1.4 var(--serif); }
+  .phase { font-size: 14px; line-height: 1.5; color: var(--text-2); margin-top: 10px; min-height: 21px; transition: opacity .12s; }
   .phase.swap { opacity: 0; }
-
-  .track-wrap { width: 420px; margin-top: 26px; }
-  .track-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-3); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
-  .prog-track {
-    height: 6px; border-radius: 999px; background: #E8EDF5; overflow: hidden;
-  }
-  .fill {
-    height: 100%; width: 0%; border-radius: 999px; background: var(--brand);
-    transition: width .5s var(--ease-out);
-  }
-  .tips { margin-top: 40px; font-size: 12.5px; color: var(--text-3); height: 20px; position: relative; width: 100%; }
-  .tip { position: absolute; inset: 0; opacity: 0; transition: opacity .45s; }
+  .track-wrap { width: min(420px, 100%); margin-top: 28px; }
+  .track-meta { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 1.5; color: var(--text-2); margin-bottom: 10px; font-variant-numeric: tabular-nums; text-align: left; }
+  #phaseName { display: none; }
+  #percent { margin-left: auto; }
+  .prog-track { height: 6px; border-radius: 999px; background: #e0e6ed; overflow: hidden; }
+  .fill { height: 100%; width: 0%; border-radius: 999px; background: var(--brand); transition: width .5s var(--ease-out); }
+  .tips { margin-top: 28px; font-size: 14px; line-height: 1.5; color: var(--text-2); min-height: 42px; position: relative; width: 100%; }
+  .tip { position: absolute; inset: 0; opacity: 0; transition: opacity .2s; }
   .tip.show { opacity: 1; }
-
-  /* ============ complete ============ */
-  .page-complete { align-items: center; justify-content: center; text-align: center; }
-  .check { width: 84px; height: 84px; margin-bottom: 24px; }
-  .check .circle { fill: var(--brand); transform-origin: center; animation: pop .4s var(--ease-out); }
-  .check .tick { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round;
-    stroke-dasharray: 60; stroke-dashoffset: 60; animation: draw .45s .18s var(--ease-out) forwards; }
-  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  @keyframes draw { to { stroke-dashoffset: 0; } }
-  .complete-title { font-size: 17px; font-weight: 600; }
-  .complete-sub { font-size: 12.5px; color: var(--text-3); margin-top: 8px; }
-
-  /* ============ uninstall ============ */
+  .check { width: 64px; height: 64px; margin-bottom: 24px; flex-shrink: 0; }
+  .check .circle { fill: var(--brand); }
+  .check .tick { fill: none; stroke: #fff; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+  .complete-sub { font-size: 14px; line-height: 1.6; color: var(--text-2); margin-top: 10px; max-width: 100%; overflow-wrap: anywhere; }
   .page-uninstall { justify-content: center; }
-  .uninstall-icon {
-    width: 64px; height: 64px; border-radius: 50%;
-    background: var(--danger-soft); color: var(--danger);
-    display: flex; align-items: center; justify-content: center;
-    margin-bottom: 22px;
-  }
-  .uninstall-title { font-size: 17px; font-weight: 600; }
-  .uninstall-desc { font-size: 13px; color: var(--text-2); margin-top: 10px; max-width: 460px; line-height: 1.7; }
-  .uninstall-desc code { background: var(--tint); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
-
-  /* ============ demo toolbar (not part of the design) ============ */
-  .demo-bar {
-    position: fixed; right: 18px; bottom: 16px;
-    display: flex; gap: 6px; align-items: center;
-    background: rgba(17,24,39,.86); backdrop-filter: blur(8px);
-    padding: 8px 10px; border-radius: 10px;
-    font: 12px var(--font); color: #E5E7EB;
-    box-shadow: 0 8px 24px rgba(0,0,0,.25);
-  }
-  .demo-bar .label { opacity: .55; margin-right: 2px; }
-  .demo-bar button {
-    background: rgba(255,255,255,.1); color: #E5E7EB; border: 0;
-    padding: 5px 10px; border-radius: 6px; cursor: pointer;
-    font: 12px var(--font);
-  }
-  .demo-bar button:hover { background: rgba(255,255,255,.22); }
-
-  /* shell mode (running inside the WebView2 host): no demo chrome */
+  .uninstall-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--danger-soft); color: var(--danger); display: flex; align-items: center; justify-content: center; margin-bottom: 24px; flex-shrink: 0; }
+  .uninstall-desc { font-size: 14px; color: var(--text-2); margin-top: 12px; max-width: 560px; line-height: 1.7; }
+  .uninstall-desc code { background: var(--tint); padding: 1px 6px; border-radius: 4px; font-size: 14px; }
+  .error-message { font-size: 14px; line-height: 1.6; color: var(--danger); margin-top: 16px; overflow-wrap: anywhere; }
+  .error-message:empty { display: none; }
+  .error-detail { margin-top: 16px; max-height: 180px; overflow: auto; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: var(--text-2); }
+  .page-error { padding-top: 48px; }
+  dialog { margin: auto; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius); width: min(720px, 90vw); color: var(--text); background: var(--surface); }
+  dialog::backdrop { background: #18233540; }
+  dialog h2 { font-size: 18px; font-weight: 600; }
+  dialog pre { margin: 16px 0; max-height: 55vh; overflow: auto; white-space: pre-wrap; font-size: 14px; line-height: 1.6; }
+  dialog form { display: flex; justify-content: end; }
+  .demo-bar { position: fixed; right: 18px; bottom: 16px; display: flex; gap: 6px; align-items: center; background: #182335; padding: 8px 10px; border-radius: 10px; font: 12px var(--font); color: #fff; }
+  .demo-bar .label { margin-right: 2px; }
+  .demo-bar button { background: #ffffff22; color: #fff; border: 0; padding: 5px 10px; border-radius: 6px; cursor: pointer; font: 12px var(--font); }
+  .demo-bar button:hover { background: #ffffff44; }
   body.shell .demo-bar { display: none; }
+  body.shell .window { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
+  @media (max-width: 700px) { .page { padding-left: 28px; padding-right: 28px; } .opt-row { flex-wrap: wrap; } .opt-path { flex: 1; max-width: 100%; } }
+  @media (max-height: 480px) { .page-progress, .page-complete, .page-uninstall { justify-content: flex-start; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  @media (forced-colors: active) { .window { background: Canvas; } .btn, .checkbox, .switch .track { border: 1px solid ButtonText; } .btn-primary, .checkbox.on, .switch input:checked ~ .track, .fill { background: Highlight; color: HighlightText; forced-color-adjust: none; } .btn-primary:disabled { background: Canvas; color: GrayText; border-color: GrayText; } .check .circle { fill: CanvasText; } .check .tick { stroke: Canvas; } }
 </style>
 </head>
 <body>
 
 <div class="window">
   <div class="titlebar">
+    <div class="brand-row"><img id="wordmarkImg" data-asset="wordmark" alt="知远"></div>
     <span class="app-title" data-i18n="winTitle"></span>
     <span class="spacer"></span>
     <button class="win-btn close" aria-label="关闭" title="关闭">
@@ -259,10 +147,7 @@
 
     <!-- ============ hero ============ -->
     <section class="page active" id="page-hero">
-      <div class="brand-row">
-        <img id="wordmarkImg" data-asset="wordmark" alt="知远">
-      </div>
-      <div class="hero-title"><span data-i18n="product"></span> <span class="en" data-i18n="productEn"></span></div>
+      <h1 class="hero-title" data-i18n="product"></h1>
       <div class="hero-tag" id="heroStatus" data-i18n="tagline" role="status"></div>
 
       <div class="options">
@@ -273,8 +158,8 @@
           <div class="opt-body">
             <div class="opt-title" data-i18n="installLocation"></div>
             <div class="opt-desc" data-i18n="locationHint"></div>
+            <span class="opt-path" id="installPath">C:\Users\Admin\AppData\Local\Programs\ZhiYuan Agent</span>
           </div>
-          <span class="opt-path" id="installPath">C:\Users\Admin\AppData\Local\Programs\ZhiYuan Agent</span>
           <button class="link" id="btnBrowse" data-i18n="browse"></button>
         </div>
 
@@ -297,7 +182,7 @@
         <span class="checkbox" id="licenseCheck" role="checkbox" aria-checked="false" tabindex="0">
           <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 5.2 4 7.5 8.5 2.5" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
-        <span><span data-i18n="licenseAgree"></span> <button class="link" data-i18n="licenseLink"></button></span>
+        <span><span data-i18n="licenseAgree"></span> <button class="link" id="btnLicense" data-i18n="licenseLink"></button></span>
       </div>
 
       <div class="footer">
@@ -331,7 +216,7 @@
         <circle class="circle" cx="42" cy="42" r="42"/>
         <path class="tick" d="M26 43.5 37 54l21-24"/>
       </svg>
-      <div class="complete-title" data-i18n="completeTitle"></div>
+      <div class="complete-title" id="completeTitle" data-i18n="completeTitle"></div>
       <div class="complete-sub" id="completeSub"></div>
       <div class="footer" style="justify-content:center; margin-top:36px; padding-top:0;">
         <button class="btn btn-ghost" id="btnDone" data-i18n="done"></button>
@@ -356,6 +241,12 @@
   </div>
 </div>
 
+<dialog id="licenseDialog" aria-labelledby="licenseTitle">
+  <h2 id="licenseTitle" data-i18n="licenseLink"></h2>
+  <pre id="licenseText"></pre>
+  <form method="dialog"><button class="btn btn-primary" data-i18n="done"></button></form>
+</dialog>
+
 <div class="demo-bar">
   <span class="label">原型演示</span>
   <button data-goto="hero">首页</button>
@@ -367,76 +258,76 @@
 <script>
 const I18N = {
   zh: {
-    winTitle: '知远智能体 安装程序',
-    product: '知远智能体',
-    productEn: '(ZhiYuan Agent)',
-    tagline: '本地优先的全能 AI 智能体，装好离线环境即可使用。',
+    winTitle: '安装程序',
+    product: '开始你的 AI 工作台',
+    tagline: '选择安装位置与所需组件。',
     installLocation: '安装位置',
-    locationHint: '应用与离线运行环境将安装到此目录',
+    locationHint: '应用与运行组件将安装到此目录',
     browse: '更改…',
     localInference: '安装本地推理组件',
     localInferenceHint: '开启后首次启动时会下载 CPU 或 NVIDIA CUDA 后端（16–621 MB），不勾选不影响其他功能',
     licenseAgree: '我已阅读并同意',
     licenseLink: '《许可协议》',
+    licenseUnavailable: '许可协议暂时无法读取，请关闭后重新运行完整安装包。',
     cancel: '取消',
     install: '安装',
-    installingTitle: '正在安装知远智能体',
+    installingTitle: '正在安装',
     completeTitle: '安装完成',
     completeSubLocal: '本地推理组件将在首次启动时按你的硬件自动准备',
     completeSub: '知远智能体已就绪，开始你的第一个任务吧',
     done: '完成',
     launch: '启动知远智能体',
     uninstallTitle: '确定要卸载知远智能体吗？',
-    uninstallDesc: '将删除应用程序、本地离线运行环境以及你的个人数据（包括会话、记忆与个人 Skills）。此操作无法撤销。',
+    uninstallDesc: '将移除应用程序和可重新下载的运行环境。你的会话、设置和个人文件会保留。',
     uninstall: '卸载',
     uninstallingTitle: '正在卸载知远智能体',
     uninstalledTitle: '已卸载知远智能体',
-    uninstalledSub: '应用程序、离线运行环境及个人数据已从你的设备移除',
+    uninstalledSub: '应用程序已移除。你的会话、设置和个人文件已保留。',
     phases: [
       '正在校验离线组件', '正在展开频道运行环境', '正在展开内置 Skills 与 MCPs',
       '正在展开 Python 运行环境', '正在展开 Skill 依赖层', '正在激活离线组件',
       '正在连接本地运行环境', '正在安装 VC++ 运行时', '正在清理旧版本'
     ],
     tips: [
-      '提示：知远可以在完全离线的环境下运行日常任务',
+      '提示：在线模型、联网工具与首次下载本地推理组件需要联网',
       '提示：Skills 让知远学会新能力，安装后可在设置中继续添加',
       '提示：本地推理组件可按需启用，不占用安装时间',
       '提示：微信、飞书、钉钉消息渠道可在安装后随时接入'
     ]
   },
   en: {
-    winTitle: 'ZhiYuan Agent Setup',
-    product: 'ZhiYuan Agent',
-    productEn: '',
-    tagline: 'A local-first AI agent. The offline runtime is prepared during setup.',
+    winTitle: 'Setup',
+    product: 'Set up your AI workspace',
+    tagline: 'Choose an install location and the components you need.',
     installLocation: 'Install location',
-    locationHint: 'The app and its offline runtime go here',
+    locationHint: 'The app and runtime components go here',
     browse: 'Change…',
     localInference: 'Install local inference components',
     localInferenceHint: 'Downloads the CPU or NVIDIA CUDA backend on first launch (16–621 MB). Optional.',
     licenseAgree: 'I have read and agree to the',
     licenseLink: 'License Agreement',
+    licenseUnavailable: 'The license could not be read. Close setup and run the complete installer again.',
     cancel: 'Cancel',
     install: 'Install',
-    installingTitle: 'Installing ZhiYuan Agent',
+    installingTitle: 'Installing',
     completeTitle: 'Installation complete',
     completeSubLocal: 'Local inference components will be prepared on first launch',
     completeSub: 'ZhiYuan Agent is ready for your first task',
     done: 'Finish',
     launch: 'Launch ZhiYuan Agent',
     uninstallTitle: 'Uninstall ZhiYuan Agent?',
-    uninstallDesc: 'This removes the app, its local offline runtime, and your personal data (including sessions, memories and personal Skills). This cannot be undone.',
+    uninstallDesc: 'This removes the app and its downloadable runtime. Your sessions, settings and personal files are kept.',
     uninstall: 'Uninstall',
     uninstallingTitle: 'Uninstalling ZhiYuan Agent',
     uninstalledTitle: 'ZhiYuan Agent uninstalled',
-    uninstalledSub: 'The app, offline runtime and personal data have been removed from this device',
+    uninstalledSub: 'The app has been removed. Your sessions, settings and personal files are kept.',
     phases: [
       'Validating offline components', 'Expanding channel runtime', 'Expanding bundled Skills and MCPs',
       'Expanding Python runtime', 'Expanding Skill dependency layer', 'Activating offline components',
       'Linking local runtimes', 'Installing VC++ runtime', 'Cleaning up previous version'
     ],
     tips: [
-      'Tip: ZhiYuan runs everyday tasks fully offline',
+      'Tip: Online models, connected tools and initial inference downloads require internet access',
       'Tip: Skills teach ZhiYuan new abilities — add more in Settings',
       'Tip: Local inference is optional and installs on demand',
       'Tip: Connect WeChat, Feishu or DingTalk anytime after install'
@@ -453,11 +344,12 @@ const uninstallMode = params.get('page') === 'uninstall';
 const initialPage = params.get('page');
 
 function applyI18n() {
+  document.getElementById('licenseCheck').setAttribute('aria-label', t('licenseAgree') + ' ' + t('licenseLink'));
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   if (uninstallMode) {
     document.querySelector('.app-title').textContent =
-      lang === 'zh' ? '知远智能体 卸载程序' : 'ZhiYuan Agent Uninstaller';
+      lang === 'zh' ? '卸载程序' : 'Uninstaller';
   }
 }
 
@@ -471,6 +363,15 @@ function showPage(id) {
 }
 
 /* ---------- hero ---------- */
+// Keep the complete path available to assistive technology and native tooltips
+// while the visual row uses a single line. The engine still reads textContent.
+function setInstallPath(value) {
+  const path = document.getElementById('installPath');
+  path.textContent = value;
+  path.title = value;
+  path.setAttribute('aria-label', value);
+}
+setInstallPath(document.getElementById('installPath').textContent);
 const licenseCheck = document.getElementById('licenseCheck');
 const btnInstall = document.getElementById('btnInstall');
 let startAdmission = Promise.resolve();
@@ -495,12 +396,12 @@ document.getElementById('btnBrowse').addEventListener('click', () => {
     // Real folder picker hosted by the shell; the confirmed path is what
     // StartInstall receives on Install click.
     window.chrome.webview.hostObjects.shell.BrowseInstallDir(installPath.textContent).then(dir => {
-      if (dir) installPath.textContent = dir;
+      if (dir) setInstallPath(dir);
     });
     return;
   }
   const path = prompt(lang === 'zh' ? '安装目录' : 'Install directory', installPath.textContent);
-  if (path) installPath.textContent = path;
+  if (path) setInstallPath(path);
 });
 document.getElementById('toggleInference').addEventListener('change', e => {
   inferenceOn = e.target.checked;
@@ -684,6 +585,21 @@ document.getElementById('btnConfirmUninstall').addEventListener('click', () => {
   if (inShell) { startShellOperation(() => window.chrome.webview.hostObjects.shell.StartUninstall()); }
 });
 
+document.getElementById('btnLicense').addEventListener('click', async () => {
+  const dialog = document.getElementById('licenseDialog');
+  const text = document.getElementById('licenseText');
+  try {
+    if (inShell) {
+      text.textContent = await window.chrome.webview.hostObjects.shell.GetLicenseText();
+    } else {
+      const response = await fetch('../../../LICENSE');
+      if (!response.ok) throw new Error('License unavailable');
+      text.textContent = await response.text();
+    }
+  } catch { text.textContent = t('licenseUnavailable'); }
+  if (!dialog.open) dialog.showModal();
+});
+
 applyI18n();
 
 /* deep links are parsed at the top (uninstallMode feeds applyI18n); this
@@ -745,7 +661,7 @@ if (inShell) {
   // events replace the simulator, and a lightweight Cancel is available.
   const shell = window.chrome.webview.hostObjects.shell;
   shell.GetDefaultInstallDir().then(dir => {
-    document.getElementById('installPath').textContent = dir;
+    setInstallPath(dir);
   });
   const cancelProgress = document.getElementById('btnCancelProgress');
   cancelProgress.style.display = '';

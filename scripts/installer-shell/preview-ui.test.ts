@@ -88,11 +88,11 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
     expect(ui.document.querySelector('.app-title')?.textContent).toBe(
       english
         ? page === 'uninstall'
-          ? 'ZhiYuan Agent Uninstaller'
-          : 'ZhiYuan Agent Setup'
+          ? 'Uninstaller'
+          : 'Setup'
         : page === 'uninstall'
-          ? '知远智能体 卸载程序'
-          : '知远智能体 安装程序',
+          ? '卸载程序'
+          : '安装程序',
     );
     for (const [selector, chinese, translated] of [
       ['#btnInstall', '安装', 'Install'],
@@ -434,4 +434,131 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
       expect(ui.close).toHaveBeenCalledExactlyOnceWith();
     },
   );
+});
+
+describe('installer brand and license review', () => {
+  it('opens the real local license without granting consent', async () => {
+    const ui = mount('?lang=zh');
+    const dialog = ui.document.getElementById('licenseDialog') as HTMLDialogElement;
+    const show = vi.fn();
+    dialog.showModal = show;
+    const license = vi.fn(() => Promise.resolve('LOCAL LICENSE TEXT'));
+    const window = ui.document.defaultView!;
+    (
+      window as unknown as {
+        chrome: { webview: { hostObjects: { shell: Record<string, unknown> } } };
+      }
+    ).chrome.webview.hostObjects.shell.GetLicenseText = license;
+    ui.click('#btnLicense');
+    await vi.waitFor(() => expect(show).toHaveBeenCalledOnce());
+    expect(license).toHaveBeenCalledOnce();
+    expect(ui.document.querySelector('#licenseText')?.textContent).toBe('LOCAL LICENSE TEXT');
+    expect(ui.document.querySelector('#licenseCheck')?.getAttribute('aria-checked')).toBe('false');
+    expect((ui.document.querySelector('#btnInstall') as HTMLButtonElement).disabled).toBe(true);
+    expect(ui.start).not.toHaveBeenCalled();
+  });
+
+  it('keeps license read errors visible without granting consent', async () => {
+    const ui = mount('?lang=en');
+    const dialog = ui.document.getElementById('licenseDialog') as HTMLDialogElement;
+    const show = vi.fn();
+    dialog.showModal = show;
+    const window = ui.document.defaultView!;
+    (
+      window as unknown as {
+        chrome: { webview: { hostObjects: { shell: Record<string, unknown> } } };
+      }
+    ).chrome.webview.hostObjects.shell.GetLicenseText = () =>
+      Promise.reject(new Error('Unavailable'));
+    ui.click('#btnLicense');
+    await vi.waitFor(() => expect(show).toHaveBeenCalledOnce());
+    expect(ui.document.querySelector('#licenseText')?.textContent).toContain(
+      'The license could not be read',
+    );
+    expect((ui.document.querySelector('#btnInstall') as HTMLButtonElement).disabled).toBe(true);
+    expect(ui.start).not.toHaveBeenCalled();
+  });
+
+  it('ships the website-inspired palette without remote assets or runtime dependencies', () => {
+    expect(html).toContain('--brand: #090d16');
+    expect(html).toContain('--serif:');
+    expect(html).toContain('prefers-reduced-motion');
+    expect(html).toContain('forced-colors');
+    expect(html).not.toMatch(/(?:src|href)=["']https?:|@import|@font-face/);
+    expect(html).toContain('id="completeTitle"');
+  });
+});
+
+it('retains the full install path for copying, tooltips and assistive technology', async () => {
+  const ui = mount('?lang=zh');
+  await Promise.resolve();
+  await Promise.resolve();
+  const path = ui.document.getElementById('installPath')!;
+  expect(path.title).toBe(path.textContent);
+  expect(path.getAttribute('aria-label')).toBe(path.textContent);
+  expect(path.textContent).toContain('知远');
+});
+
+it('renders the existing uninstall completion selector without discarding data wording', async () => {
+  const ui = mount('?page=uninstall&lang=en');
+  ui.event({ type: 'done' });
+  await vi.waitFor(() =>
+    expect(ui.document.querySelector('.page.active')?.id).toBe('page-complete'),
+  );
+  expect(ui.document.querySelector('#completeTitle')?.textContent).toBe(
+    'ZhiYuan Agent uninstalled',
+  );
+  expect(ui.document.querySelector('#completeSub')?.textContent).toContain(
+    'personal files are kept',
+  );
+  expect((ui.document.querySelector('#btnLaunch') as HTMLElement).style.display).toBe('none');
+});
+
+it('keeps one brand mark and a task heading instead of repeating the product name', () => {
+  const ui = mount('?lang=zh');
+  expect(ui.document.querySelectorAll('#wordmarkImg')).toHaveLength(1);
+  expect(ui.document.querySelector('.titlebar #wordmarkImg')).not.toBeNull();
+  expect(ui.document.querySelector('#page-hero h1')?.textContent).toBe('开始你的 AI 工作台');
+  expect(ui.document.querySelector('#page-hero')?.textContent).not.toContain('(ZhiYuan Agent)');
+});
+
+it('does not add a second admission on repeated clicks', () => {
+  const ui = mount('?lang=en');
+  ui.click('#licenseCheck');
+  ui.click('#btnInstall');
+  ui.click('#btnInstall');
+  ui.click('#btnInstall');
+  expect(ui.start).toHaveBeenCalledTimes(1);
+});
+
+describe('license fallback and repeated opening', () => {
+  it('rejects an HTTP error page without displaying it as a license or consenting', async () => {
+    const ui = mount('?lang=en', false);
+    const dialog = ui.document.getElementById('licenseDialog') as HTMLDialogElement;
+    dialog.showModal = vi.fn();
+    const text = vi.fn(async () => '404 error page');
+    ui.document.defaultView!.fetch = vi.fn(async () => ({
+      ok: false,
+      text,
+    })) as unknown as typeof fetch;
+    ui.click('#btnLicense');
+    await vi.waitFor(() => expect(dialog.showModal).toHaveBeenCalledOnce());
+    expect(text).not.toHaveBeenCalled();
+    expect(ui.document.querySelector('#licenseText')?.textContent).toContain(
+      'The license could not be read.',
+    );
+    expect((ui.document.querySelector('#btnInstall') as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('does not show an already-open dialog again during repeated clicks', async () => {
+    const ui = mount();
+    const dialog = ui.document.getElementById('licenseDialog') as HTMLDialogElement;
+    dialog.showModal = vi.fn(() => {
+      dialog.open = true;
+    });
+    ui.click('#btnLicense');
+    ui.click('#btnLicense');
+    await vi.waitFor(() => expect(dialog.showModal).toHaveBeenCalledOnce());
+    expect(dialog.open).toBe(true);
+    expect((ui.document.querySelector('#btnInstall') as HTMLButtonElement).disabled).toBe(true);
+  });
 });
