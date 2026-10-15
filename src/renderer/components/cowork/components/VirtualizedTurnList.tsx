@@ -88,7 +88,13 @@ export const VirtualizedTurnList = React.forwardRef<
     // Upward anchor adjustments stay short of the end and must not schedule a
     // later scroll write. A clamped tail write still needs a retry: the sizer
     // grows in the same turn, after this scrollTop assignment.
-    const seeksTail = wasAtTail || requestedOffset >= maxScroll - 1;
+    const totalSize = typeof instance.getTotalSize === 'function' ? instance.getTotalSize() : null;
+    const virtualizerMaxScroll =
+      totalSize !== null ? Math.max(totalSize - scrollElement.clientHeight, 0) : null;
+    const seeksTail =
+      wasAtTail ||
+      requestedOffset >= maxScroll - 1 ||
+      (virtualizerMaxScroll !== null && requestedOffset >= virtualizerMaxScroll - 1);
     if (!seeksTail && options.behavior === undefined) return;
     const clampedOffset = scrollElement.scrollTop;
     if (requestedOffset - clampedOffset < 1) return;

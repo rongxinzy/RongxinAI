@@ -53,7 +53,7 @@ export const ToolCard: React.FC<{
   const [open, setOpen] = usePersistentToggle(`tool-${toolUse.id}`, false);
   const [expanded, setExpanded] = usePersistentToggle(`toolresult-${toolUse.id}`, false);
   const lines = useMemo(() => result.split('\n'), [result]);
-  const collapsible = !isError && lines.length > TOOL_RESULT_COLLAPSE_LINE_LIMIT;
+  const collapsible = lines.length > TOOL_RESULT_COLLAPSE_LINE_LIMIT;
   const visibleResult =
     collapsible && !expanded && !forceExpand
       ? lines.slice(0, TOOL_RESULT_COLLAPSE_LINE_LIMIT).join('\n')
@@ -85,7 +85,9 @@ export const ToolCard: React.FC<{
         {toolResult && (
           <ToolOutput
             output={isError ? undefined : visibleResult || undefined}
-            errorText={isError ? result || i18nService.t('coworkToolNoErrorDetail') : undefined}
+            errorText={
+              isError ? visibleResult || i18nService.t('coworkToolNoErrorDetail') : undefined
+            }
           />
         )}
         {collapsible && !forceExpand && (

@@ -103,6 +103,12 @@ export const Reasoning = memo(
         if (startTimeRef.current === null) {
           startTimeRef.current = Date.now();
         }
+        const timer = window.setInterval(() => {
+          if (startTimeRef.current !== null) {
+            setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
+          }
+        }, 1000);
+        return () => window.clearInterval(timer);
       } else if (startTimeRef.current !== null) {
         setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
         startTimeRef.current = null;
@@ -194,7 +200,10 @@ export const ReasoningTrigger = memo(
             <BrainIcon className="size-4" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
-              className={cn('size-4 transition-transform', isOpen ? 'rotate-180' : 'rotate-0')}
+              className={cn(
+                'size-4 transition-transform motion-reduce:transition-none',
+                isOpen ? 'rotate-180' : 'rotate-0',
+              )}
             />
           </>
         )}
@@ -220,23 +229,38 @@ const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4
 
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { isStreaming, showConnector } = useReasoning();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const text = typeof children === 'string' ? children : '';
   const { committed, tail } = useStreamingTextSegments(text, isStreaming);
   const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
   const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
+
+  useEffect(() => {
+    if (isStreaming && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [children, isStreaming]);
+
   const base = (
     <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
       {text}
     </Streamdown>
   );
-  const streamingContent = (
-    <>
-      {committed && (
+
+  const committedElement = useMemo(
+    () =>
+      committed ? (
         <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
           {committed}
         </Streamdown>
-      )}
+      ) : null,
+    [committed],
+  );
+
+  const streamingContent = (
+    <>
+      {committedElement}
       {revealedTail && <div className="whitespace-pre-wrap wrap-break-word">{revealedTail}</div>}
     </>
   );
@@ -259,7 +283,10 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
       )}
       {...props}
     >
-      <div className="min-w-0 max-h-64 overflow-y-auto overscroll-contain scrollbar-gutter-stable [overflow-anchor:none]">
+      <div
+        ref={scrollRef}
+        className="min-w-0 max-h-64 overflow-y-auto overscroll-contain scrollbar-gutter-stable [overflow-anchor:none]"
+      >
         {content}
       </div>
     </CollapsibleContent>
