@@ -1,0 +1,104 @@
+{
+  "wheel": {
+    "before": {
+      "top": 6472,
+      "height": 6985,
+      "client": 513,
+      "gap": 0,
+      "messages": 80,
+      "offset": 73
+    },
+    "after": {
+      "top": 5961,
+      "height": 11474,
+      "client": 513,
+      "gap": 5000,
+      "messages": 130,
+      "offset": 23
+    },
+    "settled": {
+      "top": 5961,
+      "height": 11474,
+      "client": 513,
+      "gap": 5000,
+      "messages": 130,
+      "offset": 23
+    },
+    "keptAwayFromTail": true,
+    "loadedHistory": true
+  },
+  "draftSwitch": {
+    "preserved": true
+  },
+  "theme": [
+    {
+      "theme": "dark",
+      "sameFocus": true,
+      "sameDraft": true,
+      "sameAttachments": true,
+      "sameSelected": true
+    },
+    {
+      "theme": "light",
+      "sameFocus": true,
+      "sameDraft": true,
+      "sameAttachments": true,
+      "sameSelected": true
+    }
+  ],
+  "themeGeometry": {
+    "before": {
+      "top": 5672,
+      "height": 6985,
+      "client": 513,
+      "gap": 800,
+      "messages": 80,
+      "offset": 73
+    },
+    "after": {
+      "top": 5672,
+      "height": 6985,
+      "client": 513,
+      "gap": 800,
+      "messages": 80,
+      "offset": 73
+    }
+  },
+  "keyboard": {
+    "before": {
+      "top": 6472,
+      "height": 6985,
+      "client": 513,
+      "gap": 0,
+      "messages": 80,
+      "offset": 73
+    },
+    "after": {
+      "top": 6024,
+      "height": 6985,
+      "client": 513,
+      "gap": 448,
+      "messages": 80,
+      "offset": 73
+    },
+    "movedUp": true,
+    "keptAwayFromTail": true
+  },
+  "reducedMotion": {
+    "media": true,
+    "samples": 159,
+    "maxGap": 0,
+    "messages": 80
+  },
+  "draftsRestored": {
+    "drafts": true,
+    "attachments": true,
+    "comparison": "all session keys and values (independent of object insertion order)"
+  },
+  "restored": {
+    "sameSession": true,
+    "theme": "light",
+    "mode": "work",
+    "reducedMotion": false
+  }
+}

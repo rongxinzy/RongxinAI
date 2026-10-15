@@ -91,6 +91,7 @@ import {
 import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
+import { usePersistedArtifactSeed } from './helpers/usePersistedArtifactSeed';
 import { setPersistentToggleNamespace } from './hooks/usePersistentToggle';
 // toolUtils helpers used in sub-components
 import {
@@ -428,34 +429,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
   }, [isPanelOpen, sessionId]);
 
-  // Seed the artifact store with server-persisted artifacts collected from
-  // the full (non-paginated) message history. Without this, artifacts
-  // declared in earlier turns are invisible after a page reload because
-  // the renderer only sees the most recent page of messages.
-  useEffect(() => {
-    if (!sessionId) return;
-    const persisted = currentSession?.artifacts;
-    if (!persisted || persisted.length === 0) return;
-
-    const existingIds = new Set((previewArtifacts || []).map(a => a.id));
-    let cancelled = false;
-    void prepareAvailableArtifacts(
-      persisted
-        .filter(artifact => !existingIds.has(artifact.id))
-        .map(artifact => ({
-          artifact: { ...artifact, sessionId },
-          needsFileLoad: Boolean(artifact.filePath),
-        })),
-      false,
-      currentSession?.cwd,
-    ).then(available => {
-      if (cancelled) return;
-      available.forEach(({ artifact }) => dispatch(addArtifact({ sessionId, artifact })));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionId, currentSession?.artifacts, currentSession?.cwd]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pendingArtifacts = usePersistedArtifactSeed(
+    sessionId,
+    currentSession?.artifacts,
+    currentSession?.cwd,
+    sessionArtifacts,
+  );
 
   // Synchronous artifact detection on session mount so artifact cards
   // appear in the first-paint frame instead of popping in after the async
@@ -931,7 +910,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     lastTurnItems &&
     findToolGroupForPermission(lastTurnItems, inlinePermission),
   );
-  const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
+  const turnArtifactsMap = useTurnArtifacts(
+    turns,
+    sessionArtifacts,
+    PREVIEWABLE_ARTIFACT_TYPES,
+    currentSession?.cwd,
+  );
+  const pendingTurnArtifactsMap = useTurnArtifacts(
+    turns,
+    pendingArtifacts,
+    PREVIEWABLE_ARTIFACT_TYPES,
+    currentSession?.cwd,
+  );
   // Scope persisted collapsible state to this session. Rendered sessions are
   // shown one at a time, so a render-time namespace assignment is safe.
   setPersistentToggleNamespace(currentSession?.id ?? '');
@@ -998,6 +988,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <TurnBlock
                 turn={turn}
                 artifacts={turnArtifacts}
+                pendingArtifacts={pendingTurnArtifactsMap.get(turn.id)}
                 resolveLocalFilePath={resolveLocalFilePath}
                 mapDisplayText={mapDisplayText}
                 showTypingIndicator={showTypingIndicator}
