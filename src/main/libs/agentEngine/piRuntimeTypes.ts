@@ -136,6 +136,8 @@ export type PiStartOptions = {
   conversationHistory?: PiConversationHistoryMessage[];
   /** Internal: override prompt text sent to PI, while UI shows original prompt */
   _piPromptOverride?: string;
+  /** Internal: preserve turn workflow selection across runtime recreation. */
+  _workflowSkillIdsOverride?: string[];
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
   /** Internal: automatic resume after a stream stall; keeps the stall budget. */

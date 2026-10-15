@@ -491,8 +491,12 @@ const applyMessageTriageRouting = async (sessionId: string, prompt: string): Pro
   const config = readTriageConfig();
   if (!config.enabled || !prompt.trim()) return;
 
-  const session = getCoworkStore().getSession(sessionId, null);
-  const messageCount = session?.messages?.length ?? 0;
+  // The triage decision needs the message count and the session's model
+  // override, not the transcript: one metadata read includes the count and
+  // avoids materializing every message of a long session on each prompt.
+  const store = getCoworkStore();
+  const session = store.getSession(sessionId, 0, { includeArtifacts: false });
+  const messageCount = session?.totalMessages ?? 0;
   const classifierBaseUrl = resolveTriageClassifierBaseUrl(config);
   const effectiveConfig: TriageConfig = {
     ...config,
@@ -4801,7 +4805,7 @@ if (!gotTheLock) {
       // Work sessions use Pi (SDK mode, instant availability).
       const runtime = getPiRuntimeAdapter();
       const store = getCoworkStore();
-      let existingSession = store.getSession(options.sessionId);
+      let existingSession = store.getSession(options.sessionId, 0, { includeArtifacts: false });
       if (existingSession) {
         const previousExpertSnapshots = existingSession.experts;
         const expertSnapshots =
@@ -4826,7 +4830,7 @@ if (!gotTheLock) {
           store.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt });
         }
         if (expertsChanged || nextSystemPrompt !== existingSession.systemPrompt) {
-          existingSession = store.getSession(options.sessionId);
+          existingSession = store.getSession(options.sessionId, 0, { includeArtifacts: false });
         }
       }
       let storedImages: ReturnType<typeof persistCoworkImageAttachments> | undefined;
@@ -4916,7 +4920,9 @@ if (!gotTheLock) {
         .catch(error => {
           console.error('[Cowork] continue error:', error);
           try {
-            const existing = getCoworkStore().getSession(options.sessionId);
+            const existing = getCoworkStore().getSession(options.sessionId, 0, {
+              includeArtifacts: false,
+            });
             reportPiSessionFailure(
               getPiRuntimeAdapter(),
               options.sessionId,
@@ -4928,8 +4934,7 @@ if (!gotTheLock) {
           }
         });
 
-      const session = getCoworkStore().getSession(options.sessionId);
-      if (session) materializeSessionImages(options.sessionId, session.messages);
+      const session = store.getSession(options.sessionId, 0, { includeArtifacts: false });
       return { success: true, session: session ? sanitizeCoworkSessionForIpc(session) : session };
     } catch (error) {
       return {

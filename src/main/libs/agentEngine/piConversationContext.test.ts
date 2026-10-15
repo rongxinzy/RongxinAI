@@ -4,7 +4,10 @@ import type { CoworkMessage } from '../../coworkStore';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   buildPiConversationPrompt,
+  buildPiConversationPromptFromPages,
   calculatePiConversationHistoryCharLimit,
+  restorePiConversationPrompt,
+  summarizePiHistoryFromStore,
 } from './piConversationContext';
 
 const message = (
@@ -185,4 +188,119 @@ test('replays image references unchanged when no OCR helper is available', () =>
 
   expect(prompt).toContain('/workspace/shot.png');
   expect(prompt).not.toContain('text extraction');
+});
+
+// ── Paged restore: byte-identical output without materializing history ──
+
+const pagedFetchFrom = (
+  messages: CoworkMessage[],
+): ((offset: number, limit: number) => CoworkMessage[]) => {
+  const newestFirst = [...messages].reverse();
+  return (offset, limit) => newestFirst.slice(offset, offset + limit);
+};
+
+test('paged restore matches the array build byte for byte across page boundaries', () => {
+  const fixtures: CoworkMessage[][] = [
+    [
+      message('user-1', 'user', 'Inspect the project.'),
+      message('thinking-1', 'assistant', 'Private reasoning.', { isThinking: true }),
+      message('tool-1', 'tool_use', '', {
+        toolName: 'read',
+        toolInput: { path: 'src/app.ts' },
+      }),
+      message('result-1', 'tool_result', 'export const app = true;'),
+      message('answer-1', 'assistant', 'The app entry was found.'),
+    ],
+    // Budget cut mid-history: older entries are dropped either way.
+    Array.from({ length: 10 }, (_, index) =>
+      message(`user-${index}`, 'user', `${index}:${'x'.repeat(7_900)}`),
+    ),
+    // Mixed lengths crossing several pages.
+    Array.from({ length: 25 }, (_, index) =>
+      message(
+        `m-${index}`,
+        index % 2 === 0 ? 'user' : 'assistant',
+        `${index}:${'y'.repeat((index * 137) % 900)}`,
+      ),
+    ),
+  ];
+
+  for (const fixture of fixtures) {
+    const expected = buildPiConversationPrompt(fixture, 'Continue.');
+    for (const pageSize of [1, 3, 7, 100]) {
+      const paged = buildPiConversationPromptFromPages(pagedFetchFrom(fixture), 'Continue.', {
+        pageSize,
+      });
+      expect(paged).toBe(expected);
+    }
+  }
+});
+
+test('paged restore stops fetching once the character budget is filled', () => {
+  const messages = Array.from({ length: 50 }, (_, index) =>
+    message(`user-${index}`, 'user', `${index}:${'z'.repeat(500)}`),
+  );
+  const newestFirst = [...messages].reverse();
+  const fetchedOffsets: number[] = [];
+  const fetchPage = (offset: number, limit: number): CoworkMessage[] => {
+    fetchedOffsets.push(offset);
+    return newestFirst.slice(offset, offset + limit);
+  };
+
+  const paged = buildPiConversationPromptFromPages(fetchPage, 'Continue.', {
+    maxChars: 2_000,
+    pageSize: 10,
+  });
+
+  expect(paged).toBe(buildPiConversationPrompt(messages, 'Continue.', { maxChars: 2_000 }));
+  // 2000 chars of budget, ~500+ chars per entry: the first page alone fills it.
+  expect(fetchedOffsets).toEqual([0]);
+});
+
+test('paged restore returns the bare prompt when history is empty', () => {
+  expect(buildPiConversationPromptFromPages(() => [], 'Continue.')).toBe('Continue.');
+});
+
+test('restorePiConversationPrompt tolerates a store without paged reads', () => {
+  expect(restorePiConversationPrompt(undefined, 's1', 'Continue.')).toBe('Continue.');
+  expect(restorePiConversationPrompt({} as never, 's1', 'Continue.')).toBe('Continue.');
+});
+
+test('summarizePiHistoryFromStore never breaks a rebuild on a bad store', () => {
+  const empty = { messageCount: 0, contentBytes: 0, metadataBytes: 0 };
+  expect(summarizePiHistoryFromStore(null, 's1')).toEqual(empty);
+  expect(
+    summarizePiHistoryFromStore(
+      {
+        getSessionMessageStats: () => {
+          throw new Error('db gone');
+        },
+      } as never,
+      's1',
+    ),
+  ).toEqual(empty);
+  expect(
+    summarizePiHistoryFromStore(
+      {
+        getSessionMessageStats: () => ({ messageCount: 2, contentBytes: 10, metadataBytes: 4 }),
+      } as never,
+      's1',
+    ),
+  ).toEqual({ messageCount: 2, contentBytes: 10, metadataBytes: 4 });
+});
+
+test('history read failures reject restoration instead of silently discarding context', () => {
+  const error = new Error('history read failed');
+  expect(() =>
+    restorePiConversationPrompt(
+      {
+        getSessionMessagesDesc: () => {
+          throw error;
+        },
+        getSessionMessageStats: () => ({ messageCount: 0, contentBytes: 0, metadataBytes: 0 }),
+      },
+      'session',
+      'Continue.',
+    ),
+  ).toThrow(error);
 });

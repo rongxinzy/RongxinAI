@@ -329,6 +329,69 @@ test('creates the artifact index after adding sequence to legacy messages', asyn
   store.close();
 });
 
+test('creates the message ordering index after adding sequence to legacy messages', async () => {
+  const userDataPath = createTempUserDataPath();
+  createLegacyDatabase(userDataPath);
+  const db = new Database(path.join(userDataPath, DB_FILENAME));
+  const now = Date.now();
+  // Legacy shape: cowork_messages without the sequence column.
+  db.exec(`
+    CREATE TABLE cowork_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'idle',
+      mode TEXT NOT NULL DEFAULT 'work',
+      cwd TEXT NOT NULL,
+      system_prompt TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE cowork_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at INTEGER NOT NULL
+    );
+  `);
+  db.prepare(
+    `INSERT INTO cowork_sessions
+       (id, title, status, mode, cwd, system_prompt, created_at, updated_at)
+     VALUES ('session-1', 'legacy', 'idle', 'work', '/repo', '', ?, ?)`,
+  ).run(now, now);
+  db.prepare(
+    `INSERT INTO cowork_messages
+       (id, session_id, type, content, metadata, created_at)
+     VALUES ('message-1', 'session-1', 'assistant', 'hello', NULL, ?)`,
+  ).run(now);
+  db.close();
+
+  // The expression index references sequence, so creating it before the column
+  // migration throws "no such column: sequence" on this legacy shape.
+  const store = await SqliteStore.create(userDataPath);
+  const migratedDb = store.getDatabase();
+  const orderIndexes = migratedDb
+    .prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'index' AND name = 'idx_cowork_messages_session_order'`,
+    )
+    .all();
+  expect(orderIndexes).toHaveLength(1);
+
+  // The index is usable for tail-first paged reads right after migration.
+  const plan = migratedDb
+    .prepare(
+      `EXPLAIN QUERY PLAN SELECT id, type, content, metadata, created_at, sequence
+       FROM cowork_messages WHERE session_id = ?
+       ORDER BY COALESCE(sequence, created_at) DESC, created_at DESC, ROWID DESC LIMIT ? OFFSET ?`,
+    )
+    .all('session-1', 50, 0) as Array<{ detail: string }>;
+  expect(plan.map(row => row.detail).join('\n')).not.toContain('TEMP B-TREE');
+
+  store.close();
+});
+
 test('migrates unique workspace paths while preserving existing workspaces', async () => {
   const userDataPath = createTempUserDataPath();
   createLegacyDatabase(userDataPath);

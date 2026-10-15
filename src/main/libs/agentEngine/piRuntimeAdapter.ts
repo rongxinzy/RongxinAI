@@ -131,8 +131,9 @@ import {
   type PiBackgroundCompletionResult,
 } from './piBackgroundCompletion';
 import {
-  buildPiConversationPrompt,
   calculatePiConversationHistoryCharLimit,
+  restorePiConversationPrompt,
+  summarizePiHistoryFromStore,
 } from './piConversationContext';
 import { getPiBashCommandViolation, normalizePiBashTimeoutSeconds } from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piWriteTokenLimit';
@@ -174,6 +175,7 @@ import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { createPiWorkLoop } from './piWorkLoop';
+import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import { createPiPromptOverrides } from './piPromptOverrides';
@@ -213,22 +215,6 @@ import {
   STREAM_STALL_TIMEOUT_MS,
   resolveStreamStallTimeoutMs,
 } from './piStreamStallRecovery';
-
-const summarizePiHistory = (messages: readonly CoworkMessage[]) => {
-  let contentBytes = 0;
-  let metadataBytes = 0;
-  for (const message of messages) {
-    contentBytes += Buffer.byteLength(message.content, 'utf8');
-    if (message.metadata) {
-      try {
-        metadataBytes += Buffer.byteLength(JSON.stringify(message.metadata), 'utf8');
-      } catch {
-        // Ignore malformed metadata in diagnostics; the normal session path handles it.
-      }
-    }
-  }
-  return { messageCount: messages.length, contentBytes, metadataBytes };
-};
 
 // ── Types ──
 
@@ -340,6 +326,7 @@ interface ActivePiSession {
   requestedSystemPrompt: string;
   requestedModelOverride?: string;
   requestedSkillIds: string[] | undefined;
+  requestedWorkflowSkillIds: string[] | undefined;
   requestedExpertIds: string[];
   /** Experts selected for the current turn, retained when messages are persisted. */
   turnExperts: CoworkMessageExpertIdentity[];
@@ -1040,7 +1027,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
                 ...(expertIds.length
                   ? {
-                      experts: (this.store?.getSession(sessionId)?.experts ?? [])
+                      experts: (
+                        this.store?.getSession(sessionId, 0, { includeArtifacts: false })
+                          ?.experts ?? []
+                      )
                         .filter(expert => expertIds.includes(expert.expertId))
                         .map(expert => ({
                           expertId: expert.expertId,
@@ -1102,13 +1092,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         resourceState.expertSkillDirs,
       );
 
-      const shortcutKindForContract = isAcademicResearchSkillSet(resourceState.skillIds)
+      const workflowSkillIds = resolvePiTurnWorkflowSkills({
+        attachedSkillIds: options.attachedSkillIds,
+        previousWorkflowSkillIds: options._workflowSkillIdsOverride,
+        availableSkillIds: resourceState.skillIds,
+      });
+      const shortcutKindForContract = isAcademicResearchSkillSet(workflowSkillIds)
         ? null
-        : resolveShortcutWorkflowKind(resourceState.skillIds);
-      const workbenchContract = this.createWorkbenchContract(
-        options.sessionMode,
-        resourceState.skillIds,
-      );
+        : resolveShortcutWorkflowKind(workflowSkillIds);
+      const workbenchContract = this.createWorkbenchContract(options.sessionMode, workflowSkillIds);
       if (this.workbenchTaskService && !chatMode) {
         const workbench = this.workbenchTaskService.beginRun({
           sessionId,
@@ -1291,7 +1283,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         customTools.push(
           buildPiScheduledTaskTool({
             service: this.scheduledTaskService,
-            workspaceId: this.store?.getSession(sessionId)?.workspaceId ?? null,
+            workspaceId:
+              this.store?.getSession(sessionId, 0, { includeArtifacts: false })?.workspaceId ??
+              null,
             sessionKey: sessionId,
           }),
         );
@@ -1340,7 +1334,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // session (and reloads the same state directory after a session restart).
       const researchRun =
         options.sessionMode !== CoworkSessionMode.Chat &&
-        isAcademicResearchSkillSet(resourceState.skillIds)
+        isAcademicResearchSkillSet(workflowSkillIds)
           ? new PiResearchRunController({
               sessionId,
               workspaceRoot,
@@ -1529,8 +1523,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         requestedSystemPrompt: basePrompt,
         requestedModelOverride: options.modelOverride,
         requestedSkillIds: resourceState.skillIds,
+        requestedWorkflowSkillIds: workflowSkillIds,
         requestedExpertIds: expertIds,
-        turnExperts: (this.store?.getSession(sessionId)?.experts ?? [])
+        turnExperts: (
+          this.store?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
+        )
           .filter(expert => expertIds.includes(expert.expertId))
           .map(expert => ({
             expertId: expert.expertId,
@@ -1735,21 +1732,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, restoring context via prompt`,
       );
       const historyLoadStartedAt = Date.now();
-      // Rebuilds need the full transcript: the default page size (30) would
-      // amputate everything but the last few minutes of a long task.
-      // buildPiConversationPrompt applies the character budget instead.
-      const storedSession = this.store?.getSession(sessionId, null);
-      const history = storedSession?.messages ?? [];
+      // Read the transcript tail in pages and stop at the character budget
+      // instead of materializing the full history; the injected prompt is
+      // identical because the selection rule only ever walks newest-first.
+      // Metadata still comes from a zero-message read for mode/experts/cwd.
+      const storedSession = this.store?.getSession(sessionId, 0, { includeArtifacts: false });
       const chatMode =
         options.sessionMode === CoworkSessionMode.Chat ||
         storedSession?.mode === CoworkSessionMode.Chat;
-      const piPrompt = buildPiConversationPrompt(history, prompt, {
+      const piPrompt = restorePiConversationPrompt(this.store, sessionId, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
         ocrCommandFor: this.bundledOcrHelper?.commandFor,
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'continue',
-        ...summarizePiHistory(history),
+        ...summarizePiHistoryFromStore(this.store, sessionId),
         promptChars: piPrompt.length,
         restoreMs: Date.now() - historyLoadStartedAt,
       });
@@ -1768,6 +1765,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         goalMode: options.goalMode ?? active?.goalMode,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
+        _workflowSkillIdsOverride: resolvePiTurnWorkflowSkills({
+          attachedSkillIds: options.attachedSkillIds,
+          previousWorkflowSkillIds: active?.requestedWorkflowSkillIds,
+          availableSkillIds: options.skillIds,
+        }),
       });
     }
 
@@ -1778,6 +1780,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         : normalizeSkillIds(options.skillIds);
     const requestedExpertIds =
       options.expertIds === undefined ? active.requestedExpertIds : explicitExpertIds;
+    const requestedWorkflowSkillIds = resolvePiTurnWorkflowSkills({
+      attachedSkillIds: options.attachedSkillIds,
+      previousWorkflowSkillIds: active.requestedWorkflowSkillIds,
+      availableSkillIds: requestedSkillIds,
+    });
+    const workflowChanged = !haveSameStringList(
+      requestedWorkflowSkillIds,
+      active.requestedWorkflowSkillIds,
+    );
     const requestedSessionMode =
       options.sessionMode ??
       (active.workbenchContract.kind === WorkbenchContractKind.Chat
@@ -1800,15 +1811,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       nextCodemode !== active.codemodeEnabled ||
       nextMcpNativeBridge !== active.mcpNativeBridge ||
       mcpToolTopologyChanged ||
-      unattendedTopologyChanged
+      unattendedTopologyChanged ||
+      workflowChanged
     ) {
       const historyLoadStartedAt = Date.now();
-      // Full transcript, not the default page: see the continue-rebuild note.
-      const history = this.store?.getSession(sessionId, null)?.messages ?? [];
+      // Paged tail read, not a full transcript: see the continue-rebuild note.
       if (mcpToolTopologyChanged) {
         console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
       }
-      const piPrompt = buildPiConversationPrompt(history, prompt, {
+      const piPrompt = restorePiConversationPrompt(this.store, sessionId, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(
           typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
           typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
@@ -1818,7 +1829,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'recreate',
-        ...summarizePiHistory(history),
+        ...summarizePiHistoryFromStore(this.store, sessionId),
         promptChars: piPrompt.length,
         restoreMs: Date.now() - historyLoadStartedAt,
       });
@@ -1834,6 +1845,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         mcpNativeBridge: nextMcpNativeBridge,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
+        _workflowSkillIdsOverride: requestedWorkflowSkillIds,
       });
     }
 
@@ -1851,9 +1863,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
     if (skillsChanged) {
       const historyLoadStartedAt = Date.now();
-      // Full transcript, not the default page: see the continue-rebuild note.
-      const history = this.store?.getSession(sessionId, null)?.messages ?? [];
-      const piPrompt = buildPiConversationPrompt(history, prompt, {
+      // Paged tail read, not a full transcript: see the continue-rebuild note.
+      const piPrompt = restorePiConversationPrompt(this.store, sessionId, prompt, {
         maxChars: this.resolveConversationHistoryCharLimit(
           typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
           typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
@@ -1863,7 +1874,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'skills-change',
-        ...summarizePiHistory(history),
+        ...summarizePiHistoryFromStore(this.store, sessionId),
         promptChars: piPrompt.length,
         restoreMs: Date.now() - historyLoadStartedAt,
       });
@@ -1879,6 +1890,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         mcpNativeBridge: nextMcpNativeBridge,
         unattended: nextUnattended,
         _piPromptOverride: piPrompt,
+        _workflowSkillIdsOverride: requestedWorkflowSkillIds,
       });
     }
 
@@ -1965,7 +1977,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.errorSurfaced = false;
     active.retryNoticeEmitted = false;
     active.retryAttempts = 0;
-    active.turnExperts = (this.store?.getSession(sessionId)?.experts ?? [])
+    active.turnExperts = (
+      this.store?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
+    )
       .filter(expert => active.requestedExpertIds.includes(expert.expertId))
       .map(expert => ({
         expertId: expert.expertId,
@@ -2256,24 +2270,36 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   /** Persist a terminal result for tool calls still open when the user pauses. */
   private closeInterruptedToolUses(sessionId: string): void {
     const store = this.store;
-    if (!store || typeof store.getSession !== 'function') return;
+    if (!store || typeof store.getSessionMessagesDesc !== 'function') return;
 
-    let session: ReturnType<CoworkStore['getSession']> = null;
+    // Scan through the page containing the latest user message. Keep that
+    // whole boundary page so nearby orphan tool calls still receive terminal
+    // results, as in the previous full scan. Persist results oldest-first.
+    const tailNewestFirst: CoworkMessage[] = [];
+    const pageSize = 200;
+    let offset = 0;
     try {
-      session = store.getSession(sessionId, null);
+      for (;;) {
+        const page = store.getSessionMessagesDesc(sessionId, pageSize, offset);
+        if (page.length === 0) break;
+        offset += page.length;
+        tailNewestFirst.push(...page);
+        if (page.some(message => message.type === 'user') || page.length < pageSize) break;
+      }
     } catch {
       return;
     }
-    if (!session?.messages?.length) return;
+    if (tailNewestFirst.length === 0) return;
+    const messages = tailNewestFirst.reverse();
 
     const closed = new Set<string>();
-    for (const message of session.messages) {
+    for (const message of messages) {
       if (message.type !== 'tool_result') continue;
       const toolUseId = message.metadata?.toolUseId;
       if (typeof toolUseId === 'string' && toolUseId) closed.add(toolUseId);
     }
 
-    for (const message of session.messages) {
+    for (const message of messages) {
       if (message.type !== 'tool_use') continue;
       const toolUseId = message.metadata?.toolUseId;
       if (typeof toolUseId !== 'string' || !toolUseId || closed.has(toolUseId)) continue;
@@ -2619,7 +2645,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   private isWorkSession(sessionId: string, active: ActivePiSession | undefined): boolean {
     if (active) return active.workbenchContract.kind !== WorkbenchContractKind.Chat;
-    return this.store?.getSession(sessionId)?.mode !== CoworkSessionMode.Chat;
+    return (
+      this.store?.getSession(sessionId, 0, { includeArtifacts: false })?.mode !==
+      CoworkSessionMode.Chat
+    );
   }
 
   private persistQueuedUserMessage(

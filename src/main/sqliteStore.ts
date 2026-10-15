@@ -349,6 +349,17 @@ export class SqliteStore {
     } catch {
       // Column already exists or migration not needed.
     }
+
+    // Drives every ORDER BY COALESCE(sequence, created_at) read of the messages
+    // table (session open, UI history paging, restore tail reads). Without it
+    // each of those queries re-sorts the whole session in a temp b-tree. Must
+    // stay below the sequence-column migration: on legacy databases the column
+    // does not exist until that ALTER TABLE, and creating the index earlier
+    // fails with "no such column: sequence".
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_cowork_messages_session_order
+      ON cowork_messages(session_id, COALESCE(sequence, created_at), created_at);
+    `);
     initializeCoworkArtifactIndexSchema(this.db);
 
     try {

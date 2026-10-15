@@ -2426,7 +2426,8 @@ describe('PiRuntimeAdapter', () => {
         },
       );
       adapter.setCoworkStore({
-        getSession: () => ({ messages }),
+        getSessionMessagesDesc: (_sessionId: string, limit: number, offset: number) =>
+          [...messages].reverse().slice(offset, offset + limit),
         addMessage,
         updateSession: vi.fn(),
       } as unknown as CoworkStore);
@@ -5064,7 +5065,7 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('rebuilds a stalled session from the full persisted history', async () => {
+    it('rebuilds a stalled session from the persisted history tail, paged on demand', async () => {
       vi.useFakeTimers();
       const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
       try {
@@ -5073,8 +5074,17 @@ describe('PiRuntimeAdapter', () => {
           experts: [],
           mode: undefined,
         }));
+        const getSessionMessagesDesc = vi.fn(
+          (_sessionId: string, _limit: number, _offset: number) => [],
+        );
         stallAdapter.setCoworkStore({
           getSession,
+          getSessionMessagesDesc,
+          getSessionMessageStats: vi.fn(() => ({
+            messageCount: 0,
+            contentBytes: 0,
+            metadataBytes: 0,
+          })),
           addMessage: vi.fn((_sessionId: string, message: unknown) => message),
           updateSession: vi.fn(),
           updateMessage: vi.fn(),
@@ -5088,9 +5098,11 @@ describe('PiRuntimeAdapter', () => {
         await vi.advanceTimersByTimeAsync(1000);
         await vi.advanceTimersByTimeAsync(1);
 
-        // The rebuild must not silently page the transcript down to the last
-        // 30 messages; null asks the store for the full history.
-        expect(getSession).toHaveBeenCalledWith('stall-history', null);
+        // The restore must page the transcript from the tail on demand: the
+        // character budget bounds what is read, and a full-history read
+        // (messageLimit null) must never happen.
+        expect(getSessionMessagesDesc).toHaveBeenCalled();
+        expect(getSession).not.toHaveBeenCalledWith('stall-history', null);
         stallAdapter.stopAllSessions();
       } finally {
         vi.useRealTimers();

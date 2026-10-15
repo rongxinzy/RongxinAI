@@ -74,20 +74,36 @@ const formatHistoryMessage = (
   return null;
 };
 
+const resolveHistoryBudget = (maxChars?: number): { totalChars: number; entryBudget: number } => {
+  const totalChars = Math.min(
+    PiConversationContextLimit.TotalChars,
+    Math.max(2_000, Math.floor(maxChars ?? PiConversationContextLimit.TotalChars)),
+  );
+  // Reserve space for several messages even when one tool observation is huge.
+  const entryBudget = Math.min(PiConversationContextLimit.EntryChars, Math.floor(totalChars / 4));
+  return { totalChars, entryBudget };
+};
+
+const wrapHistoryPrompt = (selectedOldestFirst: string[], currentPrompt: string): string => {
+  if (selectedOldestFirst.length === 0) return currentPrompt;
+  return [
+    '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
+    selectedOldestFirst.join('\n\n'),
+    '=== END PREVIOUS CONVERSATION ===',
+    '',
+    `User: ${currentPrompt}`,
+  ].join('\n');
+};
+
 export const buildPiConversationPrompt = (
   messages: CoworkMessage[],
   currentPrompt: string,
   options: { maxChars?: number; ocrCommandFor?: (imagePath: string) => string } = {},
 ): string => {
-  const totalChars = Math.min(
-    PiConversationContextLimit.TotalChars,
-    Math.max(2_000, Math.floor(options.maxChars ?? PiConversationContextLimit.TotalChars)),
-  );
+  const { totalChars, entryBudget } = resolveHistoryBudget(options.maxChars);
   const entries = messages
     .map(message => formatHistoryMessage(message, options.ocrCommandFor))
     .filter((entry): entry is string => !!entry);
-  // Reserve space for several messages even when one tool observation is huge.
-  const entryBudget = Math.min(PiConversationContextLimit.EntryChars, Math.floor(totalChars / 4));
   const selected: string[] = [];
   let selectedChars = 0;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
@@ -97,12 +113,98 @@ export const buildPiConversationPrompt = (
     selected.unshift(entry);
     selectedChars = nextChars;
   }
-  if (selected.length === 0) return currentPrompt;
-  return [
-    '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
-    selected.join('\n\n'),
-    '=== END PREVIOUS CONVERSATION ===',
-    '',
-    `User: ${currentPrompt}`,
-  ].join('\n');
+  return wrapHistoryPrompt(selected, currentPrompt);
+};
+
+/** Default page size for tail-first history reads during session restore. */
+export const PI_HISTORY_RESTORE_PAGE_SIZE = 100;
+
+/**
+ * Same output as buildPiConversationPrompt, but pulls history newest-first in
+ * pages and stops as soon as the character budget is filled, so restoring a
+ * long session no longer materializes its whole transcript. Selection order
+ * and truncation are identical: newest-first greedy fill, stop at the first
+ * entry that does not fit.
+ *
+ * fetchPage(offset, limit) must return messages newest-first.
+ */
+export const buildPiConversationPromptFromPages = (
+  fetchPage: (offset: number, limit: number) => CoworkMessage[],
+  currentPrompt: string,
+  options: {
+    maxChars?: number;
+    ocrCommandFor?: (imagePath: string) => string;
+    pageSize?: number;
+  } = {},
+): string => {
+  const { totalChars, entryBudget } = resolveHistoryBudget(options.maxChars);
+  const pageSize = Math.max(1, Math.floor(options.pageSize ?? PI_HISTORY_RESTORE_PAGE_SIZE));
+  const selectedNewestFirst: string[] = [];
+  let selectedChars = 0;
+  let offset = 0;
+  let budgetFilled = false;
+  while (!budgetFilled) {
+    const page = fetchPage(offset, pageSize);
+    if (page.length === 0) break;
+    offset += page.length;
+    for (const message of page) {
+      const entry = formatHistoryMessage(message, options.ocrCommandFor);
+      if (!entry) continue;
+      const truncated = truncateEntry(entry, entryBudget);
+      const nextChars = selectedChars + truncated.length + 2;
+      if (nextChars > totalChars) {
+        budgetFilled = true;
+        break;
+      }
+      selectedNewestFirst.push(truncated);
+      selectedChars = nextChars;
+    }
+    if (page.length < pageSize) break;
+  }
+  return wrapHistoryPrompt(selectedNewestFirst.reverse(), currentPrompt);
+};
+
+/** The store surface the paged restore path relies on. */
+export interface PiHistoryRestoreStore {
+  getSessionMessagesDesc(sessionId: string, limit: number, offset: number): CoworkMessage[];
+  getSessionMessageStats(sessionId: string): {
+    messageCount: number;
+    contentBytes: number;
+    metadataBytes: number;
+  };
+}
+
+/**
+ * Builds the restore prompt for a session rebuild from paged tail reads.
+ * Returns the bare prompt when the store cannot serve paged reads.
+ */
+export const restorePiConversationPrompt = (
+  store: PiHistoryRestoreStore | null | undefined,
+  sessionId: string,
+  currentPrompt: string,
+  options: { maxChars?: number; ocrCommandFor?: (imagePath: string) => string } = {},
+): string => {
+  if (!store || typeof store.getSessionMessagesDesc !== 'function') return currentPrompt;
+  return buildPiConversationPromptFromPages(
+    (offset, limit) => store.getSessionMessagesDesc(sessionId, limit, offset),
+    currentPrompt,
+    options,
+  );
+};
+
+/**
+ * Whole-session history totals for restore diagnostics. Never throws and never
+ * materializes messages: a broken store must not break a session rebuild.
+ */
+export const summarizePiHistoryFromStore = (
+  store: PiHistoryRestoreStore | null | undefined,
+  sessionId: string,
+): { messageCount: number; contentBytes: number; metadataBytes: number } => {
+  const empty = { messageCount: 0, contentBytes: 0, metadataBytes: 0 };
+  if (!store || typeof store.getSessionMessageStats !== 'function') return empty;
+  try {
+    return store.getSessionMessageStats(sessionId);
+  } catch {
+    return empty;
+  }
 };
