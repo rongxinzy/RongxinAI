@@ -163,6 +163,11 @@ import {
   slimQueuedMessagesForIpc,
 } from './coworkImageAttachments';
 import { isAllowedLocalfilePath } from './localfilePathValidation';
+import {
+  isAllowedShellOpenPath,
+  isAllowedShellProbePath,
+  isSensitivePath,
+} from './shellPathValidation';
 import { resolveCoworkContinuationSkillState } from './coworkSessionSkills';
 import {
   type CoworkMessageMetadata,
@@ -7074,10 +7079,43 @@ if (!gotTheLock) {
     },
   );
 
+  const getAllowedShellProbeRoots = (): string[] => {
+    const roots: string[] = [];
+    try {
+      roots.push(app.getPath('userData'));
+      roots.push(app.getPath('documents'));
+      roots.push(app.getPath('downloads'));
+      roots.push(app.getPath('desktop'));
+      roots.push(app.getPath('temp'));
+    } catch {
+      // Ignore in environments where standard paths are not ready
+    }
+    try {
+      roots.push(app.getAppPath());
+    } catch {
+      // Ignore
+    }
+    try {
+      const store = getCoworkStore();
+      const workspaces = store.listWorkspaces();
+      for (const ws of workspaces) {
+        if (ws.path) roots.push(ws.path);
+      }
+    } catch {
+      // Ignore
+    }
+    roots.push(process.cwd());
+    return roots;
+  };
+
   // Shell handlers - 打开文件/文件夹
   ipcMain.handle(ShellIpc.OpenPath, async (_event, filePath: string) => {
     try {
       const normalizedPath = normalizeWindowsShellPath(filePath);
+      const validation = isAllowedShellOpenPath(normalizedPath);
+      if (!validation.allowed) {
+        return { success: false, error: validation.reason ?? 'Access denied' };
+      }
       const result = await shell.openPath(normalizedPath);
       if (result) {
         // 如果返回非空字符串，表示打开失败
@@ -7092,6 +7130,9 @@ if (!gotTheLock) {
   ipcMain.handle(ShellIpc.ShowItemInFolder, async (_event, filePath: string) => {
     try {
       const normalizedPath = normalizeWindowsShellPath(filePath);
+      if (isSensitivePath(normalizedPath)) {
+        return { success: false, error: 'Access to sensitive system paths is blocked' };
+      }
       shell.showItemInFolder(normalizedPath);
       return { success: true };
     } catch (error) {
@@ -7099,13 +7140,17 @@ if (!gotTheLock) {
     }
   });
 
-  // 2026/09/20 lixiang  供对话内本地路径高亮：仅当磁盘上存在对应文件时才可点（issue #805）
+  // 供对话内本地路径高亮：仅当处于受允许的安全根目录且磁盘上存在对应文件时返回 exists: true
   ipcMain.handle(ShellIpc.PathExists, async (_event, filePath: string) => {
     try {
       if (typeof filePath !== 'string' || !filePath.trim()) {
         return { success: true, exists: false };
       }
       const normalizedPath = normalizeWindowsShellPath(filePath);
+      const allowedRoots = getAllowedShellProbeRoots();
+      if (!isAllowedShellProbePath(normalizedPath, allowedRoots)) {
+        return { success: true, exists: false };
+      }
       return { success: true, exists: fs.existsSync(normalizedPath) };
     } catch (error) {
       return {
