@@ -8017,8 +8017,7 @@ if (!gotTheLock) {
       try {
         const aisphereGateway = await startAISphereGateway();
         await aisphereService.initialize(store, aisphereGateway.baseUrl);
-        aisphereService.busy = () =>
-          Boolean(piRuntimeAdapter?.hasRunningSessions() || activeStreamControllers.size);
+        aisphereService.busy = () => Boolean(piRuntimeAdapter?.hasRunningSessions());
         app.once('before-quit', () => {
           void aisphereGateway.close();
         });
