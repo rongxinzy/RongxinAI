@@ -2,8 +2,6 @@ import type { ComponentProps } from 'react';
 import React from 'react';
 import { useSelector } from 'react-redux';
 
-import { Skeleton } from '@shared/components/ui/skeleton';
-
 import {
   selectCurrentSession,
   selectLoadingSessionId,
@@ -11,15 +9,11 @@ import {
 import { CoworkSessionColdStartSkeleton } from './CoworkSessionLoadingState';
 
 // Session transcript pulls Streamdown / tool cards; keep it out of the empty home chunk.
-const CoworkSessionDetail = React.lazy(() => import('./CoworkSessionDetail'));
-
-const sessionDetailFallback = (
-  <div className="flex min-h-0 flex-1 flex-col gap-3 p-6" aria-busy="true">
-    <Skeleton className="h-10 w-48" />
-    <Skeleton className="h-28 w-full" />
-    <Skeleton className="h-28 w-full" />
-  </div>
-);
+const loadCoworkSessionDetail = () => import('./CoworkSessionDetail');
+// Preload the session detail chunk when Cowork viewport module initializes so the
+// first message submission does not flash or whiteout waiting on a cold dynamic import.
+const coworkSessionDetailPromise = loadCoworkSessionDetail();
+const CoworkSessionDetail = React.lazy(() => coworkSessionDetailPromise);
 
 type CoworkSessionViewportProps = Omit<
   ComponentProps<typeof CoworkSessionDetail>,
@@ -39,8 +33,8 @@ const CoworkSessionViewport = ({ sessionId, ...props }: CoworkSessionViewportPro
   }
 
   return (
-    <div className="flex min-h-0 flex-1">
-      <React.Suspense fallback={sessionDetailFallback}>
+    <div className="flex min-h-0 flex-1 bg-background">
+      <React.Suspense fallback={<CoworkSessionColdStartSkeleton />}>
         <CoworkSessionDetail
           {...props}
           displayedSessionId={sessionId}

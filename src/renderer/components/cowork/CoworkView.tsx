@@ -715,7 +715,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   if (displayedSessionId) {
     return (
-      <div className="flex-1 flex flex-col h-full">
+      <div className="flex-1 flex flex-col h-full bg-background">
         <CoworkSessionViewport
           sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
