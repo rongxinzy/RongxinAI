@@ -115,7 +115,8 @@ jobs:
       - name: Bind WebView2 acceptance to the final installer
         id: shell-evidence
         if: ${{ !cancelled() && steps.shell-interaction.outcome == 'success' }}
-        shell: powershell
+        # Runner scripts are UTF-8 without a BOM; Windows PowerShell 5 reads ANSI.
+        shell: pwsh
         run: |
           $setup = @(Get-ChildItem release/ZhiYuanAgent-Setup-*.exe -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one final WebView2 installer' }

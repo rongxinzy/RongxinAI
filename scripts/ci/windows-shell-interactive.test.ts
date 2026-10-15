@@ -245,7 +245,16 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
   const config = loadYaml(workflow) as {
     jobs: Record<
       string,
-      { steps: Array<{ id?: string; name?: string; if?: string; run?: string; uses?: string }> }
+      {
+        steps: Array<{
+          id?: string;
+          name?: string;
+          if?: string;
+          run?: string;
+          uses?: string;
+          shell?: string;
+        }>;
+      }
     >;
   };
   const { steps } = config.jobs['package-and-install'];
@@ -264,6 +273,10 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
   );
   expect(steps.find(step => step.id === 'shell-evidence')?.run).toContain(
     'windows-shell-evidence.mjs',
+  );
+  expect(steps.find(step => step.id === 'shell-evidence')?.shell).toBe('pwsh');
+  expect(steps.find(step => step.id === 'shell-evidence')?.run).toContain(
+    "$app = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'",
   );
   let previous = -1;
   for (const command of [
@@ -286,6 +299,67 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
   expect(workflow).not.toContain('continue-on-error');
   expect(workflow).toContain('bunx vitest run --maxWorkers=1');
 });
+
+test('keeps the independent Unicode installed path strict against ANSI-decoded UTF-8', () => {
+  const { report, expected } = identity();
+  const installedExecutable = path.resolve('runner/zhiyuan-shell-acceptance/安装路径/知远.exe');
+  const actual = { ...report, installedExecutable };
+  expect(() => assertShellIdentity(actual, { ...expected, installedExecutable })).not.toThrow();
+  expect(() =>
+    assertShellIdentity(actual, {
+      ...expected,
+      installedExecutable: Buffer.from(installedExecutable, 'utf8').toString('latin1'),
+    }),
+  ).toThrow('Full application smoke must use the shell-installed app');
+});
+
+test.skipIf(process.platform !== 'win32')(
+  'executes the actual evidence workflow as a BOM-less UTF-8 script with exact Unicode arguments',
+  () => {
+    const config = loadYaml(workflow) as {
+      jobs: { 'package-and-install': { steps: { id?: string; shell?: string; run?: string }[] } };
+    };
+    const step = config.jobs['package-and-install'].steps.find(
+      item => item.id === 'shell-evidence',
+    )!;
+    const fixture = fs.mkdtempSync(path.join(tmpdir(), 'shell-evidence-encoding-'));
+    const probe = path.join(fixture, 'workflow.ps1');
+    const output = path.join(fixture, 'arguments.json');
+    const setup = path.join(fixture, 'release/ZhiYuanAgent-Setup-fixture.exe');
+    try {
+      fs.mkdirSync(path.dirname(setup), { recursive: true });
+      fs.writeFileSync(setup, 'argument transport fixture, never executed');
+      fs.mkdirSync(path.join(fixture, 'scripts/ci'), { recursive: true });
+      fs.writeFileSync(
+        path.join(fixture, 'scripts/ci/windows-shell-evidence.mjs'),
+        "import fs from 'node:fs'; fs.writeFileSync(process.env.PROBE_OUTPUT, JSON.stringify(process.argv.slice(2)));",
+      );
+      // Exactly the runner's script encoding and the repository's real run block.
+      fs.writeFileSync(probe, "$ErrorActionPreference = 'Stop'\n" + step.run, 'utf8');
+      expect(fs.readFileSync(probe).subarray(0, 3).toString('hex')).not.toBe('efbbbf');
+      const result = spawnSync(
+        `${step.shell}.exe`,
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe],
+        {
+          cwd: fixture,
+          env: { ...process.env, RUNNER_TEMP: fixture, PROBE_OUTPUT: output },
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+      expect(result.error, result.stderr).toBeUndefined();
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+      expect(JSON.parse(fs.readFileSync(output, 'utf8'))).toEqual([
+        'acceptance-diagnostics/shell-interactive',
+        setup,
+        path.join(fixture, 'zhiyuan-shell-acceptance/安装路径/知远.exe'),
+      ]);
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true });
+    }
+  },
+  25_000,
+);
 
 test('drives real visible pointer input and screenshots without synthetic completion', () => {
   for (const marker of [
