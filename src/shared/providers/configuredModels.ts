@@ -2,6 +2,23 @@ import { ProviderModelOrigin, ProviderRegistry } from './constants';
 import type { ProviderConfig } from './types';
 import { normalizeCatalogModelKey } from './modelCatalog';
 
+/** Custom model IDs are opaque; only registry-declared models have aliases. */
+export function findConfiguredProviderModel<T extends { id: string }>(
+  providerName: string,
+  modelId: string,
+  models: readonly T[] | undefined,
+): T | undefined {
+  const requestedId = modelId.trim();
+  const exact = models?.find(model => model.id.trim() === requestedId);
+  if (exact) return exact;
+
+  const catalogModel = ProviderRegistry.getModel(providerName, requestedId);
+  if (!catalogModel) return undefined;
+  return models?.find(
+    model => ProviderRegistry.getModel(providerName, model.id)?.id === catalogModel.id,
+  );
+}
+
 /** Keep the same configured catalog in Settings, the picker, and runtime resolution. */
 export function resolveConfiguredProviderModels(
   providerName: string,

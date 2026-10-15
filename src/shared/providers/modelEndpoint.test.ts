@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import {
+  ApiFormat,
   clampRuntimeContextWindow,
   createLlamaCppRuntimeSnapshot,
   createOllamaRuntimeSnapshot,
@@ -9,6 +10,58 @@ import {
   ProviderName,
   resolveModelEndpoint,
 } from './index';
+
+test('keeps case-sensitive custom model identities and their own metadata', () => {
+  const models = [
+    { id: 'GLM-5.3-FLASH', name: 'Uppercase entry', contextWindow: 8192 },
+    { id: 'GLM-5.3-Flash', name: 'Tested entry', contextWindow: 65536 },
+  ];
+  for (const model of models) {
+    const endpoint = resolveModelEndpoint('custom_1', model.id, {
+      providerConfig: { apiFormat: ApiFormat.OpenAI, models },
+    });
+    expect(endpoint.modelId).toBe(model.id);
+    expect(endpoint.displayName).toBe(model.name);
+    expect(endpoint.contextWindow).toBe(model.contextWindow);
+  }
+});
+
+test('does not mistake absent catalog IDs for an alias of another custom model', () => {
+  const endpoint = resolveModelEndpoint('custom_1', 'second-model', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [
+        { id: 'first-model', name: 'First', contextWindow: 8192 },
+        { id: 'second-model', name: 'Second', contextWindow: 65536 },
+      ],
+    },
+  });
+  expect(endpoint.modelId).toBe('second-model');
+  expect(endpoint.displayName).toBe('Second');
+  expect(endpoint.contextWindow).toBe(65536);
+});
+
+test('does not borrow custom model metadata for a missing case variant', () => {
+  const endpoint = resolveModelEndpoint('custom_1', 'GLM-5.3-Flash', {
+    providerConfig: {
+      models: [{ id: 'GLM-5.3-FLASH', name: 'Other model', contextWindow: 8192 }],
+    },
+  });
+  expect(endpoint.modelId).toBe('GLM-5.3-Flash');
+  expect(endpoint.displayName).toBe('GLM-5.3-Flash');
+  expect(endpoint.contextWindow).toBeUndefined();
+});
+
+test('retains configured overrides when a registered model is selected by alias', () => {
+  const endpoint = resolveModelEndpoint(ProviderName.Moonshot, 'KIMI-K3', {
+    providerConfig: {
+      models: [{ id: 'kimi-k3', name: 'Configured Kimi', contextWindow: 65536 }],
+    },
+  });
+  expect(endpoint.modelId).toBe('kimi-k3');
+  expect(endpoint.displayName).toBe('Configured Kimi');
+  expect(endpoint.contextWindow).toBe(65536);
+});
 
 test('resolves aliases to the registry canonical model and keeps registry metadata', () => {
   const endpoint = resolveModelEndpoint(ProviderName.Moonshot, 'KIMI-K3', {

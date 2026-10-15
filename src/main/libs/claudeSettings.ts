@@ -1,5 +1,6 @@
 import {
   type ApiFormat,
+  findConfiguredProviderModel,
   isProviderEnabled,
   type ModelCapabilities,
   normalizeProviderModelPiRuntimeConfig,
@@ -498,9 +499,7 @@ function resolveMatchedProviderFromSelection(
     };
   }
 
-  const matchedModel = normalizedProviderModels.find(
-    model => model.id.toLowerCase() === modelId.toLowerCase(),
-  );
+  const matchedModel = findConfiguredProviderModel(providerName, modelId, normalizedProviderModels);
   if (!matchedModel) {
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
@@ -526,8 +525,10 @@ function resolveMatchedProviderFromSelection(
       maxTokens: matchedModel.maxTokens,
       capabilities: matchedModel.capabilities,
       piRuntime: matchedModel.piRuntime,
-      userModelConfig: storedProviderConfig.models?.find(
-        model => model.id.toLowerCase() === modelId.toLowerCase(),
+      userModelConfig: findConfiguredProviderModel(
+        providerName,
+        modelId,
+        storedProviderConfig.models,
       ),
       agentEligibility: matchedModel.agentEligibility,
     },
