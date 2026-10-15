@@ -183,3 +183,13 @@ test('checkPathExistsCached deduplicates concurrent checks and caches results', 
     }
   }
 });
+
+test('parseLocalPathHref rejects paths with null bytes or control characters', () => {
+  const nullByteHref = `${LocalPathHref.Prefix}${encodeURIComponent('/workspace/exploit\0.txt')}`;
+  expect(parseLocalPathHref(nullByteHref)).toBeNull();
+
+  const newlineHref = `${LocalPathHref.Prefix}${encodeURIComponent('/workspace/file\nname.txt')}`;
+  expect(parseLocalPathHref(newlineHref)).toBeNull();
+
+  expect(parseLocalPathHref('file:///C:/safe\0file.txt')).toBeNull();
+});

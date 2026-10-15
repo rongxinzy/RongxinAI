@@ -1,5 +1,5 @@
 /**
- * 2026/09/20 lixiang  Chat markdown 本地路径高亮与打开（issue #805）
+ * Chat markdown 本地路径高亮与打开（issue #805）
  * Streamdown 默认不会把 inline code / 裸路径变成可点链接；此处预处理为 markdown 链接，
  * 并由自定义锚点走 shell.openPath / showItemInFolder。
  *
@@ -120,11 +120,14 @@ export const parseLocalPathHref = (href: string): string | null => {
 
   if (trimmed.startsWith(LocalPathHref.Prefix)) {
     const encoded = trimmed.slice(LocalPathHref.Prefix.length);
+    let decoded = encoded;
     try {
-      return decodeURIComponent(encoded);
+      decoded = decodeURIComponent(encoded);
     } catch {
-      return encoded || null;
+      decoded = encoded || '';
     }
+    if (!decoded || decoded.includes('\0') || /[\r\n]/.test(decoded)) return null;
+    return decoded;
   }
 
   // Also accept URL-parsed form where `?path=` may appear with other query order
@@ -132,14 +135,16 @@ export const parseLocalPathHref = (href: string): string | null => {
     const url = new URL(trimmed);
     if (url.hostname === 'zr-local.path' && url.pathname === '/open') {
       const path = url.searchParams.get('path');
-      if (path) return path;
+      if (path && !path.includes('\0') && !/[\r\n]/.test(path)) return path;
     }
   } catch {
     // not a URL
   }
 
   if (FILE_URL_RE.test(trimmed)) {
-    return stripFileProtocol(trimmed);
+    const path = stripFileProtocol(trimmed);
+    if (!path.includes('\0') && !/[\r\n]/.test(path)) return path;
+    return null;
   }
 
   return null;
