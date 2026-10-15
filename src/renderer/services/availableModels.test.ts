@@ -510,3 +510,19 @@ test('hides provider-level failures', async () => {
     ),
   ).toBe(false);
 });
+
+test('suppresses community free models when branding disableCommunityFreeModels is active', async () => {
+  const config = createConfig();
+  const listModelsMock = vi.fn(async () => ({ ok: true, models: ['zhiyuan-free'] }));
+  vi.stubGlobal('window', {
+    __APP_EDITION__: 'xiaoruan',
+    electron: {
+      modelPool: { listModels: listModelsMock },
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const models = await collectAvailableModels(config);
+  expect(listModelsMock).not.toHaveBeenCalled();
+  expect(models.some(m => m.providerKey === ProviderName.Zhiyuan)).toBe(false);
+});

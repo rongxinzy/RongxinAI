@@ -400,6 +400,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelPoolSessionBusy: '当前会话仍在处理，请稍后再试。',
     modelPoolStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
 
+    aisphereMissingModel: '所选模型不在当前 AISphere 平台列表中，请刷新后重新选择。',
+    aisphereUnavailable: '无法连接 AISphere 平台，请检查平台地址和网络后重试。',
+    aisphereBusy: '请先停止正在运行的任务，再切换 AISphere地址。',
+
     'enterprise.updateBlocked': '版本更新由企业统一管理',
     'update.activeTask': '有任务正在运行，请等任务完成或停止后再安装更新。',
   },
@@ -856,6 +860,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelPoolSessionBusy: 'This conversation is still being processed. Please try again shortly.',
     modelPoolStreamInterrupted:
       'The response was interrupted. Received content is preserved. Retry or ask to continue.',
+
+    aisphereMissingModel:
+      'The selected model is not available on AISphere. Refresh and select a platform model.',
+    aisphereUnavailable:
+      'Cannot connect to AISphere. Check the platform address and network, then retry.',
+    aisphereBusy: 'Stop running tasks before switching the AISphere address.',
 
     'enterprise.updateBlocked': 'Updates are managed by enterprise',
     'update.activeTask': 'A task is running. Finish or stop it before installing the update.',

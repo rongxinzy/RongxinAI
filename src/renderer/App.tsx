@@ -10,6 +10,7 @@ import {
   ManagedProviderAccessMode,
   type ManagedProviderAccessPolicy,
 } from '../shared/managedProviders';
+import { getBranding } from '../shared/branding';
 import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
@@ -978,7 +979,7 @@ const App: React.FC = () => {
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
             updateEntry={!isSidebarCollapsed ? updateEntry : null}
-            hideLogin={false}
+            hideLogin={Boolean(enterpriseConfig) || !getBranding().features.enableCommunityAuth}
             managedModelsOnly={managedModelsOnly}
             onPrefetchView={prefetchFeatureView}
           />

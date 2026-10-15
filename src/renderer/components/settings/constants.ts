@@ -5,6 +5,7 @@ import {
   Keyboard,
   MailCheck,
   MessageCircleMore,
+  Network,
   Route,
   SlidersHorizontal,
   SunMedium,
@@ -23,6 +24,7 @@ export const SETTINGS_TAB_METAS: Record<TabType, SettingsTabMeta> = {
   appearance: { labelKey: 'appearance', icon: SunMedium },
   shortcuts: { labelKey: 'shortcuts', icon: Keyboard },
   model: { labelKey: 'model', icon: Box },
+  aisphere: { labelKey: 'aisphereTab', icon: Network },
   triage: { labelKey: 'modelTriageTitle', icon: Route },
   coworkMemory: { labelKey: 'coworkMemoryTitle', icon: Brain },
   im: { labelKey: 'imBot', icon: MessageCircleMore },
@@ -43,7 +45,7 @@ export interface SettingsNavGroupDef {
  */
 export const SETTINGS_NAV_GROUPS: SettingsNavGroupDef[] = [
   { titleKey: 'settingsGroupGeneral', tabs: ['general', 'appearance', 'shortcuts'] },
-  { titleKey: 'settingsGroupModel', tabs: ['model', 'triage', 'coworkMemory'] },
+  { titleKey: 'settingsGroupModel', tabs: ['model', 'aisphere', 'triage', 'coworkMemory'] },
   { titleKey: 'settingsGroupChannels', tabs: ['im', 'email'] },
   { titleKey: null, tabs: ['about'] },
 ];

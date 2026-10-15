@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig } from 'motion/react';
-import { MessageCircle, PanelLeftClose, Trash2 } from 'lucide-react';
+import { MessageCircle, PanelLeftClose, Settings, Trash2 } from 'lucide-react';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   Empty,
@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { getBranding } from '../../shared/branding';
 import { agentService } from '../services/agent';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
@@ -422,13 +423,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="theme-sidebar-header draggable sidebar-header-drag flex items-center justify-between">
               <div className={cn('flex items-center gap-2', isMac && 'pl-[68px]')}>
                 <img
-                  src="zhiyuan-logo-light.svg"
-                  alt="知远"
+                  src={`${getBranding().appId}-logo-light.svg`}
+                  alt={getBranding().shortName}
                   className="logo-light w-auto select-none"
                 />
                 <img
-                  src="zhiyuan-logo-dark.svg"
-                  alt="知远"
+                  src={`${getBranding().appId}-logo-dark.svg`}
+                  alt={getBranding().shortName}
                   className="logo-dark w-auto select-none"
                 />
               </div>
@@ -630,7 +631,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onShowSettings();
                   }}
                 />
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    onPrefetchView?.('settings');
+                    onShowSettings();
+                  }}
+                  data-active={activeView === 'settings' || undefined}
+                  aria-current={activeView === 'settings' ? 'page' : undefined}
+                  className="theme-action-row w-full justify-start gap-2"
+                >
+                  <Settings data-icon="inline-start" />
+                  <span>{i18nService.t('settings')}</span>
+                </Button>
+              )}
             </div>
           )}
           <DestructiveConfirmDialog
