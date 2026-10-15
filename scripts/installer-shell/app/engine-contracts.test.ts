@@ -14,17 +14,9 @@ const argumentsSource = read('SetupArguments.cs');
 
 test('engine checks extraction and retains all main repository runtime features', () => {
   expect(installer).toContain('failureMessage: "应用程序解包失败"');
-  expect(installer).toContain('"mingit", "cmd", "git.exe"');
-  for (const sentinel of [
-    'git.exe',
-    'libiconv-2.dll',
-    'libintl-8.dll',
-    'libpcre2-8-0.dll',
-    'libwinpthread-1.dll',
-    'zlib1.dll',
-  ]) {
-    expect(installer).toContain(`"mingit", "mingw64", "bin", "${sentinel}"`);
-  }
+  expect(installer).toContain('File.ReadAllText(TargetsPath)');
+  expect(installer).toContain('targets.RootElement.GetArrayLength() != 7');
+  expect(installer).toContain('target.GetProperty("sentinel")');
   expect(installer).toContain('"resources", "app.asar"');
   expect(installer).toContain('StepWritePendingInferenceMarker(localInference)');
   expect(installer).toContain('StepMigrateUserSkills(cancellationToken)');

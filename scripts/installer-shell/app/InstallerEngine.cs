@@ -574,27 +574,23 @@ public sealed class InstallerEngine
             failureMessage: "离线运行环境连接失败");
     }
 
-    /// <summary>Step 10 — the same sentinel files the NSIS installer checks.</summary>
+    /// <summary>Verify the main repository's complete component contract,
+    /// including its Python, skills, channel and PortableGit entrypoints.</summary>
     private void StepVerifyRuntimeSentinels()
     {
         ReportPhase("正在校验运行环境");
         var resources = Path.Combine(installDir, "resources");
-        foreach (var sentinel in new[]
+        using var targets = JsonDocument.Parse(File.ReadAllText(TargetsPath));
+        if (targets.RootElement.GetArrayLength() != 7)
+            throw new EngineException("安装包组件配置不完整。");
+        foreach (var target in targets.RootElement.EnumerateArray())
         {
-            Path.Combine(resources, "python-win", "python.exe"),
-            Path.Combine(resources, "uv-win", "uv.exe"),
-            Path.Combine(resources, "channel-runtime", "cc-connect-sidecar.exe"),
-            Path.Combine(resources, "mingit", "cmd", "git.exe"),
-            Path.Combine(resources, "mingit", "mingw64", "bin", "git.exe"),
-            Path.Combine(resources, "mingit", "mingw64", "bin", "libiconv-2.dll"),
-            Path.Combine(resources, "mingit", "mingw64", "bin", "libintl-8.dll"),
-            Path.Combine(resources, "mingit", "mingw64", "bin", "libpcre2-8-0.dll"),
-            Path.Combine(resources, "mingit", "mingw64", "bin", "libwinpthread-1.dll"),
-            Path.Combine(resources, "mingit", "mingw64", "bin", "zlib1.dll"),
-        })
-        {
-            if (!File.Exists(sentinel))
-                throw new EngineException("离线运行环境连接校验失败。请重新运行安装器。", sentinel);
+            var relative = target.GetProperty("sentinel").GetString()
+                ?? throw new EngineException("安装包组件配置无效。");
+            var sentinel = Path.GetFullPath(Path.Combine(resources, relative));
+            if (!sentinel.StartsWith(resources + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(sentinel))
+                throw new EngineException("运行环境校验失败，请重新下载安装包。", relative);
         }
     }
 

@@ -168,3 +168,29 @@ test.skipIf(process.platform !== 'win32')(
     expect(result.status, result.stderr).toBe(0);
   },
 );
+
+test.skipIf(process.platform !== 'win32')(
+  'parses production process helpers and stops only bounded real app, sidecar and runtime children',
+  () => {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(__dirname, 'windows-installer-process-regression.ps1'),
+        '-InstallerScriptPath',
+        path.resolve('scripts/nsis-installer.nsh'),
+      ],
+      { encoding: 'utf8', timeout: 60_000 },
+    );
+    expect(result.error, result.stderr).toBeUndefined();
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain(
+      'PASS: production NSIS commands parse and stop only real owned processes',
+    );
+  },
+  70_000,
+);
