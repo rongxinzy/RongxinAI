@@ -114,6 +114,7 @@
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
+    "notarize": false,
     "extendInfo": {
       "NSCalendarsUsageDescription": "知远需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
       "NSRemindersUsageDescription": "知远需要访问您的提醒事项来帮助您管理待办事项。",

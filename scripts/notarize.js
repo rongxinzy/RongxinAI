@@ -12,8 +12,8 @@ try {
 }
 
 /** How many times the ticket staple is retried after a successful notarization. */
-const STAPLE_ATTEMPTS = 3;
-const STAPLE_RETRY_DELAYS_MS = [10_000, 30_000];
+const STAPLE_ATTEMPTS = 5;
+const STAPLE_RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 30_000];
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -62,7 +62,7 @@ async function stapleWithRetry(appPath, deps = {}) {
  * available on the developer machines); electron-builder calls this with the
  * context only.
  */
-exports.default = async function notarizing(context, deps = {}) {
+async function notarizing(context, deps = {}) {
   const notarizeApp = deps.notarize ?? notarize;
   const stapleTicket = deps.staple ?? stapleWithRetry;
   const { electronPlatformName, appOutDir } = context;
@@ -115,7 +115,10 @@ exports.default = async function notarizing(context, deps = {}) {
     await stapleTicket(appPath);
     console.log('✅ 公证成功（票据已补 staple）');
   }
-};
+}
 
-exports.looksLikeStapleFailure = looksLikeStapleFailure;
-exports.stapleWithRetry = stapleWithRetry;
+module.exports = notarizing;
+module.exports.default = notarizing;
+module.exports.afterSign = notarizing;
+module.exports.looksLikeStapleFailure = looksLikeStapleFailure;
+module.exports.stapleWithRetry = stapleWithRetry;

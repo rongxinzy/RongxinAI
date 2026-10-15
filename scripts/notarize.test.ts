@@ -99,7 +99,7 @@ test('stapleWithRetry 对偶发失败退避重试后成功', async () => {
 
   expect(run).toHaveBeenCalledTimes(2);
   expect(wait).toHaveBeenCalledTimes(1);
-  expect(wait).toHaveBeenCalledWith(10_000);
+  expect(wait).toHaveBeenCalledWith(5_000);
 });
 
 test('stapleWithRetry 用尽重试后仍然失败（不放宽发布标准）', async () => {
@@ -109,6 +109,15 @@ test('stapleWithRetry 用尽重试后仍然失败（不放宽发布标准）', a
   const wait = vi.fn(async () => undefined);
 
   await expect(stapleWithRetry(appPath, { run, wait })).rejects.toThrow(CLOUDKIT_ERROR);
-  expect(run).toHaveBeenCalledTimes(3);
-  expect(wait.mock.calls.map(call => call[0])).toEqual([10_000, 30_000]);
+  expect(run).toHaveBeenCalledTimes(5);
+  expect(wait.mock.calls.map(call => call[0])).toEqual([5_000, 10_000, 20_000, 30_000]);
+});
+
+test('模块导出支持 CommonJS 与 ESM 调用', () => {
+  const raw = require('./notarize.js');
+  expect(typeof raw).toBe('function');
+  expect(raw.default).toBe(raw);
+  expect(raw.afterSign).toBe(raw);
+  expect(typeof raw.looksLikeStapleFailure).toBe('function');
+  expect(typeof raw.stapleWithRetry).toBe('function');
 });
