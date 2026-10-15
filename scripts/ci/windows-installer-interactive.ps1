@@ -106,6 +106,8 @@ function Start-Installer {
   param([ValidateSet(2052, 1033)][int]$Language = 2052)
   # Deliberately no /S: this is the actual packaged wizard. /D stays last,
   # unquoted as required by NSIS, including the Unicode destination.
+  # /LANGUAGE is parsed by production ApplyRequestedInstallerLanguage; it is
+  # not a built-in NSIS/MUI option and must never be assumed to work by itself.
   $process = Start-Process -FilePath $installer.FullName -ArgumentList "/LANGUAGE=$Language /D=$installRoot" -PassThru
   $script:installerProcesses.Add($process.Id) | Out-Null
   $script:wizard = Wait-Until {
@@ -128,11 +130,12 @@ function Begin-Installation {
   param([string]$Name)
   $install = Get-Button -Label '^(安装|安裝|Install)$'
   $license = Get-Button -Label '^(已阅读并同意|已閱讀並同意|I agree to the)$'
+  $licenseLink = Get-Button -Label '^(《许可协议》|《授權協議》|License)$'
   $cancel = Get-Button -Label '^(取消|Cancel)$'
-  if (-not $install -or -not $license -or -not $cancel) { throw 'Welcome page is missing a required action' }
+  if (-not $install -or -not $license -or -not $licenseLink -or -not $cancel) { throw 'Welcome page is missing a required action' }
   if ($install.Enabled) { throw 'Install must be disabled until the license is accepted' }
   if ([ZhiYuan.Acceptance.InstallerUi]::Checked($license.Handle) -ne 0) { throw 'License must start unchecked' }
-  foreach ($control in @($install, $license, $cancel)) {
+  foreach ($control in @($install, $license, $licenseLink, $cancel)) {
     [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle)
   }
   Save-Page "$Name-welcome"

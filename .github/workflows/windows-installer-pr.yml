@@ -53,6 +53,7 @@ jobs:
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
       - name: Build complete offline installer
+        id: offline-build
         # Keep a stuck packager observable and fail it before the job-level
         # timeout so the diagnostics upload below still gets a chance to run.
         timeout-minutes: 65
@@ -89,6 +90,7 @@ jobs:
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
       - name: Record fresh-run ownership before native install smoke
+        id: acceptance-ownership
         shell: powershell
         run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
       - name: Verify cold install, cache-hit upgrade, and uninstall
@@ -102,9 +104,15 @@ jobs:
         shell: powershell
         run: ./scripts/ci/windows-installer-interactive.ps1
       - name: Verify real WebView2 setup and upgrade recovery
+        id: shell-interaction
+        # Its own install/data/runtime sandbox remains independent of NSIS UI.
+        # Collect both results after a successful package; neither failure is waived.
+        if: ${{ !cancelled() && steps.offline-build.outcome == 'success' && steps.acceptance-ownership.outcome == 'success' }}
         timeout-minutes: 45
         run: node scripts/ci/windows-shell-interactive.mjs
       - name: Bind WebView2 acceptance to the final installer
+        id: shell-evidence
+        if: ${{ !cancelled() && steps.shell-interaction.outcome == 'success' }}
         shell: powershell
         run: |
           $setup = @(Get-ChildItem release/ZhiYuanAgent-Setup-*.exe -File)
@@ -113,6 +121,7 @@ jobs:
           node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $setup[0].FullName $app
           if ($LASTEXITCODE -ne 0) { throw 'Final WebView2 evidence did not match this build' }
       - name: Verify native uninstall of the real WebView2 installation
+        if: ${{ !cancelled() && steps.shell-evidence.outcome == 'success' }}
         timeout-minutes: 15
         shell: powershell
         run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify

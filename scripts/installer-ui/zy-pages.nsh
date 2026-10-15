@@ -144,7 +144,7 @@ Var /GLOBAL zyFinishTitle
 !insertmacro ZY_LangString ZY_UI_TAGLINE \
   "本地优先的全能 AI 智能体，装好离线环境即可使用。" \
   "本地優先的全能 AI 智能體，準備好離線環境即可使用。" \
-  "Your local-first AI agent, ready as soon as the offline environment is prepared."
+  "Your local-first AI agent, ready after offline setup."
 !insertmacro ZY_LangString ZY_UI_INSTALL_LOCATION \
   "安装位置" \
   "安裝位置" \
@@ -160,11 +160,11 @@ Var /GLOBAL zyFinishTitle
 !insertmacro ZY_LangString ZY_UI_LOCAL_INFERENCE_HINT \
   "开启后首次启动时会下载 CPU 或 NVIDIA CUDA 后端（16-621 MB）。" \
   "開啟後首次啟動時會下載 CPU 或 NVIDIA CUDA 後端（16-621 MB）。" \
-  "The CPU or NVIDIA CUDA backend (16-621 MB) is downloaded on first launch."
+  "CPU/NVIDIA CUDA backend download: 16-621 MB."
 !insertmacro ZY_LangString ZY_UI_LOCAL_INFERENCE_HINT2 \
   "不勾选不会影响其他功能。" \
   "不勾選不會影響其他功能。" \
-  "Leaving it unchecked does not affect other features."
+  "On first launch if selected; other features unaffected."
 !insertmacro ZY_LangString ZY_UI_LICENSE_AGREE \
   "已阅读并同意" \
   "已閱讀並同意" \
@@ -172,7 +172,7 @@ Var /GLOBAL zyFinishTitle
 !insertmacro ZY_LangString ZY_UI_LICENSE_LINK \
   "《许可协议》" \
   "《授權協議》" \
-  "License Agreement"
+  "License"
 !insertmacro ZY_LangString ZY_UI_INSTALL \
   "安装" \
   "安裝" \
