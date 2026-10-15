@@ -47,6 +47,56 @@ test('requires actual windows, screenshots, real DPI and usable actions', () => 
   );
 });
 
+test('measures the production font locally instead of using another process private GDI handle', () => {
+  const layout = helper.slice(
+    helper.indexOf('public static void AssertActionLayout('),
+    helper.indexOf('public static void Capture('),
+  );
+  expect(layout).not.toContain('0x0031');
+  expect(layout).toContain('CreateFont(height, 0, 0, 0, weight');
+  expect(layout).toContain('oldFont == IntPtr.Zero || oldFont == new IntPtr(-1)');
+  expect(layout).toContain('DrawText(dc, control.Text, -1, ref measured, 0x0420) <= 0');
+  expect(layout).toContain('DeleteObject(font)');
+  expect(layout).toContain('20 * control.Dpi / 96.0');
+  expect(script).toContain('ReadActionFontContract');
+  expect(script).toContain('$actionFont.BodyWeight');
+  expect(script).toContain('$actionFont.ButtonWeight');
+  const pages = readFileSync('scripts/installer-ui/zy-pages.nsh', 'utf8');
+  expect(pages).toContain('ZY_SetFont $heroLicense ${ZY_FONT_BODY_SIZE} ${ZY_FONT_BODY_WT}');
+  expect(pages).toMatch(
+    /NSD_CreateLink[\s\S]*?ZY_SetFont \$0 \$\{ZY_FONT_BODY_SIZE\} \$\{ZY_FONT_BODY_WT\}/,
+  );
+  expect(pages).toMatch(
+    /NSD_CreateButton[^\n]*ZY_FINISH_LAUNCH_X[\s\S]*?ZY_SetFont \$0 \$\{ZY_FONT_BODY_SIZE\} \$\{ZY_FONT_BUTTON_WT\}/,
+  );
+});
+
+test.skipIf(process.platform !== 'win32')(
+  'checks real cross-process font measurements and rejects deliberately clipped controls before packaging',
+  () => {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.join(__dirname, 'windows-installer-layout-regression.ps1'),
+        '-ProjectRoot',
+        path.resolve('.'),
+      ],
+      { encoding: 'utf8', timeout: 45_000 },
+    );
+    expect(result.error, result.stderr).toBeUndefined();
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain(
+      'PASS: cross-process Chinese and English action fonts fit; clipped width and height fail',
+    );
+  },
+  50_000,
+);
+
 test('checks cancellation against the live app, exact bytes, registration and directory identity', () => {
   for (const assertion of [
     'Opening/cancelling setup terminated the existing application',
@@ -76,6 +126,12 @@ test('recovers from a real sharing violation and real failed launch', () => {
   expect(script).toContain('Move-Item -LiteralPath $app -Destination $launchBackup');
   expect(script).toContain('usable finish page after launch failure');
   expect(script).toContain('Launch failure closed the installer instead of allowing recovery');
+  expect(script).toContain(
+    'FindDialogAcknowledgement($window.Handle, $script:wizard.ProcessId, $script:wizard.Text, $launchErrorPattern, $script:wizard.Handle)',
+  );
+  expect(script).toContain(
+    'ClickDialogAcknowledgement($launchError.Handle, $script:wizard.ProcessId, $script:wizard.Text, $launchErrorPattern, $script:wizard.Handle)',
+  );
   expect(script).toMatch(
     /finally\s*\{[\s\S]*Move-Item -LiteralPath \$launchBackup -Destination \$app/,
   );

@@ -11,6 +11,7 @@ if (-not $env:RUNNER_TEMP) { throw 'Run only on a disposable Windows acceptance 
 Add-Type -AssemblyName System.Drawing
 Add-Type -Path (Join-Path $PSScriptRoot 'windows-installer-ui.cs') -ReferencedAssemblies System,System.Core,System.Drawing
 [ZhiYuan.Acceptance.InstallerUi]::UsePhysicalCoordinates()
+$actionFont = [ZhiYuan.Acceptance.InstallerUi]::ReadActionFontContract((Join-Path $ProjectRoot 'scripts/installer-ui/zy-theme.nsh'))
 
 $evidence = Join-Path $ProjectRoot 'acceptance-diagnostics/interactive'
 $installRoot = Join-Path $env:RUNNER_TEMP 'zhiyuan-interactive-acceptance/安装路径'
@@ -35,6 +36,8 @@ $report = [ordered]@{
   installerSha256 = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
   installedExecutable = $app; checks = [ordered]@{}; pages = @(); errors = @()
   dpiCoverage = 'Actual window DPI only; no simulated high-DPI claim'
+  actionFont = $actionFont
+  fontCoverage = 'Production theme font recreated locally; real control bounds and actual HWND DPI'
 }
 
 function Wait-Until {
@@ -136,7 +139,8 @@ function Begin-Installation {
   if ($install.Enabled) { throw 'Install must be disabled until the license is accepted' }
   if ([ZhiYuan.Acceptance.InstallerUi]::Checked($license.Handle) -ne 0) { throw 'License must start unchecked' }
   foreach ($control in @($install, $license, $licenseLink, $cancel)) {
-    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle)
+    $weight = if ($control.Handle -eq $license.Handle -or $control.Handle -eq $licenseLink.Handle) { $actionFont.BodyWeight } else { $actionFont.ButtonWeight }
+    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle, $actionFont.Family, $actionFont.Points, $weight)
   }
   Save-Page "$Name-welcome"
   [ZhiYuan.Acceptance.InstallerUi]::Click($license.Handle)
@@ -168,7 +172,7 @@ function Wait-ForProgressAndFinish {
   $expectedLaunch = if ($script:language -eq 2052) { '启动知远智能体' } else { 'Launch ZhiYuan Agent' }
   if ((Normalize-Label $launch.Text) -ne $expectedLaunch) { throw 'Finish page language differs from the selected language' }
   foreach ($control in @($close, $launch)) {
-    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle)
+    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle, $actionFont.Family, $actionFont.Points, $actionFont.ButtonWeight)
   }
   if ($close.Left -lt ($launch.Left + $launch.Width) -and
       $launch.Left -lt ($close.Left + $close.Width) -and
@@ -371,16 +375,16 @@ try {
   # The only moved file is this runner's freshly installed executable.
   Move-Item -LiteralPath $app -Destination $launchBackup
   [ZhiYuan.Acceptance.InstallerUi]::Click((Get-Button -Label '^(启动知远智能体|啟動知遠智能體|Launch ZhiYuan Agent)$').Handle)
+  $launchErrorPattern = '\AThe app could not be started\. Retry, or close setup and use the Start menu\.\z'
   $launchError = Wait-Until {
     foreach ($window in (Get-InstallerWindows)) {
       if ($window.Handle -eq $script:wizard.Handle) { continue }
-      $ok = Get-Button -Id 1 -Window $window.Handle
-      $message = @(Get-Controls $window.Handle | Where-Object Text -match 'The app could not be started')
-      if ($ok -and $ok.Enabled -and $message.Count) { return $window }
+      $ok = [ZhiYuan.Acceptance.InstallerUi]::FindDialogAcknowledgement($window.Handle, $script:wizard.ProcessId, $script:wizard.Text, $launchErrorPattern, $script:wizard.Handle)
+      if ($ok) { return $window }
     }
   } 'real failed-launch error dialog'
   Save-Page 'finish-launch-error' $launchError.Handle
-  [ZhiYuan.Acceptance.InstallerUi]::Click((Get-Button -Id 1 -Window $launchError.Handle).Handle)
+  [ZhiYuan.Acceptance.InstallerUi]::ClickDialogAcknowledgement($launchError.Handle, $script:wizard.ProcessId, $script:wizard.Text, $launchErrorPattern, $script:wizard.Handle)
   $null = Wait-Until {
     $launch = Get-Button -Label '^Launch ZhiYuan Agent$'
     $close = Get-Button -Label '^Finish$'

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { load as loadYaml } from 'js-yaml';
+import { JSDOM } from 'jsdom';
 import { expect, test } from 'vitest';
 import {
   assertDetachedTransaction,
@@ -11,9 +12,15 @@ import {
   shellChecks,
   shellScreenshots,
 } from './windows-shell-evidence.mjs';
-import { assertVisibleActions } from './windows-shell-interactive.mjs';
+import { assertVisibleActions, captureFailurePages } from './windows-shell-interactive.mjs';
+import {
+  Cdp,
+  browserObservation,
+  clickObserverExpression,
+} from './windows-shell-browser-evidence.mjs';
 
 const script = readFileSync('scripts/ci/windows-shell-interactive.mjs', 'utf8');
+const native = readFileSync('scripts/ci/windows-shell-native.ps1', 'utf8');
 const workflow = readFileSync('.github/workflows/windows-installer-pr.yml', 'utf8');
 
 function identity() {
@@ -261,3 +268,176 @@ test.skipIf(process.platform !== 'win32')('parses the actual native Windows help
   expect(result.error, result.stderr).toBeUndefined();
   expect(result.status, result.stderr).toBe(0);
 });
+
+test('captures live failed sessions before cleanup without replacing the original failure', async () => {
+  const sessions = [
+    { name: 'unconnected', child: { exitCode: null } },
+    { name: 'exited', cdp: {}, child: { exitCode: 1 } },
+    { name: 'disconnected', cdp: {}, child: { exitCode: null } },
+    { name: 'fresh', cdp: {}, child: { exitCode: null } },
+  ];
+  const captures: string[] = [];
+  const report = {
+    passed: false,
+    error: 'Original installation error',
+    failureCaptureErrors: [],
+  };
+  await expect(
+    captureFailurePages(
+      sessions,
+      async (session: { name: string }, name: string) => {
+        captures.push(name);
+        if (session.name === 'disconnected') throw new Error('WebView2 disconnected');
+      },
+      report,
+    ),
+  ).resolves.toBeUndefined();
+  expect(captures).toEqual(['disconnected-failure', 'fresh-failure']);
+  expect(report.passed).toBe(false);
+  expect(report.error).toBe('Original installation error');
+  expect(report.failureCaptureErrors).toEqual([
+    { session: 'disconnected', error: 'Error: WebView2 disconnected' },
+  ]);
+  expect(script).toContain(
+    'report.error = error.stack || String(error);\n    await captureFailurePages(sessions, save, report);\n    throw error;',
+  );
+  expect(script.indexOf('await captureFailurePages(sessions, save, report)')).toBeLessThan(
+    script.indexOf('session.cdp?.close();', script.indexOf('} finally {')),
+  );
+});
+
+test('observes clicks without changing the DOM, cancelling events or invoking an action', () => {
+  const dom = new JSDOM('<button id="btnDone">Close</button>', { runScripts: 'outside-only' });
+  try {
+    const observed: unknown[] = [];
+    Object.defineProperty(dom.window, '__zhiyuanAcceptanceObservedClick', {
+      value: (payload: string) => observed.push(JSON.parse(payload)),
+    });
+    const before = dom.window.document.documentElement.outerHTML;
+    let handled = 0;
+    dom.window.document.querySelector('button')!.addEventListener('click', event => {
+      expect(event.defaultPrevented).toBe(false);
+      handled++;
+    });
+    dom.window.eval(clickObserverExpression);
+    expect(handled).toBe(0);
+    expect(observed).toEqual([]);
+    dom.window.document.querySelector('button')!.dispatchEvent(
+      new dom.window.MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 353,
+        clientY: 389,
+      }),
+    );
+    expect(handled).toBe(1);
+    expect(observed).toEqual([
+      expect.objectContaining({
+        isTrusted: false,
+        targetId: 'btnDone',
+        actionId: 'btnDone',
+        x: 353,
+        y: 389,
+        defaultPrevented: false,
+      }),
+    ]);
+    expect(dom.window.document.documentElement.outerHTML).toBe(before);
+    expect(clickObserverExpression).toContain('{ capture: true, passive: true }');
+    expect(clickObserverExpression).not.toMatch(
+      /\.click\(|dispatchEvent|preventDefault|stopPropagation/,
+    );
+  } finally {
+    dom.window.close();
+  }
+});
+
+test('retains real CDP exception and click metadata per session with a bounded event buffer', () => {
+  const socket = new EventTarget();
+  const cdp = new Cdp(socket);
+  const exception = {
+    method: 'Runtime.exceptionThrown',
+    params: {
+      exceptionDetails: {
+        text: 'Uncaught',
+        exception: { description: 'TypeError: close failed' },
+      },
+    },
+  };
+  socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(exception) }));
+  expect(cdp.observations[0]).toMatchObject({
+    kind: 'exception',
+    details: exception.params.exceptionDetails,
+  });
+  const click = {
+    method: 'Runtime.bindingCalled',
+    params: {
+      name: '__zhiyuanAcceptanceObservedClick',
+      payload: '{"isTrusted":true,"actionId":"btnDone"}',
+    },
+  };
+  expect(browserObservation(click)).toEqual({
+    kind: 'click',
+    details: { isTrusted: true, actionId: 'btnDone' },
+  });
+  expect(
+    browserObservation({ ...click, params: { ...click.params, name: 'unrelated' } }),
+  ).toBeNull();
+  for (let index = 0; index < 501; index++)
+    socket.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(click) }));
+  expect(cdp.observations).toHaveLength(500);
+  expect(cdp.droppedObservations).toBe(2);
+  expect(script).toContain("session.cdp.send('Runtime.enable')");
+  expect(script).toContain('await session.cdp.observeClicks()');
+  expect(script).toContain('`${session.name}-browser.json`');
+  expect(script).toContain('events: session.cdp.observations');
+  expect(script).toContain('processId: session.child.pid');
+});
+
+test('acknowledges the exact missing-runtime dialog by semantic OK instead of a numeric control ID', () => {
+  expect(native).not.toContain('ClickControlId');
+  expect(script).not.toContain('ClickControlId');
+  expect(script).toContain('WindowHandle: dialog.window.Handle');
+  expect(script).toContain("ExpectedWindowTitle: 'ZhiYuan Agent Setup'");
+  expect(script).toContain(
+    'Microsoft Edge WebView2 Runtime is required.*https://developer[.]microsoft[.]com/microsoft-edge/webview2/',
+  );
+  expect(native).toContain('$_.Handle -eq $WindowHandle');
+  expect(native).toContain("$WindowClass -ne '#32770'");
+  expect(native).toContain('$TargetProcessId -le 0');
+  expect(native).toContain('$windows.Count -ne 1');
+  expect(native).toContain('InstallerUi]::ClickDialogAcknowledgement(');
+  expect(native).toContain(
+    '$window.Handle, $TargetProcessId, $ExpectedWindowTitle, $AcknowledgeBodyPattern, 0)',
+  );
+  const capture = script.indexOf("Screenshot: path.join(evidence, 'missing-webview2.png')");
+  const acknowledge = script.indexOf('AcknowledgeBodyPattern:');
+  const exit = script.indexOf('await waitExit(missing, true)');
+  expect(capture).toBeGreaterThan(0);
+  expect(acknowledge).toBeGreaterThan(capture);
+  expect(exit).toBeGreaterThan(acknowledge);
+  expect(script.indexOf("const fresh = await start('fresh')")).toBeGreaterThan(exit);
+  expect(script).toContain('assert.equal(missing.child.exitCode, 1');
+  expect(script).toContain("item.type === 'webview2-error'");
+});
+
+test.skipIf(process.platform !== 'win32')(
+  'clicks real Win32 OK dialogs with either control ID and rejects unrelated or changed dialogs',
+  () => {
+    const result = spawnSync(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        path.resolve('scripts/ci/windows-installer-dialog-regression.ps1'),
+      ],
+      { encoding: 'utf8', timeout: 60_000 },
+    );
+    expect(result.error, result.stderr).toBeUndefined();
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.stdout).toContain('PASS: real modal OK dialogs with control IDs 1 and 2');
+  },
+  65_000,
+);
