@@ -325,6 +325,32 @@ export const getVisibleAssistantItems = (
 export const hasRenderableAssistantContent = (turn: ConversationTurn): boolean =>
   getVisibleAssistantItems(turn.assistantItems).length > 0;
 
+/**
+ * Checks whether an in-progress turn has any live streaming bubble, active tool execution,
+ * or pending user permission. When this returns false during session streaming, the engine is
+ * waiting for the LLM to prefill/sample the next thought or action, and the working indicator
+ * should be rendered to indicate forward progress.
+ */
+export const hasActiveTurnStreamingContent = (
+  turn: ConversationTurn,
+  toolActivities: unknown[] = [],
+  pendingPermission: unknown = null,
+): boolean => {
+  if (toolActivities.length > 0) return true;
+  if (pendingPermission != null) return true;
+  for (const item of turn.assistantItems) {
+    if (item.type === 'tool_group' && !item.group.toolResult) {
+      return true;
+    }
+    if (item.type === 'assistant') {
+      if (item.message.metadata?.isStreaming && !item.message.metadata?.isFinal) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
 export const getToolResultLineCount = (result: string): number => {
   if (!result) return 0;
   return result.split('\n').length;
