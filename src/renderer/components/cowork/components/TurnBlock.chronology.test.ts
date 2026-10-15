@@ -78,3 +78,48 @@ test('a stop after a final answer stays below that answer', () => {
     html.indexOf('NEW_FINAL_RESPONSE'),
   );
 });
+
+test('renders WorkingIndicator after a completed tool while the turn is in-progress', () => {
+  const completedTool: AssistantTurnItem = {
+    type: 'tool_group',
+    group: {
+      type: 'tool_group',
+      toolUse: {
+        id: 'tu-1',
+        type: 'tool_use',
+        content: JSON.stringify({ path: 'test.txt' }),
+        timestamp: 1,
+        metadata: { toolName: 'read', toolCallId: 'call-1' },
+      },
+      toolResult: {
+        id: 'tr-1',
+        type: 'tool_result',
+        content: 'file content',
+        timestamp: 2,
+        metadata: { toolCallId: 'call-1' },
+      },
+    },
+  };
+
+  // When turn is streaming and waiting for model (showTypingIndicator=true, isTurnComplete=false)
+  const streamingHtml = renderToStaticMarkup(
+    React.createElement(TurnBlock, {
+      turn: { id: 'turn-tool', userMessage: null, assistantItems: [completedTool] },
+      showTypingIndicator: true,
+      isTurnComplete: false,
+      showCopyButtons: false,
+    }),
+  );
+  expect(streamingHtml).toContain(i18nService.t('coworkWorkingThinking'));
+
+  // When turn is complete (isTurnComplete=true), indicator must not render
+  const completeHtml = renderToStaticMarkup(
+    React.createElement(TurnBlock, {
+      turn: { id: 'turn-tool', userMessage: null, assistantItems: [completedTool] },
+      showTypingIndicator: true,
+      isTurnComplete: true,
+      showCopyButtons: true,
+    }),
+  );
+  expect(completeHtml).not.toContain(i18nService.t('coworkWorkingThinking'));
+});
