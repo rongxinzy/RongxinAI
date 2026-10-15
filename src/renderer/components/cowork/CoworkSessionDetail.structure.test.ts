@@ -26,10 +26,7 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(source).toContain('const composerOverlayRef = useCoworkComposerInset(detailRootRef);');
   // 对话区与绝对定位输入框平级且 flex:1，用 paddingBottom 留出输入框高度，避免被遮挡
   expect(source).toContain('style={{ paddingBottom: COWORK_COMPOSER_INSET_VALUE }}');
-  expect(source).toContain(
-    'className="pointer-events-none absolute inset-x-0 z-[1] h-16 bg-gradient-to-t from-background to-transparent"',
-  );
-  expect(source).toContain('style={{ bottom: COWORK_COMPOSER_INSET_VALUE }}');
+  expect(source).not.toContain('bg-gradient-to-t from-background to-transparent');
   expect(source).not.toContain('style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
   expect(inputArea).toBeGreaterThanOrEqual(0);
   expect(overlay).toBeGreaterThan(inputArea);
@@ -47,7 +44,6 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(overlay).toBeLessThan(detailRootClose);
   const scrollContainer = source.indexOf('ref={scrollContainerRef}');
   /*
-  2026/09/16 lixiang  
   1、工具授权和提问卡片放在对话流（思考/工具执行）里，不要叠在底部输入框上
   2、能匹配到工具卡片时，拒绝/允许画在卡片内部，不再单独出一张授权卡
   */
@@ -64,7 +60,7 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(userBubbleSource).toContain(
     'className="mx-auto flex w-full max-w-6xl min-w-[320px] flex-col items-end pl-4"',
   );
-  // 2026/09/20 lixiang  验收卡改由末轮 TurnBlock.beforeCopySlot 注入，不再挂在对话流底部
+  // 验收卡改由末轮 TurnBlock.beforeCopySlot 注入，不再挂在对话流底部
   expect(source).toContain('beforeCopySlot={');
   expect(source).toContain('<WorkbenchTaskAcceptanceCard sessionId={sessionId} />');
   expect(source).not.toMatch(

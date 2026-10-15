@@ -140,7 +140,7 @@ interface CoworkSessionDetailProps {
   inlinePermission?: CoworkPermissionRequest | null;
   onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
   resumeTaskId?: string | null;
-  // 2026/09/17 lixiang  父级传入恢复中禁用；本组件再叠加 isStreaming
+  // 父级传入恢复中禁用；本组件再叠加 isStreaming
   resumeDisabled?: boolean;
   onResumeTask?: (interruption: CoworkSessionInterruption) => void;
   onCancelTaskResume?: () => void;
@@ -226,7 +226,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   const handleResumeTask = useCallback(
     (interruption: CoworkSessionInterruption) => {
-      // 2026/09/17 lixiang  点击继续执行只嵌入输入框并聚焦，不直接开跑
+      // 点击继续执行只嵌入输入框并聚焦，不直接开跑
       onResumeTask?.(interruption);
       requestAnimationFrame(() => promptInputRef.current?.focus());
     },
@@ -924,7 +924,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // Stabilize turn object identity so completed turns do not re-render on
   // every streaming token (issue #141).
   const turns = useStableConversationTurns(rawTurns, sessionId);
-  // 2026/09/16 lixiang  末轮已有匹配工具卡片时，授权按钮画在卡片里，不再单独渲染白底授权卡
+  // 末轮已有匹配工具卡片时，授权按钮画在卡片里，不再单独渲染白底授权卡
   const lastTurnItems = turns[turns.length - 1]?.assistantItems;
   const hasInlineToolPermissionCard = Boolean(
     inlinePermission &&
@@ -1006,14 +1006,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 isTurnComplete={!isStreaming || !isLastTurn}
                 recoverableTaskId={recoverableTaskId}
                 resumeTaskId={resumeTaskId}
-                // 2026/09/17 lixiang  流式或恢复中禁用继续执行按钮
+                // 流式或恢复中禁用继续执行按钮
                 resumeDisabled={resumeDisabled || isStreaming}
                 onResumeTask={onResumeTask ? handleResumeTask : undefined}
-                // 2026/09/16 lixiang  仅末轮需要工具授权，避免历史轮次误挂授权按钮
+                // 仅末轮需要工具授权，避免历史轮次误挂授权按钮
                 pendingPermission={isLastTurn ? inlinePermission : null}
                 onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
                 expandToolResults={isExportingImage}
-                // 2026/09/20 lixiang  验收卡放在末轮复制按钮上方（issue #805）
+                // 验收卡放在末轮复制按钮上方（issue #805）
                 beforeCopySlot={
                   isLastTurn && sessionId ? (
                     <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
@@ -1136,8 +1136,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           }`}
           aria-hidden={!isSessionSwitching && isArtifactWorkspace}
         >
-          {/* 2026/09/16 lixiang  流式时也用 instant，避免 smooth 跟随时动画叠加造成抖动 */}
-          {/* 2026/09/16 lixiang  输入框绝对定位且与对话区平级，对话区 flex:1 会被挡住；用 paddingBottom 把可视区收在输入框上方 */}
+          {/* 流式时也用 instant，避免 smooth 跟随时动画叠加造成抖动 */}
+          {/* 输入框绝对定位且与对话区平级，对话区 flex:1 会被挡住；用 paddingBottom 把可视区收在输入框上方 */}
           <div
             className="relative flex-1 min-h-0"
             style={{ paddingBottom: COWORK_COMPOSER_INSET_VALUE }}
@@ -1164,7 +1164,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                         </div>
                       </div>
                     )}
-                    {/* 2026/09/16 lixiang  对不上工具卡片时才在对话流里兜底展示独立授权卡 */}
+                    {/* 对不上工具卡片时才在对话流里兜底展示独立授权卡 */}
                     {inlinePermission &&
                       onRespondToInlinePermission &&
                       !hasInlineToolPermissionCard && (
@@ -1182,13 +1182,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 <ConversationScrollButton />
               </Conversation>
             )}
-
-            {/* 2026/09/16 lixiang  贴边时底部渐隐，最下方文字慢慢淡出，不挡点击 */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 z-[1] h-16 bg-gradient-to-t from-background to-transparent"
-              style={{ bottom: COWORK_COMPOSER_INSET_VALUE }}
-            />
           </div>
 
           {/* Input Area */}
