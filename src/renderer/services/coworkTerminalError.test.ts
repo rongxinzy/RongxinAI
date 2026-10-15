@@ -113,4 +113,12 @@ describe('cowork terminal errors', () => {
       ),
     ).toBe('No running instances available');
   });
+
+  test('safely handles non-JSON curly braces and bounded text without catastrophic backtracking', () => {
+    const codeSnippet = 'function test() { const a = 1; if (a) { return { ok: false }; } }';
+    expect(extractUserFacingErrorMessage(codeSnippet)).toBe(codeSnippet);
+
+    const oversized = '{' + 'x'.repeat(150_000) + '}';
+    expect(extractUserFacingErrorMessage(oversized)).toBe(oversized);
+  });
 });

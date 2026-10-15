@@ -7,6 +7,8 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
 
 import {
+  checkPathExistsCached,
+  getCachedPathExists,
   isLikelyLocalFilePath,
   linkifyLocalPathsInMarkdown,
   parseLocalPathHref,
@@ -37,9 +39,11 @@ const LocalAwareAnchor = ({
   const candidatePath = localPath ?? syntheticPath;
   const { linkSafety } = useContext(StreamdownContext);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const cached =
+    candidatePath && !skipPathExistsCheck ? getCachedPathExists(candidatePath) : undefined;
   // null = 检查中：先当普通文本，避免 1.42GB / 不存在文件误高亮
   const [exists, setExists] = useState<boolean | null>(
-    candidatePath && !skipPathExistsCheck ? null : false,
+    candidatePath && !skipPathExistsCheck ? (cached !== undefined ? cached : null) : false,
   );
 
   useEffect(() => {
@@ -48,16 +52,15 @@ const LocalAwareAnchor = ({
       setExists(false);
       return;
     }
-    setExists(null);
-    const pathExists = window.electron?.shell?.pathExists;
-    // preload 未重建时 API 可能尚不存在，避免同步抛错打崩页面
-    if (typeof pathExists !== 'function') {
-      setExists(false);
+    const currentCached = getCachedPathExists(candidatePath);
+    if (currentCached !== undefined) {
+      setExists(currentCached);
       return;
     }
-    void pathExists(candidatePath)
+    setExists(null);
+    void checkPathExistsCached(candidatePath)
       .then(result => {
-        if (!cancelled) setExists(Boolean(result?.success && result.exists));
+        if (!cancelled) setExists(result);
       })
       .catch(() => {
         if (!cancelled) setExists(false);

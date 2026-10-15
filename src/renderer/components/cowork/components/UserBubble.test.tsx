@@ -58,6 +58,27 @@ describe('UserBubble', () => {
     expect(onReEdit).toHaveBeenCalledWith(message);
   });
 
+  test('toggles action visibility on hover and unhover', () => {
+    const { container } = render(<UserBubble message={message} skills={[]} onReEdit={vi.fn()} />);
+
+    const root = container.firstChild as HTMLElement;
+    const actionsContainer = root.querySelector('.select-none');
+
+    // Initially hidden
+    expect(actionsContainer).toHaveClass('opacity-0');
+    expect(actionsContainer).toHaveAttribute('aria-hidden', 'true');
+
+    // Hover reveals actions
+    fireEvent.mouseEnter(root);
+    expect(actionsContainer).toHaveClass('opacity-100');
+    expect(actionsContainer).toHaveAttribute('aria-hidden', 'false');
+
+    // Mouse leave hides actions
+    fireEvent.mouseLeave(root);
+    expect(actionsContainer).toHaveClass('opacity-0');
+    expect(actionsContainer).toHaveAttribute('aria-hidden', 'true');
+  });
+
   test('does not render re-edit action when the session is remote-managed', () => {
     render(<UserBubble message={message} skills={[]} />);
 

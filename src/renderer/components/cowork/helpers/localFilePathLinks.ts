@@ -213,3 +213,49 @@ export const resolveOpenableLocalPath = (
   }
   return null;
 };
+
+const pathExistsStatusCache = new Map<string, boolean>();
+const pendingPathExistsPromises = new Map<string, Promise<boolean>>();
+
+export const getCachedPathExists = (candidatePath: string): boolean | undefined => {
+  return pathExistsStatusCache.get(candidatePath);
+};
+
+export const checkPathExistsCached = async (candidatePath: string): Promise<boolean> => {
+  if (pathExistsStatusCache.has(candidatePath)) {
+    return pathExistsStatusCache.get(candidatePath)!;
+  }
+
+  const pending = pendingPathExistsPromises.get(candidatePath);
+  if (pending) {
+    return pending;
+  }
+
+  const pathExists = window.electron?.shell?.pathExists;
+  if (typeof pathExists !== 'function') {
+    pathExistsStatusCache.set(candidatePath, false);
+    return false;
+  }
+
+  const promise = (async () => {
+    try {
+      const result = await pathExists(candidatePath);
+      const exists = Boolean(result?.success && result.exists);
+      pathExistsStatusCache.set(candidatePath, exists);
+      return exists;
+    } catch {
+      pathExistsStatusCache.set(candidatePath, false);
+      return false;
+    } finally {
+      pendingPathExistsPromises.delete(candidatePath);
+    }
+  })();
+
+  pendingPathExistsPromises.set(candidatePath, promise);
+  return promise;
+};
+
+export const clearPathExistsCache = (): void => {
+  pathExistsStatusCache.clear();
+  pendingPathExistsPromises.clear();
+};
