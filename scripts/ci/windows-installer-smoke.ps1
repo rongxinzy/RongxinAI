@@ -110,6 +110,28 @@ function Assert-InstallDurationBudget {
   }
 }
 
+function Get-OwnedRuntimeEntries {
+  param([Parameter(Mandatory = $true)][string]$RuntimeRoot)
+  foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')) {
+    $root = Join-Path $RuntimeRoot $key
+    if (-not (Test-Path -LiteralPath $root)) { continue }
+    foreach ($item in @(Get-ChildItem -LiteralPath $root -Force)) {
+      # Enumerating entries also sees a dangling junction, unlike Test-Path.
+      if ($item.Name -in @('current', 'current.next', 'current.previous')) {
+        $item.FullName
+      } elseif ($item.PSIsContainer -and $item.Name -cmatch '^[0-9a-f]{64}\z') {
+        $complete = Join-Path $item.FullName '.complete'
+        if (-not (Test-Path -LiteralPath $complete -PathType Leaf)) { continue }
+        try { $record = Get-Content -LiteralPath $complete -Raw -ErrorAction Stop } catch {
+          if (-not (Test-Path -LiteralPath $complete)) { continue }
+          throw
+        }
+        if (($record -split '\|', 2)[0] -ceq $item.Name) { $item.FullName }
+      }
+    }
+  }
+}
+
 function Wait-ForUninstallCompletion {
   param(
     [Parameter(Mandatory = $true)][string]$InstallRoot,
@@ -120,10 +142,12 @@ function Wait-ForUninstallCompletion {
   Write-Host "[WindowsInstallerSmoke] Waiting for the spawned background uninstaller (timeout: ${TimeoutSeconds}s)"
   $startedAt = Get-Date
   $lastProgressAt = -30
-  while ((Test-Path -LiteralPath $InstallRoot) -or (Test-Path -LiteralPath $RuntimeRoot)) {
+  # The runtime root may contain personal/unknown directories. Completion
+  # means the application and its seven owned component sets are gone.
+  while ((Test-Path -LiteralPath $InstallRoot) -or @(Get-OwnedRuntimeEntries $RuntimeRoot).Count -gt 0) {
     $elapsedSeconds = [int]((Get-Date) - $startedAt).TotalSeconds
     if ($elapsedSeconds - $lastProgressAt -ge 30) {
-      Write-Host "[WindowsInstallerSmoke] Background uninstall progress after ${elapsedSeconds}s: installRoot=$([bool](Test-Path -LiteralPath $InstallRoot)) runtimeRoot=$([bool](Test-Path -LiteralPath $RuntimeRoot))"
+      Write-Host "[WindowsInstallerSmoke] Background uninstall progress after ${elapsedSeconds}s: installRoot=$([bool](Test-Path -LiteralPath $InstallRoot)) ownedRuntimeEntries=$(@(Get-OwnedRuntimeEntries $RuntimeRoot).Count)"
       $lastProgressAt = $elapsedSeconds
     }
     if ($elapsedSeconds -ge $TimeoutSeconds) {
@@ -142,7 +166,7 @@ function Wait-ForUninstallCompletion {
 }
 
 $installers = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'release') -Filter '*.exe' -File |
-  Where-Object { $_.Name -notlike '*Uninstall*' })
+  Where-Object { $_.Name -notlike '*Uninstall*' -and $_.Name -notlike 'ZhiYuanAgent-Setup-*' })
 if ($installers.Count -ne 1) {
   throw "Expected exactly one Windows installer; found $($installers.Count)"
 }
@@ -182,6 +206,17 @@ try {
   }
   Assert-InstallDurationBudget $coldLog 'cold installation' 300
 
+  # Existing user-owned/unknown runtime content is outside uninstall ownership.
+  $preservedFiles = @(
+    (Join-Path $runtimeRoot 'acceptance-personal\keep.txt'),
+    (Join-Path $runtimeRoot 'skills\acceptance-unknown\keep.txt')
+  )
+  foreach ($file in $preservedFiles) {
+    if (Test-Path -LiteralPath $file) { throw "Preservation fixture already exists: $file" }
+    New-Item -ItemType Directory -Path (Split-Path $file) -Force | Out-Null
+    [IO.File]::WriteAllText($file, 'personal data must survive component cleanup')
+  }
+
   foreach ($key in $componentKeys) {
     $current = Join-Path (Join-Path $runtimeRoot $key) 'current'
     Assert-Path $current "active component pointer $key"
@@ -216,6 +251,12 @@ try {
   # exit before that process reaches customUnInstall, so wait for observable
   # completion instead of treating the launcher lifetime as the uninstall.
   Wait-ForUninstallCompletion $installRoot $runtimeRoot 300
+  foreach ($file in $preservedFiles) {
+    Assert-Path $file 'preserved personal/unknown runtime file'
+    if ([IO.File]::ReadAllText($file) -cne 'personal data must survive component cleanup') {
+      throw "Uninstall changed personal/unknown runtime content: $file"
+    }
+  }
 } finally {
   if (Test-Path -LiteralPath $installRoot) {
     $remainingUninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File -ErrorAction SilentlyContinue)

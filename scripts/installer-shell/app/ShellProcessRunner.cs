@@ -35,7 +35,11 @@ internal static class ShellProcessRunner
         void Append(string? line)
         {
             if (line is null) return;
-            lock (output) { output.AppendLine(line); }
+            lock (output)
+            {
+                output.AppendLine(line);
+                if (output.Length > 32 * 1024) output.Remove(0, output.Length - 32 * 1024);
+            }
         }
         process.Start();
         var stdoutPump = Task.Run(async () =>
@@ -57,6 +61,7 @@ internal static class ShellProcessRunner
                     else
                     {
                         pending.Append(ch);
+                        if (pending.Length > 32 * 1024) pending.Remove(0, pending.Length - 32 * 1024);
                     }
                 }
             }
@@ -64,8 +69,10 @@ internal static class ShellProcessRunner
         });
         var stderrPump = Task.Run(async () =>
         {
-            var line = await process.StandardError.ReadToEndAsync();
-            Append(line);
+            var buffer = new char[2048];
+            int read;
+            while ((read = await process.StandardError.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                Append(new string(buffer, 0, read));
         });
         try
         {
@@ -76,6 +83,7 @@ internal static class ShellProcessRunner
         {
             try { process.Kill(entireProcessTree: true); } catch { }
             try { await process.WaitForExitAsync(CancellationToken.None); } catch { }
+            try { await Task.WhenAll(stdoutPump, stderrPump); } catch { }
             throw;
         }
         var code = process.ExitCode;

@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 # Windows 发布包构建入口，由 Makefile 的 ci-package-windows 目标调用。
 # GitLab 编排逻辑保留在 .gitlab-ci.yml 中，具体构建行为集中在这里。
@@ -48,6 +48,10 @@ if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
 }
 $nsisVersion = (& makensis -VERSION) -join ' '
 Write-Host "makensis $nsisVersion"
+if (-not $env:ZHIYUAN_DOTNET -and -not (Test-Path '.cache\dotnet\dotnet.exe') -and
+    -not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+  throw '.NET 8 SDK is required to build the WebView2 installer shell.'
+}
 
 # 部分 shell:true 调用的 Node 工具无法稳定处理带空格的安装路径。
 # 使用 C:\nodejs junction 可以规避 C:\Program Files\nodejs 的路径问题。
@@ -135,10 +139,10 @@ if (-not $isRelease) {
 
 $distWinCommand = 'dist:win:offline'
 
-# 完整 Windows 打包流程由 npm run dist:win:* 编排：
-# 应用构建、Channel 运行时、技能构建以及 electron-builder NSIS 输出。
+# 完整 Windows 打包流程由 bun run dist:win:* 编排：
+# 应用与全量组件、NSIS 自动更新器、WebView2 安装壳。
 $env:DEBUG = 'electron-builder'
-npm run $distWinCommand
+bun run $distWinCommand
 $builderExit = $LASTEXITCODE
 if ($builderExit -ne 0) {
   Write-Error "electron-builder/npm run $distWinCommand exited with code $builderExit"
@@ -166,22 +170,59 @@ if ($builderExit -ne 0) {
   exit $builderExit
 }
 
-$exe = Get-ChildItem -Path 'release' -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+$version = (Get-Content package.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
+$shellName = "ZhiYuanAgent-Setup-$version.exe"
+$shells = @(Get-ChildItem -LiteralPath 'release' -Filter $shellName -File)
+$updaters = @(Get-ChildItem -LiteralPath 'release' -Filter '*.exe' -File |
+  Where-Object { $_.Name -ne $shellName })
+if ($shells.Count -ne 1 -or $updaters.Count -ne 1) {
+  throw 'Expected one WebView2 installer and one preserved NSIS updater.'
+}
+$exe = $shells[0]
 if ($exe) {
-  # 保留 lite 发布通道名称，安装包本身是完整的非 llama.cpp 离线包。
+  # Validate these exact unsigned bytes before the existing upload branch.
+  # A unique owned temporary root also supports self-hosted and local runs.
+  $sourceCommit = (& git rev-parse HEAD).Trim()
+  if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[a-f0-9]{40}$') {
+    throw 'Cannot establish the shell acceptance source commit.'
+  }
+  $previousSourceCommit = $env:ZHIYUAN_SOURCE_COMMIT
+  $previousRunId = $env:GITHUB_RUN_ID
+  $previousRunnerTemp = $env:RUNNER_TEMP
+  $temporaryParent = if ($previousRunnerTemp) { $previousRunnerTemp } else { [System.IO.Path]::GetTempPath() }
+  $acceptanceRoot = Join-Path $temporaryParent ("zhiyuan-package-acceptance-" + [Guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Path $acceptanceRoot -ErrorAction Stop | Out-Null
+  try {
+    $env:ZHIYUAN_SOURCE_COMMIT = $sourceCommit
+    if (-not $env:GITHUB_RUN_ID) {
+      $env:GITHUB_RUN_ID = if ($env:CI_PIPELINE_ID -and $env:CI_JOB_ID) {
+        "gitlab-$($env:CI_PIPELINE_ID)-$($env:CI_JOB_ID)"
+      } else {
+        "local-$([Guid]::NewGuid().ToString('N'))"
+      }
+    }
+    $env:RUNNER_TEMP = $acceptanceRoot
+    & node scripts/ci/windows-shell-interactive.mjs
+    if ($LASTEXITCODE -ne 0) { throw 'Shell interactive acceptance failed; upload is blocked.' }
+    $installed = Join-Path $acceptanceRoot 'zhiyuan-shell-acceptance\安装路径\知远.exe'
+    & node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $exe.FullName $installed
+    if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid; upload is blocked.' }
+  } finally {
+    $env:ZHIYUAN_SOURCE_COMMIT = $previousSourceCommit
+    $env:GITHUB_RUN_ID = $previousRunId
+    $env:RUNNER_TEMP = $previousRunnerTemp
+    # Retain the owned installed tree and diagnostic files for investigation.
+    Write-Host "Shell acceptance installation: $acceptanceRoot"
+  }
+
+  # 仅远端下载名称保留 lite；不重命名本地安装器或 NSIS/metadata/blockmap。
+  # 安装包仍含全部七个组件（不含按需下载的本地推理模型）。
   $bundleSuffix = 'lite'
   $baseName = [System.IO.Path]::GetFileNameWithoutExtension($exe.Name)
   $extension = $exe.Extension
   $newName = "$baseName-$bundleSuffix$extension"
-  $newPath = Join-Path $exe.DirectoryName $newName
-  if ($exe.Name -ne $newName) {
-    Move-Item -Path $exe.FullName -Destination $newPath -Force
-    $exe = Get-Item $newPath
-    Write-Host "Renamed package to $($exe.Name)"
-  }
-
   Write-Host "Package: $($exe.FullName) ($([math]::Round($exe.Length / 1MB, 1)) MB)"
-  $encodedName = [uri]::EscapeDataString($exe.Name)
+  $encodedName = [uri]::EscapeDataString($newName)
   $uploadUrl = "http://172.18.5.249:8081/artifactory/ZhiYuanAgent/windows/$encodedName"
   Write-Host "Uploading to $uploadUrl ..."
 

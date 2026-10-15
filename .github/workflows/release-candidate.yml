@@ -199,6 +199,11 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Set up installer shell SDK
+        if: ${{ matrix.platform == 'windows' }}
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
       - name: Set up Windows runtimes
         if: ${{ matrix.platform == 'windows' }}
         run: |
@@ -358,14 +363,40 @@ jobs:
           path: release/*smoke.png
           if-no-files-found: ignore
           retention-days: 7
+      - name: Verify the final signed WebView2 installer interactively
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        env:
+          ZHIYUAN_SOURCE_COMMIT: ${{ needs.prepare-candidate.outputs.commit }}
+        run: |
+          node scripts/ci/windows-shell-interactive.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Signed shell interactive acceptance failed.' }
+          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one signed shell installer.' }
+          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
+          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Signed shell evidence is invalid.' }
+      - name: Upload signed shell acceptance evidence
+        if: ${{ always() && matrix.platform == 'windows' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: signed-shell-acceptance-${{ github.run_id }}
+          path: acceptance-diagnostics/shell-interactive
+          if-no-files-found: error
+          retention-days: 7
       - name: Assemble Windows candidate payload
         if: ${{ matrix.platform == 'windows' }}
         shell: bash
         run: |
           shopt -s nullglob
-          installers=(release/*.exe)
+          installers=(release/ZhiYuanAgent-Setup-*.exe)
+          updaters=()
+          for file in release/*.exe; do
+            [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
+          done
           blockmaps=(release/*.exe.blockmap)
-          [[ ${#installers[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one Windows installer and blockmap' >&2; exit 1; }
+          [[ ${#installers[@]} -eq 1 && ${#updaters[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one WebView2 installer, NSIS updater, and updater blockmap' >&2; exit 1; }
+          [[ "${blockmaps[0]}" == "${updaters[0]}.blockmap" ]] || { echo 'Blockmap must belong to the NSIS updater' >&2; exit 1; }
           node scripts/release/normalize-electron-updater-metadata.mjs \
             '${{ needs.prepare-candidate.outputs.version }}' win32 x64 lite \
             release/latest.yml release/electron-updater/latest.yml
@@ -374,7 +405,7 @@ jobs:
             '${{ needs.prepare-candidate.outputs.commit }}' \
             '${{ github.run_id }}' candidate candidate-win32-x64-lite.json \
             "${installers[0]}:win32:x64:lite:installer" \
-            "${installers[0]}:win32:x64:lite:updater" \
+            "${updaters[0]}:win32:x64:lite:updater" \
             "${blockmaps[0]}:win32:x64:lite:blockmap" \
             'release/electron-updater/latest.yml:win32:x64:lite:metadata'
       - name: Assemble macOS candidate payload

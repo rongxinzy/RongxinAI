@@ -16,7 +16,13 @@ export function planGates(paths: string[], event: string, ref: string): GatePlan
   // Unknown events run everything rather than silently weakening the gate.
   const unknown =
     event !== CiEvent.PullRequest && event !== CiEvent.Push && event !== CiEvent.Manual;
-  const relevant = paths.some(file => packaging.test(file));
+  const relevant = paths.some(
+    file =>
+      packaging.test(file) ||
+      /^(?:scripts\/nsis[^/]*|scripts\/ci\/(?:windows-(?:installer|shell)|gates\/)|tests\/nsis-installer\.test\.ts$)/.test(
+        file,
+      ),
+  );
   const installations = event === CiEvent.PullRequest && relevant;
   return {
     [HeavyJob.Linux]: full || unknown || installations,

@@ -17,16 +17,17 @@ const projectRoot = path.resolve(__dirname, '..', '..');
 const appDir = path.join(projectRoot, 'scripts', 'installer-shell', 'app');
 const previewDir = path.join(projectRoot, 'scripts', 'installer-shell', 'preview');
 const outDir = path.join(projectRoot, 'scripts', 'installer-shell', 'out');
-const dotnet =
-  process.env.ZHIYUAN_DOTNET || path.join(projectRoot, '.cache', 'dotnet', 'dotnet.exe');
+const localDotnet = path.join(projectRoot, '.cache', 'dotnet', 'dotnet.exe');
+const dotnet = process.env.ZHIYUAN_DOTNET || (fs.existsSync(localDotnet) ? localDotnet : 'dotnet');
 
 function fail(message) {
   console.error(`[installer-shell] ${message}`);
   process.exitCode = 1;
 }
 
-if (!fs.existsSync(dotnet)) {
-  fail(`dotnet not found at ${dotnet}`);
+const probe = spawnSync(dotnet, ['--version'], { encoding: 'utf8' });
+if (probe.status !== 0) {
+  fail(`.NET SDK not found at ${dotnet}: ${probe.error?.message || probe.stderr || ''}`);
   return;
 }
 
@@ -45,6 +46,7 @@ const publish = spawnSync(
     'true',
     '-p:PublishSingleFile=true',
     '-p:IncludeNativeLibrariesForSelfExtract=true',
+    '-p:EnableCompressionInSingleFile=true',
   ],
   { cwd: appDir, encoding: 'utf8' },
 );
@@ -72,6 +74,7 @@ fs.copyFileSync(
 console.log(`[installer-shell] staged UI at ${uiDir}`);
 
 const exe = path.join(outDir, 'ZhiYuanSetupShell.exe');
+fs.copyFileSync(exe, path.join(outDir, 'ZhiYuanUninstall.exe'));
 if (process.argv.includes('--run')) {
   const child = spawnSync('cmd.exe', ['/c', 'start', '', exe], { cwd: outDir, stdio: 'ignore' });
   if (child.error) {

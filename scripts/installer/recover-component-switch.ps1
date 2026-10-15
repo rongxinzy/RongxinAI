@@ -8,9 +8,14 @@ if (-not (Test-Path -LiteralPath $statePath)) {
   exit 0
 }
 
-$states = @(Get-Content -LiteralPath $statePath | Where-Object {
-  $_ -match '^[a-z0-9][a-z0-9_-]*\|(?:True|False)$'
-})
+$states = @(Get-Content -LiteralPath $statePath)
+# Validate the entire journal before touching any pointer. Retired/unknown
+# component records must remain available without restoring their runtimes.
+foreach ($state in $states) {
+  if ($state -cnotmatch '^(?:channel-runtime|mcps|portable-git|python|skill-python|skills|uv)\|(?:True|False)\z') {
+    throw "Unsupported component recovery state; preserving journal: $state"
+  }
+}
 [array]::Reverse($states)
 
 foreach ($state in $states) {

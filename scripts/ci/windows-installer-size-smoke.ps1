@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $installers = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'release') -Filter '*.exe' -File |
-  Where-Object { $_.Name -notlike '*Uninstall*' })
+  Where-Object { $_.Name -notlike '*Uninstall*' -and $_.Name -notlike 'ZhiYuanAgent-Setup-*' })
 if ($installers.Count -ne 1) {
   throw "Expected exactly one Windows installer; found $($installers.Count)"
 }

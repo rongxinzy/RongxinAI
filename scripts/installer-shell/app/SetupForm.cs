@@ -11,19 +11,15 @@ internal static class Program
     private static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        // Single-instance guard, same intent as electron-builder's
-        // ALLOW_ONLY_ONE_INSTALLER_INSTANCE: a second setup process would
-        // sweep the first one's live %TEMP%\zhiyuan-setup-* payload dir during
-        // self-extraction. The mutex name is scoped per mode; a duplicate UI
-        // instance activates the running window instead, a duplicate silent
-        // uninstall exits non-zero (another uninstall is in progress).
+        // Install and uninstall share a mutex: neither may mutate component
+        // pointers or registration while the other operation is running.
         var uninstallMode = SetupForm.IsUninstallMode(args);
-        var mutexName = "ZhiYuanAgentSetup-" + InstallerEngine.AppGuid + (uninstallMode ? "-uninstall" : "");
+        var mutexName = "ZhiYuanAgentSetup-" + InstallerEngine.AppGuid;
         var mutex = new Mutex(initiallyOwned: true, name: mutexName, out var createdNew);
         if (!createdNew)
         {
             try { mutex.Dispose(); } catch { }
-            if (args.Contains("--silent"))
+            if (SetupArguments.IsSilent(args))
             {
                 Environment.ExitCode = 1;
                 return;
@@ -37,9 +33,11 @@ internal static class Program
             // events mirrored to the same JSONL log the UI path writes.
             // Unknown arguments are ignored everywhere (ARP passes /S,
             // --updated, etc.).
-            if (uninstallMode && args.Contains("--silent"))
+            if (SetupArguments.IsSilent(args))
             {
-                Environment.ExitCode = SetupForm.RunSilentUninstall(args);
+                Environment.ExitCode = uninstallMode
+                    ? SetupForm.RunSilentUninstall(args)
+                    : SetupForm.RunSilentInstall(args);
                 return;
             }
             Application.Run(new SetupForm(args));
@@ -86,7 +84,14 @@ public sealed class SetupForm : Form
     private readonly string[] rawArgs;
     private bool selfTestClose;
 
-    private readonly CancellationTokenSource installCts = new();
+    private CancellationTokenSource installCts = new();
+    private bool operationActive;
+    private bool closeRequested;
+    private bool launchStarted;
+    private bool completedUpgrade;
+    private readonly string webViewDataDir = Path.Combine(Path.GetTempPath(), "zy-webview-" + Guid.NewGuid().ToString("n"));
+    private string? materializedUiDir;
+    private readonly Uri uiUri;
     private readonly string eventsLogPath;
     private string installState = "idle";
     private string? lastLaunchPath;
@@ -143,11 +148,11 @@ public sealed class SetupForm : Form
         uninstallMode = IsUninstallMode(args);
         skipRegistration = args.Contains("--skip-registration");
         payloadDir = ValueAfter(args, "--payload");
-        forcedInstallDir = ValueAfter(args, "--install-dir");
+        forcedInstallDir = SetupArguments.InstallDirectory(args);
         runtimeRootOverride = ValueAfter(args, "--runtime-root");
         appDataRootOverride = ValueAfter(args, "--app-data-root");
         skipCleanupOf = ValueAfter(args, "--skip-cleanup-of");
-        eventsLogPath = Path.Combine(Path.GetTempPath(), "zy-setup-events.jsonl");
+        eventsLogPath = SetupArguments.EventsLogPath(args);
 
         Text = uninstallMode ? "知远智能体 卸载程序" : "知远智能体 安装程序";
         FormBorderStyle = FormBorderStyle.None;
@@ -164,6 +169,14 @@ public sealed class SetupForm : Form
         webView.NavigationCompleted += async (_, e) =>
         {
             DebugLog($"navigation completed: IsSuccess={e.IsSuccess} WebErrorStatus={e.WebErrorStatus} Uri={webView.Source}");
+            if (!e.IsSuccess)
+            {
+                Environment.ExitCode = 1;
+                OnEngineEvent(new EngineEvent(Type: "ui-error", Message: "安装界面无法加载，请重新下载安装程序。", Detail: e.WebErrorStatus.ToString()));
+                MessageBox.Show(this, "安装界面无法加载，请重新下载安装程序。\nSetup could not load its interface. Download the complete installer and try again.", Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                BeginInvoke(Close);
+                return;
+            }
             if (selfTestClose && webView.CoreWebView2 is not null)
             {
                 await Task.Delay(800);
@@ -179,9 +192,7 @@ public sealed class SetupForm : Form
                 // Let the page settle, then drive the same path as the hero
                 // page Install click: real events, no simulated timing.
                 await Task.Delay(1200);
-                bridge.StartInstall(
-                    forcedInstallDir ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir(),
-                    false);
+                bridge.StartInstall(forcedInstallDir ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir(), false);
             }
             if (autoUninstall && webView.CoreWebView2 is not null)
             {
@@ -202,14 +213,21 @@ public sealed class SetupForm : Form
         };
         Controls.Add(webView);
 
+        FormClosing += (_, e) =>
+        {
+            if (!operationActive) return;
+            e.Cancel = true;
+            closeRequested = true;
+            installCts.Cancel();
+            OnEngineEvent(new EngineEvent(Type: "phase", Label: "正在安全结束，请稍候"));
+        };
         FormClosed += (_, _) =>
         {
-            // Best-effort temp cleanup for the materialized UI and any stale
-            // extraction dirs from crashed runs.
-            foreach (var dir in Directory.EnumerateDirectories(Path.GetTempPath(), "zhiyuan-setup-*"))
-            {
-                try { Directory.Delete(dir, recursive: true); } catch { }
-            }
+            webView.Dispose();
+            installCts.Dispose();
+            foreach (var dir in new[] { materializedUiDir, webViewDataDir })
+                if (dir is not null)
+                    try { InstallDirectoryTransaction.DeleteTreeWithoutFollowingLinks(dir); } catch { }
         };
 
         Load += async (_, _) =>
@@ -217,20 +235,32 @@ public sealed class SetupForm : Form
             DebugLog("form load; ensuring CoreWebView2");
             try
             {
-                await webView.EnsureCoreWebView2Async();
+                var port = SetupArguments.AcceptanceDebugPort(args);
+                var browserOptions = new CoreWebView2EnvironmentOptions();
+                string? browserExecutableFolder = null;
+                if (port is not null)
+                {
+                    browserOptions.AdditionalBrowserArguments = $"--remote-debugging-address=127.0.0.1 --remote-debugging-port={port.Value}";
+                    browserExecutableFolder = ValueAfter(args, "--webview2-runtime-path");
+                }
+                var environment = await CoreWebView2Environment.CreateAsync(browserExecutableFolder, webViewDataDir, browserOptions);
+                await webView.EnsureCoreWebView2Async(environment);
+                webView.Source = uiUri;
                 DebugLog("CoreWebView2 ready");
             }
             catch (Exception ex)
             {
                 DebugLog($"EnsureCoreWebView2 failed: {ex}");
+                Environment.ExitCode = 1;
+                OnEngineEvent(new EngineEvent(Type: "webview2-error", Message: "Microsoft Edge WebView2 Runtime 无法加载", Detail: ex.GetType().Name));
                 // Without the runtime the page never renders and the user would
                 // stare at a blank window — say exactly what is missing.
                 var chinese = System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
                 MessageBox.Show(
                     this,
                     chinese
-                        ? "无法加载 Microsoft Edge WebView2 运行环境，安装界面无法显示。\n\n知远智能体需要 WebView2 Runtime，请从微软官网安装后重新运行安装程序。"
-                        : "Microsoft Edge WebView2 Runtime is required to show the setup UI but could not be loaded.\n\nInstall Microsoft Edge WebView2 Runtime from Microsoft and run the setup again.",
+                        ? "无法加载 Microsoft Edge WebView2 运行环境，安装界面无法显示。\n\n知远智能体需要 WebView2 Runtime，请从微软官网安装后重新运行安装程序：\nhttps://developer.microsoft.com/microsoft-edge/webview2/"
+                        : "Microsoft Edge WebView2 Runtime is required to show the setup UI but could not be loaded.\n\nInstall Microsoft Edge WebView2 Runtime from Microsoft and run the setup again:\nhttps://developer.microsoft.com/microsoft-edge/webview2/",
                     chinese ? "知远智能体 安装程序" : "ZhiYuan Agent Setup",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -260,12 +290,15 @@ public sealed class SetupForm : Form
             Path = uiPath,
             Query = query,
         };
-        webView.Source = uri.Uri;
+        uiUri = uri.Uri;
     }
 
     private ShellBridge bridge = null!;
 
     public string CurrentInstallState => installState;
+
+    internal string GetPreferredInstallDir() => forcedInstallDir ??
+        InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir();
 
     public static string DefaultInstallDir()
     {
@@ -289,7 +322,7 @@ public sealed class SetupForm : Form
 
     private static string UninstallInstallDir(string[] args)
     {
-        var forced = ValueAfter(args, "--install-dir");
+        var forced = SetupArguments.InstallDirectory(args);
         if (forced is not null) return Path.GetFullPath(forced);
         var processDir = Environment.ProcessPath is null ? null : Path.GetDirectoryName(Environment.ProcessPath);
         return processDir ?? DefaultInstallDir();
@@ -301,28 +334,53 @@ public sealed class SetupForm : Form
     /// pool and the process could exit before the done event is written).</summary>
     public static int RunSilentUninstall(string[] args)
     {
-        var eventsLogPath = Path.Combine(Path.GetTempPath(), "zy-setup-events.jsonl");
+        var eventsLogPath = SetupArguments.EventsLogPath(args);
+        var errorReported = false;
         var progress = new InlineProgress(evt =>
         {
-            try
-            {
-                File.AppendAllText(eventsLogPath, evt.ToJson() + Environment.NewLine);
-            }
-            catch { /* diagnostics only */ }
+            if (evt.Type == "error") errorReported = true;
+            AppendEvent(eventsLogPath, evt);
         });
-        var engine = new UninstallerEngine(
-            UninstallInstallDir(args),
-            ValueAfter(args, "--runtime-root"),
-            ValueAfter(args, "--app-data-root"),
-            ValueAfter(args, "--skip-cleanup-of"),
-            progress);
         try
         {
+            var engine = new UninstallerEngine(
+                UninstallInstallDir(args),
+                ValueAfter(args, "--runtime-root"),
+                ValueAfter(args, "--app-data-root"),
+                ValueAfter(args, "--skip-cleanup-of"), progress);
             engine.UninstallAsync(CancellationToken.None).GetAwaiter().GetResult();
             return 0;
         }
-        catch
+        catch (Exception ex)
         {
+            if (!errorReported)
+                AppendEvent(eventsLogPath, new EngineEvent(Type: "error", Message: ex.Message, Detail: ex.GetType().Name));
+            return 1;
+        }
+    }
+
+    public static int RunSilentInstall(string[] args)
+    {
+        var logPath = SetupArguments.EventsLogPath(args);
+        var errorReported = false;
+        var progress = new InlineProgress(evt =>
+        {
+            if (evt.Type == "error") errorReported = true;
+            AppendEvent(logPath, evt);
+        });
+        try
+        {
+            var engine = new InstallerEngine(ValueAfter(args, "--payload"),
+                SetupArguments.InstallDirectory(args) ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir(),
+                ValueAfter(args, "--runtime-root"), ValueAfter(args, "--app-data-root"),
+                !args.Contains("--skip-registration"), progress);
+            engine.RunAsync(false, CancellationToken.None).GetAwaiter().GetResult();
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            if (!errorReported)
+                AppendEvent(logPath, new EngineEvent(Type: "error", Message: ex.Message, Detail: ex.GetType().Name));
             return 1;
         }
     }
@@ -344,12 +402,12 @@ public sealed class SetupForm : Form
         public void Report(EngineEvent value) => handler(value);
     }
 
-    private static string ResolveUiPath(string[] args)
+    private string ResolveUiPath(string[] args)
     {
-        var flagsWithValue = new HashSet<string> { "--capture-preview", "--capture-delay", "--ui-query", "--payload", "--install-dir", "--runtime-root", "--app-data-root", "--skip-cleanup-of" };
+        var flagsWithValue = new HashSet<string> { "--capture-preview", "--capture-delay", "--ui-query", "--payload", "--install-dir", "--runtime-root", "--app-data-root", "--skip-cleanup-of", "--events-log", "--acceptance-debug-port", "--webview2-runtime-path" };
         for (var i = 0; i < args.Length; i++)
         {
-            if (args[i].StartsWith('-')) continue;
+            if (args[i].StartsWith('-') || args[i].StartsWith('/') || args[i].StartsWith("_?=", StringComparison.Ordinal)) continue;
             if (i > 0 && flagsWithValue.Contains(args[i - 1])) continue;
             return Path.GetFullPath(args[i]);
         }
@@ -357,7 +415,8 @@ public sealed class SetupForm : Form
         if (File.Exists(staged)) return staged;
         // Single-file SFX: no sidecar ui/ directory — materialize the embedded
         // page and brand assets into a temp dir for this process.
-        var uiDir = Path.Combine(Path.GetTempPath(), "zhiyuan-setup-ui-" + Environment.ProcessId);
+        var uiDir = Path.Combine(Path.GetTempPath(), "zhiyuan-setup-ui-" + Guid.NewGuid().ToString("n"));
+        materializedUiDir = uiDir;
         try
         {
             Directory.CreateDirectory(Path.Combine(uiDir, "assets"));
@@ -383,12 +442,12 @@ public sealed class SetupForm : Form
 
     private void OnEngineEvent(EngineEvent evt)
     {
-        if (evt.Type == "done") { installState = "done"; lastLaunchPath = evt.LaunchPath; }
-        else if (evt.Type == "error") { installState = "cancelled"; }
+        if (evt.Type == "done") { installState = "done"; lastLaunchPath = evt.LaunchPath; completedUpgrade = evt.IsUpgrade == true; }
+        else if (evt.Type == "error") { installState = "error"; }
         var json = evt.ToJson();
         try
         {
-            File.AppendAllText(eventsLogPath, json + Environment.NewLine);
+            AppendEvent(eventsLogPath, evt);
         }
         catch { /* diagnostics only */ }
         DebugLog($"engine event: {json}");
@@ -422,13 +481,28 @@ public sealed class SetupForm : Form
         webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
         bridge = new ShellBridge(this);
         webView.CoreWebView2.AddHostObjectToScript("shell", bridge);
+        var trustedPath = uiUri.LocalPath;
+        webView.CoreWebView2.NavigationStarting += (_, navigation) =>
+        {
+            if (!Uri.TryCreate(navigation.Uri, UriKind.Absolute, out var target) || !target.IsFile ||
+                !string.Equals(target.LocalPath, trustedPath, StringComparison.OrdinalIgnoreCase)) navigation.Cancel = true;
+        };
+        webView.CoreWebView2.NewWindowRequested += (_, navigation) => navigation.Handled = true;
     }
 
     private void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         var message = e.WebMessageAsJson;
         DebugLog($"web message: {message}");
-        if (message.Contains("\"drag\""))
+        string? messageType;
+        try
+        {
+            using var parsed = System.Text.Json.JsonDocument.Parse(message);
+            if (!parsed.RootElement.TryGetProperty("type", out var type)) return;
+            messageType = type.GetString();
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException) { return; }
+        if (messageType == "drag")
         {
             BeginInvoke(() =>
             {
@@ -436,7 +510,7 @@ public sealed class SetupForm : Form
                 SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
             });
         }
-        else if (message.Contains("\"close\""))
+        else if (messageType == "close")
         {
             BeginInvoke(Close);
         }
@@ -444,7 +518,11 @@ public sealed class SetupForm : Form
 
     internal void StartInstall(string engineInstallDir, bool localInference)
     {
-        if (installState == "installing") return;
+        if (InvokeRequired) { BeginInvoke(() => StartInstall(engineInstallDir, localInference)); return; }
+        if (operationActive || uninstallMode || installState == "done") return;
+        installCts.Dispose();
+        installCts = new CancellationTokenSource();
+        operationActive = true;
         installState = "installing";
         var core = webView.CoreWebView2;
         if (core is not null)
@@ -454,24 +532,34 @@ public sealed class SetupForm : Form
         // The engine pins its install dir at construction, so build it here
         // from the page-supplied path: a Browse-confirmed directory takes
         // effect exactly as displayed on the hero page.
-        var runEngine = new InstallerEngine(
-            payloadDir,
-            engineInstallDir,
-            runtimeRootOverride,
-            appDataRootOverride,
-            registerInstall: !skipRegistration,
-            new Progress<EngineEvent>(OnEngineEvent));
+        var errorReported = false;
+        var progress = new InlineProgress(evt =>
+        {
+            if (evt.Type == "error") errorReported = true;
+            BeginInvoke(() => OnEngineEvent(evt));
+        });
         _ = Task.Run(async () =>
         {
             try
             {
+                var runEngine = new InstallerEngine(payloadDir, engineInstallDir,
+                    runtimeRootOverride, appDataRootOverride, !skipRegistration, progress);
                 await runEngine.RunAsync(localInference, installCts.Token);
             }
-            catch
+            catch (Exception ex)
             {
-                // the engine already reported the error/cancel event
+                // Constructor/path failures happen before the engine can report.
+                if (!errorReported)
+                    progress.Report(new EngineEvent(Type: "error", Message: ex.Message, Detail: ex.GetType().Name));
             }
+            finally { BeginInvoke(FinishOperation); }
         });
+    }
+
+    private void FinishOperation()
+    {
+        operationActive = false;
+        if (closeRequested) Close();
     }
 
     internal void CancelInstall() => installCts.Cancel();
@@ -495,40 +583,85 @@ public sealed class SetupForm : Form
 
     internal void StartUninstall()
     {
-        if (installState == "uninstalling") return;
+        if (InvokeRequired) { BeginInvoke(StartUninstall); return; }
+        if (operationActive || !uninstallMode || installState == "done") return;
+        installCts.Dispose();
+        installCts = new CancellationTokenSource();
+        operationActive = true;
         installState = "uninstalling";
         var core = webView.CoreWebView2;
         if (core is not null)
         {
             try { BeginInvoke(() => core.PostWebMessageAsJson("{\"type\":\"uninstall-started\"}")); } catch { }
         }
-        var uninstaller = new UninstallerEngine(
-            UninstallInstallDir(rawArgs),
-            runtimeRootOverride,
-            appDataRootOverride,
-            skipCleanupOf,
-            new Progress<EngineEvent>(OnEngineEvent));
+        var errorReported = false;
+        var progress = new InlineProgress(evt =>
+        {
+            if (evt.Type == "error") errorReported = true;
+            BeginInvoke(() => OnEngineEvent(evt));
+        });
         _ = Task.Run(async () =>
         {
             try
             {
+                var uninstaller = new UninstallerEngine(UninstallInstallDir(rawArgs),
+                    runtimeRootOverride, appDataRootOverride, skipCleanupOf, progress);
                 await uninstaller.UninstallAsync(installCts.Token);
             }
-            catch
+            catch (Exception ex)
             {
-                // the engine already reported the error/cancel event
+                if (!errorReported)
+                    progress.Report(new EngineEvent(Type: "error", Message: ex.Message, Detail: ex.GetType().Name));
             }
+            finally { BeginInvoke(FinishOperation); }
         });
     }
 
-    internal void LaunchApp()
+    internal bool LaunchApp()
     {
-        if (lastLaunchPath is null || !File.Exists(lastLaunchPath)) return;
+        if (InvokeRequired) return (bool)Invoke(new Func<bool>(LaunchApp));
+        if (launchStarted) return true;
+        if (installState != "done" || uninstallMode) return false;
         try
         {
-            Process.Start(new ProcessStartInfo { FileName = lastLaunchPath, UseShellExecute = true });
+            if (lastLaunchPath is null || !File.Exists(lastLaunchPath))
+                throw new FileNotFoundException("Installed application executable is missing");
+            using var launched = Process.Start(new ProcessStartInfo
+            {
+                FileName = lastLaunchPath,
+                WorkingDirectory = Path.GetDirectoryName(lastLaunchPath)!,
+                Arguments = completedUpgrade ? "--updated" : string.Empty,
+                UseShellExecute = false,
+            });
+            if (launched is null) throw new InvalidOperationException("Application did not start");
+            launchStarted = true;
+            OnEngineEvent(new EngineEvent(Type: "launched", LaunchPath: lastLaunchPath));
+            return true;
         }
-        catch { /* a fake or moved exe must not break the finish page */ }
+        catch (Exception ex)
+        {
+            DebugLog($"launch failed: {ex}");
+            OnEngineEvent(new EngineEvent(Type: "launch-error", Message: "无法启动应用，请重试，或关闭安装程序后从开始菜单打开。", Detail: ex.GetType().Name));
+            return false;
+        }
+    }
+
+    internal string GetLicenseText()
+    {
+        using var resource = typeof(SetupForm).Assembly.GetManifestResourceStream("ui.license")
+            ?? throw new InvalidOperationException("Embedded license is missing");
+        using var reader = new StreamReader(resource);
+        return reader.ReadToEnd();
+    }
+
+    private static void AppendEvent(string path, EngineEvent evt)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.AppendAllText(path, evt.ToJson() + Environment.NewLine);
+        }
+        catch { /* diagnostics only */ }
     }
 
     private static void DebugLog(string message)
@@ -566,8 +699,7 @@ public sealed class ShellBridge
         form.WindowState = FormWindowState.Minimized;
     });
 
-    public void StartInstall(string installPath, bool localInference)
-        => form.StartInstall(installPath, localInference);
+    public void StartInstall(string installPath, bool localInference) => form.StartInstall(installPath, localInference);
 
     public void StartUninstall() => form.StartUninstall();
 
@@ -575,10 +707,11 @@ public sealed class ShellBridge
 
     public string GetInstallState() => form.CurrentInstallState;
 
-    public string GetDefaultInstallDir() =>
-        InstallerEngine.FindExistingInstallLocation() ?? SetupForm.DefaultInstallDir();
+    public string GetDefaultInstallDir() => form.GetPreferredInstallDir();
 
     public string? BrowseInstallDir(string currentPath) => form.BrowseInstallDir(currentPath);
 
-    public void LaunchApp() => form.LaunchApp();
+    public bool LaunchApp() => form.LaunchApp();
+
+    public string GetLicenseText() => form.GetLicenseText();
 }

@@ -5,20 +5,19 @@ namespace ZhiYuan.Setup.Shell;
 
 /// <summary>
 /// Real uninstall engine for the WebView2 shell, mirroring the electron-builder
-/// NSIS semantics (deleteAppDataOnUninstall: true) plus the shared
+/// NSIS application cleanup semantics plus the shared
 /// scripts/installer/uninstall-cleanup.ps1 detach logic that
 /// scripts/nsis-installer.nsh !macro customUnInstall -File-invokes. Sequence:
 /// stop processes → shared cleanup script (junctions + runtime cache detach) →
-/// start-menu shortcut + registry keys → app data root → install directory
-/// (via a detached cmd retry loop, the same "start /b rd" trick the NSIS
-/// uninstaller uses, so the still-running uninstaller exe is picked up once
-/// this process exits) → done.
+/// start-menu shortcut + registry keys → detached installation cleanup → done.
+/// Personal data is always retained. Cleanup never targets the reusable install
+/// path after returning to an updater, which may immediately install there.
 /// </summary>
 public sealed class UninstallerEngine
 {
     private readonly string installDir;
     private readonly string runtimeRoot;
-    private readonly string appDataRoot;
+    private string? detachedInstallDir;
     private readonly HashSet<string> skipCleanup;
     private readonly IProgress<EngineEvent> progress;
 
@@ -29,14 +28,15 @@ public sealed class UninstallerEngine
         string? skipCleanupOf,
         IProgress<EngineEvent> progress)
     {
-        this.installDir = Path.GetFullPath(installDir);
+        this.installDir = Path.TrimEndingDirectorySeparator(Path.GetFullPath(installDir));
         this.progress = progress;
-        appDataRoot = appDataRootOverride is null
+        var appDataRoot = appDataRootOverride is null
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZhiYuanAgent")
             : Path.GetFullPath(appDataRootOverride);
         runtimeRoot = runtimeRootOverride is null
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ZhiYuanAgent", "runtimes")
             : Path.GetFullPath(runtimeRootOverride);
+        InstallDirectoryTransaction.ValidateRoots(this.installDir, runtimeRoot, appDataRoot);
         skipCleanup = new HashSet<string>(
             (skipCleanupOf ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
             StringComparer.OrdinalIgnoreCase);
@@ -46,11 +46,20 @@ public sealed class UninstallerEngine
     {
         try
         {
+            if (!Directory.Exists(installDir))
+            {
+                progress.Report(new EngineEvent(Type: "done", InstallDir: installDir));
+                return;
+            }
+            ValidateInstallOwnership();
             await StepStopAppProcesses(cancellationToken);
-            await StepCleanupRuntimeCaches(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            StepDetachInstallDirectory();
+            // The destructive part cannot be meaningfully cancelled. Complete
+            // cleanup after the atomic detach instead of stranding half a run.
+            await StepCleanupRuntimeCaches(CancellationToken.None);
             StepRemoveShortcutAndRegistry();
-            StepRemoveAppData();
-            await StepRemoveInstallDirAsync(cancellationToken);
+            await StepRemoveInstallDirAsync(CancellationToken.None);
             progress.Report(new EngineEvent(Type: "done", InstallDir: installDir));
         }
         catch (OperationCanceledException)
@@ -88,7 +97,7 @@ public sealed class UninstallerEngine
             if (targets.Count == 0) return;
             foreach (var proc in targets)
             {
-                try { proc.Kill(); } catch { /* already exited or access denied */ }
+                using (proc) { try { proc.Kill(); } catch { /* already exited or access denied */ } }
             }
             if (attempt > 0) await Task.Delay(500, ct);
         }
@@ -112,12 +121,35 @@ public sealed class UninstallerEngine
         {
             string? path = null;
             try { path = proc.MainModule?.FileName; } catch { /* access denied */ }
-            if (path is null || proc.Id == Environment.ProcessId) continue;
-            if (roots.Any(r => path.StartsWith(r, StringComparison.CurrentCultureIgnoreCase)))
+            if (path is null || proc.Id == Environment.ProcessId) { proc.Dispose(); continue; }
+            if (roots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
             {
                 yield return proc;
             }
+            else proc.Dispose();
         }
+    }
+
+    private void StepDetachInstallDirectory()
+    {
+        if (skipCleanup.Contains("install-dir") || !Directory.Exists(installDir)) return;
+        ValidateInstallOwnership();
+        ReportPhase("正在移除应用程序，个人数据将保留");
+        Environment.CurrentDirectory = Path.GetTempPath();
+        var target = installDir + ".uninstall." + Guid.NewGuid().ToString("n");
+        try { Directory.Move(installDir, target); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new EngineException("安装目录仍被占用，请关闭相关程序后重试卸载。", ex.GetType().Name);
+        }
+        detachedInstallDir = target;
+    }
+
+    private void ValidateInstallOwnership()
+    {
+        if (!File.Exists(Path.Combine(installDir, InstallerEngine.AppExeName)) ||
+            !File.Exists(Path.Combine(installDir, "resources", "app.asar")))
+            throw new EngineException("所选目录不是知远安装目录，未删除任何文件。");
     }
 
     /// <summary>The shared cleanup script staged next to the app by the
@@ -132,7 +164,8 @@ public sealed class UninstallerEngine
             return;
         }
         ReportPhase("正在清理本地离线运行环境");
-        var script = Path.Combine(installDir, "scripts", "uninstall-cleanup.ps1");
+        var cleanupRoot = detachedInstallDir ?? installDir;
+        var script = Path.Combine(cleanupRoot, "scripts", "uninstall-cleanup.ps1");
         if (!File.Exists(script))
         {
             progress.Report(new EngineEvent(
@@ -142,7 +175,7 @@ public sealed class UninstallerEngine
         await ShellProcessRunner.RunAsync(
             "powershell.exe",
             $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{script}\" " +
-                $"-InstallDir \"{installDir}\" -RuntimeRoot \"{runtimeRoot}\"",
+                $"-InstallDir \"{cleanupRoot}\" -RuntimeRoot \"{runtimeRoot}\"",
             ct,
             failureMessage: null);
         progress.Report(new EngineEvent(Type: "progress", Percent: 40));
@@ -177,43 +210,39 @@ public sealed class UninstallerEngine
         progress.Report(new EngineEvent(Type: "progress", Percent: 60));
     }
 
-    /// <summary>deleteAppDataOnUninstall: true — the whole %APPDATA%\ZhiYuanAgent
-    /// tree (sessions, memory projection, pending markers) goes away.</summary>
-    private void StepRemoveAppData()
-    {
-        ReportPhase("正在删除个人数据");
-        if (skipCleanup.Contains("app-data")) return;
-        if (Directory.Exists(appDataRoot))
-        {
-            Directory.Delete(appDataRoot, recursive: true);
-        }
-        progress.Report(new EngineEvent(Type: "progress", Percent: 80));
-    }
-
-    /// <summary>The install directory still contains this running uninstaller,
-    /// so a direct recursive delete would fail. Hand the tree to a detached
-    /// cmd retry loop working from %TEMP% — the same "start /b rd" trick the
-    /// NSIS uninstaller uses: rd fails while we are alive, succeeds the moment
-    /// this process exits, and never blocks the done event.</summary>
+    /// <summary>The renamed directory can still contain the running host.
+    /// Retry removal of that detached tree only; a newer installation may
+    /// already be using the original path when the host finally exits.</summary>
     private Task StepRemoveInstallDirAsync(CancellationToken ct)
     {
         ReportPhase("正在删除安装目录");
         ct.ThrowIfCancellationRequested();
-        if (skipCleanup.Contains("install-dir") || !Directory.Exists(installDir))
+        if (detachedInstallDir is null || !Directory.Exists(detachedInstallDir))
         {
             return Task.CompletedTask;
         }
-        var retryLoop =
-            $"for /l %i in (1,1,60) do @(rd /s /q \"{installDir}\" >nul 2>&1 & " +
-            $"if not exist \"{installDir}\" exit /b 0 & ping -n 2 127.0.0.1 >nul)";
+        // Paths are inherited as data, never interpolated into cmd syntax.
+        // Remove links themselves rather than traversing external user files.
+        var cleanup = "Wait-Process -Id ([int]$env:ZY_UNINSTALL_PID) -ErrorAction SilentlyContinue; " +
+            "function Remove-Tree([string]$p) { " +
+            "if (-not (Test-Path -LiteralPath $p)) { return }; " +
+            "$item=Get-Item -LiteralPath $p -Force; " +
+            "if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($p); return }; " +
+            "Get-ChildItem -LiteralPath $p -Force | ForEach-Object { " +
+            "if ($_.PSIsContainer) { Remove-Tree $_.FullName } else { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop } }; " +
+            "[IO.Directory]::Delete($p) }; " +
+            "for ($i=0; $i -lt 60; $i++) { try { Remove-Tree $env:ZY_UNINSTALL_TREE; break } catch { Start-Sleep -Seconds 1 } }";
+        var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(cleanup));
         var startInfo = new ProcessStartInfo
         {
-            FileName = "cmd.exe",
-            Arguments = $"/c start \"\" /b cmd /d /c \"{retryLoop}\"",
+            FileName = "powershell.exe",
+            Arguments = $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}",
             WorkingDirectory = Path.GetTempPath(),
             UseShellExecute = false,
             CreateNoWindow = true,
         };
+        startInfo.Environment["ZY_UNINSTALL_TREE"] = detachedInstallDir;
+        startInfo.Environment["ZY_UNINSTALL_PID"] = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         using var detached = Process.Start(startInfo);
         if (detached is null) throw new InvalidOperationException("failed to spawn the install-directory cleanup");
         progress.Report(new EngineEvent(Type: "progress", Percent: 100));

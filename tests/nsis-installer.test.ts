@@ -155,8 +155,9 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(uninstallCleanupScript).toContain('current.next');
     expect(uninstallCleanupScript).toContain('current.previous');
-    expect(uninstallCleanupScript).toContain('.uninstall.');
-    expect(uninstallCleanupScript).toContain('cmd /d /c rd /s /q');
+    expect(uninstallCleanupScript).toContain('Remove-TreeWithoutFollowingLinks');
+    expect(uninstallCleanupScript).toContain('Assert-PhysicalPath $RuntimeRoot');
+    expect(uninstallCleanupScript).not.toContain('cmd /d /c rd /s /q');
     for (const moved of [
       '$$ErrorActionPreference = \\"Stop\\"',
       'Set-StrictMode -Version Latest',
@@ -171,7 +172,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(activateScript).toContain('Set-StrictMode -Version Latest');
     expect(activateScript).toContain('Missing prepared component target:');
     expect(activateScript).toContain(
-      'New-Item -ItemType Junction -Path $next -Target $target -Force -ErrorAction Stop',
+      'New-LiteralDirectoryJunction -LinkPath $next -TargetPath $target',
     );
     expect(activateScript).toContain('component-switch-state.txt');
     expect(installerScript).toContain('component-switch-state.txt');
@@ -204,7 +205,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(activateScript).toContain('^[0-9a-f]{64}\\z');
     expect(activateScript).not.toContain('^[0-9a-f]{64}$');
     expect(activateScript).toContain(
-      'New-Item -ItemType Junction -Path $next -Target $target -Force -ErrorAction Stop',
+      'New-LiteralDirectoryJunction -LinkPath $next -TargetPath $target',
     );
     expect(offlineComponents).toEqual([
       {
@@ -376,7 +377,11 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(installerScript).not.toContain('Get-ChildItem -Path "$$INSTDIR.old*"');
     expect(installerScript).not.toContain('Get-ChildItem -Path "$INSTDIR.old*"');
-    expect(cleanupScript).toContain('Get-ChildItem -Path "$InstallDir.old*"');
+    expect(cleanupScript).not.toContain('Get-ChildItem -Path "$InstallDir.old*"');
+    expect(cleanupScript).toContain('[switch]$UseExactOldInstallPath');
+    expect(cleanupScript).toContain('[regex]::Escape($installFull)');
+    expect(cleanupScript).toContain('Assert-PhysicalDirectoryPath $backup');
+    expect(cleanupScript).toContain('Remove-TreeWithoutFollowingLinks $target');
   });
 
   test('stops processes by install-root path prefix so orphaned sidecars cannot block setup', () => {
@@ -398,10 +403,11 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(macroBlock).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes');
     // The prefix root is normalized with a trailing separator so sibling
     // directories that merely share a name prefix cannot match.
-    expect(macroBlock).toContain('TrimEnd([char]0x27) + [char]0x27');
+    expect(macroBlock).toContain('TrimEnd([char]0x5c) + [char]0x5c');
+    expect(macroBlock).not.toContain('[char]0x27');
     expect(macroBlock).toContain('StartsWith(($$roots[0].TrimEnd');
     expect(macroBlock).toContain('StartsWith(($$roots[1].TrimEnd');
-    expect(macroBlock).toContain('CurrentCultureIgnoreCase');
+    expect(macroBlock).toContain('OrdinalIgnoreCase');
     expect(macroBlock).toContain('Stop-Process -Id $$proc.ProcessId -Force');
     // An in-place uninstaller runs from $INSTDIR and must not kill itself.
     expect(macroBlock).toContain('GetCurrentProcessId');
@@ -551,7 +557,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('!macro customUnInstallCheckCurrentUser');
   });
 
-  test('detaches expanded runtime caches before deleting them asynchronously', () => {
+  test('removes only owned component caches without following directory links', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const uninstallBlock = installerScript.slice(
       installerScript.indexOf('!macro customUnInstall\n'),
@@ -570,12 +576,25 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(uninstallBlock.indexOf('SetOutPath "$TEMP"')).toBeLessThan(
       uninstallBlock.indexOf("nsExec::ExecToLog 'powershell"),
     );
-    // Detach semantics moved into the shared script: rename the live cache to
-    // a .uninstall.<tick> name and hand it to a background recursive delete.
-    expect(uninstallCleanupScript).toContain('.uninstall.');
-    expect(uninstallCleanupScript).toContain('Rename-Item');
-    expect(uninstallCleanupScript).toContain('start "" /b cmd /d /c rd /s /q');
-    expect(uninstallCleanupScript).toContain('runtime-packs');
+    // Unknown/retired folders are not application-owned. Reclaim only current
+    // components with a matching completion record and never traverse links.
+    expect(uninstallCleanupScript).toContain('Assert-PhysicalPath $RuntimeRoot');
+    expect(uninstallCleanupScript).toContain('Remove-TreeWithoutFollowingLinks');
+    expect(uninstallCleanupScript).toContain("$version.Name -cnotmatch '^[0-9a-f]{64}\\z'");
+    expect(uninstallCleanupScript).toContain('-cne $version.Name');
+    expect(uninstallCleanupScript).toContain('[IO.FileAttributes]::ReparsePoint');
+    for (const key of [
+      'channel-runtime',
+      'skills',
+      'mcps',
+      'portable-git',
+      'python',
+      'skill-python',
+      'uv',
+    ]) {
+      expect(uninstallCleanupScript).toContain(`'${key}'`);
+    }
+    expect(uninstallCleanupScript).not.toContain('cmd /d /c rd /s /q');
     expect(uninstallCleanupScript).not.toContain(
       'Remove-Item -LiteralPath $RuntimeRoot -Recurse -Force',
     );

@@ -72,6 +72,14 @@ describe.skipIf(process.platform !== 'win32')('Windows installer size smoke chec
     expect(result.stdout).toContain('non-component bytes: 60');
   });
 
+  test('checks the NSIS budget separately when a final WebView2 installer is also present', () => {
+    const root = createFixture();
+    fs.writeFileSync(path.join(root, 'release', 'ZhiYuanAgent-Setup-1.0.0.exe'), Buffer.alloc(120));
+    const result = runSizeCheck(root, 100, 40, 60);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('ZhiYuan-Setup.exe');
+  });
+
   test.each([
     ['component', 100, 39, 60, 'component archives are unexpectedly large'],
     ['non-component', 100, 40, 59, 'non-component payload is unexpectedly large'],

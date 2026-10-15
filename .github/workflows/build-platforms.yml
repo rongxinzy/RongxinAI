@@ -104,6 +104,11 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Set up installer shell SDK
+        if: ${{ matrix.platform == 'windows' }}
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
       - name: Set up Windows runtimes
         if: ${{ matrix.platform == 'windows' }}
         run: |
@@ -151,6 +156,25 @@ jobs:
           node scripts/verify-linux-renderer.mjs
           release/linux-unpacked
           release/linux-render-smoke.png
+      - name: Verify the final WebView2 installer interactively
+        if: ${{ matrix.platform == 'windows' }}
+        shell: pwsh
+        run: |
+          node scripts/ci/windows-shell-interactive.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Shell interactive acceptance failed.' }
+          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one shell installer.' }
+          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
+          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid.' }
+      - name: Upload shell acceptance evidence
+        if: ${{ always() && matrix.platform == 'windows' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: shell-acceptance-${{ github.run_id }}
+          path: acceptance-diagnostics/shell-interactive
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v6
         if: ${{ matrix.platform == 'macos' }}
         with:
