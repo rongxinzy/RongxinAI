@@ -276,6 +276,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     allVisibleSessionIdsRef.current = ids;
   }, []);
 
+  const handleDismissSearch = useCallback(() => {
+    setSearchActive(false);
+  }, []);
+
+  const handleCreateScheduledTask = useCallback(
+    (workspace: WorkspaceSidebarNode) => {
+      requestScheduledTaskCreate({ workspaceId: workspace.id });
+      onShowScheduledTasks();
+    },
+    [onShowScheduledTasks],
+  );
+
   useEffect(() => {
     if (workMode !== WorkMode.Chat) return;
     handleVisibleSessionsChange(chatTaskNodes.map(task => task.id));
@@ -468,13 +480,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                   onVisibleSessionsChange={
                     workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
                   }
-                  onDismissSearch={() => {
-                    setSearchActive(false);
-                  }}
-                  onCreateScheduledTask={(workspace: WorkspaceSidebarNode) => {
-                    requestScheduledTaskCreate({ workspaceId: workspace.id });
-                    onShowScheduledTasks();
-                  }}
+                  onDismissSearch={handleDismissSearch}
+                  onCreateScheduledTask={handleCreateScheduledTask}
                   workMode={WorkMode.Work}
                 />
               </div>
