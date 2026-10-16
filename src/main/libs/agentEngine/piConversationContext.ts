@@ -172,11 +172,17 @@ export interface PiHistoryRestoreStore {
     contentBytes: number;
     metadataBytes: number;
   };
+  /** Legacy full-read fallback used only when paged reads are unavailable. */
+  getSession?(
+    sessionId: string,
+    messageLimit?: number | null,
+  ): { messages: CoworkMessage[] } | null;
 }
 
 /**
  * Builds the restore prompt for a session rebuild from paged tail reads.
- * Returns the bare prompt when the store cannot serve paged reads.
+ * Stores that cannot page fall back to the legacy full read rather than
+ * dropping the whole history.
  */
 export const restorePiConversationPrompt = (
   store: PiHistoryRestoreStore | null | undefined,
@@ -184,7 +190,11 @@ export const restorePiConversationPrompt = (
   currentPrompt: string,
   options: { maxChars?: number; ocrCommandFor?: (imagePath: string) => string } = {},
 ): string => {
-  if (!store || typeof store.getSessionMessagesDesc !== 'function') return currentPrompt;
+  if (!store || typeof store.getSessionMessagesDesc !== 'function') {
+    if (typeof store?.getSession !== 'function') return currentPrompt;
+    const legacy = store.getSession(sessionId, null);
+    return buildPiConversationPrompt(legacy?.messages ?? [], currentPrompt, options);
+  }
   return buildPiConversationPromptFromPages(
     (offset, limit) => store.getSessionMessagesDesc(sessionId, limit, offset),
     currentPrompt,

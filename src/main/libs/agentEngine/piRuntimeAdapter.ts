@@ -850,9 +850,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       },
       emitRetryNotice: (sessionId, notice) => this.emit('retryNotice', sessionId, notice),
       resumeSession: (sessionId, prompt) =>
+        // The rebuild swaps the Pi session, so session-scoped approval settings
+        // must travel with it (same rule as the image-fallback resume): an
+        // "allow all" session otherwise asks for every side-effect tool call
+        // for the rest of its life.
         this.continueSession(sessionId, prompt, {
           _skipUserMessage: true,
           _streamStallResume: true,
+          approvalMode: this.activeSessions.get(sessionId)?.approvalMode,
         }),
       disposeWatchdog: sessionId => {
         this.streamStallWatchdog.dispose(sessionId);
