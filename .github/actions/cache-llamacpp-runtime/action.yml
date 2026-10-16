@@ -1,0 +1,52 @@
+name: Cache llama.cpp runtime
+description: Restore or save a prebuilt llama.cpp runtime without touching the packaging cache keys.
+
+inputs:
+  mode:
+    description: restore before a build, or save after it when the directory exists.
+    required: true
+  cache-hit:
+    description: cache-hit output from restore mode. Required when mode is save.
+    required: false
+    default: 'false'
+  cache-primary-key:
+    description: Primary key from restore mode. Required when mode is save.
+    required: false
+    default: ''
+
+outputs:
+  cache-hit:
+    description: Whether restore mode found the primary key.
+    value: ${{ steps.llama.outputs.cache-hit }}
+  cache-primary-key:
+    description: Primary key to pass into save mode.
+    value: ${{ steps.llama.outputs.cache-primary-key }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore llama.cpp runtime
+      id: llama
+      if: inputs.mode == 'restore'
+      uses: actions/cache/restore@v5
+      with:
+        path: vendor/llamacpp-runtime
+        key: llamacpp-runtime-${{ runner.os }}-${{ hashFiles('package.json', 'scripts/download-llamacpp-runtime.cjs') }}
+        restore-keys: |
+          llamacpp-runtime-${{ runner.os }}-
+    - name: Check for a downloaded llama.cpp runtime
+      id: present
+      if: inputs.mode == 'save' && inputs.cache-hit != 'true' && inputs.cache-primary-key != ''
+      shell: bash
+      run: |
+        if [ -d vendor/llamacpp-runtime ] && [ -n "$(ls -A vendor/llamacpp-runtime 2>/dev/null)" ]; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "present=false" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Save llama.cpp runtime
+      if: inputs.mode == 'save' && inputs.cache-hit != 'true' && steps.present.outputs.present == 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: vendor/llamacpp-runtime
+        key: ${{ inputs.cache-primary-key }}

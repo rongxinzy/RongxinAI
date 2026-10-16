@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 import { BaselineJob, CiEvent, HeavyJob, JobResult } from './constants.ts';
-import { planGates, verifyGateResults, type GatePlan } from './policy.ts';
+import { enterpriseRequired, planGates, verifyGateResults, type GatePlan } from './policy.ts';
 
 const prRef = 'refs/pull/42/merge';
 const light = planGates(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest, prRef);
@@ -20,6 +20,9 @@ const prPackaging: GatePlan = {
 test.each([
   'README.md',
   'docs/development.md',
+  'docs/2026-10-15-installer-website-style.md',
+  'website/index.html',
+  'website/README.md',
   'src/renderer/components/Settings.tsx',
   'src/renderer/theme/themes.css',
   'src/renderer/components/artifacts/renderers/DxfRenderer.tsx',
@@ -82,6 +85,21 @@ test.each([
   });
 });
 
+test('enterprise toolchain follows the extension diff on pull requests only', () => {
+  expect(enterpriseRequired(['docs/readme.md', 'website/index.html'], CiEvent.PullRequest)).toBe(
+    false,
+  );
+  expect(enterpriseRequired(['enterprise/src/index.ts'], CiEvent.PullRequest)).toBe(true);
+  expect(enterpriseRequired(['src/main/enterpriseExtension/host.ts'], CiEvent.PullRequest)).toBe(
+    true,
+  );
+  expect(enterpriseRequired(['package.json'], CiEvent.PullRequest)).toBe(true);
+  expect(enterpriseRequired(['electron-builder.enterprise.cjs'], CiEvent.PullRequest)).toBe(true);
+  expect(enterpriseRequired(['src/renderer/App.tsx'], CiEvent.PullRequest)).toBe(false);
+  expect(enterpriseRequired(['docs/readme.md'], CiEvent.Push)).toBe(true);
+  expect(enterpriseRequired([], CiEvent.Manual)).toBe(true);
+});
+
 test('manual runs and unknown events fail closed to the complete suite', () => {
   expect(planGates([], CiEvent.Manual, 'refs/heads/main')).toEqual(full);
   expect(planGates([], 'unexpected-event', 'refs/heads/main')).toEqual(full);
@@ -136,6 +154,8 @@ interface WorkflowJob {
   if?: string;
   uses?: string;
   with?: Record<string, unknown>;
+  outputs?: Record<string, string>;
+  strategy?: { 'fail-fast'?: boolean; matrix?: { shard?: number[] } };
   steps?: Array<{ name?: string; run?: string; uses?: string; with?: Record<string, unknown> }>;
 }
 
@@ -144,9 +164,39 @@ function workflow(name: string) {
     readFileSync(new URL(`../../../.github/workflows/${name}`, import.meta.url), 'utf8'),
   ) as {
     on: Record<string, unknown>;
+    concurrency?: { 'cancel-in-progress'?: boolean };
     jobs: Record<string, WorkflowJob>;
   };
 }
+
+test('pull request tests are sharded without dropping the test gate', () => {
+  const ci = workflow('ci.yml');
+  expect(ci.jobs.test.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
+  expect(ci.jobs.test.strategy?.['fail-fast']).toBe(false);
+  const testCommands = ci.jobs.test.steps?.map(step => step.run ?? '').join('\n');
+  expect(testCommands).toContain('--shard=${{ matrix.shard }}/4');
+  expect(testCommands).toContain('bun run compile:electron');
+  expect(testCommands).toContain('npm test --prefix SKILLs/presentation-studio');
+  expect(ci.jobs.enterprise.needs).toBe(BaselineJob.Changes);
+  expect(ci.jobs.changes.outputs).toHaveProperty('enterprise');
+});
+
+test('channel runtime smoke is path filtered and cancels stale runs', () => {
+  const smoke = workflow('channel-runtime-smoke.yml');
+  const trigger = smoke.on.pull_request as { paths?: string[]; branches?: string[] };
+  expect(trigger.paths).toEqual(
+    expect.arrayContaining([
+      'src/main/im/**',
+      'src/main/libs/ccConnect*',
+      'package.json',
+      '.github/workflows/channel-runtime-smoke.yml',
+    ]),
+  );
+  expect(trigger.paths?.some(path => path.startsWith('docs/') || path.startsWith('website/'))).toBe(
+    false,
+  );
+  expect(smoke.concurrency?.['cancel-in-progress']).toBe(true);
+});
 
 test('CI waits for every selected reusable check and always runs the merge gate', () => {
   const ci = workflow('ci.yml');

@@ -119,7 +119,7 @@ async function run({
   core.info(
     `Required existing workflows: ${expected.map((workflow) => workflow.name).join(', ') || 'none for this diff'}`,
   );
-  for (let attempt = 0; attempt < 90; attempt++) {
+  for (let attempt = 0; attempt < 180; attempt++) {
     const current = (await github.rest.pulls.get({ ...context.repo, pull_number: pr.number })).data;
     if (current.head.sha !== pr.head.sha || current.state !== 'open')
       throw new Error('PR head changed or PR closed; use the newest gate run.');
@@ -136,7 +136,7 @@ async function run({
       return;
     }
     if (attempt % 6 === 0) core.info(`Waiting for: ${waiting.join(', ')}`);
-    await sleep(20000);
+    await sleep(10000);
   }
   throw new Error(
     'CI did not finish within 30 minutes. Rerun this gate after fixing or completing the required workflows.',

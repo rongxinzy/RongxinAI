@@ -1,16 +1,18 @@
 # CI gate ownership
 
 Every PR runs workflow validation, lint, renderer type checking/build/bundle budgets, Electron compilation,
-unit tests, and Presentation Studio tests. Documentation-only PRs retain these baseline
-checks in this first rollout. Unknown paths never skip the baseline.
+unit tests, and Presentation Studio tests. Documentation-only and website-only PRs keep these baseline
+checks. They do not run install, memory, enterprise toolchain, or channel-runtime smoke jobs.
+Unknown paths never skip the baseline. Unit tests run as four shards of one `test` job; `merge-gate`
+still requires that job to succeed.
 
 `scripts/ci/gates/policy.ts` owns expensive-check selection:
 
 | Change                                                                                                      | Additional PR checks                                                        |
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Dependencies, patches, build/configuration, workflows, scripts, bundled runtimes, Skills/MCPs, main process | Linux install/startup, Windows install/upgrade/uninstall, memory regression |
+| Dependencies, patches, build/configuration, workflows, scripts, bundled runtimes, Skills/MCPs, main process | Memory regression. Linux and Windows install run on tags, manual dispatch, and release workflows |
 | Renderer services, hooks, store, application entry points, cowork UI, shared conversation components        | Memory regression                                                           |
-| Other renderer UI, styles, documentation                                                                    | None                                                                        |
+| Other renderer UI, styles, documentation, website                                                           | None                                                                        |
 
 The planner uses the full Git merge-base diff, with NUL-separated paths and rename
 detection disabled. Deleted paths and both sides of renames participate. Invalid SHAs
@@ -102,9 +104,20 @@ Reproduce child audits with `bash scripts/ci/audit-npm-projects.sh /tmp/npm-audi
 
 ## Latency measurement
 
-Before rollout, the sampled successful PR runs had Linux median 16.2 minutes and CI
-median 6.3 minutes (short sample from September 4, 2026; queue time included). These
-are reference observations, not a performance guarantee.
+Before the October 16, 2026 streamlining, 19 successful pull request CI runs
+(October 15–16) had a median workflow wall clock of 349 seconds, including runner
+queue. The 12 runs that finished in under 10 minutes had a median of 328 seconds.
+The execution critical path was the `test` job (median 309 seconds: about 79 seconds
+of Electron `tsc` plus about 200 seconds of Vitest) followed by `merge-gate` (median
+8 seconds). `memory-leak`, when selected (14 of 19), ran in parallel at a median of
+169 seconds and was not the critical path. Lint median was 27 seconds and
+bundle-budget (renderer typecheck, Vite build, budget) was 37 seconds. `ci-gate`,
+the only required status check, tracked CI and had a median of 355 seconds on 6
+successful samples. Channel runtime smoke median was 14 seconds and ran on every PR.
+
+These are measured samples, not a performance guarantee. Sharding and TypeScript
+cache hits change the critical path; a cold TypeScript cache still pays for one
+full Electron compile on each shard.
 
 Compare one week before/after, separately for ordinary and packaging/lifecycle PRs:
 

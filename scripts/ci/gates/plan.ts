@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { CiEvent } from './constants.ts';
-import { planGates } from './policy.ts';
+import { enterpriseRequired, planGates } from './policy.ts';
 
 const event = process.env.GITHUB_EVENT_NAME ?? '';
 let paths: string[] = [];
@@ -25,11 +25,13 @@ if (event === CiEvent.PullRequest) {
     .filter(Boolean);
 }
 const plan = planGates(paths, event, process.env.GITHUB_REF ?? '');
+const enterprise = enterpriseRequired(paths, event);
 if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
 appendFileSync(process.env.GITHUB_OUTPUT, `plan=${JSON.stringify(plan)}\n`);
 for (const [name, enabled] of Object.entries(plan)) {
   appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${enabled}\n`);
 }
+appendFileSync(process.env.GITHUB_OUTPUT, `enterprise=${enterprise}\n`);
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(
     process.env.GITHUB_STEP_SUMMARY,
@@ -37,6 +39,6 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       Object.entries(plan)
         .map(([name, enabled]) => `- ${name}: ${enabled ? 'required' : 'not required'}`)
         .join('\n') +
-      '\n',
+      `\n- enterprise: ${enterprise ? 'required' : 'not required'}\n`,
   );
 }

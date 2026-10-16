@@ -8,6 +8,16 @@ const packaging =
   /^(?:package\.json$|bun\.lock$|electron-builder[^/]*$|(?:electron-)?tsconfig[^/]*$|vite\.config\.|\.github\/(?:workflows\/(?:ci\.ya?ml$|build-platforms|linux-install|windows-installer|daily-release|release-candidate|sign-).*|actions\/)|patches\/|build\/|resources\/|vendor\/|scripts\/(?:build|dist|package|installer|release|electron-builder|setup-python|prepare-signing|patch-windows|rebuild-electron).*|SKILLs\/|MCPs\/|skills\.config\.json$|src\/main\/|src\/shared\/(?:llamacpp|channelRuntime)\/)/;
 const memory =
   /^(?:src\/main\/|src\/renderer\/(?:App\.tsx$|main\.tsx$|hooks\/|store\/|services\/|components\/cowork\/(?:hooks\/|CoworkView\.tsx$|CoworkSessionViewport\.tsx$))|src\/shared\/components\/ai-elements\/)/;
+// Same paths the enterprise job used to detect before checking out the toolchain.
+const enterpriseChange =
+  /^(?:enterprise\/|src\/main\/enterpriseExtension|package\.json|bun\.lock|electron-builder)/;
+
+export function enterpriseRequired(paths: string[], event: string): boolean {
+  // Release calls, tags, manual runs and branch pushes keep the full toolchain.
+  // Pull requests skip the install when the diff cannot affect the extension.
+  if (event !== CiEvent.PullRequest) return true;
+  return paths.some(file => enterpriseChange.test(file));
+}
 
 export function planGates(paths: string[], event: string, ref: string): GatePlan {
   // Manual runs are the escape hatch for risks not captured by path ownership.

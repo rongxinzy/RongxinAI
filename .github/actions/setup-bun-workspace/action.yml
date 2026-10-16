@@ -1,0 +1,70 @@
+name: Setup Bun workspace
+description: Install frozen Bun dependencies and restore the shared install and Electron download caches.
+
+inputs:
+  cache-prefix:
+    description: Cache key prefix. Use the historical prefix so existing warm caches still hit.
+    required: false
+    default: bun
+  include-electron:
+    description: Also restore the Electron download caches saved with this prefix.
+    required: false
+    default: 'false'
+  save-cache:
+    description: Save this prefix when the restore missed. Enable on one writer only.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24.x'
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: '1.4.0'
+    - name: Restore Bun package cache
+      id: bun-cache
+      if: inputs.include-electron != 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ inputs.cache-prefix }}-${{ runner.os }}-1.4.0-
+    - name: Restore Bun and Electron caches
+      id: electron-cache
+      if: inputs.include-electron == 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ~/.bun/install/cache
+          ~/.cache/electron
+          ~/.cache/electron-builder
+        key: ${{ inputs.cache-prefix }}-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          ${{ inputs.cache-prefix }}-${{ runner.os }}-1.4.0-
+    - shell: bash
+      run: bun install --frozen-lockfile --ignore-scripts
+    - shell: bash
+      run: bun run apply:patches
+    - name: Install Electron runtime before caching it
+      if: inputs.include-electron == 'true' && inputs.save-cache == 'true' && steps.electron-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: node node_modules/electron/install.js
+    - name: Save Bun package cache
+      if: inputs.save-cache == 'true' && inputs.include-electron != 'true' && steps.bun-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+    - name: Save Bun and Electron caches
+      if: inputs.save-cache == 'true' && inputs.include-electron == 'true' && steps.electron-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ~/.bun/install/cache
+          ~/.cache/electron
+          ~/.cache/electron-builder
+        key: ${{ steps.electron-cache.outputs.cache-primary-key }}

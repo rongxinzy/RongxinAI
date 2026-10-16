@@ -29,6 +29,11 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
+      - name: Restore llama.cpp runtime
+        id: llama-runtime
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: restore
       - name: Restore packaging caches
         id: packaging-cache
         uses: actions/cache/restore@v5
@@ -172,3 +177,10 @@ jobs:
             ${{ runner.temp }}/zhiyuan-build-logs
           if-no-files-found: ignore
           retention-days: 3
+      - name: Save llama.cpp runtime
+        if: success()
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: save
+          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
+          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
