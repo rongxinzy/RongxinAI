@@ -23,15 +23,16 @@ import { existsSync } from 'node:fs';
 
 import {
   cleanupProfile,
-  analyzeMemoryInjectionSession,
   configureGlmProvider,
   createCcConnectProtocolHeaders,
   createIsolatedProfile,
   delay,
   downloadFile,
   findActiveMemoryRow,
-  focusCoworkConversationView,
   launchPackagedApp,
+  readMemoryPromptCapture,
+  redactE2eText,
+  summarizeInjectionSession,
   resolveGlmApiKey,
   resolvePackagedExecutable,
   screenshot,
@@ -51,8 +52,14 @@ const unpackedInput = process.argv[2] || DEFAULT_LINUX_UNPACKED_DIR;
 /** @type {Array<{ id: string, status: 'pass'|'fail'|'skip', detail: string, evidence?: string[] }>} */
 const results = [];
 
-function record(id, status, detail, evidence = []) {
-  results.push({ id, status, detail, evidence });
+function record(id, status, detail, evidence = [], diagnostics = undefined) {
+  results.push({
+    id,
+    status,
+    detail,
+    evidence,
+    ...(diagnostics ? { diagnostics } : {}),
+  });
   const prefix = status === 'pass' ? 'PASS' : status === 'skip' ? 'SKIP' : 'FAIL';
   console.log(`[${prefix}] ${id}: ${detail}`);
   for (const item of evidence) console.log(`  evidence: ${item}`);
@@ -274,17 +281,34 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
       { cwd: workspaceDir },
     );
     const injectionSnapshot = await waitForRunCompletion(page, injectionSession, 480_000);
-    const injectionAnalysis = await analyzeMemoryInjectionSession(page, injectionSession, {
-      marker: memoryInjectionMarker,
+    const injectionSummary = await summarizeInjectionSession(page, injectionSession, {
       distinctiveWord: memoryInjectionDistinctiveWord,
     });
+    const promptCapture = readMemoryPromptCapture(profile.userDataPath, injectionSession);
+    const memoryContext = promptCapture?.memoryContext ?? '';
+    const promptHasInjectionBlock =
+      memoryContext.includes('Relevant memory') &&
+      (memoryContext.includes(memoryInjectionMarker) || memoryContext.includes('SQLite'));
     const injected =
-      !injectionAnalysis.memoryToolUsed &&
-      (injectionAnalysis.injectionBlockHasMarker ||
-        (injectionAnalysis.assistantHasDistinctiveWord &&
-          !injectionAnalysis.userQuestionHasDistinctiveWord));
+      !injectionSummary.memoryToolUsed &&
+      (promptHasInjectionBlock ||
+        (injectionSummary.assistantHasDistinctiveWord &&
+          !injectionSummary.userQuestionHasDistinctiveWord));
+    const injectionDiagnostics = {
+      injectionSessionId: injectionSession,
+      memoryContextExcerpt: redactE2eText(memoryContext.slice(0, 800), [glmKey]),
+      initialPromptExcerpt: redactE2eText(
+        String(promptCapture?.initialPromptExcerpt ?? '').slice(0, 800),
+        [glmKey],
+      ),
+      assistantAnswerRedacted: redactE2eText(injectionSummary.assistantText.slice(0, 800), [
+        glmKey,
+      ]),
+      promptHasInjectionBlock,
+      memoryToolUsed: injectionSummary.memoryToolUsed,
+      assistantHasDistinctiveWord: injectionSummary.assistantHasDistinctiveWord,
+    };
 
-    await focusCoworkConversationView(page);
     const shot = await screenshot(page, 'glm-work-memory-tool');
     const ok =
       snapshot.phase === 'completed' &&
@@ -293,18 +317,18 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
       injected &&
       injectionSnapshot.phase === 'completed';
     const glmWorkDetail = ok
-      ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified via "${memoryInjectionMarker}" or "${memoryInjectionDistinctiveWord}"`
-      : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}; injection=${JSON.stringify(injectionAnalysis)}`;
-    record('glm-work-memory-tool', ok ? 'pass' : 'fail', glmWorkDetail, [
-      shot,
-      `session:${session.sessionId}`,
-      `injection:${injectionSession}`,
-    ]);
+      ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified via captured Pi prompt or "${memoryInjectionDistinctiveWord}"`
+      : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}; promptHasInjectionBlock=${promptHasInjectionBlock}`;
+    record(
+      'glm-work-memory-tool',
+      ok ? 'pass' : 'fail',
+      glmWorkDetail,
+      [shot, `session:${session.sessionId}`, `injection:${injectionSession}`],
+      injectionDiagnostics,
+    );
   } catch (error) {
     const shot = page
-      ? await focusCoworkConversationView(page)
-          .then(() => screenshot(page, 'glm-work-memory-tool-failure'))
-          .catch(() => null)
+      ? await screenshot(page, 'glm-work-memory-tool-failure').catch(() => null)
       : null;
     record(
       'glm-work-memory-tool',

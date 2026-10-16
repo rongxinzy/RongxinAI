@@ -650,7 +650,7 @@ export class ProjectMemoryService {
         }),
       );
     }
-    if (observations.length === 0 && plan.explicitMemoryIntent) {
+    if (observations.length === 0 && plan.allowRecentFallback) {
       observations = this.filterRecallable(
         input,
         await this.adapter.recent({
@@ -668,7 +668,7 @@ export class ProjectMemoryService {
       input.projectId,
       unique.map(observation => observation.id),
     );
-    return rankRecallResults(plan.exactQuery, unique, metadata).slice(0, limit);
+    return rankRecallResults(plan.broadQuery ?? plan.exactQuery, unique, metadata).slice(0, limit);
   }
 
   private filterRecallable<T extends { id: number; type?: string; session_id?: string }>(

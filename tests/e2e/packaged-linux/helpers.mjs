@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -75,6 +76,7 @@ export function buildLaunchEnv(home, userDataPath, options = {}) {
     ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: userDataPath,
     ZHIYUAN_ENABLE_GPU: 'false',
     ELECTRON_ENABLE_LOGGING: 'true',
+    ZHIYUAN_E2E_CAPTURE_MEMORY_PROMPT: '1',
     ...(llamaBin ? { LLAMACPP_BIN: llamaBin } : {}),
     ...(ldLibraryPath ? { LD_LIBRARY_PATH: ldLibraryPath } : {}),
   };
@@ -116,10 +118,27 @@ export async function focusCoworkConversationView(page) {
   await delay(400);
 }
 
-export async function analyzeMemoryInjectionSession(page, sessionId, { marker, distinctiveWord }) {
+export function readMemoryPromptCapture(userDataPath, sessionId) {
+  const target = path.join(userDataPath, 'e2e-memory-prompt-captures', `${sessionId}.json`);
+  if (!existsSync(target)) return null;
+  try {
+    return JSON.parse(readFileSync(target, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+export function redactE2eText(value, secrets = []) {
+  let text = String(value ?? '');
+  for (const secret of secrets) {
+    if (secret) text = text.split(String(secret)).join('[REDACTED]');
+  }
+  return text;
+}
+
+export async function summarizeInjectionSession(page, sessionId, { distinctiveWord }) {
   return page.evaluate(
-    async ({ targetSessionId, needle, word }) => {
-      const isUserMessage = message => message.role === 'user' || message.type === 'user';
+    async ({ targetSessionId, word }) => {
       const isMemoryToolMessage = message => {
         const toolName = message.metadata?.toolName;
         if (typeof toolName === 'string' && toolName.toLowerCase() === 'memory') {
@@ -135,34 +154,27 @@ export async function analyzeMemoryInjectionSession(page, sessionId, { marker, d
         const payload = `${message.content ?? ''}${message.metadata?.toolResult ?? ''}`;
         return /"action"\s*:\s*"(?:recall|save|list|propose_personal)"/i.test(payload);
       };
-
       const result = await window.electron.cowork.getSession(targetSessionId);
       const messages = (result.session ?? result)?.messages ?? [];
-      const userText = messages
-        .filter(isUserMessage)
-        .map(message => String(message.content ?? ''))
-        .join('\n');
-      const memoryToolUsed = messages.some(isMemoryToolMessage);
-      const normalizedWord = String(word).toLowerCase();
-      const userQuestionHasDistinctiveWord = userText.toLowerCase().includes(normalizedWord);
       const assistantText = messages
         .filter(message => message.role === 'assistant' || message.type === 'assistant')
         .map(message => String(message.content ?? ''))
+        .join('\n')
+        .trim();
+      const userText = messages
+        .filter(message => message.role === 'user' || message.type === 'user')
+        .map(message => String(message.content ?? ''))
         .join('\n');
-      const assistantHasDistinctiveWord = assistantText.toLowerCase().includes(normalizedWord);
-      const injectionBlockHasMarker = messages.some(message => {
-        const content = String(message.content ?? '');
-        return content.includes('Relevant memory') && content.includes(needle);
-      });
-
+      const normalizedWord = String(word).toLowerCase();
       return {
-        memoryToolUsed,
-        injectionBlockHasMarker,
-        assistantHasDistinctiveWord,
-        userQuestionHasDistinctiveWord,
+        memoryToolUsed: messages.some(isMemoryToolMessage),
+        assistantText,
+        userText,
+        assistantHasDistinctiveWord: assistantText.toLowerCase().includes(normalizedWord),
+        userQuestionHasDistinctiveWord: userText.toLowerCase().includes(normalizedWord),
       };
     },
-    { targetSessionId: sessionId, needle: marker, word: distinctiveWord },
+    { targetSessionId: sessionId, word: distinctiveWord },
   );
 }
 

@@ -28,12 +28,24 @@ test('segments an unspaced CJK memory question into a broad fallback query', () 
   expect(plan.explicitMemoryIntent).toBe(true);
 });
 
-test('does not broaden ordinary non-CJK queries', () => {
-  expect(planRecallQuery('database decision')).toEqual({
+test('does not broaden short non-CJK queries', () => {
+  expect(planRecallQuery('database decision')).toMatchObject({
     exactQuery: 'database decision',
     broadQuery: null,
     explicitMemoryIntent: false,
+    allowRecentFallback: false,
   });
+});
+
+test('extracts keyword broad query for natural-language english recall questions', () => {
+  const plan = planRecallQuery(
+    'What persistence technology did the team decide to standardize on for this workspace?',
+  );
+
+  expect(plan.broadQuery).toContain('persistence');
+  expect(plan.broadQuery).toContain('standardize');
+  expect(plan.broadQuery).toContain('workspace');
+  expect(plan.allowRecentFallback).toBe(true);
 });
 
 test('ranks exact title matches ahead of weaker content matches', () => {

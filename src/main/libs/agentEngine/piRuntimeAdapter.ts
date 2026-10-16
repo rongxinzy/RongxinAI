@@ -70,6 +70,7 @@ import type { ConversationHistoryService } from '../../conversationHistory/servi
 import { t } from '../../i18n';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
+import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import {
   buildProjectMemoryContextSafe,
   type ProjectMemoryService,
@@ -1067,6 +1068,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           sessionId,
         );
       }
+      captureMemoryPromptForE2e({
+        sessionId,
+        userPrompt: prompt,
+        memoryContext: projectMemoryContext,
+        initialPrompt,
+      });
 
       // The user may stop the session while the execution-mode question is
       // open. Do not revive an aborted Pi turn when that question resolves.
@@ -1462,6 +1469,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (!active.resourceState.chatMode) {
         nextPrompt = prependWorkbenchTaskBoundary(nextPrompt, this.workbenchTaskService, sessionId);
       }
+      captureMemoryPromptForE2e({
+        sessionId,
+        userPrompt: prompt,
+        memoryContext: projectMemoryContext,
+        initialPrompt: nextPrompt,
+      });
       const continuedImagePrompt = preparePiPrompt(
         nextPrompt,
         options.imageAttachments,
