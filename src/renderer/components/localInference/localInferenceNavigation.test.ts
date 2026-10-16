@@ -7,6 +7,7 @@ const readSource = (relativePath: string): string =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
 
 const appSource = readSource('../../App.tsx');
+const mainViewCanvasSource = readSource('../../app/MainViewCanvas.tsx');
 const settingsPageSource = readSource('../settings/SettingsPage.tsx');
 const modelSettingsPanelSource = readSource('../settings/model/ModelSettingsPanel.tsx');
 const localInferenceSource = readSource('./LocalInferenceView.tsx');
@@ -23,7 +24,7 @@ test('opens the unified model settings after starting a local model', () => {
   expect(appSource).toContain('const handleOpenLocalModelSettings = useCallback(() =>');
   expect(appSource).toContain("handleShowSettings({ initialTab: 'model' });");
   expect(appSource).toContain('onOpenModelSettings={handleOpenLocalModelSettings}');
-  expect(appSource).toContain('initialTab={settingsOptions.initialTab}');
+  expect(mainViewCanvasSource).toContain('initialTab={settingsOptions.initialTab}');
 });
 
 test('routes model settings to the unified catalog and default selection', () => {
@@ -34,7 +35,7 @@ test('routes model settings to the unified catalog and default selection', () =>
 
 test('refreshes the kept-alive local inference view on navigation requests', () => {
   expect(appSource).toContain('setLocalInferenceRefreshRequestId(current => current + 1);');
-  expect(appSource).toContain('refreshRequestId={localInferenceRefreshRequestId}');
+  expect(mainViewCanvasSource).toContain('refreshRequestId={localInferenceRefreshRequestId}');
   expect(localInferenceSource).toContain('refreshRequestId?: number;');
   expect(localInferenceSource).toContain('if (!isVisible) return;');
   expect(localInferenceSource).toContain('refreshRequestId,');
