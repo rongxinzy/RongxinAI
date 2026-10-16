@@ -83,7 +83,6 @@ import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
-import type { LegacyMemoryMigrationService } from '../../memory/legacyMemoryMigrationService';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import {
@@ -806,7 +805,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
   private sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
-  private legacyMemoryMigrationService: LegacyMemoryMigrationService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private scheduledTaskService: ScheduledTaskService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
@@ -913,9 +911,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setSessionSummaryBackfillService(service: SessionSummaryBackfillService): void {
     this.sessionSummaryBackfillService = service;
-  }
-  setLegacyMemoryMigrationService(service: LegacyMemoryMigrationService): void {
-    this.legacyMemoryMigrationService = service;
   }
   setConversationHistoryService(service: ConversationHistoryService): void {
     this.conversationHistoryService = service;
@@ -3200,17 +3195,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     workingDirectory: string,
     complete: SessionMemoryCompletion,
   ): Promise<void> {
-    if (this.legacyMemoryMigrationService) {
-      try {
-        await this.legacyMemoryMigrationService.migrateSession({
-          sessionId,
-          workingDirectory,
-          complete,
-        });
-      } catch (error) {
-        console.warn(`[MemoryMigration] Failed to migrate session ${sessionId}:`, error);
-      }
-    }
     if (this.sessionSummaryService) {
       try {
         await this.sessionSummaryService.rollup({ sessionId, workingDirectory, complete });
