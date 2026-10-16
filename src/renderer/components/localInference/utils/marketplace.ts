@@ -91,10 +91,6 @@ function isMarketplaceSearchQuery(value: string): boolean {
   return /[\p{L}\p{N}]/u.test(value.trim());
 }
 
-export function isModelScopeRepoId(value: string): boolean {
-  return /^[^/\s]+\/[^/\s]+$/.test(value.trim());
-}
-
 export function getInstallableMarketplaceModels(
   models: MarketplaceModel[],
   installedModelPathMap: Map<string, string>,
@@ -298,7 +294,7 @@ export type MarketplaceVariant = {
   isRecommended: boolean;
 };
 
-export function extractQuantization(filePath: string): string | null {
+function extractQuantization(filePath: string): string | null {
   const base = filePath.split('/').at(-1) ?? filePath;
   return base.match(QUANTIZATION_PATTERN)?.[1]?.toUpperCase() ?? null;
 }

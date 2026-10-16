@@ -6,6 +6,9 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(import.meta.dirname, '..', '..');
+const { packagingExcludePatterns } = require(
+  path.join(root, 'scripts/packaging/assert-package-contents.cjs'),
+);
 const configPath = path.join(root, 'electron-builder.enterprise.cjs');
 
 const ENV_KEYS = [
@@ -72,7 +75,14 @@ try {
   }
   assert.equal(byTarget.get('zhiyuan-enterprise/extension.cjs').from, fixture.bundle);
   assert.equal(byTarget.get('zhiyuan-enterprise/ui').from, fixture.renderer);
-  assert.deepEqual(byTarget.get('zhiyuan-enterprise/ui').filter, ['**/*', '!**/*.map']);
+  assert.deepEqual(byTarget.get('zhiyuan-enterprise/ui').filter, [
+    '**/*',
+    ...packagingExcludePatterns(),
+  ]);
+  assert.equal(
+    [...byTarget.keys()].some(target => String(target).includes('modelscope.tokens')),
+    false,
+  );
   assert.equal(byTarget.get('zhiyuan-enterprise/THIRD_PARTY_NOTICES.md').from, fixture.notices);
   assert.equal(byTarget.get('zhiyuan-enterprise/config.json').from, fixture.config);
   assert.ok(

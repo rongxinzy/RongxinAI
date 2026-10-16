@@ -121,11 +121,13 @@ describe('ZhiyuanModelProvider', () => {
     expect(changed).toHaveBeenCalledOnce();
     await provider.snapshot();
     expect(refreshEntitlement).toHaveBeenCalledTimes(1);
+    expect(refreshEntitlement).toHaveBeenLastCalledWith(['enterprise-chat']);
 
     models = [model(), model({ id: 'second', displayName: 'Second Model', isDefault: false })];
     poll!();
     await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(2));
     expect(refreshEntitlement).toHaveBeenCalledTimes(2);
+    expect(refreshEntitlement).toHaveBeenLastCalledWith(['enterprise-chat', 'second']);
 
     unsubscribe();
     unsubscribe();

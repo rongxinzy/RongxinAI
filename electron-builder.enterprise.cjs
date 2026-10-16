@@ -13,6 +13,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { packagingExcludePatterns } = require('./scripts/packaging/assert-package-contents.cjs');
 const baseConfig = require('./electron-builder.json');
 
 // electron-builder resolves extraResources "from" against the project
@@ -44,7 +45,7 @@ const enterpriseResources = [
     'ZHIYUAN_ENTERPRISE_RENDERER_DIRECTORY',
     'enterprise/dist/ui',
     'zhiyuan-enterprise/ui',
-    ['**/*', '!**/*.map'],
+    ['**/*', ...packagingExcludePatterns()],
   ),
   enterpriseResource(
     'ZHIYUAN_ENTERPRISE_NOTICE_FILE',

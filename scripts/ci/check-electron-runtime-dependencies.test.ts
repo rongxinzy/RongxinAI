@@ -13,7 +13,7 @@ import {
 const temporaryDirectories: string[] = [];
 
 function createFixture(
-  mainSource = "require('ajv'); require('node:fs'); require('electron');",
+  mainSource = "require('electron-updater'); require('node:fs'); require('electron');",
   daemonSource = '',
 ) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-electron-runtime-test-'));
@@ -45,8 +45,18 @@ describe('Electron runtime dependency check', () => {
     ).toEqual(['@scope/package', 'debug']);
   });
 
+  test('ignores package names that appear only in comments', () => {
+    expect(
+      collectLiteralExternalRoots(
+        "/* require('pako') */\n * require('google-auth-library');\n// require('debug')\nrequire('electron-updater');",
+      ),
+    ).toEqual(['electron-updater']);
+  });
+
   test('accepts a complete runtime dependency closure without source maps', () => {
-    expect(checkElectronRuntimeDependencies(createFixture()).externalRoots).toEqual(['ajv']);
+    expect(checkElectronRuntimeDependencies(createFixture()).externalRoots).toEqual([
+      'electron-updater',
+    ]);
   });
 
   test('rejects production dependency allowlist drift', () => {
@@ -80,7 +90,7 @@ describe('Electron runtime dependency check', () => {
     expect(() =>
       checkElectronRuntimeDependencies(
         createFixture(
-          "require('ajv')",
+          "require('electron-updater')",
           "require('electron'); require('extract-zip'); require('tar');",
         ),
       ),

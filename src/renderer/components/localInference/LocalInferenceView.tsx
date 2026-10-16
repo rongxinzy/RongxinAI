@@ -1402,10 +1402,13 @@ function getRemainingBusyMs(input: {
   return Math.max(0, input.minimumBusyMs - Math.max(0, input.nowMs - input.startedAtMs));
 }
 
+/** @knipignore Reached through a dynamic import() cast in LocalInferenceView.marketplace.test.ts. */
 export const __test__shouldBlockModelAction = (input: {
   modelName: string;
   unloadingModelName: string | null;
 }) => shouldBlockModelAction(input);
+
+/** @knipignore Reached through a dynamic import() cast in LocalInferenceView.marketplace.test.ts. */
 export const __test__getRemainingBusyMs = (input: {
   startedAtMs: number;
   nowMs: number;

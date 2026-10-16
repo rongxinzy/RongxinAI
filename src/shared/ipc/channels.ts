@@ -74,9 +74,6 @@ export const PermissionsIpc = {
 } as const;
 export type PermissionsIpc = (typeof PermissionsIpc)[keyof typeof PermissionsIpc];
 
-// ─── Todo ───────────────────────────────────────────────────────────────────
-export { TodoIpc, type TodoIpc as TodoIpcChannel } from '../todo/constants';
-
 // ─── Enterprise ─────────────────────────────────────────────────────────────
 export const EnterpriseIpc = {
   GetConfig: 'enterprise:getConfig',
@@ -93,7 +90,6 @@ export type ManagedProviderIpc = (typeof ManagedProviderIpc)[keyof typeof Manage
 // ─── API (HTTP proxy) ───────────────────────────────────────────────────────
 export const ApiIpc = {
   Fetch: 'api:fetch',
-  FetchModels: 'api:fetch-models',
 } as const;
 
 // ─── ZhiYuan Model Pool ────────────────────────────────────────────────────
@@ -129,9 +125,7 @@ export type ContextMenuIpc = (typeof ContextMenuIpc)[keyof typeof ContextMenuIpc
 
 // ─── App-level config ───────────────────────────────────────────────────────
 export const AppConfigIpc = {
-  GetApiConfig: 'get-api-config',
   CheckApiConfig: 'check-api-config',
-  SaveApiConfig: 'save-api-config',
   GenerateSessionTitle: 'generate-session-title',
   GetRecentCwds: 'get-recent-cwds',
 } as const;

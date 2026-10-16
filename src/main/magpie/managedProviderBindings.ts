@@ -3,7 +3,7 @@ import type { MagpieHostProvider } from './hostProviders';
 import type { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import type { LlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
 export const LOCAL_GPU_MAGPIE_PROVIDER_ID = 'zhiyuan-host-local-gpu';
-export const OLLAMA_MAGPIE_PROVIDER_ID = 'zhiyuan-host-ollama';
+const OLLAMA_MAGPIE_PROVIDER_ID = 'zhiyuan-host-ollama';
 export interface LocalGpuSnapshot {
   baseUrl: string | null;
   models: readonly LlamaCppRunningModelBinding[];

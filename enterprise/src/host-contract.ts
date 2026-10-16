@@ -22,8 +22,8 @@ export interface ModelCapabilities {
   readonly reasoning: ModelCapabilityStatus;
 }
 
-export type ProviderModelPiApi = 'anthropic-messages' | 'openai-completions' | 'openai-responses';
-export type ProviderModelPiThinkingFormat =
+type ProviderModelPiApi = 'anthropic-messages' | 'openai-completions' | 'openai-responses';
+type ProviderModelPiThinkingFormat =
   | 'openai'
   | 'openrouter'
   | 'deepseek'
@@ -121,7 +121,7 @@ export type EnterpriseSessionSnapshot =
       readonly identity: EnterpriseSessionIdentity;
     };
 
-export type EnterpriseSessionErrorCode = 'UNAVAILABLE' | 'INVALID_INPUT' | 'OPERATION_FAILED';
+type EnterpriseSessionErrorCode = 'UNAVAILABLE' | 'INVALID_INPUT' | 'OPERATION_FAILED';
 
 export type EnterpriseSessionResult =
   | { readonly ok: true; readonly snapshot: EnterpriseSessionSnapshot }
@@ -154,23 +154,23 @@ export interface ZhiyuanEnterpriseSessionProvider {
   logout(): Promise<EnterpriseSessionSnapshot>;
 }
 
-export interface ZhiyuanEnterpriseSessionHostCapability {
+interface ZhiyuanEnterpriseSessionHostCapability {
   readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION;
   registerProvider(provider: ZhiyuanEnterpriseSessionProvider): () => void;
 }
 
-export interface ZhiyuanEnterpriseRendererHostCapability {
+interface ZhiyuanEnterpriseRendererHostCapability {
   readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION;
   registerSessionGate(entrypoint: string): () => void;
 }
 
-export interface ZhiyuanEnterpriseSettingsPageRegistration {
+interface ZhiyuanEnterpriseSettingsPageRegistration {
   readonly id: string;
   readonly entrypoint: string;
   readonly labels: { readonly zh: string; readonly en: string };
 }
 
-export interface ZhiyuanEnterpriseSettingsHostCapability {
+interface ZhiyuanEnterpriseSettingsHostCapability {
   readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_SETTINGS_CAPABILITY_API_VERSION;
   registerPage(page: ZhiyuanEnterpriseSettingsPageRegistration): () => void;
 }
@@ -182,19 +182,19 @@ export interface ZhiyuanManagedProviderSource {
   onDidChange?(listener: () => void): () => void;
 }
 
-export interface ZhiyuanManagedProviderHostCapability {
+interface ZhiyuanManagedProviderHostCapability {
   /** Negotiated host version: any version >= ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION is accepted. */
   readonly apiVersion: number;
   registerSource(source: ZhiyuanManagedProviderSource): () => void;
 }
 
-export interface ZhiyuanEnterpriseManagedSkillRegistration {
+interface ZhiyuanEnterpriseManagedSkillRegistration {
   readonly directory: string;
   notifyChanged(): void;
   unregister(): void;
 }
 
-export interface ZhiyuanEnterpriseSkillHostCapability {
+interface ZhiyuanEnterpriseSkillHostCapability {
   readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_SKILL_CAPABILITY_API_VERSION;
   registerManagedRoot(): ZhiyuanEnterpriseManagedSkillRegistration;
 }

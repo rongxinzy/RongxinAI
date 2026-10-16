@@ -6,12 +6,12 @@ import type {
   WakeMode,
 } from './constants';
 
-export interface ScheduleAt {
+interface ScheduleAt {
   kind: 'at';
   at: string;
 }
 
-export interface ScheduleEvery {
+interface ScheduleEvery {
   kind: 'every';
   everyMs: number;
   anchorMs?: number;
@@ -26,19 +26,19 @@ export interface ScheduleCron {
 
 export type Schedule = ScheduleAt | ScheduleEvery | ScheduleCron;
 
-export interface AgentTurnPayload {
+interface AgentTurnPayload {
   kind: 'agentTurn';
   message: string;
   timeoutSeconds?: number;
   model?: string;
 }
 
-export interface SystemEventPayload {
+interface SystemEventPayload {
   kind: 'systemEvent';
   text: string;
 }
 
-export type ScheduledTaskPayload = AgentTurnPayload | SystemEventPayload;
+type ScheduledTaskPayload = AgentTurnPayload | SystemEventPayload;
 
 export interface ScheduledTaskDelivery {
   mode: DeliveryMode;

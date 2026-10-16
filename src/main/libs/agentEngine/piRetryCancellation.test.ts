@@ -60,11 +60,13 @@ test('cancels the real SDK backoff and sends the next prompt through its public 
     _extensionRunner: {
       hasHandlers: () => false,
       emit: async () => undefined,
-      emitBeforeAgentStart: async (text: string, images: unknown, options: unknown) => ({
-        text,
-        images,
-        systemPromptOptions: options,
+      // pi 1.2+ passes BeforeAgentStartTrigger + BuildSystemPromptOptions (not prompt/images).
+      emitBeforeAgentStart: async (
+        _trigger: unknown,
+        systemPromptOptions: { selectedTools: string[] },
+      ) => ({
         messages: [],
+        systemPromptOptions,
       }),
     },
     _modelRuntime: { hasConfiguredAuth: () => true },

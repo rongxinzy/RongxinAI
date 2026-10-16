@@ -110,10 +110,6 @@ export function getSkillCategory(skillId: string): SkillCategory {
   return SkillCategory.All;
 }
 
-export function isSkillCategory(value: string): value is SkillCategory {
-  return Object.values(SkillCategory).includes(value as SkillCategory);
-}
-
 export const SkillToolbarPlacement = {
   Inline: 'inline',
   ExpertHeader: 'expert-header',
@@ -121,7 +117,3 @@ export const SkillToolbarPlacement = {
 
 export type SkillToolbarPlacement =
   (typeof SkillToolbarPlacement)[keyof typeof SkillToolbarPlacement];
-
-export function isSkillTab(value: string): value is SkillTab {
-  return Object.values(SkillTab).includes(value as SkillTab);
-}

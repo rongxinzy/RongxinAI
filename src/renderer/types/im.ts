@@ -23,7 +23,7 @@ export interface DingTalkChannelConfig {
   debug: boolean;
 }
 
-export interface DingTalkGatewayStatus {
+interface DingTalkGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -50,28 +50,28 @@ export interface DingTalkMultiInstanceConfig {
   instances: DingTalkInstanceConfig[];
 }
 
-export interface DingTalkMultiInstanceStatus {
+interface DingTalkMultiInstanceStatus {
   instances: DingTalkInstanceStatus[];
 }
 
-export const DEFAULT_DINGTALK_MULTI_INSTANCE_CONFIG: DingTalkMultiInstanceConfig = {
+const DEFAULT_DINGTALK_MULTI_INSTANCE_CONFIG: DingTalkMultiInstanceConfig = {
   instances: [],
 };
 
 // ==================== Feishu Types ====================
 
-export interface FeishuChannelGroupConfig {
+interface FeishuChannelGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-export interface FeishuChannelFooterConfig {
+interface FeishuChannelFooterConfig {
   status?: boolean;
   elapsed?: boolean;
 }
 
-export interface FeishuChannelBlockStreamingCoalesceConfig {
+interface FeishuChannelBlockStreamingCoalesceConfig {
   minChars?: number;
   maxChars?: number;
   idleMs?: number;
@@ -97,7 +97,7 @@ export interface FeishuChannelConfig {
   debug: boolean;
 }
 
-export interface FeishuGatewayStatus {
+interface FeishuGatewayStatus {
   connected: boolean;
   startedAt: string | null;
   botOpenId: string | null;
@@ -125,13 +125,13 @@ export interface FeishuMultiInstanceConfig {
   instances: FeishuInstanceConfig[];
 }
 
-export interface FeishuMultiInstanceStatus {
+interface FeishuMultiInstanceStatus {
   instances: FeishuInstanceStatus[];
 }
 
 // ==================== Telegram Types ====================
 
-export interface TelegramGatewayStatus {
+interface TelegramGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -142,7 +142,7 @@ export interface TelegramGatewayStatus {
 
 // ==================== Telegram Channel Types ====================
 
-export interface TelegramChannelGroupConfig {
+interface TelegramChannelGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
@@ -186,7 +186,7 @@ export interface TelegramMultiInstanceConfig {
   instances: TelegramInstanceConfig[];
 }
 
-export interface TelegramMultiInstanceStatus {
+interface TelegramMultiInstanceStatus {
   instances: TelegramInstanceStatus[];
 }
 
@@ -213,7 +213,7 @@ export interface DiscordChannelConfig {
   debug: boolean;
 }
 
-export interface DiscordGatewayStatus {
+interface DiscordGatewayStatus {
   connected: boolean;
   starting: boolean;
   startedAt: number | null;
@@ -240,7 +240,7 @@ export interface DiscordMultiInstanceConfig {
   instances: DiscordInstanceConfig[];
 }
 
-export interface DiscordMultiInstanceStatus {
+interface DiscordMultiInstanceStatus {
   instances: DiscordInstanceStatus[];
 }
 
@@ -261,9 +261,8 @@ export interface QQChannelConfig {
 }
 
 /** @deprecated Use QQChannelConfig instead */
-export type QQConfig = QQChannelConfig;
 
-export interface QQGatewayStatus {
+interface QQGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -290,7 +289,7 @@ export interface QQMultiInstanceConfig {
   instances: QQInstanceConfig[];
 }
 
-export interface QQMultiInstanceStatus {
+interface QQMultiInstanceStatus {
   instances: QQInstanceStatus[];
 }
 
@@ -309,9 +308,8 @@ export interface WecomChannelConfig {
 }
 
 /** @deprecated Use WecomChannelConfig instead */
-export type WecomConfig = WecomChannelConfig;
 
-export interface WecomGatewayStatus {
+interface WecomGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -339,7 +337,7 @@ export interface WecomMultiInstanceConfig {
   instances: WecomInstanceConfig[];
 }
 
-export interface WecomMultiInstanceStatus {
+interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
 }
 
@@ -358,7 +356,7 @@ export interface WeixinChannelConfig {
   debug: boolean;
 }
 
-export interface WeixinGatewayStatus {
+interface WeixinGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -367,8 +365,6 @@ export interface WeixinGatewayStatus {
 }
 
 // ==================== Common IM Types ====================
-
-export type IMPlatform = keyof Omit<IMGatewayConfig, 'settings'>;
 
 export interface IMGatewayConfig {
   dingtalk: DingTalkMultiInstanceConfig;
@@ -402,32 +398,6 @@ export interface IMGatewayStatus {
 
 // ==================== Media Attachment Types ====================
 
-export type IMMediaType = 'image' | 'video' | 'audio' | 'voice' | 'document' | 'sticker';
-
-export interface IMMediaAttachment {
-  type: IMMediaType;
-  localPath: string; // 涓嬭浇鍚庣殑鏈湴璺緞
-  mimeType: string; // MIME 绫诲瀷
-  fileName?: string; // 鍘熷鏂囦欢鍚?
-  fileSize?: number; // 鏂囦欢澶у皬锛堝瓧鑺傦級
-  width?: number; // 鍥剧墖/瑙嗛瀹藉害
-  height?: number; // 鍥剧墖/瑙嗛楂樺害
-  duration?: number; // 闊宠棰戞椂闀匡紙绉掞級
-}
-
-export interface IMMessage {
-  platform: Platform;
-  messageId: string;
-  conversationId: string;
-  senderId: string;
-  senderName?: string;
-  content: string;
-  chatType: 'direct' | 'group';
-  timestamp: number;
-  attachments?: IMMediaAttachment[];
-  mediaGroupId?: string; // 濯掍綋缁?ID锛堢敤浜庡悎骞跺寮犲浘鐗囷級
-}
-
 // ==================== IPC Result Types ====================
 
 export interface IMConfigResult {
@@ -449,11 +419,11 @@ export interface IMGatewayResult {
 
 // ==================== Connectivity Test Types ====================
 
-export type IMConnectivityVerdict = 'pass' | 'warn' | 'fail';
+type IMConnectivityVerdict = 'pass' | 'warn' | 'fail';
 
-export type IMConnectivityCheckLevel = 'pass' | 'info' | 'warn' | 'fail';
+type IMConnectivityCheckLevel = 'pass' | 'info' | 'warn' | 'fail';
 
-export type IMConnectivityCheckCode =
+type IMConnectivityCheckCode =
   | 'missing_credentials'
   | 'auth_check'
   | 'gateway_running'
@@ -493,136 +463,27 @@ export interface IMConnectivityTestResponse {
 
 // ==================== Pairing Types ====================
 
-export interface PairingRequest {
-  id: string;
-  code: string;
-  createdAt: string;
-  lastSeenAt: string;
-  meta?: Record<string, string>;
-}
-
-export interface PairingListResult {
-  success: boolean;
-  requests: PairingRequest[];
-  allowFrom: string[];
-  error?: string;
-}
-
 // ==================== Default Configurations ====================
 
-export const DEFAULT_DINGTALK_CHANNEL_CONFIG: DingTalkChannelConfig = {
-  enabled: false,
-  clientId: '',
-  clientSecret: '',
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'open',
-  sessionTimeout: 1800000,
-  separateSessionByConversation: true,
-  groupSessionScope: 'group',
-  sharedMemoryAcrossConversations: false,
-  gatewayBaseUrl: '',
-  debug: false,
-};
-
-export const DEFAULT_FEISHU_CHANNEL_CONFIG: FeishuChannelConfig = {
-  enabled: false,
-  appId: '',
-  appSecret: '',
-  domain: 'feishu',
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'open',
-  groupAllowFrom: [],
-  groups: { '*': { requireMention: true } },
-  historyLimit: 50,
-  streaming: true,
-  replyMode: 'auto',
-  blockStreaming: false,
-  footer: { status: true, elapsed: true },
-  mediaMaxMb: 30,
-  debug: false,
-};
-
-export const DEFAULT_DISCORD_CHANNEL_CONFIG: DiscordChannelConfig = {
-  enabled: false,
-  botToken: '',
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'allowlist',
-  groupAllowFrom: [],
-  guilds: { '*': { requireMention: true } },
-  historyLimit: 50,
-  streaming: 'off',
-  mediaMaxMb: 25,
-  proxy: '',
-  debug: false,
-};
-
-export const DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG: DiscordMultiInstanceConfig = {
+const DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG: DiscordMultiInstanceConfig = {
   instances: [],
 };
 
-export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
-  enabled: false,
-  botToken: '',
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'allowlist',
-  groupAllowFrom: [],
-  groups: { '*': { requireMention: true } },
-  historyLimit: 50,
-  replyToMode: 'off',
-  linkPreview: true,
-  streaming: 'partial',
-  mediaMaxMb: 100,
-  proxy: '',
-  webhookUrl: '',
-  webhookSecret: '',
-  debug: false,
-};
-
-export const DEFAULT_TELEGRAM_MULTI_INSTANCE_CONFIG: TelegramMultiInstanceConfig = {
+const DEFAULT_TELEGRAM_MULTI_INSTANCE_CONFIG: TelegramMultiInstanceConfig = {
   instances: [],
 };
 
-export const DEFAULT_QQ_CONFIG: QQChannelConfig = {
-  enabled: false,
-  appId: '',
-  appSecret: '',
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'open',
-  groupAllowFrom: [],
-  historyLimit: 50,
-  markdownSupport: true,
-  imageServerBaseUrl: '',
-  debug: false,
-};
-
-export const DEFAULT_QQ_MULTI_INSTANCE_CONFIG: QQMultiInstanceConfig = {
+const DEFAULT_QQ_MULTI_INSTANCE_CONFIG: QQMultiInstanceConfig = {
   instances: [],
 };
 
-export const DEFAULT_FEISHU_MULTI_INSTANCE_CONFIG: FeishuMultiInstanceConfig = {
+const DEFAULT_FEISHU_MULTI_INSTANCE_CONFIG: FeishuMultiInstanceConfig = {
   instances: [],
 };
 
-export const DEFAULT_WECOM_CONFIG: WecomChannelConfig = {
-  enabled: false,
-  botId: '',
-  secret: '',
-  dmPolicy: 'open',
-  allowFrom: [],
-  groupPolicy: 'open',
-  groupAllowFrom: [],
-  sendThinkingMessage: true,
-  debug: true,
-};
+const DEFAULT_WECOM_MULTI_INSTANCE_CONFIG: WecomMultiInstanceConfig = { instances: [] };
 
-export const DEFAULT_WECOM_MULTI_INSTANCE_CONFIG: WecomMultiInstanceConfig = { instances: [] };
-
-export const DEFAULT_WEIXIN_CONFIG: WeixinChannelConfig = {
+const DEFAULT_WEIXIN_CONFIG: WeixinChannelConfig = {
   enabled: false,
   accountId: '',
   workspaceId: '',
@@ -635,7 +496,7 @@ export const DEFAULT_WEIXIN_CONFIG: WeixinChannelConfig = {
   debug: true,
 };
 
-export const DEFAULT_IM_SETTINGS: IMSettings = {
+const DEFAULT_IM_SETTINGS: IMSettings = {
   systemPrompt: '',
   skillsEnabled: true,
 };

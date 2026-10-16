@@ -317,6 +317,22 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
       },
       createFallbackEntry(
         version,
+        LlamaCppRuntimeTargetId.MacX64,
+        'darwin',
+        'x64',
+        'cpu',
+        `llama-${version}-bin-macos-x64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.MacArm64,
+        'darwin',
+        'arm64',
+        'cpu',
+        `llama-${version}-bin-macos-arm64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
         LlamaCppRuntimeTargetId.LinuxX64,
         'linux',
         'x64',

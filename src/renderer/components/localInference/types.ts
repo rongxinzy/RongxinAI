@@ -11,13 +11,6 @@ export const LocalInferenceToastKind = {
 export type LocalInferenceToastKind =
   (typeof LocalInferenceToastKind)[keyof typeof LocalInferenceToastKind];
 
-export type LocalInferenceToast = {
-  id: string;
-  kind: LocalInferenceToastKind;
-  message: string;
-  autoDismiss: boolean;
-};
-
 export type LocalInferenceSessionState = {
   activeTab: LocalInferenceTab;
 };

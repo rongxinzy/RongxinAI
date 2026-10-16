@@ -4,20 +4,13 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync 
 import { delimiter, dirname, join } from 'path';
 
 import { buildSessionTitleFromInput } from '../../common/sessionTitle';
-import {
-  buildEnvForConfig,
-  getCurrentApiConfig,
-  resolveCurrentApiConfig,
-  resolveRawApiConfig,
-} from './claudeSettings';
 import { coworkLog } from './coworkLogger';
+import { extractApiErrorSnippet } from './coworkModelApi';
 import {
-  buildAnthropicMessagesUrl,
-  buildGeminiGenerateContentUrl,
-  CoworkModelProtocol,
-  extractApiErrorSnippet,
-} from './coworkModelApi';
-import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
+  getMagpieModelService,
+  hasMagpieModelService,
+  MAGPIE_RUNTIME_API_KEY,
+} from '../magpie/modelService';
 import { applyUvPackageIndexDefaults, PythonPackageIndexUrl } from './pythonPackageIndexes';
 import { applyManagedPythonEnv } from './managedPythonEnv';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
@@ -482,7 +475,7 @@ function getWindowsGitToolDirs(bashPath: string): string[] {
   return candidates.filter(dir => existsSync(dir));
 }
 
-export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
+function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
   try {
     const shimDir = join(app.getPath('userData'), 'cowork', 'bin');
     mkdirSync(shimDir, { recursive: true });
@@ -1538,11 +1531,9 @@ export function getSkillsRoot(): string {
  * Async function to fetch system proxy and inject into environment variables
  */
 export async function getEnhancedEnv(
-  target: OpenAICompatProxyTarget = 'local',
   options: EnhancedEnvOptions = {},
 ): Promise<Record<string, string | undefined>> {
-  const config = getCurrentApiConfig(target);
-  const env = config ? buildEnvForConfig(config) : { ...process.env };
+  const env = { ...process.env };
 
   applyApplicationRuntimeEnv(env, options);
 
@@ -1583,101 +1574,50 @@ export async function getEnhancedEnv(
 }
 
 /**
- * Ensure the cowork temp directory exists in the given working directory
- * @param cwd Working directory path
- * @returns Path to the temp directory
- */
-export function ensureCoworkTempDir(cwd: string): string {
-  const tempDir = join(cwd, '.cowork-temp');
-  if (!existsSync(tempDir)) {
-    try {
-      mkdirSync(tempDir, { recursive: true });
-      console.log('Created cowork temp directory:', tempDir);
-    } catch (error) {
-      console.error('Failed to create cowork temp directory:', error);
-      // Fall back to cwd if we can't create the temp dir
-      return cwd;
-    }
-  }
-  return tempDir;
-}
-
-/**
  * Get enhanced environment variables with TMPDIR set to the cowork temp directory
  * This ensures Claude Agent SDK creates temporary files in the user's working directory
  * @param cwd Working directory path
  */
-export async function getEnhancedEnvWithTmpdir(
-  cwd: string,
-  target: OpenAICompatProxyTarget = 'local',
-): Promise<Record<string, string | undefined>> {
-  const env = await getEnhancedEnv(target);
-  const tempDir = ensureCoworkTempDir(cwd);
-
-  // Set temp directory environment variables for all platforms
-  env.TMPDIR = tempDir; // macOS, Linux
-  env.TMP = tempDir; // Windows
-  env.TEMP = tempDir; // Windows
-
-  return env;
-}
 
 const SESSION_TITLE_FALLBACK = 'New Chat';
 const COWORK_MODEL_PROBE_TIMEOUT_MS = 20000;
 
-type SessionTitleApiConfig =
-  | {
-      protocol: typeof CoworkModelProtocol.Anthropic;
-      apiKey: string;
-      baseURL: string;
-      model: string;
-    }
-  | {
-      protocol: typeof CoworkModelProtocol.GeminiNative;
-      apiKey: string;
-      baseURL: string;
-      model: string;
-    };
-
-function resolveSessionTitleApiConfig(): { config: SessionTitleApiConfig | null; error?: string } {
-  const rawResolution = resolveRawApiConfig();
-  if (rawResolution.config && rawResolution.providerMetadata?.providerName === 'gemini') {
-    return {
-      config: {
-        protocol: CoworkModelProtocol.GeminiNative,
-        apiKey: rawResolution.config.apiKey,
-        baseURL: rawResolution.config.baseURL,
-        model: rawResolution.config.model,
-      },
-    };
-  }
-
-  const resolution = resolveCurrentApiConfig();
-  if (!resolution.config) {
-    return {
-      config: null,
-      error: resolution.error ?? rawResolution.error,
-    };
-  }
-
-  return {
-    config: {
-      protocol: CoworkModelProtocol.Anthropic,
-      apiKey: resolution.config.apiKey,
-      baseURL: resolution.config.baseURL,
-      model: resolution.config.model,
-    },
-  };
-}
-
 export async function probeCoworkModelReadiness(
   timeoutMs = COWORK_MODEL_PROBE_TIMEOUT_MS,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { config, error } = resolveSessionTitleApiConfig();
-  if (!config) {
+  if (!hasMagpieModelService()) {
     return {
       ok: false,
-      error: error || 'API configuration not found.',
+      error: 'Enable the unified model service in model settings before starting a task.',
+    };
+  }
+  let endpoint: string;
+  let modelId: string;
+  let body: string;
+  try {
+    const resolved = await getMagpieModelService().resolve();
+    const gateway = new URL(resolved.gatewayUrl);
+    modelId = resolved.model.id;
+    const native = resolved.model.native_endpoints ?? [];
+    if (native.includes('/v1/messages')) {
+      endpoint = `${gateway.origin}/v1/messages`;
+      body = JSON.stringify({
+        model: modelId,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'Reply with ok.' }],
+      });
+    } else {
+      endpoint = `${gateway.origin}/v1/chat/completions`;
+      body = JSON.stringify({
+        model: modelId,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'Reply with ok.' }],
+      });
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'The model service is unavailable.',
     };
   }
 
@@ -1685,42 +1625,15 @@ export async function probeCoworkModelReadiness(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(
-      config.protocol === CoworkModelProtocol.GeminiNative
-        ? buildGeminiGenerateContentUrl(config.baseURL, config.model)
-        : buildAnthropicMessagesUrl(config.baseURL),
-      {
-        method: 'POST',
-        headers:
-          config.protocol === CoworkModelProtocol.GeminiNative
-            ? {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': config.apiKey,
-              }
-            : {
-                'Content-Type': 'application/json',
-                'x-api-key': config.apiKey,
-                'anthropic-version': '2023-06-01',
-              },
-        body: JSON.stringify(
-          config.protocol === CoworkModelProtocol.GeminiNative
-            ? {
-                contents: [{ role: 'user', parts: [{ text: 'Reply with "ok".' }] }],
-                generationConfig: {
-                  maxOutputTokens: 1,
-                  temperature: 0,
-                },
-              }
-            : {
-                model: config.model,
-                max_tokens: 1,
-                temperature: 0,
-                messages: [{ role: 'user', content: 'Reply with "ok".' }],
-              },
-        ),
-        signal: controller.signal,
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${MAGPIE_RUNTIME_API_KEY}`,
       },
-    );
+      body,
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');

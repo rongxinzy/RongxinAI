@@ -6,6 +6,9 @@ const path = require('path');
 
 const EXCLUDED_FILE_PATTERNS = [
   /\.map$/i,
+  /\.local\.json$/i,
+  /(?:^|[._-])tokens?\.json$/i,
+  /^modelscope\.tokens.*\.json$/i,
   /\.d\.(ts|cts|mts)$/i,
   /^(readme|changelog|history)(\.(md|txt|rst))?$/i,
   /^(license|licence|authors|contributors)(\.(md|txt))?$/i,
@@ -258,9 +261,6 @@ function buildWindowsResourceBundleManifest(componentManifests) {
 }
 
 module.exports = {
-  WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION,
-  WINDOWS_RESOURCE_ARCHIVE_EXTENSION,
-  WINDOWS_RESOURCE_ARCHIVE_FORMAT,
   WINDOWS_RESOURCE_ARCHIVE_COMPRESSION,
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,

@@ -189,7 +189,7 @@ export const extractAgentPreparingToolActivities = (payload: unknown): Preparing
   return [...activities.values()];
 };
 
-export const createToolActivityUpsert = (
+const createToolActivityUpsert = (
   activity: PreparingToolActivity,
   phase: CoworkToolActivityPhase = CoworkToolActivityPhase.Preparing,
 ): CoworkToolActivityEvent => ({
@@ -204,12 +204,12 @@ export const createToolActivityUpsert = (
   },
 });
 
-export const createToolActivityRemove = (toolCallId: string): CoworkToolActivityEvent => ({
+const createToolActivityRemove = (toolCallId: string): CoworkToolActivityEvent => ({
   type: CoworkToolActivityEventType.Remove,
   toolCallId,
 });
 
-export const createToolActivityClear = (): CoworkToolActivityEvent => ({
+const createToolActivityClear = (): CoworkToolActivityEvent => ({
   type: CoworkToolActivityEventType.Clear,
 });
 

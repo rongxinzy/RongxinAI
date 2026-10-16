@@ -97,10 +97,6 @@ export function isImageInputRejected(
   return observed !== undefined && observed.fingerprint === fingerprint;
 }
 
-export function clearImageInputObservation(providerName: string, modelId: string): void {
-  observations.delete(observationKey(providerName, modelId));
-}
-
 /**
  * Test/QA helper — also used when the user edits provider or model settings:
  * an explicit config edit is a reason to try images again.

@@ -1,8 +1,6 @@
 import type {
-  Todo,
   TodoActionResult,
   TodoCreateInput,
-  TodoList,
   TodoListActionResult,
   TodoListInput,
   TodoListResult,
@@ -59,6 +57,3 @@ export const todoService = {
     return await window.electron.todo.deleteStep(stepId);
   },
 };
-
-export type TodoServiceTodo = Todo;
-export type TodoServiceList = TodoList;

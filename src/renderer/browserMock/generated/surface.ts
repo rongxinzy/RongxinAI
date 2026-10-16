@@ -10,9 +10,7 @@ import { createTriage } from './createTriage';
 import { createHardware } from './createHardware';
 import { createAgents } from './createAgents';
 import { createApi } from './createApi';
-import { createGetApiConfig } from './createGetApiConfig';
 import { createCheckApiConfig } from './createCheckApiConfig';
-import { createSaveApiConfig } from './createSaveApiConfig';
 import { createGenerateSessionTitle } from './createGenerateSessionTitle';
 import { createGetRecentCwds } from './createGetRecentCwds';
 import { createAppEvents } from './createAppEvents';
@@ -64,9 +62,7 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     hardware: createHardware(runtime),
     agents: createAgents(runtime),
     api: createApi(runtime),
-    getApiConfig: createGetApiConfig(runtime),
     checkApiConfig: createCheckApiConfig(runtime),
-    saveApiConfig: createSaveApiConfig(runtime),
     generateSessionTitle: createGenerateSessionTitle(runtime),
     getRecentCwds: createGetRecentCwds(runtime),
     appEvents: createAppEvents(runtime),

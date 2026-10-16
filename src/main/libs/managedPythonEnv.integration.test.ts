@@ -12,7 +12,6 @@ vi.mock('electron', () => ({
     getPath: () => userDataRoot,
   },
 }));
-vi.mock('./claudeSettings', () => ({}));
 vi.mock('./systemProxy', () => ({}));
 vi.mock('./coworkLogger', () => ({ coworkLog: vi.fn() }));
 import { applyApplicationRuntimeEnv } from './coworkUtil';

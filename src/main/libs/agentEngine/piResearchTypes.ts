@@ -40,7 +40,7 @@ export interface PiResearchRunOptions {
   onActivation?: (event: HarnessActivationEvent) => void;
 }
 
-export interface ResearchSource {
+interface ResearchSource {
   url: string;
   sourceType: ResearchSourceType;
   verifiedAt: string;
@@ -53,12 +53,12 @@ export interface ResearchClaim {
   sourceUrls: string[];
 }
 
-export interface ResearchQuestion {
+interface ResearchQuestion {
   id: string;
   question: string;
 }
 
-export interface ResearchReview {
+interface ResearchReview {
   requested: boolean;
   passed: boolean;
   output?: string;
@@ -66,7 +66,7 @@ export interface ResearchReview {
 
 export type ResearchArtifactRole = 'deliverable' | 'validation';
 
-export interface ResearchArtifact {
+interface ResearchArtifact {
   path: string;
   role: ResearchArtifactRole;
   verifiedAt: string;

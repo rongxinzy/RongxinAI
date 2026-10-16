@@ -455,7 +455,6 @@ export const TOKEN_CONTRACT = {
 } as const;
 
 export type TokenName = keyof typeof TOKEN_CONTRACT;
-export type CSSVarName = (typeof TOKEN_CONTRACT)[TokenName];
 
 /** All token keys as an array */
 export const TOKEN_NAMES = Object.keys(TOKEN_CONTRACT) as TokenName[];

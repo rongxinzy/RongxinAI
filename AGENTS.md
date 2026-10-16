@@ -12,6 +12,7 @@
 
 ```bash
 bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
+bun run electron:dev:enterprise # 构建并加载当前工作树的企业扩展后启动开发模式
 bun run web:preview        # 浏览器预览（端口 5176，无需 Electron）
 bun run web:preview:check  # 浅色/深色走查主要界面，console error 即失败
 bun run build              # 生产构建（TS + Vite）
@@ -26,7 +27,7 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 
 ### 浏览器预览模式
 
-改渲染器 UI 时，用浏览器预览代替 Electron 做调试。`bun run web:preview` 在端口 5176 启动 Vite；`bun run web:preview:check` 会自己拉起 preview，用浅色和深色走查主要界面。
+**渲染器 UI 日常迭代优先用浏览器预览。** `bun run web:preview` 在端口 5176 启动 Vite，无需启动 Electron、主进程或真实服务；热更新与浏览器开发工具可快速检查布局、主题、交互、尺寸和控制台。`bun run web:preview:check` 会自己拉起 preview，用浅色和深色走查主要界面。这个入口缩短 UI 修改与反馈的循环；真实 IPC、系统能力和完整业务流程仍按受影响范围在 Electron 中验收。
 
 - 仅在 `import.meta.env.DEV` 且没有 preload bridge 时，`main.tsx` 才动态加载 `src/renderer/browserMock/`。生产构建不含 mock。
 - 完整表面由 `scripts/preview/generate-browser-mock.ts` 按 `Window['electron']`（`src/renderer/types/electron.d.ts`）生成。没有单独实现的方法返回类型上合法的默认值，每个路径只 `console.warn` 一次，不抛异常。`on*` 订阅注册到进程内事件总线，fixture 用同一条总线回放流式事件。
@@ -80,7 +81,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 - 作用域：`project`（id = `workspace-` + sha256(cwd)，见 `src/main/workspaceUtils.ts`、`src/shared/memory/constants.ts`）；`personal`（`personal://zhiyuan-agent/user`，写入进候选队列，用户确认后生效）；`session`（摘要，30 天 TTL）。
 - 写入：Work 模式 `memory` 工具（`src/main/memory/piMemoryTool.ts`）先经 `AtomicMemoryExtractor`；每轮后 `runPostTurnMemoryMaintenance`。
-- 注入：每轮前 `buildProjectMemoryContextSafe`，预算 project/personal/session = 900/250/350 token。Chat 不用记忆；IM/Cron 同 Work。旧 `MEMORY.md` 只在启动时导入为候选，永不注入 prompt。
+- 注入：每轮前 `buildProjectMemoryContextSafe`，预算 project/personal/session = 900/250/350 token。Chat 不用记忆；IM/Cron 同 Work。
 
 ### 其他
 
@@ -93,6 +94,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 - `enterprise/` 是知远企业客户端扩展（自 zhiyuanAaaS 仓库迁入，源提交 `7adec4a`）：企业会话、托管模型投影、Agent 控制循环、托管 Skill 与企业设置渲染器。迁移代码保持原仓库结构（`enterprise/src/`），不适用本仓 renderer 的主题与设计体系。
 - 独立构建：`bun run build:enterprise` 产出 `enterprise/dist/extension.cjs`（tsup 单文件 CJS）与 `enterprise/dist/ui/`；测试 `bun run test:enterprise`，类型检查 `bun run typecheck:enterprise`，包体验证 `bun run verify:enterprise:bundle`。根 `npm test` 的 include 不覆盖 `enterprise/`。
+- 开发启动：`bun run electron:dev:enterprise` 自动构建并加载当前工作树的企业扩展，复用 `electron:dev`。默认 AEP 地址 `http://localhost:8080`，通过 `ZHIYUAN_AEP_BASE_URL` 覆盖；分离部署可设置 `ZHIYUAN_AGENT_CONTROL_BASE_URL`。开发配置生成于 git 忽略的 `.work/enterprise-dev/config.json`，或用 `ZHIYUAN_ENTERPRISE_CONFIG_DEV_PATH` 指定现有文件；打包应用忽略开发配置覆盖。修改企业源码后重新运行命令构建。
 - 宿主经 `src/main/enterpriseExtension` 契约加载：打包产物位于 `resources/zhiyuan-enterprise/extension.cjs`，开发覆盖用 `ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH` 指向本地 bundle。UI bundle 是独立 document，不进入主渲染器主题系统。
 - 企业版 Windows 打包走手动 workflow「Build Zhiyuan Enterprise Windows package (manual)」（输入 version 与 aep_base_url），overlay 配置是 `electron-builder.enterprise.cjs`（社区流程 `electron-builder.json` 不加载它），本地入口 `bun run dist:win:enterprise`。打包产物有意不含 Admin Console bundle（控制台仍是 zhiyuanAaaS 的 Web 部署应用）。
 
@@ -155,8 +157,9 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 1. **改前**：列出涉及的 DESIGN.md 章节、复用组件、token/recipe 入口、受影响页面/状态。
 2. **委派**：传递规范、范例与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
 3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」，每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
-4. **实际渲染**（`bun run electron:dev`）：light/dark；适用状态（hover/pressed/selected/disabled/invalid/open）；键盘焦点；窄窗口、长文本、动态内容、portal；reduced-motion；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留；检查实际尺寸与溢出。
-5. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
+4. **实际渲染**：先用 `bun run web:preview` 在浏览器中迭代和检查 light/dark、适用状态（hover/pressed/selected/disabled/invalid/open）、键盘焦点、窄窗口、长文本、动态内容、portal、reduced-motion、实际尺寸与溢出；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留。运行 `bun run web:preview:check` 并检查截图；mock 未覆盖的行为如实记为未验证。
+5. **Electron 验证**：涉及真实 IPC、主进程、文件/系统能力、原生窗口或完整业务流程时，用 `bun run electron:dev` 复验受影响操作；浏览器 mock 与截图不能证明这些行为。
+6. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
 
 截图、测试、lint 各证明不同事项，互不替代；自动检查不覆盖设计判断。纯文档改动只做一致性与链接检查，不宣称 UI 验收。
 
@@ -207,7 +210,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 - 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
 - 全量测试有少量环境相关存量失败（skill smoke、release manifest 等）。遇失败用 `git stash` 对照 HEAD 判断是否由你引入。
 - **Provider 回放**：`tests/piLongTaskReplay.test.ts` 用录制磁带（`tests/replay/tapes/longtask-32doc.jsonl.gz`）对完整 Pi adapter 栈跑 32 文档长任务，做严格 seq+hash 匹配，prompt 组装、工具接线或完成语义漂移即失败。prompt/场景有意变更后重录：`AB_LONGTASK=record AB_LONGTASK_UPSTREAM_API_KEY=<token> bunx vitest run tests/abLongTask.harness.test.ts`（live 上游与模型见 `tests/replay/piLongTaskScenario.ts`；2026-10 起算力为 64K 上下文单模型部署，场景规模据此定为 32 文档）。
-- UI 改动在 `bun run electron:dev` 验证关键流程：Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。
+- UI 改动先用 `bun run web:preview` 检查受影响页面、状态与明暗主题，并运行 `bun run web:preview:check`。涉及真实集成时，再在 `bun run electron:dev` 验证受影响的关键流程，如 Cowork（发 prompt、批准/拒绝权限、停止）、Artifacts（HTML/SVG/Mermaid/React）、Settings（主题/语言切换）；console 无新增警告/错误。PR 分别写明浏览器预览与 Electron 的实际验证范围。
 
 ## Git 与 PR
 
@@ -226,7 +229,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 > [!IMPORTANT]
 > **代码冻结期约束（Code Freeze）**：当前仓库进入代码冻结期。CI 门禁已开启强校验，**仅允许 `fix` 开头的 PR 合并入 main 分支**（如 `fix(cowork): ...`、`fix: ...`）。其余任何新功能（feat）、重构（refactor）、架构调整等均禁止合入；此类工作转移至 fork 仓库推进。
 
-**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
+**CI**：统一必需检查 `ci-gate`（`scripts/ci/gates/verify.ts` 汇总全部 baseline 与路径归属 job）；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint，含 Knip 与 `scripts/` Python 死代码 / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 

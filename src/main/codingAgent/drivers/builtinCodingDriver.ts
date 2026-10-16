@@ -42,7 +42,7 @@ export const BuiltinCodingPlanMode = {
 export type BuiltinCodingPlanMode =
   (typeof BuiltinCodingPlanMode)[keyof typeof BuiltinCodingPlanMode];
 
-export interface BuiltinCodingSessionStartOptions {
+interface BuiltinCodingSessionStartOptions {
   modelOverride?: string | null;
   thinkingLevel?: string;
   permissionMode?: WorkbenchApprovalMode;

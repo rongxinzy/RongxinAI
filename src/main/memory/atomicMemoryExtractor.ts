@@ -39,7 +39,7 @@ const AtomicMemoryResponseSchema = z
 
 export type AtomicMemoryItem = z.infer<typeof AtomicMemoryItemSchema>;
 
-export interface AtomicMemorySource {
+interface AtomicMemorySource {
   id: string;
   kind: AtomicMemorySourceKind;
   content: string;
@@ -221,7 +221,7 @@ function clampOutOfRangeScores(parsed: unknown): unknown {
   return repaired;
 }
 
-export function buildAtomicMemorySources(sources: AtomicMemorySource[]): AtomicMemorySource[] {
+function buildAtomicMemorySources(sources: AtomicMemorySource[]): AtomicMemorySource[] {
   const selected: AtomicMemorySource[] = [];
   const seenIds = new Set<string>();
   let remainingCharacters = MAX_TOTAL_SOURCE_CHARACTERS;

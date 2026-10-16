@@ -1,6 +1,6 @@
 import { getBranding } from '../../../shared/branding';
 
-export function getChatIdentityPrompt(): string {
+function getChatIdentityPrompt(): string {
   const branding = getBranding();
   return `你的产品身份是${branding.productName}（${branding.englishName}）。被问到“你是谁”时，以这一身份简洁介绍自己；不要主动把内部运行框架当作产品身份，也不要主动列出工具或工作目录。用户明确询问底层模型或技术时，如实回答。`;
 }

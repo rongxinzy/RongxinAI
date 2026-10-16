@@ -58,10 +58,6 @@ import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
 import { EnterpriseRendererIpc } from '../shared/enterpriseRenderer';
-import type {
-  ProviderModelDiscoveryRequest,
-  ProviderModelDiscoveryResult,
-} from '../shared/providers';
 import { TriageIpcChannel } from '../shared/triage';
 import { TodoIpc } from '../shared/todo';
 import { WorkspaceIpc } from '../shared/workspace';
@@ -343,9 +339,6 @@ contextBridge.exposeInMainWorld('electron', {
       timeoutMs?: number;
       purpose?: ApiRequestPurpose;
     }) => ipcRenderer.invoke(ApiIpc.Fetch, options),
-
-    fetchModels: (input: ProviderModelDiscoveryRequest): Promise<ProviderModelDiscoveryResult> =>
-      ipcRenderer.invoke(ApiIpc.FetchModels, input),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -378,15 +371,8 @@ contextBridge.exposeInMainWorld('electron', {
     ) => onPush(WindowIpc.StateChanged, callback),
   },
 
-  getApiConfig: () => ipcRenderer.invoke(AppConfigIpc.GetApiConfig),
   checkApiConfig: (options?: { probeModel?: boolean }) =>
     ipcRenderer.invoke(AppConfigIpc.CheckApiConfig, options),
-  saveApiConfig: (config: {
-    apiKey: string;
-    baseURL: string;
-    model: string;
-    apiType?: 'anthropic' | 'openai';
-  }) => ipcRenderer.invoke(AppConfigIpc.SaveApiConfig, config),
   generateSessionTitle: (userInput: string | null) =>
     ipcRenderer.invoke(AppConfigIpc.GenerateSessionTitle, userInput),
   getRecentCwds: (limit?: number) => ipcRenderer.invoke(AppConfigIpc.GetRecentCwds, limit),

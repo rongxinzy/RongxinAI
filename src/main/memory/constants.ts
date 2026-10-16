@@ -11,13 +11,11 @@ export type EngramManagerPhase = (typeof EngramManagerPhase)[keyof typeof Engram
 import {
   MemoryDeliveryStatus,
   MemoryKind,
-  MemoryLifecycleStatus,
   MemoryOutboxOperation as SharedMemoryOutboxOperation,
   MemoryScope,
   MemorySourceKind as SharedMemorySourceKind,
   type MemoryDeliveryStatus as MemoryDeliveryStatusValue,
   type MemoryKind as MemoryKindValue,
-  type MemoryLifecycleStatus as MemoryLifecycleStatusValue,
   type MemoryOutboxOperation as MemoryOutboxOperationValue,
   type MemoryScope as MemoryScopeValue,
   type MemorySourceKind as MemorySourceKindValue,
@@ -26,23 +24,8 @@ import {
 export const EngramMemoryScope = MemoryScope;
 export type EngramMemoryScope = MemoryScopeValue;
 
-export const EngramMemoryCapability = {
-  Recall: 'recall',
-  SaveCandidate: 'saveCandidate',
-  ConfirmMemory: 'confirmMemory',
-  Supersede: 'supersede',
-  Forget: 'forget',
-  SessionSummary: 'sessionSummary',
-} as const;
-
-export type EngramMemoryCapability =
-  (typeof EngramMemoryCapability)[keyof typeof EngramMemoryCapability];
-
 export const EngramObservationType = MemoryKind;
 export type EngramObservationType = MemoryKindValue;
-
-export const MemoryLinkStatus = MemoryLifecycleStatus;
-export type MemoryLinkStatus = MemoryLifecycleStatusValue;
 
 export const MemoryOutboxStatus = MemoryDeliveryStatus;
 export type MemoryOutboxStatus = MemoryDeliveryStatusValue;
@@ -78,14 +61,8 @@ export type AtomicMemorySourceKind =
 export const ATOMIC_MEMORY_EXTRACTOR_VERSION = 1;
 export const SESSION_MEMORY_EXTRACTOR_VERSION = 1;
 export const SESSION_SUMMARY_BACKFILL_VERSION = 1;
-export const SEMANTIC_MEMORY_MIGRATION_VERSION = 1;
 export const PERSONAL_MEMORY_SESSION_PREFIX = 'personal:';
 export const MANUAL_MEMORY_SESSION_ID = 'settings-memory';
-export const LEGACY_MEMORY_FILE_SESSION_ID = 'legacy-memory-file';
-export const LEGACY_MEMORY_SQLITE_SESSION_ID = 'legacy-user-memories';
-export const LEGACY_MEMORY_CANDIDATE_PREFIX = 'legacy-memory:';
-export const LEGACY_MEMORY_FILE_IMPORT_VERSION = 1;
-export const LEGACY_MEMORY_SQLITE_IMPORT_VERSION = 1;
 
 export const MemoryExtractorKind = {
   Atomic: 'atomic_memory',
@@ -100,16 +77,6 @@ export const MemoryRecordStorageKind = {
 
 export type MemoryRecordStorageKind =
   (typeof MemoryRecordStorageKind)[keyof typeof MemoryRecordStorageKind];
-
-export const SemanticMemoryMigrationStatus = {
-  DeliveryPending: 'delivery_pending',
-  PendingReview: 'pending_review',
-  RetainedNoReplacement: 'retained_no_replacement',
-  EvidenceUnavailable: 'evidence_unavailable',
-} as const;
-
-export type SemanticMemoryMigrationStatus =
-  (typeof SemanticMemoryMigrationStatus)[keyof typeof SemanticMemoryMigrationStatus];
 
 export const SessionSummaryBackfillStatus = {
   DeliveryPending: 'delivery_pending',

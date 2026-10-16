@@ -19,10 +19,10 @@ import { mergeMcpSpawnEnv } from '../mcpEnvironment';
 import { expandMcpTemplate, resolveStdioCommand } from '../mcpServerManager';
 
 /** Minimal mirror of pi's McpExposure; the string values are pi's contract. */
-export type PiMcpExposure = 'codemode' | 'deferred' | 'direct' | 'hidden';
+type PiMcpExposure = 'codemode' | 'deferred' | 'direct' | 'hidden';
 
 /** Minimal mirror of pi's McpServerConfig (core/mcp-servers.ts). */
-export type PiMcpServerConfig =
+type PiMcpServerConfig =
   | {
       type: 'stdio';
       command: string;
