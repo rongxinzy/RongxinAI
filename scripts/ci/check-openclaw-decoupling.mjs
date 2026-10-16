@@ -4,6 +4,7 @@ import process from 'node:process';
 
 import {
   listGuardedWorkflowFiles,
+  stripWorkflowGateReferences,
   validateWorkflowFile,
 } from './openclaw-decoupling-workflows.mjs';
 
@@ -130,15 +131,7 @@ checkFile('vite.config.ts', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 for (const workflowFile of listGuardedWorkflowFiles(root)) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
   failures.push(...validateWorkflowFile(workflowFile, content));
-  const contentWithoutGateCommand = content
-    .split(/\r?\n/)
-    .filter(
-      line =>
-        !/(?:check:openclaw-decoupling|check-openclaw-decoupling|openclaw-decoupling-workflows)/.test(
-          line,
-        ),
-    )
-    .join('\n');
+  const contentWithoutGateCommand = stripWorkflowGateReferences(content);
   if (forbiddenRuntimePattern.test(contentWithoutGateCommand)) {
     failures.push(`${workflowFile} contains retired runtime build or cache logic`);
   }
