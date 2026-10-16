@@ -92,7 +92,7 @@ import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
 import { usePersistedArtifactSeed } from './helpers/usePersistedArtifactSeed';
-import { setPersistentToggleNamespace } from './hooks/usePersistentToggle';
+import { resolveStableSessionKey, setPersistentToggleNamespace } from './hooks/usePersistentToggle';
 // toolUtils helpers used in sub-components
 import {
   normalizeLocalPath,
@@ -648,6 +648,27 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           if (!scrollContainer) {
             throw new Error('Capture target not found');
           }
+          // Wait for React to commit `renderAll` / `forceExpand` and for lazy
+          // subtrees to settle their DOM height before measuring anchors.
+          await waitForNextFrame();
+          let previousHeight = -1;
+          let previousAnchorCount = -1;
+          for (let frame = 0; frame < 6; frame += 1) {
+            await waitForNextFrame();
+            const currentHeight = scrollContainer.scrollHeight;
+            const currentAnchorCount = scrollContainer.querySelectorAll(
+              '[data-export-role="user-message"], [data-export-role="assistant-block"]',
+            ).length;
+            if (
+              currentHeight === previousHeight &&
+              currentAnchorCount === previousAnchorCount &&
+              currentHeight > 0
+            ) {
+              break;
+            }
+            previousHeight = currentHeight;
+            previousAnchorCount = currentAnchorCount;
+          }
           const initialScrollTop = scrollContainer.scrollTop;
           try {
             const scrollRect = domRectToCaptureRect(scrollContainer.getBoundingClientRect());
@@ -896,13 +917,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     [dispatch],
   );
 
+  // Scope persisted collapsible state to this session. Rendered sessions are
+  // shown one at a time, so a render-time namespace assignment is safe.
+  setPersistentToggleNamespace(currentSession?.id ?? '');
+  const stableSessionKey = resolveStableSessionKey(sessionId);
+
   const messages = currentSession?.messages;
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
   // Stabilize turn object identity so completed turns do not re-render on
   // every streaming token (issue #141).
-  const turns = useStableConversationTurns(rawTurns, sessionId);
+  const turns = useStableConversationTurns(rawTurns, stableSessionKey);
   // 末轮已有匹配工具卡片时，授权按钮画在卡片里，不再单独渲染白底授权卡
   const lastTurnItems = turns[turns.length - 1]?.assistantItems;
   const hasInlineToolPermissionCard = Boolean(
@@ -922,9 +948,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     PREVIEWABLE_ARTIFACT_TYPES,
     currentSession?.cwd,
   );
-  // Scope persisted collapsible state to this session. Rendered sessions are
-  // shown one at a time, so a render-time namespace assignment is safe.
-  setPersistentToggleNamespace(currentSession?.id ?? '');
 
   const markInitialHistoryTailPositioned = useSessionHistoryPagination({
     sessionId,
@@ -1033,7 +1056,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     return (
       <VirtualizedTurnList
-        key={sessionId}
+        key={stableSessionKey}
         ref={virtualizedTurnListRef}
         turns={effectiveTurns}
         onInitialTailPositioned={markInitialHistoryTailPositioned}
@@ -1060,7 +1083,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       runIndicator={
         isSessionSwitching ? null : (
           <CoworkRunStatus
-            key={currentSession.id}
+            key={stableSessionKey}
             sessionId={currentSession.id}
             isStreaming={isStreaming}
           />

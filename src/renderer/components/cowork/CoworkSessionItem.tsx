@@ -257,7 +257,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             {showStatusIndicator && (
               <span
                 className={`block w-2 h-2 rounded-full shrink-0 ${
-                  showPendingPermission ? 'bg-success animate-pulse' : 'bg-ring'
+                  showPendingPermission ? 'bg-warning animate-pulse' : 'bg-ring'
                 }`}
                 title={
                   showPendingPermission
@@ -291,7 +291,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                   {displayTitle}
                 </h3>
                 {showPendingPermission && (
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+                  <span className="theme-sidebar-approval shrink-0">
                     {i18nService.t('workbenchTaskStatusWaitingApproval')}
                   </span>
                 )}

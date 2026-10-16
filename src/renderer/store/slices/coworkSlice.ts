@@ -454,6 +454,17 @@ const coworkSlice = createSlice({
         // Publish replacement as one state transition, before any asynchronous refresh.
         const temporarySessionId = action.meta.temporarySessionId;
         if (temporarySessionId && temporarySessionId !== action.payload.id) {
+          if (state.draftPrompts[temporarySessionId] && !state.draftPrompts[action.payload.id]) {
+            state.draftPrompts[action.payload.id] = state.draftPrompts[temporarySessionId];
+          }
+          delete state.draftPrompts[temporarySessionId];
+          if (
+            state.draftAttachments[temporarySessionId] &&
+            !state.draftAttachments[action.payload.id]
+          ) {
+            state.draftAttachments[action.payload.id] = state.draftAttachments[temporarySessionId];
+          }
+          delete state.draftAttachments[temporarySessionId];
           removeSessionFromState(state, temporarySessionId);
           state.chatSessions = state.chatSessions.filter(
             session => session.id !== temporarySessionId,

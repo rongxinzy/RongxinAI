@@ -58,4 +58,25 @@ test('bounds thinking block and tool results estimation to avoid virtualizer jum
   // Even with 500 lines of thought, estimated height must stay compact (well under 500px)
   expect(estimate).toBeLessThan(400);
   expect(estimate).toBeGreaterThanOrEqual(180);
+
+  const streamingThinkingTurn: ConversationTurn = {
+    id: 'turn-thinking-streaming',
+    userMessage: null,
+    assistantItems: [
+      {
+        type: 'assistant',
+        message: {
+          id: 'thought-streaming',
+          type: 'assistant',
+          content: longThinkingContent,
+          timestamp: 1,
+          metadata: { isThinking: true, isStreaming: true, isFinal: false },
+        },
+      },
+    ],
+  };
+  const streamingEstimate = estimateConversationTurnHeight(streamingThinkingTurn);
+  // Streaming/expanded thinking adds up to THINKING_MAX_CONTENT_HEIGHT_PX (256px)
+  expect(streamingEstimate).toBeGreaterThan(estimate);
+  expect(streamingEstimate).toBeLessThanOrEqual(400);
 });

@@ -1,12 +1,6 @@
-import {
-  motion,
-  useAnimation,
-  useReducedMotion,
-  type Transition,
-  type Variants,
-} from 'motion/react';
-import type { HTMLAttributes, MouseEvent } from 'react';
-import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import type { HTMLAttributes } from 'react';
+import { forwardRef, useImperativeHandle } from 'react';
 
 import { cn } from '@shared/lib/utils';
 
@@ -20,83 +14,31 @@ interface ArtifactPanelAnimatedToggleIconProps extends HTMLAttributes<HTMLDivEle
   size?: number;
 }
 
-const DEFAULT_TRANSITION: Transition = {
-  times: [0, 0.4, 1],
-  duration: 0.5,
-};
-
-const OPEN_PATH_VARIANTS: Variants = {
-  normal: { x: 0 },
-  animate: { x: [0, 1.5, 0] },
-};
-
-const CLOSE_PATH_VARIANTS: Variants = {
-  normal: { x: 0 },
-  animate: { x: [0, -1.5, 0] },
-};
-
 export const ArtifactPanelAnimatedToggleIcon = forwardRef<
   ArtifactPanelAnimatedToggleIconHandle,
   ArtifactPanelAnimatedToggleIconProps
->(({ open, onMouseEnter, onMouseLeave, className, size = 16, ...props }, ref) => {
-  const controls = useAnimation();
-  const isControlledRef = useRef(false);
-  const prefersReducedMotion = useReducedMotion();
-
-  useImperativeHandle(ref, () => {
-    isControlledRef.current = true;
-    return {
-      startAnimation: () => {
-        if (!prefersReducedMotion) void controls.start('animate');
-      },
-      stopAnimation: () => void controls.start('normal'),
-    };
-  }, [controls, prefersReducedMotion]);
-
-  const handleMouseEnter = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      if (isControlledRef.current) onMouseEnter?.(event);
-      else if (!prefersReducedMotion) void controls.start('animate');
-    },
-    [controls, onMouseEnter, prefersReducedMotion],
+>(({ open, className, size = 16, ...props }, ref) => {
+  useImperativeHandle(
+    ref,
+    () => ({
+      startAnimation: () => {},
+      stopAnimation: () => {},
+    }),
+    [],
   );
 
-  const handleMouseLeave = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      if (isControlledRef.current) onMouseLeave?.(event);
-      else void controls.start('normal');
-    },
-    [controls, onMouseLeave],
-  );
+  const Icon = open ? PanelRightClose : PanelRightOpen;
 
   return (
     <div
       aria-hidden="true"
-      className={cn('artifact-panel-animated-toggle-icon size-4 shrink-0', className)}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className={cn(
+        'artifact-panel-animated-toggle-icon inline-flex size-4 shrink-0 items-center justify-center',
+        className,
+      )}
       {...props}
     >
-      <svg
-        fill="none"
-        height={size}
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        viewBox="0 0 24 24"
-        width={size}
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <rect height="18" rx="2" width="18" x="3" y="3" />
-        <path d="M9 3v18" />
-        <motion.path
-          animate={controls}
-          d={open ? 'm16 15-3-3 3-3' : 'm14 9 3 3-3 3'}
-          transition={DEFAULT_TRANSITION}
-          variants={open ? CLOSE_PATH_VARIANTS : OPEN_PATH_VARIANTS}
-        />
-      </svg>
+      <Icon size={size} />
     </div>
   );
 });

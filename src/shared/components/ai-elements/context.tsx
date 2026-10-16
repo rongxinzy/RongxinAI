@@ -78,8 +78,15 @@ export function Context({ usedTokens, maxTokens, modelId, usage, ...props }: Con
   );
 }
 
-function ContextIcon() {
-  const { usedTokens, maxTokens } = useContextValue();
+export function ContextUsageGauge({
+  usedTokens,
+  maxTokens,
+  className,
+}: {
+  usedTokens: number;
+  maxTokens: number;
+  className?: string;
+}) {
   const usageState = getContextUsageState(usedTokens, maxTokens);
   const circumference = 2 * Math.PI * ICON_RADIUS;
   const usedPercent = Math.min(usedTokens / maxTokens, 1);
@@ -88,7 +95,7 @@ function ContextIcon() {
   return (
     <svg
       aria-hidden="true"
-      className={usageStateClassName[usageState]}
+      className={cn(usageStateClassName[usageState], className)}
       height="20"
       viewBox={`0 0 ${ICON_VIEWBOX} ${ICON_VIEWBOX}`}
       width="20"
@@ -117,6 +124,11 @@ function ContextIcon() {
       />
     </svg>
   );
+}
+
+function ContextIcon() {
+  const { usedTokens, maxTokens } = useContextValue();
+  return <ContextUsageGauge usedTokens={usedTokens} maxTokens={maxTokens} />;
 }
 
 export type ContextTriggerProps = ComponentProps<typeof Button> & {

@@ -497,13 +497,22 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       return () => observer.disconnect();
     }, []);
 
+    const previousDraftKeyRef = useRef(draftKey);
     // Sync value from draft when sessionId changes
     useEffect(() => {
-      setValue(draftPrompt);
-      // Re-derive imageVisionHint from the new session's draft attachments
-      const hasImageWithoutVision =
-        !modelSupportsImage && attachments.some(a => a.isImage || isImagePath(a.path));
-      setImageVisionHint(hasImageWithoutVision);
+      const previousDraftKey = previousDraftKeyRef.current;
+      previousDraftKeyRef.current = draftKey;
+      const isTempPromotion =
+        previousDraftKey.startsWith('temp-') &&
+        draftKey !== '__home__' &&
+        !draftKey.startsWith('temp-');
+      if (!isTempPromotion) {
+        setValue(draftPrompt);
+        // Re-derive imageVisionHint from the new session's draft attachments
+        const hasImageWithoutVision =
+          !modelSupportsImage && attachments.some(a => a.isImage || isImagePath(a.path));
+        setImageVisionHint(hasImageWithoutVision);
+      }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [draftKey]); // intentionally omit other deps to only trigger on session switch
 
