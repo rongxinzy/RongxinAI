@@ -12,7 +12,7 @@ const MAX_EXPLICIT_CONTENT_CHARACTERS = 3_000;
 const DISALLOWED_SENSITIVE_CONTENT_PATTERN =
   /\b(?:sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36,}|xox[baprs]-[A-Za-z0-9-]{10,})\b/i;
 
-export type PreparedExplicitUserMemory = {
+type PreparedExplicitUserMemory = {
   title: string;
   content: string;
   kind: typeof EngramObservationType.Decision | typeof EngramObservationType.Preference;

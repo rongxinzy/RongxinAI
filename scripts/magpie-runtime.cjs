@@ -4,6 +4,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const upstream = require('../resources/magpie/upstream.json');
 
 const TARGETS = Object.freeze({
@@ -151,6 +152,58 @@ function verifyPackagedMagpie(context) {
   for (const key of contextTargets(context)) verifyRuntime(root, key, { allowSigned: true });
 }
 
+function certumThumbprint(env) {
+  return (env.CERTUM_CERT_THUMBPRINT || '').replace(/[^0-9a-f]/gi, '').toUpperCase();
+}
+
+function signPackagedWindowsMagpie(context, deps = {}) {
+  if (context.electronPlatformName !== 'win32') return;
+  const spawn = deps.spawn || spawnSync;
+  const env = deps.env || process.env;
+  const root = packagedRoot(context);
+  const signingEnabled = /^[0-9A-F]{40}$/.test(certumThumbprint(env));
+  const script = path.join(__dirname, 'runtime-signing', 'sign-runtime.ps1');
+  for (const key of contextTargets(context)) {
+    const directory = path.join(root, key);
+    const binary = path.join(directory, binaryName(key));
+    const manifestPath = path.join(directory, 'manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const before = sha256File(binary);
+    if (before === manifest.sha256 && before === manifest.buildSha256) {
+      if (!signingEnabled) {
+        verifyRuntime(root, key);
+        continue;
+      }
+      // extraResources live outside electron-builder's Windows sign walk
+      // (app.asar.unpacked and swiftshader). Sign with the same Certum
+      // signtool script the release environment already uses.
+      const result = spawn(
+        'powershell.exe',
+        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
+        { stdio: 'inherit', windowsHide: true, env },
+      );
+      if (result.error) throw result.error;
+      if (result.status !== 0) {
+        throw new Error(`Magpie Authenticode signing failed with exit code ${result.status}`);
+      }
+    } else if (!signingEnabled) {
+      throw new Error('Magpie binary changed before Windows signing');
+    }
+    const sha256 = sha256File(binary);
+    if (sha256 === manifest.buildSha256) {
+      throw new Error('Windows signing left the Magpie compiler bytes unchanged');
+    }
+    const signed = {
+      ...manifest,
+      sha256,
+      sizeBytes: fs.statSync(binary).size,
+      signing: { platform: 'win32', format: 'authenticode' },
+    };
+    fs.writeFileSync(manifestPath, `${JSON.stringify(signed, null, 2)}\n`);
+    verifyRuntime(root, key, { allowSigned: true });
+  }
+}
+
 module.exports = {
   TARGETS,
   upstream,
@@ -161,4 +214,5 @@ module.exports = {
   contextTargets,
   configureMagpieResources,
   verifyPackagedMagpie,
+  signPackagedWindowsMagpie,
 };
