@@ -69,6 +69,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "web:preview": "vite --config vite.config.browser.ts",
     "build": "npm run build:tsc && npm run build:vite && npm run check:electron-runtime-dependencies",
     "build:tsc": "tsc",
     "build:vite": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
@@ -79,6 +80,7 @@
     "format:check": "oxfmt --check .",
     "prepare": "husky",
     "test": "node scripts/test-with-native-restore.cjs",
+    "preview:screenshots": "node scripts/preview/capture-screenshots.mjs",
     "test:memory-leak": "node scripts/ci/memory-leak-check.mjs",
     "test:bundle-budget": "node scripts/check-renderer-bundle-budget.cjs",
     "check:supply-chain-inputs": "node scripts/ci/check-supply-chain-inputs.mjs",
