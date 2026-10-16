@@ -26,7 +26,7 @@ export type MockSessionSummary = ItemOf<
   NonNullable<Resolved<Api['cowork']['listSessions']>['sessions']>
 >;
 export type MockSession = NonNullable<Resolved<Api['cowork']['getSession']>['session']>;
-export type MockMessage = MockSession['messages'][number];
+type MockMessage = MockSession['messages'][number];
 export type MockCoworkConfig = NonNullable<Resolved<Api['cowork']['getConfig']>['config']>;
 export type MockWorkspace = ItemOf<
   NonNullable<Resolved<Api['cowork']['listWorkspaces']>['workspaces']>
@@ -91,7 +91,7 @@ export const mockSessionSummaries: MockSessionSummary[] = [
   },
 ];
 
-export const mockMessages: MockMessage[] = [
+const mockMessages: MockMessage[] = [
   {
     id: 'msg-1',
     type: 'user',

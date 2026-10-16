@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-export const SENSITIVE_PATH_PATTERNS = [
+const SENSITIVE_PATH_PATTERNS = [
   '/.ssh/',
   '/.ssh',
   '/.gnupg/',
@@ -24,7 +24,7 @@ export const SENSITIVE_PATH_PATTERNS = [
   'windows/syswow64',
 ];
 
-export const DANGEROUS_EXEC_EXTENSIONS = new Set([
+const DANGEROUS_EXEC_EXTENSIONS = new Set([
   '.exe',
   '.bat',
   '.cmd',

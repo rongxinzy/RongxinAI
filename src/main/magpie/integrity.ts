@@ -4,7 +4,7 @@ import { Worker } from 'node:worker_threads';
 export const MAGPIE_COMMIT = 'f074996d93b87b17ea682c4b5951d52794bb28cb';
 export const MAGPIE_VERSION = 'zhiyuan-f074996d93b8';
 let hashing = false;
-export async function hashMagpieBinary(file: string, signal: AbortSignal): Promise<string> {
+async function hashMagpieBinary(file: string, signal: AbortSignal): Promise<string> {
   if (hashing) throw new Error('Magpie verification already running');
   signal.throwIfAborted();
   const stat = await fs.stat(file);

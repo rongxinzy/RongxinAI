@@ -767,7 +767,6 @@ const coworkSlice = createSlice({
 });
 
 export const {
-  setCoworkActive,
   setSessions,
   setHasMoreSessions,
   appendSessions,
@@ -787,7 +786,6 @@ export const {
   deleteSessions,
   addMessage,
   prependMessages,
-  updateMessageContent,
   updateMessageContents,
   updateToolActivity,
   setRemoteManaged,
@@ -797,7 +795,6 @@ export const {
   clearCurrentSessionForWorkspaceChange,
   enqueuePendingPermission,
   dequeuePendingPermission,
-  clearPendingPermissions,
   clearPendingPermissionsForSession,
   setConfig,
   updateConfig,

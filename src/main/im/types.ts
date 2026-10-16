@@ -22,7 +22,7 @@ export interface DingTalkChannelConfig {
   debug: boolean;
 }
 
-export interface DingTalkGatewayStatus {
+interface DingTalkGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -32,15 +32,13 @@ export interface DingTalkGatewayStatus {
 
 // ==================== DingTalk Multi-Instance Types ====================
 
-export const MAX_DINGTALK_INSTANCES = 5;
-
 export interface DingTalkInstanceConfig extends DingTalkChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface DingTalkInstanceStatus extends DingTalkGatewayStatus {
+interface DingTalkInstanceStatus extends DingTalkGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -49,7 +47,7 @@ export interface DingTalkMultiInstanceConfig {
   instances: DingTalkInstanceConfig[];
 }
 
-export interface DingTalkMultiInstanceStatus {
+interface DingTalkMultiInstanceStatus {
   instances: DingTalkInstanceStatus[];
 }
 
@@ -59,18 +57,18 @@ export const DEFAULT_DINGTALK_MULTI_INSTANCE_CONFIG: DingTalkMultiInstanceConfig
 
 // ==================== Feishu Types ====================
 
-export interface FeishuChannelGroupConfig {
+interface FeishuChannelGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-export interface FeishuChannelFooterConfig {
+interface FeishuChannelFooterConfig {
   status?: boolean;
   elapsed?: boolean;
 }
 
-export interface FeishuChannelBlockStreamingCoalesceConfig {
+interface FeishuChannelBlockStreamingCoalesceConfig {
   minChars?: number;
   maxChars?: number;
   idleMs?: number;
@@ -96,7 +94,7 @@ export interface FeishuChannelConfig {
   debug: boolean;
 }
 
-export interface FeishuGatewayStatus {
+interface FeishuGatewayStatus {
   connected: boolean;
   startedAt: string | null;
   botOpenId: string | null;
@@ -107,15 +105,13 @@ export interface FeishuGatewayStatus {
 
 // ==================== Feishu Multi-Instance Types ====================
 
-export const MAX_FEISHU_INSTANCES = 5;
-
 export interface FeishuInstanceConfig extends FeishuChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface FeishuInstanceStatus extends FeishuGatewayStatus {
+interface FeishuInstanceStatus extends FeishuGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -124,13 +120,13 @@ export interface FeishuMultiInstanceConfig {
   instances: FeishuInstanceConfig[];
 }
 
-export interface FeishuMultiInstanceStatus {
+interface FeishuMultiInstanceStatus {
   instances: FeishuInstanceStatus[];
 }
 
 // ==================== Telegram Types ====================
 
-export interface TelegramChannelGroupConfig {
+interface TelegramChannelGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
@@ -155,7 +151,7 @@ export interface TelegramChannelConfig {
   debug: boolean;
 }
 
-export interface TelegramGatewayStatus {
+interface TelegramGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -166,15 +162,13 @@ export interface TelegramGatewayStatus {
 
 // ==================== Telegram Multi-Instance Types ====================
 
-export const MAX_TELEGRAM_INSTANCES = 5;
-
 export interface TelegramInstanceConfig extends TelegramChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface TelegramInstanceStatus extends TelegramGatewayStatus {
+interface TelegramInstanceStatus extends TelegramGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -183,13 +177,13 @@ export interface TelegramMultiInstanceConfig {
   instances: TelegramInstanceConfig[];
 }
 
-export interface TelegramMultiInstanceStatus {
+interface TelegramMultiInstanceStatus {
   instances: TelegramInstanceStatus[];
 }
 
 // ==================== Discord Types ====================
 
-export interface DiscordChannelGuildConfig {
+interface DiscordChannelGuildConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
@@ -210,7 +204,7 @@ export interface DiscordChannelConfig {
   debug: boolean;
 }
 
-export interface DiscordGatewayStatus {
+interface DiscordGatewayStatus {
   connected: boolean;
   starting: boolean;
   startedAt: number | null;
@@ -220,15 +214,13 @@ export interface DiscordGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-export const MAX_DISCORD_INSTANCES = 5;
-
 export interface DiscordInstanceConfig extends DiscordChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface DiscordInstanceStatus extends DiscordGatewayStatus {
+interface DiscordInstanceStatus extends DiscordGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -237,7 +229,7 @@ export interface DiscordMultiInstanceConfig {
   instances: DiscordInstanceConfig[];
 }
 
-export interface DiscordMultiInstanceStatus {
+interface DiscordMultiInstanceStatus {
   instances: DiscordInstanceStatus[];
 }
 
@@ -260,7 +252,7 @@ export interface QQChannelConfig {
 /** @deprecated Use QQChannelConfig instead */
 export type QQConfig = QQChannelConfig;
 
-export interface QQGatewayStatus {
+interface QQGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -270,15 +262,13 @@ export interface QQGatewayStatus {
 
 // ==================== QQ Multi-Instance Types ====================
 
-export const MAX_QQ_INSTANCES = 5;
-
 export interface QQInstanceConfig extends QQChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface QQInstanceStatus extends QQGatewayStatus {
+interface QQInstanceStatus extends QQGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -287,7 +277,7 @@ export interface QQMultiInstanceConfig {
   instances: QQInstanceConfig[];
 }
 
-export interface QQMultiInstanceStatus {
+interface QQMultiInstanceStatus {
   instances: QQInstanceStatus[];
 }
 
@@ -306,9 +296,8 @@ export interface WecomChannelConfig {
 }
 
 /** @deprecated Use WecomChannelConfig instead */
-export type WecomConfig = WecomChannelConfig;
 
-export interface WecomGatewayStatus {
+interface WecomGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -319,15 +308,13 @@ export interface WecomGatewayStatus {
 
 // ==================== WeCom Multi-Instance Types ====================
 
-export const MAX_WECOM_INSTANCES = 5;
-
 export interface WecomInstanceConfig extends WecomChannelConfig {
   instanceId: string;
   instanceName: string;
   workspaceId: string;
 }
 
-export interface WecomInstanceStatus extends WecomGatewayStatus {
+interface WecomInstanceStatus extends WecomGatewayStatus {
   instanceId: string;
   instanceName: string;
 }
@@ -336,7 +323,7 @@ export interface WecomMultiInstanceConfig {
   instances: WecomInstanceConfig[];
 }
 
-export interface WecomMultiInstanceStatus {
+interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
 }
 
@@ -355,7 +342,7 @@ export interface WeixinChannelConfig {
   debug: boolean;
 }
 
-export interface WeixinGatewayStatus {
+interface WeixinGatewayStatus {
   connected: boolean;
   startedAt: number | null;
   lastError: string | null;
@@ -393,7 +380,7 @@ export interface IMGatewayStatus {
 
 // ==================== Media Attachment Types ====================
 
-export type IMMediaType = 'image' | 'video' | 'audio' | 'voice' | 'document' | 'sticker';
+type IMMediaType = 'image' | 'video' | 'audio' | 'voice' | 'document' | 'sticker';
 
 export interface IMMediaAttachment {
   type: IMMediaType;
@@ -422,16 +409,6 @@ export interface IMMessage {
   mediaGroupId?: string; // 濯掍綋缁?ID锛堢敤浜庡悎骞跺寮犲浘鐗囷級
 }
 
-export interface IMReplyContext {
-  platform: Platform;
-  conversationId: string;
-  messageId?: string;
-  // DingTalk specific
-  sessionWebhook?: string;
-  // Feishu specific
-  chatId?: string;
-}
-
 // ==================== IM Session Mapping ====================
 
 export interface IMSessionMapping {
@@ -444,23 +421,6 @@ export interface IMSessionMapping {
 }
 
 // ==================== IPC Result Types ====================
-
-export interface IMConfigResult {
-  success: boolean;
-  config?: IMGatewayConfig;
-  error?: string;
-}
-
-export interface IMStatusResult {
-  success: boolean;
-  status?: IMGatewayStatus;
-  error?: string;
-}
-
-export interface IMGatewayResult {
-  success: boolean;
-  error?: string;
-}
 
 // ==================== Connectivity Test Types ====================
 
@@ -499,12 +459,6 @@ export interface IMConnectivityTestResult {
   testedAt: number;
   verdict: IMConnectivityVerdict;
   checks: IMConnectivityCheck[];
-}
-
-export interface IMConnectivityTestResponse {
-  success: boolean;
-  result?: IMConnectivityTestResult;
-  error?: string;
 }
 
 // ==================== Default Configurations ====================
@@ -637,79 +591,6 @@ export const DEFAULT_WEIXIN_CONFIG: WeixinChannelConfig = {
 export const DEFAULT_IM_SETTINGS: IMSettings = {
   systemPrompt: '',
   skillsEnabled: true,
-};
-
-export const DEFAULT_IM_CONFIG: IMGatewayConfig = {
-  dingtalk: DEFAULT_DINGTALK_MULTI_INSTANCE_CONFIG,
-  feishu: DEFAULT_FEISHU_MULTI_INSTANCE_CONFIG,
-  telegram: DEFAULT_TELEGRAM_MULTI_INSTANCE_CONFIG,
-  qq: DEFAULT_QQ_MULTI_INSTANCE_CONFIG,
-  discord: DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG,
-  wecom: DEFAULT_WECOM_MULTI_INSTANCE_CONFIG,
-  weixin: DEFAULT_WEIXIN_CONFIG,
-  settings: DEFAULT_IM_SETTINGS,
-};
-
-export const DEFAULT_DINGTALK_STATUS: DingTalkGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  lastError: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_FEISHU_STATUS: FeishuGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  botOpenId: null,
-  error: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_DISCORD_STATUS: DiscordGatewayStatus = {
-  connected: false,
-  starting: false,
-  startedAt: null,
-  lastError: null,
-  botUsername: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_QQ_STATUS: QQGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  lastError: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_WECOM_STATUS: WecomGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  lastError: null,
-  botId: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_WEIXIN_STATUS: WeixinGatewayStatus = {
-  connected: false,
-  startedAt: null,
-  lastError: null,
-  lastInboundAt: null,
-  lastOutboundAt: null,
-};
-
-export const DEFAULT_IM_STATUS: IMGatewayStatus = {
-  dingtalk: { instances: [] },
-  feishu: { instances: [] },
-  telegram: { instances: [] },
-  qq: { instances: [] },
-  discord: { instances: [] },
-  wecom: { instances: [] },
-  weixin: DEFAULT_WEIXIN_STATUS,
 };
 
 // ==================== Media Marker Types ====================

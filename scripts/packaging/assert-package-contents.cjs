@@ -441,18 +441,12 @@ function assertPackagedApp(options) {
 }
 
 module.exports = {
-  PACKAGING_EXCLUDES,
-  RENDERER_PACKAGE_EXCLUDES,
   packagingExcludePatterns,
   isForbiddenPackagedBasename,
-  isForbiddenPackagedDependency,
-  ensureFilterExcludes,
   applyPackagingExcludes,
   pinElectronLanguages,
   pruneChromiumLocales,
   walkForbiddenFiles,
-  nodeModuleNameFromAsarPath,
   findAsarViolations,
-  productionDependencyClosure,
   assertPackagedApp,
 };

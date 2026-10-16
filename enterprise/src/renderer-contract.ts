@@ -157,11 +157,3 @@ export type EnterpriseRendererModelCatalogResult =
       readonly models: readonly ManagedProviderCatalogModel[];
     }
   | { readonly ok: false };
-
-export interface EnterpriseRendererModelCatalogResponseMessage {
-  readonly source: typeof EnterpriseRendererMessageSource.Host;
-  readonly apiVersion: 1;
-  readonly type: typeof EnterpriseRendererMessageType.ModelCatalogResponse;
-  readonly requestId: string;
-  readonly result: EnterpriseRendererModelCatalogResult;
-}

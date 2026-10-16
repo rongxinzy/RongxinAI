@@ -51,8 +51,8 @@ export const EnterpriseRendererSessionOperation = {
 export type EnterpriseRendererSessionOperation =
   (typeof EnterpriseRendererSessionOperation)[keyof typeof EnterpriseRendererSessionOperation];
 
-export type EnterpriseRendererLanguage = 'zh' | 'en';
-export type EnterpriseRendererTheme = 'light' | 'dark';
+type EnterpriseRendererLanguage = 'zh' | 'en';
+type EnterpriseRendererTheme = 'light' | 'dark';
 
 // Optional v1 appearance capability; no enterprise data or executable styles.
 export const EnterpriseRendererThemeVariables = [

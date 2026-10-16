@@ -3,12 +3,7 @@ import { Type } from 'typebox';
 export const PiPlanToolName = 'plan_write';
 
 /** Built-in and native tools that can mutate the workspace; plan mode blocks them. */
-export const PiPlanModeBlockedToolNames = [
-  'write',
-  'edit',
-  'python_execute',
-  'python_install',
-] as const;
+const PiPlanModeBlockedToolNames = ['write', 'edit', 'python_execute', 'python_install'] as const;
 
 export const isPlanModeBlockedTool = (toolName: string): boolean =>
   (PiPlanModeBlockedToolNames as readonly string[]).includes(toolName);
@@ -23,12 +18,12 @@ export const PiPlanModePrompt = [
   'After submitting, summarize the key trade-offs and risks, then end the turn without starting the implementation.',
 ].join('\n');
 
-export const PiPlanEntryPriority = {
+const PiPlanEntryPriority = {
   High: 'high',
   Medium: 'medium',
   Low: 'low',
 } as const;
-export type PiPlanEntryPriority = (typeof PiPlanEntryPriority)[keyof typeof PiPlanEntryPriority];
+type PiPlanEntryPriority = (typeof PiPlanEntryPriority)[keyof typeof PiPlanEntryPriority];
 
 export const PiPlanEntryStatus = {
   Pending: 'pending',
@@ -53,7 +48,7 @@ const PlanEntrySchema = Type.Object({
   ),
 });
 
-export const PiPlanParameters = Type.Object({
+const PiPlanParameters = Type.Object({
   entries: Type.Array(PlanEntrySchema, { minItems: 1, maxItems: 40 }),
 });
 

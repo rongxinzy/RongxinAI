@@ -160,8 +160,6 @@ export const {
   updateTask,
   removeTask,
   updateTaskState,
-  selectTask,
-  setViewMode,
   setRuns,
   appendRuns,
   addOrUpdateRun,

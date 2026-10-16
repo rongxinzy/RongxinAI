@@ -14,7 +14,7 @@ export interface AuthTerminalStartedEvent {
   workspaceRoot: string;
 }
 
-export interface AuthTerminalExitedEvent extends AuthTerminalStartedEvent {
+interface AuthTerminalExitedEvent extends AuthTerminalStartedEvent {
   exitCode: number;
   signal?: number;
 }

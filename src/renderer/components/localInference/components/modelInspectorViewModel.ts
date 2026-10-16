@@ -4,7 +4,7 @@ import type {
   LlamaCppRunningModel,
 } from '../../../../shared/llamacpp';
 
-export const MODEL_INSPECTOR_CONTEXT_MIN = 4 * 1024;
+const MODEL_INSPECTOR_CONTEXT_MIN = 4 * 1024;
 export const MODEL_INSPECTOR_CONTEXT_MAX = 128 * 1024;
 const TOKENS_PER_K = 1024;
 

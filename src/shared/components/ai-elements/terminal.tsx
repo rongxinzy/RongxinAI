@@ -28,9 +28,9 @@ const TerminalContext = createContext<TerminalContextType>({
   output: '',
 });
 
-export type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
+type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalHeader = ({ className, children, ...props }: TerminalHeaderProps) => (
+const TerminalHeader = ({ className, children, ...props }: TerminalHeaderProps) => (
   <div
     className={cn(
       'flex items-center justify-between border-zinc-800 border-b px-4 py-2',
@@ -42,18 +42,18 @@ export const TerminalHeader = ({ className, children, ...props }: TerminalHeader
   </div>
 );
 
-export type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
+type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalTitle = ({ className, children, ...props }: TerminalTitleProps) => (
+const TerminalTitle = ({ className, children, ...props }: TerminalTitleProps) => (
   <div className={cn('flex items-center gap-2 text-sm text-zinc-400', className)} {...props}>
     <TerminalIcon className="size-4" />
     {children ?? 'Terminal'}
   </div>
 );
 
-export type TerminalStatusProps = HTMLAttributes<HTMLDivElement>;
+type TerminalStatusProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalStatus = ({ className, children, ...props }: TerminalStatusProps) => {
+const TerminalStatus = ({ className, children, ...props }: TerminalStatusProps) => {
   const { isStreaming } = useContext(TerminalContext);
 
   if (!isStreaming) {
@@ -67,21 +67,21 @@ export const TerminalStatus = ({ className, children, ...props }: TerminalStatus
   );
 };
 
-export type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
+type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalActions = ({ className, children, ...props }: TerminalActionsProps) => (
+const TerminalActions = ({ className, children, ...props }: TerminalActionsProps) => (
   <div className={cn('flex items-center gap-1', className)} {...props}>
     {children}
   </div>
 );
 
-export type TerminalCopyButtonProps = ComponentProps<typeof Button> & {
+type TerminalCopyButtonProps = ComponentProps<typeof Button> & {
   onCopy?: () => void;
   onError?: (error: Error) => void;
   timeout?: number;
 };
 
-export const TerminalCopyButton = ({
+const TerminalCopyButton = ({
   onCopy,
   onError,
   timeout = 2000,
@@ -131,13 +131,9 @@ export const TerminalCopyButton = ({
   );
 };
 
-export type TerminalClearButtonProps = ComponentProps<typeof Button>;
+type TerminalClearButtonProps = ComponentProps<typeof Button>;
 
-export const TerminalClearButton = ({
-  children,
-  className,
-  ...props
-}: TerminalClearButtonProps) => {
+const TerminalClearButton = ({ children, className, ...props }: TerminalClearButtonProps) => {
   const { onClear } = useContext(TerminalContext);
 
   if (!onClear) {
@@ -157,9 +153,9 @@ export const TerminalClearButton = ({
   );
 };
 
-export type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
+type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalContent = ({ className, children, ...props }: TerminalContentProps) => {
+const TerminalContent = ({ className, children, ...props }: TerminalContentProps) => {
   const { output, isStreaming, autoScroll } = useContext(TerminalContext);
   const containerRef = useRef<HTMLDivElement>(null);
 

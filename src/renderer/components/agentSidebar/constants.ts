@@ -7,10 +7,6 @@ export const AgentSidebarIndicator = {
 export type AgentSidebarIndicator =
   (typeof AgentSidebarIndicator)[keyof typeof AgentSidebarIndicator];
 
-export const AgentSidebarPreferenceKey = {
-  State: 'myAgentSidebar.state',
-} as const;
-
 export const AgentSidebarPageSize = {
   Preview: 6,
   AllBatch: 100,
@@ -22,7 +18,7 @@ export const AgentSidebarPageSize = {
  * backfilling pre-source databases (see the cowork_sessions migration) and
  * must stay in sync with that SQL.
  */
-export const ScheduledSessionTitlePrefix = CoworkScheduledSessionTitlePrefix;
+const ScheduledSessionTitlePrefix = CoworkScheduledSessionTitlePrefix;
 
 export const isScheduledSessionTitle = (title: string): boolean => {
   const normalizedTitle = title.trim();

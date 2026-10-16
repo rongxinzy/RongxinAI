@@ -1,10 +1,3 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@shared/components/ui/dialog';
 import { InputGroup, InputGroupAddon } from '@shared/components/ui/input-group';
 import { cn } from '@shared/lib/utils';
 import { Command as CommandPrimitive } from 'cmdk';
@@ -18,39 +11,6 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
       className={cn('theme-command flex size-full flex-col overflow-hidden', className)}
       {...props}
     />
-  );
-}
-
-function CommandDialog({
-  title = 'Command Palette',
-  description = 'Search for a command to run...',
-  children,
-  className,
-  showCloseButton = false,
-  ...props
-}: Omit<React.ComponentProps<typeof Dialog>, 'children'> & {
-  title?: string;
-  description?: string;
-  className?: string;
-  showCloseButton?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
-      <DialogContent
-        className={cn(
-          'theme-page-command-dialog-content-variant-1 top-1/3 translate-y-0 overflow-hidden',
-          className,
-        )}
-        showCloseButton={showCloseButton}
-      >
-        {children}
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -160,24 +120,12 @@ function CommandItem({
   );
 }
 
-function CommandShortcut({ className, ...props }: React.ComponentProps<'span'>) {
-  return (
-    <span
-      data-slot="command-shortcut"
-      className={cn('theme-command-shortcut ml-auto tracking-widest', className)}
-      {...props}
-    />
-  );
-}
-
 export {
   Command,
-  CommandDialog,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
   CommandSeparator,
-  CommandShortcut,
 };

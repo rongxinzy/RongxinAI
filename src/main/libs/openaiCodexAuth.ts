@@ -121,11 +121,11 @@ function trimNonEmpty(value: unknown): string | undefined {
  * (rather than the user's real ~/.codex) avoids overwriting an existing Codex
  * CLI login.
  */
-export function getCodexHomeDir(): string {
+function getCodexHomeDir(): string {
   return path.join(app.getPath('userData'), 'codex');
 }
 
-export function getCodexAuthFilePath(): string {
+function getCodexAuthFilePath(): string {
   return path.join(getCodexHomeDir(), 'auth.json');
 }
 

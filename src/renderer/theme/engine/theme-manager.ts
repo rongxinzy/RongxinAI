@@ -4,7 +4,7 @@ import { injectStyles } from './style-injector';
 import { validateTheme } from '../themes/plugins';
 import type { ThemeDefinition } from '../themes/types';
 
-export interface ThemeStorage {
+interface ThemeStorage {
   get(key: string): string | null | Promise<string | null>;
   set(key: string, value: string): void | Promise<void>;
 }

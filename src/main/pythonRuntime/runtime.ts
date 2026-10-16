@@ -10,7 +10,6 @@ import manifest from './manifest.json';
 import { isolatedEnvironment, runtimeNetworkEnvironment, runProcess } from './process';
 import type { PythonExecutionResult, PythonRunnerRequest } from '../../shared/pythonRuntime';
 
-export const PYTHON_RUNTIME_ID = manifest.id;
 const REQUIREMENT =
   /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9][A-Za-z0-9.!+_-]*$/;
 export function validatePackages(packages: unknown): string[] {

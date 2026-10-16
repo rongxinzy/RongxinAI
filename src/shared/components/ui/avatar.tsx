@@ -2,7 +2,6 @@
 
 import { Avatar as AvatarPrimitive } from '@base-ui/react/avatar';
 import { cn } from '@shared/lib/utils';
-import * as React from 'react';
 
 function Avatar({
   className,
@@ -44,41 +43,4 @@ function AvatarFallback({ className, ...props }: AvatarPrimitive.Fallback.Props)
   );
 }
 
-function AvatarBadge({ className, ...props }: React.ComponentProps<'span'>) {
-  return (
-    <span
-      data-slot="avatar-badge"
-      className={cn(
-        'theme-avatar-badge absolute right-0 bottom-0 z-10 inline-flex items-center justify-center select-none',
-        'group-data-[size=sm]/avatar:[&>svg]:hidden',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-function AvatarGroup({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="avatar-group"
-      className={cn('theme-avatar-group group/avatar-group flex -space-x-2', className)}
-      {...props}
-    />
-  );
-}
-
-function AvatarGroupCount({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="avatar-group-count"
-      className={cn(
-        'theme-avatar-count relative flex shrink-0 items-center justify-center',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-export { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage };
+export { Avatar, AvatarFallback, AvatarImage };

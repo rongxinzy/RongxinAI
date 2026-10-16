@@ -11,7 +11,7 @@ import {
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
 
 export const ZHIYUAN_ENTERPRISE_RENDERER_SCHEME = 'zhiyuan-enterprise-ui';
-export const ZHIYUAN_ENTERPRISE_RENDERER_ORIGIN = `${ZHIYUAN_ENTERPRISE_RENDERER_SCHEME}://renderer`;
+const ZHIYUAN_ENTERPRISE_RENDERER_ORIGIN = `${ZHIYUAN_ENTERPRISE_RENDERER_SCHEME}://renderer`;
 
 const MAX_ENTRYPOINT_LENGTH = 512;
 const MAX_LABEL_LENGTH = 64;

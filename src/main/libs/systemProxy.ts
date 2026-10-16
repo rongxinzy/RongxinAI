@@ -19,7 +19,7 @@ const originalProxyEnv: ProxyEnvSnapshot = PROXY_ENV_KEYS.reduce((acc, key) => {
 
 let systemProxyEnabled = false;
 
-export const DEFAULT_PROXY_RESOLUTION_TARGETS = [
+const DEFAULT_PROXY_RESOLUTION_TARGETS = [
   'https://api.openai.com',
   'https://api.anthropic.com',
   'https://generativelanguage.googleapis.com',
@@ -94,7 +94,7 @@ export function applySystemProxyEnv(proxyUrl: string | null): void {
   setEnvValue('HTTPS_PROXY', proxyUrl);
 }
 
-export async function resolveSystemProxyUrl(targetUrl: string): Promise<string | null> {
+async function resolveSystemProxyUrl(targetUrl: string): Promise<string | null> {
   if (!app.isReady()) {
     return null;
   }

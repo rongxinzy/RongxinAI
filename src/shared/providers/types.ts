@@ -1,7 +1,6 @@
 import type { ApiFormat, ModelCapabilities, ProviderModelOrigin } from './constants';
 import type { ProviderModelConnectionTest } from './connectionTest';
 import type { ProviderModelPiRuntimeConfig } from './piRuntime';
-import { ProviderName } from './constants';
 
 export interface ProviderConfig {
   enabled: boolean;
@@ -36,19 +35,4 @@ export interface ProviderConfig {
   oauthBaseUrl?: string;
   oauthRefreshToken?: string;
   oauthTokenExpiresAt?: number;
-}
-
-export function isProviderEnabled(
-  providerName: string,
-  providerConfig?: Pick<ProviderConfig, 'enabled' | 'userEnabled'> | null,
-): boolean {
-  if (!providerConfig) {
-    return false;
-  }
-
-  if (providerName === ProviderName.LlamaCpp) {
-    return providerConfig.userEnabled === true;
-  }
-
-  return providerConfig.enabled === true;
 }

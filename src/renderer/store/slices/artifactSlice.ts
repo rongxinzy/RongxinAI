@@ -378,7 +378,6 @@ const artifactSlice = createSlice({
 
 export const {
   activateSessionArtifactView,
-  setSessionArtifacts,
   addArtifact,
   setActiveArtifactProjection,
   selectArtifact,
@@ -395,16 +394,6 @@ export const EMPTY_ARTIFACTS: Artifact[] = [];
 
 export const selectSessionArtifacts = (state: RootState, sessionId: string): Artifact[] =>
   state.artifact.artifactsBySession[sessionId] ?? EMPTY_ARTIFACTS;
-
-export const selectTaskRunArtifacts = (
-  state: RootState,
-  sessionId: string,
-  taskId: string,
-  runId?: string,
-): Artifact[] =>
-  (state.artifact.artifactsBySession[sessionId] ?? EMPTY_ARTIFACTS).filter(
-    artifact => artifact.taskId === taskId && (!runId || artifact.runId === runId),
-  );
 
 export const selectSelectedArtifact = (state: RootState): Artifact | null => {
   const id = state.artifact.selectedArtifactId;

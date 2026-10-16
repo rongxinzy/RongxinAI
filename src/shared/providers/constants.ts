@@ -79,17 +79,6 @@ export const AgentProviderId = {
 } as const;
 export type AgentProviderId = (typeof AgentProviderId)[keyof typeof AgentProviderId];
 
-// ─── Agent Runtime API Protocol ────────────────────────────────────────
-export const AgentApi = {
-  AnthropicMessages: 'anthropic-messages',
-  OpenAICompletions: 'openai-completions',
-  OpenAIResponses: 'openai-responses',
-  OpenAICodexResponses: 'openai-codex-responses',
-  GoogleGenerativeAI: 'google-generative-ai',
-  Ollama: 'ollama',
-} as const;
-export type AgentApi = (typeof AgentApi)[keyof typeof AgentApi];
-
 // ─── API Format (provider default protocol format) ──────────────────────
 export const ApiFormat = {
   OpenAI: 'openai',
@@ -97,13 +86,6 @@ export const ApiFormat = {
   Gemini: 'gemini',
 } as const;
 export type ApiFormat = (typeof ApiFormat)[keyof typeof ApiFormat];
-
-// ─── Auth Type ──────────────────────────────────────────────────────────
-export const AuthType = {
-  ApiKey: 'api-key',
-  OAuth: 'oauth',
-} as const;
-export type AuthType = (typeof AuthType)[keyof typeof AuthType];
 
 export const ModelCapabilityStatus = {
   Supported: 'supported',
@@ -1096,7 +1078,7 @@ const PROVIDER_DEFINITIONS = [
 // 4. Provider Definition Interface (public)
 // ═══════════════════════════════════════════════════════
 
-export interface ProviderDef {
+interface ProviderDef {
   /** Provider identifier (e.g. 'openai', 'moonshot') */
   readonly id: string;
   /** Human-readable display name shown in UI */

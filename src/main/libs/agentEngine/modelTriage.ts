@@ -9,7 +9,7 @@ import { classifyTierForTriage } from './piClassifierTriage';
  * Returns a TriageResult with the recommended tier and optional model override.
  * If modelRef is null, the current model should be kept unchanged.
  */
-export function classifyByRules(
+function classifyByRules(
   prompt: string,
   conversationDepth: number,
   config: TriageConfig,
@@ -86,7 +86,7 @@ export function classifyByRules(
  * Switching up (light→standard, standard→heavy) is always allowed.
  * Switching down must respect the cooldown period.
  */
-export function shouldAllowSwitch(
+function shouldAllowSwitch(
   newTier: TriageTier,
   currentRound: number,
   state: TriageState,
@@ -108,7 +108,7 @@ export function shouldAllowSwitch(
  * Extract the provider prefix from a model ref.
  * e.g. "openai/gpt-5.4" → "openai", "ollama/qwen2.5:0.5b" → "ollama"
  */
-export function extractProviderId(modelRef: string): string | null {
+function extractProviderId(modelRef: string): string | null {
   const idx = modelRef.indexOf('/');
   if (idx <= 0) return null;
   return modelRef.slice(0, idx);
