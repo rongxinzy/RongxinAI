@@ -21,17 +21,10 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
-import {
-  classifyCoworkError,
-  CoworkErrorKind,
-  isTransient,
-  makeCoworkError,
-  type CoworkError,
-} from '../../../common/coworkError';
+import { classifyCoworkError } from '../../../common/coworkError';
 import {
   CoworkSessionExpertSource,
   normalizeSingleExpertIds,
-  type CoworkMessageExpertIdentity,
 } from '../../../shared/cowork/sessionExperts';
 import {
   CoworkQueueDelivery,
@@ -46,18 +39,12 @@ import {
   CoworkInterruptionCause,
   type CoworkSessionInterruption,
 } from '../../../shared/cowork/interruption';
-import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
-import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import {
   HarnessVersion,
   type HarnessActivationEvent,
   type HarnessModelProfileInput,
 } from '../../../shared/harness';
-import {
-  ZhiyuanModelPoolHeader,
-  ZhiyuanModelPoolWorkload,
-  type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
-} from '../../../shared/modelPool/constants';
+import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import {
   WorkbenchApprovalMode,
   WorkbenchContractKind,
@@ -69,12 +56,10 @@ import {
 } from '../../../shared/workbenchTask';
 import {
   isLocalProviderName,
-  type ModelCapabilities,
   ModelCapabilityStatus,
-  ProviderName,
   type ProviderModelPiCompaction,
 } from '../../../shared/providers';
-import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
+import { persistCoworkImageAttachments } from '../../coworkImageAttachments';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import type { CoworkMessage } from '../../coworkStore';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -100,34 +85,20 @@ import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
-import {
-  getMagpieModelService,
-  hasMagpieModelService,
-  MAGPIE_RUNTIME_API_KEY,
-} from '../../magpie/modelService';
-import type { MagpieModel } from '../../../shared/magpie/types';
 import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
-import {
-  createPiAskUserQuestionTool,
-  PiAskUserQuestionToolName,
-  PiAskUserQuestionTimeoutMs,
-  type PiAskUserQuestionInput,
-  type PiAskUserQuestionResponse,
-} from './piAskUserQuestion';
+import { createPiAskUserQuestionTool, type PiAskUserQuestionResponse } from './piAskUserQuestion';
 import {
   createPiCodingElicitationTool,
-  type PiCodingElicitationInput,
   type PiCodingElicitationResponse,
 } from './piCodingElicitation';
-import { PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
+import { PiAgentLoopMode } from './piAgentLoop';
 import { createPiPlanTool, isPlanModeBlockedTool, PiPlanModePrompt } from './piPlanTool';
 import {
   buildPiBackgroundCompletionContext,
   extractPiBackgroundCompletionText,
-  type PiBackgroundCompletionResult,
 } from './piBackgroundCompletion';
 import {
   calculatePiConversationHistoryCharLimit,
@@ -150,7 +121,7 @@ import {
   type PiExtensionApi,
   type PiExtensionFactory,
 } from './piExtensionTypes';
-import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
+import { buildPiSubagentTool } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool, PiCadViewerService } from './piCadViewerTool';
@@ -163,12 +134,9 @@ import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskS
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
-import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
 import { prependWorkbenchTaskBoundary } from './piWorkbenchTaskBoundary';
 import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
-import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
-import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { createPiWorkLoop } from './piWorkLoop';
@@ -177,11 +145,7 @@ import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import { createPiPromptOverrides } from './piPromptOverrides';
 import { buildPiWebSearchTool } from './piWebSearchTool';
-import {
-  getPiPreparingToolActivity,
-  ToolActivityTracker,
-  toToolActivityInput,
-} from './toolActivity';
+import { ToolActivityTracker } from './toolActivity';
 import type {
   PiContinueOptions,
   PiPermissionResult,
@@ -190,557 +154,31 @@ import type {
   PiSessionPatch,
   PiStartOptions,
 } from './piRuntimeTypes';
-import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
+import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolveBundledOcrHelper } from '../ocrHelper';
+import { collectImagePathReferences } from './piImageInputFallback';
+
 import {
-  buildImageOmittedNotice,
-  clearImageInputObservations,
-  collectImagePathReferences,
-  imageCapabilityFingerprint,
-  ImageInputVerdict,
-  imageInputVerdict,
-  isImageCapabilityError,
-  isImagePayloadRejection,
-  markImageInputRejected,
-  type ImageCapabilityConfiguration,
-  type ImageInputAttachmentRef,
-  type ImagePromptPreparation,
-} from './piImageInputFallback';
-
-// ── Types ──
-
-const PiChatRuntimeLimit = {
-  HistoryChars: 16_000,
-  MaxOutputTokens: 8_192,
-} as const;
-
-/** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
-interface PiSession {
-  prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
-  sendUserMessage?(
-    content:
-      | string
-      | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
-    options?: { deliverAs?: 'steer' | 'followUp' },
-  ): Promise<void>;
-  steer(text: string): Promise<void>;
-  abort(): Promise<void>;
-  abortBash(): void;
-  reload(): Promise<void>;
-  setModel(model: unknown): Promise<void>;
-  setThinkingLevel?(level: string): unknown;
-  bindExtensions?(bindings: Record<string, unknown>): Promise<void>;
-  compact?(customInstructions?: string): Promise<{ cancelled?: boolean }>;
-  getContextUsage?():
-    | {
-        tokens: number | null;
-        contextWindow: number;
-        percent: number | null;
-      }
-    | undefined;
-  subscribe(listener: (event: PiEvent) => void): () => void;
-}
-
-interface PiContentBlock {
-  type: string;
-  text?: string;
-  thinking?: string;
-  id?: string;
-  name?: string;
-  arguments?: Record<string, unknown>;
-}
-
-interface PiUsage {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  reasoning?: number;
-  totalTokens: number;
-  cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
-}
-
-interface PiEvent {
-  displayResultText?: string;
-  type: string;
-  success?: boolean;
-  attempt?: number;
-  finalError?: string;
-  message?: {
-    id?: string;
-    role: string;
-    // For message_update / message_end this is the FULL accumulating snapshot
-    // (blocks: {type:'text',text} / {type:'thinking',thinking}), NOT a delta.
-    content: string | PiContentBlock[];
-    model?: string;
-    usage?: PiUsage;
-    stopReason?: string;
-    errorMessage?: string;
-  };
-  // message_update carries the fine-grained streaming delta here.
-  assistantMessageEvent?: {
-    type: string; // text_delta | thinking_delta | text_end | thinking_end | ...
-    delta?: string;
-    content?: string;
-    contentIndex?: number;
-    partial?: unknown;
-    toolCall?: unknown;
-  };
-  // tool_execution_start / _update / _end fields
-  toolCallId?: string;
-  toolName?: string;
-  args?: unknown;
-  result?: unknown;
-  partialResult?: unknown;
-  isError?: boolean;
-}
-
-interface ActivePiSession {
-  eventProjection?: PiEventProjectionQueue<PiEvent>;
-  sessionId: string;
-  piSession: PiSession;
-  abortController: AbortController;
-  model: Record<string, unknown>;
-  modelRuntime: PiModelRuntime | null;
-  modelRequestOptions?: { apiKey?: string };
-  /** Per-model compaction budgets applied on create and every reload. */
-  modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
-  /** Whether this session runs with the pi 1.0 codemode tool active. */
-  codemodeEnabled: boolean;
-  /** Whether pi's builtin MCP extension owns this session's MCP tools. */
-  mcpNativeBridge: boolean;
-  capabilities: ModelCapabilities;
-  /** Endpoint identity behind the current model; scopes image observations. */
-  imageEndpointKey?: string;
-  harnessModelProfile: HarnessModelProfileInput;
-  /** System prompt requested by the current Cowork session snapshot. */
-  requestedSystemPrompt: string;
-  requestedModelOverride?: string;
-  requestedSkillIds: string[] | undefined;
-  requestedWorkflowSkillIds: string[] | undefined;
-  requestedExpertIds: string[];
-  /** Experts selected for the current turn, retained when messages are persisted. */
-  turnExperts: CoworkMessageExpertIdentity[];
-  resourceState: PiResourceState;
-  /** Message id for the visible answer (text) bubble of the current turn. */
-  assistantMessageId: string | null;
-  /** Message id for the thinking bubble of the current turn. */
-  thinkingMessageId: string | null;
-  /** Latest full snapshot of answer text for the current turn. */
-  answerText: string;
-  /** Latest full snapshot of thinking text for the current turn. */
-  thinkingText: string;
-  streamAccumulator: PiStreamAccumulator;
-  thinkingLifecycle: PiThinkingLifecycle;
-  /** Latest completed answer message, promoted to final only when the agent run ends. */
-  lastCompletedAnswerMessageId: string | null;
-  lastCompletedAnswerText: string;
-  /**
-   * Set once a settled turn's error was shown, preventing duplicate reporting.
-   */
-  errorSurfaced: boolean;
-  /** One retry notice per turn: the user learns the model answered with an error. */
-  retryNoticeEmitted: boolean;
-  /** Retry attempts Pi reported in the current turn. */
-  retryAttempts: number;
-  completionPending?: Promise<void>;
-  requestStartedAt: number | null;
-  firstVisibleTextAt: number | null;
-  /** Timestamp when this in-process Pi AgentSession finished creation. */
-  piSessionCreatedAt: number;
-  /** First agent_start timestamp for this Pi AgentSession. */
-  agentStartedAt: number | null;
-  /** Startup timings are recorded once, on the first visible token. */
-  startupLatencyRecorded: boolean;
-  startupLatency?: PiStartupLatency;
-  confirmationMode: 'modal' | 'text';
-  unsubscribe: () => void;
-  /** Set to true once stopSession has aborted the turn. continueSession must not
-   * reuse the underlying Pi session object after it has been aborted; instead it
-   * should reconstruct the conversation from SQLite and create a fresh session. */
-  aborted: boolean;
-  /** toolCallId → tool_result message id, for streaming updates + de-dup */
-  toolResultMessageIdByCallId: Map<string, string>;
-  toolStartedAtByCallId: Map<string, number>;
-  preparingToolCallIdByContentIndex: Map<number, string>;
-  toolActivityTracker: ToolActivityTracker;
-  /** Long-horizon agent loop controller for this session (agent_loop tool). */
-  agentLoop: PiAgentLoopController;
-  /** Present only for the controlled academic-research workflow. */
-  researchRun: PiResearchRunController | null;
-  /** Present for every other first-class sidebar shortcut workflow. */
-  shortcutWorkflow: PiShortcutWorkflowController | null;
-  goalMode: boolean;
-  /** Whether the current turn runs in read-only plan mode. */
-  planMode: boolean;
-  writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
-  /**
-   * Error from the latest failed attempt (message_end with stopReason=error).
-   * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
-   * flushPendingError surfaces it once the run settles (auto_retry_end /
-   * agent_settled). Cleared when a retry succeeds or the turn is reset.
-   *
-   * `sticky` marks a terminal error (including an explicitly cancelled retry).
-   * Pi can report aborted turns with a plain
-   * stop reason, so a later successful-looking assistant message must not erase
-   * them the way it erases a recovered retry.
-   */
-  pendingError: { message: string; classified: CoworkError; sticky?: boolean } | null;
-  workbenchRunId: string | null;
-  workbenchContract: WorkbenchTaskContract;
-  workspaceRoot: string;
-  settingsManager: PiSettingsManager | null;
-  approvalMode: WorkbenchApprovalMode;
-  unattended: boolean;
-  /** True while Pi is executing the current Work/Chat turn. */
-  isRunning: boolean;
-  /** Last time this session was used by a turn; idle sessions may be rebuilt from SQLite. */
-  lastUsedAt: number;
-  /** True when the current turn settled with an unrecoverable Pi error. */
-  turnFailed: boolean;
-  /**
-   * Image attachments of the turn currently in flight. Kept so an image-payload
-   * rejection can be retried as text and explained to the user; cleared on every
-   * new user prompt so a stale turn can never drive the fallback.
-   */
-  lastImagePrompt: {
-    text: string;
-    sentImages: ImageInputAttachmentRef[];
-    omittedImages: ImageInputAttachmentRef[];
-    retried: boolean;
-  } | null;
-  /** Set when the failed turn carried images and deserves one text-only retry. */
-  imageRetryPending: boolean;
-  /**
-   * True once this turn's failure has been attributed to an image payload
-   * rejection, so repeated SDK retries cannot resurface it as a generic error.
-   */
-  imageRejectionHandled: boolean;
-  /** Prevents duplicate queue drains when Pi emits multiple settled events. */
-  queueFlushInFlight: boolean;
-  /** MCP tool manifest generation captured when this Pi session was created. */
-  mcpToolManifestGeneration: number;
-}
-
-// ── Dynamic imports ──
-
-interface PiModules {
-  createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
-  DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
-  SessionManager?: {
-    inMemory(cwd?: string): unknown;
-  };
-  SettingsManager?: {
-    create(cwd: string, agentDir?: string): PiSettingsManager;
-    inMemory?(): PiSettingsManager;
-  };
-  getAgentDir: () => string;
-  getModel: (provider: string, modelId: string) => unknown;
-  ModelRuntime: {
-    create(options?: PiModelRuntimeCreateOptions): Promise<PiModelRuntime>;
-  };
-  /** Registers the codemode sandbox tool (inactive until defaultTools names it). */
-  createCodemodeExtension?: (options?: Record<string, unknown>) => unknown;
-  /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
-  createToolSearchExtension?: () => unknown;
-  /** Registers the builtin MCP extension (config/transport injectable). */
-  createMcpExtension?: (options?: Record<string, unknown>) => unknown;
-  completeSimple: (
-    model: unknown,
-    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
-    options?: { apiKey?: string },
-  ) => Promise<PiBackgroundCompletionResult>;
-}
-
-interface PiResourceLoader {
-  reload(): Promise<void>;
-  settingsManager?: PiSettingsManager | null;
-}
-
-interface PiSettingsManager {
-  applyOverrides(overrides: {
-    shellPath?: string;
-    compaction?: {
-      enabled?: boolean;
-      reserveTokens?: number;
-      keepRecentTokens?: number;
-      /** Per-model budget overrides keyed by provider/modelId (pi 1.0.0). */
-      modelOverrides?: Record<string, { reserveTokens?: number; keepRecentTokens?: number }>;
-    };
-    /** Tool activation overrides; "+name"/"-name" add/remove relative to defaults. */
-    defaultTools?: string[];
-  }): void;
-  getShellPath?(): string | undefined;
-  setHttpIdleTimeoutMs?(timeoutMs: number): void;
-}
-
-interface PiResourceState {
-  systemPrompt: string;
-  skillIds: string[] | undefined;
-  maxOutputTokens: number;
-  fileToolsEnabled: boolean;
-  unattended: boolean;
-  /** Chat keeps the Pi kernel but opts out of Work resource discovery. */
-  chatMode: boolean;
-  /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
-  expertSkillDirs: string[];
-  skillRoots: Record<string, string>;
-}
-
-interface PiStartupLatency {
-  sessionCreatedAt: number;
-  agentStartedAt: number;
-  firstTokenAt: number;
-  sessionCreateToAgentStartMs: number;
-  agentStartToFirstTokenMs: number;
-  sessionCreateToFirstTokenMs: number;
-}
-
-interface InitializingPiSession {
-  abortController: AbortController;
-  generation: symbol;
-}
-
-interface PiModelRuntime {
-  registerProvider(provider: string, config: Record<string, unknown>): void;
-  setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
-  getModel(provider: string, modelId: string): unknown;
-  completeSimple?(
-    model: unknown,
-    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
-  ): Promise<PiBackgroundCompletionResult>;
-}
-
-interface PiModelRuntimeCreateOptions {
-  allowModelNetwork?: boolean;
-}
-
-type PiResolvedModel = {
-  /** Base URL identity of the endpoint the model was resolved against. */
-  endpointKey: string;
-  model: Record<string, unknown>;
-  modelRuntime: PiModelRuntime | null;
-  maxOutputTokens: number;
-  providerName: string;
-  capabilities?: Partial<ModelCapabilities>;
-  requestOptions?: {
-    apiKey?: string;
-  };
-  /** Per-model compaction budgets keyed for pi's compaction.modelOverrides. */
-  modelCompactionOverride?: {
-    key: string;
-    compaction: ProviderModelPiCompaction;
-  };
-};
-
-function preparePiPrompt(
-  text: string,
-  attachments: PiStartOptions['imageAttachments'] | undefined,
-  verdict: ImageInputVerdict,
-  ocrCommandFor?: (imagePath: string) => string,
-  pathImageReferences: readonly ImageInputAttachmentRef[] = [],
-): {
-  content:
-    | string
-    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
-  hasImages: boolean;
-  sentImages: ImageInputAttachmentRef[];
-  omittedImages: ImageInputAttachmentRef[];
-} {
-  const sendImages = verdict === ImageInputVerdict.Supported;
-  // A path-only image is only worth explaining when the model cannot open it as
-  // an image: a vision-capable model just reads the file.
-  const pathOnly = sendImages ? [] : pathImageReferences;
-  if (!attachments?.length && pathOnly.length === 0) {
-    return { content: text, hasImages: false, sentImages: [], omittedImages: [] };
-  }
-  const imageAttachments = (attachments ?? []).filter(item => item.mimeType.startsWith('image/'));
-  const references = imageAttachments.map(item => ({ name: item.name, path: item.path }));
-  if (sendImages) {
-    const images = imageAttachments
-      .filter(item => item.base64Data || item.path)
-      .map(item => ({
-        type: 'image' as const,
-        data: readCoworkImageBase64(item),
-        mimeType: item.mimeType,
-      }))
-      .filter(item => item.data.length > 0);
-    if (images.length > 0) {
-      return {
-        content: [{ type: 'text', text }, ...images],
-        hasImages: true,
-        sentImages: references,
-        omittedImages: [],
-      };
-    }
-  }
-  // Pi answers a non-vision model's `read` with an in-band note instead of a
-  // failed request; Cowork images never pass through `read`, so the same facts
-  // (why the picture is absent, plus the file paths) have to travel with the
-  // prompt itself. Images withheld by capability and images the UI could only
-  // attach by path share one note: in both cases the model holds a path, not
-  // pixels.
-  const notice = buildImageOmittedNotice([...references, ...pathOnly], { verdict, ocrCommandFor });
-  return {
-    content: text.trim() ? `${text}\n\n${notice}` : notice,
-    hasImages: false,
-    sentImages: [],
-    omittedImages: references,
-  };
-}
-
-/** Yields one macrotask so settling bookkeeping (e.g. a cancelled retry) can run. */
-const yieldToEventLoop = (): Promise<void> => {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 0);
-  return promise;
-};
-
-/**
- * Prompt content prepared for one Pi turn: the text, plus image blocks when the
- * model may receive them, and the attachment bookkeeping the failure path needs.
- */
-interface PreparedPiPrompt {
-  content:
-    | string
-    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
-  hasImages: boolean;
-  sentImages: ImageInputAttachmentRef[];
-  omittedImages: ImageInputAttachmentRef[];
-}
-
-/**
- * Sends a prompt that was already prepared (and recorded) by the caller.
- *
- * Preparation is deliberately separated from sending: the SDK can report a
- * rejected payload through events that land before the send promise settles, so
- * the turn's image state must be recorded *before* the request leaves.
- */
-async function sendPiPrompt(
-  session: PiSession,
-  prepared: PreparedPiPrompt,
-  streamingBehavior?: 'steer' | 'followUp',
-): Promise<void> {
-  if (prepared.hasImages) {
-    if (!session.sendUserMessage) {
-      throw new Error('The installed agent runtime cannot send image attachments.');
-    }
-    await session.sendUserMessage(
-      prepared.content,
-      streamingBehavior ? { deliverAs: streamingBehavior } : undefined,
-    );
-    return;
-  }
-  if (streamingBehavior) {
-    await session.prompt(prepared.content as string, { streamingBehavior });
-  } else {
-    await session.prompt(prepared.content as string);
-  }
-}
-
-let _piModules: PiModules | null = null;
-
-async function getPiModules(): Promise<PiModules> {
-  if (!_piModules) {
-    try {
-      // Pi packages are ESM-only (package.json "exports" with only "import" condition).
-      // Vite/esbuild resolves them correctly at build time. Type declarations are provided
-      // by piModules.d.ts for tsc --noEmit.
-      const codingAgent = await import('@earendil-works/pi-coding-agent');
-      const compat = await import('@earendil-works/pi-ai/compat');
-      _piModules = {
-        createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
-        DefaultResourceLoader:
-          codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
-        SessionManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SessionManager')
-          ? ((codingAgent as typeof codingAgent & { SessionManager?: unknown })
-              .SessionManager as PiModules['SessionManager'])
-          : undefined,
-        SettingsManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SettingsManager')
-          ? ((codingAgent as typeof codingAgent & { SettingsManager?: unknown })
-              .SettingsManager as PiModules['SettingsManager'])
-          : undefined,
-        getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
-        ModelRuntime: codingAgent.ModelRuntime as unknown as PiModules['ModelRuntime'],
-        createCodemodeExtension: Object.prototype.hasOwnProperty.call(
-          codingAgent,
-          'createCodemodeExtension',
-        )
-          ? ((
-              codingAgent as typeof codingAgent & {
-                createCodemodeExtension?: unknown;
-              }
-            ).createCodemodeExtension as PiModules['createCodemodeExtension'])
-          : undefined,
-        createToolSearchExtension: Object.prototype.hasOwnProperty.call(
-          codingAgent,
-          'createToolSearchExtension',
-        )
-          ? ((
-              codingAgent as typeof codingAgent & {
-                createToolSearchExtension?: unknown;
-              }
-            ).createToolSearchExtension as PiModules['createToolSearchExtension'])
-          : undefined,
-        createMcpExtension: Object.prototype.hasOwnProperty.call(codingAgent, 'createMcpExtension')
-          ? ((
-              codingAgent as typeof codingAgent & {
-                createMcpExtension?: unknown;
-              }
-            ).createMcpExtension as PiModules['createMcpExtension'])
-          : undefined,
-        // getModel is the current API (deprecated but functional); will migrate to createModels() later
-        getModel: compat.getModel as unknown as PiModules['getModel'],
-        completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
-      };
-    } catch (err) {
-      throw new Error(
-        `[PiRuntime] Pi engine packages not found. ` +
-          `Ensure @earendil-works/pi-coding-agent and @earendil-works/pi-ai are installed.\n${err}`,
-      );
-    }
-  }
-  return _piModules;
-}
-
-// ── Constants ──
-
-/** How often the renderer receives streaming content updates. */
-const MESSAGE_UPDATE_THROTTLE_MS = 200;
-/**
- * How often streaming content is written to SQLite. better-sqlite3 is synchronous
- * and blocks the main-process event loop, so writing on every Pi frame causes
- * visible streaming jank. Store writes are throttled
- * and flush the latest content on finalize.
- */
-const STORE_UPDATE_THROTTLE_MS = 250;
-
-const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined =>
-  skillIds === undefined
-    ? undefined
-    : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
-
-/**
- * Skills are additive: a queued turn keeps whatever the session already runs
- * and adds the ones the user attached to that queued input. Both sides unknown
- * keeps the session's implicit "no explicit skill set" state instead of
- * materializing an empty list, which would force a session rebuild.
- */
-const mergeSkillIds = (
-  base: string[] | undefined,
-  added: string[] | undefined,
-): string[] | undefined =>
-  base === undefined && added === undefined
-    ? undefined
-    : [...new Set([...(base ?? []), ...(added ?? [])])];
-
-const haveSameStringList = (left: string[] | undefined, right: string[] | undefined): boolean =>
-  left === right ||
-  (left !== undefined &&
-    right !== undefined &&
-    left.length === right.length &&
-    left.every((value, index) => value === right[index]));
-
+  ActivePiSession,
+  getPiModules,
+  haveSameStringList,
+  InitializingPiSession,
+  mergeSkillIds,
+  normalizeSkillIds,
+  PiChatRuntimeLimit,
+  PiEvent,
+  PiModelRuntime,
+  PiModules,
+  PiResourceLoader,
+  PiResourceState,
+  PiSettingsManager,
+  preparePiPrompt,
+  sendPiPrompt,
+} from './piRuntimeSessionState';
+import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
+import { PiAssistantTranscript } from './piAssistantTranscript';
+import { PiRuntimeTurnEvents } from './piRuntimeTurnEvents';
+import { PiRuntimeTurnRecovery } from './piRuntimeTurnRecovery';
 // ── PiRuntimeAdapter ──
 
 // Force ANSI color output from CLI tools (npm, git, jest, etc.) run by
@@ -754,6 +192,39 @@ if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 let hasAppliedApplicationRuntimeEnv = false;
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
+  private readonly transcript = new PiAssistantTranscript({
+    getStore: () => this.store,
+    emitMessage: (sessionId, message) => {
+      this.emit('message', sessionId, message);
+    },
+    emitMessageUpdate: (sessionId, messageId, content, metadata) => {
+      this.emit('messageUpdate', sessionId, messageId, content, metadata);
+    },
+    getActiveSession: sessionId => this.activeSessions.get(sessionId),
+  });
+
+  private readonly turnEvents = new PiRuntimeTurnEvents({
+    getStore: () => this.store,
+    getWorkbench: () => this.workbenchTaskService,
+    transcript: this.transcript,
+    sessionCount: () => this.activeSessions.size,
+    activeSessions: () => [...this.activeSessions.values()],
+    getActiveSession: sessionId => this.activeSessions.get(sessionId),
+    emit: (event, ...args) => {
+      this.emit(event as 'started', ...(args as [string]));
+    },
+    stopActiveSession: (sessionId, reason, drainQueuedFollowUp, cause) => {
+      this.stopActiveSession(sessionId, reason, drainQueuedFollowUp, cause);
+    },
+    flushFollowUpQueue: (sessionId, active) => this.flushFollowUpQueue(sessionId, active),
+    flushPendingError: (sessionId, active) => this.recovery.flushPendingError(sessionId, active),
+    imageCapabilityConfiguration: active => this.recovery.imageCapabilityConfiguration(active),
+    syncImageInputCapability: sessionIds => this.recovery.syncImageInputCapability(sessionIds),
+    createSessionMemoryCompletion: active => this.createSessionMemoryCompletion(active),
+    runPostTurnMemoryMaintenance: (sessionId, workingDirectory, complete) =>
+      this.runPostTurnMemoryMaintenance(sessionId, workingDirectory, complete),
+  });
+
   private static readonly MAX_RESIDENT_IDLE_SESSIONS = 4;
   private static readonly IDLE_SESSION_TTL_MS = 30 * 60 * 1000;
   private readonly activeSessions = new Map<string, ActivePiSession>();
@@ -808,6 +279,26 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   /** Bundled image-text helper; null when the platform/build cannot run it. */
   private readonly bundledOcrHelper = resolveBundledOcrHelper();
 
+  private readonly recovery = new PiRuntimeTurnRecovery({
+    getStore: () => this.store,
+    getWorkbench: () => this.workbenchTaskService,
+    transcript: this.transcript,
+    getActiveSession: sessionId => this.activeSessions.get(sessionId),
+    activeSessionIds: () => this.activeSessions.keys(),
+    deleteActiveSession: sessionId => {
+      this.activeSessions.delete(sessionId);
+    },
+    emit: (event, ...args) => {
+      this.emit(event as 'started', ...(args as [string]));
+    },
+    continueSession: (sessionId, prompt, options) =>
+      this.continueSession(sessionId, prompt, options),
+    ocrCommandFor: () => this.bundledOcrHelper?.commandFor,
+    approvalSessionMap: this.approvalSessionMap,
+    pendingAskUserQuestions: this.pendingAskUserQuestions,
+    pendingCodingElicitations: this.pendingCodingElicitations,
+  });
+
   constructor() {
     super();
   }
@@ -832,9 +323,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return persistCoworkImageAttachments(this.imageAttachmentRoot, sessionId, attachments);
   }
 
-  private noteThrottleMessage(sessionId: string, messageId: string): void {
-    this.throttleSessionByMessageId.set(messageId, sessionId);
-  }
   /**
    * Bundled SKILLs root (resources/SKILLs in production). Injected so the
    * live member source matches the main-session preset snapshot; getSkillsRoot
@@ -887,22 +375,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return this.mcpInjected;
   }
   private mcpInjected = false;
-
-  // Throttle state
-  private readonly lastMessageUpdateEmitTime = new Map<string, number>();
-  private readonly pendingMessageUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly pendingMessageUpdate = new Map<
-    string,
-    { content: string; metadata?: Record<string, unknown> }
-  >();
-  // Separate throttle for synchronous SQLite writes (see STORE_UPDATE_THROTTLE_MS).
-  private readonly lastStoreUpdateTime = new Map<string, number>();
-  private readonly pendingStoreUpdate = new Map<
-    string,
-    { content: string; metadata: Record<string, unknown> }
-  >();
-  private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly throttleSessionByMessageId = new Map<string, string>();
 
   // ── PiRuntime.on/off ──
 
@@ -1180,7 +652,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // Coding-only free-text pause point: the agent asks, the lane waits.
         customTools.push(
           createPiCodingElicitationTool((toolCallId, input, signal) =>
-            this.requestCodingElicitation(sessionId, toolCallId, input, signal),
+            this.recovery.requestCodingElicitation(sessionId, toolCallId, input, signal),
           ),
         );
       }
@@ -1188,7 +660,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (shouldExposeAskUserQuestionTool(resourceState.unattended)) {
         customTools.push(
           createPiAskUserQuestionTool((toolCallId, input, signal) =>
-            this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
+            this.recovery.requestAskUserQuestion(sessionId, toolCallId, input, signal),
           ),
         );
       }
@@ -1527,7 +999,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       // Session ownership stays on main; display transforms preserve SDK event order.
       active.eventProjection = new PiEventProjectionQueue<PiEvent>(
-        event => this.handlePiEvent(sessionId, active, event),
+        event => this.turnEvents.handlePiEvent(sessionId, active, event),
         abortController.signal,
         error =>
           console.error(`[PiRuntime] event projection failed in session ${sessionId}:`, error),
@@ -1604,13 +1076,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const initialImagePrompt = preparePiPrompt(
         initialPrompt,
         options.imageAttachments,
-        this.imageInputVerdictForActive(active),
+        this.recovery.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(options.fileAttachments),
       );
       // Recorded before the request leaves: the SDK can report the rejection
       // through events that arrive before the send promise settles.
-      this.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
+      this.recovery.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
       await sendPiPrompt(session, initialImagePrompt, undefined);
       await active.eventProjection?.drain();
       await active.completionPending;
@@ -1993,11 +1465,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const continuedImagePrompt = preparePiPrompt(
         nextPrompt,
         options.imageAttachments,
-        this.imageInputVerdictForActive(active),
+        this.recovery.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(options.fileAttachments),
       );
-      this.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
+      this.recovery.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
       await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
       await active.eventProjection?.drain();
       await active.completionPending;
@@ -2083,8 +1555,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // A queued control action belongs to the turn that queued it; replaying it
     // after a resource-driven recreation would be an unexpected side effect.
     this.queuedControlActions.delete(sessionId);
-    this.dismissAskUserQuestionsBySession(sessionId);
-    this.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
+    this.recovery.dismissAskUserQuestionsBySession(sessionId);
+    this.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
     active.agentLoop.stop();
     active.pendingError = null;
     active.toolStartedAtByCallId.clear();
@@ -2098,7 +1570,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionId,
       'The session resources changed before the approval was resolved.',
     );
-    this.clearApprovalsBySession(sessionId);
+    this.recovery.clearApprovalsBySession(sessionId);
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
   }
@@ -2121,8 +1593,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // Control actions are not durable user input: an explicit stop must not
     // carry them into a later session that reuses the same id.
     this.queuedControlActions.delete(sessionId);
-    this.dismissAskUserQuestionsBySession(sessionId);
-    this.dismissCodingElicitationsBySession(sessionId, reason);
+    this.recovery.dismissAskUserQuestionsBySession(sessionId);
+    this.recovery.dismissCodingElicitationsBySession(sessionId, reason);
     const initializing = this.initializingSessions.get(sessionId);
     if (initializing) {
       initializing.abortController.abort();
@@ -2132,7 +1604,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!active) {
       this.closeInterruptedToolUses(sessionId);
       this.workbenchTaskService?.pauseRun?.(sessionId, reason);
-      this.clearApprovalsBySession(sessionId);
+      this.recovery.clearApprovalsBySession(sessionId);
       if (cause && !this.retainedSessionIds.has(sessionId)) {
         this.recordSessionInterruption(sessionId, cause);
       }
@@ -2141,7 +1613,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const wasRunning = active.isRunning;
     if (!wasRunning && active.aborted) return;
 
-    this.finalizeActiveThinking(sessionId, active);
+    this.transcript.finalizeActiveThinking(sessionId, active);
     // Close in-flight tools before the turn is marked paused. Otherwise resume
     // starts a new command while the previous one still looks "running".
     this.closeInterruptedToolUses(sessionId);
@@ -2165,7 +1637,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.unsubscribe();
     void active.piSession.abort();
     this.workbenchTaskService?.pauseRun?.(sessionId, reason);
-    this.clearApprovalsBySession(sessionId);
+    this.recovery.clearApprovalsBySession(sessionId);
     this.emit('sessionStopped', sessionId);
     if (cause) this.recordSessionInterruption(sessionId, cause);
 
@@ -2177,7 +1649,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.releaseStoppedSession(sessionId);
     // Stopping flushes the throttled store write, which may carry isStreaming; the
     // partial answer bubble must not stay in flight after the run is gone.
-    this.closeIdlePlaceholders(sessionId, active);
+    this.transcript.closeIdlePlaceholders(sessionId, active);
 
     if (shouldDrainFollowUp) {
       const next = this.pendingMessageQueue.findNextPending(
@@ -2290,7 +1762,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   respondToPermission(requestId: string, result: PiPermissionResult): void {
     const pendingQuestion = this.pendingAskUserQuestions.get(requestId);
     if (pendingQuestion) {
-      this.finishAskUserQuestion(requestId, {
+      this.recovery.finishAskUserQuestion(requestId, {
         behavior: result.behavior,
         ...(result.behavior === 'allow'
           ? { updatedInput: result.updatedInput }
@@ -2352,13 +1824,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!normalized) return false;
     const pending = this.pendingCodingElicitations.get(requestId);
     if (!pending) return false;
-    this.finishCodingElicitation(requestId, { cancelled: false, answer: normalized });
+    this.recovery.finishCodingElicitation(requestId, { cancelled: false, answer: normalized });
     return true;
   }
 
   cancelCodingElicitation(requestId: string, reason: string): boolean {
     if (!this.pendingCodingElicitations.has(requestId)) return false;
-    this.finishCodingElicitation(requestId, { cancelled: true, reason });
+    this.recovery.finishCodingElicitation(requestId, { cancelled: true, reason });
     return true;
   }
 
@@ -2503,11 +1975,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const queuedImagePrompt = preparePiPrompt(
         item.text,
         item.imageAttachments,
-        this.imageInputVerdictForActive(active),
+        this.recovery.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(item.fileAttachments),
       );
-      this.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
+      this.recovery.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
       await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
       this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
@@ -2667,11 +2139,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   onSessionDeleted(sessionId: string): void {
     this.stopActiveSession(sessionId, 'The session was deleted.', false);
-    this.clearApprovalsBySession(sessionId);
+    this.recovery.clearApprovalsBySession(sessionId);
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.delete(sessionId);
-    this.clearThrottleStateBySession(sessionId, true);
+    this.transcript.clearThrottleStateBySession(sessionId, true);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
   }
@@ -2709,7 +2181,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.memoryInjectionDedup.reset(session.sessionId);
       this.activeSessions.delete(session.sessionId);
       this.retainedSessionIds.add(session.sessionId);
-      this.clearThrottleStateBySession(session.sessionId, true);
+      this.transcript.clearThrottleStateBySession(session.sessionId, true);
       console.debug(`[PiRuntime] evicted idle session ${session.sessionId} from memory`);
     }
   }
@@ -2718,7 +2190,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.add(sessionId);
-    this.clearThrottleStateBySession(sessionId, true);
+    this.transcript.clearThrottleStateBySession(sessionId, true);
   }
 
   // ── Pi session resources and context limits ──
@@ -2907,7 +2379,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                     // The run cannot continue: end the turn with a visible error
                     // instead of returning another tool error the model would
                     // answer with yet another tool call.
-                    this.endTerminatedWorkbenchTurn(
+                    this.recovery.endTerminatedWorkbenchTurn(
                       approvalContext.sessionId,
                       authorization.reason ?? 'The workbench run can no longer continue.',
                     );
@@ -3131,1369 +2603,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return extractPiBackgroundCompletionText(result);
   }
 
-  // ── Private: event mapping ──
-
-  private recordFirstVisibleToken(sessionId: string, active: ActivePiSession): void {
-    const firstTokenAt = active.firstVisibleTextAt ?? Date.now();
-    active.firstVisibleTextAt = firstTokenAt;
-    if (active.startupLatencyRecorded || active.agentStartedAt === null) return;
-
-    const startupLatency: PiStartupLatency = {
-      sessionCreatedAt: active.piSessionCreatedAt,
-      agentStartedAt: active.agentStartedAt,
-      firstTokenAt,
-      sessionCreateToAgentStartMs: Math.max(0, active.agentStartedAt - active.piSessionCreatedAt),
-      agentStartToFirstTokenMs: Math.max(0, firstTokenAt - active.agentStartedAt),
-      sessionCreateToFirstTokenMs: Math.max(0, firstTokenAt - active.piSessionCreatedAt),
-    };
-    active.startupLatency = startupLatency;
-    active.startupLatencyRecorded = true;
-    console.log(
-      `[PiRuntime] startup latency for ${sessionId}: ` +
-        `create-to-agent_start=${startupLatency.sessionCreateToAgentStartMs}ms, ` +
-        `agent_start-to-first_token=${startupLatency.agentStartToFirstTokenMs}ms, ` +
-        `create-to-first_token=${startupLatency.sessionCreateToFirstTokenMs}ms`,
-    );
-  }
-
-  private handlePiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
-    // Late events from an aborted turn must not touch state.
-    if (active.aborted) return;
-    // Debug: log all Pi events to diagnose frontend rendering issues
-    if (event.type !== 'message_update') {
-      console.log(
-        '[PiRuntime] Event:',
-        event.type,
-        event.message?.role ? `role=${event.message.role}` : '',
-        event.message?.stopReason ? `stopReason=${event.message.stopReason}` : '',
-      );
-    }
-    switch (event.type) {
-      case 'agent_start':
-        active.isRunning = true;
-        active.lastUsedAt = Date.now();
-        this.store?.updateSession(sessionId, { status: 'running' });
-        if (active.agentStartedAt === null) {
-          active.agentStartedAt = Date.now();
-          console.log(
-            `[PiRuntime] agent_start for ${sessionId} after ${active.agentStartedAt - active.piSessionCreatedAt}ms from Pi session creation`,
-          );
-        }
-        this.emit('started', sessionId);
-        break;
-
-      case 'turn_start':
-        active.isRunning = true;
-        active.lastUsedAt = Date.now();
-        active.toolStartedAtByCallId.clear();
-        active.preparingToolCallIdByContentIndex.clear();
-        {
-          const clearActivity = active.toolActivityTracker.clear();
-          if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
-        }
-        // New turn → fresh answer + thinking messages, created lazily on first content.
-        active.assistantMessageId = null;
-        active.thinkingMessageId = null;
-        active.answerText = '';
-        active.thinkingText = '';
-        active.streamAccumulator.reset();
-        active.thinkingLifecycle.reset();
-        break;
-
-      case 'message_start':
-        active.requestStartedAt = Date.now();
-        active.firstVisibleTextAt = null;
-        break;
-
-      case 'message_update': {
-        const assistantEvent = event.assistantMessageEvent;
-        if (assistantEvent?.type.startsWith('toolcall_')) {
-          const contentIndex = assistantEvent.contentIndex ?? -1;
-          const fallbackToolCallId =
-            active.preparingToolCallIdByContentIndex.get(contentIndex) ??
-            `pi-preparing:${event.message?.id ?? sessionId}:${contentIndex}`;
-          const activity = getPiPreparingToolActivity(assistantEvent, fallbackToolCallId);
-          if (activity) {
-            const previousToolCallId = active.preparingToolCallIdByContentIndex.get(contentIndex);
-            if (previousToolCallId && previousToolCallId !== activity.toolCallId) {
-              const removeEvent = active.toolActivityTracker.remove(previousToolCallId);
-              if (removeEvent) this.emit('toolActivity', sessionId, removeEvent);
-            }
-            active.preparingToolCallIdByContentIndex.set(contentIndex, activity.toolCallId);
-            const activityEvent = active.toolActivityTracker.upsert(activity);
-            if (activityEvent) this.emit('toolActivity', sessionId, activityEvent);
-          }
-        }
-        // Pi 0.84 emits fine-grained assistantMessageEvent deltas. Keep support
-        // for older cumulative snapshots, then reconcile against message_end.
-        const { text, thinking } = active.streamAccumulator.update(
-          event.assistantMessageEvent,
-          event.message,
-        );
-        const segmentEventType = event.assistantMessageEvent?.type;
-        const thinkingEnded = segmentEventType === PiAssistantEventType.ThinkingEnd;
-        if (segmentEventType === PiAssistantEventType.ThinkingDelta) {
-          active.thinkingLifecycle.start();
-        } else if (thinkingEnded) {
-          active.thinkingLifecycle.finish();
-        }
-        if (thinking && thinking !== active.thinkingText) {
-          active.thinkingText = thinking;
-          if (!thinkingEnded) active.thinkingLifecycle.start();
-          this.streamInto(sessionId, active, 'thinking', thinking);
-        }
-        if (thinkingEnded) {
-          this.finalizeActiveThinking(sessionId, active);
-        }
-        if (text && text !== active.answerText) {
-          this.recordFirstVisibleToken(sessionId, active);
-          this.finalizeActiveThinking(sessionId, active);
-          active.answerText = text;
-          this.streamInto(sessionId, active, 'answer', text);
-        }
-        break;
-      }
-
-      case 'message_end': {
-        if (event.message?.role === 'assistant') {
-          active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
-          if (event.message.stopReason === 'error') {
-            // The turn was already reported as failed (non-retryable error).
-            if (active.errorSurfaced) return;
-            const { text, thinking } = active.streamAccumulator.reconcile(event.message);
-            if (thinking && thinking !== active.thinkingText) {
-              active.thinkingText = thinking;
-              active.thinkingLifecycle.markContentStreaming();
-            }
-            if (text) {
-              active.answerText = text;
-              this.recordFirstVisibleToken(sessionId, active);
-            }
-            this.finalizeActiveThinking(sessionId, active);
-            const errMsg = event.message.errorMessage || 'Pi agent error';
-            const errDetail = event.message.content
-              ? typeof event.message.content === 'string'
-                ? event.message.content
-                : JSON.stringify(event.message.content)
-              : '(no content)';
-            console.error('[PiRuntime] Assistant error:', errMsg, 'detail:', errDetail);
-            // Defer surfacing: Pi may auto-retry this turn (auto_retry_start).
-            // Persisting/emitting here would produce one error bubble per failed
-            // attempt — flushPendingError surfaces the error exactly once when
-            // the run settles (auto_retry_end / agent_settled).
-            const classified = classifyCoworkError(errMsg);
-            const carriedImages = (active.lastImagePrompt?.sentImages.length ?? 0) > 0;
-            // A 400-class rejection of a turn that actually carried images is an
-            // image-capability rejection even when the server wording misses the
-            // textual rules (see piImageInputFallback).
-            const imageRejection =
-              classified.kind === CoworkErrorKind.ModelCapabilityUnsupported
-                ? // Only image rejections are corrected: an audio/video capability
-                  // error must not silently strip the model's image-input verdict,
-                  // and a payload problem must not either.
-                  isImageCapabilityError(errMsg)
-                : isImagePayloadRejection(errMsg, carriedImages);
-            active.pendingError = {
-              message: errMsg,
-              classified: imageRejection
-                ? makeCoworkError(CoworkErrorKind.ModelCapabilityUnsupported, errMsg)
-                : classified,
-            };
-            active.turnFailed = true;
-            // A failed turn leaves its bubble behind too; a retry streams into the
-            // same id and flips the flag back on by itself.
-            this.closeIdlePlaceholders(sessionId, active);
-            if (
-              !active.errorSurfaced &&
-              active.pendingError.classified.kind !== CoworkErrorKind.Unknown &&
-              !isTransient(active.pendingError.classified.kind)
-            ) {
-              // Keep the original failure until Pi settles. If the SDK retries,
-              // auto_retry_start cancels its newly installed backoff controller.
-              active.pendingError.sticky = true;
-            }
-            if (imageRejection) {
-              // Keep the rejection as a runtime observation instead of rewriting
-              // the user's capability configuration: following turns simply stop
-              // sending images, and the file paths still reach the model as text.
-              markImageInputRejected(
-                active.harnessModelProfile.provider,
-                active.harnessModelProfile.model,
-                imageCapabilityFingerprint(this.imageCapabilityConfiguration(active)),
-              );
-              // Other live sessions on the same model must learn this too: their
-              // Pi snapshot still advertises image input, so their own `read`
-              // would send the payload this server just refused.
-              void this.syncImageInputCapability();
-              console.log('[DBG mark]', JSON.stringify(this.imageCapabilityConfiguration(active)));
-              if (carriedImages) {
-                active.imageRetryPending = true;
-                active.imageRejectionHandled = true;
-              }
-            }
-            return;
-          }
-
-          // A successful assistant message after failed attempts means the retry
-          // recovered — drop the deferred error so it is never surfaced, and
-          // clear the flag so agent_end still finalizes and completes the turn.
-          // Errors the runtime recorded itself are sticky: Pi reports those
-          // turns as a plain aborted or truncated turn, which must not erase them.
-          if (!active.pendingError?.sticky) {
-            active.errorSurfaced = false;
-            active.pendingError = null;
-            active.turnFailed = false;
-          }
-
-          const { text, thinking } = active.streamAccumulator.reconcile(event.message);
-          const finalThinking = thinking || active.thinkingText;
-          const finalAnswer = text || active.answerText;
-
-          if (invalidatesPiFinalResponse(event.message)) {
-            active.lastCompletedAnswerMessageId = null;
-            active.lastCompletedAnswerText = '';
-          }
-
-          // Finalize thinking bubble (if any) on its own id.
-          if (finalThinking.trim()) {
-            if (finalThinking !== active.thinkingText) {
-              active.thinkingLifecycle.markContentStreaming();
-            }
-            active.thinkingText = finalThinking;
-            this.finalizeActiveThinking(sessionId, active);
-          }
-          // Finalize the answer bubble on its own id.
-          if (finalAnswer.trim()) {
-            this.recordFirstVisibleToken(sessionId, active);
-            const startupLatency = active.startupLatency;
-            active.startupLatency = undefined;
-            active.answerText = finalAnswer;
-            this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
-            if (isPiFinalResponse(event.message)) {
-              active.lastCompletedAnswerMessageId = active.assistantMessageId;
-              active.lastCompletedAnswerText = finalAnswer;
-            }
-            this.scheduleContextUsageSync(
-              sessionId,
-              active.assistantMessageId,
-              event.message.usage,
-              event.message.model,
-              active.requestStartedAt,
-              active.firstVisibleTextAt,
-              startupLatency,
-            );
-          }
-
-          // A turn can finish without any text (it answered with a tool call).
-          // Its placeholder bubbles must still be closed: they were created with
-          // isStreaming and would otherwise keep every later view of the session
-          // spinning.
-          this.closeIdlePlaceholders(sessionId, active);
-
-          // Turn's segments are done; next turn starts fresh messages.
-          active.assistantMessageId = null;
-          active.thinkingMessageId = null;
-          active.answerText = '';
-          active.thinkingText = '';
-          active.streamAccumulator.reset();
-        }
-        break;
-      }
-
-      case 'turn_end':
-        break;
-
-      case 'tool_execution_start': {
-        active.lastCompletedAnswerMessageId = null;
-        active.lastCompletedAnswerText = '';
-        // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
-        // Preserve the shared tool_use message shape.
-        if (!event.toolCallId || !event.toolName) break;
-        const runningActivity = active.toolActivityTracker.upsert(
-          {
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
-            toolInput: toToolActivityInput(event.args),
-          },
-          CoworkToolActivityPhase.Running,
-        );
-        active.toolStartedAtByCallId.set(event.toolCallId, Date.now());
-        if (runningActivity) this.emit('toolActivity', sessionId, runningActivity);
-        if (event.toolName === PiSubagentToolName) {
-          active.researchRun?.recordSubagentStart(event.toolCallId, event.args);
-          active.shortcutWorkflow?.recordSubagentStart(event.toolCallId, event.args);
-        }
-        const toolUseMsg: CoworkMessage = {
-          id: randomUUID(),
-          type: 'tool_use',
-          content: `Using tool: ${event.toolName}`,
-          timestamp: Date.now(),
-          metadata: {
-            toolName: event.toolName,
-            toolInput: toToolInputRecord(event.args),
-            toolUseId: event.toolCallId,
-          },
-        };
-        // Emit the persisted message (store assigns its own id) to keep the
-        // rendered id and DB id in sync — see message_end note.
-        const emittedToolUse = this.store
-          ? this.store.addMessage(sessionId, toolUseMsg)
-          : toolUseMsg;
-        this.emit('message', sessionId, emittedToolUse);
-        break;
-      }
-
-      case 'tool_execution_end': {
-        // Tool finished → emit tool_result linked by toolUseId.
-        if (!event.toolCallId) break;
-        const removeActivity = active.toolActivityTracker.remove(event.toolCallId);
-        if (removeActivity) this.emit('toolActivity', sessionId, removeActivity);
-        // Avoid duplicate result for the same call.
-        if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
-        const resultText = event.displayResultText ?? '';
-        const resultIsError = Boolean(event.isError) || extractToolResultIsError(event.result);
-        agentResourceDiagnostics.recordPiToolResult(sessionId, resultText.length * 2);
-        if (active.workbenchRunId) {
-          this.workbenchTaskService?.recordToolResult(
-            active.workbenchRunId,
-            event.toolCallId,
-            event.result,
-            resultIsError,
-          );
-        }
-        if (event.toolName === PiSubagentToolName) {
-          active.researchRun?.recordSubagentResult(event.toolCallId, resultText, resultIsError);
-          active.shortcutWorkflow?.recordSubagentResult(
-            event.toolCallId,
-            resultText,
-            resultIsError,
-          );
-        }
-        // Keep the result only on `content` — duplicating into metadata.toolResult
-        // doubles the largest strings in SQLite, IPC, and the renderer heap.
-        const toolResultMsg: CoworkMessage = {
-          id: randomUUID(),
-          type: 'tool_result',
-          content: resultText,
-          timestamp: Date.now(),
-          metadata: {
-            toolUseId: event.toolCallId,
-            isError: resultIsError,
-            isStreaming: false,
-            isFinal: true,
-            ...(active.toolStartedAtByCallId.has(event.toolCallId)
-              ? {
-                  metrics: {
-                    toolDurationMs: Math.max(
-                      0,
-                      Date.now() -
-                        (active.toolStartedAtByCallId.get(event.toolCallId) ?? Date.now()),
-                    ),
-                  },
-                }
-              : {}),
-          },
-        };
-        active.toolStartedAtByCallId.delete(event.toolCallId);
-        const emittedToolResult = this.store
-          ? this.store.addMessage(sessionId, toolResultMsg)
-          : toolResultMsg;
-        active.toolResultMessageIdByCallId.set(event.toolCallId, emittedToolResult.id);
-        this.emit('message', sessionId, emittedToolResult);
-        break;
-      }
-
-      case 'tool_execution_update':
-        // Streaming partial tool output — ignored for now (final result emitted on _end).
-        // Kept as an explicit no-op so it doesn't fall to the "Unhandled" default log.
-        break;
-
-      case 'agent_end': {
-        if (active.completionPending) break;
-        this.finalizeActiveThinking(sessionId, active);
-        active.toolStartedAtByCallId.clear();
-        const clearActivity = active.toolActivityTracker.clear();
-        if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
-        // Failed attempt (deferred error pending): do not continue the agent
-        // loop, mark completed, or emit complete. flushPendingError surfaces
-        // the error when the run settles (auto_retry_end / agent_settled).
-        // A non-retryable error is flushed the moment it is seen, so the turn
-        // is already reported as failed by the time agent_end arrives.
-        if (active.pendingError || active.errorSurfaced) break;
-        if (
-          active.workbenchRunId &&
-          this.workbenchTaskService &&
-          !this.workbenchTaskService.isRunRunning(active.workbenchRunId)
-        ) {
-          this.stopActiveSession(
-            sessionId,
-            'The workbench run is no longer active.',
-            false,
-            CoworkInterruptionCause.RuntimePaused,
-          );
-          break;
-        }
-        // Agent loop: when the finished iteration signaled "next", continue
-        // the session with the next iteration prompt instead of completing.
-        const loopDecision = active.agentLoop.handleAgentEnd();
-        if (loopDecision.shouldContinue && loopDecision.nextPrompt) {
-          // Reset turn state (same as continueSession).
-          active.answerText = '';
-          active.thinkingText = '';
-          active.assistantMessageId = null;
-          active.thinkingMessageId = null;
-          active.thinkingLifecycle.reset();
-          active.lastCompletedAnswerMessageId = null;
-          active.lastCompletedAnswerText = '';
-          active.errorSurfaced = false;
-          active.retryNoticeEmitted = false;
-          active.retryAttempts = 0;
-          active.toolResultMessageIdByCallId.clear();
-          active.toolStartedAtByCallId.clear();
-          active.piSession
-            .prompt(loopDecision.nextPrompt, { streamingBehavior: 'followUp' })
-            .catch(error => {
-              const message = error instanceof Error ? error.message : String(error);
-              this.emit('error', sessionId, classifyCoworkError(message));
-            });
-          break;
-        }
-        // agent_end is not the terminal signal: the SDK may follow it with an
-        // automatic compaction continuation turn, whose tool calls still need
-        // a live run. Completion happens on agent_settled.
-        break;
-      }
-
-      case 'auto_retry_start':
-        if (active.pendingError?.sticky) {
-          void cancelPiRetry(active.piSession).catch(error => {
-            console.error(`[PiRuntime] failed to cancel retry for session ${sessionId}:`, error);
-          });
-          break;
-        }
-        // Pi is retrying after an error. Retrying is invisible otherwise — the
-        // failed attempt is deferred until the run settles — so the user is told
-        // once per turn that the model answered with an error.
-        active.retryAttempts += 1;
-        if (!active.retryNoticeEmitted && active.pendingError) {
-          active.retryNoticeEmitted = true;
-          this.emit('retryNotice', sessionId, {
-            sessionId,
-            kind: active.pendingError.classified.kind,
-            message: active.pendingError.classified.message,
-            attempt: typeof event.attempt === 'number' ? event.attempt : active.retryAttempts,
-          });
-        }
-        break;
-
-      case 'auto_retry_end':
-        // The runtime already ended and reported this turn: retry bookkeeping
-        // must not reopen the error.
-        if (active.errorSurfaced) break;
-        // Pi reports both recovered retries and final exhaustion here.
-        if (event.success === true && !active.pendingError?.sticky) {
-          active.pendingError = null;
-          active.turnFailed = false;
-          break;
-        }
-        if (event.finalError && !active.pendingError?.sticky) {
-          active.pendingError = {
-            message: event.finalError,
-            classified: classifyCoworkError(event.finalError),
-          };
-        }
-        // Cancellation precedes agent_settled: retain the lane and writer lease.
-        if (!active.pendingError?.sticky) this.flushPendingError(sessionId, active);
-        break;
-
-      case 'agent_settled':
-        // Terminal signal: exactly once per prompt, after every continuation
-        // the SDK runs on its own (compaction, queued follow-ups, retries).
-        this.handleTurnSettled(sessionId, active);
-        break;
-
-      default:
-        // Silently ignore unknown/internal events
-        if (event.type && !event.type.startsWith('_')) {
-          console.log('[PiRuntime] Unhandled event type:', event.type);
-        }
-    }
-  }
-
-  /**
-   * Terminal signal for a prompt: agent_settled arrives exactly once, after
-   * every continuation the SDK runs on its own (compaction, queued follow-ups,
-   * retries). Completion must not happen earlier — an agent_end may still be
-   * followed by a compaction continuation turn whose tool calls need a live
-   * run.
-   */
-  private handleTurnSettled(sessionId: string, active: ActivePiSession): void {
-    if (active.completionPending) return;
-    active.isRunning = false;
-    // Run settled with a deferred or surfaced failure: never complete it.
-    // flushPendingError is idempotent after auto_retry_end.
-    if (active.pendingError || active.errorSurfaced) {
-      const retryingWithoutImages = this.flushPendingError(sessionId, active);
-      if (!retryingWithoutImages) void this.flushFollowUpQueue(sessionId, active);
-      return;
-    }
-    if (
-      active.workbenchRunId &&
-      this.workbenchTaskService &&
-      !this.workbenchTaskService.isRunRunning(active.workbenchRunId)
-    ) {
-      this.stopActiveSession(
-        sessionId,
-        'The workbench run is no longer active.',
-        false,
-        CoworkInterruptionCause.RuntimePaused,
-      );
-      return;
-    }
-    this.markFinalAnswer(sessionId, active);
-    this.clearThrottleStateBySession(sessionId, false);
-    active.lastUsedAt = Date.now();
-    agentResourceDiagnostics.finishPiTurn(
-      sessionId,
-      this.activeSessions.size,
-      [...this.activeSessions.values()].filter(session => session.isRunning).length,
-    );
-    let verification: Promise<unknown> | undefined;
-    if (active.workbenchRunId && this.workbenchTaskService) {
-      const domainWorkflowSnapshot = active.researchRun
-        ? active.researchRun.getSnapshot()
-        : active.shortcutWorkflow
-          ? active.shortcutWorkflow.getSnapshot()
-          : null;
-      verification = this.workbenchTaskService.completeRun({
-        sessionId,
-        runId: active.workbenchRunId,
-        signal: active.abortController.signal,
-        workspaceRoot: active.workspaceRoot,
-        finalAnswer: active.lastCompletedAnswerText,
-        finalMessageId: active.lastCompletedAnswerMessageId,
-        workflowCompleted:
-          active.researchRun || active.shortcutWorkflow
-            ? active.agentLoop.getState().done
-            : undefined,
-        workflowSnapshot: domainWorkflowSnapshot,
-      });
-    }
-    void settlePiWorkbenchCompletion(
-      active,
-      verification,
-      () => this.activeSessions.get(sessionId) === active && !active.aborted,
-      () => {
-        if (this.store) {
-          this.store.updateSession(sessionId, { status: 'idle' });
-          if (!active.resourceState.chatMode) {
-            try {
-              this.store.refreshSessionArtifacts(sessionId);
-            } catch (error) {
-              console.error(
-                `[PiRuntimeAdapter] artifact refresh failed for session ${sessionId}:`,
-                error,
-              );
-            }
-          }
-        }
-        if (!active.resourceState.chatMode) {
-          void this.runPostTurnMemoryMaintenance(
-            sessionId,
-            active.workspaceRoot,
-            this.createSessionMemoryCompletion(active),
-          );
-        }
-        this.emit('complete', sessionId);
-        void this.flushFollowUpQueue(sessionId, active);
-      },
-      error => {
-        console.error(`[PiRuntimeAdapter] completion failed for session ${sessionId}:`, error);
-        this.workbenchTaskService?.failRun?.(sessionId, { message: String(error) });
-        this.emit('error', sessionId, classifyCoworkError(String(error)));
-      },
-    );
-  }
-
-  // ── Private: image input fallback ──
-  /** Whether the current turn may carry image bytes (see piImageInputFallback). */
-  /**
-   * Configured image capability as it stands right now.
-   *
-   * A session's capabilities are a snapshot from the last model resolution, so
-   * after the user edits provider settings they must not be trusted: the next
-   * turn, and any capability sync, have to read the current configuration.
-   * When the configuration cannot be read the snapshot is the best available
-   * answer, and withholding images stays the conservative outcome.
-   */
-  private configuredImageInputForActive(active: ActivePiSession): ModelCapabilityStatus {
-    const modelId = typeof active.model.id === 'string' ? active.model.id : '';
-    if (hasMagpieModelService() && modelId) {
-      const projected = getMagpieModelService().peekModel(modelId);
-      if (projected) return magpieImageInput(projected);
-    }
-    return active.capabilities.imageInput;
-  }
-
-  /** Configuration half of the image-capability fingerprint, in one shape. */
-  private imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration {
-    const imageInput = this.configuredImageInputForActive(active);
-    return {
-      imageInput,
-      supportsImage: imageInput === ModelCapabilityStatus.Supported,
-      endpointKey: active.imageEndpointKey,
-    };
-  }
-
-  /**
-   * Keep every live Pi session's declared image capability in step with the
-   * effective verdict.
-   *
-   * The verdict can change while sessions are open — a rejection is learned, or
-   * the user edits provider settings — and a stale snapshot would either drop
-   * images the host still sends, or keep sending images the server already
-   * refused. Duplicate work is skipped so an unchanged session is untouched.
-   */
-  private async syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void> {
-    const targets = sessionIds ? [...sessionIds] : [...this.activeSessions.keys()];
-    await Promise.allSettled(
-      targets.map(async sessionId => {
-        const active = this.activeSessions.get(sessionId);
-        if (!active) return;
-        const input: Array<'text' | 'image'> =
-          this.imageInputVerdictForActive(active) === ImageInputVerdict.Supported
-            ? ['text', 'image']
-            : ['text'];
-        const current = Array.isArray(active.model.input) ? active.model.input : [];
-        if (current.length === input.length && current.every((value, i) => value === input[i])) {
-          return;
-        }
-        const model = { ...active.model, input };
-        try {
-          await active.piSession.setModel(model);
-          active.model = model;
-        } catch (error) {
-          console.warn(`[PiRuntime] could not update image input for session ${sessionId}:`, error);
-        }
-      }),
-    );
-  }
-
-  /**
-   * Provider/model settings are the user's statement about what the models can
-   * do: drop the runtime observations and let open sessions follow immediately.
-   */
   async resetImageInputCapabilities(): Promise<void> {
-    clearImageInputObservations();
-    if (hasMagpieModelService()) {
-      try {
-        await getMagpieModelService().catalog();
-      } catch (error) {
-        console.warn('[PiRuntime] could not refresh model image capabilities:', error);
-      }
-    }
-    await this.syncImageInputCapability();
-  }
-
-  private imageInputVerdictForActive(active: ActivePiSession): ImageInputVerdict {
-    return imageInputVerdict(
-      this.configuredImageInputForActive(active),
-      active.harnessModelProfile.provider,
-      active.harnessModelProfile.model,
-      this.imageCapabilityConfiguration(active),
-    );
-  }
-
-  /**
-   * Records what happened to this turn's image attachments, so a failure can be
-   * retried as text, and tells the user when images were withheld: a text-only
-   * turn must never look like the image was delivered.
-   */
-  private recordImagePrompt(
-    sessionId: string,
-    active: ActivePiSession,
-    text: string,
-    prepared: ImagePromptPreparation,
-  ): void {
-    active.imageRetryPending = false;
-    active.imageRejectionHandled = false;
-    // Image state is recorded whether or not the turn carried text: an
-    // image-only submission is a normal turn, and the failure path has to be
-    // able to retry it.
-    active.lastImagePrompt =
-      prepared.sentImages.length > 0 || prepared.omittedImages.length > 0
-        ? {
-            text,
-            sentImages: prepared.sentImages,
-            omittedImages: prepared.omittedImages,
-            retried: false,
-          }
-        : null;
-    if (active.lastImagePrompt && prepared.omittedImages.length > 0) {
-      this.appendSystemNotice(sessionId, t('coworkImageNotSentNotice'));
-    }
-  }
-
-  /** Persist and emit a system message — the surface users actually read. */
-  private appendSystemNotice(sessionId: string, content: string): void {
-    const seed: CoworkMessage = {
-      id: randomUUID(),
-      type: 'system',
-      content,
-      timestamp: Date.now(),
-    };
-    const message = this.store ? this.store.addMessage(sessionId, seed) : seed;
-    this.emit('message', sessionId, message);
-  }
-
-  // ── Private: deferred error handling ──
-  /**
-   * Persist and emit a deferred turn error exactly once.
-   *
-   * message_end(stopReason=error) only records the error on the session because
-   * Pi may auto-retry the turn; this flush runs on auto_retry_end / agent_settled,
-   * when the run has genuinely failed. Idempotent — a second call is a no-op.
-   *
-   * Returns true when it scheduled a text-only retry of an image rejection
-   * instead of surfacing the error; the caller must then skip its own
-   * post-failure work (queue draining, completion).
-   */
-  private flushPendingError(sessionId: string, active: ActivePiSession): boolean {
-    const pending = active.pendingError;
-    if (!pending) return false;
-    const fallback = active.lastImagePrompt;
-    // A turn that carried images whose payload the provider rejected is an image
-    // rejection no matter how often the SDK retried it: the user's capability
-    // setting stays as configured, the model gets the file paths, and a repeated
-    // failure must not resurface as a misleading generic error.
-    const imageTurnError =
-      active.imageRejectionHandled && fallback !== null && fallback.sentImages.length > 0;
-    if (imageTurnError && fallback) {
-      active.pendingError = null;
-      active.imageRetryPending = false;
-      if (!fallback.retried) {
-        this.retryTurnWithoutImages(sessionId, active, fallback);
-        return true;
-      }
-      // Already retried once: the retry replaces this turn's outcome.
-      active.turnFailed = false;
-      active.isRunning = false;
-      return true;
-    }
-    active.pendingError = null;
-    if (active.answerText.trim()) {
-      this.finalizeMessage(sessionId, active, 'answer', active.answerText);
-      active.assistantMessageId = null;
-      active.answerText = '';
-    }
-    this.surfaceTurnError(sessionId, active, pending.classified, pending.message);
-    return false;
-  }
-
-  /**
-   * Re-sends the failed turn as text, with the image paths in the prompt, after
-   * an image payload rejection. The capability configuration is untouched.
-   */
-  private retryTurnWithoutImages(
-    sessionId: string,
-    active: ActivePiSession,
-    fallback: NonNullable<ActivePiSession['lastImagePrompt']>,
-  ): void {
-    active.lastImagePrompt = { ...fallback, retried: true };
-    active.errorSurfaced = false;
-    active.turnFailed = false;
-    active.isRunning = true;
-    this.appendSystemNotice(sessionId, t('coworkImageRetryNotice'));
-    const retryPrompt = [
-      fallback.text,
-      buildImageOmittedNotice(fallback.sentImages, {
-        verdict: ImageInputVerdict.Rejected,
-        ocrCommandFor: this.bundledOcrHelper?.commandFor,
-      }),
-    ]
-      .filter(content => content.trim().length > 0)
-      .join('\n\n');
-    void (async () => {
-      try {
-        // The SDK may already be aborting its own retry of the rejected payload;
-        // continuing before it settles would race that run. Its failure is
-        // already explained by the notice above, so it must not escape here.
-        await waitForPiRetryCancellation(active.piSession);
-      } catch {
-        // Intentionally ignored: the cancelled attempt's error is not the user's.
-      }
-      // Let the cancellation bookkeeping clear before continuing: continueSession
-      // awaits the same promise and would rethrow this already-failed attempt.
-      await yieldToEventLoop();
-      // A run that failed hard leaves its Pi session unable to accept another
-      // prompt (the SDK swallows it), so the retry drops the session and lets
-      // continueSession rebuild it from the stored transcript. The rebuild starts
-      // a fresh session, so the session-scoped approval settings travel with it —
-      // otherwise an "allow all" session would start asking for every tool call.
-      const approvalMode = active.approvalMode;
-      this.activeSessions.delete(sessionId);
-      try {
-        await this.continueSession(sessionId, retryPrompt, {
-          _skipUserMessage: true,
-          approvalMode,
-        });
-      } catch (error) {
-        console.warn(`[PiRuntime] image fallback retry failed for session ${sessionId}:`, error);
-        const message = error instanceof Error ? error.message : String(error);
-        const current = this.activeSessions.get(sessionId) ?? active;
-        this.surfaceTurnError(sessionId, current, classifyCoworkError(message), message);
-      }
-    })();
-  }
-
-  /** Persists and emits a turn failure exactly once (bubble + stream error). */
-  private surfaceTurnError(
-    sessionId: string,
-    active: ActivePiSession,
-    classified: CoworkError,
-    rawMessage: string,
-  ): void {
-    active.errorSurfaced = true;
-    active.turnFailed = true;
-    active.isRunning = false;
-    this.workbenchTaskService?.failRun?.(sessionId, { message: rawMessage });
-    // Persist a system error message so the error survives session switching
-    // and is visible in the message list. The classified kind lets the renderer
-    // translate it into a user-friendly i18n message; the raw message is kept
-    // for console diagnostics only.
-    const errorMessageSeed: CoworkMessage = {
-      id: randomUUID(),
-      type: 'system',
-      content: '',
-      timestamp: Date.now(),
-      metadata: { error: rawMessage, errorKind: classified.kind },
-    };
-    let errorMessage = errorMessageSeed;
-    if (this.store) {
-      this.store.updateSession(sessionId, { status: 'error' });
-      errorMessage = this.store.addMessage(sessionId, errorMessageSeed);
-    }
-    this.emit('message', sessionId, errorMessage);
-    this.emit('error', sessionId, classified);
-  }
-
-  /**
-   * Ends the turn when a workbench run can no longer execute tools. The run is
-   * already failed, so every further tool call is denied: without ending the
-   * turn the model answers each denial with another tool call.
-   *
-   * The error is flushed immediately so the user sees the concrete reason
-   * instead of a turn that silently stops producing output.
-   */
-  private endTerminatedWorkbenchTurn(sessionId: string, message: string): void {
-    const active = this.activeSessions.get(sessionId);
-    if (!active || active.aborted || active.turnFailed) return;
-    console.warn(`[PiRuntime] ending the turn of session ${sessionId}: ${message}`);
-    active.pendingError = { message, classified: classifyCoworkError(message) };
-    active.piSession.abortBash();
-    void active.piSession.abort().catch((error: unknown) => {
-      console.warn('[PiRuntime] failed to abort a terminated workbench run:', error);
-    });
-    this.flushPendingError(sessionId, active);
-  }
-
-  // ── Private: assistant message lifecycle ──
-
-  /**
-   * Lazily create the answer or thinking message for the current turn, returning its id.
-   *
-   * The message is persisted via store.addMessage() (which assigns its own id) and the
-   * initial 'message' event is emitted ONCE, so the rendered bubble and the DB row share
-   * the same id. Streaming updates and the final content go out as 'messageUpdate' on this
-   * same id — never a second 'message' event — which prevents the duplicate-render bug.
-   *
-   * Thinking messages carry metadata.isThinking so the frontend renders them as a
-   * ThinkingBlock instead of a normal answer bubble.
-   */
-  private ensureMessage(
-    sessionId: string,
-    active: ActivePiSession,
-    kind: 'answer' | 'thinking',
-    initialContent: string,
-  ): string {
-    const existing = kind === 'thinking' ? active.thinkingMessageId : active.assistantMessageId;
-    if (existing) return existing;
-
-    const seed: CoworkMessage = {
-      id: randomUUID(),
-      type: 'assistant',
-      content: initialContent,
-      timestamp: Date.now(),
-      metadata:
-        kind === 'thinking'
-          ? { isStreaming: true, isFinal: false, isThinking: true }
-          : {
-              isStreaming: true,
-              isFinal: false,
-              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-            },
-    };
-    if (kind === 'thinking') {
-      active.thinkingLifecycle.start(seed.timestamp);
-    }
-    const created = this.store ? this.store.addMessage(sessionId, seed) : seed;
-    if (kind === 'thinking') active.thinkingMessageId = created.id;
-    else active.assistantMessageId = created.id;
-    this.emit('message', sessionId, created);
-    return created.id;
-  }
-
-  /** Push a streaming (non-final) content snapshot to the answer/thinking message. */
-  private streamInto(
-    sessionId: string,
-    active: ActivePiSession,
-    kind: 'answer' | 'thinking',
-    content: string,
-  ): void {
-    const messageId = this.ensureMessage(sessionId, active, kind, content);
-    const metadata =
-      kind === 'thinking'
-        ? { isStreaming: true, isFinal: false, isThinking: true }
-        : {
-            isStreaming: true,
-            isFinal: false,
-            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-          };
-    if (kind === 'thinking') {
-      active.thinkingLifecycle.markContentStreaming();
-    }
-    // Throttle the synchronous SQLite write separately from the IPC emit so a
-    // fast Pi stream doesn't block the main-process event loop every frame.
-    this.throttledStoreUpdate(sessionId, messageId, content, metadata);
-    this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
-  }
-
-  /** Finalize the answer/thinking message: flush throttles, mark final, emit last update. */
-  private finalizeMessage(
-    sessionId: string,
-    active: ActivePiSession,
-    kind: 'answer' | 'thinking',
-    content: string,
-  ): void {
-    const messageId = this.ensureMessage(sessionId, active, kind, content);
-    this.clearPendingMessageUpdate(messageId);
-    this.clearPendingStoreUpdate(messageId);
-    const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
-    const metadata =
-      kind === 'thinking'
-        ? {
-            isStreaming: false,
-            isFinal: true,
-            isThinking: true,
-            ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-          }
-        : {
-            isStreaming: false,
-            isFinal: true,
-            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-          };
-    if (this.store) {
-      this.store.updateMessage(sessionId, messageId, { content, metadata });
-    }
-    this.emit('messageUpdate', sessionId, messageId, content, metadata);
-    if (kind === 'thinking') {
-      active.thinkingLifecycle.markMessageFinalized();
-    }
-  }
-
-  /**
-   * Closes placeholder bubbles that never received text, so a finished turn can
-   * no longer look like it is still streaming.
-   */
-  private closeIdlePlaceholders(sessionId: string, active: ActivePiSession): void {
-    const placeholderIds = [active.thinkingMessageId, active.assistantMessageId].filter(
-      (messageId): messageId is string => Boolean(messageId),
-    );
-    for (const messageId of placeholderIds) {
-      this.clearPendingMessageUpdate(messageId);
-      this.clearPendingStoreUpdate(messageId);
-    }
-    if (!this.store || placeholderIds.length === 0) return;
-
-    const messages = this.store.getSession(sessionId)?.messages ?? [];
-    for (const messageId of placeholderIds) {
-      const message = messages.find(candidate => candidate.id === messageId);
-      // A bubble finalizeMessage already closed (the ordinary turn with text) needs
-      // no second write, emit, or session updated_at bump.
-      if (!message || message.metadata?.isStreaming !== true) continue;
-      const metadata = { ...message.metadata, isStreaming: false, isFinal: true };
-      this.store.updateMessage(sessionId, messageId, { metadata });
-      // Republish the row with its own content, so a live view stops spinning
-      // without waiting for the session to be reloaded.
-      this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
-      console.debug('[PiRuntime] closed an idle placeholder message for', sessionId);
-    }
-  }
-
-  private finalizeActiveThinking(sessionId: string, active: ActivePiSession): void {
-    if (!active.thinkingText.trim() || active.thinkingLifecycle.isMessageFinalized) return;
-    this.finalizeMessage(sessionId, active, 'thinking', active.thinkingText);
-  }
-
-  private markFinalAnswer(sessionId: string, active: ActivePiSession): void {
-    const messageId = active.lastCompletedAnswerMessageId;
-    const content = active.lastCompletedAnswerText;
-    if (!messageId || !content.trim()) return;
-
-    const metadata = {
-      isStreaming: false,
-      isFinal: true,
-      isFinalAnswer: true,
-      ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-    };
-    if (this.store) {
-      const message = this.store
-        .getSession(sessionId)
-        ?.messages.find(candidate => candidate.id === messageId);
-      this.store.updateMessage(sessionId, messageId, {
-        content,
-        metadata: { ...message?.metadata, ...metadata },
-      });
-    }
-    this.emit('messageUpdate', sessionId, messageId, content, metadata);
-  }
-
-  /**
-   * Pi commits usage after emitting the terminal assistant event. Deferring one
-   * task ensures the snapshot corresponds to the response just persisted.
-   */
-  private scheduleContextUsageSync(
-    sessionId: string,
-    messageId: string | null,
-    piUsage: PiUsage | undefined,
-    model: string | undefined,
-    requestStartedAt: number | null,
-    firstVisibleTextAt: number | null,
-    startupLatency?: PiStartupLatency,
-  ): void {
-    if (!messageId) return;
-    setTimeout(() => {
-      const active = this.activeSessions.get(sessionId);
-      const contextUsage = active?.piSession.getContextUsage?.();
-      const hasValidContextUsage = Boolean(
-        contextUsage &&
-        contextUsage.tokens != null &&
-        Number.isFinite(contextUsage.tokens) &&
-        Number.isFinite(contextUsage.contextWindow) &&
-        contextUsage.tokens >= 0 &&
-        contextUsage.contextWindow > 0,
-      );
-      if (!hasValidContextUsage && !piUsage && requestStartedAt === null && !startupLatency) {
-        return;
-      }
-
-      const message = this.store
-        ?.getSession(sessionId)
-        ?.messages.find(item => item.id === messageId);
-      if (!message) return;
-
-      const usage = hasValidContextUsage
-        ? (() => {
-            const contextWindowTokens = Math.round(contextUsage!.contextWindow);
-            return {
-              usedTokens: Math.min(Math.round(contextUsage!.tokens!), contextWindowTokens),
-              contextWindowTokens,
-              updatedAt: Date.now(),
-            };
-          })()
-        : undefined;
-      // Pi materializes `usage` with zeros and only fills it once the provider
-      // reports one; persisting that default would read as a real zero in the
-      // stats line (see hasReportedTokenUsage).
-      const reportedUsage = piUsage
-        ? {
-            inputTokens: piUsage.input,
-            outputTokens: piUsage.output,
-            cacheReadTokens: piUsage.cacheRead,
-            cacheWriteTokens: piUsage.cacheWrite,
-            reasoningTokens: piUsage.reasoning,
-            totalTokens: piUsage.totalTokens,
-          }
-        : null;
-      const metadata = {
-        ...message.metadata,
-        ...(usage ? { contextUsage: usage } : {}),
-        ...(model ? { model } : {}),
-        ...(requestStartedAt !== null
-          ? {
-              metrics: {
-                requestStartedAt,
-                ...(firstVisibleTextAt !== null ? { firstVisibleTextAt } : {}),
-                completedAt: Date.now(),
-                ...(startupLatency ?? {}),
-              },
-            }
-          : {}),
-        ...(reportedUsage && hasReportedTokenUsage(reportedUsage) ? { usage: reportedUsage } : {}),
-      };
-      this.store?.updateMessage(sessionId, messageId, { metadata });
-      this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
-    }, 0);
-  }
-
-  // ── Private: throttling ──
-
-  private throttledEmitMessageUpdate(
-    sessionId: string,
-    messageId: string,
-    content: string,
-    metadata?: Record<string, unknown>,
-  ): void {
-    this.noteThrottleMessage(sessionId, messageId);
-    const now = Date.now();
-    const lastEmit = this.lastMessageUpdateEmitTime.get(messageId) ?? 0;
-    const elapsed = now - lastEmit;
-
-    if (elapsed >= MESSAGE_UPDATE_THROTTLE_MS) {
-      this.clearPendingMessageUpdate(messageId);
-      this.lastMessageUpdateEmitTime.set(messageId, now);
-      this.emit('messageUpdate', sessionId, messageId, content, metadata);
-      return;
-    }
-
-    // Within the throttle window: record the latest content and arm a single
-    // trailing emit at the window's end. Do NOT re-arm on every frame, or a
-    // continuous fast stream keeps pushing the deadline back and the UI freezes
-    // until the stream pauses ("burst-freeze" jank).
-    this.pendingMessageUpdate.set(messageId, { content, metadata });
-    if (!this.pendingMessageUpdateTimer.has(messageId)) {
-      this.pendingMessageUpdateTimer.set(
-        messageId,
-        setTimeout(() => {
-          this.pendingMessageUpdateTimer.delete(messageId);
-          const pending = this.pendingMessageUpdate.get(messageId);
-          this.pendingMessageUpdate.delete(messageId);
-          this.lastMessageUpdateEmitTime.set(messageId, Date.now());
-          if (pending) {
-            this.emit('messageUpdate', sessionId, messageId, pending.content, pending.metadata);
-          }
-        }, MESSAGE_UPDATE_THROTTLE_MS - elapsed),
-      );
-    }
-  }
-
-  private clearPendingMessageUpdate(messageId: string): void {
-    const timer = this.pendingMessageUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingMessageUpdateTimer.delete(messageId);
-    }
-    this.pendingMessageUpdate.delete(messageId);
-  }
-
-  /**
-   * Throttle synchronous SQLite writes. Leading write fires immediately; further
-   * writes within the window are coalesced into a single trailing write that
-   * persists the latest content. Prevents per-frame event-loop stalls.
-   */
-  private throttledStoreUpdate(
-    sessionId: string,
-    messageId: string,
-    content: string,
-    metadata: Record<string, unknown>,
-  ): void {
-    this.noteThrottleMessage(sessionId, messageId);
-    if (!this.store) return;
-    const now = Date.now();
-    const lastWrite = this.lastStoreUpdateTime.get(messageId) ?? 0;
-    const elapsed = now - lastWrite;
-
-    if (elapsed >= STORE_UPDATE_THROTTLE_MS) {
-      this.clearPendingStoreUpdate(messageId);
-      this.lastStoreUpdateTime.set(messageId, now);
-      this.store.updateMessage(
-        sessionId,
-        messageId,
-        { content, metadata },
-        { touchUpdatedAt: false },
-      );
-      return;
-    }
-
-    // Coalesce: remember the latest content and (re)arm a single trailing write.
-    this.pendingStoreUpdate.set(messageId, { content, metadata });
-    if (!this.pendingStoreUpdateTimer.has(messageId)) {
-      this.pendingStoreUpdateTimer.set(
-        messageId,
-        setTimeout(() => {
-          this.pendingStoreUpdateTimer.delete(messageId);
-          const pending = this.pendingStoreUpdate.get(messageId);
-          this.pendingStoreUpdate.delete(messageId);
-          this.lastStoreUpdateTime.set(messageId, Date.now());
-          if (pending && this.store) {
-            this.store.updateMessage(sessionId, messageId, pending, { touchUpdatedAt: false });
-          }
-        }, STORE_UPDATE_THROTTLE_MS - elapsed),
-      );
-    }
-  }
-
-  private clearPendingStoreUpdate(messageId: string): void {
-    const timer = this.pendingStoreUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingStoreUpdateTimer.delete(messageId);
-    }
-    this.pendingStoreUpdate.delete(messageId);
-  }
-
-  private clearThrottleStateBySession(sessionId: string, flush: boolean): void {
-    for (const [messageId, owner] of this.throttleSessionByMessageId) {
-      if (owner !== sessionId) continue;
-      if (flush && this.store) {
-        const pending = this.pendingStoreUpdate.get(messageId);
-        if (pending) this.store.updateMessage(sessionId, messageId, pending);
-      }
-      if (flush) {
-        const pendingEmit = this.pendingMessageUpdate.get(messageId);
-        if (pendingEmit) {
-          this.emit(
-            'messageUpdate',
-            sessionId,
-            messageId,
-            pendingEmit.content,
-            pendingEmit.metadata,
-          );
-        }
-      }
-      this.clearPendingMessageUpdate(messageId);
-      this.clearPendingStoreUpdate(messageId);
-      this.lastMessageUpdateEmitTime.delete(messageId);
-      this.lastStoreUpdateTime.delete(messageId);
-      this.throttleSessionByMessageId.delete(messageId);
-    }
-  }
-
-  private clearApprovalsBySession(sessionId: string): void {
-    for (const [requestId, sid] of this.approvalSessionMap.entries()) {
-      if (sid !== sessionId) continue;
-      this.approvalSessionMap.delete(requestId);
-      this.emit('permissionDismiss', requestId);
-    }
-  }
-
-  private requestAskUserQuestion(
-    sessionId: string,
-    toolCallId: string,
-    input: PiAskUserQuestionInput,
-    signal?: AbortSignal,
-  ): Promise<PiAskUserQuestionResponse> {
-    if (signal?.aborted) {
-      return Promise.resolve({ behavior: 'deny', message: 'The request was cancelled.' });
-    }
-
-    const requestId = randomUUID();
-    return new Promise(resolve => {
-      const timer = setTimeout(() => {
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'The question timed out without a response.',
-        });
-      }, PiAskUserQuestionTimeoutMs);
-
-      const onAbort = () => {
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'The request was cancelled.',
-        });
-      };
-      signal?.addEventListener('abort', onAbort, { once: true });
-
-      this.pendingAskUserQuestions.set(requestId, {
-        sessionId,
-        resolve,
-        timer,
-        removeAbortListener: () => signal?.removeEventListener('abort', onAbort),
-      });
-
-      try {
-        this.emit('permissionRequest', sessionId, {
-          requestId,
-          toolName: PiAskUserQuestionToolName,
-          toolInput: input as unknown as Record<string, unknown>,
-          toolUseId: toolCallId,
-        });
-      } catch (error) {
-        console.error('[PiRuntime] failed to emit AskUserQuestion request:', error);
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'Unable to show the question to the user.',
-        });
-      }
-    });
-  }
-
-  private finishAskUserQuestion(requestId: string, response: PiAskUserQuestionResponse): void {
-    const pending = this.pendingAskUserQuestions.get(requestId);
-    if (!pending) return;
-    this.pendingAskUserQuestions.delete(requestId);
-    clearTimeout(pending.timer);
-    pending.removeAbortListener?.();
-    pending.resolve(response);
-    this.emit('permissionDismiss', requestId);
-  }
-
-  private dismissAskUserQuestionsBySession(sessionId: string): void {
-    for (const [requestId, pending] of this.pendingAskUserQuestions.entries()) {
-      if (pending.sessionId === sessionId) {
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'The session was stopped.',
-        });
-      }
-    }
-  }
-
-  private dismissCodingElicitationsBySession(sessionId: string, reason: string): void {
-    for (const [requestId, pending] of this.pendingCodingElicitations.entries()) {
-      if (pending.sessionId === sessionId) {
-        this.finishCodingElicitation(requestId, { cancelled: true, reason });
-      }
-    }
-  }
-
-  private requestCodingElicitation(
-    sessionId: string,
-    _toolCallId: string,
-    input: PiCodingElicitationInput,
-    signal?: AbortSignal,
-  ): Promise<PiCodingElicitationResponse> {
-    const question = input.question.trim();
-    if (
-      !question ||
-      signal?.aborted ||
-      [...this.pendingCodingElicitations.values()].some(item => item.sessionId === sessionId)
-    ) {
-      return Promise.resolve({ cancelled: true, reason: 'The coding question was cancelled.' });
-    }
-    const requestId = randomUUID();
-    return new Promise(resolve => {
-      const onAbort = () =>
-        this.finishCodingElicitation(requestId, {
-          cancelled: true,
-          reason: 'The coding session was stopped.',
-        });
-      signal?.addEventListener('abort', onAbort, { once: true });
-      this.pendingCodingElicitations.set(requestId, {
-        sessionId,
-        resolve,
-        removeAbortListener: () => signal?.removeEventListener('abort', onAbort),
-      });
-      this.emit('codingElicitationRequest', sessionId, { requestId, question });
-    });
-  }
-
-  private finishCodingElicitation(requestId: string, response: PiCodingElicitationResponse): void {
-    const pending = this.pendingCodingElicitations.get(requestId);
-    if (!pending) return;
-    this.pendingCodingElicitations.delete(requestId);
-    pending.removeAbortListener?.();
-    pending.resolve(response);
+    await this.recovery.resetImageInputCapabilities();
   }
 
   // ── Skills & MCP integration ──
@@ -4550,165 +2661,4 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       },
     };
   }
-}
-
-// ── Gateway model resolution ──
-
-const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
-
-interface ModelPoolRequestContext {
-  conversationId: string;
-  workload: ZhiyuanModelPoolWorkloadValue;
-}
-
-function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
-  if (!model.modalities) return ModelCapabilityStatus.Unknown;
-  return model.modalities.input?.includes('image')
-    ? ModelCapabilityStatus.Supported
-    : ModelCapabilityStatus.Unsupported;
-}
-
-const MAGPIE_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-
-function buildMagpiePiModel(
-  selected: MagpieModel,
-  gatewayUrl: string,
-  modelPoolRequestContext?: ModelPoolRequestContext,
-): {
-  model: Record<string, unknown>;
-  baseUrl: string;
-  api: string;
-  supportsImage: boolean;
-  maxTokens: number;
-} {
-  const url = new URL(gatewayUrl);
-  if (
-    url.protocol !== 'http:' ||
-    url.hostname !== '127.0.0.1' ||
-    !url.port ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    url.pathname !== '/'
-  ) {
-    throw new Error('Invalid owned model gateway URL');
-  }
-  const endpoints = selected.native_endpoints ?? [];
-  const api = endpoints.includes('/v1/responses')
-    ? 'openai-responses'
-    : endpoints.includes('/v1/messages')
-      ? 'anthropic-messages'
-      : 'openai-completions';
-  const levels = selected.supported_reasoning_levels?.map(level => level.effort) ?? [];
-  const thinkingLevelMap = levels.length
-    ? Object.fromEntries(
-        MAGPIE_THINKING_LEVELS.map(level => {
-          const effort = level === 'off' ? 'none' : level;
-          return [level, levels.includes(effort) ? effort : null];
-        }),
-      )
-    : undefined;
-  const contextWindow = selected.context_window ?? 32768;
-  const maxTokens = Math.min(selected.max_output_tokens ?? 4096, contextWindow);
-  const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
-  const imageInput = magpieImageInput(selected);
-  const supportsImage = imageInput === ModelCapabilityStatus.Supported;
-
-  const model: Record<string, unknown> = {
-    id: selected.id,
-    name: selected.display_name || selected.id,
-    provider: 'magpie',
-    api,
-    baseUrl,
-    reasoning: selected.reasoning === true,
-    input: supportsImage ? ['text', 'image'] : ['text'],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow,
-    maxTokens,
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
-    compat: { sendSessionAffinityHeaders: true },
-    headers: {
-      ...(modelPoolRequestContext?.conversationId
-        ? {
-            'X-Magpie-Session': modelPoolRequestContext.conversationId,
-            [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
-            [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
-          }
-        : {}),
-    },
-  };
-
-  return { model, baseUrl, api, supportsImage, maxTokens };
-}
-
-async function resolvePiModel(
-  pi: PiModules,
-  modelRef?: string,
-  existingModelRuntime?: PiModelRuntime | null,
-  modelPoolRequestContext?: ModelPoolRequestContext,
-): Promise<PiResolvedModel> {
-  if (hasMagpieModelService()) {
-    const magpieService = getMagpieModelService();
-    const resolution = await magpieService.resolve(modelRef);
-    const {
-      model: customModel,
-      baseUrl,
-      api,
-      maxTokens,
-    } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
-    const modelRuntime =
-      existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
-    modelRuntime.registerProvider('magpie', {
-      name: 'magpie',
-      baseUrl,
-      api,
-      models: [customModel],
-    });
-    await modelRuntime.setRuntimeApiKey('magpie', MAGPIE_RUNTIME_API_KEY);
-
-    const imageInput = magpieImageInput(resolution.model);
-    const effectiveImageInput = imageInputVerdict(
-      imageInput,
-      ProviderName.Magpie,
-      resolution.model.id,
-      {
-        supportsImage: imageInput === ModelCapabilityStatus.Supported,
-        imageInput,
-        endpointKey: baseUrl,
-      },
-    );
-    const model =
-      effectiveImageInput === ImageInputVerdict.Supported
-        ? customModel
-        : { ...customModel, input: ['text'] as Array<'text' | 'image'> };
-
-    return {
-      model,
-      endpointKey: baseUrl,
-      modelRuntime,
-      maxOutputTokens: maxTokens,
-      providerName: ProviderName.Magpie,
-      capabilities: { imageInput },
-      requestOptions: { apiKey: MAGPIE_RUNTIME_API_KEY },
-    };
-  }
-
-  throw new Error('Enable the unified model service in model settings before starting a task.');
-}
-
-/** Normalize Pi tool args into a plain record for CoworkMessage metadata. */
-function toToolInputRecord(args: unknown): Record<string, unknown> {
-  if (args && typeof args === 'object' && !Array.isArray(args)) {
-    return args as Record<string, unknown>;
-  }
-  if (args === undefined || args === null) return {};
-  return { value: args };
-}
-
-function extractToolResultIsError(result: unknown): boolean {
-  if (!result || typeof result !== 'object') return false;
-  const details = (result as { details?: unknown }).details;
-  if (!details || typeof details !== 'object') return false;
-  return Boolean((details as { isError?: unknown }).isError);
 }
