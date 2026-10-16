@@ -5109,6 +5109,48 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('keeps the session approval mode when a stream stall resume rebuilds it', async () => {
+      vi.useFakeTimers();
+      const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });
+      try {
+        stallAdapter.setCoworkStore({
+          getSession: vi.fn(() => ({ messages: [], experts: [], mode: undefined })),
+          getSessionMessagesDesc: vi.fn(() => []),
+          getSessionMessageStats: vi.fn(() => ({
+            messageCount: 0,
+            contentBytes: 0,
+            metadataBytes: 0,
+          })),
+          addMessage: vi.fn((_sessionId: string, message: unknown) => message),
+          updateSession: vi.fn(),
+          updateMessage: vi.fn(),
+        } as unknown as CoworkStore);
+        stallAdapter.on('error', () => {});
+        stallAdapter.on('retryNotice', () => {});
+
+        await stallAdapter.startSession('stall-approval', 'Hello Pi', {
+          approvalMode: WorkbenchApprovalMode.AllowAll,
+        });
+        const listener = latestListener();
+        listener({ type: 'agent_start' });
+        listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
+
+        // The stall watchdog aborts the turn and resumes by rebuilding the Pi
+        // session; "allow all" must travel with it or the user starts getting
+        // permission prompts for every side-effect tool call.
+        const continueSpy = vi.spyOn(stallAdapter, 'continueSession');
+        await vi.advanceTimersByTimeAsync(1000);
+        await vi.advanceTimersByTimeAsync(1);
+
+        const resumeOptions = continueSpy.mock.calls.at(-1)?.[2];
+        expect(resumeOptions?._streamStallResume).toBe(true);
+        expect(resumeOptions?.approvalMode).toBe(WorkbenchApprovalMode.AllowAll);
+        stallAdapter.stopAllSessions();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('labels the automatic resume run with a localized goal', async () => {
       vi.useFakeTimers();
       const stallAdapter = new PiRuntimeAdapter({ streamStallTimeoutMs: 1000 });

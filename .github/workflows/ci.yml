@@ -27,9 +27,14 @@ jobs:
     timeout-minutes: 5
     outputs:
       plan: ${{ steps.plan.outputs.plan }}
+      path-plan: ${{ steps.plan.outputs.path-plan }}
       linux-install: ${{ steps.plan.outputs.linux-install }}
       windows-install: ${{ steps.plan.outputs.windows-install }}
       memory-leak: ${{ steps.plan.outputs.memory-leak }}
+      channel-runtime: ${{ steps.plan.outputs.channel-runtime }}
+      python-runtime-linux: ${{ steps.plan.outputs.python-runtime-linux }}
+      python-runtime-windows: ${{ steps.plan.outputs.python-runtime-windows }}
+      installer-preview: ${{ steps.plan.outputs.installer-preview }}
       enterprise: ${{ steps.plan.outputs.enterprise }}
     steps:
       - uses: actions/checkout@v6
@@ -39,12 +44,30 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-      - name: Select expensive checks from the complete PR diff
+      - name: Select expensive checks from the complete diff
         id: plan
         run: node scripts/ci/gates/plan.ts
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+  pr-metadata:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github
+      - name: Validate pull request title and description
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { validatePr } = require(`${process.env.GITHUB_WORKSPACE}/.github/devops-gate.cjs`);
+            const errors = validatePr(context.payload.pull_request);
+            if (errors.length) core.setFailed(errors.join('\n'));
 
   lint:
     runs-on: ubuntu-latest
@@ -60,13 +83,19 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint/archive.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/actionlint/archive.tar.gz" -C "$RUNNER_TEMP/actionlint" actionlint
       - name: Validate workflow syntax and job dependencies
-        # ShellCheck policy is separate; this gate validates every workflow's
-        # YAML, expressions, reusable-workflow inputs and dependency graph.
         run: '"$RUNNER_TEMP/actionlint/actionlint" -shellcheck='
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Verify CI inventory matches workflow triggers
+        run: |
+          python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
+          python3 .github/check-devops-config.py
+      - name: Test DevOps gate decisions
+        run: node --test .github/devops-gate.test.cjs
       - uses: ./.github/actions/setup-bun-workspace
         with:
           save-cache: 'true'
-
       - name: Validate bundled Skill frontmatter
         run: bun run validate:skills
       - name: Enforce retired runtime decoupling
@@ -76,20 +105,16 @@ jobs:
       - name: Lint
         run: bun run lint
 
-  test:
+  electron-compile:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun-workspace
         with:
           cache-prefix: test
           include-electron: 'true'
-          save-cache: ${{ matrix.shard == 1 && 'true' || 'false' }}
+          save-cache: 'true'
       - name: Restore Electron TypeScript cache
         id: electron-tsc
         uses: actions/cache/restore@v5
@@ -97,28 +122,53 @@ jobs:
           path: |
             .cache/tsc/electron.tsbuildinfo
             dist-electron
-          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json') }}-${{ github.sha }}
+          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}
           restore-keys: |
-            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json') }}-
+            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}-
             tsc-electron-${{ runner.os }}-
       - name: Compile Electron sources used by integration tests
         run: |
           mkdir -p .cache/tsc
           bun run compile:electron -- --incremental --tsBuildInfoFile .cache/tsc/electron.tsbuildinfo
       - name: Save Electron TypeScript cache
-        if: matrix.shard == 1 && steps.electron-tsc.outputs.cache-hit != 'true'
+        if: steps.electron-tsc.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: |
             .cache/tsc/electron.tsbuildinfo
             dist-electron
           key: ${{ steps.electron-tsc.outputs.cache-primary-key }}
+      - name: Upload compiled Electron artifacts for test shards
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-dist-${{ github.run_id }}
+          path: |
+            dist-electron
+            .cache/tsc/electron.tsbuildinfo
+          retention-days: 1
+
+  test:
+    needs: electron-compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+        with:
+          cache-prefix: test
+          include-electron: 'true'
+      - name: Download compiled Electron artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: electron-dist-${{ github.run_id }}
       - name: Install Electron for native ABI integration tests
-        # Dependency lifecycle scripts are disabled above; the ABI probe needs
-        # the actual target runtime, rather than a host Node approximation.
         run: node node_modules/electron/install.js
       - name: Run tests
-        run: bun run test -- --shard=${{ matrix.shard }}/4
+        run: bun run test -- --shard=${{ matrix.shard }}/2
       - name: Verify Presentation Studio compiler and validator
         if: matrix.shard == 1
         run: |
@@ -138,7 +188,7 @@ jobs:
           path: |
             .cache/tsc/renderer.tsbuildinfo
             .cache/vite
-          key: renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}-${{ github.sha }}
+          key: renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}
           restore-keys: |
             renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}-
             renderer-build-${{ runner.os }}-
@@ -190,6 +240,131 @@ jobs:
         if: needs.changes.outputs.enterprise == 'true'
         run: bun run verify:enterprise:packaging-config
 
+  channel-runtime:
+    needs: changes
+    if: needs.changes.outputs.channel-runtime == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Restore channel runtime download
+        id: channel-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: vendor/channel-runtime
+          key: channel-runtime-${{ runner.os }}-${{ hashFiles('package.json', 'scripts/download-channel-runtime.cjs') }}
+          restore-keys: |
+            channel-runtime-${{ runner.os }}-
+      - name: Download the pinned channel runtime
+        run: npm run channel:runtime:linux-x64
+      - name: Verify channel transport and QQ Bot support
+        run: npm run channel:runtime:smoke
+      - name: Save channel runtime download
+        if: steps.channel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: vendor/channel-runtime
+          key: ${{ steps.channel-cache.outputs.cache-primary-key }}
+
+  python-runtime-linux:
+    needs: changes
+    if: needs.changes.outputs.python-runtime-linux == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+      PYTHON_RUNTIME_INTEGRATION: '1'
+      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore Bun package cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-1.4.0-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Bundle the independent Runner
+        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
+      - name: Verify pinned Python, isolated packages, rebuild and process cancellation
+        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
+
+  python-runtime-windows:
+    needs: changes
+    if: needs.changes.outputs.python-runtime-windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+      PYTHON_RUNTIME_INTEGRATION: '1'
+      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
+      PYTHON_RUNTIME_JOB_HELPER: '${{ github.workspace }}/resources/python-runtime/job-runner.exe'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build actual Job Object helper
+        shell: pwsh
+        run: ./scripts/python-runtime/build-job-runner.ps1
+      - name: Verify descendant containment and parent-death cleanup
+        run: node --test scripts/python-runtime/job-runner.test.cjs
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore Bun package cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-1.4.0-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Bundle the independent Runner
+        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
+      - name: Verify Windows standalone Python and real uv wheel environments
+        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
+
+  installer-preview:
+    needs: changes
+    if: needs.changes.outputs.installer-preview == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Restore Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.58.0-${{ runner.os }}
+      - run: pip install playwright==1.58.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python scripts/ci/installer-style-preview.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-preview-${{ github.run_id }}
+          path: acceptance-diagnostics/installer-preview
+          retention-days: 7
+
   memory-leak:
     needs: changes
     if: needs.changes.outputs.memory-leak == 'true'
@@ -210,7 +385,22 @@ jobs:
   merge-gate:
     name: merge-gate
     if: always()
-    needs: [changes, lint, test, bundle-budget, enterprise, memory-leak, linux-install, windows-install]
+    needs:
+      [
+        changes,
+        lint,
+        electron-compile,
+        test,
+        bundle-budget,
+        enterprise,
+        channel-runtime,
+        python-runtime-linux,
+        python-runtime-windows,
+        installer-preview,
+        memory-leak,
+        linux-install,
+        windows-install,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -225,4 +415,17 @@ jobs:
         run: node scripts/ci/gates/verify.ts
         env:
           GATE_PLAN: ${{ needs.changes.outputs.plan }}
+          GATE_PATH_PLAN: ${{ needs.changes.outputs.path-plan }}
           GATE_RESULTS: ${{ toJSON(needs) }}
+
+  ci-gate:
+    name: ci-gate
+    if: always() && github.event_name == 'pull_request'
+    needs: [pr-metadata, merge-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require PR metadata and merge gate
+        run: |
+          test "${{ needs.pr-metadata.result }}" = "success"
+          test "${{ needs.merge-gate.result }}" = "success"

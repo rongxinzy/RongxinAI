@@ -266,6 +266,19 @@ test('restorePiConversationPrompt tolerates a store without paged reads', () => 
   expect(restorePiConversationPrompt({} as never, 's1', 'Continue.')).toBe('Continue.');
 });
 
+test('restorePiConversationPrompt falls back to the legacy full read when paging is unavailable', () => {
+  const store = {
+    getSession: (_sessionId: string, _messageLimit?: number | null) => ({
+      messages: [message('user-1', 'user', 'Earlier context from the full read.')],
+    }),
+  };
+
+  const prompt = restorePiConversationPrompt(store as never, 's1', 'Continue.');
+
+  expect(prompt).toContain('User: Earlier context from the full read.');
+  expect(prompt).toContain('User: Continue.');
+});
+
 test('summarizePiHistoryFromStore never breaks a rebuild on a bad store', () => {
   const empty = { messageCount: 0, contentBytes: 0, metadataBytes: 0 };
   expect(summarizePiHistoryFromStore(null, 's1')).toEqual(empty);

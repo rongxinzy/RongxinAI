@@ -19,8 +19,11 @@ detection disabled. Deleted paths and both sides of renames participate. Invalid
 or diff failures stop the planner; no API pagination or 300-file filter limit applies.
 
 `merge-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped
-required jobs. Linux and Windows workflows are reusable/manual workflows, so they do
-not create duplicate PR runs. The parent CI owns concurrency cancellation.
+required jobs. Path-owned checks (channel runtime smoke, Python runtime containment,
+installer preview) now run as conditional jobs inside CI instead of separate pull
+request workflows. Linux and Windows install workflows remain reusable/manual workflows.
+The parent CI owns concurrency cancellation and exposes the required `ci-gate` check
+after PR metadata validation and merge-gate succeed.
 
 ## Release and nightly checks
 
@@ -63,10 +66,11 @@ the miss and investigate the measured bottleneck without relaxing installation t
 ## Required-check rollout and measurement
 
 The default branch requires `ci-gate` and retains `merge-gate` from GitHub Actions
-(app ID 15368), with the branch up to date before merging. `ci-gate` validates the
-PR title/body and aggregates applicable workflows at the current head;
-`.github/devops-ci.json` records their triggers. `merge-gate` retains application
-job validation. Do not require conditional platform jobs directly.
+(app ID 15368), with the branch up to date before merging. `ci-gate` validates PR
+title/body and requires `merge-gate` to pass; inventory drift is checked in the lint
+job via `.github/check-devops-config.py` against `.github/devops-ci.json` (CI only).
+`merge-gate` retains application job validation. Do not require conditional platform
+jobs directly.
 
 All PRs, including documentation, require one independent GitHub approval. New
 commits dismiss stale approvals; the latest push must be approved by another person.
@@ -111,9 +115,8 @@ The execution critical path was the `test` job (median 309 seconds: about 79 sec
 of Electron `tsc` plus about 200 seconds of Vitest) followed by `merge-gate` (median
 8 seconds). `memory-leak`, when selected (14 of 19), ran in parallel at a median of
 169 seconds and was not the critical path. Lint median was 27 seconds and
-bundle-budget (renderer typecheck, Vite build, budget) was 37 seconds. `ci-gate`,
-the only required status check, tracked CI and had a median of 355 seconds on 6
-successful samples. Channel runtime smoke median was 14 seconds and ran on every PR.
+bundle-budget (renderer typecheck, Vite build, budget) was 37 seconds. `ci-gate` tracked CI and had a median of 355 seconds on 6 successful samples when it
+polled separate workflows. Channel runtime smoke median was 14 seconds when selected.
 
 These are measured samples, not a performance guarantee. Sharding and TypeScript
 cache hits change the critical path; a cold TypeScript cache still pays for one

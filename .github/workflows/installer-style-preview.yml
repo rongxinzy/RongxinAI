@@ -1,21 +1,12 @@
 name: Installer visual review only
+
+# Pull request checks run inside CI. This workflow remains for manual reruns.
+
 concurrency:
-  group: installer-preview-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: installer-preview-manual-${{ github.ref }}
   cancel-in-progress: true
 on:
-  push:
-    branches: [main, style/installer-website-alignment]
-    paths:
-      - 'scripts/installer-shell/preview/**'
-      - 'scripts/installer-shell/preview-ui.test.ts'
-      - 'scripts/ci/installer-style-preview.py'
-      - '.github/workflows/installer-style-preview.yml'
-  pull_request:
-    paths:
-      - 'scripts/installer-shell/preview/**'
-      - 'scripts/installer-shell/preview-ui.test.ts'
-      - 'scripts/ci/installer-style-preview.py'
-      - '.github/workflows/installer-style-preview.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -1,8 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
-import { BaselineJob, CiEvent, HeavyJob, JobResult } from './constants.ts';
-import { enterpriseRequired, planGates, verifyGateResults, type GatePlan } from './policy.ts';
+import { BaselineJob, CiEvent, HeavyJob, JobResult, PathJob, TestShardCount } from './constants.ts';
+import {
+  enterpriseRequired,
+  planGates,
+  planPathJobs,
+  verifyGateResults,
+  type GatePlan,
+  type PathPlan,
+} from './policy.ts';
+
+const noPathJobs: PathPlan = {
+  [PathJob.ChannelRuntime]: false,
+  [PathJob.PythonRuntimeLinux]: false,
+  [PathJob.PythonRuntimeWindows]: false,
+  [PathJob.InstallerPreview]: false,
+};
 
 const prRef = 'refs/pull/42/merge';
 const light = planGates(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest, prRef);
@@ -96,8 +110,25 @@ test('enterprise toolchain follows the extension diff on pull requests only', ()
   expect(enterpriseRequired(['package.json'], CiEvent.PullRequest)).toBe(true);
   expect(enterpriseRequired(['electron-builder.enterprise.cjs'], CiEvent.PullRequest)).toBe(true);
   expect(enterpriseRequired(['src/renderer/App.tsx'], CiEvent.PullRequest)).toBe(false);
-  expect(enterpriseRequired(['docs/readme.md'], CiEvent.Push)).toBe(true);
+  expect(enterpriseRequired(['docs/readme.md'], CiEvent.Push)).toBe(false);
   expect(enterpriseRequired([], CiEvent.Manual)).toBe(true);
+});
+
+test('path-owned checks follow the same diff ownership as the former standalone workflows', () => {
+  expect(planPathJobs(['src/main/im/wechat.ts'], CiEvent.PullRequest)).toEqual({
+    ...noPathJobs,
+    [PathJob.ChannelRuntime]: true,
+  });
+  expect(planPathJobs(['src/main/pythonRuntime/runner.ts'], CiEvent.PullRequest)).toEqual({
+    ...noPathJobs,
+    [PathJob.PythonRuntimeLinux]: true,
+    [PathJob.PythonRuntimeWindows]: true,
+  });
+  expect(planPathJobs(['scripts/installer-shell/preview/page.tsx'], CiEvent.PullRequest)).toEqual({
+    ...noPathJobs,
+    [PathJob.InstallerPreview]: true,
+  });
+  expect(planPathJobs(['README.md'], CiEvent.PullRequest)).toEqual(noPathJobs);
 });
 
 test('manual runs and unknown events fail closed to the complete suite', () => {
@@ -110,28 +141,31 @@ test('main pushes are light while tag releases retain all heavy checks', () => {
   expect(planGates([], CiEvent.Push, 'refs/tags/v2026.9.5')).toEqual(full);
 });
 
-function resultsFor(plan: GatePlan) {
+function resultsFor(plan: GatePlan, pathPlan: PathPlan = noPathJobs) {
   const results: Record<string, { result: string }> = Object.fromEntries(
     Object.values(BaselineJob).map(name => [name, { result: JobResult.Success }]),
   );
   for (const [name, enabled] of Object.entries(plan)) {
     results[name] = { result: enabled ? JobResult.Success : JobResult.Skipped };
   }
+  for (const [name, enabled] of Object.entries(pathPlan)) {
+    results[name] = { result: enabled ? JobResult.Success : JobResult.Skipped };
+  }
   return results;
 }
 
 test('merge gate permits only intentional skips', () => {
-  expect(() => verifyGateResults(light, resultsFor(light))).not.toThrow();
-  expect(() => verifyGateResults(full, resultsFor(full))).not.toThrow();
+  expect(() => verifyGateResults(light, noPathJobs, resultsFor(light))).not.toThrow();
+  expect(() => verifyGateResults(full, noPathJobs, resultsFor(full))).not.toThrow();
 });
 
 test.each([JobResult.Failure, JobResult.Cancelled, JobResult.Skipped])(
   'required check %s cannot pass the gate',
   result => {
-    for (const name of Object.keys(resultsFor(full))) {
+    for (const name of [...Object.values(BaselineJob), ...Object.values(HeavyJob)]) {
       const results = resultsFor(full);
       results[name] = { result };
-      expect(() => verifyGateResults(full, results)).toThrow();
+      expect(() => verifyGateResults(full, noPathJobs, results)).toThrow();
     }
   },
 );
@@ -139,14 +173,14 @@ test.each([JobResult.Failure, JobResult.Cancelled, JobResult.Skipped])(
 test('missing jobs and incomplete decisions cannot pass the gate', () => {
   const results = resultsFor(full);
   delete results[HeavyJob.Linux];
-  expect(() => verifyGateResults(full, results)).toThrow();
-  expect(() => verifyGateResults({} as GatePlan, resultsFor(light))).toThrow();
+  expect(() => verifyGateResults(full, noPathJobs, results)).toThrow();
+  expect(() => verifyGateResults({} as GatePlan, noPathJobs, resultsFor(light))).toThrow();
 });
 
 test('unexpected failure of an optional check cannot be hidden', () => {
   const results = resultsFor(light);
   results[HeavyJob.Memory] = { result: JobResult.Failure };
-  expect(() => verifyGateResults(light, results)).toThrow();
+  expect(() => verifyGateResults(light, noPathJobs, results)).toThrow();
 });
 
 interface WorkflowJob {
@@ -169,47 +203,57 @@ function workflow(name: string) {
   };
 }
 
-test('pull request tests are sharded without dropping the test gate', () => {
+test('pull request tests compile Electron once and shard the suite', () => {
   const ci = workflow('ci.yml');
-  expect(ci.jobs.test.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
+  expect(ci.jobs.test.strategy?.matrix?.shard).toEqual(
+    Array.from({ length: TestShardCount }, (_, index) => index + 1),
+  );
   expect(ci.jobs.test.strategy?.['fail-fast']).toBe(false);
+  expect(ci.jobs.test.needs).toBe(BaselineJob.ElectronCompile);
+  const compileCommands = ci.jobs[BaselineJob.ElectronCompile].steps
+    ?.map(step => step.run ?? '')
+    .join('\n');
+  expect(compileCommands).toContain('bun run compile:electron');
   const testCommands = ci.jobs.test.steps?.map(step => step.run ?? '').join('\n');
-  expect(testCommands).toContain('--shard=${{ matrix.shard }}/4');
-  expect(testCommands).toContain('bun run compile:electron');
+  expect(testCommands).toContain(`--shard=\${{ matrix.shard }}/${TestShardCount}`);
+  expect(testCommands).not.toContain('bun run compile:electron');
   expect(testCommands).toContain('npm test --prefix SKILLs/presentation-studio');
   expect(ci.jobs.enterprise.needs).toBe(BaselineJob.Changes);
   expect(ci.jobs.changes.outputs).toHaveProperty('enterprise');
+  expect(ci.jobs.changes.outputs).toHaveProperty('path-plan');
 });
 
-test('channel runtime smoke is path filtered and cancels stale runs', () => {
+test('channel runtime checks live in CI and manual smoke remains dispatch-only', () => {
+  const ci = workflow('ci.yml');
+  expect(ci.jobs[PathJob.ChannelRuntime].if).toBe(
+    `needs.changes.outputs.${PathJob.ChannelRuntime} == 'true'`,
+  );
   const smoke = workflow('channel-runtime-smoke.yml');
-  const trigger = smoke.on.pull_request as { paths?: string[]; branches?: string[] };
-  expect(trigger.paths).toEqual(
-    expect.arrayContaining([
-      'src/main/im/**',
-      'src/main/libs/ccConnect*',
-      'package.json',
-      '.github/workflows/channel-runtime-smoke.yml',
-    ]),
-  );
-  expect(trigger.paths?.some(path => path.startsWith('docs/') || path.startsWith('website/'))).toBe(
-    false,
-  );
+  expect(smoke.on).toEqual({ workflow_dispatch: null });
   expect(smoke.concurrency?.['cancel-in-progress']).toBe(true);
 });
 
 test('CI waits for every selected reusable check and always runs the merge gate', () => {
   const ci = workflow('ci.yml');
   expect(ci.on).toHaveProperty(CiEvent.PullRequest);
+  expect(ci.jobs['ci-gate'].name).toBe('ci-gate');
   const gate = ci.jobs['merge-gate'];
   expect(gate.if).toBe('always()');
   expect(gate.needs).toEqual(
-    expect.arrayContaining([...Object.values(BaselineJob), ...Object.values(HeavyJob)]),
+    expect.arrayContaining([
+      ...Object.values(BaselineJob),
+      ...Object.values(HeavyJob),
+      ...Object.values(PathJob),
+    ]),
   );
   for (const job of Object.values(HeavyJob)) {
     expect(ci.jobs[job].needs).toBe(BaselineJob.Changes);
     expect(ci.jobs[job].if).toBe(`needs.changes.outputs.${job} == 'true'`);
     expect(ci.jobs[job].uses).toMatch(/\.yml$/);
+  }
+  for (const job of Object.values(PathJob)) {
+    expect(ci.jobs[job].needs).toBe(BaselineJob.Changes);
+    expect(ci.jobs[job].if).toBe(`needs.changes.outputs.${job} == 'true'`);
   }
   for (const file of ['linux-install-pr.yml', 'windows-installer-pr.yml']) {
     expect(workflow(file).on).toHaveProperty('workflow_call');
