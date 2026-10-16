@@ -70,11 +70,11 @@ import type { ConversationHistoryService } from '../../conversationHistory/servi
 import { t } from '../../i18n';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
-import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import {
-  buildProjectMemoryContextSafe,
-  type ProjectMemoryService,
-} from '../../memory/projectMemoryService';
+  finalizePiPromptWithProjectMemory,
+  resolveProjectMemoryContextForPiPrompt,
+} from '../../memory/piRuntimeProjectMemoryPrompt';
+import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import type {
   SessionMemoryCompletion,
   SessionMemoryCompletionMessage,
@@ -135,7 +135,6 @@ import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskS
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
-import { prependWorkbenchTaskBoundary } from './piWorkbenchTaskBoundary';
 import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
@@ -1048,31 +1047,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // A fresh Pi transcript never contains an earlier memory block, so the
       // per-session dedup fingerprint must restart with it.
       this.memoryInjectionDedup.reset(sessionId);
-      const projectMemoryContext = resourceState.chatMode
-        ? null
-        : this.memoryInjectionDedup.take(
-            sessionId,
-            await buildProjectMemoryContextSafe(
-              this.projectMemoryService,
-              workspaceRoot,
-              sessionId,
-              prompt,
-            ),
-          );
-      if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
-      if (projectMemoryContext) initialPrompt = `${projectMemoryContext}\n\n${initialPrompt}`;
-      if (!resourceState.chatMode) {
-        initialPrompt = prependWorkbenchTaskBoundary(
-          initialPrompt,
-          this.workbenchTaskService,
-          sessionId,
-        );
-      }
-      captureMemoryPromptForE2e({
+      const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
+        chatMode: resourceState.chatMode,
+        memoryInjectionDedup: this.memoryInjectionDedup,
+        projectMemoryService: this.projectMemoryService,
+        workspaceRoot,
         sessionId,
         userPrompt: prompt,
-        memoryContext: projectMemoryContext,
-        initialPrompt,
+      });
+      if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
+      initialPrompt = finalizePiPromptWithProjectMemory({
+        chatMode: resourceState.chatMode,
+        sessionId,
+        userPrompt: prompt,
+        prompt: initialPrompt,
+        projectMemoryContext,
+        workbenchTaskService: this.workbenchTaskService,
       });
 
       // The user may stop the session while the execution-mode question is
@@ -1454,26 +1444,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     }
     try {
-      const projectMemoryContext = active.resourceState.chatMode
-        ? null
-        : this.memoryInjectionDedup.take(
-            sessionId,
-            await buildProjectMemoryContextSafe(
-              this.projectMemoryService,
-              active.workspaceRoot,
-              sessionId,
-              prompt,
-            ),
-          );
-      if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;
-      if (!active.resourceState.chatMode) {
-        nextPrompt = prependWorkbenchTaskBoundary(nextPrompt, this.workbenchTaskService, sessionId);
-      }
-      captureMemoryPromptForE2e({
+      const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
+        chatMode: active.resourceState.chatMode,
+        memoryInjectionDedup: this.memoryInjectionDedup,
+        projectMemoryService: this.projectMemoryService,
+        workspaceRoot: active.workspaceRoot,
         sessionId,
         userPrompt: prompt,
-        memoryContext: projectMemoryContext,
-        initialPrompt: nextPrompt,
+      });
+      nextPrompt = finalizePiPromptWithProjectMemory({
+        chatMode: active.resourceState.chatMode,
+        sessionId,
+        userPrompt: prompt,
+        prompt: nextPrompt,
+        projectMemoryContext,
+        workbenchTaskService: this.workbenchTaskService,
       });
       const continuedImagePrompt = preparePiPrompt(
         nextPrompt,
