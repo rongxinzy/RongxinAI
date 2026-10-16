@@ -5,12 +5,21 @@ import {
 } from '@shared/components/ai-elements/reasoning';
 import React from 'react';
 
+import { i18nService } from '../../../services/i18n';
 import type { CoworkMessage } from '../../../types/cowork';
 
 const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
-  if (isStreaming || duration === 0) return <p>思考中…</p>;
-  if (duration === undefined) return <p>思考内容</p>;
-  return <p>已思考 {duration} 秒</p>;
+  if (isStreaming || duration === 0) {
+    return <span>{i18nService.t('codingAgentReasoningActive')}</span>;
+  }
+  if (duration === undefined) {
+    return <span>{i18nService.t('reasoning')}</span>;
+  }
+  return (
+    <span>
+      {i18nService.t('localInferenceThoughtForSeconds').replace('{seconds}', String(duration))}
+    </span>
+  );
 };
 
 export const ThinkingBlock: React.FC<{
@@ -21,7 +30,7 @@ export const ThinkingBlock: React.FC<{
   const content = mapDisplayText ? mapDisplayText(message.content) : message.content;
 
   return (
-    <Reasoning isStreaming={isStreaming}>
+    <Reasoning isStreaming={isStreaming} showConnector>
       <ReasoningTrigger getThinkingMessage={getThinkingMessage} />
       <ReasoningContent>{content}</ReasoningContent>
     </Reasoning>

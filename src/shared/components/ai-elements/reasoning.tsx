@@ -96,19 +96,13 @@ export const Reasoning = memo(
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
     const startTimeRef = useRef<number | null>(null);
 
-    // Track when streaming starts and compute duration
+    // Track when streaming starts and compute duration when it settles
     useEffect(() => {
       if (isStreaming) {
         hasEverStreamedRef.current = true;
         if (startTimeRef.current === null) {
           startTimeRef.current = Date.now();
         }
-        const timer = window.setInterval(() => {
-          if (startTimeRef.current !== null) {
-            setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
-          }
-        }, 1000);
-        return () => window.clearInterval(timer);
       } else if (startTimeRef.current !== null) {
         setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
         startTimeRef.current = null;
@@ -154,10 +148,10 @@ export const Reasoning = memo(
           open={isOpen}
           {...props}
         >
-          {showConnector && (
+          {showConnector && isOpen && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute top-5 -bottom-3 left-2 w-px bg-border"
+              className="pointer-events-none absolute top-9 bottom-0 left-2 w-px bg-border"
             />
           )}
           {children}

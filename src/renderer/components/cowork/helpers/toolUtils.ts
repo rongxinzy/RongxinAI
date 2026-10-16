@@ -17,14 +17,64 @@ export const getStringArray = (value: unknown): string | null => {
 export const truncatePreview = (value: string, maxLength = 120): string =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
 
+const MAX_STRUCTURED_FORMAT_CHARS = 100_000;
+export const TOOL_RESULT_COLLAPSE_LINE_LIMIT = 200;
+export const TOOL_RESULT_COLLAPSE_CHAR_LIMIT = 12_000;
+
 export const formatStructuredText = (value: string): string => {
   const trimmed = value.trim();
-  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return value;
+  if (
+    trimmed.length > MAX_STRUCTURED_FORMAT_CHARS ||
+    (!trimmed.startsWith('{') && !trimmed.startsWith('['))
+  ) {
+    return value;
+  }
   try {
     return JSON.stringify(JSON.parse(trimmed), null, 2);
   } catch {
     return value;
   }
+};
+
+/**
+ * Truncates tool input/output by both line count and character count without
+ * splitting the full string into an array, protecting the renderer main thread
+ * and Shiki tokenizer against multi-megabyte single-line or multi-line payloads.
+ */
+export const collapseToolText = (
+  text: string,
+  maxLines = TOOL_RESULT_COLLAPSE_LINE_LIMIT,
+  maxChars = TOOL_RESULT_COLLAPSE_CHAR_LIMIT,
+): { preview: string; collapsible: boolean } => {
+  if (!text) return { preview: '', collapsible: false };
+
+  let newlineCount = 0;
+  let searchFrom = 0;
+  const scanLimit = Math.min(text.length, maxChars);
+
+  while (searchFrom < scanLimit) {
+    const nextNewline = text.indexOf('\n', searchFrom);
+    if (nextNewline === -1 || nextNewline >= scanLimit) {
+      break;
+    }
+    newlineCount += 1;
+    if (newlineCount >= maxLines) {
+      return {
+        preview: text.slice(0, nextNewline),
+        collapsible: true,
+      };
+    }
+    searchFrom = nextNewline + 1;
+  }
+
+  if (text.length > maxChars) {
+    return {
+      preview: text.slice(0, maxChars),
+      collapsible: true,
+    };
+  }
+
+  return { preview: text, collapsible: false };
 };
 
 // ── ANSI / error tags ──

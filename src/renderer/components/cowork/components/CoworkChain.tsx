@@ -8,6 +8,7 @@ import {
   ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
 } from '@shared/components/ai-elements/chain-of-thought';
+import { ToolOutput } from '@shared/components/ai-elements/tool';
 import { BrainIcon, CheckCircleIcon, SparklesIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import React from 'react';
@@ -15,8 +16,7 @@ import React from 'react';
 import { i18nService } from '../../../services/i18n';
 import type { CoworkMessage } from '../../../types/cowork';
 import type { AssistantTurnItem } from '../helpers/messageGrouping';
-import { getToolResultLineCount } from '../helpers/messageGrouping';
-import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
+import { collapseToolText, getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { ToolCard } from './ToolCard';
 
 // ── helpers ──
@@ -93,7 +93,7 @@ export const CoworkChain: React.FC<{
     <>
       <ChainOfThought defaultOpen={false}>
         <ChainOfThoughtHeader icon={SparklesIcon}>
-          {`工作过程 (${stepCount} 步)`}
+          {`${i18nService.t('reasoning')} (${stepCount})`}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
           {items.map(item => {
@@ -105,11 +105,11 @@ export const CoworkChain: React.FC<{
                 <ChainOfThoughtStep
                   key={msg.id}
                   icon={BrainIcon}
-                  label="思考分析"
+                  label={i18nService.t('reasoning')}
                   status="complete"
                 >
                   {hasText(text) && (
-                    <div className="text-xs text-muted-foreground whitespace-pre-wrap max-h-48 overflow-y-auto rounded bg-muted/50 p-2">
+                    <div className="theme-reasoning-panel max-h-48 overflow-y-auto whitespace-pre-wrap">
                       {text}
                     </div>
                   )}
@@ -120,37 +120,27 @@ export const CoworkChain: React.FC<{
             // ── Orphan tool result: render as step with the execution output ──
             if (item.type === 'tool_result') {
               const msg = item.message;
-              const display = mapDisplayText
+              const rawDisplay = mapDisplayText
                 ? mapDisplayText(getToolResultDisplay(msg))
                 : getToolResultDisplay(msg);
-              const lineCount = getToolResultLineCount(display);
+              const display = collapseToolText(rawDisplay).preview;
               const isError = Boolean(msg.metadata?.isError || msg.metadata?.error);
               const label = isError
-                ? i18nService.t('coworkToolNoErrorDetail')
+                ? i18nService.t('codingAgentToolFailed')
                 : i18nService.t('coworkToolResult');
-              const desc =
-                lineCount > 0
-                  ? `${lineCount} ${lineCount === 1 ? 'line' : 'lines'} of output`
-                  : undefined;
 
               return (
                 <ChainOfThoughtStep
                   key={msg.id}
                   icon={CheckCircleIcon}
                   label={label}
-                  description={desc}
                   status="complete"
                 >
                   {hasText(display) && (
-                    <div className="mt-1 px-3 py-2 rounded-lg bg-surface-raised max-h-64 overflow-y-auto">
-                      <pre
-                        className={`text-xs whitespace-pre-wrap wrap-break-word font-mono ${
-                          isError ? 'text-destructive' : 'text-foreground'
-                        }`}
-                      >
-                        {display}
-                      </pre>
-                    </div>
+                    <ToolOutput
+                      output={isError ? undefined : display}
+                      errorText={isError ? display : undefined}
+                    />
                   )}
                 </ChainOfThoughtStep>
               );

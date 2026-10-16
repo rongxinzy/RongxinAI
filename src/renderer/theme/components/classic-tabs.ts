@@ -2,7 +2,7 @@ import { recipe } from './recipe';
 export function classicTabs(dark: boolean) {
   const clear = { 'background-color': 'transparent', 'box-shadow': 'none' };
   const transition = {
-    'transition-property': 'all',
+    'transition-property': 'color, background-color, border-color, box-shadow',
     'transition-duration': '150ms',
     'transition-timing-function': 'cubic-bezier(0.4, 0, 0.2, 1)',
   };

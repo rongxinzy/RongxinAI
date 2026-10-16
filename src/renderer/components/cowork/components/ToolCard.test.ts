@@ -163,3 +163,13 @@ test('opens approval details and sends the original input when allowed', () => {
     updatedInput: input,
   });
 });
+
+test('caps single-line oversized tool output by character limit until expanded', () => {
+  setPersistentToggleNamespace('single-line-huge');
+  const hugeLine = `${'a'.repeat(12_000)}TAIL_MARKER`;
+  render(createElement(ToolCard, { group: group('huge-line', hugeLine) }));
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.queryByText(/TAIL_MARKER/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: i18nService.t('coworkToolResultShowAll') }));
+  expect(screen.getByText(/TAIL_MARKER/)).toBeVisible();
+});

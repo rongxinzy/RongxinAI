@@ -35,7 +35,7 @@ import type { AssistantTurnItem, ConversationTurn } from '../helpers/messageGrou
 import { getVisibleAssistantItems } from '../helpers/messageGrouping';
 import { findToolGroupForPermission } from '../helpers/toolPermissionMatch';
 import { getThinkingPresentation } from '../helpers/thinkingPresentation';
-import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
+import { collapseToolText, getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
 import { CopyButton } from './CopyButton';
 import { PersistentReasoning } from './PersistentCollapsible';
@@ -206,6 +206,7 @@ const TurnBlockComponent: React.FC<{
           isStreaming={isStreaming}
           defaultOpen={isStreaming}
           autoClose={false}
+          showConnector
           duration={durationSeconds}
         >
           <ReasoningTrigger
@@ -251,7 +252,8 @@ const TurnBlockComponent: React.FC<{
     }
     if (item.type === CoworkMessageType.ToolResult) {
       const raw = getToolResultDisplay(item.message);
-      const content = mapDisplayText ? mapDisplayText(raw) : raw;
+      const fullContent = mapDisplayText ? mapDisplayText(raw) : raw;
+      const content = expandToolResults ? fullContent : collapseToolText(fullContent).preview;
       const isError = Boolean(item.message.metadata?.isError || item.message.metadata?.error);
       return (
         <ToolOutput

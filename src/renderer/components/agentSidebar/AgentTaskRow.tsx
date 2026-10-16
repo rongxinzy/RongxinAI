@@ -161,10 +161,10 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
           )}
           {hasPendingPermission && (
             <span
-              className="absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
+              className="theme-sidebar-approval absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
               title={i18nService.t('workbenchTaskStatusWaitingApproval')}
             >
-              <Loader className="size-3 animate-spin text-success [animation-duration:1.8s]" />
+              <Loader className="size-3 animate-spin" />
             </span>
           )}
           {!hasPendingPermission && isRunning && (

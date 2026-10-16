@@ -1,3 +1,4 @@
+import { getPersistentToggleValue } from '../hooks/usePersistentToggle';
 import type { ConversationTurn } from './messageGrouping';
 
 const DEFAULT_TURN_HEIGHT_PX = 300;
@@ -7,6 +8,7 @@ const APPROXIMATE_UNITS_PER_LINE = 72;
 const MAX_ESTIMATED_TEXT_LINES = 800;
 const TOOL_GROUP_HEIGHT_PX = 84;
 const THINKING_ESTIMATED_HEIGHT_PX = 44;
+const THINKING_MAX_CONTENT_HEIGHT_PX = 256;
 const SYSTEM_MESSAGE_HEIGHT_PX = 52;
 const MIN_TURN_HEIGHT_PX = 180;
 const MAX_TURN_HEIGHT_PX = 18_000;
@@ -47,7 +49,16 @@ export const estimateConversationTurnHeight = (turn: ConversationTurn): number =
     } else if (item.type === 'system') {
       height += SYSTEM_MESSAGE_HEIGHT_PX;
     } else if (item.type === 'assistant' && item.message.metadata?.isThinking) {
-      height += THINKING_ESTIMATED_HEIGHT_PX;
+      const persistedOpen = getPersistentToggleValue(`reasoning-${item.message.id}`);
+      const isStreamingOpen =
+        Boolean(item.message.metadata?.isStreaming) &&
+        !item.message.metadata?.isFinal &&
+        Boolean(item.message.content.trim());
+      const isExpanded = persistedOpen ?? isStreamingOpen;
+      height += isExpanded
+        ? THINKING_ESTIMATED_HEIGHT_PX +
+          Math.min(THINKING_MAX_CONTENT_HEIGHT_PX, estimateTextHeight(item.message.content))
+        : THINKING_ESTIMATED_HEIGHT_PX;
     } else {
       height += estimateTextHeight(item.message.content);
     }
