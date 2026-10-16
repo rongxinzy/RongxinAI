@@ -63,7 +63,7 @@ export interface PiSession {
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
 
-export interface PiContentBlock {
+interface PiContentBlock {
   type: string;
   text?: string;
   thinking?: string;
@@ -333,7 +333,7 @@ export interface PiModelRuntime {
   ): Promise<PiBackgroundCompletionResult>;
 }
 
-export interface PiModelRuntimeCreateOptions {
+interface PiModelRuntimeCreateOptions {
   allowModelNetwork?: boolean;
 }
 

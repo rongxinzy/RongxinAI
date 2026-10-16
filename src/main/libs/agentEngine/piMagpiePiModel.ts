@@ -33,7 +33,7 @@ export function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
     : ModelCapabilityStatus.Unsupported;
 }
 
-export const MAGPIE_THINKING_LEVELS = [
+const MAGPIE_THINKING_LEVELS = [
   'off',
   'minimal',
   'low',
@@ -43,7 +43,7 @@ export const MAGPIE_THINKING_LEVELS = [
   'max',
 ] as const;
 
-export function buildMagpiePiModel(
+function buildMagpiePiModel(
   selected: MagpieModel,
   gatewayUrl: string,
   modelPoolRequestContext?: ModelPoolRequestContext,
