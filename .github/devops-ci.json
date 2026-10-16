@@ -3,6 +3,15 @@
     {
       "name": "Channel runtime smoke",
       "path": ".github/workflows/channel-runtime-smoke.yml",
+      "paths": [
+        "package.json",
+        "scripts/channel-runtime-*",
+        "scripts/download-channel-runtime.cjs",
+        "src/main/im/**",
+        "src/main/libs/ccConnect*",
+        "src/scheduledTask/ccConnect*",
+        ".github/workflows/channel-runtime-smoke.yml"
+      ],
       "branches": [
         "main"
       ]

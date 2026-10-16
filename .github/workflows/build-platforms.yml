@@ -80,6 +80,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
+      - name: Restore llama.cpp runtime
+        id: llama-runtime
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: restore
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
@@ -204,3 +209,10 @@ jobs:
             release/*.deb
             release/linux-render-smoke.png
           retention-days: 7
+      - name: Save llama.cpp runtime
+        if: success()
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: save
+          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
+          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
