@@ -7,51 +7,45 @@
 
 <h1 align="center">ZhiYuan Agent</h1>
 
-<p align="center"><strong>Give AI a task. Get work done on your computer.</strong></p>
-<p align="center">Open source · Local first · Files and browser tools · Local models · Reusable workflows</p>
+<p align="center"><strong>The open-source, local-first desktop AI agent — start free with a built-in model, run GGUF models locally, and assign tasks from WeChat, Feishu or DingTalk.</strong></p>
 
 <p align="center">
-  <a href="https://www.rongxzyai.com/#download">Download</a> ·
-  <a href="#get-started">Get started</a> ·
-  <a href="#developer-quick-start">Develop locally</a> ·
-  <a href="https://github.com/rongxinzy/RongxinAI/issues">Report an issue</a> ·
+  <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat&logo=github" alt="Stars"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/v/release/rongxinzy/RongxinAI?include_prereleases" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rongxinzy/RongxinAI" alt="AGPL-3.0"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&label=CI" alt="CI"></a>
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platforms">
+</p>
+
+<p align="center">
+  <a href="https://www.rongxzyai.com/#download"><b>⬇️ Download</b></a> ·
+  <a href="#get-started">Quick start</a> ·
+  <a href="#developer-quick-start">Build from source</a> ·
   <a href="README_zh.md">中文</a>
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"></a>
-  <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&amp;label=CI" alt="CI"></a>
-  <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat" alt="GitHub Stars"></a>
+  <img src="public/readme/zhiyuan-ppt-demo.gif" alt="ZhiYuan creating a presentation from a natural-language task" width="960">
 </p>
 
-ZhiYuan Agent is a desktop AI workspace from Beijing Rongxin Zhiyuan, maintained by Li Keran. Use it to organize research, create documents, analyze spreadsheets, work on code, or run recurring tasks. The agent can read and write files, run commands, and operate a browser while showing messages, tool activity, and results.
+## Why ZhiYuan
 
-<p align="center">
-  <img src="public/readme/zhiyuan-ppt-demo.gif" alt="A recording of ZhiYuan creating a presentation from a natural-language task" width="960">
-</p>
-<p align="center"><sub>From a task description to a presentation, with visible progress and generated files.</sub></p>
-
-## What you can do
-
-| Task | Workflow |
-| --- | --- |
-| Research | Search the web, read local material, and organize findings with sources |
-| Documents and data | Create presentations, work with Word, PDF, and Excel, and produce files from analysis |
-| Code | Select a project directory, explore a repository, edit code, run commands, and inspect artifacts |
-| Everyday work | Track work in Todos and schedule briefings, reports, and other recurring tasks |
-| Browser tasks | Find information and operate web pages while following the agent's progress |
-| Messaging | Connect WeChat, WeCom, DingTalk, Feishu/Lark, QQ, or email to use the agent through configured channels |
-
-Experts provide presets for specific kinds of work. Skills package reusable methods and tools. MCP connects external services. Start with the bundled integrations and extend the workflows you need.
+- 🆓 **Free to start** — built-in ZhiYuan free model, no third-party API key needed (network required; limits shown in app). Bring your own provider anytime.
+- 💻 **Runs local models** — browse a model marketplace, pick a GGUF model & quantization, tune context / GPU / threads, powered by llama.cpp runtime.
+- 🛠️ **Actually does the work** — reads & writes files, runs commands, operates a browser; creates PPT, Word, PDF, Excel outputs.
+- 💬 **Lives in your chat apps** — WeChat, WeCom, DingTalk, Feishu/Lark, QQ, email.
+- 🧩 **Extensible** — Experts, Skills and MCP; scheduled recurring tasks.
+- 🔒 **Local first** — sessions, config and task metadata stored locally; approval modes for tool execution.
 
 ## Get started
 
-1. Choose an installer for your system on the [official website](https://www.rongxzyai.com/#download). Release history and attached downloads are also available in [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases).
-2. Open the app and start with the **built-in ZhiYuan free model**, without entering a third-party API key. You can also configure your own provider in model settings.
-3. For local files or code, select a project directory, describe the task, and attach any relevant material.
-4. Follow the progress, respond to approval requests, inspect the output, and continue with feedback.
+1. **Download** the installer from the [official website](https://www.rongxzyai.com/#download) or [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases). GitHub Releases currently ships a **Windows** installer; macOS and Linux packages are unconfirmed—check the download page.
+2. **Open the app** and chat with the built-in free model — no API key required.
+3. **Pick a project folder**, describe your task, then follow progress and approve actions as it works.
 
-The free model requires a network connection; availability and usage limits are shown in the app. The desktop project supports macOS, Windows, and Linux. Check the download page for available installers and architectures, or [run from source](#developer-quick-start).
+Developers: `git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent && cd ZhiYuanAgent && bun install && bun run electron:dev` (Node 24.x, Bun 1.4.0). See [Developer quick start](#developer-quick-start) for prerequisites and more commands.
+
+The free model requires a network connection; availability and usage limits are shown in the app. You can also [run from source](#developer-quick-start) on other platforms.
 
 ### Use local models
 
@@ -64,6 +58,29 @@ Local models reduce reliance on cloud inference. Web search, model downloads, re
 Sessions, configuration, and task metadata are stored locally. The desktop execution environment accesses local files. When you use a cloud model or remote tool, the content needed for that request is sent to the corresponding service.
 
 Tool execution follows the selected permission mode. Operations requiring approval display a request; automatic authorization allows some operations to run directly. Progress and results remain visible in the workspace.
+
+## How it compares
+
+| | ZhiYuan | Manus | Claude Desktop | Cherry Studio | Open Interpreter |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| Assign tasks from WeChat / Feishu / DingTalk | ✅ (also WeCom, QQ, email) | ❌ (Slack, Gmail connectors) | ❌ (Slack connector) | ❌ | ❌ |
+| Open-source desktop app | ✅ AGPL-3.0 | ❌ closed source | ❌ closed source | ✅ AGPL-3.0 | ❌ Apache-2.0 terminal app; GUI is a separate project |
+| Built-in GGUF model market (no Ollama needed) | ✅ llama.cpp runtime | ❌ cloud only | ❌ cloud only | ❌ via Ollama / LM Studio | ❌ via Ollama / LM Studio |
+| Free model + local model + fully open source | ✅ all three | ❌ free tier only (300 credits/day) | ❌ free tier only | ✅ CherryAI free (Qwen3-8B) + Ollama/LM Studio | ❌ no built-in free model |
+| Agent: files + commands + browser | ✅ | ✅ | ✅ paid plans only (Cowork) | ? | ✅ (browser via QA skill) |
+
+---
+
+<p align="center">⭐ <b>If ZhiYuan helps you, please star the repo</b> — it helps more people find it and keeps us shipping.</p>
+
+## Star History
+
+<a href="https://star-history.com/#rongxinzy/RongxinAI&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rongxinzy/RongxinAI&type=Date&theme=dark">
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rongxinzy/RongxinAI&type=Date">
+  </picture>
+</a>
 
 ## Choose your workspace appearance
 
