@@ -53,9 +53,9 @@ export function defineThemePlugins(plugins: ThemePlugin[]): ThemePlugin[] {
   return plugins;
 }
 
-/** 
+/**
  * Zenith - Premium Futuristic Design System
- * 
+ *
  * Consolidated to a single world-class theme pair for stronger brand identity.
  * Traditional themes (Daming, Changan, Weiyang, Xiaoruan) removed to focus on
  * premium, tech-forward aesthetic.

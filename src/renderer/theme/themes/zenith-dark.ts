@@ -4,7 +4,7 @@ import type { ThemeDefinition } from './types';
 
 /**
  * Zenith Dark - Premium Futuristic Design
- * 
+ *
  * Philosophy: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
  * Features: Glassmorphism, generous spacing, fluid motion, luminous gradients
  */
@@ -85,22 +85,15 @@ export const zenithDark: ThemeDefinition = {
     // ── Shadows (Multi-layer with colored glow) ──
     'style-shadow-xs': '0 1px 2px rgba(0, 0, 0, 0.4)',
     'style-shadow-sm': '0 2px 4px rgba(0, 0, 0, 0.5), 0 0 16px rgba(96, 165, 250, 0.08)',
-    'style-shadow-md':
-      '0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12)',
-    'style-shadow-lg':
-      '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16)',
-    'style-shadow-xl':
-      '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24)',
-    'style-shadow-2xl':
-      '0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20)',
+    'style-shadow-md': '0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12)',
+    'style-shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16)',
+    'style-shadow-xl': '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24)',
+    'style-shadow-2xl': '0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20)',
     'style-shadow-subtle': '0 1px 3px rgba(0, 0, 0, 0.5)',
     'style-shadow-card': '0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12)',
-    'style-shadow-elevated':
-      '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16)',
-    'style-shadow-modal':
-      '0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20)',
-    'style-shadow-popover':
-      '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24)',
+    'style-shadow-elevated': '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16)',
+    'style-shadow-modal': '0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20)',
+    'style-shadow-popover': '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24)',
     'style-shadow-glow-accent': '0 0 48px rgba(96, 165, 250, 0.4)',
     'style-shadow-inset': 'inset 0 2px 4px rgba(0, 0, 0, 0.3)',
 
