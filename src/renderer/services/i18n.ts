@@ -1586,8 +1586,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkAgentEngineClaudeLegacy: 'Cowork',
     coworkAgentEngineClaudeLegacyHint: '内置引擎，开箱即用，推荐作为日常任务主引擎。',
     coworkMemoryTitle: '记忆',
-    coworkMemoryEnabled: '启用用户记忆',
-    coworkMemoryEnabledHint: 'Agent 引擎会自动索引 MEMORY.md 文件，为 Agent 提供长期记忆检索。',
     coworkMemoryFilePath: '记忆文件路径',
     coworkMemoryLlmJudgeEnabled: '启用 LLM 二级判定',
     coworkMemoryLlmJudgeEnabledHint:
@@ -5394,9 +5392,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkAgentEngineClaudeLegacyHint:
       'Built-in engine, ready out of the box, recommended for daily tasks.',
     coworkMemoryTitle: 'Memory',
-    coworkMemoryEnabled: 'Enable user memories',
-    coworkMemoryEnabledHint:
-      'Agent engine automatically indexes MEMORY.md for long-term memory retrieval by the Agent.',
     coworkMemoryFilePath: 'Memory file path',
     coworkMemoryLlmJudgeEnabled: 'Enable LLM secondary judge',
     coworkMemoryLlmJudgeEnabledHint:
