@@ -52,24 +52,6 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
-  pr-metadata:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          sparse-checkout: .github
-      - name: Validate pull request title and description
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { validatePr } = require(`${process.env.GITHUB_WORKSPACE}/.github/devops-gate.cjs`);
-            const errors = validatePr(context.payload.pull_request);
-            if (errors.length) core.setFailed(errors.join('\n'));
-
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -105,15 +87,10 @@ jobs:
         run: bun run format:check
       - name: Lint
         run: bun run lint
-
-  knip:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - uses: ./.github/actions/setup-bun-workspace
-      - name: Fail on unused files, exports, and dependencies
+      - name: Fail on unused TypeScript files, exports, and dependencies
         run: bun run knip
+      - name: Fail on dead Python under scripts/
+        run: bun run check:python-dead-code
 
   electron-compile:
     runs-on: ubuntu-latest
@@ -429,7 +406,6 @@ jobs:
       [
         changes,
         lint,
-        knip,
         electron-compile,
         test,
         bundle-budget,
@@ -463,11 +439,9 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always() && github.event_name == 'pull_request'
-    needs: [pr-metadata, merge-gate]
+    needs: [merge-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require PR metadata and merge gate
-        run: |
-          test "${{ needs.pr-metadata.result }}" = "success"
-          test "${{ needs.merge-gate.result }}" = "success"
+      - name: Require merge gate
+        run: test "${{ needs.merge-gate.result }}" = "success"

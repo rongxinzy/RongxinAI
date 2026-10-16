@@ -58,21 +58,6 @@ const config: KnipConfig = {
         'tests/**/*.{js,mjs,cjs,jsx,ts,tsx}',
         'electron-builder*.cjs',
       ],
-      ignore: [
-        // Temporary: Magpie gateway refactor (agent bc-84727bff) is editing the
-        // Pi proxy/adapter and claudeSettings files. Do not report or delete
-        // from them until that work lands.
-        'src/main/libs/agentEngine/piRuntimeAdapter.ts',
-        'src/main/libs/agentEngine/piRuntimeAdapter.*.ts',
-        'src/main/libs/agentEngine/piManagedModelProxy.ts',
-        'src/main/libs/agentEngine/piManagedModelProxy.test.ts',
-        'src/main/libs/agentEngine/piOpenAICompatProxy.ts',
-        'src/main/libs/agentEngine/piOpenAICompatProxy.test.ts',
-        'src/main/libs/agentEngine/mcpPiAdapter.ts',
-        'src/main/libs/agentEngine/mcpPiAdapter.test.ts',
-        'src/main/libs/claudeSettings.ts',
-        'src/main/libs/claudeSettings.*.ts',
-      ],
     },
     enterprise: {
       // Separate tsconfig: `@/*` maps to enterprise/src/ui, not the renderer.

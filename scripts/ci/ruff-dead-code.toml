@@ -1,0 +1,4 @@
+# Repository Python under scripts/ only. Skill and MCP Python is invoked by name from SKILL.md.
+target-version = "py312"
+[lint]
+select = ["F401", "F841", "F821"]

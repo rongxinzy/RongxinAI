@@ -20,7 +20,6 @@ export const HeavyJob = {
 export const BaselineJob = {
   Changes: 'changes',
   ElectronCompile: 'electron-compile',
-  Knip: 'knip',
   Lint: 'lint',
   Test: 'test',
   Bundle: 'bundle-budget',
