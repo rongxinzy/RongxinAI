@@ -124,9 +124,14 @@ checkFile('vite.config.ts', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 
 for (const workflowFile of workflowFiles) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
-  if (
-    /repository:\s*rongxinzy\/pi-connect|actions\/setup-go|ZHIYUAN_CC_CONNECT_SOURCE/.test(content)
-  ) {
+  // pi-connect sidecars must come from package.json channelRuntime assets, not source builds.
+  // Magpie (#1021) is built from pinned yetone/magpie via magpie:build; setup-go is allowed
+  // only when the workflow also runs that script (not for pi-connect checkout builds).
+  const buildsPiConnectFromSource =
+    /repository:\s*rongxinzy\/pi-connect|ZHIYUAN_CC_CONNECT_SOURCE/.test(content);
+  const setupGoWithoutMagpieBuild =
+    /actions\/setup-go/.test(content) && !/magpie:build/.test(content);
+  if (buildsPiConnectFromSource || setupGoWithoutMagpieBuild) {
     failures.push(
       `${workflowFile} must consume the published channel runtime, not pi-connect source`,
     );

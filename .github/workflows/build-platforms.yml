@@ -127,8 +127,6 @@ jobs:
         with:
           path: .cache/magpie
           key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go1.26.8-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-          restore-keys: |
-            magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go1.26.8-
       - name: Build and verify Magpie runtime
         shell: bash
         env:
