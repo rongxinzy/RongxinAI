@@ -3,28 +3,12 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
-import { Button } from '@shared/components/ui/button';
-import { Download, Image as ImageIcon } from 'lucide-react';
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
-import { resolveArtifactPath } from '../../../shared/cowork/artifactPath';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
-import { ArtifactDetectionService } from '../../services/artifactDetectionService';
-import type { DetectedArtifact } from '../../services/artifactParser';
-import {
-  openAvailableArtifact,
-  prepareAvailableArtifacts,
-} from '../../services/artifactAvailability';
-import {
-  detectArtifactsFromMessages,
-  getArtifactTypeFromExtension,
-  normalizeFilePathForDedup,
-} from '../../services/artifactParser';
-import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
 import {
@@ -36,21 +20,16 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import {
-  addArtifact,
-  activateSessionArtifactView,
   ArtifactLayoutMode,
   closePanel,
-  DEFAULT_PANEL_WIDTH,
-  MIN_PANEL_WIDTH,
   EMPTY_ARTIFACTS,
-  selectArtifact,
+  MIN_PANEL_WIDTH,
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
-import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
@@ -60,45 +39,27 @@ import type {
   CoworkPermissionRequest,
   CoworkPermissionResult,
 } from '../../types/cowork';
-import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import {
   VirtualizedTurnList,
   type VirtualizedTurnListHandle,
 } from './components/VirtualizedTurnList';
-import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import { CoworkConversationLoadingSkeleton } from './CoworkSessionLoadingState';
 import { CoworkSessionLayout } from './CoworkSessionLayout';
 import PendingMessageQueue from './PendingMessageQueue';
-import type { CaptureRect } from './helpers/exportUtils';
-import {
-  composeExportCanvas,
-  domRectToCaptureRect,
-  formatExportTimestamp,
-  loadImageFromBase64,
-  MAX_EXPORT_CANVAS_HEIGHT,
-  MAX_EXPORT_SEGMENTS,
-  sanitizeExportFileName,
-  waitForNextFrame,
-} from './helpers/exportUtils';
 import {
   buildConversationTurns,
   buildDisplayItems,
   hasActiveTurnStreamingContent,
 } from './helpers/messageGrouping';
+import { resolveLocalFilePath } from './helpers/pathUtils';
 import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
 import { usePersistedArtifactSeed } from './helpers/usePersistedArtifactSeed';
 import { resolveStableSessionKey, setPersistentToggleNamespace } from './hooks/usePersistentToggle';
-// toolUtils helpers used in sub-components
-import {
-  normalizeLocalPath,
-  parseRootRelativePath,
-  toAbsolutePathFromCwd,
-} from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
 import {
@@ -109,12 +70,12 @@ import AskUserQuestionCard from './AskUserQuestionCard';
 import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
 import { CoworkRunStatus } from './components/CoworkRunStatus';
-
-// The artifact panel only mounts when the user opens it, so keep its code
-// (and the whole renderers tree behind it) out of the cowork startup chunk.
-const ArtifactPanelFrame = React.lazy(() =>
-  import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
-);
+import { SessionArtifactPanelRegion } from './sessionDetail/SessionArtifactPanelRegion';
+import { SessionExportDialog } from './sessionDetail/SessionExportDialog';
+import { useArtifactLinkInterception } from './sessionDetail/useArtifactLinkInterception';
+import { useArtifactPanelPresentation } from './sessionDetail/useArtifactPanelPresentation';
+import { useSessionArtifactDetection } from './sessionDetail/useSessionArtifactDetection';
+import { useSessionExport } from './sessionDetail/useSessionExport';
 
 interface CoworkSessionDetailProps {
   displayedSessionId?: string;
@@ -145,46 +106,6 @@ interface CoworkSessionDetailProps {
   resumeDisabled?: boolean;
   onResumeTask?: (interruption: CoworkSessionInterruption) => void;
   onCancelTaskResume?: () => void;
-}
-
-const ARTIFACT_PANEL_TRANSITION_MS = 200;
-class ArtifactPanelErrorBoundary extends React.Component<
-  { children: React.ReactNode; onClose: () => void },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode; onClose: () => void }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: Error) {
-    console.error('[ArtifactPanel] render error:', error);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <aside className="w-[420px] shrink-0 border-l border-border-subtle bg-background flex flex-col h-full items-center justify-center p-4">
-          <p className="text-sm text-destructive mb-2">Artifact panel error</p>
-          <pre className="text-xs text-muted whitespace-pre-wrap max-w-full overflow-auto mb-3">
-            {this.state.error?.message}
-          </pre>
-          <Button
-            variant="secondary"
-            size="xs"
-            onClick={() => {
-              this.setState({ hasError: false, error: null });
-              this.props.onClose();
-            }}
-          >
-            Close
-          </Button>
-        </aside>
-      );
-    }
-    return this.props.children;
-  }
 }
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
@@ -236,11 +157,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   const virtualizedTurnListRef = useRef<VirtualizedTurnListHandle>(null);
 
-  // Export states
-  const [isExportingImage, setIsExportingImage] = useState(false);
-  const [showExportOptions, setShowExportOptions] = useState(false);
+  // ─── Export ─────────────────────────────────────────────────────────
+  const {
+    isExportingImage,
+    showExportOptions,
+    setShowExportOptions,
+    handleExportText,
+    handleShareClick,
+  } = useSessionExport({ currentSession, scrollContainerRef });
 
-  // ─── Artifact detection ─────────────────────────────────────────────
+  // ─── Artifact panel ─────────────────────────────────────────────────
   const isPanelOpen = useSelector((state: RootState) =>
     selectIsSessionArtifactPanelOpen(state, sessionId),
   );
@@ -248,186 +174,30 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     selectSessionArtifactLayoutMode(state, sessionId),
   );
   const isArtifactWorkspace = artifactLayoutMode === ArtifactLayoutMode.Workspace;
-  const [shouldRenderArtifactPanel, setShouldRenderArtifactPanel] = useState(isPanelOpen);
-  const [isArtifactPanelVisible, setIsArtifactPanelVisible] = useState(isPanelOpen);
-  const [isArtifactPanelTransitioning, setIsArtifactPanelTransitioning] = useState(false);
-  const [previewSessionId, setPreviewSessionId] = useState<string | null>(() =>
-    isPanelOpen ? (sessionId ?? null) : null,
-  );
-  const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
-    typeof window === 'undefined'
-      ? DEFAULT_PANEL_WIDTH
-      : resolveArtifactPanelMaxWidth(Math.max(MIN_PANEL_WIDTH, window.innerWidth), MIN_PANEL_WIDTH),
-  );
-  const previousArtifactPanelOpenRef = useRef(isPanelOpen);
-  const previousArtifactSessionIdRef = useRef(sessionId);
-  const skipArtifactPanelTransitionRef = useRef(false);
   const contentRowRef = useRef<HTMLDivElement>(null);
   const sessionArtifacts = useSelector((state: RootState) =>
     sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS,
   );
+
+  const {
+    shouldRenderArtifactPanel,
+    isArtifactPanelVisible,
+    isArtifactPanelTransitioning,
+    previewSessionId,
+    artifactPanelMaxWidth,
+  } = useArtifactPanelPresentation({ isPanelOpen, sessionId, contentRowRef });
+
   const previewArtifacts = useSelector((state: RootState) =>
     previewSessionId ? selectSessionArtifacts(state, previewSessionId) : EMPTY_ARTIFACTS,
   );
 
-  const artifactDetectionServiceRef = useRef<ArtifactDetectionService | null>(null);
-  // Whether this session produced anything while we were watching it. Revealing the
-  // artifact panel is a live-delivery signal: opening an old session must not pop
-  // the panel for artifacts it already had.
-  const liveRunRef = useRef(false);
-  const isStreamingRef = useRef(isStreaming);
-  const detectionQueueRef = useRef<Promise<void>>(Promise.resolve());
-  useEffect(() => {
-    isStreamingRef.current = isStreaming;
-    // Sticky on purpose: detection runs once the run has settled, so liveness has
-    // to outlive the streaming flag.
-    if (isStreaming) liveRunRef.current = true;
-  }, [isStreaming]);
-  // A session that is already streaming has no transition to observe, so liveness
-  // follows the current streaming state on every session switch.
-  useEffect(() => {
-    liveRunRef.current = isStreamingRef.current;
-  }, [sessionId]);
-
-  // Adds a detection batch, revealing only the artifacts the agent declared as
-  // deliverables during a live run and whose file is actually readable. The
-  // readability probe runs for the whole batch before anything is dispatched, so
-  // insertion order (and therefore "newest deliverable wins") never depends on
-  // which file happened to be read first.
-  const addDetectedArtifacts = useCallback(
-    async (detected: DetectedArtifact[]) => {
-      const targetSessionId = sessionId;
-      if (!targetSessionId) return;
-
-      const available = await prepareAvailableArtifacts(
-        detected,
-        liveRunRef.current,
-        currentSession?.cwd,
-      );
-
-      available.forEach(({ artifact, reveal }) => {
-        dispatch(addArtifact({ sessionId: targetSessionId, artifact, reveal }));
-      });
-    },
-    [dispatch, sessionId, currentSession?.cwd],
-  );
-
-  // Initialize/replace artifact detection service when session changes
-  useEffect(() => {
-    if (!sessionId) {
-      artifactDetectionServiceRef.current?.terminate();
-      artifactDetectionServiceRef.current = null;
-      return undefined;
-    }
-
-    const service = new ArtifactDetectionService(detected => {
-      // Batches must land in detection order: a slow readability probe in an older
-      // batch must not settle the selection after a newer batch was added.
-      detectionQueueRef.current = detectionQueueRef.current
-        .then(() => addDetectedArtifacts(detected))
-        .catch(error => {
-          console.error('[ArtifactDetection] failed to add detected artifacts:', error);
-        });
-    });
-    artifactDetectionServiceRef.current = service;
-
-    return () => {
-      service.terminate();
-    };
-  }, [sessionId, dispatch, addDetectedArtifacts]);
-
-  useEffect(() => {
-    let animationFrame: number | undefined;
-    let transitionTimeout: number | undefined;
-    const wasOpen = previousArtifactPanelOpenRef.current;
-
-    previousArtifactPanelOpenRef.current = isPanelOpen;
-
-    if (skipArtifactPanelTransitionRef.current) {
-      skipArtifactPanelTransitionRef.current = false;
-      setShouldRenderArtifactPanel(isPanelOpen);
-      setIsArtifactPanelVisible(isPanelOpen);
-      setIsArtifactPanelTransitioning(false);
-      return undefined;
-    }
-
-    if (wasOpen === isPanelOpen) {
-      return undefined;
-    }
-
-    if (isPanelOpen) {
-      setShouldRenderArtifactPanel(true);
-      setIsArtifactPanelVisible(false);
-      setIsArtifactPanelTransitioning(true);
-      animationFrame = window.requestAnimationFrame(() => {
-        animationFrame = window.requestAnimationFrame(() => {
-          setIsArtifactPanelVisible(true);
-          transitionTimeout = window.setTimeout(() => {
-            setIsArtifactPanelTransitioning(false);
-          }, ARTIFACT_PANEL_TRANSITION_MS);
-        });
-      });
-    } else {
-      setIsArtifactPanelTransitioning(true);
-      setIsArtifactPanelVisible(false);
-      transitionTimeout = window.setTimeout(() => {
-        setShouldRenderArtifactPanel(false);
-        setPreviewSessionId(null);
-        setIsArtifactPanelTransitioning(false);
-      }, ARTIFACT_PANEL_TRANSITION_MS);
-    }
-
-    return () => {
-      if (animationFrame !== undefined) {
-        window.cancelAnimationFrame(animationFrame);
-      }
-      if (transitionTimeout !== undefined) {
-        window.clearTimeout(transitionTimeout);
-      }
-    };
-  }, [isPanelOpen]);
-
-  const updateArtifactPanelMaxWidth = useCallback(() => {
-    const contentWidth = contentRowRef.current?.clientWidth ?? 0;
-    if (contentWidth <= 0) return;
-    const nextMaxWidth = resolveArtifactPanelMaxWidth(contentWidth, MIN_PANEL_WIDTH);
-    setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
-  }, []);
-
-  // ResizeObserver must run in useEffect (async), NOT useLayoutEffect:
-  // useLayoutEffect flushes state updates synchronously — when the observed
-  // container resizes as a result of our own setState, the observer fires
-  // again before paint, forming a sync setState → DOM → observer → setState
-  // cycle that exhausts React's nested update limit.
-  useEffect(() => {
-    updateArtifactPanelMaxWidth();
-    const container = contentRowRef.current;
-
-    const resizeObserver = new ResizeObserver(updateArtifactPanelMaxWidth);
-    if (container) {
-      resizeObserver.observe(container);
-    }
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [currentSession?.id, updateArtifactPanelMaxWidth]);
-
-  useLayoutEffect(() => {
-    if (
-      previousArtifactSessionIdRef.current &&
-      previousArtifactSessionIdRef.current !== sessionId
-    ) {
-      skipArtifactPanelTransitionRef.current = true;
-    }
-    previousArtifactSessionIdRef.current = sessionId;
-    dispatch(activateSessionArtifactView(sessionId ?? null));
-  }, [sessionId, dispatch]);
-
-  useLayoutEffect(() => {
-    if (isPanelOpen && sessionId) {
-      setPreviewSessionId(sessionId);
-    }
-  }, [isPanelOpen, sessionId]);
+  useSessionArtifactDetection({ sessionId, currentSession, isStreaming, messagesLength });
+  useArtifactLinkInterception({
+    scrollContainerRef,
+    sessionId,
+    sessionArtifacts,
+    cwd: currentSession?.cwd,
+  });
 
   const pendingArtifacts = usePersistedArtifactSeed(
     sessionId,
@@ -436,457 +206,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     sessionArtifacts,
   );
 
-  // Synchronous artifact detection on session mount so artifact cards
-  // appear in the first-paint frame instead of popping in after the async
-  // Web Worker pass completes (which would change turn heights and jank).
-  useLayoutEffect(() => {
-    if (!sessionId || !currentSession?.messages?.length) return;
-    if (isStreaming) return;
-
-    const detected = detectArtifactsFromMessages(currentSession.messages, sessionId);
-    if (detected.length > 0) {
-      for (const { artifact } of detected) {
-        // Inline content is immediately available; file candidates use the validated worker batch.
-        if (artifact.filePath) continue;
-        dispatch(addArtifact({ sessionId, artifact }));
-      }
-      // The async useEffect pass below will also call processMessages.
-      // addArtifact is idempotent (merges by id / filePath).
-    }
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!sessionId || !currentSession?.messages?.length) return;
-    if (isStreaming) return;
-
-    const service = artifactDetectionServiceRef.current;
-    if (!service) return;
-
-    service.processMessages(currentSession.messages, sessionId).catch(err => {
-      console.error('[ArtifactDetection] failed:', err);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- message count and updatedAt cover message additions and content updates
-  }, [sessionId, messagesLength, currentSession?.updatedAt, isStreaming]);
-
-  // The session the registered document listeners belong to. A link probe that
-  // settles after a session switch (or after unmount) must not change the
-  // selection of a session the user has already left.
-  const artifactListenerSessionIdRef = useRef<string | null>(sessionId ?? null);
-  useEffect(() => {
-    artifactListenerSessionIdRef.current = sessionId ?? null;
-    return () => {
-      artifactListenerSessionIdRef.current = null;
-    };
-  }, [sessionId]);
-
-  // Intercept clicks on artifact-compatible file links → open in panel
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !sessionId) return;
-
-    const handleLinkClick = (e: MouseEvent) => {
-      const anchor = (e.target as HTMLElement).closest('a');
-      if (!anchor) return;
-
-      const href = anchor.getAttribute('href') || '';
-      if (!href.startsWith('file://')) return;
-
-      const filePath = resolveArtifactPath(href);
-
-      const lastDot = filePath.lastIndexOf('.');
-      if (lastDot === -1) return;
-      const ext = filePath.slice(lastDot).toLowerCase();
-      if (!getArtifactTypeFromExtension(ext)) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      const normalizedClick = normalizeFilePathForDedup(filePath);
-      const existing = sessionArtifacts.find(
-        a => a.filePath && normalizeFilePathForDedup(a.filePath) === normalizedClick,
-      );
-      if (existing) {
-        // The probe may settle after the user switched sessions; only a verdict for
-        // the session that registered this listener may change the selection.
-        void openAvailableArtifact(
-          existing,
-          () => dispatch(selectArtifact(existing.id)),
-          currentSession?.cwd,
-          { isCurrent: () => artifactListenerSessionIdRef.current === sessionId },
-        );
-      }
-      // No fallback creation — artifacts are now declared via declare_artifact tool,
-      // not created from ad-hoc link clicks or regex parsing.
-    };
-
-    container.addEventListener('click', handleLinkClick, true);
-    return () => container.removeEventListener('click', handleLinkClick, true);
-  }, [sessionId, sessionArtifacts, dispatch, currentSession?.cwd]);
-  // ─── End artifact detection ─────────────────────────────────────────
-
-  useEffect(() => {
-    const handleOpenShareOptions = (event: Event) => {
-      const detail = (event as CustomEvent<CoworkOpenShareOptionsEventDetail>).detail;
-      if (!detail?.sessionId || detail.sessionId !== currentSession?.id) return;
-      setShowExportOptions(true);
-    };
-
-    window.addEventListener(CoworkUiEvent.OpenShareOptions, handleOpenShareOptions);
-    return () => {
-      window.removeEventListener(CoworkUiEvent.OpenShareOptions, handleOpenShareOptions);
-    };
-  }, [currentSession?.id]);
-
-  const sessionToMarkdown = useCallback((): string => {
-    if (!currentSession) return '';
-    const lines: string[] = [];
-    lines.push(`# ${currentSession.title}`);
-    lines.push('');
-    lines.push(
-      `> ${i18nService.t('coworkExportCreatedAt')}: ${new Date(currentSession.createdAt).toLocaleString()}`,
-    );
-    lines.push('');
-    lines.push('---');
-    lines.push('');
-    for (const msg of currentSession.messages) {
-      if (msg.type === 'user') {
-        lines.push(`## 🧑 User`);
-        lines.push('');
-        lines.push(msg.content);
-        lines.push('');
-      } else if (msg.type === 'assistant') {
-        lines.push(`## 🤖 Assistant`);
-        lines.push('');
-        lines.push(msg.content);
-        lines.push('');
-      } else if (msg.type === 'tool_use' && msg.metadata?.toolName) {
-        lines.push(`### 🔧 Tool: ${msg.metadata.toolName}`);
-        lines.push('');
-        if (msg.metadata.toolInput) {
-          lines.push('```json');
-          lines.push(JSON.stringify(msg.metadata.toolInput, null, 2));
-          lines.push('```');
-          lines.push('');
-        }
-      } else if (msg.type === 'tool_result') {
-        lines.push('#### Tool Result');
-        lines.push('');
-        lines.push('```');
-        lines.push(
-          msg.content.slice(0, 2000) + (msg.content.length > 2000 ? '\n... (truncated)' : ''),
-        );
-        lines.push('```');
-        lines.push('');
-      }
-    }
-    return lines.join('\n');
-  }, [currentSession]);
-
-  const sessionToJSON = useCallback((): string => {
-    if (!currentSession) return '{}';
-    return JSON.stringify(
-      {
-        title: currentSession.title,
-        createdAt: new Date(currentSession.createdAt).toISOString(),
-        updatedAt: new Date(currentSession.updatedAt).toISOString(),
-        status: currentSession.status,
-        messages: currentSession.messages.map(msg => ({
-          type: msg.type,
-          content: msg.content,
-          timestamp: new Date(msg.timestamp).toISOString(),
-          ...(msg.metadata?.toolName ? { toolName: msg.metadata.toolName } : {}),
-          ...(msg.metadata?.toolInput ? { toolInput: msg.metadata.toolInput } : {}),
-        })),
-      },
-      null,
-      2,
-    );
-  }, [currentSession]);
-
-  const handleExportText = useCallback(
-    async (format: 'md' | 'json') => {
-      if (!currentSession) return;
-      const content = format === 'md' ? sessionToMarkdown() : sessionToJSON();
-      const timestamp = new Date().toISOString().slice(0, 10);
-      const fileName = sanitizeExportFileName(`${currentSession.title}-${timestamp}.${format}`);
-      try {
-        const result = await window.electron.cowork.exportSessionText({
-          content,
-          defaultFileName: fileName,
-          fileExtension: format,
-        });
-        if (result.success && !result.canceled) {
-          window.dispatchEvent(
-            new CustomEvent('app:showToast', {
-              detail: i18nService.t('coworkExportTextSuccess'),
-            }),
-          );
-        } else if (!result.success) {
-          throw new Error(result.error || 'Export failed');
-        }
-      } catch (error) {
-        console.error('Failed to export session text:', error);
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: i18nService.t('coworkExportTextFailed'),
-          }),
-        );
-      }
-    },
-    [currentSession, sessionToMarkdown, sessionToJSON],
-  );
-
-  const handleShareClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!currentSession || isExportingImage) return;
-    setIsExportingImage(true);
-
-    window.requestAnimationFrame(() => {
-      void (async () => {
-        try {
-          const scrollContainer = scrollContainerRef.current;
-          if (!scrollContainer) {
-            throw new Error('Capture target not found');
-          }
-          // Wait for React to commit `renderAll` / `forceExpand` and for lazy
-          // subtrees to settle their DOM height before measuring anchors.
-          await waitForNextFrame();
-          let previousHeight = -1;
-          let previousAnchorCount = -1;
-          for (let frame = 0; frame < 6; frame += 1) {
-            await waitForNextFrame();
-            const currentHeight = scrollContainer.scrollHeight;
-            const currentAnchorCount = scrollContainer.querySelectorAll(
-              '[data-export-role="user-message"], [data-export-role="assistant-block"]',
-            ).length;
-            if (
-              currentHeight === previousHeight &&
-              currentAnchorCount === previousAnchorCount &&
-              currentHeight > 0
-            ) {
-              break;
-            }
-            previousHeight = currentHeight;
-            previousAnchorCount = currentAnchorCount;
-          }
-          const initialScrollTop = scrollContainer.scrollTop;
-          try {
-            const scrollRect = domRectToCaptureRect(scrollContainer.getBoundingClientRect());
-            if (scrollRect.width <= 0 || scrollRect.height <= 0) {
-              throw new Error('Invalid capture area');
-            }
-
-            const scrollContentHeight = Math.max(
-              scrollContainer.scrollHeight,
-              scrollContainer.clientHeight,
-            );
-            if (scrollContentHeight <= 0) {
-              throw new Error('Invalid content height');
-            }
-
-            const toContentY = (viewportY: number): number => {
-              const y = scrollContainer.scrollTop + (viewportY - scrollRect.y);
-              return Math.max(0, Math.min(scrollContentHeight, y));
-            };
-
-            const userAnchors = scrollContainer.querySelectorAll<HTMLElement>(
-              '[data-export-role="user-message"]',
-            );
-            const assistantAnchors = scrollContainer.querySelectorAll<HTMLElement>(
-              '[data-export-role="assistant-block"]',
-            );
-
-            let contentStart = 0;
-            let contentEnd = scrollContentHeight;
-
-            if (userAnchors.length > 0) {
-              contentStart = toContentY(userAnchors[0].getBoundingClientRect().top);
-            } else if (assistantAnchors.length > 0) {
-              contentStart = toContentY(assistantAnchors[0].getBoundingClientRect().top);
-            }
-
-            if (assistantAnchors.length > 0) {
-              const lastAssistant = assistantAnchors[assistantAnchors.length - 1];
-              contentEnd = toContentY(lastAssistant.getBoundingClientRect().bottom);
-            } else if (userAnchors.length > 0) {
-              const lastUser = userAnchors[userAnchors.length - 1];
-              contentEnd = toContentY(lastUser.getBoundingClientRect().bottom);
-            }
-
-            const maxStart = Math.max(0, scrollContentHeight - 1);
-            contentStart = Math.max(0, Math.min(maxStart, Math.round(contentStart)));
-            contentEnd = Math.max(
-              contentStart + 1,
-              Math.min(scrollContentHeight, Math.round(contentEnd)),
-            );
-
-            const outputHeight = contentEnd - contentStart;
-
-            if (outputHeight > MAX_EXPORT_CANVAS_HEIGHT) {
-              throw new Error(`Export image is too tall (${outputHeight}px)`);
-            }
-
-            const segmentsEstimate = Math.ceil(outputHeight / Math.max(1, scrollRect.height)) + 1;
-            if (segmentsEstimate > MAX_EXPORT_SEGMENTS) {
-              throw new Error('Export image is too long');
-            }
-
-            const canvas = document.createElement('canvas');
-            canvas.width = scrollRect.width;
-            canvas.height = outputHeight;
-            const context = canvas.getContext('2d');
-            if (!context) {
-              throw new Error('Canvas context unavailable');
-            }
-
-            const captureAndLoad = async (rect: CaptureRect): Promise<HTMLImageElement> => {
-              const chunk = await coworkService.captureSessionImageChunk({ rect });
-              if (!chunk.success || !chunk.pngBase64) {
-                throw new Error(chunk.error || 'Failed to capture image chunk');
-              }
-              return loadImageFromBase64(chunk.pngBase64);
-            };
-
-            scrollContainer.scrollTop = Math.min(
-              contentStart,
-              Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight),
-            );
-            await waitForNextFrame();
-            await waitForNextFrame();
-
-            const maxScrollTop = Math.max(
-              0,
-              scrollContainer.scrollHeight - scrollContainer.clientHeight,
-            );
-            let contentOffset = contentStart;
-            while (contentOffset < contentEnd) {
-              const targetScrollTop = Math.min(contentOffset, maxScrollTop);
-              scrollContainer.scrollTop = targetScrollTop;
-              await waitForNextFrame();
-              await waitForNextFrame();
-
-              const chunkImage = await captureAndLoad(scrollRect);
-              const sourceYOffset = Math.max(0, contentOffset - targetScrollTop);
-              const drawableHeight = Math.min(
-                scrollRect.height - sourceYOffset,
-                contentEnd - contentOffset,
-              );
-              if (drawableHeight <= 0) {
-                throw new Error('Failed to stitch export image');
-              }
-              const scaleY = chunkImage.naturalHeight / scrollRect.height;
-              const sourceYInImage = Math.max(0, Math.round(sourceYOffset * scaleY));
-              const sourceHeightInImage = Math.max(
-                1,
-                Math.min(
-                  chunkImage.naturalHeight - sourceYInImage,
-                  Math.round(drawableHeight * scaleY),
-                ),
-              );
-
-              context.drawImage(
-                chunkImage,
-                0,
-                sourceYInImage,
-                chunkImage.naturalWidth,
-                sourceHeightInImage,
-                0,
-                contentOffset - contentStart,
-                scrollRect.width,
-                drawableHeight,
-              );
-
-              contentOffset += drawableHeight;
-            }
-
-            // Compose final canvas with branded header and footer
-            const finalCanvas = await composeExportCanvas(
-              canvas,
-              currentSession.title,
-              currentSession.createdAt,
-            );
-
-            const pngDataUrl = finalCanvas.toDataURL('image/png');
-            const base64Index = pngDataUrl.indexOf(',');
-            if (base64Index < 0) {
-              throw new Error('Failed to encode export image');
-            }
-
-            const timestamp = formatExportTimestamp(new Date());
-            const saveResult = await coworkService.saveSessionResultImage({
-              pngBase64: pngDataUrl.slice(base64Index + 1),
-              defaultFileName: sanitizeExportFileName(`${currentSession.title}-${timestamp}.png`),
-            });
-            if (saveResult.success && !saveResult.canceled) {
-              window.dispatchEvent(
-                new CustomEvent('app:showToast', {
-                  detail: i18nService.t('coworkExportImageSuccess'),
-                }),
-              );
-              return;
-            }
-            if (!saveResult.success) {
-              throw new Error(saveResult.error || 'Failed to export image');
-            }
-          } finally {
-            scrollContainer.scrollTop = initialScrollTop;
-          }
-        } catch (error) {
-          console.error('Failed to export session image:', error);
-          window.dispatchEvent(
-            new CustomEvent('app:showToast', {
-              detail: i18nService.t('coworkExportImageFailed'),
-            }),
-          );
-        } finally {
-          setIsExportingImage(false);
-        }
-      })();
-    });
-  };
-
   // lastMessageContent and messagesLength are now sourced from memoized
   // selectors (selectLastMessageContent / selectCurrentMessagesLength)
   // so there is no need to derive them from currentSession here.
 
-  const resolveLocalFilePath = useCallback(
-    (href: string, text: string) => {
-      const hrefValue = typeof href === 'string' ? href.trim() : '';
-      const textValue = typeof text === 'string' ? text.trim() : '';
-      if (!hrefValue && !textValue) return null;
-
-      const hrefRootRelative = hrefValue ? parseRootRelativePath(hrefValue) : null;
-      if (hrefRootRelative) {
-        return hrefRootRelative;
-      }
-
-      const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
-      if (hrefPath) {
-        if (hrefPath.isRelative && currentSession?.cwd) {
-          return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
-        }
-        if (hrefPath.isAbsolute) {
-          return hrefPath.path;
-        }
-      }
-
-      const textRootRelative = textValue ? parseRootRelativePath(textValue) : null;
-      if (textRootRelative) {
-        return textRootRelative;
-      }
-
-      const textPath = textValue ? normalizeLocalPath(textValue) : null;
-      if (textPath) {
-        if (textPath.isRelative && currentSession?.cwd) {
-          return toAbsolutePathFromCwd(textPath.path, currentSession.cwd);
-        }
-        if (textPath.isAbsolute) {
-          return textPath.path;
-        }
-      }
-
-      return null;
-    },
+  const resolveSessionLocalFilePath = useCallback(
+    (href: string, text: string) => resolveLocalFilePath(href, text, currentSession?.cwd),
     [currentSession?.cwd],
   );
 
@@ -1025,7 +350,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 turn={turn}
                 artifacts={turnArtifacts}
                 pendingArtifacts={pendingTurnArtifactsMap.get(turn.id)}
-                resolveLocalFilePath={resolveLocalFilePath}
+                resolveLocalFilePath={resolveSessionLocalFilePath}
                 mapDisplayText={mapDisplayText}
                 showTypingIndicator={showTypingIndicator}
                 toolActivities={isLastTurn ? toolActivities : undefined}
@@ -1092,66 +417,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     >
       {/* Export Options Dialog */}
       {!isSessionSwitching && (
-        <Dialog open={showExportOptions} onOpenChange={setShowExportOptions}>
-          <DialogContent className="sm:max-w-xs">
-            <DialogHeader>
-              <DialogTitle className="text-base font-semibold">
-                {i18nService.t('coworkExportAs')}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col gap-1 py-1">
-              <Button
-                variant="ghost"
-                className="theme-action-row-large w-full justify-start gap-3"
-                onClick={e => {
-                  setShowExportOptions(false);
-                  handleShareClick(e);
-                }}
-                disabled={isExportingImage}
-              >
-                <ImageIcon className="h-5 w-5 shrink-0" />
-                <div className="text-left">
-                  <div className="font-medium">{i18nService.t('coworkExportImage')}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {i18nService.t('coworkExportImageDesc')}
-                  </div>
-                </div>
-              </Button>
-              <Button
-                variant="ghost"
-                className="theme-action-row-large w-full justify-start gap-3"
-                onClick={() => {
-                  setShowExportOptions(false);
-                  handleExportText('md');
-                }}
-              >
-                <Download className="h-5 w-5 shrink-0" />
-                <div className="text-left">
-                  <div className="font-medium">Markdown</div>
-                  <div className="text-xs text-muted-foreground">
-                    {i18nService.t('coworkExportMarkdownDesc')}
-                  </div>
-                </div>
-              </Button>
-              <Button
-                variant="ghost"
-                className="theme-action-row-large w-full justify-start gap-3"
-                onClick={() => {
-                  setShowExportOptions(false);
-                  handleExportText('json');
-                }}
-              >
-                <Download className="h-5 w-5 shrink-0" />
-                <div className="text-left">
-                  <div className="font-medium">JSON</div>
-                  <div className="text-xs text-muted-foreground">
-                    {i18nService.t('coworkExportJSONDesc')}
-                  </div>
-                </div>
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <SessionExportDialog
+          open={showExportOptions}
+          onOpenChange={setShowExportOptions}
+          onExportImage={handleShareClick}
+          onExportText={handleExportText}
+          disabled={isExportingImage}
+        />
       )}
 
       {/* Content row: chat + artifact panel */}
@@ -1270,29 +542,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           </div>
         </div>
         {!isSessionSwitching && shouldRenderArtifactPanel && (
-          <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-            <React.Suspense
-              fallback={
-                <ArtifactPanelFallback
-                  layoutMode={artifactLayoutMode}
-                  minPanelWidth={MIN_PANEL_WIDTH}
-                  maxPanelWidth={artifactPanelMaxWidth}
-                />
-              }
-            >
-              <ArtifactPanelFrame
-                sessionId={previewSessionId}
-                cwd={currentSession?.cwd}
-                artifacts={previewArtifacts}
-                isOpen={isPanelOpen}
-                isVisible={isArtifactPanelVisible}
-                isTransitioning={isArtifactPanelTransitioning}
-                layoutMode={artifactLayoutMode}
-                minPanelWidth={MIN_PANEL_WIDTH}
-                maxPanelWidth={artifactPanelMaxWidth}
-              />
-            </React.Suspense>
-          </ArtifactPanelErrorBoundary>
+          <SessionArtifactPanelRegion
+            sessionId={previewSessionId}
+            cwd={currentSession?.cwd}
+            artifacts={previewArtifacts}
+            isOpen={isPanelOpen}
+            isVisible={isArtifactPanelVisible}
+            isTransitioning={isArtifactPanelTransitioning}
+            layoutMode={artifactLayoutMode}
+            minPanelWidth={MIN_PANEL_WIDTH}
+            maxPanelWidth={artifactPanelMaxWidth}
+            onClose={() => dispatch(closePanel())}
+          />
         )}
       </div>
     </CoworkSessionLayout>
