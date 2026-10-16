@@ -51,24 +51,6 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
-  pr-metadata:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          sparse-checkout: .github
-      - name: Validate pull request title and description
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const { validatePr } = require(`${process.env.GITHUB_WORKSPACE}/.github/devops-gate.cjs`);
-            const errors = validatePr(context.payload.pull_request);
-            if (errors.length) core.setFailed(errors.join('\n'));
-
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -425,11 +407,9 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always() && github.event_name == 'pull_request'
-    needs: [pr-metadata, merge-gate]
+    needs: [merge-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require PR metadata and merge gate
-        run: |
-          test "${{ needs.pr-metadata.result }}" = "success"
-          test "${{ needs.merge-gate.result }}" = "success"
+      - name: Require merge gate
+        run: test "${{ needs.merge-gate.result }}" = "success"

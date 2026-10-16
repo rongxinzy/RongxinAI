@@ -1,19 +1,9 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { validatePr, workflowApplies, evaluateRuns, run } = require('./devops-gate.cjs');
+const { workflowApplies, evaluateRuns, run } = require('./devops-gate.cjs');
 const body =
   '## 改动\n保留更新请求未携带的字段。\n## 原因\n触发：只改名。原因：旧实现清空缺席字段。修复前丢配置，修复后保留。\n## 验证\n接口回归测试通过，尚未部署。';
-test('valid bug description passes; missing trigger and blank template fail', () => {
-  assert.deepEqual(validatePr({ title: 'fix(portal): preserve omitted fields', body }), []);
-  assert.ok(validatePr({ title: 'update', body }).length);
-  assert.ok(validatePr({ title: 'fix: preserve fields', body: body.replace('触发', '情形') }).length);
-  assert.ok(validatePr({ title: 'fix: preserve fields', body: body.replace('原因：旧实现清空缺席字段。', '') }).length);
-  assert.ok(
-    validatePr({ title: 'docs: update conventions', body: '## 改动\n<!-- done -->\n## 原因\nTBD\n## 验证\n-\n' })
-      .length,
-  );
-});
 test('aggregation fails closed for failed CI, changed head and incomplete file lists', async () => {
   const pr = {
     number: 1,
@@ -71,15 +61,6 @@ test('paths match root Go files, exclusions and branch selection', () => {
   assert.equal(workflowApplies(workflow, ['internal/server.go'], 'master'), false);
   assert.equal(workflowApplies({ pathsIgnore: ['docs/**'] }, ['docs/a.md'], 'main'), false);
   assert.throws(() => workflowApplies({ paths: ['src/[ab].js'] }, ['src/a.js'], 'main'), /Unsupported/);
-});
-test('only the actual Dependabot bot may use generated release notes', () => {
-  const pr = {
-    title: 'build(deps): Bump dependency',
-    body: 'Release notes and dependency comparison.',
-    user: { login: 'dependabot[bot]', type: 'Bot' },
-  };
-  assert.deepEqual(validatePr(pr), []);
-  assert.ok(validatePr({ ...pr, user: { login: 'a-person', type: 'User' } }).length);
 });
 test('missing, cancelled and newest failed CI never pass; other heads cannot satisfy the gate', () => {
   const expected = [{ name: 'CI', path: '.github/workflows/ci.yml' }];

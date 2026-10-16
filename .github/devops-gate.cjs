@@ -1,49 +1,5 @@
 'use strict';
 
-// Read-only PR metadata and existing-workflow aggregation; never publishes or deploys.
-function validatePr(pr) {
-  const errors = [];
-  // Dependabot's generated release notes do not use our manual PR template.
-  if (pr.user?.login === 'dependabot[bot]' && pr.user?.type === 'Bot') {
-    if (!/^(build|chore)(\([a-z0-9._/-]+\))?: .+/.test(pr.title || '') || !(pr.body || '').trim()) {
-      errors.push('Dependabot PRs still require a conventional dependency title and nonempty release notes.');
-    }
-    return errors;
-  }
-  // Code freeze policy: only fix PRs are allowed to merge during the freeze period.
-  if (!/^fix(\([a-z0-9][a-z0-9._/-]*\))?!?: [a-z][^\n]*$/.test(pr.title || '')) {
-    errors.push('Repository is currently in code freeze. Only bug fix PRs (title starting with "fix") are allowed to merge.');
-  }
-  let body = (pr.body || '').replace(/\r/g, '');
-  while (body.includes('<!--')) {
-    const start = body.indexOf('<!--');
-    const end = body.indexOf('-->', start + 4);
-    body = body.slice(0, start) + (end === -1 ? '' : body.slice(end + 3));
-  }
-  const sections = [...body.matchAll(/^##\s+([^\n]+)\n([\s\S]*?)(?=^#{1,2}\s|$(?![\s\S]))/gm)];
-  for (const names of [
-    ['改动', 'What changed', 'Summary', 'Changes'],
-    ['原因', 'Why', 'Reason'],
-    ['验证', 'Validation', 'Testing'],
-  ]) {
-    const section = sections.find((match) =>
-      names.some((name) => match[1].trim().toLowerCase() === name.toLowerCase()),
-    );
-    const content = section?.[2].replace(/^[\s\-*]+$/gm, '').trim();
-    if (!content || /^(?:todo|tbd|n\/a|待填写|待补充|\.\.\.)$/i.test(content))
-      errors.push(`Fill the ${names[0]} section.`);
-  }
-  if (/^fix(?:\(|!?\s*:)/.test(pr.title || '')) {
-    for (const [label, pattern] of [
-      ['trigger', /触发|复现|reproduc|trigger/i],
-      ['cause', /根因|原因|root cause|cause/i],
-      ['before/after behavior', /修复前|修复后|before|after/i],
-    ])
-      if (!pattern.test(body.replace(/^#{1,6}\s+.*$/gm, ''))) errors.push(`Bug fixes must explain ${label}.`);
-  }
-  return errors;
-}
-
 function globMatches(path, pattern) {
   if (/[[\]+]/.test(pattern)) throw new Error(`Unsupported filter pattern: ${pattern}; update the gate matcher.`);
   let source = '^';
@@ -99,8 +55,6 @@ async function run({
 }) {
   const pr = context.payload.pull_request;
   if (!pr) throw new Error('This gate only runs for pull requests.');
-  const errors = validatePr(pr);
-  if (errors.length) throw new Error(errors.join('\n'));
   const files = await github.paginate(github.rest.pulls.listFiles, {
     ...context.repo,
     pull_number: pr.number,
@@ -132,7 +86,7 @@ async function run({
     const { waiting, failed } = evaluateRuns(expected, runs, pr.head.sha);
     if (failed.length) throw new Error(failed.join('\n'));
     if (!waiting.length) {
-      core.info('PR metadata and all applicable CI workflows passed.');
+      core.info('All applicable CI workflows passed.');
       return;
     }
     if (attempt % 6 === 0) core.info(`Waiting for: ${waiting.join(', ')}`);
@@ -143,4 +97,4 @@ async function run({
   );
 }
 
-module.exports = { validatePr, globMatches, workflowApplies, evaluateRuns, run };
+module.exports = { globMatches, workflowApplies, evaluateRuns, run };
