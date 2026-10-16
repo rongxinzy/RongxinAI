@@ -10,7 +10,6 @@ export const APP_DATA_DIR_NAME = branding.dataDirName;
 // never read each other's configuration, sessions, or state. No migration:
 // enterprise installs start with a fresh directory.
 export const ENTERPRISE_APP_DATA_DIR_NAME = `${branding.dataDirName}Enterprise`;
-export const APP_ID = branding.appId;
 export const APP_USER_MODEL_ID = branding.appUserModelId;
 export const DB_FILENAME = branding.dbFileName;
 

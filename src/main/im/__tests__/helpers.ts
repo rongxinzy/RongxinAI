@@ -66,7 +66,7 @@ export function makeCheck(
   return check;
 }
 
-export function makeMissingCredentialsCheck(fields = 'botToken'): IMConnectivityCheck {
+function makeMissingCredentialsCheck(fields = 'botToken'): IMConnectivityCheck {
   return makeCheck(
     'missing_credentials',
     'fail',

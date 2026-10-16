@@ -1,6 +1,6 @@
 import type { AppConfig } from '../config';
 
-export function hasSettingsValueChanged(current: unknown, next: unknown): boolean {
+function hasSettingsValueChanged(current: unknown, next: unknown): boolean {
   return JSON.stringify(current) !== JSON.stringify(next);
 }
 

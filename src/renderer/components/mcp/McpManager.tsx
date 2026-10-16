@@ -49,8 +49,6 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 
-export { McpTab } from './constants';
-
 const TRANSPORT_BADGE_CLASS_NAME = 'bg-muted text-muted-foreground';
 
 const MCP_ICON_BY_ID: Record<string, string> = {

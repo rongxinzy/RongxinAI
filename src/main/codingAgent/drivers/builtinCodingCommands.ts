@@ -32,7 +32,7 @@ export type BuiltinCodingControlCommand =
 export const BuiltinCodingSelectionOff = 'off';
 
 /** One installed skill, expert or MCP server offered after its command. */
-export interface BuiltinCodingCommandChoice {
+interface BuiltinCodingCommandChoice {
   id: string;
   name: string;
   description: string;

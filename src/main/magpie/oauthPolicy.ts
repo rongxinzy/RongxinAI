@@ -5,7 +5,7 @@ export interface MagpieSignInState {
   url: string;
   state: string;
 }
-export const SUPPORTED_SUBSCRIPTION_SIGN_INS = new Set([
+const SUPPORTED_SUBSCRIPTION_SIGN_INS = new Set([
   'codex',
   'copilot',
   'gemini',

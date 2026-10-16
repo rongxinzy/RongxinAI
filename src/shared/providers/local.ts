@@ -1,6 +1,6 @@
 import { ProviderName } from './constants';
 
-export const LocalProviderName = {
+const LocalProviderName = {
   LlamaCpp: ProviderName.LlamaCpp,
   Ollama: ProviderName.Ollama,
 } as const;
@@ -12,7 +12,7 @@ export function isLocalProviderName(providerName?: string | null): boolean {
   return !!normalized && LOCAL_PROVIDER_NAMES.has(normalized);
 }
 
-export function getProviderNameFromModelRef(modelRef?: string | null): string | null {
+function getProviderNameFromModelRef(modelRef?: string | null): string | null {
   const normalized = modelRef?.trim();
   if (!normalized) return null;
   const slashIndex = normalized.indexOf('/');

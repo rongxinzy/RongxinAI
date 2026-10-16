@@ -16,7 +16,7 @@ import { Spinner } from '@shared/components/ui/spinner';
 import { SquarePen } from 'lucide-react';
 import { useRef } from 'react';
 
-export interface TaskSearchItem {
+interface TaskSearchItem {
   id: string;
   title: string;
   context?: string;

@@ -1,6 +1,6 @@
 import { access, constants as FsConstants } from 'node:fs/promises';
 
-export const DeclareArtifactToolName = 'declare_artifact';
+const DeclareArtifactToolName = 'declare_artifact';
 
 export const DeclareArtifactSystemPrompt = [
   '## Artifact declaration',

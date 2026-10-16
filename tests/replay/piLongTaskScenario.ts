@@ -39,15 +39,14 @@ if (typeof mutableApp.getAppPath !== 'function') {
   mutableApp.getAppPath = () => process.cwd();
 }
 
-export const LONGTASK_SCENARIO_ID = 'longtask-32doc';
-export const LONGTASK_FROZEN_TIME = '2026-06-15T08:00:00.000Z';
+const LONGTASK_SCENARIO_ID = 'longtask-32doc';
+const LONGTASK_FROZEN_TIME = '2026-06-15T08:00:00.000Z';
 export const LONGTASK_DOC_COUNT = 32;
 // 2026-10 compute endpoint: single qwen3.8-flash-next deployment with a 64K
 // window and no cross-request prefix caching. AB_LONGTASK_UPSTREAM points a
 // recording run at a different origin without touching the tape semantics.
-export const LONGTASK_LIVE_UPSTREAM =
-  process.env.AB_LONGTASK_UPSTREAM ?? 'http://172.18.6.119:8080';
-export const LONGTASK_MODEL_ID = 'qwen3.8-flash-next';
+const LONGTASK_LIVE_UPSTREAM = process.env.AB_LONGTASK_UPSTREAM ?? 'http://172.18.6.119:8080';
+const LONGTASK_MODEL_ID = 'qwen3.8-flash-next';
 
 const PROVIDER_NAME = 'custom_ab';
 const ARTIFACT_NAMES = ['summaries.md', 'index.csv', 'report.md'] as const;
@@ -113,7 +112,7 @@ const PARAGRAPHS = [
 ];
 
 /** Deterministic 32-document workspace content (identical on every machine). */
-export function seedLongTaskWorkspace(workDir: string): void {
+function seedLongTaskWorkspace(workDir: string): void {
   fs.rmSync(workDir, { recursive: true, force: true });
   const dataDir = path.join(workDir, 'data');
   fs.mkdirSync(dataDir, { recursive: true });

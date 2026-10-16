@@ -21,7 +21,7 @@ const QuestionSchema = Type.Object({
   multiSelect: Type.Optional(Type.Boolean()),
 });
 
-export const PiAskUserQuestionParameters = Type.Object({
+const PiAskUserQuestionParameters = Type.Object({
   questions: Type.Array(QuestionSchema, { minItems: 1, maxItems: 4 }),
 });
 

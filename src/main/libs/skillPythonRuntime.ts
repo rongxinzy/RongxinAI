@@ -97,10 +97,6 @@ export function findSkillPythonExecutable(
   return null;
 }
 
-export function getSkillPythonRuntimeRoot(): string | null {
-  return candidateRoots()[0] || null;
-}
-
 /**
  * Resolve the shared dependency layer's Python executable without per-Skill
  * manifest gating. Used to put the managed environment (pandas, numpy, ...)

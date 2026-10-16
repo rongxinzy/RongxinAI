@@ -1,4 +1,4 @@
-export const RendererStartupEnvironment = {
+const RendererStartupEnvironment = {
   DisableGpu: 'ZHIYUAN_DISABLE_GPU',
   ElectronDisableGpu: 'ELECTRON_DISABLE_GPU',
   EnableGpu: 'ZHIYUAN_ENABLE_GPU',

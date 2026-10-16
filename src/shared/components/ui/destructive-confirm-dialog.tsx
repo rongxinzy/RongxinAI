@@ -103,4 +103,4 @@ function DestructiveConfirmDialog({
   );
 }
 
-export { DestructiveConfirmDialog, type DestructiveConfirmDialogProps };
+export { DestructiveConfirmDialog };

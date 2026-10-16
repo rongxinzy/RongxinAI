@@ -13,15 +13,13 @@ export const selectCurrentSessionId = (state: RootState) => state.cowork.current
 export const selectCurrentSession = (state: RootState) => state.cowork.currentSession;
 export const selectLoadingSessionId = (state: RootState) => state.cowork.loadingSessionId;
 export const selectStreamingSessionIds = (state: RootState) => state.cowork.streamingSessionIds;
-export const selectToolActivitiesBySession = (state: RootState) =>
-  state.cowork.toolActivitiesBySession;
+const selectToolActivitiesBySession = (state: RootState) => state.cowork.toolActivitiesBySession;
 
 export const selectIsStreaming = (state: RootState) => {
   const session = state.cowork.currentSession;
   if (!session) return false;
   return state.cowork.streamingSessionIds.includes(session.id);
 };
-export const selectIsCoworkActive = (state: RootState) => state.cowork.isCoworkActive;
 export const selectRemoteManaged = (state: RootState) => state.cowork.remoteManaged;
 export const selectCoworkConfig = (state: RootState) => state.cowork.config;
 export const selectDraftPrompts = (state: RootState) => state.cowork.draftPrompts;
@@ -51,7 +49,7 @@ export const selectDisplayedSessionId = createSelector(
   resolveDisplayedSessionId,
 );
 
-export const selectCurrentMessages = createSelector(
+const selectCurrentMessages = createSelector(
   selectCurrentSession,
   session => session?.messages ?? null,
 );
@@ -70,14 +68,4 @@ export const selectCurrentToolActivities = createSelector(
       (left, right) => left.updatedAt - right.updatedAt,
     );
   },
-);
-
-export const selectLastMessageContent = createSelector(selectCurrentMessages, messages => {
-  if (!messages || messages.length === 0) return undefined;
-  return messages[messages.length - 1]?.content;
-});
-
-export const selectFirstPendingPermission = createSelector(
-  selectPendingPermissions,
-  permissions => permissions[0] ?? null,
 );

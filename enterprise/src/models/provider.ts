@@ -14,7 +14,7 @@ import type { ZhiyuanPasswordSession } from '../session/password-session.js';
 
 export const ZHIYUAN_MODEL_PROVIDER_KEY = 'custom_enterprise';
 export const ZHIYUAN_MODEL_PROVIDER_DISPLAY_NAME = 'Zhiyuan';
-export const ZHIYUAN_MODEL_POLL_INTERVAL_MS = 30_000;
+const ZHIYUAN_MODEL_POLL_INTERVAL_MS = 30_000;
 
 /** Host capability version that accepts anthropic managed models (per-model baseUrl + apiFormat passthrough). */
 const HOST_MANAGED_PROVIDER_ANTHROPIC_API_VERSION = 2;

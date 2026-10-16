@@ -1,6 +1,3 @@
-/** chat 会话滚动相关默认防抖间隔 */
-export const SCROLL_DEBOUNCE_MS = 80;
-
 export type DebouncedFunction<T extends (...args: never[]) => void> = ((
   ...args: Parameters<T>
 ) => void) & {

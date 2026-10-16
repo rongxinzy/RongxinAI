@@ -388,4 +388,3 @@ function Switch({
 }
 
 export { Switch };
-export type { SwitchProps };

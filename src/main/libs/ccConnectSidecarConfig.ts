@@ -14,7 +14,7 @@ const SUPPORTED_PLATFORMS = new Set([
 
 type TomlValue = string | number | boolean | readonly string[];
 
-export type CcConnectSidecarProject = {
+type CcConnectSidecarProject = {
   /** Stable ZhiYuan ChannelAccount id. It is never a user-visible cc-connect project. */
   accountId: string;
   /** Scheduler projects intentionally have no platform transport. */

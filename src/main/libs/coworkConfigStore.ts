@@ -2,7 +2,7 @@ import { app } from 'electron';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-export type CoworkApiType = 'anthropic' | 'openai';
+type CoworkApiType = 'anthropic' | 'openai';
 
 export type CoworkApiConfig = {
   apiKey: string;

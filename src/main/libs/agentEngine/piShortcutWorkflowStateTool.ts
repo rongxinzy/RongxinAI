@@ -13,7 +13,7 @@ interface ToolResult {
   details: Record<string, unknown>;
 }
 
-export const PiShortcutWorkflowStateToolName = 'workflow_state';
+const PiShortcutWorkflowStateToolName = 'workflow_state';
 
 /** Records only values independently checked by Pi's main process. */
 export function buildPiShortcutWorkflowStateTool(

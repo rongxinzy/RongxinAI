@@ -1402,14 +1402,4 @@ function getRemainingBusyMs(input: {
   return Math.max(0, input.minimumBusyMs - Math.max(0, input.nowMs - input.startedAtMs));
 }
 
-export const __test__shouldBlockModelAction = (input: {
-  modelName: string;
-  unloadingModelName: string | null;
-}) => shouldBlockModelAction(input);
-export const __test__getRemainingBusyMs = (input: {
-  startedAtMs: number;
-  nowMs: number;
-  minimumBusyMs: number;
-}) => getRemainingBusyMs(input);
-
 export default LocalInferenceView;

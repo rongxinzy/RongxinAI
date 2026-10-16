@@ -19,7 +19,7 @@ export const NativeAbiStatus = {
   Unavailable: 'unavailable',
 };
 export const NativeAbiProbeExitCode = { Compatible: 0, Unavailable: 1, Incompatible: 2 };
-export const NATIVE_ABI_PROBE_TIMEOUT_MS = 10_000;
+const NATIVE_ABI_PROBE_TIMEOUT_MS = 10_000;
 const probePath = fileURLToPath(new URL('./electron-native-abi-probe.cjs', import.meta.url));
 
 /** Classify errors from the target Electron process, never from the host Node. */

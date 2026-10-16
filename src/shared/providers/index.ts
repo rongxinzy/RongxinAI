@@ -1,65 +1,21 @@
-export { resolveCodingPlanBaseUrl } from './codingPlan';
-export { findConfiguredProviderModel, resolveConfiguredProviderModels } from './configuredModels';
-export {
-  applyProviderModelConnectionTestResults,
-  createProviderConnectionTestSignature,
-  isCurrentModelAvailableTest,
-  ProviderModelConnectionFailureKind,
-  ProviderModelConnectionTestStatus,
-} from './connectionTest';
-export type { ProviderModelConnectionTest } from './connectionTest';
-export { buildAnthropicMessagesUrl, normalizeProviderBaseUrl } from './apiUrl';
+export { buildAnthropicMessagesUrl } from './apiUrl';
 export * from './modelDiscovery';
-export type { ModelCapabilities, ProviderDef, ProviderModelDefinition } from './constants';
+export type { ModelCapabilities } from './constants';
 export {
   ApiFormat,
-  AuthType,
   ModelCapabilityStatus,
-  AgentApi,
   AgentProviderId,
-  ProviderModelOrigin,
   ProviderName,
   ProviderRegistry,
 } from './constants';
-export {
-  getProviderNameFromModelRef,
-  isLocalModelRef,
-  isLocalProviderName,
-  LocalProviderName,
-} from './local';
-export {
-  normalizeProviderModelPiRuntimeConfig,
-  ProviderModelPiApi,
-  ProviderModelPiCacheControlFormat,
-  ProviderModelPiMaxTokensField,
-  ProviderModelPiThinkingBudgetField,
-  ProviderModelPiThinkingFormat,
-  resolveProviderModelPiReasoning,
-} from './piRuntime';
-export type {
-  ProviderModelPiCompaction,
-  ProviderModelPiInputLimits,
-  ProviderModelPiRuntimeCompat,
-  ProviderModelPiRuntimeConfig,
-  ProviderModelPiThinkingLevel,
-  ProviderModelPiThinkingLevelMap,
-} from './piRuntime';
+export { isLocalModelRef, isLocalProviderName } from './local';
+export { normalizeProviderModelPiRuntimeConfig } from './piRuntime';
+export type { ProviderModelPiCompaction } from './piRuntime';
 export type { ProviderConfig } from './types';
-export { isProviderEnabled } from './types';
 export {
   clampRuntimeContextWindow,
   createLlamaCppRuntimeSnapshot,
   createOllamaRuntimeSnapshot,
   parseLlamaCppRuntimeCapabilities,
-  parseOllamaRuntimeCapabilities,
-  parseLlamaCppRuntimeSnapshot,
-  parseOllamaRuntimeSnapshot,
   resolveModelEndpoint,
-} from './modelEndpoint';
-export type {
-  ResolveModelEndpointOptions,
-  ResolvedModelEndpoint,
-  RuntimeModelKind,
-  RuntimeModelSnapshot,
-  RuntimeModelStatus,
 } from './modelEndpoint';

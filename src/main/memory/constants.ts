@@ -11,13 +11,11 @@ export type EngramManagerPhase = (typeof EngramManagerPhase)[keyof typeof Engram
 import {
   MemoryDeliveryStatus,
   MemoryKind,
-  MemoryLifecycleStatus,
   MemoryOutboxOperation as SharedMemoryOutboxOperation,
   MemoryScope,
   MemorySourceKind as SharedMemorySourceKind,
   type MemoryDeliveryStatus as MemoryDeliveryStatusValue,
   type MemoryKind as MemoryKindValue,
-  type MemoryLifecycleStatus as MemoryLifecycleStatusValue,
   type MemoryOutboxOperation as MemoryOutboxOperationValue,
   type MemoryScope as MemoryScopeValue,
   type MemorySourceKind as MemorySourceKindValue,
@@ -26,23 +24,8 @@ import {
 export const EngramMemoryScope = MemoryScope;
 export type EngramMemoryScope = MemoryScopeValue;
 
-export const EngramMemoryCapability = {
-  Recall: 'recall',
-  SaveCandidate: 'saveCandidate',
-  ConfirmMemory: 'confirmMemory',
-  Supersede: 'supersede',
-  Forget: 'forget',
-  SessionSummary: 'sessionSummary',
-} as const;
-
-export type EngramMemoryCapability =
-  (typeof EngramMemoryCapability)[keyof typeof EngramMemoryCapability];
-
 export const EngramObservationType = MemoryKind;
 export type EngramObservationType = MemoryKindValue;
-
-export const MemoryLinkStatus = MemoryLifecycleStatus;
-export type MemoryLinkStatus = MemoryLifecycleStatusValue;
 
 export const MemoryOutboxStatus = MemoryDeliveryStatus;
 export type MemoryOutboxStatus = MemoryDeliveryStatusValue;
