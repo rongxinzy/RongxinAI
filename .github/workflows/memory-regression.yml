@@ -46,9 +46,9 @@ jobs:
           path: |
             .cache/tsc/electron.tsbuildinfo
             dist-electron
-          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json') }}-${{ github.sha }}
+          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}
           restore-keys: |
-            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json') }}-
+            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}-
             tsc-electron-${{ runner.os }}-
       - name: Restore Vite cache
         uses: actions/cache/restore@v5
@@ -56,7 +56,7 @@ jobs:
           path: |
             .cache/tsc/renderer.tsbuildinfo
             .cache/vite
-          key: renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}-${{ github.sha }}
+          key: renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}
           restore-keys: |
             renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}-
             renderer-build-${{ runner.os }}-
