@@ -21,7 +21,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
-import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
+import { classifyCoworkError } from '../../../common/coworkError';
 import {
   CoworkSessionExpertSource,
   normalizeSingleExpertIds,
@@ -85,21 +85,13 @@ import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
-import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
-import {
-  createPiAskUserQuestionTool,
-  PiAskUserQuestionToolName,
-  PiAskUserQuestionTimeoutMs,
-  type PiAskUserQuestionInput,
-  type PiAskUserQuestionResponse,
-} from './piAskUserQuestion';
+import { createPiAskUserQuestionTool, type PiAskUserQuestionResponse } from './piAskUserQuestion';
 import {
   createPiCodingElicitationTool,
-  type PiCodingElicitationInput,
   type PiCodingElicitationResponse,
 } from './piCodingElicitation';
 import { PiAgentLoopMode } from './piAgentLoop';
@@ -164,15 +156,7 @@ import type {
 } from './piRuntimeTypes';
 import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolveBundledOcrHelper } from '../ocrHelper';
-import {
-  buildImageOmittedNotice,
-  clearImageInputObservations,
-  collectImagePathReferences,
-  ImageInputVerdict,
-  imageInputVerdict,
-  type ImageCapabilityConfiguration,
-  type ImagePromptPreparation,
-} from './piImageInputFallback';
+import { collectImagePathReferences } from './piImageInputFallback';
 
 import {
   ActivePiSession,
@@ -190,11 +174,11 @@ import {
   PiSettingsManager,
   preparePiPrompt,
   sendPiPrompt,
-  yieldToEventLoop,
 } from './piRuntimeSessionState';
-import { DEFAULT_PI_LOCAL_MAX_TOKENS, magpieImageInput, resolvePiModel } from './piMagpiePiModel';
+import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import { PiRuntimeTurnEvents } from './piRuntimeTurnEvents';
+import { PiRuntimeTurnRecovery } from './piRuntimeTurnRecovery';
 // ── PiRuntimeAdapter ──
 
 // Force ANSI color output from CLI tools (npm, git, jest, etc.) run by
@@ -233,9 +217,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.stopActiveSession(sessionId, reason, drainQueuedFollowUp, cause);
     },
     flushFollowUpQueue: (sessionId, active) => this.flushFollowUpQueue(sessionId, active),
-    flushPendingError: (sessionId, active) => this.flushPendingError(sessionId, active),
-    imageCapabilityConfiguration: active => this.imageCapabilityConfiguration(active),
-    syncImageInputCapability: sessionIds => this.syncImageInputCapability(sessionIds),
+    flushPendingError: (sessionId, active) => this.recovery.flushPendingError(sessionId, active),
+    imageCapabilityConfiguration: active => this.recovery.imageCapabilityConfiguration(active),
+    syncImageInputCapability: sessionIds => this.recovery.syncImageInputCapability(sessionIds),
     createSessionMemoryCompletion: active => this.createSessionMemoryCompletion(active),
     runPostTurnMemoryMaintenance: (sessionId, workingDirectory, complete) =>
       this.runPostTurnMemoryMaintenance(sessionId, workingDirectory, complete),
@@ -294,6 +278,26 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     null;
   /** Bundled image-text helper; null when the platform/build cannot run it. */
   private readonly bundledOcrHelper = resolveBundledOcrHelper();
+
+  private readonly recovery = new PiRuntimeTurnRecovery({
+    getStore: () => this.store,
+    getWorkbench: () => this.workbenchTaskService,
+    transcript: this.transcript,
+    getActiveSession: sessionId => this.activeSessions.get(sessionId),
+    activeSessionIds: () => this.activeSessions.keys(),
+    deleteActiveSession: sessionId => {
+      this.activeSessions.delete(sessionId);
+    },
+    emit: (event, ...args) => {
+      this.emit(event as 'started', ...(args as [string]));
+    },
+    continueSession: (sessionId, prompt, options) =>
+      this.continueSession(sessionId, prompt, options),
+    ocrCommandFor: () => this.bundledOcrHelper?.commandFor,
+    approvalSessionMap: this.approvalSessionMap,
+    pendingAskUserQuestions: this.pendingAskUserQuestions,
+    pendingCodingElicitations: this.pendingCodingElicitations,
+  });
 
   constructor() {
     super();
@@ -648,7 +652,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // Coding-only free-text pause point: the agent asks, the lane waits.
         customTools.push(
           createPiCodingElicitationTool((toolCallId, input, signal) =>
-            this.requestCodingElicitation(sessionId, toolCallId, input, signal),
+            this.recovery.requestCodingElicitation(sessionId, toolCallId, input, signal),
           ),
         );
       }
@@ -656,7 +660,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (shouldExposeAskUserQuestionTool(resourceState.unattended)) {
         customTools.push(
           createPiAskUserQuestionTool((toolCallId, input, signal) =>
-            this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
+            this.recovery.requestAskUserQuestion(sessionId, toolCallId, input, signal),
           ),
         );
       }
@@ -1072,13 +1076,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const initialImagePrompt = preparePiPrompt(
         initialPrompt,
         options.imageAttachments,
-        this.imageInputVerdictForActive(active),
+        this.recovery.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(options.fileAttachments),
       );
       // Recorded before the request leaves: the SDK can report the rejection
       // through events that arrive before the send promise settles.
-      this.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
+      this.recovery.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
       await sendPiPrompt(session, initialImagePrompt, undefined);
       await active.eventProjection?.drain();
       await active.completionPending;
@@ -1461,11 +1465,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const continuedImagePrompt = preparePiPrompt(
         nextPrompt,
         options.imageAttachments,
-        this.imageInputVerdictForActive(active),
+        this.recovery.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(options.fileAttachments),
       );
-      this.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
+      this.recovery.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
       await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
       await active.eventProjection?.drain();
       await active.completionPending;
@@ -1551,8 +1555,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // A queued control action belongs to the turn that queued it; replaying it
     // after a resource-driven recreation would be an unexpected side effect.
     this.queuedControlActions.delete(sessionId);
-    this.dismissAskUserQuestionsBySession(sessionId);
-    this.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
+    this.recovery.dismissAskUserQuestionsBySession(sessionId);
+    this.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
     active.agentLoop.stop();
     active.pendingError = null;
     active.toolStartedAtByCallId.clear();
@@ -1566,7 +1570,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionId,
       'The session resources changed before the approval was resolved.',
     );
-    this.clearApprovalsBySession(sessionId);
+    this.recovery.clearApprovalsBySession(sessionId);
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
   }
@@ -1589,8 +1593,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // Control actions are not durable user input: an explicit stop must not
     // carry them into a later session that reuses the same id.
     this.queuedControlActions.delete(sessionId);
-    this.dismissAskUserQuestionsBySession(sessionId);
-    this.dismissCodingElicitationsBySession(sessionId, reason);
+    this.recovery.dismissAskUserQuestionsBySession(sessionId);
+    this.recovery.dismissCodingElicitationsBySession(sessionId, reason);
     const initializing = this.initializingSessions.get(sessionId);
     if (initializing) {
       initializing.abortController.abort();
@@ -1600,7 +1604,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!active) {
       this.closeInterruptedToolUses(sessionId);
       this.workbenchTaskService?.pauseRun?.(sessionId, reason);
-      this.clearApprovalsBySession(sessionId);
+      this.recovery.clearApprovalsBySession(sessionId);
       if (cause && !this.retainedSessionIds.has(sessionId)) {
         this.recordSessionInterruption(sessionId, cause);
       }
@@ -1633,7 +1637,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.unsubscribe();
     void active.piSession.abort();
     this.workbenchTaskService?.pauseRun?.(sessionId, reason);
-    this.clearApprovalsBySession(sessionId);
+    this.recovery.clearApprovalsBySession(sessionId);
     this.emit('sessionStopped', sessionId);
     if (cause) this.recordSessionInterruption(sessionId, cause);
 
@@ -1758,7 +1762,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   respondToPermission(requestId: string, result: PiPermissionResult): void {
     const pendingQuestion = this.pendingAskUserQuestions.get(requestId);
     if (pendingQuestion) {
-      this.finishAskUserQuestion(requestId, {
+      this.recovery.finishAskUserQuestion(requestId, {
         behavior: result.behavior,
         ...(result.behavior === 'allow'
           ? { updatedInput: result.updatedInput }
@@ -1820,13 +1824,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!normalized) return false;
     const pending = this.pendingCodingElicitations.get(requestId);
     if (!pending) return false;
-    this.finishCodingElicitation(requestId, { cancelled: false, answer: normalized });
+    this.recovery.finishCodingElicitation(requestId, { cancelled: false, answer: normalized });
     return true;
   }
 
   cancelCodingElicitation(requestId: string, reason: string): boolean {
     if (!this.pendingCodingElicitations.has(requestId)) return false;
-    this.finishCodingElicitation(requestId, { cancelled: true, reason });
+    this.recovery.finishCodingElicitation(requestId, { cancelled: true, reason });
     return true;
   }
 
@@ -1971,11 +1975,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const queuedImagePrompt = preparePiPrompt(
         item.text,
         item.imageAttachments,
-        this.imageInputVerdictForActive(active),
+        this.recovery.imageInputVerdictForActive(active),
         this.bundledOcrHelper?.commandFor,
         collectImagePathReferences(item.fileAttachments),
       );
-      this.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
+      this.recovery.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
       await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
       this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
@@ -2135,7 +2139,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   onSessionDeleted(sessionId: string): void {
     this.stopActiveSession(sessionId, 'The session was deleted.', false);
-    this.clearApprovalsBySession(sessionId);
+    this.recovery.clearApprovalsBySession(sessionId);
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.delete(sessionId);
@@ -2375,7 +2379,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                     // The run cannot continue: end the turn with a visible error
                     // instead of returning another tool error the model would
                     // answer with yet another tool call.
-                    this.endTerminatedWorkbenchTurn(
+                    this.recovery.endTerminatedWorkbenchTurn(
                       approvalContext.sessionId,
                       authorization.reason ?? 'The workbench run can no longer continue.',
                     );
@@ -2599,413 +2603,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return extractPiBackgroundCompletionText(result);
   }
 
-  // ── Private: image input fallback ──
-  /** Whether the current turn may carry image bytes (see piImageInputFallback). */
-  /**
-   * Configured image capability as it stands right now.
-   *
-   * A session's capabilities are a snapshot from the last model resolution, so
-   * after the user edits provider settings they must not be trusted: the next
-   * turn, and any capability sync, have to read the current configuration.
-   * When the configuration cannot be read the snapshot is the best available
-   * answer, and withholding images stays the conservative outcome.
-   */
-  private configuredImageInputForActive(active: ActivePiSession): ModelCapabilityStatus {
-    const modelId = typeof active.model.id === 'string' ? active.model.id : '';
-    if (hasMagpieModelService() && modelId) {
-      const projected = getMagpieModelService().peekModel(modelId);
-      if (projected) return magpieImageInput(projected);
-    }
-    return active.capabilities.imageInput;
-  }
-
-  /** Configuration half of the image-capability fingerprint, in one shape. */
-  private imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration {
-    const imageInput = this.configuredImageInputForActive(active);
-    return {
-      imageInput,
-      supportsImage: imageInput === ModelCapabilityStatus.Supported,
-      endpointKey: active.imageEndpointKey,
-    };
-  }
-
-  /**
-   * Keep every live Pi session's declared image capability in step with the
-   * effective verdict.
-   *
-   * The verdict can change while sessions are open — a rejection is learned, or
-   * the user edits provider settings — and a stale snapshot would either drop
-   * images the host still sends, or keep sending images the server already
-   * refused. Duplicate work is skipped so an unchanged session is untouched.
-   */
-  private async syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void> {
-    const targets = sessionIds ? [...sessionIds] : [...this.activeSessions.keys()];
-    await Promise.allSettled(
-      targets.map(async sessionId => {
-        const active = this.activeSessions.get(sessionId);
-        if (!active) return;
-        const input: Array<'text' | 'image'> =
-          this.imageInputVerdictForActive(active) === ImageInputVerdict.Supported
-            ? ['text', 'image']
-            : ['text'];
-        const current = Array.isArray(active.model.input) ? active.model.input : [];
-        if (current.length === input.length && current.every((value, i) => value === input[i])) {
-          return;
-        }
-        const model = { ...active.model, input };
-        try {
-          await active.piSession.setModel(model);
-          active.model = model;
-        } catch (error) {
-          console.warn(`[PiRuntime] could not update image input for session ${sessionId}:`, error);
-        }
-      }),
-    );
-  }
-
-  /**
-   * Provider/model settings are the user's statement about what the models can
-   * do: drop the runtime observations and let open sessions follow immediately.
-   */
   async resetImageInputCapabilities(): Promise<void> {
-    clearImageInputObservations();
-    if (hasMagpieModelService()) {
-      try {
-        await getMagpieModelService().catalog();
-      } catch (error) {
-        console.warn('[PiRuntime] could not refresh model image capabilities:', error);
-      }
-    }
-    await this.syncImageInputCapability();
-  }
-
-  private imageInputVerdictForActive(active: ActivePiSession): ImageInputVerdict {
-    return imageInputVerdict(
-      this.configuredImageInputForActive(active),
-      active.harnessModelProfile.provider,
-      active.harnessModelProfile.model,
-      this.imageCapabilityConfiguration(active),
-    );
-  }
-
-  /**
-   * Records what happened to this turn's image attachments, so a failure can be
-   * retried as text, and tells the user when images were withheld: a text-only
-   * turn must never look like the image was delivered.
-   */
-  private recordImagePrompt(
-    sessionId: string,
-    active: ActivePiSession,
-    text: string,
-    prepared: ImagePromptPreparation,
-  ): void {
-    active.imageRetryPending = false;
-    active.imageRejectionHandled = false;
-    // Image state is recorded whether or not the turn carried text: an
-    // image-only submission is a normal turn, and the failure path has to be
-    // able to retry it.
-    active.lastImagePrompt =
-      prepared.sentImages.length > 0 || prepared.omittedImages.length > 0
-        ? {
-            text,
-            sentImages: prepared.sentImages,
-            omittedImages: prepared.omittedImages,
-            retried: false,
-          }
-        : null;
-    if (active.lastImagePrompt && prepared.omittedImages.length > 0) {
-      this.appendSystemNotice(sessionId, t('coworkImageNotSentNotice'));
-    }
-  }
-
-  /** Persist and emit a system message — the surface users actually read. */
-  private appendSystemNotice(sessionId: string, content: string): void {
-    const seed: CoworkMessage = {
-      id: randomUUID(),
-      type: 'system',
-      content,
-      timestamp: Date.now(),
-    };
-    const message = this.store ? this.store.addMessage(sessionId, seed) : seed;
-    this.emit('message', sessionId, message);
-  }
-
-  // ── Private: deferred error handling ──
-  /**
-   * Persist and emit a deferred turn error exactly once.
-   *
-   * message_end(stopReason=error) only records the error on the session because
-   * Pi may auto-retry the turn; this flush runs on auto_retry_end / agent_settled,
-   * when the run has genuinely failed. Idempotent — a second call is a no-op.
-   *
-   * Returns true when it scheduled a text-only retry of an image rejection
-   * instead of surfacing the error; the caller must then skip its own
-   * post-failure work (queue draining, completion).
-   */
-  private flushPendingError(sessionId: string, active: ActivePiSession): boolean {
-    const pending = active.pendingError;
-    if (!pending) return false;
-    const fallback = active.lastImagePrompt;
-    // A turn that carried images whose payload the provider rejected is an image
-    // rejection no matter how often the SDK retried it: the user's capability
-    // setting stays as configured, the model gets the file paths, and a repeated
-    // failure must not resurface as a misleading generic error.
-    const imageTurnError =
-      active.imageRejectionHandled && fallback !== null && fallback.sentImages.length > 0;
-    if (imageTurnError && fallback) {
-      active.pendingError = null;
-      active.imageRetryPending = false;
-      if (!fallback.retried) {
-        this.retryTurnWithoutImages(sessionId, active, fallback);
-        return true;
-      }
-      // Already retried once: the retry replaces this turn's outcome.
-      active.turnFailed = false;
-      active.isRunning = false;
-      return true;
-    }
-    active.pendingError = null;
-    if (active.answerText.trim()) {
-      this.transcript.finalizeMessage(sessionId, active, 'answer', active.answerText);
-      active.assistantMessageId = null;
-      active.answerText = '';
-    }
-    this.surfaceTurnError(sessionId, active, pending.classified, pending.message);
-    return false;
-  }
-
-  /**
-   * Re-sends the failed turn as text, with the image paths in the prompt, after
-   * an image payload rejection. The capability configuration is untouched.
-   */
-  private retryTurnWithoutImages(
-    sessionId: string,
-    active: ActivePiSession,
-    fallback: NonNullable<ActivePiSession['lastImagePrompt']>,
-  ): void {
-    active.lastImagePrompt = { ...fallback, retried: true };
-    active.errorSurfaced = false;
-    active.turnFailed = false;
-    active.isRunning = true;
-    this.appendSystemNotice(sessionId, t('coworkImageRetryNotice'));
-    const retryPrompt = [
-      fallback.text,
-      buildImageOmittedNotice(fallback.sentImages, {
-        verdict: ImageInputVerdict.Rejected,
-        ocrCommandFor: this.bundledOcrHelper?.commandFor,
-      }),
-    ]
-      .filter(content => content.trim().length > 0)
-      .join('\n\n');
-    void (async () => {
-      try {
-        // The SDK may already be aborting its own retry of the rejected payload;
-        // continuing before it settles would race that run. Its failure is
-        // already explained by the notice above, so it must not escape here.
-        await waitForPiRetryCancellation(active.piSession);
-      } catch {
-        // Intentionally ignored: the cancelled attempt's error is not the user's.
-      }
-      // Let the cancellation bookkeeping clear before continuing: continueSession
-      // awaits the same promise and would rethrow this already-failed attempt.
-      await yieldToEventLoop();
-      // A run that failed hard leaves its Pi session unable to accept another
-      // prompt (the SDK swallows it), so the retry drops the session and lets
-      // continueSession rebuild it from the stored transcript. The rebuild starts
-      // a fresh session, so the session-scoped approval settings travel with it —
-      // otherwise an "allow all" session would start asking for every tool call.
-      const approvalMode = active.approvalMode;
-      this.activeSessions.delete(sessionId);
-      try {
-        await this.continueSession(sessionId, retryPrompt, {
-          _skipUserMessage: true,
-          approvalMode,
-        });
-      } catch (error) {
-        console.warn(`[PiRuntime] image fallback retry failed for session ${sessionId}:`, error);
-        const message = error instanceof Error ? error.message : String(error);
-        const current = this.activeSessions.get(sessionId) ?? active;
-        this.surfaceTurnError(sessionId, current, classifyCoworkError(message), message);
-      }
-    })();
-  }
-
-  /** Persists and emits a turn failure exactly once (bubble + stream error). */
-  private surfaceTurnError(
-    sessionId: string,
-    active: ActivePiSession,
-    classified: CoworkError,
-    rawMessage: string,
-  ): void {
-    active.errorSurfaced = true;
-    active.turnFailed = true;
-    active.isRunning = false;
-    this.workbenchTaskService?.failRun?.(sessionId, { message: rawMessage });
-    // Persist a system error message so the error survives session switching
-    // and is visible in the message list. The classified kind lets the renderer
-    // translate it into a user-friendly i18n message; the raw message is kept
-    // for console diagnostics only.
-    const errorMessageSeed: CoworkMessage = {
-      id: randomUUID(),
-      type: 'system',
-      content: '',
-      timestamp: Date.now(),
-      metadata: { error: rawMessage, errorKind: classified.kind },
-    };
-    let errorMessage = errorMessageSeed;
-    if (this.store) {
-      this.store.updateSession(sessionId, { status: 'error' });
-      errorMessage = this.store.addMessage(sessionId, errorMessageSeed);
-    }
-    this.emit('message', sessionId, errorMessage);
-    this.emit('error', sessionId, classified);
-  }
-
-  /**
-   * Ends the turn when a workbench run can no longer execute tools. The run is
-   * already failed, so every further tool call is denied: without ending the
-   * turn the model answers each denial with another tool call.
-   *
-   * The error is flushed immediately so the user sees the concrete reason
-   * instead of a turn that silently stops producing output.
-   */
-  private endTerminatedWorkbenchTurn(sessionId: string, message: string): void {
-    const active = this.activeSessions.get(sessionId);
-    if (!active || active.aborted || active.turnFailed) return;
-    console.warn(`[PiRuntime] ending the turn of session ${sessionId}: ${message}`);
-    active.pendingError = { message, classified: classifyCoworkError(message) };
-    active.piSession.abortBash();
-    void active.piSession.abort().catch((error: unknown) => {
-      console.warn('[PiRuntime] failed to abort a terminated workbench run:', error);
-    });
-    this.flushPendingError(sessionId, active);
-  }
-
-  private clearApprovalsBySession(sessionId: string): void {
-    for (const [requestId, sid] of this.approvalSessionMap.entries()) {
-      if (sid !== sessionId) continue;
-      this.approvalSessionMap.delete(requestId);
-      this.emit('permissionDismiss', requestId);
-    }
-  }
-
-  private requestAskUserQuestion(
-    sessionId: string,
-    toolCallId: string,
-    input: PiAskUserQuestionInput,
-    signal?: AbortSignal,
-  ): Promise<PiAskUserQuestionResponse> {
-    if (signal?.aborted) {
-      return Promise.resolve({ behavior: 'deny', message: 'The request was cancelled.' });
-    }
-
-    const requestId = randomUUID();
-    return new Promise(resolve => {
-      const timer = setTimeout(() => {
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'The question timed out without a response.',
-        });
-      }, PiAskUserQuestionTimeoutMs);
-
-      const onAbort = () => {
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'The request was cancelled.',
-        });
-      };
-      signal?.addEventListener('abort', onAbort, { once: true });
-
-      this.pendingAskUserQuestions.set(requestId, {
-        sessionId,
-        resolve,
-        timer,
-        removeAbortListener: () => signal?.removeEventListener('abort', onAbort),
-      });
-
-      try {
-        this.emit('permissionRequest', sessionId, {
-          requestId,
-          toolName: PiAskUserQuestionToolName,
-          toolInput: input as unknown as Record<string, unknown>,
-          toolUseId: toolCallId,
-        });
-      } catch (error) {
-        console.error('[PiRuntime] failed to emit AskUserQuestion request:', error);
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'Unable to show the question to the user.',
-        });
-      }
-    });
-  }
-
-  private finishAskUserQuestion(requestId: string, response: PiAskUserQuestionResponse): void {
-    const pending = this.pendingAskUserQuestions.get(requestId);
-    if (!pending) return;
-    this.pendingAskUserQuestions.delete(requestId);
-    clearTimeout(pending.timer);
-    pending.removeAbortListener?.();
-    pending.resolve(response);
-    this.emit('permissionDismiss', requestId);
-  }
-
-  private dismissAskUserQuestionsBySession(sessionId: string): void {
-    for (const [requestId, pending] of this.pendingAskUserQuestions.entries()) {
-      if (pending.sessionId === sessionId) {
-        this.finishAskUserQuestion(requestId, {
-          behavior: 'deny',
-          message: 'The session was stopped.',
-        });
-      }
-    }
-  }
-
-  private dismissCodingElicitationsBySession(sessionId: string, reason: string): void {
-    for (const [requestId, pending] of this.pendingCodingElicitations.entries()) {
-      if (pending.sessionId === sessionId) {
-        this.finishCodingElicitation(requestId, { cancelled: true, reason });
-      }
-    }
-  }
-
-  private requestCodingElicitation(
-    sessionId: string,
-    _toolCallId: string,
-    input: PiCodingElicitationInput,
-    signal?: AbortSignal,
-  ): Promise<PiCodingElicitationResponse> {
-    const question = input.question.trim();
-    if (
-      !question ||
-      signal?.aborted ||
-      [...this.pendingCodingElicitations.values()].some(item => item.sessionId === sessionId)
-    ) {
-      return Promise.resolve({ cancelled: true, reason: 'The coding question was cancelled.' });
-    }
-    const requestId = randomUUID();
-    return new Promise(resolve => {
-      const onAbort = () =>
-        this.finishCodingElicitation(requestId, {
-          cancelled: true,
-          reason: 'The coding session was stopped.',
-        });
-      signal?.addEventListener('abort', onAbort, { once: true });
-      this.pendingCodingElicitations.set(requestId, {
-        sessionId,
-        resolve,
-        removeAbortListener: () => signal?.removeEventListener('abort', onAbort),
-      });
-      this.emit('codingElicitationRequest', sessionId, { requestId, question });
-    });
-  }
-
-  private finishCodingElicitation(requestId: string, response: PiCodingElicitationResponse): void {
-    const pending = this.pendingCodingElicitations.get(requestId);
-    if (!pending) return;
-    this.pendingCodingElicitations.delete(requestId);
-    pending.removeAbortListener?.();
-    pending.resolve(response);
+    await this.recovery.resetImageInputCapabilities();
   }
 
   // ── Skills & MCP integration ──
