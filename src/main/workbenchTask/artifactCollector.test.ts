@@ -110,3 +110,85 @@ test('uses the final message id in message-block references', () => {
 
   expect(artifact.reference).toBe('message:assistant-1:block:0');
 });
+
+test('accepts a declared deliverable outside the workspace as an external artifact', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-ws-'));
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-user-specified-'));
+  const deliverablePath = path.join(outsideDir, 'report.md');
+  fs.writeFileSync(deliverablePath, '# user specified output');
+  try {
+    const [artifact] = collectWorkbenchArtifacts({
+      taskId: 'task',
+      runId: 'run',
+      workspaceRoot: workspace,
+      finalAnswer: '',
+      artifactCandidates: [
+        {
+          path: deliverablePath,
+          role: 'deliverable',
+          source: WorkbenchArtifactCandidateSource.Declaration,
+        },
+      ],
+    });
+
+    // The workspace gate no longer swallows user-specified output locations:
+    // the file keeps its absolute path and is marked as external.
+    expect(artifact.reference).toBe(fs.realpathSync(deliverablePath));
+    expect(artifact.provenance).toBe(WorkbenchArtifactProvenance.External);
+    expect(artifact.metadata).toMatchObject({ outsideWorkspace: true });
+    expect(artifact.contentHash).toBeTruthy();
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test('still throws when the declared deliverable is actually missing', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-ws-'));
+  try {
+    expect(() =>
+      collectWorkbenchArtifacts({
+        taskId: 'task',
+        runId: 'run',
+        workspaceRoot: workspace,
+        finalAnswer: '',
+        artifactCandidates: [
+          {
+            path: path.join(workspace, 'does-not-exist.md'),
+            role: 'deliverable',
+            source: WorkbenchArtifactCandidateSource.Declaration,
+          },
+        ],
+      }),
+    ).toThrow('The declared deliverable is missing');
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test('skips non-deliverable declarations outside the workspace', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-ws-'));
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-scratch-'));
+  const scratchPath = path.join(outsideDir, 'notes.md');
+  fs.writeFileSync(scratchPath, '# scratch');
+  try {
+    const artifacts = collectWorkbenchArtifacts({
+      taskId: 'task',
+      runId: 'run',
+      workspaceRoot: workspace,
+      finalAnswer: '',
+      artifactCandidates: [
+        {
+          path: scratchPath,
+          role: 'intermediate',
+          source: WorkbenchArtifactCandidateSource.Declaration,
+        },
+      ],
+    });
+
+    expect(artifacts).toEqual([]);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  }
+});

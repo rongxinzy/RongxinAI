@@ -84,6 +84,22 @@ const resolveWorkspaceFile = (workspaceRoot: string, reference: string): string 
   }
 };
 
+/**
+ * Validate a user-specified deliverable path outside the workspace. The
+ * workspace gate exists to keep intermediates contained; a deliverable the
+ * user explicitly asked for at a given location is still verified (existence,
+ * file type, content hash) and recorded with its absolute path.
+ */
+const resolveExternalFile = (reference: string): string | null => {
+  if (!reference.trim() || !path.isAbsolute(reference) || !fs.existsSync(reference)) return null;
+  try {
+    const resolved = fs.realpathSync(reference);
+    return fs.statSync(resolved).isFile() ? resolved : null;
+  } catch {
+    return null;
+  }
+};
+
 export function collectWorkbenchArtifacts(input: {
   taskId: string;
   runId: string;
@@ -154,20 +170,26 @@ export function collectWorkbenchArtifacts(input: {
   ];
   for (const candidate of snapshotFiles) {
     const reference = candidate.path;
-    const resolved = resolveWorkspaceFile(input.workspaceRoot, reference);
+    const isDeclaredDeliverable =
+      candidate.source === WorkbenchArtifactCandidateSource.Declaration &&
+      candidate.role === CoworkArtifactRole.Deliverable;
+    let resolved = resolveWorkspaceFile(input.workspaceRoot, reference);
+    let outsideWorkspace = false;
+    if (!resolved && isDeclaredDeliverable) {
+      resolved = resolveExternalFile(reference);
+      outsideWorkspace = resolved !== null;
+    }
     if (!resolved) {
-      if (
-        candidate.source === WorkbenchArtifactCandidateSource.Declaration &&
-        candidate.role === CoworkArtifactRole.Deliverable
-      ) {
-        throw new Error('The declared deliverable is missing or outside the workspace.');
+      if (isDeclaredDeliverable) {
+        throw new Error(`The declared deliverable is missing: ${reference}`);
       }
       continue;
     }
     const contentHash = hashFile(resolved);
     const declaredHash = candidate.sha256 ?? null;
-    const provenance =
-      candidate.source === WorkbenchArtifactCandidateSource.DomainWorkflow
+    const provenance = outsideWorkspace
+      ? WorkbenchArtifactProvenance.External
+      : candidate.source === WorkbenchArtifactCandidateSource.DomainWorkflow
         ? WorkbenchArtifactProvenance.Controller
         : WorkbenchArtifactProvenance.Workspace;
     artifacts.push({
@@ -175,7 +197,7 @@ export function collectWorkbenchArtifacts(input: {
       runId: input.runId,
       kind: WorkbenchArtifactKind.File,
       mimeType: mimeForPath(reference),
-      reference: path.relative(input.workspaceRoot, resolved),
+      reference: outsideWorkspace ? resolved : path.relative(input.workspaceRoot, resolved),
       contentHash,
       provenance,
       verificationStatus:
@@ -188,6 +210,7 @@ export function collectWorkbenchArtifacts(input: {
         ...(candidate.title ? { title: candidate.title } : {}),
         ...(candidate.kind ? { declaredKind: candidate.kind } : {}),
         ...(declaredHash ? { declaredHash } : {}),
+        ...(outsideWorkspace ? { outsideWorkspace: true } : {}),
       },
     });
   }
