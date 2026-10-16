@@ -43,7 +43,7 @@
 2. **Open the app** and chat with the built-in free model — no API key required.
 3. **Pick a project folder**, describe your task, then follow progress and approve actions as it works.
 
-Developers: `git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent && cd ZhiYuanAgent && bun install && bun run electron:dev` (Node 24.x, Bun 1.4.0). See [Developer quick start](#developer-quick-start) for prerequisites and more commands.
+Developers iterating on the UI can start with `bun run web:preview` after installation (Node 24.x, Bun 1.4.0). See [Developer quick start](#developer-quick-start) for setup and desktop development commands.
 
 The free model requires a network connection; availability and usage limits are shown in the app. You can also [run from source](#developer-quick-start) on other platforms.
 
@@ -105,10 +105,10 @@ Install Git, Node.js **24.x**, and Bun **1.4.0**, as pinned in [`package.json`](
 git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent
 cd ZhiYuanAgent
 bun install
-bun run electron:dev
+bun run web:preview
 ```
 
-The development command prepares the channel and memory runtimes, then starts Vite and Electron. Initial runtime preparation requires network access. To use local inference, download the inference runtime for your host separately:
+Open the Vite URL in a browser to iterate on the renderer with hot reload, without starting Electron. To verify real desktop and IPC flows, run `bun run electron:dev`; it prepares the channel and memory runtimes, then starts Vite and Electron. Initial runtime preparation requires network access. To use local inference, download the inference runtime for your host separately:
 
 ```bash
 bun run llamacpp:runtime:download
@@ -169,9 +169,9 @@ Preview the renderer in a plain browser without Electron:
 bun run web:preview
 ```
 
-This starts a Vite dev server on port 5176 with a typed mock of the Electron preload API. `bun run web:preview:check` starts that server, walks the main screens in light and dark (sessions, a streamed reply, every settings panel, skills, MCP, automation, local inference, IM, and dialogs), fails on any console error, and writes screenshots to `.github/pr-assets/browser-preview/`. The mock covers the full preload contract: unimplemented calls return a typed default and warn once.
+This starts a Vite dev server on port 5176 with a typed mock of the Electron preload API. Use it as the fast path for day-to-day renderer UI changes: hot reload, browser developer tools, responsive layouts, themes, and interactions. `bun run web:preview:check` starts that server, walks the main screens in light and dark (sessions, a streamed reply, every settings panel, skills, MCP, automation, local inference, IM, and dialogs), fails on any console error, and writes screenshots to `.github/pr-assets/browser-preview/`. The mock covers the full preload contract: unimplemented calls return a typed default and warn once.
 
-The mock is only active in browser mode (`import.meta.env.DEV` + no `window.electron`). Production builds and Electron runs use the real preload bridge.
+The mock is only active in browser mode (`import.meta.env.DEV` + no `window.electron`). Production builds and Electron runs use the real preload bridge. Verify affected IPC, system, native-window, and end-to-end behavior with `bun run electron:dev`; browser preview does not exercise those integrations. See [CONTRIBUTING.md](CONTRIBUTING.md) for the UI workflow.
 
 ## Contribute
 
