@@ -1,4 +1,3 @@
-import { ZhiyuanModelPool } from '../../shared/modelPool/constants';
 import { getCoworkOpenAICompatProxyStatus } from './coworkOpenAICompatProxy';
 import { defaultConfig } from '../../renderer/config';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -675,7 +674,7 @@ test('resolves custom providers without an API key for anonymous compatible endp
   );
 });
 
-test('managed free model is available without a user key or compatibility proxy', () => {
+test('legacy raw routing does not invent a model after the unified catalog cutover', () => {
   vi.mocked(getCoworkOpenAICompatProxyStatus).mockReturnValue({ running: false } as ReturnType<
     typeof getCoworkOpenAICompatProxyStatus
   >);
@@ -683,10 +682,8 @@ test('managed free model is available without a user key or compatibility proxy'
   setStoreGetter(() => ({ get: () => config }) as never);
   try {
     const resolved = resolveRawApiConfig();
-    expect(resolved.error).toBeUndefined();
-    expect(resolved.config?.model).toBe(ZhiyuanModelPool.FreeModelId);
-    expect(resolved.config?.apiKey).toBe('sk-zhiyuan-managed');
-    expect(resolved.providerMetadata?.providerName).toBe(ProviderName.Zhiyuan);
+    expect(resolved.config).toBeNull();
+    expect(resolved.error).toBe('No available model configured in enabled providers.');
     expect(resolveCurrentApiConfig().config).toBeNull();
   } finally {
     vi.mocked(getCoworkOpenAICompatProxyStatus).mockReturnValue({ running: true } as ReturnType<

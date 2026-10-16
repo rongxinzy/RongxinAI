@@ -129,6 +129,27 @@ try {
     .getByTestId('sidebar-new-conversation')
     .waitFor({ state: 'visible', timeout: 120_000 });
 
+  // The isolated profile has no model. Seed a local test-only model so the
+  // Cowork onboarding redirect does not replace the view-cycle benchmark.
+  const readiness = await page.evaluate(async () => {
+    const config = await window.electron.store.get('app_config');
+    await window.electron.store.set('app_config', {
+      ...config,
+      model: { defaultModel: 'memory-test-model', defaultModelProvider: 'custom_memorytest' },
+      providers: {
+        custom_memorytest: {
+          enabled: true,
+          apiKey: 'memory-test-key',
+          baseUrl: 'http://127.0.0.1:1/v1',
+          apiFormat: 'openai',
+          models: [{ id: 'memory-test-model', name: 'Memory Test Model' }],
+        },
+      },
+    });
+    return window.electron.checkApiConfig();
+  });
+  if (!readiness.hasConfig) throw new Error(`Memory test model setup failed: ${readiness.error}`);
+
   const baselineSnapshots = await takeSnapshots(electronApp, 'before');
   const baselineSamples = await sampleMetrics(electronApp);
   await runCycles(page);

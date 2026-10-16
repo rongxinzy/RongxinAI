@@ -9,7 +9,6 @@ import { StreamdownContext } from 'streamdown';
 import {
   checkPathExistsCached,
   getCachedPathExists,
-  isLikelyLocalFilePath,
   linkifyLocalPathsInMarkdown,
   parseLocalPathHref,
   resolveOpenableLocalPath,
@@ -209,5 +208,3 @@ export const StreamingMarkdownResponse = ({
     </div>
   );
 };
-
-export { isLikelyLocalFilePath };

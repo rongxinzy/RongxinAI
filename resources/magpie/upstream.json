@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/yetone/magpie.git",
+  "commit": "f074996d93b87b17ea682c4b5951d52794bb28cb",
+  "tree": "9e429356dad873ba4d30246f20a1d3fe9e53c2ff",
+  "archiveSha256": "ef8c08361794c41f6812266a99b328fc4c836d0507a9be7238fd0c45b1aca712",
+  "goModSha256": "5769f86829653b4b183fe12ff384682ace230d79578ad0f25da6af64a471cedd",
+  "goSumSha256": "7ac9a1aa23ef7d74112801933245264f0ac236d69754fc4372b26a675bdbd9cf",
+  "licenseSha256": "79d2c8444715d4bc453ec4f8a0aaf2051a4c1ee5ac08f5bd2e5848aef87c7572",
+  "version": "zhiyuan-f074996d93b8",
+  "goVersion": "go1.26.8",
+  "toolchainChecksumsSource": "https://go.dev/dl/?mode=json&include=all",
+  "toolchains": {
+    "linux-x64": { "archive": "go1.26.8.linux-amd64.tar.gz", "sha256": "d0f743b33e8d8945e6b1f432edd15785c70507121d6e2a723b21285eddf8b57b" },
+    "linux-arm64": { "archive": "go1.26.8.linux-arm64.tar.gz", "sha256": "211ffced9dcb9633a55eac6364816ec0ddd951389a740e88fa8b3337971bdda0" },
+    "darwin-x64": { "archive": "go1.26.8.darwin-amd64.tar.gz", "sha256": "186be014105aa6542b767d2c6ed5cca10a0214bdff809ef1724022a8c7894150" },
+    "darwin-arm64": { "archive": "go1.26.8.darwin-arm64.tar.gz", "sha256": "a012b25b571bd0138a03dcd25375ceba866fe5ca822f426d2c66a4de56fd3f4b" },
+    "win32-x64": { "archive": "go1.26.8.windows-amd64.zip", "sha256": "b92c3b2adae85a11ba71fe7216daf0d84e82af4c8ab6c5625807f28622043a59" },
+    "win32-arm64": { "archive": "go1.26.8.windows-arm64.zip", "sha256": "4bc560ed3ccb64eec0be6180b8c29185c07f5215276820adb4303d7bf3365435" }
+  }
+}

@@ -1,12 +1,9 @@
 import {
   assessLlamaCppAgentEligibility,
-  DEFAULT_LLAMACPP_SERVICE_CONFIG,
   type LlamaCppAgentEligibility,
   type LlamaCppRunningModel,
-  type LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
-import type { ModelCapabilities, ProviderConfig } from '../../shared/providers';
-import { ApiFormat, ProviderName, ProviderRegistry } from '../../shared/providers';
+import type { ModelCapabilities } from '../../shared/providers';
 
 export type { LlamaCppAgentEligibility } from '../../shared/llamacpp';
 export {
@@ -18,7 +15,6 @@ export {
 const LLAMACPP_MIN_AGENT_MAX_TOKENS = 512;
 const LLAMACPP_MAX_AGENT_MAX_TOKENS = 4096;
 const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
-const LLAMACPP_PROVIDER_PATH = '/v1';
 
 export type LlamaCppRunningModelBinding = {
   id: string;
@@ -27,219 +23,9 @@ export type LlamaCppRunningModelBinding = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
-  capabilities?: Pick<ModelCapabilities, 'toolCalling'>;
+  capabilities?: Partial<ModelCapabilities>;
   agentEligibility: LlamaCppAgentEligibility;
 };
-
-export type LlamaCppAgentAppConfig = {
-  model?: {
-    defaultModel?: string;
-    defaultModelProvider?: string;
-  };
-  providers?: Record<string, ProviderConfig>;
-};
-
-function serializeLlamaCppProviderConfig(provider?: ProviderConfig): string {
-  if (!provider) {
-    return '';
-  }
-
-  return JSON.stringify({
-    enabled: provider.enabled,
-    userEnabled: provider.userEnabled,
-    apiKey: provider.apiKey,
-    baseUrl: provider.baseUrl,
-    apiFormat: provider.apiFormat,
-    models: normalizeLlamaCppProviderModels(provider.models ?? []),
-  });
-}
-
-function normalizeLlamaCppProviderModels(
-  models: NonNullable<ProviderConfig['models']>,
-): NonNullable<ProviderConfig['models']> {
-  return models
-    .map(model => ({
-      id: model.id,
-      name: model.name,
-      supportsImage: model.supportsImage,
-      ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
-      ...(model.contextTokens ? { contextTokens: model.contextTokens } : {}),
-      ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
-      ...(model.capabilities ? { capabilities: model.capabilities } : {}),
-    }))
-    .sort((modelA, modelB) => {
-      const keyA = `${modelA.id.trim()}::${modelA.name.trim()}`;
-      const keyB = `${modelB.id.trim()}::${modelB.name.trim()}`;
-      return keyA.localeCompare(keyB);
-    });
-}
-
-function buildManagedLlamaCppProviderConfig(
-  currentProvider: ProviderConfig | undefined,
-  models: NonNullable<ProviderConfig['models']>,
-  baseUrl: string,
-  preserveExistingModels: boolean,
-): ProviderConfig {
-  const providerDef = ProviderRegistry.get(ProviderName.LlamaCpp);
-  const userEnabled = currentProvider?.userEnabled === true;
-  const existingModels = currentProvider?.models ?? [];
-  const refreshedModels = models.map(model => {
-    const existing = existingModels.find(candidate => candidate.id.trim() === model.id.trim());
-    if (!existing) return model;
-
-    const nextModel = { ...model };
-    if (existing.contextWindow) {
-      nextModel.contextWindow = existing.contextWindow;
-      if (existing.contextTokens) {
-        nextModel.contextTokens = existing.contextTokens;
-      } else {
-        delete nextModel.contextTokens;
-      }
-    } else if (existing.contextTokens) {
-      nextModel.contextTokens = existing.contextTokens;
-    }
-    if (existing.maxTokens) nextModel.maxTokens = existing.maxTokens;
-    if (existing.capabilities) nextModel.capabilities = existing.capabilities;
-    return nextModel;
-  });
-  // A timed-out model remains selectable: the local gateway restores it before inference.
-  const refreshedIds = new Set(refreshedModels.map(model => model.id.trim()));
-  const managedModels = preserveExistingModels
-    ? [...refreshedModels, ...existingModels.filter(model => !refreshedIds.has(model.id.trim()))]
-    : refreshedModels;
-
-  return {
-    ...currentProvider,
-    enabled: userEnabled,
-    userEnabled,
-    apiKey: currentProvider?.apiKey ?? '',
-    baseUrl: baseUrl || providerDef?.defaultBaseUrl || 'http://127.0.0.1:8080/v1',
-    apiFormat: ApiFormat.OpenAI,
-    models: normalizeLlamaCppProviderModels(managedModels),
-  };
-}
-
-export function upsertLlamaCppProviderInAppConfig(
-  current: LlamaCppAgentAppConfig,
-  models: NonNullable<ProviderConfig['models']>,
-  serviceConfig: LlamaCppServiceConfig = {},
-  providerBaseUrl?: string,
-): { config: LlamaCppAgentAppConfig; changed: boolean; clearedDefaultModel: boolean } {
-  return syncLlamaCppProviderInAppConfig(current, models, serviceConfig, providerBaseUrl, true);
-}
-
-function syncLlamaCppProviderInAppConfig(
-  current: LlamaCppAgentAppConfig,
-  models: NonNullable<ProviderConfig['models']>,
-  serviceConfig: LlamaCppServiceConfig,
-  providerBaseUrl: string | undefined,
-  preserveExistingModels: boolean,
-): { config: LlamaCppAgentAppConfig; changed: boolean; clearedDefaultModel: boolean } {
-  const currentProvider = current.providers?.[ProviderName.LlamaCpp];
-  const nextProvider = buildManagedLlamaCppProviderConfig(
-    currentProvider,
-    models,
-    providerBaseUrl || getLlamaCppProviderBaseUrl(serviceConfig),
-    preserveExistingModels,
-  );
-  const availableModelIds = new Set(
-    (nextProvider.models ?? []).map(model => model.id.trim()).filter(Boolean),
-  );
-  const clearedDefaultModel =
-    current.model?.defaultModelProvider === ProviderName.LlamaCpp &&
-    (!current.model.defaultModel?.trim() ||
-      !availableModelIds.has(current.model.defaultModel.trim()));
-  const changed =
-    serializeLlamaCppProviderConfig(currentProvider) !==
-      serializeLlamaCppProviderConfig(nextProvider) || clearedDefaultModel;
-
-  if (!changed) {
-    return {
-      config: current,
-      changed: false,
-      clearedDefaultModel: false,
-    };
-  }
-
-  return {
-    config: {
-      ...current,
-      providers: {
-        ...(current.providers ?? {}),
-        [ProviderName.LlamaCpp]: nextProvider,
-      },
-      model: clearedDefaultModel
-        ? {
-            ...(current.model ?? {}),
-            defaultModel: '',
-          }
-        : current.model,
-    },
-    changed: true,
-    clearedDefaultModel,
-  };
-}
-
-export function removeLlamaCppModelFromAppConfig(
-  current: LlamaCppAgentAppConfig,
-  modelName: string,
-): { config: LlamaCppAgentAppConfig; clearedDefaultModel: boolean } {
-  const trimmedModelName = modelName.trim();
-  if (!trimmedModelName) {
-    return { config: current, clearedDefaultModel: false };
-  }
-
-  const provider = current.providers?.[ProviderName.LlamaCpp];
-  const nextProviderModels = (provider?.models ?? []).filter(model => {
-    const id = typeof model?.id === 'string' ? model.id.trim() : '';
-    const name = typeof model?.name === 'string' ? model.name.trim() : '';
-    return id !== trimmedModelName && name !== trimmedModelName;
-  });
-  const next = syncLlamaCppProviderInAppConfig(
-    current,
-    nextProviderModels,
-    {
-      // Model removal must retain the endpoint previously synchronized from the service configuration.
-      host: readLlamaCppProviderHost(provider?.baseUrl),
-      port: readLlamaCppProviderPort(provider?.baseUrl),
-    },
-    undefined,
-    false,
-  );
-
-  return {
-    config: next.config,
-    clearedDefaultModel: next.clearedDefaultModel,
-  };
-}
-
-export function getLlamaCppProviderBaseUrl(
-  serviceConfig: Pick<LlamaCppServiceConfig, 'host' | 'port'>,
-): string {
-  const configuredHost = serviceConfig.host?.trim();
-  const host =
-    configuredHost && configuredHost !== '0.0.0.0'
-      ? configuredHost
-      : (DEFAULT_LLAMACPP_SERVICE_CONFIG.host ?? '127.0.0.1');
-  const port = serviceConfig.port?.trim() || DEFAULT_LLAMACPP_SERVICE_CONFIG.port || '8080';
-  return `http://${host}:${port}${LLAMACPP_PROVIDER_PATH}`;
-}
-
-function readLlamaCppProviderHost(baseUrl: string | undefined): string | undefined {
-  try {
-    return new URL(baseUrl).hostname;
-  } catch {
-    return undefined;
-  }
-}
-
-function readLlamaCppProviderPort(baseUrl: string | undefined): string | undefined {
-  try {
-    return new URL(baseUrl).port || undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 function normalizePositiveInteger(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;

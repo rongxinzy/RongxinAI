@@ -103,6 +103,8 @@
     "build:skills": "npm run build:skill:web-search && npm run build:skill:tech-news && npm run build:skill:email",
     "prepare:modelscope-tokens": "node scripts/write-modelscope-token-resource.cjs",
     "prepare:update-release": "node scripts/prepare-update-release.cjs",
+    "magpie:build": "node scripts/build-magpie-runtime.cjs",
+    "magpie:verify": "node scripts/verify-magpie-runtime.cjs",
     "build:electron:dev": "node scripts/build-electron-development.mjs",
     "start:electron": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron --remote-debugging-port=9222 .",
     "start:electron:inspect": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron --inspect=9229 --remote-debugging-port=9222 .",
