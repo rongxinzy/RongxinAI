@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getLlamaCppModelAgentEligibility: vi.fn(),
 }));
 
-vi.mock('./claudeSettings', () => ({
+vi.mock('./llamacppRunningModelRegistry', () => ({
   isLlamaCppModelRunning: mocks.isLlamaCppModelRunning,
   getLlamaCppModelAgentEligibility: mocks.getLlamaCppModelAgentEligibility,
 }));

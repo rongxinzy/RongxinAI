@@ -69,7 +69,6 @@ import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
 import { assertLlamaCppWorkModeContext } from '../llamacppWorkModeContextGuard';
-import type { LegacyMemoryMigrationService } from '../../memory/legacyMemoryMigrationService';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import {

@@ -4,7 +4,7 @@ import { t } from '../i18n';
 import {
   getLlamaCppModelAgentEligibility,
   isLlamaCppModelRunning,
-} from './claudeSettings';
+} from './llamacppRunningModelRegistry';
 
 export function assertLlamaCppWorkModeContext(input: {
   providerName: string;

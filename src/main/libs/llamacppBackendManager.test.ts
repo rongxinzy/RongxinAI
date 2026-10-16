@@ -8,7 +8,7 @@ import { app } from 'electron';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ZipFile } from 'yazl';
 
-vi.mock('./llamacppManager', () => ({
+vi.mock('./llamacppRuntimeDeviceProbe', () => ({
   listLlamaCppRuntimeDevices: vi.fn(async (input: { executablePath: string }) => ({
     success: true,
     executablePath: input.executablePath,
