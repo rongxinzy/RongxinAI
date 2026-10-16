@@ -59,11 +59,9 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 ### 托管 Python 运行时
 
-首启同步到 `userData/runtimes/`，两层：
-
-- `resources/python-win|mac|linux`：便携 CPython（uv 管理），agent shell PATH 基础解释器，`UV_PYTHON` 绑定。
-- `resources/skill-python/layers/shared`：合并所有内置 Skill requirements 的单个 uv venv，经 `applyManagedPythonEnv`（`src/main/libs/managedPythonEnv.ts`）前置到 PATH。Windows 需 `python3.exe` 别名（安装脚本创建，`ensureSharedSkillWindowsPython3Alias` 自愈）。`run_skill_script` 经 `findSkillPythonExecutable` 解析并强制 per-Skill `requirementsSha256` manifest 门。
-- **模型面策略三处必须同步**：`SYSTEM_PROMPT.md`（托管环境与工具节）、`piPythonEnvGuidelines.ts`（`python-runtime` contribution，用户覆盖系统提示后仍生效）、`piBashToolGuidelines.ts` 的 `getPiBashPythonEnvViolation`（拦截向托管解释器 pip install、直接 `python` 调内置 Skill 脚本）。
+- **独立工作区 Python 运行时**（`src/main/pythonRuntime/`）：由独立子进程 `dist-electron/python-runtime-runner.js`（`runner.ts`）管理版本锁定的 `python-build-standalone` CPython + `uv`（`manifest.json` 校验 SHA-256），按工作区哈希创建原子交换 `venv`（`userData/python-runtime/envs/<sha256>/venv`），暴露 `python_execute` 与 `python_install` 工具（`src/main/libs/agentEngine/piPythonTools.ts`）。POSIX 用 detached 进程组（`-pid`）清理子进程，Windows 用 `resources/python-runtime/job-runner.exe`（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）。
+- **内置 Skill 共享 Python 环境**：首启同步到 `userData/runtimes/`，`resources/python-win|mac|linux` + `resources/skill-python/layers/shared` 经 `applyManagedPythonEnv`（`src/main/libs/managedPythonEnv.ts`）注入 shell PATH；`run_skill_script` 经 `findSkillPythonExecutable` 解析并强制 per-Skill `requirementsSha256` manifest 门。
+- **模型面策略三处必须同步**：`SYSTEM_PROMPT.md`（托管环境与工具节）、`piPythonEnvGuidelines.ts`（`python-runtime` contribution，用户覆盖系统提示后仍生效）、`piBashToolGuidelines.ts` 的 `getPiBashPythonEnvViolation`（拦截在 bash 中直接用 `python` 调内置 `$SKILLS_ROOT` 脚本，引导改用 `run_skill_script`）。
 
 ### 记忆系统
 
@@ -217,7 +215,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 > [!IMPORTANT]
 > **代码冻结期约束（Code Freeze）**：当前仓库进入代码冻结期。CI 门禁已开启强校验，**仅允许 `fix` 开头的 PR 合并入 main 分支**（如 `fix(cowork): ...`、`fix: ...`）。其余任何新功能（feat）、重构（refactor）、架构调整等均禁止合入；此类工作转移至 fork 仓库推进。
 
-**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 按 PR diff 路径选择；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
+**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 
