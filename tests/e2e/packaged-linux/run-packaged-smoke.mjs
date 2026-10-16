@@ -29,11 +29,13 @@ import {
   createIsolatedProfile,
   delay,
   downloadFile,
+  findActiveMemoryRow,
   launchPackagedApp,
   resolveGlmApiKey,
   resolvePackagedExecutable,
   screenshot,
   seedLegacyUserMemoryTables,
+  seedMagpieZhipu,
   sqliteTableExists,
   stopApp,
   waitForCcConnectConfig,
@@ -198,11 +200,16 @@ async function scenarioManagedMemory(executablePath) {
 
 async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
   const profile = await createIsolatedProfile('zhiyuan-e2e-glm-work-');
+  const seeded = await seedMagpieZhipu(executablePath, profile, glmKey, GLM_MODEL);
+  console.log(
+    `[E2E] magpie seed add=${seeded.addStatus} models=${seeded.modelsStatus} hint=${JSON.stringify(seeded.modelsHint)}`,
+  );
   const workspaceDir = path.join(profile.home, 'workspace');
   await import('node:fs/promises').then(fs => fs.mkdir(workspaceDir, { recursive: true }));
   let electronApp;
   let page;
-  const secretFact = `packaged-e2e-secret-${Date.now()}`;
+  const decisionToken = `packaged-e2e-decision-${Date.now()}`;
+  const teamDecisionFact = `Team decision (${decisionToken}): standardize on SQLite for workspace persistence in packaged Linux E2E.`;
   try {
     ({ electronApp, page } = await launchPackagedApp(
       executablePath,
@@ -211,11 +218,11 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
     await configureGlmProvider(page, glmKey, { baseURL: GLM_BASE_URL, model: GLM_MODEL });
 
     const session = await page.evaluate(
-      async ({ cwd, secretFact: fact }) => {
+      async ({ cwd, teamDecisionFact: fact }) => {
         const started = await window.electron.cowork.startSession({
           prompt:
-            `Work mode E2E: use the memory tool to explicitly save this exact workspace fact: "${fact}". ` +
-            'Then answer with the single word SAVED if the tool succeeded.',
+            `Work mode E2E: use the memory tool to explicitly save this exact workspace decision: "${fact}". ` +
+            'Confirm only after the tool reports a successful save.',
           cwd,
           mode: 'work',
         });
@@ -224,35 +231,67 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
         }
         return { sessionId: started.session.id };
       },
-      { cwd: workspaceDir, secretFact },
+      { cwd: workspaceDir, teamDecisionFact },
     );
 
     const snapshot = await waitForRunCompletion(page, session.sessionId, 480_000);
-    const messages = await page.evaluate(async sessionId => {
+    await page.evaluate(async () => {
+      const drained = await window.electron.memory.drainOutbox();
+      if (!drained.success) throw new Error(drained.error || 'drainOutbox failed');
+    });
+
+    const dbRow = findActiveMemoryRow(profile.dbPath, decisionToken);
+    const recalled = await page.evaluate(
+      async ({ cwd, token }) => {
+        const list = await window.electron.memory.list({
+          workingDirectory: cwd,
+          query: token,
+        });
+        if (!list.success || !list.data) throw new Error(list.error || 'memory list failed');
+        return list.data.some(entry => entry.content.includes(token));
+      },
+      { cwd: workspaceDir, token: decisionToken },
+    );
+
+    const injectionSession = await page.evaluate(
+      async ({ cwd, token }) => {
+        const started = await window.electron.cowork.startSession({
+          prompt:
+            `What team decision about SQLite workspace persistence is recorded for this workspace (${token})? ` +
+            'Quote the stored decision verbatim if you have it in context.',
+          cwd,
+          mode: 'work',
+        });
+        if (!started.success || !started.session?.id) {
+          throw new Error(started.error || 'injection startSession failed');
+        }
+        return started.session.id;
+      },
+      { cwd: workspaceDir, token: decisionToken },
+    );
+    const injectionSnapshot = await waitForRunCompletion(page, injectionSession, 480_000);
+    const injectionMessages = await page.evaluate(async sessionId => {
       const result = await window.electron.cowork.getSession(sessionId);
       const sessionRecord = result.session ?? result;
       const messageList = sessionRecord?.messages ?? [];
       return messageList.map(message => message.content).join('\n');
-    }, session.sessionId);
-
-    const recalled = await page.evaluate(
-      async ({ cwd, fact }) => {
-        const list = await window.electron.memory.list({ workingDirectory: cwd });
-        if (!list.success || !list.data) throw new Error(list.error || 'memory list failed');
-        return list.data.some(entry => entry.content.includes(fact));
-      },
-      { cwd: workspaceDir, fact: secretFact },
-    );
+    }, injectionSession);
+    const injected = injectionMessages.includes(decisionToken);
 
     const shot = await screenshot(page, 'glm-work-memory-tool');
-    const ok = snapshot.phase === 'completed' && /SAVED|memory/i.test(messages) && recalled;
+    const ok =
+      snapshot.phase === 'completed' &&
+      dbRow !== null &&
+      recalled &&
+      injected &&
+      injectionSnapshot.phase === 'completed';
     record(
       'glm-work-memory-tool',
       ok ? 'pass' : 'fail',
       ok
-        ? `Work-mode turn completed (${snapshot.phase}); memory tool save and recall verified`
-        : `Run phase=${snapshot.phase}; messages include memory=${/memory/i.test(messages)}; recalled=${recalled}`,
-      [shot, `session:${session.sessionId}`],
+        ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified for ${decisionToken}`
+        : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}`,
+      [shot, `session:${session.sessionId}`, `injection:${injectionSession}`],
     );
   } catch (error) {
     const shot = page
@@ -272,6 +311,10 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
 
 async function scenarioImBridgeReply(executablePath, glmKey) {
   const profile = await createIsolatedProfile('zhiyuan-e2e-im-');
+  const seeded = await seedMagpieZhipu(executablePath, profile, glmKey, GLM_MODEL);
+  console.log(
+    `[E2E] magpie seed add=${seeded.addStatus} models=${seeded.modelsStatus} hint=${JSON.stringify(seeded.modelsHint)}`,
+  );
   const workspaceDir = path.join(profile.home, 'workspace');
   await import('node:fs/promises').then(fs => fs.mkdir(workspaceDir, { recursive: true }));
   let electronApp;
@@ -353,8 +396,8 @@ async function scenarioImBridgeReply(executablePath, glmKey) {
       'im-cc-connect-bridge-reply',
       ok ? 'pass' : 'fail',
       ok
-        ? 'Inbound cc-connect turn received a non-empty agent reply through the desktop bridge'
-        : `Bridge returned content without expected reply: ${content.slice(0, 200)}`,
+        ? 'Inbound cc-connect turn returned PONG through the desktop bridge'
+        : `Bridge reply did not contain PONG: ${content.slice(0, 200)}`,
       [shot, bridge.configPath],
     );
   } catch (error) {

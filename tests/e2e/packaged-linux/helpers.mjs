@@ -276,6 +276,29 @@ export async function configureGlmProvider(page, apiKey, { baseURL, model }) {
         apiType: 'openai',
       });
       if (!result.success) throw new Error(result.error || 'saveApiConfig failed');
+      if (window.electron.magpie?.start) {
+        const started = await window.electron.magpie.start();
+        if (started && started.state && started.state !== 'running') {
+          throw new Error(`magpie.start state=${started.state} ${started.error || ''}`);
+        }
+      }
+      if (window.electron.magpie?.models) {
+        const res = await window.electron.magpie.models();
+        const list = Array.isArray(res) ? res : (res?.data ?? res?.models ?? []);
+        const ids = list.map(entry => entry?.id ?? entry?.modelId ?? String(entry));
+        const pick = ids.find(id =>
+          String(id).toLowerCase().includes(String(resolvedModel).toLowerCase()),
+        );
+        if (!pick) {
+          throw new Error(
+            `no magpie model matches ${resolvedModel}; ids=${JSON.stringify(ids).slice(0, 800)}`,
+          );
+        }
+        const sel = await window.electron.magpie.selectDefault(pick);
+        if (sel?.success === false) {
+          throw new Error(sel.error || `selectDefault failed for ${pick}`);
+        }
+      }
       const readiness = await window.electron.checkApiConfig({ probeModel: true });
       if (!readiness.hasConfig) {
         throw new Error(readiness.error || 'checkApiConfig failed after GLM setup');
@@ -284,6 +307,57 @@ export async function configureGlmProvider(page, apiKey, { baseURL, model }) {
     },
     { baseURL, model, key: apiKey },
   );
+}
+
+export async function seedMagpieZhipu(executablePath, profile, apiKey, model) {
+  const { spawnSync } = await import('node:child_process');
+  const bin = path.join(path.dirname(executablePath), 'resources', 'magpie', 'linux-x64', 'magpie');
+  const root = path.join(profile.userDataPath, 'magpie');
+  const env = {
+    PATH: process.env.PATH,
+    HOME: profile.home,
+    DO_NOT_TRACK: '1',
+    MAGPIE_NO_ACCOUNTS: '1',
+    XDG_CONFIG_HOME: path.join(root, 'config'),
+    XDG_CACHE_HOME: path.join(root, 'cache'),
+    XDG_DATA_HOME: path.join(root, 'data'),
+    XDG_STATE_HOME: path.join(root, 'state'),
+  };
+  const add = spawnSync(bin, ['provider', 'add', 'zhipu', apiKey], {
+    env,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  const models = spawnSync(bin, ['provider', 'models', 'zhipu', model], {
+    env,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  const redact = value =>
+    String(value ?? '')
+      .split(String(apiKey))
+      .join('[REDACTED]');
+  return {
+    addStatus: add.status ?? String(add.error?.code),
+    modelsStatus: models.status,
+    modelsHint: redact(`${models.stdout ?? ''}${models.stderr ?? ''}`).slice(0, 300),
+  };
+}
+
+export function findActiveMemoryRow(dbPath, needle) {
+  if (!existsSync(dbPath)) return null;
+  const escaped = needle.replace(/'/g, "''");
+  const rows = execFileSync(
+    'sqlite3',
+    [
+      dbPath,
+      `SELECT id, title, content FROM memory_links WHERE status = 'active' AND content LIKE '%${escaped}%' LIMIT 1;`,
+    ],
+    { encoding: 'utf8' },
+  ).trim();
+  if (!rows) return null;
+  const [id, title, content] = rows.split('|');
+  return { id, title, content };
 }
 
 export async function writeJsonReport(results) {
