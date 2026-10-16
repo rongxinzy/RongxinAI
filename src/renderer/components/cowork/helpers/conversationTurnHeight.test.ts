@@ -28,3 +28,34 @@ test('estimates content-heavy turns above the empty-turn fallback', () => {
   expect(shortEstimate).toBeLessThan(300);
   expect(codeEstimate).toBeGreaterThan(1_500);
 });
+
+test('bounds thinking block and tool results estimation to avoid virtualizer jumps', () => {
+  const longThinkingContent = Array.from({ length: 500 }, (_, i) => `Thinking step ${i}`).join(
+    '\n',
+  );
+  const thinkingTurn: ConversationTurn = {
+    id: 'turn-thinking',
+    userMessage: null,
+    assistantItems: [
+      {
+        type: 'assistant',
+        message: {
+          id: 'thought-1',
+          type: 'assistant',
+          content: longThinkingContent,
+          timestamp: 1,
+          metadata: { isThinking: true },
+        },
+      },
+      {
+        type: 'assistant',
+        message: message('assistant-1', 'short answer'),
+      },
+    ],
+  };
+
+  const estimate = estimateConversationTurnHeight(thinkingTurn);
+  // Even with 500 lines of thought, estimated height must stay compact (well under 500px)
+  expect(estimate).toBeLessThan(400);
+  expect(estimate).toBeGreaterThanOrEqual(180);
+});

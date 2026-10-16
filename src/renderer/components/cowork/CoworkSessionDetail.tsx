@@ -967,6 +967,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
 
     const renderTurn = (turn: (typeof effectiveTurns)[number], index: number) => {
+      if (!turn) return null;
       const isStreamingOnly = turn.id === 'streaming-only';
       const isLastTurn = index === effectiveTurns.length - 1;
       const hasActiveToolActivity = isStreaming && isLastTurn && toolActivities.length > 0;

@@ -6,6 +6,8 @@ const TEXT_LINE_HEIGHT_PX = 22;
 const APPROXIMATE_UNITS_PER_LINE = 72;
 const MAX_ESTIMATED_TEXT_LINES = 800;
 const TOOL_GROUP_HEIGHT_PX = 84;
+const THINKING_ESTIMATED_HEIGHT_PX = 44;
+const SYSTEM_MESSAGE_HEIGHT_PX = 52;
 const MIN_TURN_HEIGHT_PX = 180;
 const MAX_TURN_HEIGHT_PX = 18_000;
 
@@ -40,8 +42,15 @@ export const estimateConversationTurnHeight = (turn: ConversationTurn): number =
 
   for (const item of turn.assistantItems) {
     hasContent = true;
-    height +=
-      item.type === 'tool_group' ? TOOL_GROUP_HEIGHT_PX : estimateTextHeight(item.message.content);
+    if (item.type === 'tool_group' || item.type === 'tool_result') {
+      height += TOOL_GROUP_HEIGHT_PX;
+    } else if (item.type === 'system') {
+      height += SYSTEM_MESSAGE_HEIGHT_PX;
+    } else if (item.type === 'assistant' && item.message.metadata?.isThinking) {
+      height += THINKING_ESTIMATED_HEIGHT_PX;
+    } else {
+      height += estimateTextHeight(item.message.content);
+    }
   }
 
   if (!hasContent) return DEFAULT_TURN_HEIGHT_PX;
