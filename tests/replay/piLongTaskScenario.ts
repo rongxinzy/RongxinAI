@@ -25,7 +25,7 @@ import { WorkbenchApprovalMode } from '@shared/workbenchTask';
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
 import { CoworkStore } from '../../src/main/coworkStore';
 import { composeCoworkSystemPrompt } from '../../src/main/coworkPrompt/composer';
-import { setStoreGetter } from '../../src/main/libs/claudeSettings';
+import { installTestMagpie } from '../helpers/installTestMagpie';
 import { stopPiOpenAICompatProxyForTests } from '../../src/main/libs/agentEngine/piOpenAICompatProxy';
 import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
 import { SqliteStore } from '../../src/main/sqliteStore';
@@ -199,6 +199,7 @@ export async function runLongTaskScenario(
   let tapeServer: PiProviderTapeServer | null = null;
   let store: SqliteStore | null = null;
   let adapter: PiRuntimeAdapter | null = null;
+  let disposeGateway: (() => void) | undefined;
   try {
     if (options.mode !== 'live') {
       if (!options.tapePath) throw new Error(`${options.mode} mode requires tapePath`);
@@ -262,7 +263,20 @@ export async function runLongTaskScenario(
       useSystemProxy: false,
       app: { port: 0, isDevelopment: false },
     });
-    setStoreGetter(() => store);
+    if (!tapeServer) {
+      throw new Error('Live long-task runs must go through the local model gateway.');
+    }
+    const gateway = installTestMagpie({
+      gatewayUrl: `http://127.0.0.1:${tapeServer.port}`,
+      defaultModelId: LONGTASK_MODEL_ID,
+      acceptUnknownModels: false,
+    });
+    gateway.upsert(LONGTASK_MODEL_ID, {
+      context_window: 65_536,
+      max_output_tokens: 4096,
+    });
+    gateway.setImage(LONGTASK_MODEL_ID, false);
+    disposeGateway = gateway.dispose;
 
     const db = store.getDatabase();
     initializeWorkbenchTaskSchema(db);
@@ -381,6 +395,7 @@ export async function runLongTaskScenario(
     };
   } finally {
     if (adapter) await adapter.stopAllSessions();
+    disposeGateway?.();
     await stopPiOpenAICompatProxyForTests();
     if (tapeServer) await tapeServer.close();
     if (store) store.close();

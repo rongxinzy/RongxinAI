@@ -238,16 +238,9 @@ import { registerTodoIpcHandlers } from './todo/ipc';
 import { TodoReminderScheduler } from './todo/reminderScheduler';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
-import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
 import { shutdownPythonRuntime } from './pythonRuntime/host';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
-import {
-  getCurrentApiConfig,
-  resolveAllEnabledProviderConfigs,
-  resolveAllProviderApiKeys,
-  resolveCurrentApiConfig,
-  setStoreGetter,
-} from './libs/claudeSettings';
+import { MAGPIE_RUNTIME_API_KEY } from './magpie/modelService';
 import {
   chooseTriageModelSwitch,
   classifyMessage,
@@ -255,7 +248,6 @@ import {
 } from './libs/agentEngine/modelTriage';
 import { setTriageClassifierDeps } from './libs/agentEngine/piClassifierTriage';
 import { DEFAULT_TRIAGE_CONFIG, type TriageConfig, type TriageState } from '../shared/triage';
-import { ProviderName } from '../shared/providers';
 import {
   clearCopilotTokenState,
   initCopilotTokenManager,
@@ -264,11 +256,6 @@ import {
 } from './libs/copilotTokenManager';
 import { saveCoworkApiConfig } from './libs/coworkConfigStore';
 import { getCoworkLogPath } from './libs/coworkLogger';
-import {
-  registerProxyTokenRefresher,
-  startCoworkOpenAICompatProxy,
-  stopCoworkOpenAICompatProxy,
-} from './libs/coworkOpenAICompatProxy';
 import {
   applyApplicationRuntimeEnv,
   generateSessionTitle,
@@ -343,7 +330,7 @@ import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscope
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { getSystemMemorySnapshot } from './libs/systemMemory';
 import { OllamaManager } from './libs/ollamaManager';
-import { resolveQualifiedAgentModelRef } from './libs/agentModels';
+import { registerAcpMagpieModelApply } from './codingAgent/acpMagpieModel';
 import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenceInstall';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
@@ -477,13 +464,10 @@ const readTriageConfig = (): TriageConfig => {
   return DEFAULT_TRIAGE_CONFIG;
 };
 
-/** classifier URL: explicit config first, then the enabled llama.cpp provider endpoint. */
+/** classifier URL: explicit config first, then the local inference service endpoint. */
 const resolveTriageClassifierBaseUrl = (config: TriageConfig): string => {
   if (config.rules.classifierBaseUrl) return config.rules.classifierBaseUrl;
-  const llama = resolveAllEnabledProviderConfigs().find(
-    provider => provider.providerName === ProviderName.LlamaCpp && provider.baseURL,
-  );
-  return llama?.baseURL ?? '';
+  return getLlamaCppManager().getBaseUrl();
 };
 
 /**
@@ -522,41 +506,6 @@ const applyMessageTriageRouting = async (sessionId: string, prompt: string): Pro
     await getPiRuntimeAdapter().patchSession(sessionId, { model: decision.modelRef });
     console.log(`[Triage] session ${sessionId} routed to ${decision.modelRef} (${result.reason})`);
   }
-};
-
-const migrateAgentModelRefs = (): number => {
-  const defaultModelRef = resolveDefaultAgentModelRef();
-  if (!defaultModelRef) return 0;
-
-  const availableProviders = buildAvailableAgentProviders();
-  const agents = getAgentManager().listAgents();
-  let changed = 0;
-
-  for (const agent of agents) {
-    const normalizedModel = agent.model.trim();
-    if (!normalizedModel) continue;
-
-    const qualification = resolveQualifiedAgentModelRef({
-      agentModel: normalizedModel,
-      availableProviders,
-    });
-
-    if (qualification.status === 'ambiguous') {
-      console.warn(
-        `[Main] Skipped ambiguous agent model migration for "${agent.id}" because "${qualification.modelId}" matches multiple providers: ${qualification.providerIds.join(', ')}`,
-      );
-      continue;
-    }
-
-    if (qualification.status !== 'qualified' || qualification.primaryModel === agent.model.trim()) {
-      continue;
-    }
-
-    getCoworkStore().updateAgent(agent.id, { model: qualification.primaryModel });
-    changed += 1;
-  }
-
-  return changed;
 };
 
 const sanitizeAttachmentFileName = (value?: string): string => {
@@ -1186,7 +1135,6 @@ process.on('exit', code => {
 let store: SqliteStore | null = null;
 let coworkStore: CoworkStore | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
-let piModelCatalogRefreshCoordinator: PiModelCatalogRefreshCoordinator | null = null;
 let workbenchTaskService: WorkbenchTaskService | null = null;
 let codingRoomService: CodingRoomService | null = null;
 let engramManager: EngramManager | null = null;
@@ -1245,7 +1193,11 @@ const getCodingRoomService = (): CodingRoomService => {
       new CodingRoomRepository(getStore().getDatabase()),
       new CodingAgentRegistry(
         new CodingAgentProfileRepository(getStore().getDatabase()),
-        () => resolveCurrentApiConfig().config !== null,
+        () => {
+          const enabled = getStore().get<boolean>('magpie_service_enabled') === true;
+          const modelId = getStore().get<string>('magpie_default_model_id')?.trim();
+          return enabled && Boolean(modelId);
+        },
         app.isPackaged
           ? path.join(process.resourcesPath, 'acp', 'registry.json')
           : path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
@@ -1632,21 +1584,6 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     // credential here so installed builds work without user configuration.
     process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = resolveAnySearchGatewayToken();
     process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
-    // Pi SDK resolves API keys from environment variables (ANTHROPIC_API_KEY etc.).
-    // Inject keys from ZhiYuanAgent's provider configuration before initializing Pi.
-    const keys = resolveAllProviderApiKeys();
-    const injected: string[] = [];
-    for (const [suffix, value] of Object.entries(keys)) {
-      const envKey = `${suffix}_API_KEY`;
-      if (!process.env[envKey] && value) {
-        process.env[envKey] = value;
-        injected.push(envKey);
-      }
-    }
-    console.log(
-      '[PiRuntime] Injected API keys:',
-      injected.length > 0 ? injected.join(', ') : '(none — provider config may be empty)',
-    );
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
@@ -2094,19 +2031,6 @@ const getStore = (): SqliteStore => {
 
 const getMainAgentWorkspace = (): string =>
   path.join(app.getPath('userData'), 'agent-workspaces', 'main');
-
-const buildAvailableAgentProviders = (): Record<string, { models: Array<{ id: string }> }> => {
-  const providerMap: Record<string, { models: Array<{ id: string }> }> = {};
-  for (const provider of resolveAllEnabledProviderConfigs()) {
-    for (const model of provider.models) {
-      const models = (providerMap[provider.providerName] ??= { models: [] }).models;
-      if (!models.some(entry => entry.id === model.id)) {
-        models.push({ id: model.id });
-      }
-    }
-  }
-  return providerMap;
-};
 
 const getLlamaCppManager = (): LlamaCppManager => {
   if (!llamaCppManager) {
@@ -4724,6 +4648,21 @@ if (!gotTheLock) {
     allowedModel: model => managedMagpieBindings!.allowedModel(model.id),
   });
   disposeMagpieModels = installMagpieModelService(modelService);
+  registerAcpMagpieModelApply(async modelId => {
+    const snapshot = await magpieManager?.agents();
+    for (const agent of snapshot?.agents ?? []) {
+      if (agent.cliMissing) continue;
+      for (const field of agent.models) {
+        if (field.value === modelId) continue;
+        if (!field.options.some(option => option.value === modelId)) continue;
+        try {
+          await magpieManager?.setModel({ agentId: agent.id, field: field.key, value: modelId });
+        } catch (error) {
+          console.warn(`[CodingAgent] could not apply gateway model to ${agent.id}:`, error);
+        }
+      }
+    }
+  });
   disposeMagpie = registerMagpieIpc(
     magpieManager,
     event =>
@@ -6902,7 +6841,16 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('get-api-config', async () => {
-    return getCurrentApiConfig();
+    const status = magpieManager?.status();
+    const model = getStore().get<string>('magpie_default_model_id')?.trim();
+    if (!status || status.state !== 'running' || !status.gatewayUrl || !model) return null;
+    const gateway = new URL(status.gatewayUrl);
+    return {
+      apiKey: MAGPIE_RUNTIME_API_KEY,
+      baseURL: `${gateway.origin}/v1`,
+      model,
+      apiType: 'openai' as const,
+    };
   });
 
   ipcMain.handle(AppConfigIpc.CheckApiConfig, () => modelService.checkReadiness());
@@ -7844,13 +7792,6 @@ if (!gotTheLock) {
       console.error('[PythonRuntime] Failed to shut down Python runtime on quit:', error);
     });
 
-    await piModelCatalogRefreshCoordinator?.stop();
-    piModelCatalogRefreshCoordinator = null;
-
-    await stopCoworkOpenAICompatProxy().catch(error => {
-      console.error('Failed to stop OpenAI compatibility proxy:', error);
-    });
-
     // Stop skill services.
     const skillServices = getSkillServiceManager();
     await skillServices.stopAll();
@@ -8233,13 +8174,7 @@ if (!gotTheLock) {
       resolveSessionTitles: sessionIds =>
         resolveMemorySessionTitles(getStore().getDatabase(), sessionIds),
     });
-    // Inject store getter into claudeSettings
-    setStoreGetter(() => store);
-    piModelCatalogRefreshCoordinator = new PiModelCatalogRefreshCoordinator({
-      resolveApiKeys: resolveAllProviderApiKeys,
-    });
     getStore().onDidChange<AppConfigSettings>('app_config', (next, previous) => {
-      piModelCatalogRefreshCoordinator?.notifyConfigurationChanged();
       // Provider/model edits are the user's explicit statement about what the
       // models can do: drop runtime image-capability observations so a corrected
       // endpoint or a re-enabled switch takes effect without a restart.
@@ -8299,17 +8234,6 @@ if (!gotTheLock) {
           console.warn('[Main] failed to restore Copilot token on startup:', err);
         });
     }
-
-    registerProxyTokenRefresher('github-copilot', async () => {
-      try {
-        const { refreshCopilotTokenNow } = await import('./libs/copilotTokenManager.js');
-        const refreshed = await refreshCopilotTokenNow();
-        return refreshed.copilotToken;
-      } catch (err) {
-        console.warn('[Auth] Copilot proxy token refresh failed:', err);
-        return null;
-      }
-    });
 
     // Enterprise config sync must run before agent services initialize.
     profiler.mark('enterpriseConfigSync');
@@ -8401,16 +8325,10 @@ if (!gotTheLock) {
 
     const defaultAgentModelRef = resolveDefaultAgentModelRef();
     const backfilledAgentModels = getCoworkStore().backfillEmptyAgentModels(defaultAgentModelRef);
-    const qualifiedAgentModels = migrateAgentModelRefs();
-    if (backfilledAgentModels > 0 || qualifiedAgentModels > 0) {
-      console.log(
-        `[Main] migrated agent model bindings: backfilled=${backfilledAgentModels}, qualified=${qualifiedAgentModels}`,
-      );
+    if (backfilledAgentModels > 0) {
+      console.log(`[Main] backfilled ${backfilledAgentModels} empty agent model binding(s)`);
     }
 
-    // Start proxy BEFORE config sync so proxy-dependent providers (e.g. copilot)
-    // get the correct baseURL on the first write, avoiding a mid-startup config
-    // overwrite that triggers unnecessary gateway hot-reload.
     profiler.mark('applyProxyPreference');
     const appConfig = getStore().get<AppConfigSettings>('app_config');
     await applyProxyPreference(getUseSystemProxyFromConfig(appConfig));
@@ -8420,12 +8338,6 @@ if (!gotTheLock) {
         console.warn('[Magpie] Previously enabled model service could not start:', error);
       });
     }
-
-    profiler.mark('coworkOpenAICompatProxy');
-    await startCoworkOpenAICompatProxy().catch(error => {
-      console.error('Failed to start OpenAI compatibility proxy:', error);
-    });
-    profiler.measure('coworkOpenAICompatProxy');
 
     try {
       getCronJobService().startPolling();
@@ -8444,7 +8356,6 @@ if (!gotTheLock) {
     createWindow();
     profiler.measure('createWindow');
     console.log('[Main] initApp: window created');
-    piModelCatalogRefreshCoordinator.start();
     startAppUpdatePolling();
 
     // ── Step 2-4: Skill bootstrap (non-blocking) ────────────────────

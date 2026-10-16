@@ -359,7 +359,7 @@ async function prepareSkillScript(
 
   let env: Record<string, string | undefined>;
   try {
-    env = await getEnhancedEnv('local');
+    env = await getEnhancedEnv();
   } catch (error) {
     console.warn(
       '[skill-runtime] Falling back to process environment:',

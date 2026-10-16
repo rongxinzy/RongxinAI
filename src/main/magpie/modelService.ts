@@ -1,5 +1,8 @@
 import type { MagpieModel, MagpieModelCatalog, MagpieStatus } from '../../shared/magpie/types';
 
+/** Loopback credential the runtime presents to the owned gateway. The gateway, not this process, holds upstream keys. */
+export const MAGPIE_RUNTIME_API_KEY = 'magpie-zhiyuan';
+
 export interface MagpieModelBackend {
   status(): MagpieStatus;
   ensureRunning?(): Promise<MagpieStatus>;
@@ -14,10 +17,17 @@ export interface MagpieModelServiceOptions {
   allowedModel?(model: MagpieModel): boolean;
 }
 export class MagpieModelService {
+  private latestModels: MagpieModel[] = [];
+
   constructor(
     private readonly backend: MagpieModelBackend,
     private readonly options: MagpieModelServiceOptions,
   ) {}
+
+  /** Last catalog projection, for synchronous capability reads between turns. */
+  peekModel(modelId: string): MagpieModel | undefined {
+    return this.latestModels.find(model => model.id === modelId);
+  }
   async catalog(): Promise<MagpieModelCatalog> {
     const status = this.backend.status();
     if (status.state !== 'running')
@@ -26,6 +36,7 @@ export class MagpieModelService {
     const models = (await this.backend.models()).filter(
       model => this.options.allowedModel?.(model) ?? true,
     );
+    this.latestModels = models;
     const current = this.backend.status();
     if (current.state !== 'running' || current.gatewayUrl !== status.gatewayUrl)
       throw new Error('Model service changed while reading its catalog. Try again.');
