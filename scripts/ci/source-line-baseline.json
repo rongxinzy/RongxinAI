@@ -34,7 +34,6 @@
     "src/renderer/components/localInference/LocalInferenceView.tsx": 1418,
     "src/renderer/components/mcp/McpManager.tsx": 1250,
     "src/renderer/components/skills/SkillsManager.tsx": 1158,
-    "src/renderer/services/i18n.ts": 7759,
     "src/renderer/theme/components/contract.ts": 1143,
     "src/renderer/types/electron.d.ts": 2082,
     "src/shared/components/ai-elements/prompt-input.tsx": 1028,
