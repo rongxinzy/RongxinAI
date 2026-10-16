@@ -7,7 +7,6 @@
     "scripts/generate-quick-case-sites.mjs": 1073,
     "SKILLs/pdf/scripts/cover.py": 1579,
     "SKILLs/pdf/scripts/render_body.py": 1039,
-    "src/main/codingAgent/codingRoomService.test.ts": 1973,
     "src/main/codingAgent/codingRoomService.ts": 2509,
     "src/main/codingAgent/drivers/acpCodingDriver.ts": 1231,
     "src/main/coworkStore.ts": 2066,
