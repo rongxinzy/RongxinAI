@@ -84,8 +84,13 @@ const copyPhotonWasmPlugin = () => ({
 export default defineConfig(async ({ command }) => {
   const electronSourceMap = command === 'serve' || process.env.VITE_ELECTRON_SOURCEMAP === '1';
   if (!electronSourceMap) {
-    for (const sourceMap of ['main.js.map', 'preload.js.map']) {
-      fs.rmSync(path.resolve(projectRoot, 'dist-electron', sourceMap), { force: true });
+    const distElectronDir = path.resolve(projectRoot, 'dist-electron');
+    if (fs.existsSync(distElectronDir)) {
+      for (const file of fs.readdirSync(distElectronDir)) {
+        if (file.endsWith('.map')) {
+          fs.rmSync(path.join(distElectronDir, file), { force: true });
+        }
+      }
     }
   }
 
@@ -162,6 +167,24 @@ export default defineConfig(async ({ command }) => {
                     sourcemap: electronSourceMap,
                     outDir: 'dist-electron',
                     minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
+                // Managed Python runtime runner is forked as a standalone Node child process.
+                entry: 'src/main/pythonRuntime/runner.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: {
+                      output: {
+                        entryFileNames: 'python-runtime-runner.js',
+                      },
+                    },
                   },
                 },
                 onstart() {},

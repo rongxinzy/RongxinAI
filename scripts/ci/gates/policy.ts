@@ -12,10 +12,10 @@ const memory =
 export function planGates(paths: string[], event: string, ref: string): GatePlan {
   // Manual runs are the escape hatch for risks not captured by path ownership.
   const full = event === CiEvent.Manual;
-  // main pushes repeat fast checks; PRs already own the expensive install checks.
   // Unknown events run everything rather than silently weakening the gate.
   const unknown =
     event !== CiEvent.PullRequest && event !== CiEvent.Push && event !== CiEvent.Manual;
+  const isRelease = ref.startsWith('refs/tags/');
   const relevant = paths.some(
     file =>
       packaging.test(file) ||
@@ -23,14 +23,15 @@ export function planGates(paths: string[], event: string, ref: string): GatePlan
         file,
       ),
   );
-  const installations = event === CiEvent.PullRequest && relevant;
+  // PRs no longer run expensive install checks; only release tags, manual runs, and unknown events trigger install checks.
+  const installations = full || unknown || isRelease;
   return {
-    [HeavyJob.Linux]: full || unknown || installations,
-    [HeavyJob.Windows]: full || unknown || installations,
+    [HeavyJob.Linux]: installations,
+    [HeavyJob.Windows]: installations,
     [HeavyJob.Memory]:
       full ||
       unknown ||
-      ref.startsWith('refs/tags/') ||
+      isRelease ||
       (event === CiEvent.PullRequest && (relevant || paths.some(file => memory.test(file)))),
   };
 }

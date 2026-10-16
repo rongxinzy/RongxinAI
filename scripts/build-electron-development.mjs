@@ -67,6 +67,13 @@ await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
 await build(createBuildOptions('src/main/libs/appUpdateHashWorker.ts'));
 await build(
+  createBuildOptions('src/main/pythonRuntime/runner.ts', {
+    output: {
+      entryFileNames: 'python-runtime-runner.js',
+    },
+  }),
+);
+await build(
   createBuildOptions('src/main/main.ts', {
     output: {
       codeSplitting: false,

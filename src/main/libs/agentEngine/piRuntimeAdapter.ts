@@ -160,6 +160,8 @@ import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitie
 import { resolvePiBuiltinProviderId } from './piProviderIds';
 import { resolvePiCustomModelApi } from './piModelApi';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
+import { getPythonRuntimeService } from '../../pythonRuntime/host';
+import { buildPiPythonTools } from './piPythonTools';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
@@ -1292,6 +1294,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
       if (!resourceState.chatMode && resourceState.fileToolsEnabled) {
         customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
+        customTools.push(
+          ...buildPiPythonTools({
+            service: getPythonRuntimeService(),
+            workspaceRoot,
+          }),
+        );
         customTools.push(
           buildDeclareArtifactTool({
             onDeclare: this.workbenchTaskService

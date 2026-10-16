@@ -2,8 +2,13 @@ import { Type } from 'typebox';
 
 export const PiPlanToolName = 'plan_write';
 
-/** Built-in Pi tools that can mutate the workspace; plan mode blocks them. */
-export const PiPlanModeBlockedToolNames = ['write', 'edit'] as const;
+/** Built-in and native tools that can mutate the workspace; plan mode blocks them. */
+export const PiPlanModeBlockedToolNames = [
+  'write',
+  'edit',
+  'python_execute',
+  'python_install',
+] as const;
 
 export const isPlanModeBlockedTool = (toolName: string): boolean =>
   (PiPlanModeBlockedToolNames as readonly string[]).includes(toolName);
