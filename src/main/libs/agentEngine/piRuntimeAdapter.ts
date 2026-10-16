@@ -4934,48 +4934,38 @@ async function resolvePiModel(
   modelPoolRequestContext?: ModelPoolRequestContext,
 ): Promise<PiResolvedModel> {
   if (hasMagpieModelService()) {
-    try {
-      const magpieService = getMagpieModelService();
-      const resolution = await magpieService.resolve(modelRef);
-      const {
-        model: customModel,
-        baseUrl,
-        api,
-        supportsImage,
-        maxTokens,
-      } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
-      const modelRuntime =
-        existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
-      modelRuntime.registerProvider('magpie', {
-        name: 'magpie',
-        baseUrl,
-        api,
-        models: [customModel],
-      });
-      await modelRuntime.setRuntimeApiKey('magpie', 'magpie-zhiyuan');
+    const magpieService = getMagpieModelService();
+    const resolution = await magpieService.resolve(modelRef);
+    const {
+      model: customModel,
+      baseUrl,
+      api,
+      supportsImage,
+      maxTokens,
+    } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
+    const modelRuntime =
+      existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
+    modelRuntime.registerProvider('magpie', {
+      name: 'magpie',
+      baseUrl,
+      api,
+      models: [customModel],
+    });
+    await modelRuntime.setRuntimeApiKey('magpie', 'magpie-zhiyuan');
 
-      return {
-        model: customModel,
-        endpointKey: baseUrl,
-        modelRuntime,
-        maxOutputTokens: maxTokens,
-        providerName: ProviderName.Magpie,
-        capabilities: {
-          imageInput: supportsImage
-            ? ModelCapabilityStatus.Supported
-            : ModelCapabilityStatus.Unsupported,
-        },
-        requestOptions: { apiKey: 'magpie-zhiyuan' },
-      };
-    } catch (magpieError) {
-      const normalizedModelRef = modelRef?.trim() || '';
-      const legacyResolution = normalizedModelRef
-        ? resolveRawApiConfigForModelRef(normalizedModelRef)
-        : resolveRawApiConfig();
-      if (!legacyResolution.config || !legacyResolution.providerMetadata) {
-        throw magpieError;
-      }
-    }
+    return {
+      model: customModel,
+      endpointKey: baseUrl,
+      modelRuntime,
+      maxOutputTokens: maxTokens,
+      providerName: ProviderName.Magpie,
+      capabilities: {
+        imageInput: supportsImage
+          ? ModelCapabilityStatus.Supported
+          : ModelCapabilityStatus.Unsupported,
+      },
+      requestOptions: { apiKey: 'magpie-zhiyuan' },
+    };
   }
 
   const normalizedModelRef = modelRef?.trim() || '';

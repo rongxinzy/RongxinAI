@@ -81,6 +81,7 @@ import {
 } from '../shared/cowork/sessionExperts';
 import {
   ApiIpc,
+  AppConfigIpc,
   AppIpc,
   CommunityAuthIpc,
   CoworkPermissionIpc,
@@ -245,7 +246,6 @@ import {
   resolveAllEnabledProviderConfigs,
   resolveAllProviderApiKeys,
   resolveCurrentApiConfig,
-  resolveRawApiConfig,
   setStoreGetter,
 } from './libs/claudeSettings';
 import {
@@ -459,14 +459,7 @@ const sanitizeExportFileName = (value: string): string => {
 };
 
 const resolveDefaultAgentModelRef = (): string => {
-  const apiResolution = resolveRawApiConfig();
-  const config = apiResolution.config;
-  const providerName = apiResolution.providerMetadata?.providerName.trim();
-  const modelId = config?.model?.trim();
-  if (!providerName || !modelId) {
-    return '';
-  }
-  return `${providerName}/${modelId}`;
+  return getStore().get<string>('magpie_default_model_id')?.trim() || '';
 };
 
 const triageStatesBySession = new Map<string, TriageState>();
@@ -6912,17 +6905,7 @@ if (!gotTheLock) {
     return getCurrentApiConfig();
   });
 
-  ipcMain.handle('check-api-config', async (_event, options?: { probeModel?: boolean }) => {
-    // Pi and managed Model Pool requests do not depend on the compatibility proxy.
-    const { config, error } = resolveRawApiConfig();
-    if (config && options?.probeModel) {
-      const probe = await probeCoworkModelReadiness();
-      if (probe.ok === false) {
-        return { hasConfig: false, config: null, error: probe.error };
-      }
-    }
-    return { hasConfig: config !== null, config, error };
-  });
+  ipcMain.handle(AppConfigIpc.CheckApiConfig, () => modelService.checkReadiness());
 
   ipcMain.handle(
     'save-api-config',

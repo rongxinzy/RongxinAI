@@ -40,6 +40,18 @@ export class MagpieModelService {
     await this.options.writeDefaultModelId(modelId);
     return { ...catalog, defaultModelId: modelId };
   }
+  async checkReadiness(): Promise<{ hasConfig: boolean; config: null; error?: string }> {
+    try {
+      await this.resolve();
+      return { hasConfig: true, config: null };
+    } catch (error) {
+      return {
+        hasConfig: false,
+        config: null,
+        error: error instanceof Error ? error.message : 'The model service is unavailable.',
+      };
+    }
+  }
   async resolve(
     modelRef?: string,
   ): Promise<{ model: MagpieModel; catalog: MagpieModelCatalog; gatewayUrl: string }> {
