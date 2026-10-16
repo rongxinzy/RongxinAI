@@ -7,13 +7,9 @@ import { app, nativeImage, shell, BrowserWindow } from 'electron';
 import { DEV_SERVER_URL, isDev, isLinuxRendererSmoke, isMac } from './appEnv';
 import { rt } from './runtimeState';
 import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
-import {
-  emitWindowState,
-  schedulePersistAppWindowState,
-  updateTitleBarOverlay,
-} from './windowManagement';
+import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
 import { openDevToolsWindow, toggleDevToolsForSender } from './appIpc';
-import { setContentSecurityPolicy, isWecomAuthUrl } from './windowSecurity';
+import { isWecomAuthUrl } from './windowSecurity';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { getCronJobService } from '../ipcHandlers/scheduledTask';
@@ -29,7 +25,7 @@ import {
 } from '../windowState';
 import { registerContextMenu } from '../contextMenu';
 import { setLanguage } from '../i18n';
-import { createTray, destroyTray, updateTrayMenu } from '../trayManager';
+import { createTray } from '../trayManager';
 import {
   getDisplayWorkAreas,
   getTitleBarOverlayOptions,
@@ -345,4 +341,6 @@ export const createMainWindow = (): void => {
       })();
     });
   };
+
+  createWindow();
 };

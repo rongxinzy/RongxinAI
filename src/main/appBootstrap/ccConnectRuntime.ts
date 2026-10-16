@@ -378,11 +378,6 @@ const scheduleCcConnectRuntimeRestart = (): void => {
   }, delayMs);
 };
 
-const getActivityService = () => {
-  rt.activityService ??= new ActivityService(getStore().getDatabase());
-  return rt.activityService;
-};
-
 export const getIMGatewayManager = () => {
   if (!rt.imGatewayManager) {
     rt.imGatewayManager = new ChannelAccountManager(getStore().getDatabase(), async accountId => {

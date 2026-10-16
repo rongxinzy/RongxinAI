@@ -95,11 +95,13 @@ import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from '../libs/pyth
 import { getSkillServiceManager } from '../skillServices';
 import { StartupProfiler } from '../startupProfiler';
 import { setAutoLaunchEnabled } from '../autoLaunchManager';
-import { createTray, updateTrayMenu } from '../trayManager';
+import { updateTrayMenu } from '../trayManager';
 import { APP_UPDATE_POLL_INTERVAL_MS } from '../../shared/appUpdate/constants';
 
 export const initApp = async (): Promise<void> => {
-  const initApp = async () => {
+  // Original bootstrap body, kept as one unit; invoked below so exported
+  // initApp() actually runs the startup sequence.
+  const runInitApp = async (): Promise<void> => {
     const profiler = new StartupProfiler();
 
     profiler.mark('app.whenReady');
@@ -702,4 +704,6 @@ export const initApp = async (): Promise<void> => {
       }
     });
   };
+
+  await runInitApp();
 };
