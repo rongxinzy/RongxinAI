@@ -4,10 +4,10 @@ import path from 'path';
 
 const dir = path.dirname(new URL(import.meta.url).pathname);
 
-const BW_4090M = 576;
+const BW_4090_LAPTOP = 576;
 const ETA = 0.6;
 
-function speedFromFileGb(fileGb, bw = BW_4090M) {
+function speedFromFileGb(fileGb, bw = BW_4090_LAPTOP) {
   const center = (bw * ETA) / fileGb;
   const low = Math.round(center * 0.85);
   const high = Math.round(center * 1.15);
@@ -79,7 +79,7 @@ th { color: ${muted}; font-weight: 500; }
 function wrap(theme, title, body) {
   return `<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"/><title>${title}</title><style>${css(theme)}</style></head>
-<body><span class="mock-label">rev3 · ${theme === 'light' ? '浅' : '深'} · dual-4090-16g</span><div class="app">${body}</div></body></html>`;
+<body><span class="mock-label">rev3.1 · ${theme === 'light' ? '浅' : '深'} · dual-4090-laptop-16g</span><div class="app">${body}</div></body></html>`;
 }
 
 const profileSimple = `
@@ -126,8 +126,8 @@ ${profileSimple}
   <p style="margin-top:8px;color:#64748B">推荐加载：上下文 40K · 记忆缓存 q8_0 · 文件 5.0 GB（权重同文件大小）</p>
   <p>单卡显存约 7.0 GB / 16 GB · 未使用 CPU 卸载</p>
   <table><tr><th>显卡</th><th>用途</th><th>占用</th></tr>
-  <tr><td>显卡 1 · 4090M 16GB</td><td>本模型</td><td>7.0 GB</td></tr>
-  <tr><td>显卡 2 · 4090M 16GB</td><td>向量模型（自动）</td><td>0.6 GB</td></tr></table>
+  <tr><td>显卡 1 · RTX 4090 Laptop 16GB</td><td>本模型</td><td>7.0 GB</td></tr>
+  <tr><td>显卡 2 · RTX 4090 Laptop 16GB</td><td>向量模型（自动）</td><td>0.6 GB</td></tr></table>
   <p style="margin-top:8px;font-size:11px;color:#64748B">速度估算：576×0.6÷5.0≈${s8.center.toFixed(1)} tok/s，展示 ${s8.low}–${s8.high}（±15%）</p>
 </details>`),
 
