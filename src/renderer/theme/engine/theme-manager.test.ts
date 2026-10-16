@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { ThemeManager } from './theme-manager';
 import { removeStyles } from './style-injector';
 import { allThemes } from '../themes';
-import { classicLight } from '../themes/classic-light';
+import { zenithLight } from '../themes/zenith-light';
 import { defineThemePlugins, THEME_PLUGIN_VERSION, validateTheme } from '../themes/plugins';
 import { TOKEN_NAMES } from '../tokens/contract';
 
@@ -16,10 +16,10 @@ afterEach(() => {
 
 test('switches complete plugin values without replacing focused inputs or application state', async () => {
   const custom = {
-    ...classicLight,
-    meta: { ...classicLight.meta, id: 'test-paper' },
+    ...zenithLight,
+    meta: { ...zenithLight.meta, id: 'test-paper' },
     tokens: {
-      ...classicLight.tokens,
+      ...zenithLight.tokens,
       primary: '#993322',
       'semantic-card': '#fff8ee',
       'style-font-sans': 'serif',
@@ -39,13 +39,13 @@ test('switches complete plugin values without replacing focused inputs or applic
   expect(document.documentElement.dataset.theme).toBe(custom.meta.id);
   expect(document.querySelectorAll('#zhiyuan-theme-styles')).toHaveLength(1);
   expect(document.querySelector('#zhiyuan-theme-styles')?.textContent).toContain('--card: #fff8ee');
-  await manager.setTheme('classic-dark');
+  await manager.setTheme('zenith-dark');
   expect(document.documentElement.classList.contains('dark')).toBe(true);
   expect(document.querySelector('#zhiyuan-theme-styles')?.textContent).not.toContain('#fff8ee');
   expect(document.activeElement).toBe(input);
   expect(persist).toHaveBeenCalledTimes(2);
   await manager.setTheme('missing-plugin');
-  expect(manager.getThemeId()).toBe('classic-dark');
+  expect(manager.getThemeId()).toBe('zenith-dark');
 });
 
 test('rejects incomplete, duplicate and unsafe theme definitions before they reach CSS', () => {
@@ -54,12 +54,12 @@ test('rejects incomplete, duplicate and unsafe theme definitions before they rea
     expect(() => validateTheme(theme)).not.toThrow();
   }
   expect(() =>
-    validateTheme({ ...classicLight, tokens: { ...classicLight.tokens, primary: '' } }),
+    validateTheme({ ...zenithLight, tokens: { ...zenithLight.tokens, primary: '' } }),
   ).toThrow();
   expect(() =>
     validateTheme({
-      ...classicLight,
-      tokens: { ...classicLight.tokens, primary: 'red; } body { display:none' },
+      ...zenithLight,
+      tokens: { ...zenithLight.tokens, primary: 'red; } body { display:none' },
     }),
   ).toThrow();
   expect(() =>
@@ -68,7 +68,7 @@ test('rejects incomplete, duplicate and unsafe theme definitions before they rea
         version: THEME_PLUGIN_VERSION,
         id: 'test',
         name: { zh: 'test', en: 'test' },
-        appearances: { light: classicLight, dark: classicLight },
+        appearances: { light: zenithLight, dark: zenithLight },
       },
     ]),
   ).toThrow();
@@ -77,8 +77,8 @@ test('rejects incomplete, duplicate and unsafe theme definitions before they rea
 test('switches packaged backgrounds with the complete theme and clears them on default themes', async () => {
   const { BackgroundKind, DEFAULT_BACKGROUND } = await import('../background/background');
   const painted = {
-    ...classicLight,
-    meta: { ...classicLight.meta, id: 'painted' },
+    ...zenithLight,
+    meta: { ...zenithLight.meta, id: 'painted' },
     background: {
       ...DEFAULT_BACKGROUND,
       kind: BackgroundKind.Color,
@@ -98,12 +98,13 @@ test('switches packaged backgrounds with the complete theme and clears them on d
     '#aabbcc',
   );
   expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0.4');
-  await manager.setTheme('classic-dark');
+  await manager.setTheme('zenith-light');
+  // Zenith has its own background, not transparent
   expect(document.documentElement.style.getPropertyValue('--main-background-color')).toBe(
-    'transparent',
+    '#FAFBFD',
   );
   expect(document.documentElement.style.getPropertyValue('--main-background-image')).toBe('none');
-  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0');
+  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('1');
   expect(input.value).toBe('draft');
   expect(document.activeElement).toBe(input);
 });

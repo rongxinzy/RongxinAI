@@ -12,6 +12,7 @@
 
 ```bash
 bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
+bun run web:preview        # 浏览器预览模式（端口 5176，无需 Electron，有模拟数据）
 bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
 bun run format             # oxfmt；提交前 bun run format:check
@@ -21,6 +22,15 @@ bun run dist:mac|dist:win|dist:linux
 bun run theme:generate     # 改 token/recipe/生成器后必跑
 bun run rebuild:electron-native   # 原生模块依赖变更后
 ```
+
+### 浏览器预览模式
+
+`bun run web:preview` 在普通浏览器（不依赖 Electron）中预览渲染器主要界面，用于快速 UI 迭代与截图。
+
+- 仅在 `import.meta.env.DEV` 且无 preload bridge 时由 `main.tsx` 动态加载 `src/renderer/browserMock/`；生产构建不含 mock。
+- Mock 与 fixture 均以 `Window['electron']`（`src/renderer/types/electron.d.ts`）为类型契约；契约变更会让 mock 报类型错误。
+- 只为主界面所需调用提供 fixture；其余调用返回 `{ success: false }`，订阅返回空取消函数。新界面需要数据时在 `browserMock/index.ts` 补充有类型的 override。
+- `bun run preview:screenshots [dir]`（需先 `bunx playwright install chromium` 并启动 preview）生成工作台、对话、设置的明暗截图。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 
