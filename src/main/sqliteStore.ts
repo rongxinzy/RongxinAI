@@ -1,5 +1,4 @@
 import Database from 'better-sqlite3';
-import crypto from 'crypto';
 import { app } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
@@ -32,7 +31,6 @@ type ChangePayload<T = unknown> = {
   oldValue: T | undefined;
 };
 
-const USER_MEMORIES_MIGRATION_KEY = 'userMemories.migration.v1.completed';
 const AGENT_WORKING_DIRECTORY_BACKFILL_KEY = 'agents.workingDirectoryBackfill.v1.completed';
 
 export class SqliteStore {
@@ -202,50 +200,6 @@ export class SqliteStore {
     initializeWorkbenchTaskSchema(this.db);
     initializeCodingAgentSchema(this.db);
     initializeTodoSchema(this.db);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS user_memories (
-        id TEXT PRIMARY KEY,
-        text TEXT NOT NULL,
-        fingerprint TEXT NOT NULL,
-        confidence REAL NOT NULL DEFAULT 0.75,
-        is_explicit INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'created',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        last_used_at INTEGER
-      );
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS user_memory_sources (
-        id TEXT PRIMARY KEY,
-        memory_id TEXT NOT NULL,
-        session_id TEXT,
-        message_id TEXT,
-        role TEXT NOT NULL DEFAULT 'system',
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at INTEGER NOT NULL,
-        FOREIGN KEY (memory_id) REFERENCES user_memories(id) ON DELETE CASCADE
-      );
-    `);
-
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_user_memories_status_updated_at
-      ON user_memories(status, updated_at DESC);
-    `);
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_user_memories_fingerprint
-      ON user_memories(fingerprint);
-    `);
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_user_memory_sources_session_id
-      ON user_memory_sources(session_id, is_active);
-    `);
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_user_memory_sources_memory_id
-      ON user_memory_sources(memory_id, is_active);
-    `);
 
     // Create agents table
     this.db.exec(`
@@ -596,7 +550,7 @@ export class SqliteStore {
       console.warn('[SqliteStore] failed to backfill agent working directories:', error);
     }
 
-    this.migrateLegacyMemoryFileToUserMemories();
+    this.dropLegacyUserMemoryTables();
     migrateScheduledSessionTitles(this.db);
     this.migrateFromElectronStore(basePath);
   }
@@ -709,105 +663,15 @@ export class SqliteStore {
     }
   }
 
-  private tryReadLegacyMemoryText(): string {
-    const candidates = [
-      path.join(process.cwd(), 'MEMORY.md'),
-      path.join(app.getAppPath(), 'MEMORY.md'),
-      path.join(process.cwd(), 'memory.md'),
-      path.join(app.getAppPath(), 'memory.md'),
-    ];
-
-    for (const candidate of candidates) {
-      try {
-        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-          return fs.readFileSync(candidate, 'utf8');
-        }
-      } catch {
-        // Skip unreadable candidates.
-      }
-    }
-    return '';
-  }
-
-  private parseLegacyMemoryEntries(raw: string): string[] {
-    const normalized = raw.replace(/```[\s\S]*?```/g, ' ');
-    const lines = normalized.split(/\r?\n/);
-    const entries: string[] = [];
-    const seen = new Set<string>();
-
-    for (const line of lines) {
-      const match = line.trim().match(/^-+\s*(?:\[[^\]]+\]\s*)?(.+)$/);
-      if (!match?.[1]) continue;
-      const text = match[1].replace(/\s+/g, ' ').trim();
-      if (!text || text.length < 6) continue;
-      if (/^\(empty\)$/i.test(text)) continue;
-      const key = text.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      entries.push(text.length > 360 ? `${text.slice(0, 359)}…` : text);
-    }
-
-    return entries.slice(0, 200);
-  }
-
-  private memoryFingerprint(text: string): string {
-    const normalized = text
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return crypto.createHash('sha1').update(normalized).digest('hex');
-  }
-
-  private migrateLegacyMemoryFileToUserMemories(): void {
-    if (this.get<string>(USER_MEMORIES_MIGRATION_KEY) === '1') {
-      return;
-    }
-
-    const content = this.tryReadLegacyMemoryText();
-    if (!content.trim()) {
-      this.set(USER_MEMORIES_MIGRATION_KEY, '1');
-      return;
-    }
-
-    const entries = this.parseLegacyMemoryEntries(content);
-    if (entries.length === 0) {
-      this.set(USER_MEMORIES_MIGRATION_KEY, '1');
-      return;
-    }
-
-    const now = Date.now();
-    const insertMemory = this.db.prepare(`
-      INSERT INTO user_memories (
-        id, text, fingerprint, confidence, is_explicit, status, created_at, updated_at, last_used_at
-      ) VALUES (?, ?, ?, ?, 1, 'created', ?, ?, NULL)
-    `);
-    const insertSource = this.db.prepare(`
-      INSERT INTO user_memory_sources (id, memory_id, session_id, message_id, role, is_active, created_at)
-      VALUES (?, ?, NULL, NULL, 'system', 1, ?)
-    `);
-    const checkExisting = this.db.prepare(
-      `SELECT id FROM user_memories WHERE fingerprint = ? AND status != 'deleted' LIMIT 1`,
-    );
-
-    const migrate = this.db.transaction(() => {
-      for (const text of entries) {
-        const fingerprint = this.memoryFingerprint(text);
-        if (checkExisting.get(fingerprint)) continue;
-
-        const memoryId = crypto.randomUUID();
-        insertMemory.run(memoryId, text, fingerprint, 0.9, now, now);
-        insertSource.run(crypto.randomUUID(), memoryId, now);
-      }
-    });
-
+  private dropLegacyUserMemoryTables(): void {
     try {
-      migrate();
+      this.db.exec(`
+        DROP TABLE IF EXISTS user_memory_sources;
+        DROP TABLE IF EXISTS user_memories;
+      `);
     } catch (error) {
-      console.warn('Failed to migrate legacy MEMORY.md entries:', error);
+      console.warn('[SqliteStore] failed to drop legacy user memory tables:', error);
     }
-
-    this.set(USER_MEMORIES_MIGRATION_KEY, '1');
   }
 
   private migrateFromElectronStore(userDataPath: string) {

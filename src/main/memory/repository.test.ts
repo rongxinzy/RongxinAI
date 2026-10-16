@@ -11,7 +11,6 @@ import {
 import {
   MemoryExtractorKind,
   MemoryOutboxOperation,
-  MemoryRecordStorageKind,
   PERSONAL_MEMORY_SESSION_PREFIX,
 } from './constants';
 import { MemoryRepository } from './repository';
@@ -314,34 +313,6 @@ test('rejecting an imported candidate leaves a content-free durable receipt', ()
     expect(repository.getCandidate(candidateId)).toBeNull();
     expect(repository.hasImportRejection(candidateId)).toBe(true);
     expect(repository.listPending()).toHaveLength(0);
-  } finally {
-    db.close();
-  }
-});
-
-test('finds confirmed Personal memories by their prefixed origin session', () => {
-  const db = new Database(':memory:');
-  const repository = new MemoryRepository(db);
-
-  try {
-    repository.createLink({
-      id: 'personal-link',
-      memoryId: 8,
-      projectId: 'personal://zhiyuan-agent/user',
-      scope: MemoryScope.Personal,
-      sessionId: 'personal:session-a',
-      sourceKind: MemorySourceKind.ModelProposal,
-      title: 'Editor preference',
-      content: 'Copied conversation text.',
-      kind: MemoryKind.Preference,
-    });
-
-    expect(repository.listMigrationRecordsForContext('project-a')).toEqual([
-      expect.objectContaining({
-        storageKind: MemoryRecordStorageKind.Link,
-        memory: expect.objectContaining({ id: 'personal-link' }),
-      }),
-    ]);
   } finally {
     db.close();
   }
