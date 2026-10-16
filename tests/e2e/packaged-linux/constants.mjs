@@ -9,7 +9,6 @@ const REPO_ROOT = path.resolve(E2E_DIR, '../../..');
 export const APP_DATA_DIR_NAME = 'ZhiYuanAgent';
 export const DB_FILENAME = 'zhiyuan.sqlite';
 
-export const GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4';
 export const GLM_MODEL = process.env.ZHIYUAN_E2E_GLM_MODEL?.trim() || 'glm-4.7';
 
 export const E2E_ARTIFACT_DIR =

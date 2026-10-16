@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -75,6 +76,7 @@ export function buildLaunchEnv(home, userDataPath, options = {}) {
     ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: userDataPath,
     ZHIYUAN_ENABLE_GPU: 'false',
     ELECTRON_ENABLE_LOGGING: 'true',
+    ZHIYUAN_E2E_CAPTURE_MEMORY_PROMPT: '1',
     ...(llamaBin ? { LLAMACPP_BIN: llamaBin } : {}),
     ...(ldLibraryPath ? { LD_LIBRARY_PATH: ldLibraryPath } : {}),
   };
@@ -107,6 +109,66 @@ export async function screenshot(page, name) {
   const target = path.join(E2E_ARTIFACT_DIR, `${name}.png`);
   await page.screenshot({ path: target, fullPage: true });
   return target;
+}
+
+export function readMemoryPromptCapture(userDataPath, sessionId) {
+  const target = path.join(userDataPath, 'e2e-memory-prompt-captures', `${sessionId}.json`);
+  if (!existsSync(target)) return null;
+  try {
+    return JSON.parse(readFileSync(target, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+export function redactE2eText(value, secrets = []) {
+  let text = String(value ?? '');
+  for (const secret of secrets) {
+    if (secret) text = text.split(String(secret)).join('[REDACTED]');
+  }
+  return text;
+}
+
+export async function summarizeInjectionSession(page, sessionId, { distinctiveWord }) {
+  return page.evaluate(
+    async ({ targetSessionId, word }) => {
+      const isMemoryToolMessage = message => {
+        const toolName = message.metadata?.toolName;
+        if (typeof toolName === 'string' && toolName.toLowerCase() === 'memory') {
+          return true;
+        }
+        if (message.type !== 'tool_use' && message.type !== 'tool_result') {
+          return false;
+        }
+        const toolInput = message.metadata?.toolInput;
+        if (toolInput && typeof toolInput === 'object' && 'action' in toolInput) {
+          return true;
+        }
+        const payload = `${message.content ?? ''}${message.metadata?.toolResult ?? ''}`;
+        return /"action"\s*:\s*"(?:recall|save|list|propose_personal)"/i.test(payload);
+      };
+      const result = await window.electron.cowork.getSession(targetSessionId);
+      const messages = (result.session ?? result)?.messages ?? [];
+      const assistantText = messages
+        .filter(message => message.role === 'assistant' || message.type === 'assistant')
+        .map(message => String(message.content ?? ''))
+        .join('\n')
+        .trim();
+      const userText = messages
+        .filter(message => message.role === 'user' || message.type === 'user')
+        .map(message => String(message.content ?? ''))
+        .join('\n');
+      const normalizedWord = String(word).toLowerCase();
+      return {
+        memoryToolUsed: messages.some(isMemoryToolMessage),
+        assistantText,
+        userText,
+        assistantHasDistinctiveWord: assistantText.toLowerCase().includes(normalizedWord),
+        userQuestionHasDistinctiveWord: userText.toLowerCase().includes(normalizedWord),
+      };
+    },
+    { targetSessionId: sessionId, word: distinctiveWord },
+  );
 }
 
 const LEGACY_MEMORY_DDL = `
@@ -255,46 +317,34 @@ export function waitForRunCompletion(page, sessionId, timeoutMs = 600_000) {
   );
 }
 
-export async function configureGlmProvider(page, apiKey, { baseURL, model }) {
+export async function configureGlmProvider(page, { model }) {
   return page.evaluate(
-    async ({ baseURL: resolvedBaseUrl, model: resolvedModel, key }) => {
-      const result = await window.electron.saveApiConfig({
-        apiKey: key,
-        baseURL: resolvedBaseUrl,
-        model: resolvedModel,
-        apiType: 'openai',
-      });
-      if (!result.success) throw new Error(result.error || 'saveApiConfig failed');
-      if (window.electron.magpie?.start) {
-        const started = await window.electron.magpie.start();
-        if (started && started.state && started.state !== 'running') {
-          throw new Error(`magpie.start state=${started.state} ${started.error || ''}`);
-        }
+    async ({ resolvedModel }) => {
+      if (!window.electron.magpie?.start || !window.electron.magpie?.models) {
+        throw new Error('Magpie APIs are unavailable in renderer');
       }
-      if (window.electron.magpie?.models) {
-        const res = await window.electron.magpie.models();
-        const list = Array.isArray(res) ? res : (res?.data ?? res?.models ?? []);
-        const ids = list.map(entry => entry?.id ?? entry?.modelId ?? String(entry));
-        const pick = ids.find(id =>
-          String(id).toLowerCase().includes(String(resolvedModel).toLowerCase()),
+      const started = await window.electron.magpie.start();
+      if (started && started.state && started.state !== 'running') {
+        throw new Error(`magpie.start state=${started.state} ${started.error || ''}`);
+      }
+      const res = await window.electron.magpie.models();
+      const list = Array.isArray(res) ? res : (res?.data ?? res?.models ?? []);
+      const ids = list.map(entry => entry?.id ?? entry?.modelId ?? String(entry));
+      const pick = ids.find(id =>
+        String(id).toLowerCase().includes(String(resolvedModel).toLowerCase()),
+      );
+      if (!pick) {
+        throw new Error(
+          `no magpie model matches ${resolvedModel}; ids=${JSON.stringify(ids).slice(0, 800)}`,
         );
-        if (!pick) {
-          throw new Error(
-            `no magpie model matches ${resolvedModel}; ids=${JSON.stringify(ids).slice(0, 800)}`,
-          );
-        }
-        const sel = await window.electron.magpie.selectDefault(pick);
-        if (sel?.success === false) {
-          throw new Error(sel.error || `selectDefault failed for ${pick}`);
-        }
       }
-      const readiness = await window.electron.checkApiConfig({ probeModel: true });
-      if (!readiness.hasConfig) {
-        throw new Error(readiness.error || 'checkApiConfig failed after GLM setup');
+      const sel = await window.electron.magpie.selectDefault(pick);
+      if (sel?.success === false) {
+        throw new Error(sel.error || `selectDefault failed for ${pick}`);
       }
-      return readiness;
+      return { modelId: pick, magpieState: started?.state ?? 'running' };
     },
-    { baseURL, model, key: apiKey },
+    { resolvedModel: model },
   );
 }
 
