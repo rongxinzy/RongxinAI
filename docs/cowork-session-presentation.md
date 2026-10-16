@@ -130,7 +130,6 @@ final answer
 | `src/renderer/components/cowork/CoworkSessionDetail.tsx` | 将当前 turn 的流式状态传给展示组件 |
 | `src/renderer/components/cowork/components/TurnBlock.tsx` | 执行组、任务完成组和 final answer 的展示逻辑 |
 | `src/renderer/components/cowork/components/ToolCard.tsx` | 执行工具卡片的折叠展示 |
-| `src/shared/components/ai-elements/chain-of-thought.tsx` | AI Elements 折叠标题与箭头布局 |
 | `src/renderer/services/i18n.ts` | 中英文界面文案 |
 
 ## 5. 兼容性说明
