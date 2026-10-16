@@ -1,6 +1,6 @@
 # CI gate ownership
 
-Every PR runs workflow validation, lint, renderer type checking/build/bundle budgets, Electron compilation,
+Every PR runs workflow validation, lint, Knip unused-code checks, renderer type checking/build/bundle budgets, Electron compilation,
 unit tests, and Presentation Studio tests. Documentation-only and website-only PRs keep these baseline
 checks. They do not run install, memory, enterprise toolchain, or channel-runtime smoke jobs.
 Unknown paths never skip the baseline. Unit tests run as four shards of one `test` job; `merge-gate`

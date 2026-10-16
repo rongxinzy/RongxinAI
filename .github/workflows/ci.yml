@@ -106,6 +106,15 @@ jobs:
       - name: Lint
         run: bun run lint
 
+  knip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Fail on unused files, exports, and dependencies
+        run: bun run knip
+
   electron-compile:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -420,6 +429,7 @@ jobs:
       [
         changes,
         lint,
+        knip,
         electron-compile,
         test,
         bundle-budget,
