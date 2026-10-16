@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
@@ -6,7 +6,15 @@ import { describe, expect, test } from 'vitest';
 const readSource = (relativePath: string): string =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
 
-const mainSource = readSource('../../main.ts');
+// The main-process bootstrap lives in main.ts plus the appBootstrap/ modules it
+// wires together; Pi runtime wiring must be checked across all of them.
+const appBootstrapDir = fileURLToPath(new URL('../../appBootstrap', import.meta.url));
+const appBootstrapSources = readdirSync(appBootstrapDir)
+  .filter(fileName => fileName.endsWith('.ts') && !fileName.endsWith('.test.ts'))
+  .map(fileName => readFileSync(`${appBootstrapDir}/${fileName}`, 'utf8'))
+  .join('\n');
+
+const mainSource = `${readSource('../../main.ts')}\n${appBootstrapSources}`;
 const coworkViewSource = readSource('../../../renderer/components/cowork/CoworkView.tsx');
 const coworkServiceSource = readSource('../../../renderer/services/cowork.ts');
 const piRuntimeAdapterSource = readSource('./piRuntimeAdapter.ts');
