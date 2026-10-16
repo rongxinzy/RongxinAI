@@ -41,6 +41,36 @@ try {
     await page.getByText('Appearance', { exact: true }).first().click();
     await settle();
     await shot('settings-appearance');
+
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.getByText('Calculator', { exact: true }).first().waitFor({ timeout: 60_000 });
+    await page.getByText('Automation', { exact: true }).first().click();
+    await page.getByText('Daily sales digest').first().waitFor({ timeout: 30_000 });
+    await settle();
+    await shot('scheduled-tasks');
+
+    await page.getByText('New Task', { exact: true }).first().click();
+    await page.getByText('Calculator', { exact: true }).first().waitFor({ timeout: 30_000 });
+    await settle();
+    const plus = page.getByRole('button', { name: 'Files & Images' }).first();
+    await plus.click();
+    await page.getByText('Skills', { exact: true }).first().click();
+    await page.getByText('Manage Skills', { exact: true }).click();
+    await page.getByText('Word documents').first().waitFor({ timeout: 30_000 });
+    await settle();
+    await shot('skills');
+
+    await page.keyboard.press('Escape');
+    await page.getByText('New Task', { exact: true }).first().click();
+    await settle();
+    await page.getByRole('button', { name: 'Files & Images' }).first().click();
+    await page.getByRole('menuitem', { name: 'Connectors' }).hover();
+    await page.getByRole('menuitem', { name: 'Manage Connectors' }).click();
+    await page.getByRole('heading', { name: 'Connectors' }).waitFor({ timeout: 30_000 });
+    await page.getByRole('tab', { name: /^Installed/ }).click();
+    await page.getByText('Filesystem', { exact: true }).waitFor({ timeout: 30_000 });
+    await settle();
+    await shot('mcp');
     await page.close();
   }
 } finally {

@@ -3,6 +3,16 @@
  * Every shape is derived from the preload contract (`Window['electron']`) so fixtures
  * cannot drift from what the renderer actually receives over IPC.
  */
+import {
+  DeliveryMode,
+  PayloadKind,
+  ScheduleKind,
+  SessionTarget,
+  TaskStatus,
+  WakeMode,
+} from '../../../scheduledTask/constants';
+import type { ScheduledTask } from '../../../scheduledTask/types';
+import type { MagpieModelCatalog } from '../../../shared/magpie/types';
 import type { Agent } from '../../types/agent';
 import type { Skill } from '../../types/skill';
 
@@ -209,6 +219,78 @@ export const mockMcpServers: MockMcpServer[] = [
     isBuiltIn: false,
     createdAt: NOW - 48 * HOUR,
     updatedAt: NOW - 48 * HOUR,
+  },
+];
+
+export const mockMagpieCatalog: MagpieModelCatalog = {
+  status: { state: 'running', version: 'preview', enabled: true },
+  defaultModelId: 'preview-model',
+  models: [
+    {
+      id: 'preview-model',
+      owned_by: 'preview',
+      display_name: 'Preview model',
+      context_window: 128000,
+      reasoning: false,
+      modalities: { input: ['text'], output: ['text'] },
+    },
+  ],
+};
+
+export const mockScheduledTasks: ScheduledTask[] = [
+  {
+    id: 'task-daily-report',
+    name: 'Daily sales digest',
+    description: 'Summarize yesterday’s sales and post the report.',
+    enabled: true,
+    schedule: { kind: ScheduleKind.Cron, expr: '0 9 * * 1-5', tz: 'Asia/Shanghai' },
+    sessionTarget: SessionTarget.Isolated,
+    wakeMode: WakeMode.Now,
+    payload: {
+      kind: PayloadKind.AgentTurn,
+      message: 'Summarize yesterday’s sales from the Sales Analysis workspace.',
+    },
+    delivery: { mode: DeliveryMode.None },
+    workspaceId: 'workspace-2',
+    sessionKey: null,
+    state: {
+      nextRunAtMs: NOW + 20 * HOUR,
+      lastRunAtMs: NOW - 4 * HOUR,
+      lastStatus: TaskStatus.Success,
+      lastError: null,
+      lastDurationMs: 42_000,
+      runningAtMs: null,
+      consecutiveErrors: 0,
+    },
+    createdAt: new Date(NOW - 96 * HOUR).toISOString(),
+    updatedAt: new Date(NOW - 4 * HOUR).toISOString(),
+  },
+  {
+    id: 'task-weekly-research',
+    name: 'Weekly research brief',
+    description: 'Collect TypeScript release notes every Monday.',
+    enabled: false,
+    schedule: { kind: ScheduleKind.Every, everyMs: 7 * 24 * HOUR },
+    sessionTarget: SessionTarget.Isolated,
+    wakeMode: WakeMode.NextHeartbeat,
+    payload: {
+      kind: PayloadKind.AgentTurn,
+      message: 'Summarize TypeScript releases from the past week.',
+    },
+    delivery: { mode: DeliveryMode.None },
+    workspaceId: 'workspace-1',
+    sessionKey: null,
+    state: {
+      nextRunAtMs: null,
+      lastRunAtMs: NOW - 8 * 24 * HOUR,
+      lastStatus: TaskStatus.Skipped,
+      lastError: null,
+      lastDurationMs: null,
+      runningAtMs: null,
+      consecutiveErrors: 0,
+    },
+    createdAt: new Date(NOW - 14 * 24 * HOUR).toISOString(),
+    updatedAt: new Date(NOW - 24 * HOUR).toISOString(),
   },
 ];
 

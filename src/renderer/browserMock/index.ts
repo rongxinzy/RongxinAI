@@ -10,9 +10,11 @@ import {
   mockAgents,
   mockApiConfig,
   mockCoworkConfig,
+  mockMagpieCatalog,
   mockMcpServers,
   mockSession,
   mockSessionSummaries,
+  mockScheduledTasks,
   mockSkills,
   mockWorkspaces,
 } from './fixtures';
@@ -148,6 +150,15 @@ const overrides: MockOverrides = {
   },
   preventSleep: {
     get: () => Promise.resolve({ enabled: false }),
+  },
+  magpie: {
+    catalog: () => Promise.resolve(mockMagpieCatalog),
+    selectDefault: () => Promise.resolve(mockMagpieCatalog),
+    status: () => Promise.resolve(mockMagpieCatalog.status),
+    models: () => Promise.resolve(mockMagpieCatalog.models),
+  },
+  scheduledTasks: {
+    list: () => Promise.resolve({ success: true, tasks: mockScheduledTasks }),
   },
   cowork: {
     getConfig: () => Promise.resolve({ success: true, config: mockCoworkConfig }),
