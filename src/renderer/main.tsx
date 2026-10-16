@@ -13,15 +13,11 @@ import { EnterpriseSessionGate } from './components/enterprise/EnterpriseSession
 import { ContextMenu } from './components/ContextMenu';
 import { startCodingFailureNoticeListener } from './services/codingFailureNotice';
 import { startRuntimeNoticeListener } from './services/runtimeNotice';
-import { installBrowserMock } from './browserMock/installMock';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Failed to find the root element');
 }
-
-// Install browser mock if running without Electron
-installBrowserMock();
 
 const routeParams = new URLSearchParams(window.location.search);
 const isModelLaunchLogWindow =
@@ -35,6 +31,13 @@ let codingFailureUnsubscribe: (() => void) | null = null;
 let devNetworkUnsubscribe: (() => void) | null = null;
 
 async function renderRoot(): Promise<void> {
+  // Browser preview (`bun run web:preview`): no preload bridge, so install the IPC mock.
+  // Gated on DEV so the mock is tree-shaken out of production bundles.
+  if (import.meta.env.DEV && typeof window.electron?.platform !== 'string') {
+    const { installBrowserMock } = await import('./browserMock/installMock');
+    installBrowserMock();
+  }
+
   if (isModelLaunchLogWindow) {
     const { ModelLaunchLogWindow } =
       await import('./components/localInference/windows/ModelLaunchLogWindow');

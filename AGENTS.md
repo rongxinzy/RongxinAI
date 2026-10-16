@@ -25,14 +25,12 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 
 ### 浏览器预览模式
 
-`bun run web:preview` 在普通浏览器（不依赖 Electron）中预览渲染器全部界面，适用于快速 UI 迭代、截图与视觉测试。
+`bun run web:preview` 在普通浏览器（不依赖 Electron）中预览渲染器主要界面，用于快速 UI 迭代与截图。
 
-- 在 `import.meta.env.DEV` 且无 `window.electron` 时自动启用 mock 实现（`src/renderer/browserMock/`）
-- Mock 提供完整 preload API（会话、Skills、MCP、本地推理、定时任务、IM、记忆、Todos 等）与真实 fixture 数据
-- 生产构建与 Electron 运行时不含 mock 代码，只走真实 IPC bridge
-- 共享 IPC 契约类型（`src/shared/ipc/`）保证 mock 同步，contract 变更时类型错误提示 mock 失效
-
-Playwright 测试（`tests/browserPreview.test.ts`）验证所有主要界面可渲染并生成明暗主题截图（`docs/browser-preview-screenshots/`）。
+- 仅在 `import.meta.env.DEV` 且无 preload bridge 时由 `main.tsx` 动态加载 `src/renderer/browserMock/`；生产构建不含 mock。
+- Mock 与 fixture 均以 `Window['electron']`（`src/renderer/types/electron.d.ts`）为类型契约；契约变更会让 mock 报类型错误。
+- 只为主界面所需调用提供 fixture；其余调用返回 `{ success: false }`，订阅返回空取消函数。新界面需要数据时在 `browserMock/index.ts` 补充有类型的 override。
+- `bun run preview:screenshots [dir]`（需先 `bunx playwright install chromium` 并启动 preview）生成工作台、对话、设置的明暗截图。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 

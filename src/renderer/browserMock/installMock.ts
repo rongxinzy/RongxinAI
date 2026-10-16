@@ -1,14 +1,12 @@
 /**
- * Installs the browser mock into window.electron.
- * Called only when running in plain browser (Vite dev without Electron).
+ * Installs the browser preview mock as `window.electron` when no preload bridge exists.
+ * Imported dynamically from main.tsx behind `import.meta.env.DEV`, so production
+ * bundles never include it.
  */
-
 import { browserMockElectron } from './index';
-import { shouldUseBrowserMock } from './detectEnvironment';
 
 export function installBrowserMock(): void {
-  if (shouldUseBrowserMock()) {
-    console.log('[Browser Mock] Installing window.electron mock for browser preview');
-    (window as any).electron = browserMockElectron;
-  }
+  if (typeof window.electron?.platform === 'string') return;
+  console.info('[Browser Mock] Installing window.electron mock for browser preview');
+  window.electron = browserMockElectron;
 }

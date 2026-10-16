@@ -141,10 +141,10 @@ The renderer owns the UI, preload provides the communication boundary, and the m
 Preview the renderer in a plain browser without Electron:
 
 ```bash
-npm run web:preview
+bun run web:preview
 ```
 
-This starts a Vite dev server on port 5176 with mock implementations of all Electron APIs. Use it for rapid UI iteration, visual testing, and screenshots. The mock provides realistic fixture data for sessions, skills, MCP servers, local inference, and all other features.
+This starts a Vite dev server on port 5176 with a typed mock of the Electron preload API. Use it for rapid UI iteration and screenshots (`bun run preview:screenshots`). Main screens (workbench, chat, settings, skills, MCP) are backed by fixture data; other IPC calls return a structured "not available in browser preview" failure.
 
 The mock is only active in browser mode (`import.meta.env.DEV` + no `window.electron`). Production builds and Electron runs use the real preload bridge.
 
