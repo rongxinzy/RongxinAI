@@ -31,7 +31,7 @@ export type AgentModelValidationTarget = {
   modelRef: string;
 };
 
-export type AgentModelSupportResult = {
+type AgentModelSupportResult = {
   reason: AgentModelSupportReason;
   modelRef: string;
 };
@@ -54,7 +54,7 @@ export function resolveDraftAgentModelRef(model: Model | null, preservedModelRef
   return '';
 }
 
-export function resolveAgentModelSupportResult(
+function resolveAgentModelSupportResult(
   modelRef: string,
   availableModels: Model[],
 ): AgentModelSupportResult {

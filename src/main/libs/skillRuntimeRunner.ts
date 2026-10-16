@@ -26,7 +26,7 @@ export type SkillScriptErrorCode =
   | 'SKILL_SCRIPT_TIMEOUT'
   | 'SKILL_SCRIPT_ABORTED';
 
-export type SkillScriptRuntime = 'python' | 'node' | 'bash' | 'powershell';
+type SkillScriptRuntime = 'python' | 'node' | 'bash' | 'powershell';
 
 export type SkillScriptRunResult = {
   ok: boolean;

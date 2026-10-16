@@ -261,9 +261,6 @@ function buildWindowsResourceBundleManifest(componentManifests) {
 }
 
 module.exports = {
-  WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION,
-  WINDOWS_RESOURCE_ARCHIVE_EXTENSION,
-  WINDOWS_RESOURCE_ARCHIVE_FORMAT,
   WINDOWS_RESOURCE_ARCHIVE_COMPRESSION,
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,

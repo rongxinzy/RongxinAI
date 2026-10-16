@@ -475,7 +475,7 @@ function getWindowsGitToolDirs(bashPath: string): string[] {
   return candidates.filter(dir => existsSync(dir));
 }
 
-export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
+function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
   try {
     const shimDir = join(app.getPath('userData'), 'cowork', 'bin');
     mkdirSync(shimDir, { recursive: true });
@@ -1574,43 +1574,10 @@ export async function getEnhancedEnv(
 }
 
 /**
- * Ensure the cowork temp directory exists in the given working directory
- * @param cwd Working directory path
- * @returns Path to the temp directory
- */
-export function ensureCoworkTempDir(cwd: string): string {
-  const tempDir = join(cwd, '.cowork-temp');
-  if (!existsSync(tempDir)) {
-    try {
-      mkdirSync(tempDir, { recursive: true });
-      console.log('Created cowork temp directory:', tempDir);
-    } catch (error) {
-      console.error('Failed to create cowork temp directory:', error);
-      // Fall back to cwd if we can't create the temp dir
-      return cwd;
-    }
-  }
-  return tempDir;
-}
-
-/**
  * Get enhanced environment variables with TMPDIR set to the cowork temp directory
  * This ensures Claude Agent SDK creates temporary files in the user's working directory
  * @param cwd Working directory path
  */
-export async function getEnhancedEnvWithTmpdir(
-  cwd: string,
-): Promise<Record<string, string | undefined>> {
-  const env = await getEnhancedEnv();
-  const tempDir = ensureCoworkTempDir(cwd);
-
-  // Set temp directory environment variables for all platforms
-  env.TMPDIR = tempDir; // macOS, Linux
-  env.TMP = tempDir; // Windows
-  env.TEMP = tempDir; // Windows
-
-  return env;
-}
 
 const SESSION_TITLE_FALLBACK = 'New Chat';
 const COWORK_MODEL_PROBE_TIMEOUT_MS = 20000;

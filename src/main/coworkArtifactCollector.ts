@@ -27,7 +27,7 @@ export interface CoworkArtifactCandidate {
   artifact: CoworkPersistedArtifact;
 }
 
-export function normalizeArtifactPath(filePath: string): string {
+function normalizeArtifactPath(filePath: string): string {
   const withoutFileUrlPrefix = filePath.replace(/^file:\/\/+/, '');
   const withoutWindowsUrlSlash = /^\/[A-Za-z]:/.test(withoutFileUrlPrefix)
     ? withoutFileUrlPrefix.slice(1)

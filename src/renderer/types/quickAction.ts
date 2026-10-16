@@ -85,7 +85,7 @@ export interface QuickActionsI18n {
   en: QuickActionsI18nData;
 }
 
-export interface QuickActionsI18nData {
+interface QuickActionsI18nData {
   [actionId: string]: {
     label: string;
     prompts: {

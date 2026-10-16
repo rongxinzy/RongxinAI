@@ -6,7 +6,7 @@ export const CoworkSessionExpertSource = {
 export type CoworkSessionExpertSource =
   (typeof CoworkSessionExpertSource)[keyof typeof CoworkSessionExpertSource];
 
-export const COWORK_SESSION_MAX_EXPERTS = 1;
+const COWORK_SESSION_MAX_EXPERTS = 1;
 
 /** Normalizes the expert selection and enforces the single-expert session invariant. */
 export const normalizeSingleExpertIds = (expertIds: readonly string[] | undefined): string[] => {

@@ -138,25 +138,15 @@ const config: KnipConfig = {
     'src/renderer/utils/llamacppAgentEligibility.ts': ['exports', 'types', 'files'],
     'scripts/**/*llamacpp*': ['exports', 'types', 'files'],
   },
+  // @knipignore marks a dynamic import() type query Knip cannot see.
+  tags: ['-knipignore'],
   ignoreUnresolved: [
     // Opt-in Magpie smoke imports a durable provider the gateway refactor owns.
     // The module is not in this tree; the test stays skipped without the env flag.
     '../libs/agentEngine/durable/provider',
   ],
-  // This gate fails on unused files and dependencies. Export and type
-  // findings stay out until a follow-up: Knip drops the qualifier on a
-  // dynamic import() type query, and one named re-export hides a star
-  // re-export, so IPC constants such as TodoIpc look unused.
-  // duplicates: intentional aliases (parseX = createX).
-  exclude: [
-    'duplicates',
-    'exports',
-    'nsExports',
-    'nsTypes',
-    'enumMembers',
-    'namespaceMembers',
-    'types',
-  ],
+  // Intentional aliases (parseX = createX, marketplace counts sharing one value).
+  exclude: ['duplicates'],
 };
 
 export default config;

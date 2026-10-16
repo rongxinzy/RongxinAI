@@ -21,7 +21,7 @@ export const PiUiEventType = {
 
 export type PiUiEventType = (typeof PiUiEventType)[keyof typeof PiUiEventType];
 
-export const PI_UI_EVENT_PROTOCOL_VERSION = 1 as const;
+const PI_UI_EVENT_PROTOCOL_VERSION = 1 as const;
 
 export type PiUiMessage = {
   id: string;

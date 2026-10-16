@@ -42,7 +42,7 @@ export { PiSubagentToolName } from './piSubagentConstants';
  * recon on slow local models) routinely exceeds ten minutes, so the budget
  * matches a long Work turn rather than a single tool call.
  */
-export const SUBAGENT_TIMEOUT_MS = 1_800_000;
+const SUBAGENT_TIMEOUT_MS = 1_800_000;
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
@@ -74,7 +74,7 @@ interface PiSubagentModules {
   }>;
 }
 
-export interface PiSubagentResolvedModel {
+interface PiSubagentResolvedModel {
   model: Record<string, unknown>;
   /** Opaque model runtime handle, forwarded to sub-session options when set. */
   modelRuntime: unknown;

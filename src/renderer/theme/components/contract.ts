@@ -994,7 +994,7 @@ export const COMPONENT_STATES = {
 } as const;
 
 /** Only appearance properties; layout, hit testing and accessibility stay in components. */
-export const APPEARANCE_PROPERTIES = [
+const APPEARANCE_PROPERTIES = [
   '--zy-control-icon-size',
   'color',
   'fill',

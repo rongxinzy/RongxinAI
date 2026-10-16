@@ -1,14 +1,7 @@
 import cronstrue from 'cronstrue/i18n';
 
-import type {
-  Schedule,
-  ScheduleCron,
-  ScheduledTask,
-  ScheduledTaskDelivery,
-  ScheduledTaskPayload,
-  TaskLastStatus,
-} from '../../../scheduledTask/types';
-import { PlatformRegistry } from '../../../shared/platform';
+import type { Schedule, ScheduleCron, TaskLastStatus } from '../../../scheduledTask/types';
+
 import { i18nService } from '../../services/i18n';
 
 const WEEKDAY_KEYS = [
@@ -291,49 +284,6 @@ export function formatNextRunRelative(nextRunAtMs: number | null): string | null
   });
 }
 
-export function formatPayloadLabel(payload: ScheduledTaskPayload): string {
-  if (payload.kind === 'systemEvent') {
-    return `${i18nService.t('scheduledTasksFormPayloadKindSystemEvent')} · ${payload.text}`;
-  }
-  const timeoutLabel =
-    typeof payload.timeoutSeconds === 'number' ? ` · ${payload.timeoutSeconds}s` : '';
-  return `${i18nService.t('scheduledTasksFormPayloadKindAgentTurn')} · ${payload.message}${timeoutLabel}`;
-}
-
-/**
- * Resolve a channel name to a user-friendly display name via i18n + PlatformRegistry.
- * e.g. 'feishu' -> '飞书', 'weixin' -> '微信'
- */
-function resolveChannelDisplayName(channel: string): string {
-  const platform = PlatformRegistry.platformOfChannel(channel);
-  if (platform) {
-    return i18nService.t(platform) || PlatformRegistry.get(platform).label;
-  }
-  return channel;
-}
-
-export function formatDeliveryLabel(delivery: ScheduledTaskDelivery): string {
-  if (delivery.mode === 'none' && !delivery.channel) {
-    return i18nService.t('scheduledTasksFormDeliveryModeNone');
-  }
-
-  if (delivery.mode === 'none' && delivery.channel) {
-    const channelName = resolveChannelDisplayName(delivery.channel);
-    const toLabel = delivery.to ? ` -> ${delivery.to}` : '';
-    return `${channelName}${toLabel}`;
-  }
-
-  if (delivery.mode === 'webhook') {
-    return delivery.to
-      ? `${i18nService.t('scheduledTasksFormDeliveryModeWebhook')} · ${delivery.to}`
-      : i18nService.t('scheduledTasksFormDeliveryModeWebhook');
-  }
-
-  const channelName = delivery.channel ? resolveChannelDisplayName(delivery.channel) : 'last';
-  const toLabel = delivery.to ? ` -> ${delivery.to}` : '';
-  return `${i18nService.t('scheduledTasksFormDeliveryModeAnnounce')} · ${channelName}${toLabel}`;
-}
-
 export type PlanType = 'once' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'cron' | 'advanced';
 
 export interface PlanInfo {
@@ -445,10 +395,6 @@ export function scheduleToPlanInfo(schedule: Schedule): PlanInfo {
   }
 
   return { ...DEFAULT_PLAN_INFO, planType: 'cron', cronExpr: schedule.expr, cronTz: schedule.tz };
-}
-
-export function getTaskPromptText(task: ScheduledTask): string {
-  return task.payload.kind === 'systemEvent' ? task.payload.text : task.payload.message;
 }
 
 /**

@@ -82,7 +82,7 @@ export const PiThinkingLevel = {
 } as const;
 export type PiThinkingLevel = (typeof PiThinkingLevel)[keyof typeof PiThinkingLevel];
 
-export type PiImageAttachment = {
+type PiImageAttachment = {
   name: string;
   mimeType: string;
   /** Present only for the in-flight model request. Persisted copies keep `path`. */
@@ -90,7 +90,7 @@ export type PiImageAttachment = {
   path?: string;
 };
 
-export type PiConversationHistoryMessage = {
+type PiConversationHistoryMessage = {
   role: 'user' | 'assistant';
   content: string;
 };

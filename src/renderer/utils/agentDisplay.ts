@@ -8,13 +8,11 @@ interface AgentDisplaySource {
   icon?: string;
 }
 
-export const isDefaultAgentId = (agentId?: string | null): boolean => {
+const isDefaultAgentId = (agentId?: string | null): boolean => {
   return agentId?.trim() === AgentId.Main;
 };
 
-export const isDefaultAgentProfileName = (
-  agent: Pick<AgentDisplaySource, 'id' | 'name'>,
-): boolean => {
+const isDefaultAgentProfileName = (agent: Pick<AgentDisplaySource, 'id' | 'name'>): boolean => {
   if (!isDefaultAgentId(agent.id)) return false;
   const normalizedName = agent.name?.trim() ?? '';
   return (
@@ -24,7 +22,7 @@ export const isDefaultAgentProfileName = (
   );
 };
 
-export const getAgentDisplayName = (agent: Pick<AgentDisplaySource, 'id' | 'name'>): string => {
+const getAgentDisplayName = (agent: Pick<AgentDisplaySource, 'id' | 'name'>): string => {
   if (isDefaultAgentProfileName(agent)) {
     return i18nService.t('defaultAgentDisplayName');
   }
@@ -48,10 +46,4 @@ export const getAgentDisplayNameById = (
   }
 
   return normalizedAgentId;
-};
-
-export const shouldUseDefaultAgentIcon = (
-  agent: Pick<AgentDisplaySource, 'id' | 'icon'>,
-): boolean => {
-  return isDefaultAgentId(agent.id) && !agent.icon?.trim();
 };

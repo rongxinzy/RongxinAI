@@ -2,7 +2,7 @@ import type { ComponentAppearances } from '../components/contract';
 import type { ThemeBackground } from '../background/background';
 import type { TokenName } from '../tokens/contract';
 
-export interface ThemeMeta {
+interface ThemeMeta {
   id: string;
   name: string;
   description: string;
@@ -10,7 +10,7 @@ export interface ThemeMeta {
 }
 
 /** A theme must provide a CSS value for every key in TOKEN_CONTRACT */
-export type ThemeTokens = Record<TokenName, string>;
+type ThemeTokens = Record<TokenName, string>;
 
 export interface ThemeDefinition {
   meta: ThemeMeta;

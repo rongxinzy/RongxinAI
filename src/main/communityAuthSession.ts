@@ -292,13 +292,3 @@ export function configureCommunityAuthSession(
   configuredSessionManager = new CommunityAuthSessionManager(getStore);
   return configuredSessionManager;
 }
-
-export function getCommunityAuthAccessToken(options?: { forceRefresh?: boolean }): Promise<string> {
-  if (!configuredSessionManager) throw new Error('Community authentication is not initialized.');
-  return configuredSessionManager.getAccessToken(options);
-}
-
-export function getModelPoolAccessToken(options?: { forceRefresh?: boolean }): Promise<string> {
-  if (!configuredSessionManager) throw new Error('Community authentication is not initialized.');
-  return configuredSessionManager.getModelPoolAccessToken(options);
-}

@@ -7,7 +7,7 @@ import type {
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../hardware/types';
 import { estimateLlamaCppModelMemory } from '../llamacpp/modelMemoryEstimate';
 
-export const MARKETPLACE_SCORE_VERSION = '2026-08-01-v2';
+const MARKETPLACE_SCORE_VERSION = '2026-08-01-v2';
 
 export type MarketplaceHardwareProfile = {
   totalVramMiB: number;
@@ -265,9 +265,4 @@ export function formatMarketplaceHardwareSummaryParts(
     gpuNames,
     systemMemoryGiB: hardware.systemMemoryMiB ? Math.round(hardware.systemMemoryMiB / 1024) : null,
   };
-}
-
-export function formatMarketplaceStars(stars?: number): string {
-  if (!stars || stars <= 0) return '—';
-  return stars.toFixed(1);
 }

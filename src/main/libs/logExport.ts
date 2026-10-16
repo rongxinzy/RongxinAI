@@ -2,7 +2,7 @@ import fs from 'fs';
 import { pipeline } from 'stream/promises';
 import yazl from 'yazl';
 
-export type LogArchiveEntry = {
+type LogArchiveEntry = {
   archiveName: string;
   filePath: string;
 };

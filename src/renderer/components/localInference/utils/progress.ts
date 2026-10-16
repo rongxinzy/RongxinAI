@@ -51,7 +51,7 @@ export function formatInstallProgressSummary(progress: Record<string, unknown>):
   };
 }
 
-export function readProgressStatus(progress: Record<string, unknown>): string {
+function readProgressStatus(progress: Record<string, unknown>): string {
   if (typeof progress.status === 'string') return progress.status;
   if (typeof progress.phase === 'string') return progress.phase;
   return '';
@@ -155,7 +155,7 @@ export function isSuccessfulMarketplaceInstallProgress(
   });
 }
 
-export function humanizeInstallPhase(phase: string): string {
+function humanizeInstallPhase(phase: string): string {
   switch (phase) {
     case 'starting':
       return i18nService.t('marketplaceInstallStarting');

@@ -875,10 +875,6 @@ export function setLanguage(language: LanguageType): void {
   currentLanguage = language;
 }
 
-export function getLanguage(): LanguageType {
-  return currentLanguage;
-}
-
 /**
  * Look up a translation key and optionally interpolate `{param}` placeholders.
  * Returns the key itself if no translation exists.

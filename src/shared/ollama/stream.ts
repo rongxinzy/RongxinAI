@@ -1,6 +1,6 @@
 import type { OllamaChatChunk, OllamaToolCall } from './types';
 
-export type OllamaStreamPhase = 'waiting' | 'thinking' | 'responding' | 'done' | 'error';
+type OllamaStreamPhase = 'waiting' | 'thinking' | 'responding' | 'done' | 'error';
 
 export type OllamaStreamState = {
   rawContent: string;

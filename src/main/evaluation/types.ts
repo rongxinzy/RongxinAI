@@ -1,7 +1,7 @@
 import type { WorkbenchJsonObject } from '../../shared/workbenchTask';
 import type { ZhiyuanEvaluationToolMode } from './constants';
 
-export interface ZhiyuanEvaluationTool {
+interface ZhiyuanEvaluationTool {
   name: string;
   execute(toolCallId: string, params: Record<string, unknown>): Promise<unknown>;
   [key: string]: unknown;
@@ -33,13 +33,13 @@ export interface ZhiyuanEvaluationPolicyContext {
   emitActivation(name: string, evidence?: WorkbenchJsonObject): void;
 }
 
-export interface ZhiyuanEvaluationAgentEndInput {
+interface ZhiyuanEvaluationAgentEndInput {
   iteration: number;
   messages: unknown[];
   usage: Record<string, unknown>;
 }
 
-export interface ZhiyuanEvaluationContinueDecision {
+interface ZhiyuanEvaluationContinueDecision {
   shouldContinue: boolean;
   nextPrompt?: string;
 }

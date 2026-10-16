@@ -137,7 +137,7 @@ export const emailConfigsEqual = (left: EmailFormState, right: EmailFormState): 
   return Object.keys(leftConfig).every(key => leftConfig[key] === rightConfig[key]);
 };
 
-export const getEmailProviderLabel = (
+const getEmailProviderLabel = (
   provider: EmailProvider,
   translate: (key: string) => string,
 ): string => {

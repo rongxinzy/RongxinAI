@@ -16,7 +16,7 @@ export const CoworkBundledPromptMarker = {
 
 import { getBranding } from '../../shared/branding';
 
-export function buildIdentityPrompt(): string {
+function buildIdentityPrompt(): string {
   const branding = getBranding();
   if (branding.editionId === 'zhiyuan') {
     return [

@@ -9,8 +9,8 @@ import type { ProviderConfig } from './types';
 import { resolveCodingPlanBaseUrl } from './codingPlan';
 import { findConfiguredProviderModel } from './configuredModels';
 
-export type RuntimeModelKind = 'cloud' | 'ollama' | 'llamacpp';
-export type RuntimeModelStatus = 'unknown' | 'stopped' | 'running' | 'loaded';
+type RuntimeModelKind = 'cloud' | 'ollama' | 'llamacpp';
+type RuntimeModelStatus = 'unknown' | 'stopped' | 'running' | 'loaded';
 
 export interface RuntimeModelSnapshot {
   kind: RuntimeModelKind;
@@ -70,24 +70,8 @@ const positiveNumber = (value: unknown): number | undefined =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const stringArray = (value: unknown): string[] | undefined =>
-  Array.isArray(value) && value.every(item => typeof item === 'string')
-    ? value.map(item => item.toLowerCase())
-    : undefined;
-
 const capabilityStatus = (supported: boolean): ModelCapabilityStatus =>
   supported ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported;
-
-export function parseOllamaRuntimeCapabilities(payload: unknown): Partial<ModelCapabilities> {
-  if (!isRecord(payload)) return {};
-  const declared = stringArray(payload.capabilities);
-  if (!declared) return {};
-  return {
-    toolCalling: capabilityStatus(declared.includes('tools')),
-    imageInput: capabilityStatus(declared.includes('vision')),
-    ...(declared.includes('thinking') ? { reasoning: ModelCapabilityStatus.Supported } : {}),
-  };
-}
 
 export function parseLlamaCppRuntimeCapabilities(payload: unknown): Partial<ModelCapabilities> {
   if (!isRecord(payload)) return {};
@@ -351,6 +335,3 @@ export function createLlamaCppRuntimeSnapshot(input: {
       : {}),
   };
 }
-
-export const parseOllamaRuntimeSnapshot = createOllamaRuntimeSnapshot;
-export const parseLlamaCppRuntimeSnapshot = createLlamaCppRuntimeSnapshot;

@@ -80,7 +80,7 @@ export function buildProviderModelsUrlCandidates(baseUrl: string): string[] {
   return [...new Set(candidates)];
 }
 
-export function buildLlamaCppPropsUrl(baseUrl: string): string {
+function buildLlamaCppPropsUrl(baseUrl: string): string {
   const normalized = normalizedBaseUrl(baseUrl);
   const serverRoot = normalized.replace(/\/v\d+(?:(?:alpha|beta)\d*)?$/i, '');
   return `${serverRoot}/props`;

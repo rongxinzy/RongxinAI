@@ -126,7 +126,7 @@ export type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error';
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
 export type { CoworkExecutionMode } from '../shared/cowork/constants';
 
-export type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
+type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
 
 export interface Agent {
   id: string;

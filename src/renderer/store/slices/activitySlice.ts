@@ -3,7 +3,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { ActivityRun } from '../../../shared/activity/types';
 import { shouldAcceptActivityUpdate } from '../../../shared/activity/ordering';
 
-export interface ActivityState {
+interface ActivityState {
   runs: ActivityRun[];
 }
 

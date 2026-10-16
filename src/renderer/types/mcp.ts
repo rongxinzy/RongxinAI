@@ -1,5 +1,5 @@
 // MCP Server type definitions
-export type McpTransportType = 'stdio' | 'sse' | 'http';
+type McpTransportType = 'stdio' | 'sse' | 'http';
 
 export interface McpServerConfig {
   id: string;
@@ -91,7 +91,7 @@ export interface McpMarketplaceServer {
   presentation?: McpPresentation;
 }
 
-export interface McpPresentationSection {
+interface McpPresentationSection {
   title?: string;
   description?: string;
 }
@@ -107,7 +107,7 @@ export interface McpPresentationLocale {
   };
 }
 
-export interface McpPresentation {
+interface McpPresentation {
   name?: string;
   authorization?: string;
   zh?: McpPresentationLocale;

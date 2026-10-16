@@ -23,8 +23,8 @@ import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
-export const WORK_DIR_PLACEHOLDER = '<PI_REPLAY_WORKDIR>';
-export const REPO_ROOT_PLACEHOLDER = '<PI_REPLAY_REPOROOT>';
+const WORK_DIR_PLACEHOLDER = '<PI_REPLAY_WORKDIR>';
+const REPO_ROOT_PLACEHOLDER = '<PI_REPLAY_REPOROOT>';
 const REQUEST_SNIPPET_LENGTH = 4096;
 /**
  * Stored body segments per entry: the head pins down request shape and the

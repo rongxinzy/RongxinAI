@@ -3,7 +3,7 @@ import type { AepClient, EntitlementTokenResponse } from '@aep/sdk-node';
 import type { ZhiyuanPasswordSession } from '../session/password-session.js';
 import { type LicenseSnapshot, LicenseStatus } from './types.js';
 
-export const ZHIYUAN_ENTITLEMENT_REFRESH_WINDOW_MS = 60_000;
+const ZHIYUAN_ENTITLEMENT_REFRESH_WINDOW_MS = 60_000;
 
 export interface ZhiyuanLicenseActivationOptions {
   readonly session: ZhiyuanPasswordSession;

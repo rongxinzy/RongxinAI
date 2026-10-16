@@ -1,6 +1,3 @@
-import { mergeProps } from '@base-ui/react/merge-props';
-import { useRender } from '@base-ui/react/use-render';
-import { Separator } from '@shared/components/ui/separator';
 import { cn } from '@shared/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
@@ -35,38 +32,4 @@ function ButtonGroup({
   );
 }
 
-function ButtonGroupText({ className, render, ...props }: useRender.ComponentProps<'div'>) {
-  return useRender({
-    defaultTagName: 'div',
-    props: mergeProps<'div'>(
-      {
-        className: cn('flex items-center gap-2 [&_svg]:pointer-events-none', className),
-      },
-      props,
-    ),
-    render,
-    state: {
-      slot: 'button-group-text',
-    },
-  });
-}
-
-function ButtonGroupSeparator({
-  className,
-  orientation = 'vertical',
-  ...props
-}: React.ComponentProps<typeof Separator>) {
-  return (
-    <Separator
-      data-slot="button-group-separator"
-      orientation={orientation}
-      className={cn(
-        'relative self-stretch data-horizontal:mx-px data-horizontal:w-auto data-vertical:my-px data-vertical:h-auto',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-export { ButtonGroup, ButtonGroupSeparator, ButtonGroupText, buttonGroupVariants };
+export { ButtonGroup };
