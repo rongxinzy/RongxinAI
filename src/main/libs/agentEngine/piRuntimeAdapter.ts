@@ -167,7 +167,6 @@ import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse
 import { prependWorkbenchTaskBoundary } from './piWorkbenchTaskBoundary';
 import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
-import { PiAgentSettleFallback } from './piAgentSettleFallback';
 import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
 import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
@@ -207,12 +206,6 @@ import {
   type ImageInputAttachmentRef,
   type ImagePromptPreparation,
 } from './piImageInputFallback';
-import { PiStreamStallWatchdog } from './piStreamStallWatchdog';
-import {
-  PiStreamStallRecovery,
-  STREAM_STALL_TIMEOUT_MS,
-  resolveStreamStallTimeoutMs,
-} from './piStreamStallRecovery';
 
 // ── Types ──
 
@@ -812,63 +805,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly memoryInjectionDedup = new MemoryInjectionDedup();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
-  /** Aborts turns whose model stream silently stops producing Pi events. */
-  private readonly streamStallWatchdog: PiStreamStallWatchdog;
-  /** Insurance for a missing agent_settled after a completion-ready agent_end. */
-  private readonly agentSettleFallback: PiAgentSettleFallback;
-  /** Stall recovery flow: abort the dead turn, surface the error, resume once. */
-  private readonly streamStallRecovery: PiStreamStallRecovery;
-  /** Test override for the stall window; production uses per-provider tiers. */
-  private readonly streamStallTimeoutOverrideMs?: number;
   /** Bundled image-text helper; null when the platform/build cannot run it. */
   private readonly bundledOcrHelper = resolveBundledOcrHelper();
 
-  constructor(options?: { streamStallTimeoutMs?: number }) {
+  constructor() {
     super();
-    this.streamStallTimeoutOverrideMs = options?.streamStallTimeoutMs;
-    this.streamStallRecovery = new PiStreamStallRecovery({
-      getSession: sessionId => this.activeSessions.get(sessionId),
-      hasPendingAskUserQuestion: sessionId =>
-        [...this.pendingAskUserQuestions.values()].some(pending => pending.sessionId === sessionId),
-      hasPendingCodingElicitation: sessionId =>
-        [...this.pendingCodingElicitations.values()].some(
-          pending => pending.sessionId === sessionId,
-        ),
-      hasPendingApproval: sessionId =>
-        [...this.approvalSessionMap.values()].includes(sessionId) ||
-        (this.workbenchTaskService?.hasPendingApprovalForSession(sessionId) ?? false),
-      flushPendingError: sessionId => {
-        const active = this.activeSessions.get(sessionId);
-        if (active) this.flushPendingError(sessionId, active);
-      },
-      emitRetryNotice: (sessionId, notice) => this.emit('retryNotice', sessionId, notice),
-      resumeSession: (sessionId, prompt) =>
-        // The rebuild swaps the Pi session, so session-scoped approval settings
-        // must travel with it (same rule as the image-fallback resume): an
-        // "allow all" session otherwise asks for every side-effect tool call
-        // for the rest of its life.
-        this.continueSession(sessionId, prompt, {
-          _skipUserMessage: true,
-          _streamStallResume: true,
-          approvalMode: this.activeSessions.get(sessionId)?.approvalMode,
-        }),
-      disposeWatchdog: sessionId => {
-        this.streamStallWatchdog.dispose(sessionId);
-        this.agentSettleFallback.dispose(sessionId);
-      },
-    });
-    this.agentSettleFallback = new PiAgentSettleFallback(sessionId => {
-      const active = this.activeSessions.get(sessionId);
-      if (!active || active.aborted) return;
-      this.handleTurnSettled(sessionId, active);
-    });
-    this.streamStallWatchdog = new PiStreamStallWatchdog(
-      {
-        isSuspended: sessionId => this.streamStallRecovery.isAwaitingUserInput(sessionId),
-        onStall: sessionId => this.streamStallRecovery.handleStall(sessionId),
-      },
-      options?.streamStallTimeoutMs ?? STREAM_STALL_TIMEOUT_MS,
-    );
   }
 
   setCoworkStore(store: CoworkStore): void {
@@ -982,7 +923,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   ): Promise<void> {
     assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
     this.evictIdleSessions();
-    if (!options._streamStallResume) this.streamStallRecovery.resetResumeBudget(sessionId);
     const expertIds = normalizeSingleExpertIds(options.expertIds);
 
     if (this.activeSessions.has(sessionId) || this.initializingSessions.has(sessionId)) {
@@ -1103,9 +1043,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (this.workbenchTaskService && !chatMode) {
         const workbench = this.workbenchTaskService.beginRun({
           sessionId,
-          // An automatic stall resume has no user-visible prompt; the run goal
-          // must not leak the internal English instruction into the task list.
-          goal: options._streamStallResume ? t('workbenchStreamStallResumeGoal') : prompt,
+          goal: prompt,
           contract: workbenchContract,
           trigger: options._workbenchRunId
             ? WorkbenchRunTrigger.Resume
@@ -1603,23 +1541,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (abortController.signal.aborted || this.activeSessions.get(sessionId) !== active) {
           return;
         }
-        // Feed the watchdog the raw SDK event stream, before the display
-        // projection queue: a busy transform pipeline must not mask a dead
-        // model stream. Aborted turns are excluded so a late event cannot
-        // re-arm the watchdog of a session that is already being rebuilt.
-        if (!active.aborted) {
-          this.streamStallWatchdog.handleEvent(
-            sessionId,
-            event.type,
-            resolveStreamStallTimeoutMs(
-              active.harnessModelProfile.provider,
-              this.streamStallTimeoutOverrideMs,
-            ),
-          );
-        }
-        // The settle fallback listens to the raw stream too: any event after
-        // agent_end proves the run settled or continues, cancelling the timer.
-        this.agentSettleFallback.handleEvent(sessionId, event.type);
         this.emit('executionEvent', sessionId, event);
         active.eventProjection?.push(event);
       });
@@ -1722,7 +1643,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   ): Promise<void> {
     assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
     this.evictIdleSessions();
-    if (!options._streamStallResume) this.streamStallRecovery.resetResumeBudget(sessionId);
     const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
     const nextUnattended = options.unattended === true;
     const active = this.activeSessions.get(sessionId);
@@ -2163,8 +2083,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // A queued control action belongs to the turn that queued it; replaying it
     // after a resource-driven recreation would be an unexpected side effect.
     this.queuedControlActions.delete(sessionId);
-    this.streamStallWatchdog.dispose(sessionId);
-    this.agentSettleFallback.dispose(sessionId);
     this.dismissAskUserQuestionsBySession(sessionId);
     this.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
     active.agentLoop.stop();
@@ -2203,8 +2121,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // Control actions are not durable user input: an explicit stop must not
     // carry them into a later session that reuses the same id.
     this.queuedControlActions.delete(sessionId);
-    this.streamStallWatchdog.dispose(sessionId);
-    this.agentSettleFallback.dispose(sessionId);
     this.dismissAskUserQuestionsBySession(sessionId);
     this.dismissCodingElicitationsBySession(sessionId, reason);
     const initializing = this.initializingSessions.get(sessionId);
@@ -2362,9 +2278,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     for (const sessionId of sessionIds) {
       this.stopActiveSession(sessionId, 'The application stopped the active session.', false);
     }
-    this.streamStallWatchdog.disposeAll();
-    this.agentSettleFallback.disposeAll();
-    this.streamStallRecovery.disposeAll();
     void this.cadViewerService.stop();
   }
 
@@ -2754,9 +2667,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   onSessionDeleted(sessionId: string): void {
     this.stopActiveSession(sessionId, 'The session was deleted.', false);
-    this.streamStallWatchdog.dispose(sessionId);
-    this.agentSettleFallback.dispose(sessionId);
-    this.streamStallRecovery.forgetSession(sessionId);
     this.clearApprovalsBySession(sessionId);
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
@@ -2794,8 +2704,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     ];
     for (const session of candidates) {
       session.unsubscribe();
-      this.streamStallWatchdog.dispose(session.sessionId);
-      this.agentSettleFallback.dispose(session.sessionId);
       session.piSession.abortBash();
       void session.piSession.abort();
       this.memoryInjectionDedup.reset(session.sessionId);
@@ -2807,8 +2715,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   private releaseStoppedSession(sessionId: string): void {
-    this.streamStallWatchdog.dispose(sessionId);
-    this.agentSettleFallback.dispose(sessionId);
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.add(sessionId);
@@ -3251,8 +3157,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   private handlePiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
-    // Late events from an aborted turn (e.g. after a stall abort) must not
-    // touch state — including the rebuilt session's stream-stall watchdog.
+    // Late events from an aborted turn must not touch state.
     if (active.aborted) return;
     // Debug: log all Pi events to diagnose frontend rendering issues
     if (event.type !== 'message_update') {
@@ -3655,9 +3560,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         }
         // agent_end is not the terminal signal: the SDK may follow it with an
         // automatic compaction continuation turn, whose tool calls still need
-        // a live run. Completion happens on agent_settled; this fallback only
-        // guards a settle that never arrives.
-        this.agentSettleFallback.arm(sessionId);
+        // a live run. Completion happens on agent_settled.
         break;
       }
 
@@ -3722,11 +3625,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    * every continuation the SDK runs on its own (compaction, queued follow-ups,
    * retries). Completion must not happen earlier — an agent_end may still be
    * followed by a compaction continuation turn whose tool calls need a live
-   * run. The settle fallback invokes this too when agent_settled never arrives.
+   * run.
    */
   private handleTurnSettled(sessionId: string, active: ActivePiSession): void {
     if (active.completionPending) return;
-    this.agentSettleFallback.dispose(sessionId);
     active.isRunning = false;
     // Run settled with a deferred or surfaced failure: never complete it.
     // flushPendingError is idempotent after auto_retry_end.
@@ -3751,8 +3653,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.markFinalAnswer(sessionId, active);
     this.clearThrottleStateBySession(sessionId, false);
     active.lastUsedAt = Date.now();
-    // The turn completed, so a later stall earns a fresh auto-resume budget.
-    this.streamStallRecovery.resetResumeBudget(sessionId);
     agentResourceDiagnostics.finishPiTurn(
       sessionId,
       this.activeSessions.size,
@@ -4035,9 +3935,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       try {
         await this.continueSession(sessionId, retryPrompt, {
           _skipUserMessage: true,
-          // Same resume path the stream-stall recovery uses: the previous run is
-          // already dead, so this must not race its cancellation bookkeeping.
-          _streamStallResume: true,
           approvalMode,
         });
       } catch (error) {
