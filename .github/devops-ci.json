@@ -23,6 +23,16 @@
         "scripts/ci/installer-style-preview.py",
         ".github/workflows/installer-style-preview.yml"
       ]
+    },
+    {
+      "name": "Python runtime process containment",
+      "path": ".github/workflows/python-runtime.yml",
+      "paths": [
+        "src/main/pythonRuntime/**",
+        "src/main/libs/agentEngine/piPythonTools*",
+        "scripts/python-runtime/**",
+        ".github/workflows/python-runtime.yml"
+      ]
     }
   ]
 }
