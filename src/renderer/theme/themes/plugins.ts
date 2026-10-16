@@ -1,15 +1,11 @@
-import { weiyangLight, weiyangDark } from './weiyang';
-import { xiaoruanLight, xiaoruanDark } from './xiaoruan';
-import { changanLight, changanDark } from './changan';
-import { damingLight, damingDark } from './daming';
+import { zenithLight } from './zenith-light';
+import { zenithDark } from './zenith-dark';
 import { validateComponentAppearances } from '../components/contract';
-import { classicDark } from './classic-dark';
-import { classicLight } from './classic-light';
 import type { ThemeDefinition } from './types';
 import { TOKEN_NAMES } from '../tokens/contract';
 
 export const THEME_PLUGIN_VERSION = 1 as const;
-export const DEFAULT_THEME_PLUGIN_ID = 'codex';
+export const DEFAULT_THEME_PLUGIN_ID = 'zenith';
 
 /** Presentation data only. Plugins cannot replace controls or own application state. */
 export interface ThemePlugin {
@@ -57,37 +53,19 @@ export function defineThemePlugins(plugins: ThemePlugin[]): ThemePlugin[] {
   return plugins;
 }
 
-/** Add future style plugins here. Each plugin supplies both appearances. */
+/**
+ * Zenith - Premium Futuristic Design System
+ *
+ * Consolidated to a single world-class theme pair for stronger brand identity.
+ * Traditional themes (Daming, Changan, Weiyang, Xiaoruan) removed to focus on
+ * premium, tech-forward aesthetic.
+ */
 export const themePlugins = defineThemePlugins([
   {
     version: THEME_PLUGIN_VERSION,
     id: DEFAULT_THEME_PLUGIN_ID,
-    name: { zh: 'Codex', en: 'Codex' },
-    appearances: { light: classicLight, dark: classicDark },
-  },
-  {
-    version: THEME_PLUGIN_VERSION,
-    id: 'daming',
-    name: { zh: '大明风华', en: 'Daming Fenghua' },
-    appearances: { light: damingLight, dark: damingDark },
-  },
-  {
-    version: THEME_PLUGIN_VERSION,
-    id: 'changan',
-    name: { zh: '长安风物', en: 'Changan Fengwu' },
-    appearances: { light: changanLight, dark: changanDark },
-  },
-  {
-    version: THEME_PLUGIN_VERSION,
-    id: 'weiyang',
-    name: { zh: '未央金石', en: 'Weiyang Jinshi' },
-    appearances: { light: weiyangLight, dark: weiyangDark },
-  },
-  {
-    version: THEME_PLUGIN_VERSION,
-    id: 'xiaoruan',
-    name: { zh: '晓软红', en: 'Xiaoruan Red' },
-    appearances: { light: xiaoruanLight, dark: xiaoruanDark },
+    name: { zh: 'Zenith', en: 'Zenith' },
+    appearances: { light: zenithLight, dark: zenithDark },
   },
 ]);
 

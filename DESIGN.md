@@ -1,378 +1,401 @@
-# DESIGN.md - 知远智能体 (ZhiYuan Agent) 前端设计规范与工程约束
+# DESIGN.md - 知远智能体 (ZhiYuan Agent) Zenith Design System
 
-> **版本**：v2.0（Codex & Modern Agent Studio 标准）
-> **更新日期**：2026-10-13
-> **定位**：项目级强制约束。所有新增和修改的前端界面必须遵守，与 `AGENTS.md` 的工程规则配套使用。
-> **设计基准**：参考 Codex、Kimi、Raycast、Cursor 的现代桌面客户端设计语言：极简克制、内容优先、层次明确、对齐精确。
+> **Version**: v3.0 (Zenith - Premium Futuristic)  
+> **Date**: 2026-10-16  
+> **Positioning**: P0 mandatory constraint for all frontend work, paired with `AGENTS.md` engineering rules.  
+> **Philosophy**: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
 
-本版将设计诊断转化为色彩、排版、几何、组件和交互的可验收标准。具体色值与尺寸是内置 Codex 主题的新版目标；其他已注册主题保留各自完整的视觉语言，共同遵守组件归属、可访问性、状态保留和性能约束。
+Zenith is a modern premium design system that balances futuristic aesthetics with desktop efficiency, characterized by subtle glassmorphism, clean typography, efficient spacing, and smooth interactions. Surfaces have depth without distraction, typography is crisp and readable, and the interface feels light yet information-dense.
 
-**规范目标与实现状态分开记录。** 本文件更新不代表界面已完成改造。现有 token、recipe 或控件与新版目标不一致时，后续实现须同步修改主题契约、共享组件及所有主题，完成验证后才能声明落地；不得在页面局部补样式。本文件中的模型名、运行指标、导航名称和布局示例也不构成已有能力声明。
+## Design Principles
 
-## 一、诊断与修订目标
+1. **Subtle Glassmorphism** - Light backdrop blur and translucency for depth without overwhelming
+2. **Efficient Density** - Compact spacing optimized for desktop productivity, not mobile bloat
+3. **Smooth Transitions** - 150-200ms animations for responsive, polished feel
+4. **Clean Hierarchy** - Clear visual relationships through weight, size, and color
+5. **Tech-Forward Polish** - Modern aesthetics without sacrificing usability or information density
 
-| 问题 | 修订要求 | 验收依据 |
-| --- | --- | --- |
-| 输入区与画布缺乏主次 | 用表面层级、宽度、留白与聚焦反馈建立主输入岛 | 输入区可辨认，工具栏不拥挤，聚焦不导致布局跳动 |
-| 卡片、边框、圆角与图标颜色不统一 | 统一语义 token、圆角刻度与组件 recipe | 无调用点外观覆写，无装饰性彩色卡片 |
-| 侧栏字重、行高与操作入口不一致 | 固定导航与会话行规格，主要动作常显 | 普通行高一致，标题、时间与操作不互相遮挡 |
-| 模式、功能入口与历史会话层级混杂 | 分开模式切换、主动作、功能导航、项目历史与底部状态 | 靠分组留白、文字角色和顺序识别层级，不堆分隔框 |
-| 空状态只有大色块或默认图标 | 用简短说明、有效 CTA 与任务引导项组织起点 | 用户能判断用途并立即开始，不靠装饰动画吸引注意 |
-| 设置弹窗遮挡工作区、表单规格不一 | 运行配置优先抽屉，首次配置采用分步流程，共享表单规格 | 保留工作上下文，步骤、错误、保存结果与返回路径清楚 |
-| 规范描述与代码映射含糊 | 每个规格明确数值、角色、归属与适用范围 | 可定位到 token、共享组件或 recipe，不靠开发者自行猜测 |
-| 动效与状态反馈相互矛盾 | 统一时长、按压反馈、加载和减少动效规则 | 键盘、鼠标、禁用、展开及主题切换均可验证 |
+## 一、Color System - 色彩系统
 
-## 二、核心原则与工程归属
+### Zenith Light Palette
 
-1. **界面退后，内容向前。** Codex 主题骨架采用中性冷石墨色阶，品牌蓝为唯一主强调色；红、绿、黄只表达状态。禁止装饰性高饱和色、发光与多色卡片。
-2. **留白与字重建立层级。** 分组优先靠间距，强调使用 500/600 字重；表面按 `background`、`surface`、`surface-raised`、`surface-overlay` 分工，避免厚边框与层层套卡片。
-3. **输入框是对话工作台的交互中心。** 首页、项目和会话围绕同一输入流程组织，模式、权限、模型与上下文状态就近呈现。功能页保持自己的操作层级，不重复堆叠 Hero。
-4. **整套主题同时设计明暗。** 浅色、深色与跟随系统共用 DOM 和业务逻辑，不为某个主题复制页面，不提供独立颜色、字体、背景、圆角或透明度设置。
-
-整体设计语言为 **Modern Agent Studio**。微质感来自冷白/石墨表面的微小层级差、精确对齐、细边界与一致的字阶；蓝色保持单一强调角色，不另加 Indigo 等第二套主色。留白优先解决密度，阴影仅服务真实层级，不用霓虹光晕掩盖信息组织问题。
-
-### 单一事实来源
-
-| 层级 | 负责内容 | 代码入口 |
-| --- | --- | --- |
-| 设计规范 | 视觉角色、目标刻度、组件装配与验收规则 | 本文件 |
-| 主题包 | token 值、固定控件尺寸、内边距、字体、边框、圆角、阴影、状态外观与背景 | `src/renderer/theme/themes/`、`src/renderer/theme/components/` |
-| 共享组件 | DOM、语义 variant/size、状态、键盘、焦点、禁用行为、交互流程与测量 | `src/shared/components/ui/`、`src/shared/components/ai-elements/` |
-| 页面与业务 | 排列、响应式列数、父容器填充、滚动、视口约束、业务数据与事件 | `src/renderer/` |
-| 主题引擎 | 固定 hook、状态选择器、属性校验、portal 适配、规则原位替换与减少动效 | `src/renderer/theme/engine/`、`src/renderer/theme/components/css.ts` |
-
-- 注册入口为 `themes/plugins.ts`，定义为 `themes/types.ts`；变量契约为 `tokens/contract.ts`，组件 hook、状态及属性白名单为 `components/contract.ts`（均相对 `src/renderer/theme/`）。
-- `css/themes.css` 只能由 `bun run theme:generate` 生成，禁止手改、全局覆盖修补、提高选择器权重或使用 `!important`。
-- 下文的 Tailwind 名称用于标识刻度及映射，**不是在调用点写控件外观类的许可**。颜色、字号、圆角、阴影、高度、内边距和视觉状态全部由 recipe 提供，语义色 utility 也不能绕过此规则。
-- 新视觉需求先更新本文件与契约，再扩展共享 variant/size 或稳定 hook，补齐所有主题。布局类继续使用 Tailwind 与 `cn()`；`h-full`、`min-h-0`、视口限制等布局关系留在组件中。
-
-### 组件与技能参考
-
-UI 实现前先查现成组件，并参考 `shadcn`、`ai-elements`、`rongxinai-ui-adapter` 的组件与项目适配规则；这些技能补充本文件，不替代本文件。
-
-- 基础控件使用 shadcn/ui，对话、思考、工具、消息、输入、附件、来源和终端使用 ai-elements，禁止重造已有组件。
-- 页面顶栏唯一使用 `src/renderer/components/PageHeader.tsx`；页面级标签使用 `PageTabs`，分段/筛选使用 `FluidTabs`，删除确认使用 `DestructiveConfirmDialog`。
-- 表单使用共享 `FieldGroup`、`Field` 等组件组织，不在页面重做控件间距与状态外观。
-- 功能图标统一为 `lucide-react`，禁止手写 SVG 图标组件；品牌和供应商标识复用正式资产。
-- 用户可见文案通过 `t()` 走 i18n，新增键补齐 zh/en；状态、模式与 IPC 判别值使用模块常量。
-
-## 三、色彩与 Token 契约
-
-### Codex 浅色目标色板
-
-以下从设计建议的备选值中确定单一目标值；HEX 仅供主题作者落实 token，禁止复制到业务组件。深色须提供完整的对应角色，不通过 `dark:` 局部补丁实现。
-
-| 角色 | CSS 变量 | Light 目标 | 用途 |
+| Role | Token | Value | Usage |
 | --- | --- | --- | --- |
-| 画布底层 | `--zy-background` | `#FFFFFF` | 应用视口与内容画布 |
-| 基础表面 | `--zy-surface` | `#FAFAFA` | 侧栏、卡片默认底色、输入区外围表面 |
-| 浮起表面 | `--zy-surface-raised` | `#F1F3F5` | hover、次级标签、开关轨道 |
-| 覆盖浮层 | `--zy-surface-overlay` | `#FFFFFF` | 菜单、Popover、搜索弹层；配 1px 边框 |
-| 主文本 | `--zy-text-primary` / `--zy-foreground` | `#1E293B` | 正文、标题、激活项 |
-| 次文本 | `--zy-text-secondary` | `#64748B` | 辅助说明、占位符、快捷键、时间戳 |
-| 弱文本 | `--zy-text-muted` | `#94A3B8` | 禁用内容；不得用于必须读清的正文或状态 |
-| 微边框 | `--zy-border` | `#E2E8F0` | 常规 1px 分隔与描边 |
-| 弱边框 | `--zy-border-subtle` | `#F1F5F9` | 非必要的内部细分隔；不承担唯一控件识别 |
-| 品牌强调 | `--zy-primary` / `--zy-primary-strong` | `#0F6BF2` | 主动作、激活链接及焦点反馈 |
-| 品牌微背景 | `--zy-primary-muted` | `#EFF6FF` | 已定义强调语义的轻背景；不普遍铺满选中项 |
+| Canvas Base | `--zy-background` | `#FAFBFD` | Ethereal off-white canvas with subtle cool tint |
+| Primary Surface | `--zy-surface` | `rgba(255, 255, 255, 0.85)` | Glassmorphic cards with 85% opacity |
+| Elevated Surface | `--zy-surface-raised` | `rgba(255, 255, 255, 0.95)` | Hovered/elevated cards, 95% opacity |
+| Overlay Surface | `--zy-surface-overlay` | `rgba(255, 255, 255, 0.98)` | Menus, popovers with subtle backdrop blur |
+| Primary Text | `--zy-text-primary` | `#0A1628` | Deep blue-black for premium feel |
+| Secondary Text | `--zy-text-secondary` | `#4A5568` | Muted for hierarchy |
+| Tertiary Text | `--zy-text-muted` | `#A0AEC0` | Subtle hints and disabled states |
+| Electric Accent | `--zy-primary` | `linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)` | Vibrant blue-to-purple gradient |
+| Accent Glow | `--zy-primary-glow` | `0 0 24px rgba(59, 130, 246, 0.3)` | Luminous glow effect |
+| Success | `--zy-success` | `#10B981` | Vibrant emerald |
+| Warning | `--zy-warning` | `#F59E0B` | Warm amber |
+| Error | `--zy-error` | `#EF4444` | Clean red |
+| Border | `--zy-border` | `rgba(0, 0, 0, 0.06)` | Subtle separation |
+| Border Glow | `--zy-border-glow` | `rgba(59, 130, 246, 0.15)` | Accent border with subtle glow |
 
-`primary-hover`、`destructive`、`success`、`warning` 及对应前景色继续由主题包完整定义。`primary-strong` 与 `primary` 保持独立角色：深色可以提亮链接/图标，同时保留适合浅色按钮文字的实色背景。`text-muted-foreground` 等 shadcn 映射跟随相应语义角色。
+### Zenith Dark Palette
 
-### 使用规则
-
-1. 一个主操作区只保留一个主强调动作。普通导航、工具图标、说明文字不借品牌色提亮；侧栏常规选中项使用中性表面与 500 字重。
-2. 普通工具卡片禁止分别套红、黄、绿背景。状态同时用图标或文字表达，不只依靠颜色。成功工具调用使用次文本，不把整条执行轨迹染绿。
-3. 禁止在页面、包装组件、原生控件或运行时 DOM 中裸写 HEX/RGB/HSL、`bg-white`、`text-gray-500`、`bg-blue-500` 等；禁止业务组件中的 `dark:` 外观类。
-4. 品牌原图、供应商标识、用户内容和隔离预览保留内容颜色。第三方 Logo 使用统一尺寸及中性徽章外壳；白色外壳仅是浅色目标，深色使用对应主题表面，不强制白底。
-5. 已挂载技能 token 继续使用注册的 `skill-blue` 语义及 `surface-skill-token` / `surface-skill-remove` recipe，不推广为普通装饰色。
-6. 可读正文及重要辅助信息以对比度至少 4.5:1 为验收目标；必要控件边界、状态与焦点标识至少 3:1。浅灰弱文本只服务禁用等非关键内容；深色、hover、选中及透明叠加后都要检查实际对比度。
-7. 搜索无匹配等紧凑空态用 14px 次文本与清除筛选等下一步指引，不加警报色或额外卡片。
-
-### 透明度
-
-透明度只用于禁用、非激活状态、遮罩和动效；文字弱化优先换语义 token。禁用控件可使用 0.5 透明度；非激活分段文字的透明度以实际对比度为准，不达标时改用可读的次文本色，不机械套用 0.5。全部由 recipe 提供，不能连带降低整行可用控件的对比度。模态遮罩只变暗，不加背景模糊。主画布纹理或图片透明度仅作用于背景层。
-
-## 四、字体与排版
-
-### 字体栈
-
-- 界面：`-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Inter, sans-serif`。
-- 代码与终端：`"SF Mono", "Fira Code", Menlo, Monaco, Consolas, monospace`。
-- 字体栈通过主题角色提供，不在组件中设置 `font-family`，不新增网络字体文件。其他主题的标题可使用 `style-font-heading`，正文与操作控件保持统一。
-
-### 六档字号
-
-| 角色 | 刻度映射 | 字号 / 行高目标 | 场景 |
+| Role | Token | Value | Usage |
 | --- | --- | --- | --- |
-| 辅助 | `text-xs` | 12px / 16px | 时间戳、Kbd、Badge、状态 |
-| 次要 | `text-sm` | 14px / 20px | 默认界面正文、按钮、列表、说明 |
-| 强调 | `text-base` | 16px / 24px | 区块标题、弹窗标题、主输入区 |
-| 页面 | `text-lg` | 18px / 28px | PageHeader 标题、空状态标题 |
-| 展示 | `text-xl` | 20px / 28px | 展示短标题、紧凑字标布局 |
-| 超大 | `text-2xl` | 24px / 32px | 欢迎页 Hero；一屏至多一处，不重复页面标题 |
+| Canvas Base | `--zy-background` | `#0A0E1A` | Deep space background |
+| Primary Surface | `--zy-surface` | `rgba(20, 24, 36, 0.85)` | Glassmorphic cards with 85% opacity |
+| Elevated Surface | `--zy-surface-raised` | `rgba(30, 35, 50, 0.90)` | Elevated surfaces |
+| Overlay Surface | `--zy-surface-overlay` | `rgba(30, 35, 50, 0.98)` | Menus and overlays |
+| Primary Text | `--zy-text-primary` | `#E8EBF0` | Near-white for readability |
+| Secondary Text | `--zy-text-secondary` | `#A0AEC0` | Muted hierarchy |
+| Tertiary Text | `--zy-text-muted` | `#4A5568` | Subtle disabled |
+| Electric Accent | `--zy-primary` | `linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)` | Lighter gradient for dark bg |
+| Accent Glow | `--zy-primary-glow` | `0 0 32px rgba(96, 165, 250, 0.4)` | Stronger glow in dark |
+| Success | `--zy-success` | `#34D399` | Brighter emerald |
+| Warning | `--zy-warning` | `#FBBF24` | Bright amber |
+| Error | `--zy-error` | `#F87171` | Softer red |
+| Border | `--zy-border` | `rgba(255, 255, 255, 0.08)` | Subtle light borders |
+| Border Glow | `--zy-border-glow` | `rgba(96, 165, 250, 0.25)` | Luminous accent borders |
 
-字号与行高成对定义在 token/recipe 中。`leading-tight`、`leading-normal`、`leading-snug` 是比例名称，不能直接当作表中的固定像素值。长消息/文档正文保留 1.6 阅读行高，代码块采用 1.625，由对应内容组件统一提供。
+### Color Usage Rules
 
-旧 `text-xxl` 为 22px，不属于新版六档；后续迁移其 token 与使用方到 24px 展示角色，禁止继续扩散。品牌图片尺寸与用户文档排版不计入界面字号刻度。
+1. **Glassmorphism Everywhere** - All cards and surfaces use 80-95% opacity with backdrop blur (8-16px)
+2. **Gradient Primaries** - Main actions use the electric blue-purple gradient, never flat colors
+3. **Colored Shadows** - Shadows carry subtle color tints matching their context (blue glow for primary, green for success)
+4. **Depth Through Opacity** - Layer surfaces from 80% (background cards) to 98% (top overlays)
+5. **No Pure Black/White** - Light mode uses #FAFBFD, dark mode uses #0A0E1A - both with character
 
-### 三档字重
+## 二、Typography - 字体排版
 
-| 字重 | 映射 | 场景 |
+### Font Stack
+
+```css
+--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+--font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
+```
+
+### Type Scale (Desktop-optimized: light and dense)
+
+| Role | Size / Line Height | Weight | Usage |
+| --- | --- | --- | --- |
+| Display | 24px / 32px | 650 | Hero headings, welcome screens |
+| H1 | 20px / 28px | 600 | Page titles |
+| H2 | 17px / 24px | 600 | Section headers |
+| H3 | 15px / 22px | 600 | Card titles |
+| Body | 13px / 20px | 400 | Default UI text, lists |
+| Caption | 12px / 18px | 400 | Labels, auxiliary, metadata |
+| Tiny | 11px / 16px | 500 | Badges, tags, compact info |
+
+### Typography Rules
+
+1. **Tight Line Height** - 1.45-1.55x for UI text, optimized for density
+2. **Variable Fonts** - Use Inter's variable weight axis (400-650) for smooth hierarchy
+3. **Compact Hierarchy** - Clear differentiation without excessive size jumps
+4. **Sentence Case** - Use sentence case for UI labels, not UPPERCASE (except acronyms)
+
+## 三、Spacing & Layout - 间距与布局
+
+### 8px Grid System
+
+All spacing uses 8px base unit for consistency and scale:
+
+| Token | Value | Usage |
 | --- | --- | --- |
-| 400 | `font-normal` | 正文、说明、占位符 |
-| 500 | `font-medium` | 按钮、交互项、选中导航 |
-| 600 | `font-semibold` | 页面/区块标题、激活 Tab |
+| `space-1` | 8px | Tight gaps between related items |
+| `space-2` | 16px | Standard gaps, button padding |
+| `space-3` | 24px | Card padding, section spacing |
+| `space-4` | 32px | Large section gaps |
+| `space-5` | 40px | Page margins |
+| `space-6` | 48px | Hero spacing |
+| `space-8` | 64px | Major layout divisions |
 
-禁止 700 及以上界面字重；正式品牌字标资产除外。不要用随意加粗、字号跳跃或彩色文字补救层级。
+### Component Sizing (Desktop-optimized: light and dense)
 
-## 五、间距、圆角、边框与阴影
+| Component | Height | Padding (H×V) | Notes |
+| --- | --- | --- | --- |
+| Button Default | 32px | 16px × 8px | Standard desktop size |
+| Button Small | 28px | 12px × 6px | Compact contexts |
+| Button Large | 36px | 20px × 10px | Primary CTAs |
+| Input Field | 32px | 12px × 8px | Efficient typing area |
+| Navigation Item | 32px | 12px × 8px | Comfortable clicking |
+| Card | - | 20px | Balanced internal padding |
+| Dialog | - | 24px | Modal padding |
+| Sidebar | 240px | - | Compact but usable |
 
-### 间距与尺寸
+### Layout Principles
 
-主布局使用 4px 网格；紧凑控件明确允许 2px 半步进，因此 6px、10px、14px 是有限刻度，不宣称全部间距都是 4 的倍数。禁止 `p-[13px]` 等任意值。页面控制外部排列，控件内部尺寸由 recipe 控制。
+1. **Efficient Density** - Desktop-optimized spacing, not mobile-first bloat
+2. **Max Width 1600px** - Wide-screen friendly content container
+3. **Smart Padding** - 16/20/24px padding based on hierarchy
+4. **Clean Surfaces** - Subtle glassmorphism without excessive decoration
 
-| 场景 | 目标 |
-| --- | --- |
-| 微间距 | 4 / 6 / 8px，对应 `gap-1` / `gap-1.5` / `gap-2` |
-| 控件内边距 | 紧凑行参考水平 12px、垂直 6px；有固定高度时共同计算 |
-| 卡片内边距 | 16px，紧凑卡片可用 14px |
-| 区块间距 | 16 / 24px |
-| 对话框 | 内容 24px；footer 水平 24px、垂直 16px |
-| 普通按钮 / 小号按钮 | 高 32 / 28px，统一水平内边距；主新建按钮单独为 36px 语义尺寸 |
-| 导航与会话行 | 高 32px；不能因附加操作或选中而改变行高 |
-| 图标按钮 | 默认 32px 命中区域，16px 图标；18px 用于明确的较大工具栏场景 |
-| 菜单项 | 高 32px，水平内边距 8px、垂直 6px，图标与文字间距 8px |
+## 四、Elevation & Shadows - 高度与阴影
 
-### 密度与舒展度
+### Shadow System
 
-弹窗与表单必须舒展大气，宁可留白不可拥挤。2026-10-13 经用户核准，以 Codex「编辑项目」弹窗（名称 + 源文件夹列表 + 底部操作区）的密度为基准范例。
+Shadows include both depth (grey) and colored glow components:
 
-- 表单/弹窗字段组纵向间距 16px；标签与控件间距 6–8px；内容区与 footer 间距 ≥16px。不发明新刻度，全部取自上表。
-- 表单类弹窗最小宽度 `sm:max-w-md`（448px）；含列表或多字段分区的弹窗用 `max-w-lg`（32rem）。不得用更窄的弹窗承载表单。
-- 表单正文、控件、菜单文字不小于 14px（辅助说明、错误信息、状态标签/徽章 12px 除外）；图标按钮命中区不小于上表规定。
-- **空间不够时，加宽容器、增加间距或改用列表分区；禁止缩小字号、压缩内边距、挤排控件或降低行高来塞内容。**
-- 侧栏项目/工作区行就是导航行，遵守 §六.1 行状态（透明常态、无卡片描边、行高 32px、次要操作 hover/focus-within 显示且预留槽位）；禁止给导航行加卡片式描边、独立表面或胶囊包装。
+| Level | Shadow | Glow | Usage |
+| --- | --- | --- | --- |
+| Flat | none | none | Inline elements |
+| Low | `0 1px 3px rgba(0,0,0,0.06)` | - | Subtle cards |
+| Medium | `0 4px 12px rgba(0,0,0,0.08)` | `0 0 20px rgba(59,130,246,0.08)` | Default cards |
+| High | `0 8px 24px rgba(0,0,0,0.10)` | `0 0 32px rgba(59,130,246,0.12)` | Elevated cards, hover |
+| Ultra | `0 12px 40px rgba(0,0,0,0.12)` | `0 0 48px rgba(59,130,246,0.18)` | Modals, popovers |
+| Primary | `0 8px 24px rgba(59,130,246,0.20)` | `0 0 32px rgba(59,130,246,0.30)` | Primary button hover |
 
-### 圆角刻度
+### Glassmorphism Recipe
 
-Codex 基准 `--zy-radius` 为 10px；各派生 token 按下表确定，不依赖组件库默认计算公式。
+Standard glassmorphic surface:
+```css
+background: rgba(255, 255, 255, 0.85);
+backdrop-filter: blur(12px) saturate(180%);
+border: 1px solid rgba(255, 255, 255, 0.18);
+box-shadow: 
+  0 8px 32px rgba(0, 0, 0, 0.08),
+  0 0 24px rgba(59, 130, 246, 0.08);
+```
 
-| 映射 | 新版目标 | 用途 |
+## 五、Border Radius - 圆角
+
+### Radius Scale
+
+| Token | Value | Usage |
 | --- | --- | --- |
-| `rounded-sm` | 4px | 小标签、行内代码 |
-| `rounded-md` | 6px | Kbd、小型内部控件 |
-| `rounded-lg` | 10px | 默认按钮、输入控件、菜单 |
-| 侧栏专用 recipe | 8px | 导航选中项、工作/对话紧凑轨道 |
-| `rounded-xl` | 12px | 普通专家/技能/模型卡片、Dialog、折叠面板、代码预览容器 |
-| `rounded-2xl` | 16px | 独立复合卡片、分步配置容器、任务搜索弹层 |
-| `rounded-3xl` | 24px | Hero 主输入岛专用 |
-| `rounded-full` | 全圆 | 头像、状态点、胶囊标签/引导项、专用圆形提交按钮 |
+| `radius-sm` | 8px | Small tags, inline code |
+| `radius-md` | 12px | Buttons, inputs, badges |
+| `radius-lg` | 16px | Cards, panels |
+| `radius-xl` | 20px | Large cards, dialogs |
+| `radius-2xl` | 24px | Hero sections, modals |
+| `radius-3xl` | 32px | Feature cards, islands |
+| `radius-full` | 9999px | Pills, avatar, circular buttons |
 
-- 子元素圆角不得大于外壳；嵌套时结合内边距保持同心。全圆图标按钮等独立形状不用于拼接外壳边缘。
-- 拼接控件通过共享 joined-control hook 处理相邻边，不在调用点堆 `rounded-none`。
-- 普通按钮禁止用 `rounded-full` 等类覆写；主输入岛圆形提交使用专用共享语义，不推广为所有按钮形状。
-- 当前 `sm/md=8px`、`xl=14px` 等实现须在后续主题迁移中统一调整，不能仅改文档后假定映射已生效。
+**Rule**: Larger surfaces = larger radii. Nest with 8px step-down (20px container → 12px inner card).
 
-### 边框与阴影
+## 六、Motion & Animation - 动效与动画
 
-分隔优先留白，其次 1px 边框；阴影用于浮层及明确列出的输入岛、滑块特例。普通列表和模型卡片静止、hover 均无阴影，hover 使用表面换档。
+### Timing Functions
 
-| 场景 | 目标 |
-| --- | --- |
-| 普通按钮、输入控件、列表、模型卡片 | 无阴影；需要边界时使用 1px 语义边框 |
-| 主输入岛 | 静止 `shadow-sm`，聚焦最多 `shadow-md`，配明确焦点反馈 |
-| 工作/对话或分段选中滑块 | 最多 `shadow-sm`，保持在轨道内部 |
-| Dropdown、Popover、搜索弹层、Dialog、Toast | `shadow-lg` 与 1px 边框；深色优先依靠表面与边界区分 |
+```css
+--ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);      /* Smooth deceleration */
+--ease-in-out-circ: cubic-bezier(0.85, 0, 0.15, 1);  /* Circular ease */
+--spring: cubic-bezier(0.34, 1.56, 0.64, 1);         /* Bouncy spring */
+```
 
-`shadow-*` 均映射主题变量，不允许 `shadow-[...]`。不把旧 `shadow-xl/2xl`、`shadow-glow-accent` 刻度作为新增层级或装饰的理由。普通按钮不使用 hover 投影。输入岛聚焦边框由 recipe 配置品牌色弱档，不在页面写 `border-primary/30`。
+### Duration Scale
 
-浮层及二级子菜单必须保留真实边框，不用 ring 代替；focus ring 是独立焦点标识。边框不随 hover 改宽度，避免抖动；大于 1px 的描边限焦点标识等明确语义。
-
-## 六、核心组件装配标准
-
-### 1. App Shell 与侧栏
-
-- **顶栏**：统一 `PageHeader`，保持高 48px、水平 16px 的布局与窗口拖拽边界。macOS 留出原生交通灯，Windows 复用 `WindowTitleBar`；操作区不可拖动，标题可截断，导航与操作不可被挤没。页面标题只出现一次。
-- **环境状态**：设计支持在顶栏状态槽展示本地服务、当前模型及量化信息；采用用户可理解的名称，如“本地模型已就绪 · 当前模型 · 4-bit”。只展示真实状态，不写内部运行时品牌或固定示例数据，不遮挡页面标题。
-- **侧栏**：默认宽 260px，保留拖宽与收起；顶部品牌区高 40px。导航与会话行高 32px，分组标题 12px，图标 16px，外侧水平留白 8px、行内 10px。
-- **信息分组**：从上到下为品牌/模式、主新建动作、功能导航、项目与历史、底部状态/设置。组间用 16px 留白区分，密集组内用 4px 间距；模式切换不混入普通导航行，分组标题用次文本，避免全侧栏同时加粗。展开状态保持相同分组顺序，收起入口提供名称提示与可访问标签。
-- **品牌与折叠**：顶部使用正式紧凑品牌资产及折叠按钮；折叠快捷键目标为 Cmd/Ctrl+B，须由统一快捷键入口注册、检查冲突后再展示提示。
-- **工作/对话开关**：沿用受控 Switch 语义和唯一变更入口，轨道高 28px、圆角 8px，滑块内嵌、微阴影。浅色滑块为浅表面，深色用对应 token；选中 500 字重，未选中可降低至 0.5 透明度，仍须可读。
-- **新建**：主新建入口常显、全宽、高 36px，品牌色填充，由 `Button` 共享 variant/size 提供；文案按当前模式本地化，如“新建智能任务”。
-- **导航**：沿用本地推理、编程、自动化、活动、专家等实际路由和 i18n 名称。统一复用 `SidebarNavigationView` / `SidebarNavigationItem` 与 `Button` 的 navigation 语义，不因设计示例增造页面。
-- **行状态**：透明常态、中性 hover/selected/pressed 表面，选中 500 字重，无卡片描边。反馈 120ms ease-out；焦点清楚可见。
-- **项目与历史**：树状折叠、标题截断；有时间数据时在独立槽位常显相对时间。重命名/删除等次要操作可在 hover、focus-within 或菜单展开时显示，不能只有鼠标悬停可达；预留槽位，不覆盖标题、时间、状态或 Agent 名。
-- **底部**：设置入口常显；硬件状态区可显示真实 RAM/GPU 占用与推理速率。数据不可用时隐藏对应读数或显示不可用，不伪造百分比或 tok/s，不为展示增加主进程阻塞采样。
-
-侧栏收起时内容保持挂载并设置 `inert`，退出键盘顺序与可访问树。编程工作区文件夹点击只展开/折叠，不切换当前会话；默认展开仅在首次非空加载执行。后台刷新、搜索和主题切换保留树状态。Agent 名称列最多占行宽 30% 且不超过 6.5rem，截断后提供完整名称提示。
-
-### 2. 居中主输入岛（Hero Prompt Island）
-
-- 外部最大宽度 `max-w-3xl`（48rem），小窗口随容器收缩。圆角 24px，浅色使用微冷白表面、1px 细边框与轻阴影；明暗外观由 composer recipe 提供。
-- 输入区复用 ai-elements `PromptInput` 及其文本输入能力：16px / 24px，无独立内层边框，占位符用次文本。草稿、附件和焦点不因主页/会话切换或主题变化而丢失。
-- 工具栏左侧放附件、工作区与权限；右侧放模型和圆形提交动作。权限和模型复用 `PromptSelectorButton`，普通动作复用 `PromptInputButton`，提交复用 ai-elements 提交组件及其真实运行/停止/禁用状态。
-- 选择器使用相同高度、内边距、图标槽、文字截断、尾部箭头及展开反馈；常态无边框、无阴影，hover 用中性表面。纯动作不加菜单箭头。空间不足时使用共享紧凑模式，不能挤掉提交和权限入口。
-- 菜单项复用 `SelectorOptionContent`：主文字 14px、说明 12px，长标题可换行；模型当前值标记与键盘游标分开，权限保留单选语义。菜单搜索、状态和回调留在原控制组件。
-- 输入岛下方预留六类引导：制作幻灯片、数据分析、创建网站、深度调研、学术研究、文档。复用 `Suggestion` 等共享组件，以中性胶囊、细边框、14px 文字、无静态阴影呈现；按实际可用能力配置，不放无法执行的入口。
-
-### 3. 本地推理与模型市场
-
-- 内容区不足 48rem 时单列，达到 48rem 时两列，间距 16px；不固定双列挤压窄窗口。
-- 卡片按“模型身份 → 能力与设备适配 → 版本、安装与运行”组织。顶部为中性图标槽、16px / 600 模型名、必要标签；模型名保留最多两行，发布者在其下。
-- 说明使用 14px 次文本，默认一至两行。能力和适配使用图标与文字，不用彩色填充块；评分、校验和下载量可通过鼠标、点击及键盘访问详情。
-- 底部量化选择器目标高 32px，显示量化与真实文件大小；未安装提供获取/下载，已就绪提供运行。安装进度、失败、取消和不可用状态继续由现有业务状态驱动；主要动作常显。
-- 右侧运行控制抽屉组织上下文与内存/显存信息、端口、局域网共享及兼容 API 调用示例；仅呈现后端已支持、已授权的控制能力，不把版式调整变为新增网络开放行为。
-- 骨架与真实卡片使用同一布局。展示模块只接收数据与回调；量化选择、安装参数、服务调用、IPC 和持久化仍由控制层负责。
-
-### 4. 任务执行与代码工作台
-
-- 宽屏且预览打开时，左右区域以 55% 交互 / 45% 工件预览为初始比例，保留拖动、收起与最小可用宽度；窄窗口切换面板，不强制比例造成溢出。
-- 思考折叠行目标高 36px，包含图标、状态、耗时和展开指示；复用 ai-elements `Reasoning`。展开用 1px 中性竖线与留白表达从属。
-- 工具调用复用 ai-elements `Tool` 等组件，默认是最小高 32px 的紧凑活动行：真实工具名、命令或路径摘要、状态、耗时（有数据时）、展开箭头。完整参数与结果在同一展开层查看，不套多重终端/摘要卡片。
-- 普通工具行无外围边框、底色与阴影；工具名 14px，摘要/状态 12px。进行中和成功使用次文本，等待批准、拒绝及失败保留语义反馈。权限请求立即展开且操作常显。
-- 用户消息采用中性表面，助手正文直接排在画布上。消息、思考、工具和系统信息按原始顺序呈现，不隐藏中间回答。展开选择跨虚拟列表卸载及主题切换保留，导出包含完整结果。
-- 预览顶部可组织实时渲染、源代码、控制台视图；页面标签进 `PageHeader` 的 `PageTabs` 槽，面板内部多选一视图复用 `FluidTabs`。刷新、全屏、独立窗口等动作以实际能力为准。
-- 工件大小、DOM 节点数、离线阻断状态及 FPS 是有真实数据源时的辅助指标，不能填模拟值。采样有界，不阻塞消息流；HTML/React 隔离、SVG 消毒与 Mermaid 严格模式保持原有安全边界。
-- 对话运行条位于页头下方，目标高 24px、文字 12px，仅展示简短状态与用时，失去后台确认时显示重连。定时刷新不能重渲染消息列表。
-
-### 5. 页面 Tabs、分段与任务搜索
-
-- `PageTabs` 是页面级标签的唯一实现，放在 `PageHeader` 的 tabs 槽，仅由顶栏绘制一条底部分隔线。组件负责键盘、ARIA、指示器测量和实例隔离；页面只传受控值、items 与回调。
-- 页面标签选中用文字层级与共享指示器，不铺品牌色块。面板切换复用 `layered-tabs-content` 的退出/进入范式，并遵守减少动效。
-- `FluidTabs` 是分段/筛选的唯一实现；轨道中性，选中滑块内嵌、微阴影，文字承担状态区分。禁止向轨道外突出的玻璃滑块、厚投影及自造分段条。
-- 卡片式单选（主题、认证方式、渠道等）使用描边与勾选，禁止整卡 `primary` / `primary-muted` 填充。
-- 侧栏搜索复用 `SidebarSearchTrigger`、`TaskSearchDialog`，查询与跳转由 `CoworkSearchModal` 管理。搜索不重建或过滤侧栏树。
-- 搜索弹层最大宽度 `max-w-lg`、圆角 16px、结果行高 32px；内部输入区无独立边框，弹层外壳仍有细边框。结果高亮可使用专用胶囊形状。保留方向键、Enter、Cmd/Ctrl+1–9，Escape 关闭并恢复焦点。
-
-### 6. 模块化卡片与空状态
-
-- 专家、技能、模型卡片共用“身份 → 说明/能力 → 状态与动作”的结构；复用共享 Card、Badge、Button 及已有业务展示组件，通过语义 variant 区分密度，不为每个模块复制一套外观。
-- 普通卡片统一 12px 圆角，独立复合卡片或分步配置容器为 16px。相同网格中的卡片保持相同内边距、图标槽、标签高度与动作基线，不以更大圆角暗示推荐。
-- 图标底座使用统一中性表面，功能图标采用单色 lucide，供应商标识保留正式资产。标签使用中性弱底；语义色只表达真实警告、错误或必要状态，不按技能/专家分类随机着色。
-- 细边界负责区域识别，普通卡片静止与 hover 均无投影。设计建议中的“微光晕”落实为低对比边界；轻阴影仅用于已列出的浮层、输入岛和滑块，不增加外发光或多层装饰轮廓。
-- 网格按可用内容宽度响应，加载骨架复用真实卡片布局；说明截断后可查看完整内容，动作保持可发现，避免卡片内嵌套多层描边面板。
-- 空状态使用短标题、一句用途或下一步说明和一个主要 CTA；任务型入口补充 `Suggestion` 引导项。禁止用大面积色块、放大的默认图标或无关动画填空；原生共享组件的短时反馈即可。
-
-### 7. 设置抽屉与分步配置
-
-| 场景 | 首选容器 | 组织方式 |
+| Speed | Duration | Usage |
 | --- | --- | --- |
-| 本地推理的端口、目录、上下文和运行参数 | 右侧 Sheet / 运行控制抽屉 | 保留模型列表及当前工作上下文，相关配置就近分组 |
-| 首次运行、环境准备、安装配置 | 页面内 Setup Flow / 分步配置卡片 | 步骤、当前进度、校验结果及下一步明确，支持返回修正 |
-| 全局偏好 | 既有设置页面或共享设置容器 | 使用一致的分类导航与表单，不再层层打开新的模态窗口 |
-| 不可撤销操作、必须立即完成的短确认 | Dialog；删除使用 DestructiveConfirmDialog | 仅呈现必要说明与动作，避免塞入长表单 |
+| Instant | 100ms | Micro-interactions, hover |
+| Fast | 200ms | Button press, small transitions |
+| Medium | 350ms | Cards, panels, modals |
+| Slow | 500ms | Page transitions, complex animations |
+| Lazy | 800ms | Ambient animations, breathing |
 
-- 抽屉复用共享 Sheet，步骤流组合已有表单与按钮；先查现有能力，不为视觉改造增加另一套设置状态、持久化或业务入口。
-- 同一表单密度下输入、选择器、按钮使用相同高度档，普通行以 32px 为基准，表单行间距 16px。标签、辅助说明、校验错误按固定顺序排列，由共享 Field/FieldGroup 和 recipe 控制外观。
-- 常用配置直接可见，高级选项按需展开；不把无依赖的一页表单硬拆成步骤。步骤切换保留输入，错误就地显示并可定位到字段。
-- 保存、取消及需要重启/重新加载才能生效的状态明确表达，沿用现有业务行为，不以关闭抽屉暗示已保存。工作区保持可辨认；模态抽屉仍保留必要焦点约束，关闭后恢复触发器焦点。
-- 窄窗口可以使用全宽 Sheet；不叠开多个设置弹窗，也不遮住必须用于判断配置结果的反馈。
+### Animation Principles
 
-### Button 使用纪律
+1. **Spring Physics** - All movements use spring easing for natural feel
+2. **Staggered Reveals** - Lists animate in with 50ms delay between items (max 8 items)
+3. **Morphing Shapes** - Buttons and cards morph between states, don't just fade
+4. **Breathing Idle** - Subtle scale pulse (1.0 → 1.02) on idle interactive elements
+5. **Colored Transitions** - Shadows and glows transition color along with state
+6. **Reduce Motion** - All animations respect `prefers-reduced-motion`, falling back to instant or opacity-only
 
-1. 所有按钮使用 `Button` 或工具栏的 `PromptInputButton`。确实无法表达的复合交互才使用原生控件，且必须绑定注册 hook、真实状态与完整可访问性。
-2. `className` 只允许 `w-full`、`justify-start`、`gap-*`、`mt-*` 等布局类；禁止颜色、圆角、阴影、字重、字号、高度和内边距覆写。新规格先扩展共享 variant/size 及全部主题 recipe。
-3. 行级/卡片级可点区域优先使用适当的语义按钮或链接；复合内容不能嵌套按钮。自定义可点区域必须具备正确 role、tabIndex、Enter/Space 键盘行为及 hover/pressed/focus/disabled 状态，禁止裸 `div onClick`。
-4. 按钮与可点卡片保留 1px 按压反馈，由 recipe 实现；内嵌操作只响应自己的交互，不能连带移动父卡片或抹掉父卡片的独立按压反馈。disabled 不响应按压。
-5. 不可撤销删除统一 `DestructiveConfirmDialog`。确认用专用危险填充，取消用无边框 ghost；说明简短，长名称截断并可查看完整值。不得手搓确认框。
+### Hover Effects
 
-## 七、品牌与资产
+```css
+/* Button hover - lift + glow */
+transform: translateY(-2px) scale(1.02);
+box-shadow: 0 12px 32px rgba(59, 130, 246, 0.25);
+transition: all 200ms var(--ease-out-expo);
 
-- 对外统一使用“知远智能体 (ZhiYuan Agent)”，不恢复旧名称。内部引擎和传输实现不进入品牌或普通界面文案。
-- 欢迎 Hero 使用正式“知远”字标及右上蓝色实心圆点，字标视觉高度目标约 48px；这是资产尺寸，不是额外界面字号。浅色用正式深色字标，深色使用可读的正式反白版本，保留蓝点。
-- 顶栏与侧栏使用正式紧凑品牌组合（图形标识与知远 / ZhiYuan 标准字）。缺少目标资产时先补正式资产，不用系统字体拼字或手绘图标冒充 Logo。
-- 品牌圆点沿用资产原色；控件主色目标为 `#0F6BF2`，二者职责不同。禁止主题把品牌圆点改成红色、橙色或其他强调色，禁止拉伸、压扁或替换字标字体。
-- 内容区初始化继续复用 `LogoLoadingState`，只在其既定加载用途使用正式单色衍生轮廓；它不替代导航和 Hero 的标准品牌组合。后续对齐时保证品牌识别与明暗可读性。
+/* Card hover - gentle lift */
+transform: translateY(-4px);
+box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+transition: transform 350ms var(--ease-out-expo);
+```
 
-## 八、动效、交互状态与连续性
+## 七、Component Specifications - 组件规格
 
-### 动效尺度
+### Buttons
 
-| 场景 | 时长 | 规则 |
-| --- | --- | --- |
-| hover / press / focus | 100–150ms | ease-out；按压位移 1px，hover 使用中性背景换档 |
-| 状态切换、抽屉、弹层、视图进入/退出 | 200–250ms | 短距离 transform 与 opacity，沿用共享组件编排 |
-| 持续运行、加载 | 与真实状态同寿命 | 使用共享 Shimmer、骨架或紧凑状态图标；减少动效下静态呈现 |
+**Primary Button** (Gradient with glow):
+```css
+background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+padding: 14px 28px;
+border-radius: 12px;
+font-size: 15px;
+font-weight: 550;
+box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
 
-- 超过 300ms 的单次动画必须说明业务理由；既有 `LogoLoadingState` 1.2s 单程呼吸仅用于持续初始化，不推广为普通交互。共享布局弹簧应在交互时长预算内稳定。
-- 禁止 `transition-all`，显式列出颜色、透明度或 transform。位移动画不修改 width/height/top/left；既有侧栏宽度交互由共享组件负责，不扩大例外。
-- 控件视觉动效由 recipe 提供，不在页面写 keyframes 或动画 utility。共享布局组件保留测量和交互时序职责，主题不控制业务完成时间。
-- 含正文的卡片不做 scale；普通导航图标保持静态，不逐个播放装饰动画。复用 ai-elements/shadcn 的动效也要遵守状态语义与减少动效要求。
-- 同屏最多一组入场编排，不超过四层，总延迟不超过 400ms；不为显示已就绪内容人为等待。持续动效聚焦当前主状态，不让多条工具记录同时循环扫光。
-- `prefers-reduced-motion` 下去除位移、缩放、旋转、扫光与错峰，用静态状态和即时切换保留反馈；不得因此影响焦点、展开或任务运行。
+/* Hover */
+transform: translateY(-2px);
+box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35);
+```
 
-### 完整交互状态
+**Secondary Button** (Ghost with border):
+```css
+background: rgba(255, 255, 255, 0.05);
+border: 1.5px solid rgba(59, 130, 246, 0.3);
+backdrop-filter: blur(8px);
+```
 
-- **hover**：可感知的中性表面或文字层级变化，只在支持悬停的设备生效。
-- **pressed**：按钮和可点卡片有按压反馈；滑块、Tab 等复合控件沿用自己的选中/拖动语义，不强加会破坏定位的位移。
-- **focus-visible**：统一可见焦点标识，不得无替代地移除 outline/ring。
-- **disabled**：recipe 提供外观，组件阻止动作并提供正确禁用语义。
-- **selected / checked / open / invalid**：绑定真实状态；验证 selected+hover、invalid+focus、disabled 等组合，不能被 variant 常态覆盖。
+**Icon Button**:
+- Size: 40×40px (24px icon)
+- Hover: Subtle scale (1.08) + background fade-in
 
-指针策略统一在 `index.css` 的 base 层：动作元素 pointer，输入区 text，展示与拖拽区 default，禁用元素 not-allowed。组件仅在有明确交互语义时声明例外。
+### Input Fields
 
-### 状态连续性与加载
+```css
+height: 48px;
+padding: 0 16px;
+background: rgba(255, 255, 255, 0.5);
+border: 1.5px solid rgba(0, 0, 0, 0.08);
+border-radius: 12px;
+backdrop-filter: blur(8px);
+font-size: 15px;
 
-1. 首页、项目、会话与模式切换保留草稿、附件、焦点、滚动和任务状态；需要舍弃内容时必须明确告知。异步真实 id 返回不替换稳定 React key，不中途 remount 消息树或编辑器。
-2. 视图切换由共享退出/进入序列组织，减少动效时即时切换；不把树节点展开当导航，不为纯折叠强制切换主面板。
-3. 原地内容加载使用与目标布局一致的骨架或共享 Shimmer；短于约 200ms 的加载不闪现占位，不用全屏 Spinner 打断会话。应用启动、内容区初始化和运行条各自复用既有加载组件。
-4. `LogoLoadingState` 内容区居中、宽 128px、下方本地化状态文字；加载结束立即显示内容，无最短播放时间。侧栏仍可操作，失败显示原因与重试；减少动效时 Logo 静止。
-5. 新建、安装、提交、权限批准/拒绝等主要动作常显；低频次要动作可以随 hover/focus-within 显示，但必须可被键盘和无悬停设备访问。
-6. 完整空状态提供 CTA 或明确操作指引；无匹配等紧凑空态给出恢复路径，不为凑 CTA 制造无效按钮。
+/* Focus */
+border-color: var(--zy-primary);
+box-shadow: 
+  0 0 0 4px rgba(59, 130, 246, 0.1),
+  0 0 20px rgba(59, 130, 246, 0.2);
+```
 
-### 全局提示与错误文案
+### Cards
 
-- 唯一全局提示组件为 `src/renderer/components/Toast.tsx`，通过 `src/renderer/services/toastNotification.ts` 的 `showAppToast`、`showAppInfoToast`、`showAppErrorToast`、`showAppSuccessToast` 派发，由 App 统一呈现。禁止调用方直接使用 sonner 或另建 Toast 容器。
-- 位置顶部居中，宽度随内容，使用标准浮层边框、圆角与阴影；图标槽 24px。错误、成功、信息分别使用语义图标，信息直接用 lucide `Info`，不叠第二层圆底；当前共享范式不显示右侧关闭图标。
-- 短暂提示默认 2.2s，最长 3s；持续状态使用页面内 Alert/进度。超过数秒且页面无进度的批量操作可续期同一条信息提示，结果立即替换，不堆新弹层。
-- 错误先分类归一化并走 i18n；未知原因只保留清理后的摘要。禁止暴露堆栈、原始 JSON/HTML、完整 URL、敏感路径和内部模块名，原始错误写日志。
-- 显式 `isError` / `isSuccess` 优先于文案启发式，顺序为 isError → isSuccess → 文案判断；`isSuccess: false` 是明确中性汇报。已归一化文案用 `showAppErrorToast`，不重复加“操作失败”前缀。
-- 批量全部成功用成功，部分成功用信息，全部失败用错误。只读探测失败且未改状态时用信息提示并给出下一步；已保存配置整体不可用仍需错误提示。
+```css
+background: rgba(255, 255, 255, 0.85);
+backdrop-filter: blur(12px) saturate(180%);
+border: 1px solid rgba(255, 255, 255, 0.18);
+border-radius: 16px;
+padding: 32px;
+box-shadow: 
+  0 8px 32px rgba(0, 0, 0, 0.08),
+  0 0 24px rgba(59, 130, 246, 0.08);
 
-## 九、主题包实现与验证边界
+/* Hover */
+transform: translateY(-4px);
+box-shadow:
+  0 16px 48px rgba(0, 0, 0, 0.12),
+  0 0 32px rgba(59, 130, 246, 0.12);
+transition: all 350ms var(--ease-out-expo);
+```
 
-- 每套主题同时提供 light/dark 完整 token、组件 recipe 及可选背景；主题仅为展示数据，不含 React 分支、脚本、事件、IPC、权限判断或持久化逻辑。
-- 所有 hook 声明 `COMPONENT_STATES` 全部状态，无独立外观时由 `recipe()` 补空对象继承。空对象不豁免交互语义、键盘或错误反馈。
-- hook 使用稳定标识，不依赖包装层可能替换的 `data-slot`。属性只能来自契约白名单；状态优先级、portal 和第三方控件适配放在引擎固定入口。
-- 基础规则先输出，状态规则统一后输出，避免 variant 遮盖焦点或错误；禁用控件的 hover、pressed、focus 保护由引擎管理。
-- 主题动画通过 `motionStart` / `motionEnd` 与隔离 keyframe 定义，帧限 opacity、scale、translate、加载旋转；静态渐变仅用于已登记的状态反馈，不允许 `url()`、外部请求或任意选择器。
-- 分段指示器测量真实标签 x/y/宽高，不假定主题内边距；开关几何、形变和时长由主题变量提供，滑块不能越出轨道。工作/对话滑块背景与前景保持独立角色，不借用主按钮前景造成同色。
-- 主题切换原位更新样式和背景，覆盖 portal 与动态内容，不修改 React key、草稿、焦点、滚动、选中、弹层或持久化行为。
-- 主画布背景可使用纯色、打包图片或内置静态纹理；图层位于内容之后，不捕获事件、不改变滚动，透明度不作用于文字和控件。没有背景的主题清除之前的背景。
-- 用户设置只选择整套主题与浅色/深色/跟随系统。预览卡消费各主题真实 token/背景，选中用描边与勾选，全部预览随当前明暗模式变化。
-- 已有大明风华、长安风物、未央金石沿用各自色板。长安风物的绢白/墨青与静态绢纹、未央金石的玄金/石白与静态云气纹属于完整主题定义；不将 Codex 色板强套到这些主题，也不新增背景单独设置。
+### Sidebar
 
-实施顺序：规范与契约 → 主题 token/recipe → 共享组件语义 → 业务装配 → 生成、审计、构建与实际渲染验证。代码事实入口与更多边界见 `src/renderer/theme/README.md`。
+```css
+width: 280px;
+background: rgba(255, 255, 255, 0.85);
+backdrop-filter: blur(16px) saturate(180%);
+border-right: 1px solid rgba(0, 0, 0, 0.06);
 
-## 十、落地检查清单
+/* Navigation Item */
+height: 40px;
+padding: 0 16px;
+border-radius: 10px;
+font-size: 15px;
+font-weight: 450;
 
-提交前端改动前逐项检查；纯规范更新只进行文档一致性与差异检查，不据此声明 UI 验收完成。
+/* Active */
+background: linear-gradient(135deg, 
+  rgba(59, 130, 246, 0.1) 0%, 
+  rgba(139, 92, 246, 0.1) 100%);
+color: #3B82F6;
+font-weight: 600;
+```
 
-- [ ] 控件外观全部归 theme recipe，无硬编码颜色、默认彩阶、`dark:`、任意值、局部 CSS 或语义 utility 覆写。
-- [ ] 界面字号为 12/14/16/18/20/24px 六档，行高角色明确，字重仅 400/500/600（正式品牌资产除外）。
-- [ ] 间距采用 4px 主网格与明确的半步进；圆角符合刻度与嵌套关系，没有沿用相互冲突的旧映射。
-- [ ] 弹窗与表单舒展：字段间距、最小宽度、最小字号与命中区符合「密度与舒展度」；侧栏项目/工作区行无卡片化包装。
-- [ ] 普通卡片与按钮没有 hover 投影；浮层有 1px 边框，输入岛与滑块特例未扩散。
-- [ ] 主要动作常显；次要动作可由键盘及无悬停设备访问，空状态有有效下一步。
-- [ ] 输入区选择器同构，按钮只用语义 variant/size，图标尺寸和来源统一。
-- [ ] 顶栏、Tabs、分段、删除确认及对话组件使用指定共享实现，无重复标题和自造控件。
-- [ ] 侧栏分组清楚；专家/技能/模型卡片共享结构与 12px/16px 容器规格，没有随机图标底色或多层描边。
-- [ ] 配置使用合适的 Sheet/步骤流/设置页，表单高度与间距统一，保存、返回、错误和焦点恢复可用。
-- [ ] hover/pressed/focus/disabled/selected/invalid/open 等适用状态完整，组合状态及实际对比度通过检查。
-- [ ] 微交互 100–150ms，切换 200–250ms，无 `transition-all`；超时动画有明确理由，减少动效可用。
-- [ ] 原地加载无闪屏，真实运行状态与指标有数据依据，没有虚构监控值、菜单动作或功能入口。
-- [ ] 窄窗口、长标题、中文/英文、动态内容、包装组件与 portal 无遮挡、截断失控或溢出。
-- [ ] light/dark 与运行中热切换均验证，新 recipe 确实生效；草稿、焦点、选中、弹层、滚动及任务状态保留。
-- [ ] 品牌资产完整、蓝点未被主题改色；用户内容与隔离预览未被主题重着色。
-- [ ] 修改 token/recipe/生成器后执行 `bun run theme:generate`；代码改动执行 `bun run lint`（含 theme:check/audit），提交前执行 `bun run format:check`。
-- [ ] 共享契约/引擎改动执行 `bunx vitest run src/renderer src/shared`、`bun run build`、`bun run test:bundle-budget`；新增/修改测试实际运行通过。
-- [ ] UI 改动通过 `bun run electron:dev` 验证相关 Cowork、权限、停止、Artifacts、主题/语言切换流程，记录实际覆盖范围，不以编译或截图代替行为验证。
+### Modals & Overlays
 
+```css
+/* Backdrop */
+background: rgba(10, 14, 26, 0.4);
+backdrop-filter: blur(8px);
 
-### Windows 安装壳官网风格（2026-10-15 用户要求，待视觉验收）
+/* Dialog */
+background: rgba(255, 255, 255, 0.98);
+backdrop-filter: blur(20px) saturate(180%);
+border-radius: 24px;
+padding: 40px;
+box-shadow:
+  0 24px 80px rgba(0, 0, 0, 0.15),
+  0 0 64px rgba(59, 130, 246, 0.12);
+```
 
-独立 860×560 WebView2 安装壳采用官网参考的浅天蓝至白背景、柔和静态云感、深墨色文字与黑色胶囊主按钮、白底细边次按钮。仅限 `scripts/installer-shell/preview/index.html` 的独立样式；不扩散到产品 renderer、NSIS 系统向导或官网。复用现有正式字标和蓝点，不新增品牌图片、远程字体、远程请求或运行时依赖。标题使用系统宋体 / serif（32px 首屏、28px 状态），正文 Segoe UI / Microsoft YaHei UI 14px，窗口标题12px；按钮44px高。此标题字阶、胶囊与背景是本轮官网对齐要求的明确局部设计变化。
+## 八、Iconography - 图标系统
 
-品牌只在标题栏出现一次，主体用“开始你的 AI 工作台 / Set up your AI workspace”任务标题；进度页用纯细环与“正在安装”，不重复品牌图标或阶段标签。按钮按下立即以墨色/轻微内阴影反馈，无缩放、弹簧、光晕或长延迟；移出松开不得启动。首屏、真实进度、完成、错误重试和卸载沿用原有宿主桥接、事件、许可门、安装位置与按钮状态；主仓保留本地推理选项，知远保留其现有功能范围。路径单行省略，原文保留于 textContent / title / aria-label，低高度允许内容滚动，焦点、禁用、reduced-motion 与 forced-colors 状态须验证。浏览器渲染只证明视觉与 DOM 交互，不代替最终 Windows 单文件安装验收。
+1. **Lucide React** - Continue using Lucide for consistency
+2. **Stroke Width**: 1.5px (slightly thinner for refined look)
+3. **Size Scale**: 20px (small), 24px (default), 28px (large), 32px (hero)
+4. **Animated Icons**: Subtle scale/rotation on hover (1.1x scale, 15° rotate for settings cog)
 
-参考来源：`rongxinzy/rongxinxzyai-pages` commit `432c14d003fb284f565e49f2ea024ce529ee95f6` 的 `src/editorial/site.css` / `Home.tsx` 与用户截图。官网仓库只读；不复制其字体或 CloudShader 运行时；在独立视觉 CI 中将官网现有 CloudShader 固定 t=0 渲染为 860×560 WebP（4096 bytes），以 data URI 内嵌。该授权官网派生静态资产只用于本安装壳，来源与生成参数在验收记录中保留。
+## 九、Removed Features & Consolidation
+
+Based on analysis, the following changes for streamlined premium experience:
+
+### Theme Consolidation
+
+**REMOVE** the following traditional themes:
+- ❌ 大明风华 (Daming) - Traditional Chinese aesthetic doesn't fit futuristic vision
+- ❌ 长安风物 (Changan) - Classical style conflicts with tech-forward direction
+- ❌ 未央金石 (Weiyang) - Ancient aesthetic out of place
+- ❌ 晓软红 (Xiaoruan) - Brand-specific theme creates inconsistency
+
+**KEEP** only:
+- ✅ **Zenith Light** - New premium light theme
+- ✅ **Zenith Dark** - New premium dark theme
+
+**Rationale**: Multiple traditional themes fragment the experience and dilute the premium, futuristic brand positioning. A focused, world-class light/dark pair creates stronger identity.
+
+### UI Feature Simplification
+
+**Potential removals** (pending user confirmation):
+- Consider consolidating "Expert" and "Skills" into single "Extensions" view
+- Merge "Activity" feed into main conversation view as inline status
+- Simplify sidebar categories from 8+ to 4-5 core views
+
+*Note: No features removed yet. Will confirm specific removals with user before implementation.*
+
+## 十、Implementation Checklist
+
+Before committing Zenith redesign:
+
+- [ ] All colors use new tokens, no hardcoded values
+- [ ] Typography matches the new 30%-larger scale
+- [ ] All surfaces have glassmorphism (opacity + backdrop-filter)
+- [ ] Shadows include both depth AND colored glow components
+- [ ] Border radii follow 8px-stepped scale (12/16/20/24/32)
+- [ ] All animations use spring physics and respect reduced-motion
+- [ ] Buttons use gradient primary, not flat colors
+- [ ] Spacing uses 8px grid throughout
+- [ ] Component heights 30% larger (44px buttons, 48px inputs, 40px nav items)
+- [ ] Hover states include lift (translateY) + scale effects
+- [ ] Focus states have colored ring shadows
+- [ ] Both light AND dark themes fully specified
+- [ ] Obsolete traditional themes (daming/changan/weiyang/xiaoruan) removed
+- [ ] `bun run theme:generate` completes successfully
+- [ ] `bun run lint`, `bun run test`, `bun run build` all pass
+- [ ] Before/after screenshots captured at 1280×800 and 1920×1080
+
+## 十一、Migration Notes
+
+### Breaking Changes
+
+1. **Token names unchanged** - Use existing `--zy-*` tokens but with new values
+2. **Component contracts preserved** - No IPC/state changes, only visual
+3. **Backdrop filter support** - Requires modern browsers (already required by Electron)
+4. **Performance** - Glassmorphism adds GPU cost; test on lower-end hardware
+
+### Transition Strategy
+
+1. Create new `zenith-light.ts` and `zenith-dark.ts` theme files
+2. Set Zenith as new default in `plugins.ts`
+3. Mark old themes as `deprecated: true` (hide from UI but keep code temporarily)
+4. Remove deprecated themes after 2-week migration period
+5. Update all theme preview screenshots
+
+---
+
+**Design Authority**: This specification is the single source of truth for Zenith design system. Any deviation requires explicit approval and documentation update.
+
+**Version**: 3.0.0-zenith  
+**Last Updated**: 2026-10-16  
+**Next Review**: Q1 2027
