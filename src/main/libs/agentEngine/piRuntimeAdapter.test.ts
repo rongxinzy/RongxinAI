@@ -12,14 +12,15 @@ import { PiWebSearchToolName } from './constants';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  installTestMagpie,
+  TEST_MAGPIE_GATEWAY,
+  type TestMagpieGateway,
+} from '../../../../tests/helpers/installTestMagpie';
+import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
 } from '../../../shared/cowork/toolActivity';
-import {
-  ModelCapabilityStatus,
-  ProviderModelPiApi,
-  ProviderModelPiMaxTokensField,
-} from '../../../shared/providers';
+import { ModelCapabilityStatus } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
@@ -209,11 +210,6 @@ const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockCreateMcpExtension = hoisted.mockCreateMcpExtension;
-const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
-const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
-const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
-const mockRegisterPiOpenAICompatTokenRefresher = hoisted.mockRegisterPiOpenAICompatTokenRefresher;
-const mockGetCommunityAuthAccessToken = hoisted.mockGetCommunityAuthAccessToken;
 const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
@@ -238,11 +234,6 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 vi.mock('@earendil-works/pi-ai/compat', () => ({
   getModel: hoisted.mockGetModel,
   completeSimple: hoisted.mockCompleteSimple,
-}));
-
-vi.mock('../claudeSettings', () => ({
-  resolveRawApiConfig: hoisted.mockResolveRawApiConfig,
-  resolveRawApiConfigForModelRef: hoisted.mockResolveRawApiConfigForModelRef,
 }));
 
 vi.mock('./piOpenAICompatProxy', () => ({
@@ -305,11 +296,49 @@ import {
  * capability sync), so counting `mockReturnValueOnce` values would make these
  * cases depend on call order.
  */
-const stubRawApiConfig = (resolution: object): (() => void) => {
-  const previous = mockResolveRawApiConfig.getMockImplementation();
-  mockResolveRawApiConfig.mockReturnValue(resolution);
+let testMagpie: TestMagpieGateway;
+
+const applyTestResolution = (resolution: {
+  config?: { model?: string; apiKey?: string; baseURL?: string; apiType?: string };
+  providerMetadata?: {
+    providerName?: string;
+    codingPlanEnabled?: boolean;
+    supportsImage?: boolean;
+    modelName?: string;
+    contextWindow?: number;
+    contextTokens?: number;
+    maxTokens?: number;
+    capabilities?: { imageInput?: ModelCapabilityStatus; toolCalling?: ModelCapabilityStatus };
+  };
+}): void => {
+  const id = resolution.config?.model || testMagpie.defaultModelId;
+  testMagpie.upsert(id, {
+    ...(resolution.providerMetadata?.contextWindow
+      ? { context_window: resolution.providerMetadata.contextWindow }
+      : {}),
+    ...(resolution.providerMetadata?.maxTokens
+      ? { max_output_tokens: resolution.providerMetadata.maxTokens }
+      : {}),
+  });
+  const image = resolution.providerMetadata?.capabilities?.imageInput;
+  if (image === ModelCapabilityStatus.Supported) testMagpie.setImage(id, true);
+  else if (image === ModelCapabilityStatus.Unsupported) testMagpie.setImage(id, false);
+  else testMagpie.setImage(id, 'unknown');
+  testMagpie.defaultModelId = id;
+};
+
+const stubRawApiConfig = (resolution: {
+  config?: { model?: string };
+  providerMetadata?: {
+    contextWindow?: number;
+    maxTokens?: number;
+    capabilities?: { imageInput?: ModelCapabilityStatus };
+  };
+}): (() => void) => {
+  const previousDefault = testMagpie.defaultModelId;
+  applyTestResolution(resolution);
   return () => {
-    if (previous) mockResolveRawApiConfig.mockImplementation(previous);
+    testMagpie.defaultModelId = previousDefault;
   };
 };
 
@@ -377,6 +406,7 @@ const VISION_MODEL_RESOLUTION = {
 
 describe('PiRuntimeAdapter', () => {
   let adapter: PiRuntimeAdapter;
+  let disposeMagpie: (() => void) | undefined;
   const temporaryWorkspaceRoots = new Set<string>();
   const createTemporaryWorkspace = (): string => {
     const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-runtime-'));
@@ -391,6 +421,9 @@ describe('PiRuntimeAdapter', () => {
     // cannot leak a suppression into the next one.
     clearImageInputObservations();
     mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
+    disposeMagpie?.();
+    testMagpie = installTestMagpie();
+    disposeMagpie = () => testMagpie.dispose();
     adapter = new PiRuntimeAdapter();
   });
 
@@ -399,6 +432,8 @@ describe('PiRuntimeAdapter', () => {
       fs.rmSync(workspaceRoot, { recursive: true, force: true });
     }
     temporaryWorkspaceRoots.clear();
+    disposeMagpie?.();
+    disposeMagpie = undefined;
   });
 
   // ── Session lifecycle ──
@@ -468,7 +503,7 @@ describe('PiRuntimeAdapter', () => {
         ]),
       ).resolves.toBe('Hello from Pi');
       expect(hoisted.mockCompleteSimple).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'gpt-5', provider: 'openai' }),
+        expect.objectContaining({ id: 'openai/gpt-5', provider: 'magpie' }),
         {
           systemPrompt: 'Extract memory.',
           messages: [
@@ -680,7 +715,7 @@ describe('PiRuntimeAdapter', () => {
 
         expect(service.getCurrent('audited-runtime')?.runs[0].context).toEqual({
           model: 'qwen-local',
-          provider: 'llamacpp',
+          provider: 'magpie',
           reasoningProfile: 'default',
           workspaceRoot,
           skillIds: ['documents'],
@@ -697,7 +732,7 @@ describe('PiRuntimeAdapter', () => {
         for (const task of tasks) {
           expect(service.getDetail(task.id)?.runs[0].context).toEqual({
             model: 'qwen-local',
-            provider: 'llamacpp',
+            provider: 'magpie',
             reasoningProfile: 'default',
             workspaceRoot,
             skillIds: ['documents'],
@@ -894,78 +929,6 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
-    it('forwards per-model compaction budgets through compaction.modelOverrides', async () => {
-      mockResolveRawApiConfigForModelRef.mockImplementationOnce(() => ({
-        config: {
-          apiKey: 'sk-test',
-          baseURL: 'http://127.0.0.1:11434/v1',
-          model: 'qwen-compact',
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName: 'llamacpp',
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName: 'qwen-compact',
-          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-          contextWindow: 32768,
-          contextTokens: 32768,
-          maxTokens: 4096,
-          piRuntime: { compaction: { reserveTokens: 4096, keepRecentTokens: 6000 } },
-        },
-      }));
-      await adapter.startSession('per-model-compaction', 'Hello', {
-        modelOverride: 'llamacpp/qwen-compact',
-      });
-
-      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
-      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
-        compaction: {
-          enabled: true,
-          reserveTokens: 8_192,
-          keepRecentTokens: 16_384,
-          modelOverrides: {
-            'llamacpp/qwen-compact': { reserveTokens: 4096, keepRecentTokens: 6000 },
-          },
-        },
-      });
-    });
-
-    it('emits configured piRuntime input limits on the custom model only when set', async () => {
-      mockResolveRawApiConfigForModelRef.mockImplementationOnce(() => ({
-        config: {
-          apiKey: 'sk-test',
-          baseURL: 'http://127.0.0.1:11434/v1',
-          model: 'qwen-limits',
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName: 'llamacpp',
-          codingPlanEnabled: false,
-          supportsImage: true,
-          modelName: 'qwen-limits',
-          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-          contextWindow: 32768,
-          contextTokens: 32768,
-          maxTokens: 4096,
-          piRuntime: {
-            inputLimits: { images: { resize: { maxWidth: 1280, maxHeight: 960 } } },
-          },
-        },
-      }));
-      await adapter.startSession('input-limits', 'Hello', {
-        modelOverride: 'llamacpp/qwen-limits',
-      });
-
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.objectContaining({
-            inputLimits: { images: { resize: { maxWidth: 1280, maxHeight: 960 } } },
-          }),
-        }),
-      );
-    });
-
     it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
       await adapter.startSession('settings-manager', 'Hello Pi');
 
@@ -1084,346 +1047,27 @@ describe('PiRuntimeAdapter', () => {
       expect(loaderOptions?.extensionFactories ?? []).not.toContain('codemode-extension-factory');
     });
 
-    it('should resolve the explicit model override for a new session', async () => {
+    it('routes the selected gateway model through the owned endpoint', async () => {
       await adapter.startSession('test', 'Hello Pi', { modelOverride: 'llamacpp/qwen-local' });
 
-      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('llamacpp/qwen-local');
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
         expect.objectContaining({
           model: expect.objectContaining({
-            provider: 'llamacpp',
-            id: 'qwen-local',
-            baseUrl: 'http://127.0.0.1:11434/v1',
+            provider: 'magpie',
+            id: 'llamacpp/qwen-local',
+            baseUrl: `${TEST_MAGPIE_GATEWAY}/v1`,
           }),
         }),
       );
-      expect(mockGetModel).not.toHaveBeenCalled();
-      expect(mockModelRuntimeCreate).toHaveBeenCalledWith({ allowModelNetwork: false });
       expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'llamacpp',
+        'magpie',
         expect.objectContaining({
-          baseUrl: 'http://127.0.0.1:11434/v1',
+          baseUrl: `${TEST_MAGPIE_GATEWAY}/v1`,
           api: 'openai-completions',
-          models: [expect.objectContaining({ id: 'qwen-local' })],
+          models: [expect.objectContaining({ id: 'llamacpp/qwen-local' })],
         }),
       );
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('llamacpp', 'sk-test');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({ modelRuntime: mockModelRuntime }),
-      );
-    });
-
-    it('should keep supported remote models on the Pi built-in path', async () => {
-      await adapter.startSession('test', 'Hello Pi', { modelOverride: 'openai/gpt-5.2' });
-
-      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('openai/gpt-5.2');
-      expect(mockGetModel).toHaveBeenCalledWith('openai', 'gpt-5.2');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.objectContaining({
-            provider: 'openai',
-            id: 'gpt-5.2',
-          }),
-        }),
-      );
-      // The built-in model stays on Pi's catalog, but the user's API key must
-      // still be registered under the built-in provider id — otherwise the
-      // session fails with "No API key found for <provider>".
-      expect(mockModelRuntimeCreate).toHaveBeenCalledWith({ allowModelNetwork: false });
-      expect(mockModelRuntime.registerProvider).not.toHaveBeenCalled();
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('openai', 'sk-openai');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({ modelRuntime: mockModelRuntime }),
-      );
-    });
-
-    it('should register the API key under the Pi built-in provider id for MiniMax', async () => {
-      mockGetModel.mockImplementationOnce(() => ({
-        provider: 'minimax-cn',
-        id: 'MiniMax-M3',
-        baseUrl: 'https://api.minimaxi.com/anthropic',
-      }));
-      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
-        config: {
-          apiKey: 'sk-cp-minimax',
-          baseURL: 'https://api.minimaxi.com/anthropic',
-          model: 'MiniMax-M3',
-          apiType: 'anthropic' as const,
-        },
-        providerMetadata: {
-          providerName: 'minimax',
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName: 'MiniMax-M3',
-          contextWindow: 1000000,
-          contextTokens: 1000000,
-          maxTokens: 128000,
-        },
-      });
-
-      await adapter.startSession('test', 'Hello Pi', { modelOverride: 'minimax/MiniMax-M3' });
-
-      expect(mockGetModel).toHaveBeenCalledWith('minimax-cn', 'MiniMax-M3');
-      expect(mockModelRuntime.registerProvider).not.toHaveBeenCalled();
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('minimax-cn', 'sk-cp-minimax');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.objectContaining({ provider: 'minimax-cn', id: 'MiniMax-M3' }),
-          modelRuntime: mockModelRuntime,
-        }),
-      );
-    });
-
-    it('should register remote custom models with their configured endpoint and API key', async () => {
-      mockGetModel.mockImplementationOnce(() => undefined);
-
-      await adapter.startSession('test', 'Hello Pi', {
-        modelOverride: 'moonshot/kimi-for-coding',
-      });
-
-      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('moonshot/kimi-for-coding');
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'moonshot',
-        expect.objectContaining({
-          baseUrl: 'http://172.18.5.179:3000/v1',
-          api: 'openai-completions',
-          models: [
-            expect.objectContaining({
-              provider: 'moonshot',
-              id: 'kimi-for-coding',
-              baseUrl: 'http://172.18.5.179:3000/v1',
-            }),
-          ],
-        }),
-      );
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('moonshot', 'sk-moonshot');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.objectContaining({
-            provider: 'moonshot',
-            id: 'kimi-for-coding',
-            baseUrl: 'http://172.18.5.179:3000/v1',
-          }),
-          modelRuntime: mockModelRuntime,
-        }),
-      );
-    });
-
-    it('should route custom OpenAI completions models through the compatibility proxy', async () => {
-      mockGetModel.mockImplementationOnce(() => undefined);
-      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
-        config: {
-          apiKey: 'sk-custom',
-          baseURL: 'https://gateway.example',
-          model: 'agent-model',
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName: 'custom_1',
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName: 'Agent Model',
-          contextWindow: 128000,
-          maxTokens: 16000,
-        },
-      });
-
-      await adapter.startSession('test', 'Hello Pi', {
-        modelOverride: 'custom_1/agent-model',
-      });
-
-      expect(mockRegisterPiOpenAICompatUpstream).toHaveBeenCalledWith('custom_1', {
-        baseURL: 'https://gateway.example',
-        apiKey: 'sk-custom',
-      });
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'custom_1',
-        expect.objectContaining({
-          baseUrl: 'http://127.0.0.1:19191/__pi_openai_compat/custom_1/v1',
-          api: ProviderModelPiApi.OpenAICompletions,
-          models: [
-            expect.objectContaining({
-              provider: 'custom_1',
-              id: 'agent-model',
-              baseUrl: 'http://127.0.0.1:19191/__pi_openai_compat/custom_1/v1',
-            }),
-          ],
-        }),
-      );
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: expect.objectContaining({
-            provider: 'custom_1',
-            id: 'agent-model',
-            baseUrl: 'http://127.0.0.1:19191/__pi_openai_compat/custom_1/v1',
-          }),
-        }),
-      );
-    });
-
-    it('should retain the runtime API key for anonymous custom models', async () => {
-      mockGetModel.mockImplementationOnce(() => undefined);
-      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
-        config: {
-          apiKey: 'sk-zhiyuan-local',
-          baseURL: 'http://127.0.0.1:8081/v1',
-          model: 'anonymous-model',
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName: 'custom_2',
-          usesAnonymousAccess: true,
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName: 'Anonymous Model',
-        },
-      });
-
-      await adapter.startSession('test', 'Hello Pi', {
-        modelOverride: 'custom_2/anonymous-model',
-      });
-
-      expect(mockRegisterPiOpenAICompatUpstream).toHaveBeenCalledWith('custom_2', {
-        baseURL: 'http://127.0.0.1:8081/v1',
-        forwardIncomingAuthorization: false,
-      });
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith(
-        'custom_2',
-        'sk-zhiyuan-local',
-      );
-    });
-
-    it('should inject and refresh access tokens for the managed model proxy', async () => {
-      mockGetModel.mockImplementationOnce(() => undefined);
-      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
-        config: {
-          apiKey: 'sk-zhiyuan-managed',
-          baseURL: 'https://model.rongxzyai.com',
-          model: 'zhiyuan-free',
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName: 'zhiyuan',
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName: '知远免费模型',
-          contextWindow: 131072,
-          maxTokens: 32768,
-        },
-      });
-
-      await adapter.startSession('test', 'Hello Pi', {
-        modelOverride: 'zhiyuan/zhiyuan-free',
-      });
-
-      expect(mockGetCommunityAuthAccessToken).toHaveBeenCalledWith();
-      expect(mockRegisterPiOpenAICompatUpstream).toHaveBeenCalledWith('zhiyuan', {
-        baseURL: 'https://model.rongxzyai.com',
-        apiKey: 'community-access-token',
-        requiredIncomingApiKey: expect.stringMatching(/^sk-zhiyuan-/u),
-      });
-      expect(mockRegisterPiOpenAICompatTokenRefresher).toHaveBeenCalledWith(
-        'zhiyuan',
-        expect.any(Function),
-      );
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'zhiyuan',
-        expect.objectContaining({
-          models: [
-            expect.objectContaining({
-              headers: {
-                'x-zhiyuan-conversation-id': 'test',
-                'x-zhiyuan-workload': 'work',
-              },
-            }),
-          ],
-        }),
-      );
-
-      const refresher = mockRegisterPiOpenAICompatTokenRefresher.mock.calls.at(-1)?.[1];
-      await expect(refresher?.()).resolves.toBe('community-access-token');
-      expect(mockGetCommunityAuthAccessToken).toHaveBeenLastCalledWith({ forceRefresh: true });
-    });
-
-    it('should pass configured Pi runtime options to custom models', async () => {
-      mockGetModel.mockImplementationOnce(() => undefined);
-      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
-        config: {
-          apiKey: 'sk-custom',
-          baseURL: 'https://custom.example/v1',
-          model: 'agent-model',
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName: 'custom_0',
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName: 'Agent Model',
-          contextWindow: 128000,
-          maxTokens: 16000,
-          capabilities: {
-            imageInput: ModelCapabilityStatus.Supported,
-            reasoning: ModelCapabilityStatus.Supported,
-          },
-          piRuntime: {
-            api: ProviderModelPiApi.OpenAIResponses,
-            reasoning: true,
-            thinkingLevelMap: { off: null, low: 'low', high: 'high', max: 'max' },
-            compat: {
-              supportsDeveloperRole: false,
-              maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
-              requiresToolResultName: true,
-            },
-          },
-        },
-      });
-
-      await adapter.startSession('test', 'Hello Pi', {
-        modelOverride: 'custom_0/agent-model',
-      });
-
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'custom_0',
-        expect.objectContaining({
-          baseUrl: 'https://custom.example/v1',
-          api: ProviderModelPiApi.OpenAIResponses,
-          models: [
-            expect.objectContaining({
-              provider: 'custom_0',
-              id: 'agent-model',
-              api: ProviderModelPiApi.OpenAIResponses,
-              reasoning: true,
-              thinkingLevelMap: { off: null, low: 'low', high: 'high', max: 'max' },
-              input: ['text', 'image'],
-              compat: {
-                supportsDeveloperRole: false,
-                maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
-                requiresToolResultName: true,
-              },
-            }),
-          ],
-        }),
-      );
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('custom_0', 'sk-custom');
-    });
-
-    it('should not reuse a built-in model when the configured endpoint differs', async () => {
-      await adapter.startSession('test', 'Hello Pi', {
-        modelOverride: 'moonshot/kimi-k2.6',
-      });
-
-      expect(mockGetModel).toHaveBeenCalledWith('moonshotai-cn', 'kimi-k2.6');
-      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-        'moonshot',
-        expect.objectContaining({
-          baseUrl: 'http://172.18.5.179:3000/v1',
-          models: [expect.objectContaining({ id: 'kimi-k2.6' })],
-        }),
-      );
-      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('moonshot', 'sk-moonshot');
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({ modelRuntime: mockModelRuntime }),
-      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('magpie', 'magpie-zhiyuan');
     });
 
     it('should make session active after start', async () => {
@@ -1433,7 +1077,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('uses the cloud fallback when provider metadata has no capacity limits', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-cloud',
           baseURL: 'https://example.com/v1',
@@ -1452,8 +1096,8 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
         expect.objectContaining({
           model: expect.objectContaining({
-            contextWindow: 256000,
-            maxTokens: 32768,
+            contextWindow: 32768,
+            maxTokens: 4096,
           }),
         }),
       );
@@ -1464,7 +1108,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('forwards image attachments to vision-capable models', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-vision',
           baseURL: 'https://api.moonshot.cn/v1',
@@ -1545,7 +1189,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('leaves a path-only image alone for a vision-capable model', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-vision',
           baseURL: 'https://api.moonshot.cn/v1',
@@ -1866,11 +1510,13 @@ describe('PiRuntimeAdapter', () => {
 
     it('resolves the newly selected model before continuing a cached session', async () => {
       await adapter.startSession('test', 'First', { modelOverride: 'openai/gpt-5.2' });
-      mockResolveRawApiConfigForModelRef.mockClear();
       await adapter.continueSession('test', 'Second', { modelOverride: 'zhipu/glm-5.3-flash' });
 
-      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('zhipu/glm-5.3-flash');
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      const models = mockCreateAgentSession.mock.calls.map(
+        call => (call[0] as { model?: { id?: string } }).model?.id,
+      );
+      expect(models).toEqual(['openai/gpt-5.2', 'zhipu/glm-5.3-flash']);
       expect(mockSession.abort).toHaveBeenCalledOnce();
       await adapter.continueSession('test', 'Third', { modelOverride: 'zhipu/glm-5.3-flash' });
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
@@ -2530,7 +2176,12 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello');
       await adapter.patchSession('test', { model: 'openai/gpt-5.2' });
       expect(mockSession.setModel).toHaveBeenCalled();
-      expect(mockResolveRawApiConfigForModelRef).toHaveBeenCalledWith('openai/gpt-5.2');
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'magpie',
+        expect.objectContaining({
+          models: [expect.objectContaining({ id: 'openai/gpt-5.2' })],
+        }),
+      );
       expect(mockSession.reload).toHaveBeenCalledOnce();
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
@@ -3916,7 +3567,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('retries an image-carrying turn as text after the server rejects the payload', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-vision',
           baseURL: 'https://api.moonshot.cn/v1',
@@ -3964,7 +3615,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('retries an image-only turn as text when the server rejects the payload', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-vision',
           baseURL: 'https://api.moonshot.cn/v1',
@@ -4155,7 +3806,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('does not treat a refused image format as a capability verdict', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce(VISION_MODEL_RESOLUTION);
+      applyTestResolution(VISION_MODEL_RESOLUTION);
       await adapter.startSession('format-issue', 'Describe this image', {
         imageAttachments: [
           {
@@ -4178,19 +3829,19 @@ describe('PiRuntimeAdapter', () => {
       // No capability verdict was recorded: normal PNG/JPEG still ships.
       expect(
         isImageInputRejected(
-          'moonshot',
+          'magpie',
           'kimi-k2.6',
           imageCapabilityFingerprint({
             supportsImage: true,
             imageInput: ModelCapabilityStatus.Supported,
-            endpointKey: 'https://api.moonshot.cn/v1',
+            endpointKey: `${TEST_MAGPIE_GATEWAY}/v1`,
           }),
         ),
       ).toBe(false);
     });
 
     it('retries when the rejection arrives before the send promise resolves', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-vision',
           baseURL: 'https://api.moonshot.cn/v1',
@@ -4230,7 +3881,7 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('keeps the session approval mode when the retry rebuilds the session', async () => {
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-vision',
           baseURL: 'https://api.moonshot.cn/v1',
@@ -4947,9 +4598,8 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('uses a wider stall window for local providers', async () => {
+    it('uses the gateway stall window for catalog models', async () => {
       vi.useFakeTimers();
-      // No timeout override: the default mock resolves a llamacpp local model.
       const localAdapter = new PiRuntimeAdapter();
       try {
         const errors: CoworkError[] = [];
@@ -4960,11 +4610,9 @@ describe('PiRuntimeAdapter', () => {
         listener({ type: 'agent_start' });
         listener({ type: 'message_start', message: { role: 'assistant', content: [] } });
 
-        // Prompt evaluation on a slow local server is silent well past the
-        // default two-minute window; that must not kill a healthy turn.
-        await vi.advanceTimersByTimeAsync(120_000);
+        await vi.advanceTimersByTimeAsync(119_000);
         expect(errors).toHaveLength(0);
-        await vi.advanceTimersByTimeAsync(480_000);
+        await vi.advanceTimersByTimeAsync(1_000);
         expect(errors).toHaveLength(1);
         expect(errors[0].kind).toBe(CoworkErrorKind.StreamInterrupted);
         localAdapter.stopAllSessions();
@@ -4975,7 +4623,7 @@ describe('PiRuntimeAdapter', () => {
 
     it('keeps the default stall window for hosted providers', async () => {
       vi.useFakeTimers();
-      mockResolveRawApiConfig.mockReturnValueOnce({
+      applyTestResolution({
         config: {
           apiKey: 'sk-openai',
           baseURL: 'https://api.openai.com/v1',

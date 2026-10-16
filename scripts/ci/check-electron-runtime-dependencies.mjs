@@ -19,6 +19,12 @@ function packageRoot(specifier) {
   return specifier.split('/')[0];
 }
 
+function isCommentMatch(source, index) {
+  const lineStart = source.lastIndexOf('\n', index) + 1;
+  const line = source.slice(lineStart, index);
+  return /^\s*(?:\/\/|\*)/.test(line) || /\/\*\s*$/.test(line);
+}
+
 export function collectLiteralExternalRoots(source) {
   const roots = new Set();
   const patterns = [
@@ -27,6 +33,7 @@ export function collectLiteralExternalRoots(source) {
   ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) {
+      if (isCommentMatch(source, match.index ?? 0)) continue;
       const specifier = match[2];
       if (
         specifier.startsWith('.') ||

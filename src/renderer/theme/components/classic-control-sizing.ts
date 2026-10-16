@@ -88,7 +88,6 @@ export function classicControlSizing() {
     'control-sizing-29': recipe({ base: { height: '20rem' } }),
     // src/renderer/components/todo/TodoView.tsx:311
     'control-sizing-30': recipe({ base: { 'padding-left': '2rem' } }),
-    // src/shared/components/ai-elements/model-selector.tsx:56
     'control-sizing-31': recipe({ base: { 'padding-block': '0.875rem' } }),
     // src/shared/components/ui/input-group.tsx:126
     'control-sizing-32': recipe({ base: { 'padding-block': '0.5rem' } }),

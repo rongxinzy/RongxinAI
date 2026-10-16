@@ -83,13 +83,10 @@ const recipePrimitives = [
   'separator',
   'empty',
   'label',
-  'breadcrumb',
   'scroll-area',
   'avatar',
   'spinner',
   'field',
-  'sonner',
-  'sidebar',
   'progress',
 ];
 const stateAppearance =

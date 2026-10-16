@@ -7,7 +7,7 @@ import {
   ProviderModelPiApi,
   type ResolvedModelEndpoint,
 } from '../../../shared/providers';
-import type { ApiConfigResolution } from '../claudeSettings';
+import type { ApiConfigResolution } from './piApiConfig';
 
 const intranetMocks = vi.hoisted(() => ({
   probe: vi.fn(async () => false),

@@ -16,7 +16,7 @@ import {
   type StartCodingSessionInput,
 } from '../../shared/codingAgent';
 import { t } from '../i18n';
-import { resolveCurrentApiConfig } from '../libs/claudeSettings';
+import { ensureAcpModelFromMagpie } from './acpMagpieModel';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
 import type { CodingAgentDriver, CodingAgentSession } from './drivers/codingAgentDriver';
@@ -48,11 +48,8 @@ export const resolveSessionTarget = (
   if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
   if (profile.status !== CodingAgentProfileStatus.Ready) {
     if (profile.id === CodingAgentProfileId.Builtin) {
-      const { error } = resolveCurrentApiConfig();
       throw new Error(
-        error
-          ? `${CodingErrorDetailMessage.AgentNotReadyDetail} ${error}`
-          : CodingErrorMessage.ProfileNotReady,
+        `${CodingErrorDetailMessage.AgentNotReadyDetail} Enable the unified model service and choose a default model in model settings before starting a task.`,
       );
     }
     throw new Error(CodingErrorMessage.ProfileNotReady);
@@ -134,6 +131,10 @@ export const prepareCodingSession = async (input: {
   const target = resolveSessionTarget(input.repository, input.registry, input.request);
   if (target.profile.driverKind === CodingAgentDriverKind.Builtin && !input.request.modelOverride) {
     await input.validateBuiltinModel?.();
+  }
+
+  if (target.profile.driverKind === CodingAgentDriverKind.Acp) {
+    await ensureAcpModelFromMagpie();
   }
 
   const laneId = randomUUID();

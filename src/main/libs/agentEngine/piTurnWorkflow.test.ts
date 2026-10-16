@@ -4,8 +4,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { AcademicResearchSkillIds, CoreSkillId } from '../../../shared/skills/constants';
-import { ApiFormat, ModelCapabilityStatus, ProviderName } from '../../../shared/providers';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
 import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
 import { PiAgentLoopToolName } from './piAgentLoop';
 import { PiResearchStateToolName } from './piResearchTypes';
@@ -42,22 +42,6 @@ vi.mock('@earendil-works/pi-ai/compat', () => ({
   getModel: () => null,
   completeSimple: vi.fn(),
 }));
-vi.mock('../claudeSettings', () => ({
-  resolveRawApiConfig: () => ({
-    config: {
-      apiKey: 'test-key',
-      baseURL: 'http://localhost:11434/v1',
-      model: 'test-model',
-      apiType: ApiFormat.OpenAI,
-    },
-    providerMetadata: {
-      providerName: ProviderName.LlamaCpp,
-      capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-      contextWindow: 32768,
-      maxTokens: 4096,
-    },
-  }),
-}));
 vi.mock('../coworkUtil', async importOriginal => ({
   ...(await importOriginal<typeof import('../coworkUtil')>()),
   applyApplicationRuntimeEnv: vi.fn(),
@@ -66,13 +50,18 @@ vi.mock('../coworkUtil', async importOriginal => ({
 
 let adapter: PiRuntimeAdapter;
 let workspaceRoot: string;
+let disposeMagpie: (() => void) | undefined;
 beforeEach(() => {
   vi.clearAllMocks();
+  disposeMagpie?.();
+  disposeMagpie = installTestMagpie().dispose;
   workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-turn-workflow-'));
   adapter = new PiRuntimeAdapter();
 });
 afterEach(() => {
   adapter.stopSession('session');
+  disposeMagpie?.();
+  disposeMagpie = undefined;
   fs.rmSync(workspaceRoot, { recursive: true, force: true });
 });
 

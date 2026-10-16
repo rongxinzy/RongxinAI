@@ -4,7 +4,26 @@ import { timingSafeEqual } from 'crypto';
 
 import { ZhiyuanModelPoolHeader } from '../../../shared/modelPool/constants';
 import { buildAnthropicMessagesUrl } from '../../../shared/providers';
-import { buildOpenAIChatCompletionsURL } from '../coworkFormatTransform';
+
+/** Join an OpenAI-compatible base URL with the chat completions path. */
+export function buildOpenAIChatCompletionsURL(baseURL: string): string {
+  const normalized = baseURL.trim().replace(/\/+$/, '');
+  if (!normalized) return '/v1/chat/completions';
+  if (normalized.endsWith('/chat/completions')) return normalized;
+  if (normalized.includes('generativelanguage.googleapis.com')) {
+    if (normalized.endsWith('/v1beta/openai') || normalized.endsWith('/v1/openai')) {
+      return `${normalized}/chat/completions`;
+    }
+    if (normalized.endsWith('/v1beta') || normalized.endsWith('/v1')) {
+      const betaBase = normalized.endsWith('/v1') ? `${normalized.slice(0, -3)}v1beta` : normalized;
+      return `${betaBase}/openai/chat/completions`;
+    }
+    return `${normalized}/v1beta/openai/chat/completions`;
+  }
+  if (normalized.includes('githubcopilot.com')) return `${normalized}/chat/completions`;
+  if (/\/v\d+$/.test(normalized)) return `${normalized}/chat/completions`;
+  return `${normalized}/v1/chat/completions`;
+}
 
 interface PiOpenAICompatUpstream {
   baseURL: string;
