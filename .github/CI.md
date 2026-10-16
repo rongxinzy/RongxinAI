@@ -1,10 +1,10 @@
 # CI gate ownership
 
-Every PR runs workflow validation, lint, Knip unused-code checks, renderer type checking/build/bundle budgets, Electron compilation,
-unit tests, and Presentation Studio tests. Documentation-only and website-only PRs keep these baseline
-checks. They do not run install, memory, enterprise toolchain, or channel-runtime smoke jobs.
-Unknown paths never skip the baseline. Unit tests run as four shards of one `test` job; `merge-gate`
-still requires that job to succeed.
+Every PR runs workflow validation, lint (including Knip unused-code and `scripts/` Python dead-code checks),
+renderer type checking/build/bundle budgets, Electron compilation, unit tests, and Presentation Studio tests.
+Documentation-only and website-only PRs keep these baseline checks. They do not run install, memory,
+enterprise toolchain, or channel-runtime smoke jobs. Unknown paths never skip the baseline. Unit tests run
+as two shards of one `test` job; `ci-gate` still requires that job to succeed.
 
 `scripts/ci/gates/policy.ts` owns expensive-check selection:
 
@@ -18,13 +18,12 @@ The planner uses the full Git merge-base diff, with NUL-separated paths and rena
 detection disabled. Deleted paths and both sides of renames participate. Invalid SHAs
 or diff failures stop the planner; no API pagination or 300-file filter limit applies.
 
-`merge-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped
-required jobs. Path-owned checks (channel runtime smoke, Python runtime containment,
-installer preview, browser preview) now run as conditional jobs inside CI instead of separate pull
-request workflows. Browser preview runs when the renderer, shared contracts, or
-`scripts/preview` change. Linux and Windows install workflows remain reusable/manual workflows.
-The parent CI owns concurrency cancellation and exposes the required `ci-gate` check
-after PR metadata validation and merge-gate succeed.
+`ci-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped required
+jobs. Path-owned checks (channel runtime smoke, Python runtime containment, installer preview,
+browser preview) run as conditional jobs inside CI. Browser preview runs when the renderer, shared
+contracts, or `scripts/preview` change. Linux and Windows install workflows remain reusable/manual
+workflows. The parent CI owns concurrency cancellation and exposes `ci-gate` as the sole required
+GitHub check for pull requests.
 
 ## Release and nightly checks
 
@@ -66,12 +65,12 @@ the miss and investigate the measured bottleneck without relaxing installation t
 
 ## Required-check rollout and measurement
 
-The default branch requires `ci-gate` and retains `merge-gate` from GitHub Actions
-(app ID 15368), with the branch up to date before merging. `ci-gate` validates PR
-title/body and requires `merge-gate` to pass; inventory drift is checked in the lint
-job via `.github/check-devops-config.py` against `.github/devops-ci.json` (CI only).
-`merge-gate` retains application job validation. Do not require conditional platform
-jobs directly.
+The default branch requires `ci-gate` from GitHub Actions (app ID 15368), with the branch up to
+date before merging. The `ci-gate` job aggregates every baseline and path-selected job via
+`scripts/ci/gates/verify.ts`. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB
+source line-limit gate (1000 lines; shrinking-only baseline for legacy files), and a diff-only
+binary size gate with an explicit asset allowlist. Do not require conditional platform jobs
+directly on branch protection.
 
 All PRs, including documentation, require one independent GitHub approval. New
 commits dismiss stale approvals; the latest push must be approved by another person.
@@ -109,15 +108,14 @@ Reproduce child audits with `bash scripts/ci/audit-npm-projects.sh /tmp/npm-audi
 
 ## Latency measurement
 
-Before the October 16, 2026 streamlining, 19 successful pull request CI runs
-(October 15–16) had a median workflow wall clock of 349 seconds, including runner
-queue. The 12 runs that finished in under 10 minutes had a median of 328 seconds.
-The execution critical path was the `test` job (median 309 seconds: about 79 seconds
-of Electron `tsc` plus about 200 seconds of Vitest) followed by `merge-gate` (median
-8 seconds). `memory-leak`, when selected (14 of 19), ran in parallel at a median of
-169 seconds and was not the critical path. Lint median was 27 seconds and
-bundle-budget (renderer typecheck, Vite build, budget) was 37 seconds. `ci-gate` tracked CI and had a median of 355 seconds on 6 successful samples when it
-polled separate workflows. Channel runtime smoke median was 14 seconds when selected.
+Before the October 16, 2026 dead-code and gate streamlining, successful PR CI runs on
+main (for example run 38931409654) took about 330 seconds wall clock. The critical path
+was `test` (about 218 seconds across two shards after `electron-compile`) plus
+`ci-gate` (about 8 seconds). Baseline jobs (`lint`, former standalone `knip`,
+`bundle-budget`, `electron-compile`) ran in parallel and were not on the critical path.
+Removing the standalone `pr-metadata` and `knip` jobs saves one runner bootstrap each
+(typically 10–20 seconds of queue plus checkout per job) without weakening gates: Knip
+and Python dead-code checks now run inside `lint`.
 
 These are measured samples, not a performance guarantee. Sharding and TypeScript
 cache hits change the critical path; a cold TypeScript cache still pays for one

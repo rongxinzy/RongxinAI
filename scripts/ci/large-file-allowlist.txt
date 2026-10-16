@@ -1,0 +1,16 @@
+# One glob per line. Matches use forward slashes; * does not cross directories unless **.
+# Shipped runtime/installer binaries and skill vendor archives.
+resources/**
+build/installer-assets/**
+**/vendor/**
+# Test fixtures, CI screenshots, theme previews.
+tests/replay/**
+.github/pr-assets/**
+docs/theme-previews/**
+# Marketing and in-app static assets.
+public/**
+src/renderer/assets/**
+# Generated theme bundle (size tracked by theme:check).
+src/renderer/theme/css/themes.css
+# MCP reference corpora.
+MCPs/**/references/**

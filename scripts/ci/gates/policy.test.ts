@@ -71,17 +71,22 @@ test.each([
   'scripts/installer-ui/zy-pages.nsh',
   'scripts/ci/windows-installer-interactive.ps1',
   'scripts/ci/windows-shell-interactive.mjs',
-  'scripts/ci/gates/policy.ts',
   'tests/nsis-installer.test.ts',
   'SKILLs/pdf/requirements.txt',
   'MCPs/feishu/server.js',
-  '.github/workflows/ci.yml',
   'src/main/main.ts',
   'src/main/newPlatformModule.ts',
 ])(
   'packaging and main-process changes in PR run memory regression without install checks: %s',
   file => {
     expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(prPackaging);
+  },
+);
+
+test.each(['.github/workflows/ci.yml', 'scripts/ci/gates/policy.ts'])(
+  'CI planner edits stay on baseline checks: %s',
+  file => {
+    expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(light);
   },
 );
 
@@ -113,6 +118,13 @@ test('enterprise toolchain follows the extension diff on pull requests only', ()
   expect(enterpriseRequired(['src/renderer/App.tsx'], CiEvent.PullRequest)).toBe(false);
   expect(enterpriseRequired(['docs/readme.md'], CiEvent.Push)).toBe(false);
   expect(enterpriseRequired([], CiEvent.Manual)).toBe(true);
+});
+
+test('CI infrastructure diffs skip expensive integration and enterprise jobs', () => {
+  const paths = ['.github/workflows/ci.yml', 'scripts/ci/gates/policy.ts', 'package.json'];
+  expect(planGates(paths, CiEvent.PullRequest, prRef)).toEqual(light);
+  expect(planPathJobs(paths, CiEvent.PullRequest)).toEqual(noPathJobs);
+  expect(enterpriseRequired(paths, CiEvent.PullRequest)).toBe(false);
 });
 
 test('path-owned checks follow the same diff ownership as the former standalone workflows', () => {
@@ -246,7 +258,7 @@ test('CI waits for every selected reusable check and always runs the merge gate'
   const ci = workflow('ci.yml');
   expect(ci.on).toHaveProperty(CiEvent.PullRequest);
   expect(ci.jobs['ci-gate'].name).toBe('ci-gate');
-  const gate = ci.jobs['merge-gate'];
+  const gate = ci.jobs['ci-gate'];
   expect(gate.if).toBe('always()');
   expect(gate.needs).toEqual(
     expect.arrayContaining([

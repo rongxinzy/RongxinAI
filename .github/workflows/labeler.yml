@@ -1,23 +1,14 @@
+# Disabled for agent-first velocity. Restore pull_request_target if automatic labels are needed.
 name: Labeler
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-concurrency:
-  group: labeler-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   label:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
-      - uses: actions/labeler@v5
-        with:
-          configuration-path: .github/labeler.yml
+      - run: echo "Labeler workflow is manual-only."
