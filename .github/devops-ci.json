@@ -23,19 +23,6 @@
         "scripts/ci/installer-style-preview.py",
         ".github/workflows/installer-style-preview.yml"
       ]
-    },
-    {
-      "name": "Windows installer gate",
-      "path": ".github/workflows/windows-installer-pr.yml",
-      "branches": [
-        "fix/installer-language-acceptance"
-      ],
-      "paths": [
-        "scripts/installer-shell/**",
-        "scripts/ci/windows-shell-*",
-        "scripts/ci/windows-installer-*",
-        ".github/workflows/windows-installer-pr.yml"
-      ]
     }
   ]
 }

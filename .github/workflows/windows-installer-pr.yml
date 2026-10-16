@@ -1,9 +1,6 @@
 name: Windows installer gate
 
 on:
-  pull_request:
-    branches: [fix/installer-language-acceptance]
-    paths: ['scripts/installer-shell/**', 'scripts/ci/windows-shell-*', 'scripts/ci/windows-installer-*', '.github/workflows/windows-installer-pr.yml']
   schedule:
     - cron: '23 2 * * 1'
   workflow_dispatch:
