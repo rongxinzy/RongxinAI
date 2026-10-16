@@ -294,6 +294,7 @@ jobs:
             fi
             sleep $((attempt * 10))
           done
+          node scripts/ci/verify-packaged-magpie-signature.mjs "$app_path"
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Build Linux candidate
         if: ${{ matrix.platform == 'linux' }}

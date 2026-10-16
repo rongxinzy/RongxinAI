@@ -109,17 +109,6 @@ export async function screenshot(page, name) {
   return target;
 }
 
-export async function collectMainLogs(electronApp) {
-  try {
-    return await electronApp.evaluate(() => {
-      const lines = [];
-      return lines;
-    });
-  } catch {
-    return '';
-  }
-}
-
 const LEGACY_MEMORY_DDL = `
 CREATE TABLE IF NOT EXISTS user_memories (
   id TEXT PRIMARY KEY,
@@ -200,7 +189,7 @@ export async function downloadFile(url, destinationPath, timeoutMs = 900_000) {
   return destinationPath;
 }
 
-export async function parseCcConnectBridgeFromConfig(userDataPath) {
+async function parseCcConnectBridgeFromConfig(userDataPath) {
   const configPath = path.join(userDataPath, 'cc-connect', 'runtime', 'config.toml');
   const raw = await readFile(configPath, 'utf8');
   const bridgeUrl = raw.match(/bridge_url\s*=\s*"([^"]+)"/)?.[1];
