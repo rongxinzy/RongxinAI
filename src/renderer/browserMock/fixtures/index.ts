@@ -12,6 +12,8 @@ import {
   WakeMode,
 } from '../../../scheduledTask/constants';
 import type { ScheduledTask } from '../../../scheduledTask/types';
+import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
+import type { ActivityRun } from '../../../shared/activity/types';
 import type { MagpieModelCatalog } from '../../../shared/magpie/types';
 import type { Agent } from '../../types/agent';
 import type { Skill } from '../../types/skill';
@@ -312,5 +314,55 @@ export const mockAgents: Agent[] = [
     presetId: 'main',
     createdAt: NOW - 96 * HOUR,
     updatedAt: NOW - 96 * HOUR,
+  },
+];
+
+export const mockActivityRuns: ActivityRun[] = [
+  {
+    id: 'act-1',
+    source: ActivitySource.Channel,
+    status: ActivityStatus.Running,
+    platform: 'weixin',
+    startedAt: NOW - 10 * 60_000,
+    updatedAt: NOW - 2 * 60_000,
+    replyPreview: '正在查询最近30天的系统日志并统计异常分布...',
+  },
+  {
+    id: 'act-2',
+    source: ActivitySource.ScheduledTask,
+    status: ActivityStatus.Completed,
+    taskName: 'Daily sales digest',
+    startedAt: NOW - 2 * HOUR,
+    updatedAt: NOW - 2 * HOUR + 42_000,
+    replyPreview:
+      '已完成昨日销售数据汇总：总计成交 1,280 笔，营收环比增长 12.4%。报表已成功同步到销售工作区。',
+  },
+  {
+    id: 'act-3',
+    source: ActivitySource.Channel,
+    status: ActivityStatus.Completed,
+    platform: 'feishu',
+    startedAt: NOW - 5 * HOUR,
+    updatedAt: NOW - 5 * HOUR + 15_000,
+    replyPreview: '已经为您创建了任务【Q3季度复盘】，并邀请了相关参与人员。',
+  },
+  {
+    id: 'act-4',
+    source: ActivitySource.Channel,
+    status: ActivityStatus.Failed,
+    platform: 'dingtalk',
+    startedAt: NOW - 26 * HOUR,
+    updatedAt: NOW - 26 * HOUR + 5_000,
+    errorMessage: '网络连接超时：无法访问企业内部文档知识库服务。',
+  },
+  {
+    id: 'act-5',
+    source: ActivitySource.ScheduledTask,
+    status: ActivityStatus.Completed,
+    taskName: 'Weekly research brief',
+    startedAt: NOW - 28 * HOUR,
+    updatedAt: NOW - 28 * HOUR + 35_000,
+    replyPreview:
+      '已收集 TypeScript 5.8 发布的更新要点，包括类型检查性能优化与新的构建配置参数说明。',
   },
 ];
