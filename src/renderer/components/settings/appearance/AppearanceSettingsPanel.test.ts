@@ -37,7 +37,7 @@ function systemAppearance() {
 
 const props = () => ({
   appearance: 'light' as const,
-  styleId: 'codex',
+  styleId: 'zenith',
   onAppearanceChange: vi.fn(),
   onStyleChange: vi.fn(),
 });
@@ -47,24 +47,20 @@ test('shows one preview per theme and keeps mode controls separate from theme se
   const callbacks = props();
   const view = render(createElement(AppearanceSettingsPanel, callbacks));
   expect(view.container.querySelectorAll('[data-theme-preview]')).toHaveLength(themePlugins.length);
-  expect(screen.getByRole('button', { name: /Codex/i })).toHaveAttribute('aria-pressed', 'true');
-  const daming = screen.getByRole('button', { name: /Daming Fenghua/i });
-  daming.focus();
-  await userEvent.setup().keyboard('{Enter}');
-  await vi.waitFor(() => expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming'));
-  expect(callbacks.onAppearanceChange).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: /Zenith/i })).toHaveAttribute('aria-pressed', 'true');
+  // With only one theme, changing theme is not possible - test mode switching instead
+  await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
+  expect(callbacks.onAppearanceChange).toHaveBeenCalledWith('dark');
+  expect(callbacks.onStyleChange).not.toHaveBeenCalled();
   expect(
     screen.getByRole('tablist', { name: 'appearanceMode' }).querySelector('[data-theme-preview]'),
   ).toBeNull();
-  await userEvent.setup().click(screen.getByRole('tab', { name: 'dark' }));
-  expect(callbacks.onAppearanceChange).toHaveBeenCalledWith('dark');
   view.rerender(
-    createElement(AppearanceSettingsPanel, { ...callbacks, appearance: 'dark', styleId: 'daming' }),
+    createElement(AppearanceSettingsPanel, { ...callbacks, appearance: 'dark', styleId: 'zenith' }),
   );
-  expect(view.container.querySelector('[data-theme-preview="classic-dark"]')).not.toBeNull();
-  expect(view.container.querySelector('[data-theme-preview="daming-dark"]')).not.toBeNull();
-  expect(screen.getByRole('button', { name: /Daming Fenghua/i })).toBe(daming);
-  expect(daming).toHaveAttribute('aria-pressed', 'true');
+  expect(view.container.querySelector('[data-theme-preview="zenith-dark"]')).not.toBeNull();
+  expect(view.container.querySelector('[data-theme-preview="zenith-light"]')).not.toBeNull();
+  expect(screen.getByRole('button', { name: /Zenith/i })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('shows an applying spinner on the selected style before the change runs', () => {
@@ -72,7 +68,7 @@ test('shows an applying spinner on the selected style before the change runs', (
   systemAppearance();
   const callbacks = props();
   const view = render(createElement(AppearanceSettingsPanel, callbacks));
-  const daming = screen.getByRole('button', { name: /Daming Fenghua/i });
+  const zenith = screen.getByRole('button', { name: /Zenith/i });
 
   act(() => {
     fireEvent.click(daming);
