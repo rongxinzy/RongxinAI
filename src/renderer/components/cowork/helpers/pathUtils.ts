@@ -1,6 +1,6 @@
 // ── URI / path helpers ──
 
-export const safeDecodeURIComponent = (value: string): string => {
+const safeDecodeURIComponent = (value: string): string => {
   try {
     return decodeURIComponent(value);
   } catch {
@@ -8,21 +8,20 @@ export const safeDecodeURIComponent = (value: string): string => {
   }
 };
 
-export const stripHashAndQuery = (value: string): string => value.split('#')[0].split('?')[0];
+const stripHashAndQuery = (value: string): string => value.split('#')[0].split('?')[0];
 
-export const stripFileProtocol = (value: string): string => {
+const stripFileProtocol = (value: string): string => {
   let cleaned = value.replace(/^file:\/\//i, '');
   if (/^\/[A-Za-z]:/.test(cleaned)) cleaned = cleaned.slice(1);
   return cleaned;
 };
 
-export const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(value);
+const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(value);
 
-export const isAbsolutePath = (value: string): boolean =>
+const isAbsolutePath = (value: string): boolean =>
   value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
 
-export const isRelativePath = (value: string): boolean =>
-  !isAbsolutePath(value) && !hasScheme(value);
+const isRelativePath = (value: string): boolean => !isAbsolutePath(value) && !hasScheme(value);
 
 /**
  * Parse `file:///root/path::relative/path` syntax into a single absolute path.

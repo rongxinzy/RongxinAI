@@ -17,15 +17,9 @@ const mcpSlice = createSlice({
     setMcpServers: (state, action: PayloadAction<McpServerConfig[]>) => {
       state.servers = action.payload;
     },
-    toggleMcpServer: (state, action: PayloadAction<string>) => {
-      const server = state.servers.find(s => s.id === action.payload);
-      if (server) {
-        server.enabled = !server.enabled;
-      }
-    },
   },
 });
 
-export const { setMcpServers, toggleMcpServer } = mcpSlice.actions;
+export const { setMcpServers } = mcpSlice.actions;
 
 export default mcpSlice.reducer;

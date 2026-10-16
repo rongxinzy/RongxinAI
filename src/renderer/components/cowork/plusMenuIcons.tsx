@@ -61,13 +61,6 @@ export const PlusMenuManageIcon: React.FC<PlusMenuIconProps> = ({ className }) =
   </svg>
 );
 
-/** 技能行缺省图标：小星光。 */
-export const PlusMenuSkillGlyphIcon: React.FC<PlusMenuIconProps> = ({ className }) => (
-  <svg {...baseProps} className={className}>
-    <path d="M8 3l1.3 3.2 3.2 1.3-3.2 1.3L8 12l-1.3-3.2-3.2-1.3 3.2-1.3z" />
-  </svg>
-);
-
 /** 专家行缺省图标：人物。 */
 export const PlusMenuExpertGlyphIcon: React.FC<PlusMenuIconProps> = ({ className }) => (
   <svg {...baseProps} className={className}>

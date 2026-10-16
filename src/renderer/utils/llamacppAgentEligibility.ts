@@ -19,7 +19,7 @@ export function getRunningModelAgentEligibility(
   });
 }
 
-export function isLlamaCppModel(model: Pick<Model, 'providerKey'>): boolean {
+function isLlamaCppModel(model: Pick<Model, 'providerKey'>): boolean {
   return model.providerKey === ProviderName.LlamaCpp;
 }
 
@@ -36,17 +36,4 @@ export function getModelAgentEligibility(
     return null;
   }
   return model.llamaCppAgentEligibility ?? null;
-}
-
-export function isModelSelectableForAgent(
-  model: Pick<
-    Model,
-    | 'providerKey'
-    | 'llamaCppAgentEligibility'
-    | 'llamaCppRuntimeContextWindow'
-    | 'llamaCppTrainedContextWindow'
-  >,
-): boolean {
-  const eligibility = getModelAgentEligibility(model);
-  return eligibility ? eligibility.eligible : true;
 }

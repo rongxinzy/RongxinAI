@@ -38,10 +38,6 @@ const quickActionSlice = createSlice({
     selectPrompt: (state, action: PayloadAction<string | null>) => {
       state.selectedPromptId = action.payload;
     },
-    /** 设置加载状态 */
-    setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
-    },
     /** 清空选择 */
     clearSelection: state => {
       state.selectedActionId = null;
@@ -50,7 +46,6 @@ const quickActionSlice = createSlice({
   },
 });
 
-export const { setActions, selectAction, selectPrompt, setLoading, clearSelection } =
-  quickActionSlice.actions;
+export const { setActions, selectAction, selectPrompt, clearSelection } = quickActionSlice.actions;
 
 export default quickActionSlice.reducer;
