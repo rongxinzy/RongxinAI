@@ -118,6 +118,26 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.8'
+          cache: false
+      - name: Cache Magpie module and build scratch
+        uses: actions/cache@v5
+        with:
+          path: .cache/magpie
+          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go1.26.8-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
+          restore-keys: |
+            magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go1.26.8-
+      - name: Build and verify Magpie runtime
+        shell: bash
+        env:
+          MAGPIE_TARGET: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform == 'windows' && 'win32-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
+        run: |
+          set -euo pipefail
+          go version | grep -Fq 'go1.26.8'
+          bun run magpie:build -- --target "${MAGPIE_TARGET}"
+          bun run magpie:verify -- --target "${MAGPIE_TARGET}"
       - name: Set up installer shell SDK
         if: ${{ matrix.platform == 'windows' }}
         uses: actions/setup-dotnet@v5
