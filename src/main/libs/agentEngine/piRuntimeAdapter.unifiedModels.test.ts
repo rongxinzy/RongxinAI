@@ -11,16 +11,6 @@ const mocks = vi.hoisted(() => {
   };
   return {
     createAgentSession: vi.fn(async () => ({ session })),
-    resolveRawApiConfig: vi.fn(() => ({
-      config: {
-        apiKey: 'legacy-test-key',
-        baseURL: 'http://127.0.0.1:1235/v1',
-        model: 'legacy-model',
-        apiType: 'openai',
-      },
-      providerMetadata: { providerName: 'legacy', modelName: 'Legacy model' },
-    })),
-    resolveRawApiConfigForModelRef: vi.fn(),
   };
 });
 
@@ -45,10 +35,6 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 vi.mock('@earendil-works/pi-ai/compat', () => ({
   getModel: vi.fn(),
   completeSimple: vi.fn(),
-}));
-vi.mock('../claudeSettings', () => ({
-  resolveRawApiConfig: mocks.resolveRawApiConfig,
-  resolveRawApiConfigForModelRef: mocks.resolveRawApiConfigForModelRef,
 }));
 vi.mock('../coworkUtil', async importOriginal => ({
   ...(await importOriginal<typeof import('../coworkUtil')>()),
@@ -95,8 +81,6 @@ describe('unified model readiness and actual inference', () => {
       await expect(adapter.startSession('unified-rejected', 'Hello')).rejects.toThrow(
         readiness.error,
       );
-      expect(mocks.resolveRawApiConfig).not.toHaveBeenCalled();
-      expect(mocks.resolveRawApiConfigForModelRef).not.toHaveBeenCalled();
       expect(mocks.createAgentSession).not.toHaveBeenCalled();
     },
   );

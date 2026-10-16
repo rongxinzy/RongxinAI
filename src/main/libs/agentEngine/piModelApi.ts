@@ -1,7 +1,7 @@
 import type { KnownApi } from '@earendil-works/pi-ai';
 
 import { ApiFormat, ProviderModelPiApi, ProviderName } from '../../../shared/providers';
-import type { ApiConfigResolution } from '../claudeSettings';
+import type { ApiConfigResolution } from './piApiConfig';
 
 export const PiModelApi = {
   ...ProviderModelPiApi,

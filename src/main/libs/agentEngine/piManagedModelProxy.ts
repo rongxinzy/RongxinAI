@@ -5,7 +5,7 @@ import { ZhiyuanModelPool } from '../../../shared/modelPool/constants';
 import { getModelPoolAccessToken } from '../../communityAuthSession';
 import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
 import { probeZhiyuanIntranet, zhiyuanIntranetApiKey } from '../zhiyuanIntranet';
-import type { ApiConfigResolution } from '../claudeSettings';
+import type { ApiConfigResolution } from './piApiConfig';
 import type { PiModelApi } from './piModelApi';
 import {
   registerPiOpenAICompatTokenRefresher,

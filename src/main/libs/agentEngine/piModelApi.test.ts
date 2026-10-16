@@ -10,7 +10,7 @@ import {
   ProviderRegistry,
   resolveModelEndpoint,
 } from '../../../shared/providers';
-import type { ApiConfigResolution } from '../claudeSettings';
+import type { ApiConfigResolution } from './piApiConfig';
 import { PiModelApi, resolvePiCustomModelApi } from './piModelApi';
 
 const MOCK_API_KEY = 'mock-pi-api-key';
