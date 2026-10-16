@@ -71,26 +71,26 @@ test('shows an applying spinner on the selected style before the change runs', (
   const zenith = screen.getByRole('button', { name: /Zenith/i });
 
   act(() => {
-    fireEvent.click(daming);
+    fireEvent.click(zenith);
   });
 
   expect(callbacks.onStyleChange).not.toHaveBeenCalled();
-  expect(daming).toHaveAttribute('aria-busy', 'true');
-  expect(daming).toHaveAttribute('aria-pressed', 'true');
-  expect(daming.querySelector('[data-slot="spinner"]')).toBeTruthy();
+  expect(zenith).toHaveAttribute('aria-busy', 'true');
+  expect(zenith).toHaveAttribute('aria-pressed', 'true');
+  expect(zenith.querySelector('[data-slot="spinner"]')).toBeTruthy();
 
   act(() => {
     vi.runAllTimers();
   });
 
-  expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('daming');
+  expect(callbacks.onStyleChange).toHaveBeenCalledExactlyOnceWith('zenith');
   // pending 等到 styleId 同步后才清，避免转圈结束与高亮之间空窗
-  expect(daming).toHaveAttribute('aria-busy', 'true');
-  expect(daming).toHaveAttribute('aria-pressed', 'true');
+  expect(zenith).toHaveAttribute('aria-busy', 'true');
+  expect(zenith).toHaveAttribute('aria-pressed', 'true');
 
-  view.rerender(createElement(AppearanceSettingsPanel, { ...callbacks, styleId: 'daming' }));
-  expect(daming).not.toHaveAttribute('aria-busy');
-  expect(daming).toHaveAttribute('aria-pressed', 'true');
+  view.rerender(createElement(AppearanceSettingsPanel, { ...callbacks, styleId: 'zenith' }));
+  expect(zenith).not.toHaveAttribute('aria-busy');
+  expect(zenith).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('system mode updates all previews live while explicit mode stays fixed and listener is cleaned up', () => {
