@@ -59,6 +59,7 @@ test('mount reads process status only and never starts or reads syncing manageme
   expect(api.agents).not.toHaveBeenCalled();
   expect(api.models).not.toHaveBeenCalled();
   expect(screen.getByText('magpieActivationNotice')).toBeVisible();
+  expect(screen.getByText('magpieLicenseNotice')).toBeVisible();
 });
 
 test('explicit enable starts the official runtime then loads real state without inventing CLI versions', async () => {
