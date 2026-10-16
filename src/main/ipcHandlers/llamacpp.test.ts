@@ -519,7 +519,11 @@ test('synchronizes running models and notifies renderers after service startup',
     get: vi.fn(() => undefined),
     set: vi.fn(),
   };
+  const onModelBindingsChanged = vi.fn();
   vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'gatewayBaseUrl').mockReturnValue(
+    'http://127.0.0.1:8080',
+  );
   vi.spyOn(LlamaCppModelDaemonController.prototype, 'status').mockResolvedValue({
     status: 'running',
     managedByApp: true,
@@ -531,22 +535,17 @@ test('synchronizes running models and notifies renderers after service startup',
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
+    onModelBindingsChanged,
   });
 
   const startHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Start);
   if (!startHandler) throw new Error('The local inference start handler was not registered.');
 
   await expect(Promise.resolve(startHandler())).resolves.toMatchObject({ status: 'running' });
-  expect(store.set).toHaveBeenCalledWith(
-    'app_config',
-    expect.objectContaining({
-      providers: expect.objectContaining({
-        llamacpp: expect.objectContaining({
-          models: [expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 })],
-        }),
-      }),
-    }),
-  );
+  expect(onModelBindingsChanged).toHaveBeenCalledWith('http://127.0.0.1:8080', [
+    expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 }),
+  ]);
+  expect(store.set).not.toHaveBeenCalledWith('app_config', expect.anything());
   expect(send).toHaveBeenCalledWith(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
 });
 
@@ -563,29 +562,28 @@ test('synchronizes current running models when model bindings are refreshed', as
     get: vi.fn(() => undefined),
     set: vi.fn(),
   };
+  const onModelBindingsChanged = vi.fn();
   vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
+  vi.spyOn(LlamaCppModelDaemonController.prototype, 'gatewayBaseUrl').mockReturnValue(
+    'http://127.0.0.1:8080',
+  );
   vi.spyOn(LlamaCppModelDaemonController.prototype, 'listRunningModels').mockResolvedValue([
     { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
   ]);
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
+    onModelBindingsChanged,
   });
 
   const refreshHandler = electronMocks.handlers.get(LlamaCppIpcChannel.RefreshRunningModelBindings);
   if (!refreshHandler) throw new Error('The local model refresh handler was not registered.');
 
   await expect(Promise.resolve(refreshHandler())).resolves.toBeUndefined();
-  expect(store.set).toHaveBeenCalledWith(
-    'app_config',
-    expect.objectContaining({
-      providers: expect.objectContaining({
-        llamacpp: expect.objectContaining({
-          models: [expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 })],
-        }),
-      }),
-    }),
-  );
+  expect(onModelBindingsChanged).toHaveBeenCalledWith('http://127.0.0.1:8080', [
+    expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 }),
+  ]);
+  expect(store.set).not.toHaveBeenCalledWith('app_config', expect.anything());
 });
 
 test('preserves model bindings when the running-model query temporarily fails', async () => {

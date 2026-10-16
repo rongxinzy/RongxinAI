@@ -89,12 +89,12 @@ test.each([false, true])(
   },
 );
 
-test('distinguishes identical model names and IDs across providers with keyboard selection', async () => {
+test('distinguishes identical model names with unique catalog IDs using keyboard selection', async () => {
   const user = userEvent.setup();
   const onSelect = vi.fn();
   const duplicates = [
-    { id: 'shared', name: 'Same model', providerKey: 'openai' },
-    { id: 'shared', name: 'Same model', providerKey: 'anthropic' },
+    { id: 'openai/shared', name: 'Same model', providerKey: 'openai', provider: 'OpenAI' },
+    { id: 'anthropic/shared', name: 'Same model', providerKey: 'anthropic', provider: 'Anthropic' },
   ];
   function Picker() {
     const [open, setOpen] = useState(false);

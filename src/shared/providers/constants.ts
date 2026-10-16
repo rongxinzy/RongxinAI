@@ -49,6 +49,7 @@ export const ProviderName = {
   Ollama: 'ollama',
   Custom: 'custom',
   Copilot: 'github-copilot',
+  Magpie: 'magpie',
 } as const;
 export type ProviderName = (typeof ProviderName)[keyof typeof ProviderName];
 

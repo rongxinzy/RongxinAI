@@ -10,9 +10,9 @@ import type {
 } from '../../shared/ollama';
 import { OllamaIpcChannel } from '../../shared/ollama';
 import {
-  updateOllamaRuntimeModelCapabilities,
-  updateOllamaRuntimeModels,
-} from '../libs/claudeSettings';
+  readOllamaProviderSnapshot,
+  type OllamaProviderSnapshot,
+} from '../magpie/ollamaProviderBinding';
 import { OllamaManager } from '../libs/ollamaManager';
 import type { SqliteStore } from '../sqliteStore';
 
@@ -23,6 +23,7 @@ export function registerOllamaIpcHandlers(
   manager: OllamaManager,
   options: {
     getStore: () => SqliteStore;
+    onModelBindingsChanged?: (snapshot: OllamaProviderSnapshot) => void | Promise<void>;
   },
 ): void {
   const broadcast = (channel: string, payload: unknown): void => {
@@ -31,8 +32,33 @@ export function registerOllamaIpcHandlers(
       win.webContents.send(channel, payload);
     });
   };
-  const sendStatus = (status: OllamaStatusSnapshot) =>
+  const publishBindings = async (snapshot: OllamaProviderSnapshot): Promise<void> => {
+    try {
+      await options.onModelBindingsChanged?.(snapshot);
+    } catch {
+      console.warn('[Ollama] unified model catalog synchronization failed');
+    }
+  };
+  let bindingEpoch = 0;
+  const clearBindings = async (): Promise<void> => {
+    bindingEpoch++;
+    await publishBindings({ baseUrl: null, models: [] });
+  };
+  const refreshBindings = async (): Promise<void> => {
+    const epoch = ++bindingEpoch;
+    let snapshot: OllamaProviderSnapshot;
+    try {
+      snapshot = await readOllamaProviderSnapshot(manager);
+    } catch {
+      snapshot = { baseUrl: null, models: [] };
+    }
+    if (epoch === bindingEpoch) await publishBindings(snapshot);
+  };
+  const sendStatus = (status: OllamaStatusSnapshot) => {
     broadcast(OllamaIpcChannel.StatusChanged, status);
+    if (status.status === 'running') void refreshBindings();
+    else void clearBindings();
+  };
   const sendProgress = (progress: OllamaInstallProgress) =>
     broadcast(OllamaIpcChannel.InstallProgress, progress);
 
@@ -51,9 +77,21 @@ export function registerOllamaIpcHandlers(
     }
     return status;
   });
-  ipcMain.handle(OllamaIpcChannel.Start, async () => manager.start());
-  ipcMain.handle(OllamaIpcChannel.Stop, async () => manager.stop());
-  ipcMain.handle(OllamaIpcChannel.Restart, async () => manager.restart());
+  ipcMain.handle(OllamaIpcChannel.Start, async () => {
+    const status = await manager.start();
+    await refreshBindings();
+    return status;
+  });
+  ipcMain.handle(OllamaIpcChannel.Stop, async () => {
+    const status = await manager.stop();
+    await clearBindings();
+    return status;
+  });
+  ipcMain.handle(OllamaIpcChannel.Restart, async () => {
+    const status = await manager.restart();
+    await refreshBindings();
+    return status;
+  });
   ipcMain.handle(OllamaIpcChannel.GetServiceConfig, async () =>
     getOllamaServiceConfig(options.getStore()),
   );
@@ -73,18 +111,19 @@ export function registerOllamaIpcHandlers(
   ipcMain.handle(OllamaIpcChannel.ListRunningModels, async () => {
     const client = await manager.client();
     const runningModels = await client.runningModels();
-    updateOllamaRuntimeModels(runningModels);
+    await refreshBindings();
     return runningModels;
   });
   ipcMain.handle(OllamaIpcChannel.DeleteModel, async (_event, name: string) => {
     const client = await manager.client();
     await client.deleteModel(name);
+    await refreshBindings();
     return { success: true };
   });
   ipcMain.handle(OllamaIpcChannel.ShowModel, async (_event, name: string) => {
     const client = await manager.client();
     const model = await client.showModel(name);
-    updateOllamaRuntimeModelCapabilities(name, model);
+
     return model;
   });
   ipcMain.handle(OllamaIpcChannel.CreateModel, async (_event, name: string, modelfile: string) => {
@@ -97,7 +136,7 @@ export function registerOllamaIpcHandlers(
     if (!modelName) throw new Error('Model name is required');
     const client = await manager.client();
     const result = await client.preloadModel({ ...input, model: modelName });
-    updateOllamaRuntimeModels(result.runningModels);
+    await refreshBindings();
     return result;
   });
   ipcMain.handle(OllamaIpcChannel.UnloadModel, async (_event, name: string) => {
@@ -106,7 +145,7 @@ export function registerOllamaIpcHandlers(
     const client = await manager.client();
     await client.unloadModel(modelName);
     const runningModels = await client.runningModels();
-    updateOllamaRuntimeModels(runningModels);
+    await refreshBindings();
     return { success: true, runningModels };
   });
   ipcMain.handle(OllamaIpcChannel.PullModel, async (_event, name: string) => {

@@ -45,7 +45,7 @@ function normalizeModelRef(modelRef?: string | null): string {
 }
 
 export function resolveDraftAgentModelRef(model: Model | null, preservedModelRef = ''): string {
-  if (model?.providerKey) {
+  if (model && model.id !== '__invalid__') {
     return toAgentModelRef(model);
   }
   if (model) {

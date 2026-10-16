@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import {
   ManagedProviderAccessMode,
   OPEN_MANAGED_PROVIDER_ACCESS_POLICY,
@@ -7,10 +8,8 @@ import {
 } from '../../shared/managedProviders';
 import {
   ApiFormat,
-  isProviderEnabled,
   normalizeProviderModelPiRuntimeConfig,
   type ProviderConfig,
-  ProviderName,
 } from '../../shared/providers';
 import {
   ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION,
@@ -19,65 +18,43 @@ import {
 } from './contract';
 import {
   registerPiOpenAICompatTokenRefresher,
+  registerPiOpenAICompatUpstream,
+  unregisterPiOpenAICompatUpstream,
   type PiOpenAICompatTokenRefresher,
 } from '../libs/agentEngine/piOpenAICompatProxy';
-import { EnterpriseExtensionStoreKey, LegacyManagedProviderKey } from './constants';
-
+import type { MagpieHostProvider } from '../magpie/hostProviders';
 const MANAGED_PROVIDER_KEY_PATTERN = /^custom_[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const MAX_MODELS = 256;
 const MAX_TEXT_LENGTH = 16_384;
+type Registrar = (providerId: string, refresher: PiOpenAICompatTokenRefresher) => () => void;
 
-interface ConfigStore {
-  get<T>(key: string): T | undefined;
-  set(key: string, value: unknown): void;
-  delete(key: string): void;
-}
-
-interface StoredAppConfig {
-  readonly model?: {
-    readonly defaultModel?: string;
-    readonly defaultModelProvider?: string;
-    readonly [key: string]: unknown;
-  };
-  readonly providers?: Record<string, ProviderConfig>;
-  readonly [key: string]: unknown;
-}
-
-interface StoredManagedProviderProjection {
-  readonly providerKey: string;
-  readonly previousDefaultModel?: string;
-  readonly previousDefaultModelProvider?: string;
-}
-
-type PiOpenAICompatTokenRefresherRegistrar = (
-  providerId: string,
-  refresher: PiOpenAICompatTokenRefresher,
-) => () => void;
-
+/** Enterprise credentials remain in Main's existing loopback proxy, never AppConfig or Magpie. */
 export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostCapability {
   readonly apiVersion = ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION;
-  readonly #registerTokenRefresher: PiOpenAICompatTokenRefresherRegistrar;
   readonly #listeners = new Set<() => void>();
   #source: ZhiyuanManagedProviderSource | null = null;
   #disposeSourceListener: (() => void) | null = null;
   #disposeTokenRefresher: (() => void) | null = null;
-  #store: ConfigStore | null = null;
-  #snapshot: ManagedProviderSnapshot | null = null;
+  #epoch = 0;
+  #definitions: MagpieHostProvider[] = [];
+  #upstreamIds = new Set<string>();
+  #localKey = '';
   #refreshPromise: Promise<void> | null = null;
   #refreshAgain = false;
-
   constructor(
-    registerTokenRefresher: PiOpenAICompatTokenRefresherRegistrar = registerPiOpenAICompatTokenRefresher,
-  ) {
-    this.#registerTokenRefresher = registerTokenRefresher;
-  }
-
+    private readonly registerTokenRefresher: Registrar = registerPiOpenAICompatTokenRefresher,
+  ) {}
   registerSource(source: ZhiyuanManagedProviderSource): () => void {
     if (this.#source) throw new Error('A Zhiyuan managed provider source is already registered.');
     validateSource(source);
     this.#source = source;
-    this.#disposeSourceListener = source.onDidChange?.(() => void this.refresh()) ?? null;
-    this.#disposeTokenRefresher = this.#registerTokenRefresher(source.providerKey, async () => {
+    this.#localKey = randomBytes(32).toString('hex');
+    this.#disposeSourceListener =
+      source.onDidChange?.(() => {
+        this.#clearSnapshot();
+        void this.refresh();
+      }) ?? null;
+    this.#disposeTokenRefresher = this.registerTokenRefresher(source.providerKey, async () => {
       try {
         const snapshot = await this.#syncSnapshot(source);
         this.#emitChanged();
@@ -93,65 +70,65 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
       if (!registered) return;
       registered = false;
       this.#disposeSourceListener?.();
-      this.#disposeSourceListener = null;
       this.#disposeTokenRefresher?.();
+      this.#disposeSourceListener = null;
       this.#disposeTokenRefresher = null;
       this.#source = null;
       this.#clearSnapshot();
+      this.#localKey = '';
     };
   }
-
-  attachStore(store: ConfigStore): void {
-    this.#store = store;
-    if (!this.#source) this.#clearOrphanedProjection();
-    void this.refresh();
-  }
-
   accessPolicy(): ManagedProviderAccessPolicy {
-    const source = this.#source;
-    if (!source?.exclusive) return OPEN_MANAGED_PROVIDER_ACCESS_POLICY;
+    if (!this.#source?.exclusive) return OPEN_MANAGED_PROVIDER_ACCESS_POLICY;
     return Object.freeze({
       mode: ManagedProviderAccessMode.Exclusive,
-      providerKeys: Object.freeze([source.providerKey]),
+      providerKeys: Object.freeze(this.#definitions.map(def => def.id)),
     });
   }
-
-  isManagedProvider(providerName: string): boolean {
-    return this.#source?.providerKey === providerName;
+  isManagedProvider(name: string): boolean {
+    return name.startsWith('zhiyuan-host-enterprise-');
   }
-
-  catalog(): readonly ManagedProviderCatalogModel[] {
-    const snapshot = this.#snapshot;
-    if (!snapshot) return Object.freeze([]);
-    const providerDisplayName = snapshot.config.displayName?.trim() || 'Zhiyuan';
-    return Object.freeze(
-      (snapshot.config.models ?? []).map((model, index) =>
-        Object.freeze({
-          id: model.id,
-          displayName: model.name,
-          providerKey: snapshot.providerKey,
-          providerDisplayName,
-          ...(model.capabilities ? { capabilities: model.capabilities } : {}),
-          ...(model.contextWindow || model.contextTokens
-            ? { contextWindow: model.contextWindow ?? model.contextTokens }
-            : {}),
-          isDefault: index === 0,
-        }),
-      ),
+  hostProviders(): readonly MagpieHostProvider[] {
+    return this.#definitions;
+  }
+  allowedModel(modelRef: string): boolean {
+    if (!this.#source?.exclusive) return true;
+    return this.#definitions.some(def =>
+      def.models.some(model => `${def.id}/${model.id}` === modelRef),
     );
   }
-
+  catalog(): readonly ManagedProviderCatalogModel[] {
+    return this.#definitions.flatMap(def =>
+      def.models.map((model, index) => ({
+        id: model.id,
+        displayName: model.name ?? model.id,
+        providerKey: def.id,
+        providerDisplayName: def.name,
+        contextWindow: model.contextWindow,
+        isDefault: index === 0,
+      })),
+    );
+  }
   onDidChange(listener: () => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
-
   refresh(): Promise<void> {
     if (this.#refreshPromise) {
       this.#refreshAgain = true;
       return this.#refreshPromise;
     }
-    this.#refreshPromise = this.#runRefresh().finally(() => {
+    this.#refreshPromise = (async () => {
+      const source = this.#source;
+      if (!source) return;
+      try {
+        await this.#syncSnapshot(source);
+      } catch {
+        if (source === this.#source) this.#clearSnapshot();
+        return;
+      }
+      this.#emitChanged();
+    })().finally(() => {
       this.#refreshPromise = null;
       if (this.#refreshAgain) {
         this.#refreshAgain = false;
@@ -160,181 +137,84 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     });
     return this.#refreshPromise;
   }
-
-  async #runRefresh(): Promise<void> {
-    const source = this.#source;
-    if (!source || !this.#store) return;
-    try {
-      await this.#syncSnapshot(source);
-    } catch {
-      this.#clearSnapshot();
-      return;
-    }
-    this.#emitChanged();
-  }
-
   async #syncSnapshot(source: ZhiyuanManagedProviderSource): Promise<ManagedProviderSnapshot> {
-    if (!this.#store || source !== this.#source) {
-      throw new Error('Zhiyuan managed provider source is unavailable.');
-    }
+    const epoch = this.#epoch;
     const snapshot = normalizeSnapshot(
       source.providerKey,
       source.exclusive,
       await source.snapshot(),
     );
-    if (source !== this.#source) {
-      throw new Error('Zhiyuan managed provider source changed during refresh.');
+    if (source !== this.#source || epoch !== this.#epoch)
+      throw new Error('Managed provider source changed during refresh.');
+    const next: MagpieHostProvider[] = [];
+    const ids = new Set<string>();
+    for (const model of snapshot.config.models ?? []) {
+      const baseUrl = model.baseUrl ?? snapshot.config.baseUrl;
+      const api =
+        model.piRuntime?.api ??
+        (snapshot.config.apiFormat === ApiFormat.Anthropic
+          ? 'anthropic-messages'
+          : 'openai-completions');
+      if (api !== 'openai-completions' && api !== 'anthropic-messages')
+        throw new Error('Enterprise proxy protocol is not supported.');
+      const hash = createHash('sha256')
+        .update(`${source.providerKey}\n${api}\n${baseUrl}\n${model.id}`)
+        .digest('hex')
+        .slice(0, 20);
+      const proxyId = `${source.providerKey}#${hash}`;
+      const loopback = await registerPiOpenAICompatUpstream(
+        proxyId,
+        {
+          baseURL: baseUrl,
+          apiKey: snapshot.config.apiKey,
+          requiredIncomingApiKey: this.#localKey,
+          forwardIncomingAuthorization: false,
+        },
+        { bareBaseUrl: api === 'anthropic-messages' },
+      );
+      if (source !== this.#source || epoch !== this.#epoch) {
+        unregisterPiOpenAICompatUpstream(proxyId);
+        throw new Error('Managed provider source changed during refresh.');
+      }
+      ids.add(proxyId);
+      this.#upstreamIds.add(proxyId);
+      next.push({
+        id: `zhiyuan-host-enterprise-${hash}`,
+        name: snapshot.config.displayName ?? 'Enterprise',
+        api,
+        baseUrl: loopback,
+        apiKey: this.#localKey,
+        models: [
+          {
+            id: model.id,
+            name: model.name,
+            contextWindow: model.contextWindow ?? model.contextTokens,
+            maxTokens: model.maxTokens,
+            input: model.supportsImage ? ['text', 'image'] : ['text'],
+          },
+        ],
+      });
     }
-    this.#snapshot = snapshot;
-    this.#writeSnapshot(snapshot);
+    for (const id of this.#upstreamIds) if (!ids.has(id)) unregisterPiOpenAICompatUpstream(id);
+    this.#upstreamIds = ids;
+    this.#definitions = next;
     return snapshot;
   }
-
-  #writeSnapshot(snapshot: ManagedProviderSnapshot): void {
-    const store = this.#store;
-    if (!store) return;
-    const current = store.get<StoredAppConfig>(EnterpriseExtensionStoreKey.AppConfig) ?? {};
-    const firstModel = snapshot.config.models?.[0];
-    const currentModel = current.model ?? {};
-    const projection = store.get<StoredManagedProviderProjection>(
-      EnterpriseExtensionStoreKey.ManagedProviderProjection,
-    );
-    if (projection?.providerKey !== snapshot.providerKey) {
-      store.set(EnterpriseExtensionStoreKey.ManagedProviderProjection, {
-        providerKey: snapshot.providerKey,
-        ...(snapshot.exclusive
-          ? {
-              previousDefaultModel: currentModel.defaultModel,
-              previousDefaultModelProvider: currentModel.defaultModelProvider,
-            }
-          : {}),
-      } satisfies StoredManagedProviderProjection);
-    }
-    store.set(EnterpriseExtensionStoreKey.AppConfig, {
-      ...current,
-      providers: { ...current.providers, [snapshot.providerKey]: snapshot.config },
-      ...(snapshot.exclusive && firstModel
-        ? {
-            model: {
-              ...currentModel,
-              defaultModel: firstModel.id,
-              defaultModelProvider: snapshot.providerKey,
-            },
-          }
-        : {}),
-    });
-  }
-
   #clearSnapshot(): void {
-    const projection = this.#store?.get<StoredManagedProviderProjection>(
-      EnterpriseExtensionStoreKey.ManagedProviderProjection,
-    );
-    const providerKey =
-      this.#snapshot?.providerKey ?? this.#source?.providerKey ?? projection?.providerKey;
-    this.#snapshot = null;
-    this.#removeStoredProjection(providerKey, projection);
+    this.#epoch++;
+    for (const id of this.#upstreamIds) unregisterPiOpenAICompatUpstream(id);
+    this.#upstreamIds.clear();
+    this.#definitions = [];
     this.#emitChanged();
   }
-
-  #clearOrphanedProjection(): void {
-    const store = this.#store;
-    if (!store) return;
-    const projection = store.get<StoredManagedProviderProjection>(
-      EnterpriseExtensionStoreKey.ManagedProviderProjection,
-    );
-    if (projection) {
-      this.#removeStoredProjection(projection.providerKey, projection);
-      return;
-    }
-
-    const current = store.get<StoredAppConfig>(EnterpriseExtensionStoreKey.AppConfig);
-    if (current?.providers?.[LegacyManagedProviderKey.Enterprise]) {
-      this.#removeStoredProjection(LegacyManagedProviderKey.Enterprise);
-    }
-  }
-
-  #removeStoredProjection(
-    providerKey: string | undefined,
-    projection?: StoredManagedProviderProjection,
-  ): void {
-    const store = this.#store;
-    if (!store || !providerKey) return;
-    const current = store.get<StoredAppConfig>(EnterpriseExtensionStoreKey.AppConfig);
-    if (!current) return;
-    const providers = { ...current.providers };
-    delete providers[providerKey];
-    const model =
-      current.model?.defaultModelProvider === providerKey
-        ? restoreDefaultModel(current.model, providers, projection)
-        : current.model;
-    store.set(EnterpriseExtensionStoreKey.AppConfig, { ...current, providers, model });
-    store.delete(EnterpriseExtensionStoreKey.ManagedProviderProjection);
-  }
-
   #emitChanged(): void {
-    for (const listener of this.#listeners) {
+    for (const listener of this.#listeners)
       try {
         listener();
       } catch {
-        // A renderer notification must not break managed-provider synchronization.
+        /* notification cannot interrupt revocation */
       }
-    }
   }
-}
-
-function restoreDefaultModel(
-  currentModel: NonNullable<StoredAppConfig['model']>,
-  providers: Record<string, ProviderConfig>,
-  projection?: StoredManagedProviderProjection,
-): StoredAppConfig['model'] {
-  const previousProvider = projection?.previousDefaultModelProvider;
-  const previousModel = projection?.previousDefaultModel;
-  if (
-    previousProvider &&
-    previousModel &&
-    providerContainsModel(previousProvider, previousModel, providers)
-  ) {
-    return {
-      ...currentModel,
-      defaultModel: previousModel,
-      defaultModelProvider: previousProvider,
-    };
-  }
-
-  const fallback = selectFallbackModel(providers);
-  if (fallback) {
-    return {
-      ...currentModel,
-      defaultModel: fallback.model,
-      defaultModelProvider: fallback.provider,
-    };
-  }
-
-  return { ...currentModel, defaultModel: '', defaultModelProvider: undefined };
-}
-
-function selectFallbackModel(
-  providers: Record<string, ProviderConfig>,
-): { provider: string; model: string } | null {
-  const candidates = Object.entries(providers).filter(
-    ([providerName, config]) => isProviderEnabled(providerName, config) && config.models?.[0]?.id,
-  );
-  const selected =
-    candidates.find(([providerName]) => providerName === ProviderName.DeepSeek) ?? candidates[0];
-  if (!selected?.[1].models?.[0]?.id) return null;
-  return { provider: selected[0], model: selected[1].models[0].id };
-}
-
-function providerContainsModel(
-  providerName: string,
-  model: string,
-  providers: Record<string, ProviderConfig>,
-): boolean {
-  const config = providers[providerName];
-  return (
-    isProviderEnabled(providerName, config) &&
-    config.models?.some(candidate => candidate.id === model)
-  );
 }
 
 function validateSource(source: ZhiyuanManagedProviderSource): void {

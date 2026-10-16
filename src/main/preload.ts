@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
+import { MagpieIpc, type MagpieModelSelection } from '../shared/magpie/types';
 import type { ApiRequestPurpose } from '../shared/ipc/apiRequest';
 import { AISphereIpc } from '../shared/aisphere';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
@@ -443,6 +444,21 @@ contextBridge.exposeInMainWorld('electron', {
     getPresetExperts: async () => {
       return await ipcRenderer.invoke(AgentIpcChannel.GetPresetExperts);
     },
+  },
+
+  magpie: {
+    status: () => ipcRenderer.invoke(MagpieIpc.status),
+    setSubscriptionAccounts: (enabled: boolean) =>
+      ipcRenderer.invoke(MagpieIpc.setSubscriptionAccounts, enabled),
+    start: () => ipcRenderer.invoke(MagpieIpc.start),
+    stop: () => ipcRenderer.invoke(MagpieIpc.stop),
+    agents: () => ipcRenderer.invoke(MagpieIpc.agents),
+    setModel: (selection: MagpieModelSelection) =>
+      ipcRenderer.invoke(MagpieIpc.setModel, selection),
+    models: () => ipcRenderer.invoke(MagpieIpc.models),
+    catalog: () => ipcRenderer.invoke(MagpieIpc.catalog),
+    selectDefault: (modelId: string) => ipcRenderer.invoke(MagpieIpc.selectDefault, modelId),
+    openManagement: () => ipcRenderer.invoke(MagpieIpc.openManagement),
   },
 
   cowork: {

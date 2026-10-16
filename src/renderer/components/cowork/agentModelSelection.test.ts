@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { AgentProviderId, ProviderName } from '../../../shared/providers';
+import { ProviderName } from '../../../shared/providers';
 import type { Model } from '../../store/slices/modelSlice';
 import { resolveAgentModelSelection, resolveEffectiveModel } from './agentModelSelection';
 
@@ -31,7 +31,7 @@ const ineligibleLlamaCppModel: Model = {
 describe('resolveAgentModelSelection', () => {
   test('uses explicit agent model when present', () => {
     const result = resolveAgentModelSelection({
-      agentModel: 'anthropic/claude-sonnet-4',
+      agentModel: 'claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
     });
@@ -43,8 +43,8 @@ describe('resolveAgentModelSelection', () => {
 
   test('prefers explicit session model override over agent model', () => {
     const result = resolveAgentModelSelection({
-      sessionModel: 'openai/gpt-4o',
-      agentModel: 'anthropic/claude-sonnet-4',
+      sessionModel: 'gpt-4o',
+      agentModel: 'claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
     });
@@ -68,7 +68,7 @@ describe('resolveAgentModelSelection', () => {
 
   test('preserves explicit model resolution for the only supported engine', () => {
     const result = resolveAgentModelSelection({
-      agentModel: 'anthropic/claude-sonnet-4',
+      agentModel: 'claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
     });
@@ -105,7 +105,7 @@ describe('resolveAgentModelSelection', () => {
   test('marks invalid session model override as error', () => {
     const result = resolveAgentModelSelection({
       sessionModel: 'deleted-provider/deleted-model',
-      agentModel: 'anthropic/claude-sonnet-4',
+      agentModel: 'claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
     });
@@ -117,7 +117,7 @@ describe('resolveAgentModelSelection', () => {
 
   test('keeps explicit llama.cpp selection for work chat', () => {
     const result = resolveAgentModelSelection({
-      agentModel: `${AgentProviderId.LlamaCpp}/qwen-local`,
+      agentModel: 'qwen-local',
       availableModels: [...models, ineligibleLlamaCppModel],
       fallbackModel: models[0],
     });

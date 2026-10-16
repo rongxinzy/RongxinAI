@@ -107,6 +107,8 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
+import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
+import type { MagpieModel } from '../../../shared/magpie/types';
 import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
 import type { McpServerManager } from '../mcpServerManager';
@@ -4847,12 +4849,130 @@ function buildPiBuiltinModel(
   }
 }
 
+const MAGPIE_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
+
+function buildMagpiePiModel(
+  selected: MagpieModel,
+  gatewayUrl: string,
+  modelPoolRequestContext?: ModelPoolRequestContext,
+): {
+  model: Record<string, unknown>;
+  baseUrl: string;
+  api: string;
+  supportsImage: boolean;
+  maxTokens: number;
+} {
+  const url = new URL(gatewayUrl);
+  if (
+    url.protocol !== 'http:' ||
+    url.hostname !== '127.0.0.1' ||
+    !url.port ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname !== '/'
+  ) {
+    throw new Error('Invalid owned model gateway URL');
+  }
+  const endpoints = selected.native_endpoints ?? [];
+  const api = endpoints.includes('/v1/responses')
+    ? 'openai-responses'
+    : endpoints.includes('/v1/messages')
+      ? 'anthropic-messages'
+      : 'openai-completions';
+  const levels = selected.supported_reasoning_levels?.map(level => level.effort) ?? [];
+  const thinkingLevelMap = levels.length
+    ? Object.fromEntries(
+        MAGPIE_THINKING_LEVELS.map(level => {
+          const effort = level === 'off' ? 'none' : level;
+          return [level, levels.includes(effort) ? effort : null];
+        }),
+      )
+    : undefined;
+  const contextWindow = selected.context_window ?? 32768;
+  const maxTokens = Math.min(selected.max_output_tokens ?? 4096, contextWindow);
+  const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
+  const supportsImage = selected.modalities?.input?.includes('image') ?? false;
+
+  const model: Record<string, unknown> = {
+    id: selected.id,
+    name: selected.display_name || selected.id,
+    provider: 'magpie',
+    api,
+    baseUrl,
+    reasoning: selected.reasoning === true,
+    input: supportsImage ? ['text', 'image'] : ['text'],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow,
+    maxTokens,
+    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
+    compat: { sendSessionAffinityHeaders: true },
+    headers: {
+      ...(modelPoolRequestContext?.conversationId
+        ? {
+            'X-Magpie-Session': modelPoolRequestContext.conversationId,
+            [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
+            [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
+          }
+        : {}),
+    },
+  };
+
+  return { model, baseUrl, api, supportsImage, maxTokens };
+}
+
 async function resolvePiModel(
   pi: PiModules,
   modelRef?: string,
   existingModelRuntime?: PiModelRuntime | null,
   modelPoolRequestContext?: ModelPoolRequestContext,
 ): Promise<PiResolvedModel> {
+  if (hasMagpieModelService()) {
+    try {
+      const magpieService = getMagpieModelService();
+      const resolution = await magpieService.resolve(modelRef);
+      const {
+        model: customModel,
+        baseUrl,
+        api,
+        supportsImage,
+        maxTokens,
+      } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
+      const modelRuntime =
+        existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
+      modelRuntime.registerProvider('magpie', {
+        name: 'magpie',
+        baseUrl,
+        api,
+        models: [customModel],
+      });
+      await modelRuntime.setRuntimeApiKey('magpie', 'magpie-zhiyuan');
+
+      return {
+        model: customModel,
+        endpointKey: baseUrl,
+        modelRuntime,
+        maxOutputTokens: maxTokens,
+        providerName: ProviderName.Magpie,
+        capabilities: {
+          imageInput: supportsImage
+            ? ModelCapabilityStatus.Supported
+            : ModelCapabilityStatus.Unsupported,
+        },
+        requestOptions: { apiKey: 'magpie-zhiyuan' },
+      };
+    } catch (magpieError) {
+      const normalizedModelRef = modelRef?.trim() || '';
+      const legacyResolution = normalizedModelRef
+        ? resolveRawApiConfigForModelRef(normalizedModelRef)
+        : resolveRawApiConfig();
+      if (!legacyResolution.config || !legacyResolution.providerMetadata) {
+        throw magpieError;
+      }
+    }
+  }
+
   const normalizedModelRef = modelRef?.trim() || '';
   const resolution = normalizedModelRef
     ? resolveRawApiConfigForModelRef(normalizedModelRef)
