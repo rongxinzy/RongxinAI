@@ -27,7 +27,11 @@ CMAKE_ARGS=(
 
 case "${PLATFORM}" in
   linux)
-    CMAKE_ARGS+=(-DGGML_METAL=OFF)
+    # Match ggml-org/llama.cpp .devops/cuda.Dockerfile: devel images have no driver libcuda.so.
+    CMAKE_ARGS+=(
+      -DGGML_METAL=OFF
+      -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined
+    )
     EXECUTABLE_NAME=llama-server
     ;;
   win|windows)

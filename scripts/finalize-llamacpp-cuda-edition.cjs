@@ -71,6 +71,27 @@ function findRuntimePayloadDirectory(rootDir) {
   return fallback || rootDir;
 }
 
+const NVIDIA_DRIVER_CUDA_LIB = /^libcuda\.so(\.|$)/i;
+
+function assertNoNvidiaDriverLibraries(rootDir) {
+  const queue = [rootDir];
+  while (queue.length > 0) {
+    const currentDir = queue.shift();
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const absolutePath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(absolutePath);
+        continue;
+      }
+      if (NVIDIA_DRIVER_CUDA_LIB.test(entry.name)) {
+        throw new Error(
+          `[finalize-llamacpp-cuda-edition] Refusing to bundle NVIDIA driver library ${entry.name}; runtime must use the host driver.`,
+        );
+      }
+    }
+  }
+}
+
 function copyDirectoryContents(sourceDir, targetDir) {
   fs.mkdirSync(targetDir, { recursive: true });
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
@@ -78,6 +99,9 @@ function copyDirectoryContents(sourceDir, targetDir) {
     const targetPath = path.join(targetDir, entry.name);
     if (entry.isDirectory()) {
       copyDirectoryContents(sourcePath, targetPath);
+      continue;
+    }
+    if (NVIDIA_DRIVER_CUDA_LIB.test(entry.name)) {
       continue;
     }
     fs.copyFileSync(sourcePath, targetPath);
@@ -146,6 +170,7 @@ async function main() {
     const binDir = path.join(CUDA_EDITION_ROOT, 'bin');
     fs.rmSync(binDir, { recursive: true, force: true });
     copyDirectoryContents(payloadDir, binDir);
+    assertNoNvidiaDriverLibraries(binDir);
     fs.writeFileSync(path.join(binDir, executableName), builtServerBytes);
     if (process.platform !== 'win32') {
       fs.chmodSync(path.join(binDir, executableName), 0o755);
@@ -159,6 +184,7 @@ async function main() {
       ? cpuBackendDir
       : path.join(CPU_EDITION_ROOT, 'bin');
     copyDirectoryContents(cpuBinSource, cpuFallbackRoot);
+    assertNoNvidiaDriverLibraries(cpuFallbackRoot);
 
     const cpuFallbackExecutable = path
       .join('cpu-fallback', executableName)
@@ -189,6 +215,11 @@ async function main() {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
+
+module.exports = {
+  assertNoNvidiaDriverLibraries,
+  NVIDIA_DRIVER_CUDA_LIB,
+};
 
 if (require.main === module) {
   main().catch(error => {

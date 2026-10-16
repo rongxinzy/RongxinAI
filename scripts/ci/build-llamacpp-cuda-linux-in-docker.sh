@@ -26,6 +26,7 @@ docker run --rm \
   "${IMAGE}" \
   bash -lc '
     set -euo pipefail
+    git config --global --add safe.directory "*"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y --no-install-recommends cmake ninja-build git ca-certificates
