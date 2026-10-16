@@ -7,11 +7,19 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
 
 namespace ZhiYuan.Acceptance {
+  public sealed class ActionFontContract {
+    public string Family;
+    public int Points, BodyWeight, ButtonWeight;
+  }
+
   public sealed class WindowInfo {
     public long Handle;
+    public long ParentHandle;
+    public long OwnerHandle;
     public int ProcessId;
     public int ControlId;
     public string ClassName;
@@ -48,6 +56,8 @@ namespace ZhiYuan.Acceptance {
     [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out Rect rect);
     [DllImport("user32.dll")] private static extern int MapWindowPoints(IntPtr from, IntPtr to, ref Rect rect, uint points);
     [DllImport("user32.dll")] private static extern int GetDlgCtrlID(IntPtr window);
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr window, uint command);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern bool IsWindowEnabled(IntPtr window);
     [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
@@ -60,6 +70,11 @@ namespace ZhiYuan.Acceptance {
     [DllImport("user32.dll")] private static extern int ReleaseDC(IntPtr window, IntPtr dc);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int DrawText(IntPtr dc, string text, int length, ref Rect rect, uint format);
     [DllImport("gdi32.dll")] private static extern IntPtr SelectObject(IntPtr dc, IntPtr value);
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateFontW")]
+    private static extern IntPtr CreateFont(int height, int width, int escapement, int orientation,
+      int weight, uint italic, uint underline, uint strikeout, uint charset,
+      uint outputPrecision, uint clipPrecision, uint quality, uint pitch, string family);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")] private static extern int GetWindowLong(IntPtr window, int index);
 
     public static void UsePhysicalCoordinates() {
@@ -99,6 +114,8 @@ namespace ZhiYuan.Acceptance {
       if (!GetWindowRect(window, out bounds)) throw new Win32Exception();
       return new WindowInfo {
         Handle = window.ToInt64(), ProcessId = (int)processId,
+        ParentHandle = GetParent(window).ToInt64(),
+        OwnerHandle = GetWindow(window, 4).ToInt64(),
         ControlId = GetDlgCtrlID(window), ClassName = className.ToString(),
         Text = text.ToString(), Visible = IsWindowVisible(window),
         Enabled = IsWindowEnabled(window), Left = bounds.Left, Top = bounds.Top,
@@ -125,8 +142,79 @@ namespace ZhiYuan.Acceptance {
       return controls.ToArray();
     }
 
+    public static WindowInfo[] ProgressControls(long wizard) {
+      // ZYProgressShow creates these statics directly on $HWNDPARENT.
+      // nsDialogs restarts IDs at 1200 inside every hero/finish child dialog,
+      // so descendant IDs alone do not identify a progress control.
+      var controls = new List<WindowInfo>();
+      foreach (var control in Controls(wizard)) {
+        if (control.ParentHandle == wizard && control.ControlId >= 1200 && control.ControlId <= 1206)
+          controls.Add(control);
+      }
+      return controls.ToArray();
+    }
+
+    public static bool HasBrandedProgress(long wizard, string expectedTitle) {
+      var controls = ProgressControls(wizard);
+      if (controls.Length != 7) return false;
+      var ids = new HashSet<int>();
+      bool titleVisible = false;
+      foreach (var control in controls) {
+        if (control.ClassName != "Static" || !ids.Add(control.ControlId)) return false;
+        if (control.ControlId == 1201)
+          titleVisible = control.Visible && control.Text == expectedTitle;
+      }
+      return titleVisible;
+    }
+
+    public static void AssertProgressRemoved(long wizard) {
+      var controls = ProgressControls(wizard);
+      if (controls.Length != 0) {
+        var first = controls[0];
+        // Hidden controls still leak wizard-owned resources and must be gone.
+        throw new InvalidOperationException("Wizard-owned progress controls were not destroyed: " +
+          controls.Length + "; first id=" + first.ControlId + "; visible=" + first.Visible + "; text=" + first.Text);
+      }
+    }
+
     public static int Checked(long handle) {
       return SendMessage(new IntPtr(handle), 0x00F0, IntPtr.Zero, IntPtr.Zero).ToInt32();
+    }
+
+    public static WindowInfo FindDialogAcknowledgement(long dialog, int expectedProcessId,
+      string expectedTitle, string expectedBodyPattern, long expectedOwner) {
+      var info = Inspect(new IntPtr(dialog));
+      if (!info.Visible || !info.Enabled || info.ClassName != "#32770" ||
+          info.ProcessId != expectedProcessId || info.Text != expectedTitle) return null;
+      if (expectedOwner != 0) {
+        if (info.OwnerHandle != expectedOwner) return null;
+        var owner = Inspect(new IntPtr(expectedOwner));
+        if (owner.ProcessId != expectedProcessId || !owner.Visible || owner.Enabled) return null;
+      }
+      var buttons = new List<WindowInfo>();
+      bool hasExpectedBody = false;
+      foreach (var control in Controls(dialog)) {
+        if (!control.Visible || control.ProcessId != expectedProcessId) continue;
+        if (control.ClassName == "Button") buttons.Add(control);
+        if (control.ClassName == "Static" && Regex.IsMatch(control.Text, expectedBodyPattern,
+            RegexOptions.CultureInvariant)) hasExpectedBody = true;
+      }
+      if (!hasExpectedBody || buttons.Count != 1 || !buttons[0].Enabled) return null;
+      var label = Regex.Replace(buttons[0].Text.Replace("&", ""), @"\s*\([A-Za-z]\)", "").Trim();
+      // MB_OK may expose IDCANCEL (2) as the child ID while still returning
+      // IDOK (1). Match the unique visible acknowledgement, never a guessed ID.
+      if (!String.Equals(label, "OK", StringComparison.OrdinalIgnoreCase) &&
+          label != "\u786e\u5b9a" && label != "\u78ba\u5b9a") return null;
+      return buttons[0];
+    }
+
+    public static void ClickDialogAcknowledgement(long dialog, int expectedProcessId,
+      string expectedTitle, string expectedBodyPattern, long expectedOwner) {
+      var button = FindDialogAcknowledgement(dialog, expectedProcessId, expectedTitle,
+        expectedBodyPattern, expectedOwner);
+      if (button == null)
+        throw new InvalidOperationException("Expected unique acknowledgement dialog is no longer available");
+      Click(button.Handle);
     }
 
     public static void Click(long handle) {
@@ -143,35 +231,69 @@ namespace ZhiYuan.Acceptance {
       if (!PostMessage(new IntPtr(handle), 0x0010, IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception();
     }
 
-    public static void AssertActionLayout(long parent, long handle) {
+    public static ActionFontContract ReadActionFontContract(string themePath) {
+      var theme = System.IO.File.ReadAllText(themePath);
+      Func<string, string, string> read = (name, pattern) => {
+        var matches = System.Text.RegularExpressions.Regex.Matches(theme,
+          "(?m)^!define[ \\t]+" + name + "[ \\t]+" + pattern + "[ \\t]*(?:;[^\\r\\n]*)?\\r?$");
+        if (matches.Count != 1) throw new InvalidOperationException("Missing or ambiguous production font token: " + name);
+        return matches[0].Groups[1].Value;
+      };
+      return new ActionFontContract {
+        Family = read("ZY_FONT_FAMILY", "\"([^\"]+)\""),
+        Points = int.Parse(read("ZY_FONT_BODY_SIZE", "([0-9]+)")),
+        BodyWeight = int.Parse(read("ZY_FONT_BODY_WT", "([0-9]+)")),
+        ButtonWeight = int.Parse(read("ZY_FONT_BUTTON_WT", "([0-9]+)"))
+      };
+    }
+
+    public static void AssertActionLayout(long parent, long handle, string family, int points, int weight) {
       var window = new IntPtr(handle);
       var control = Inspect(window);
       if (!control.Visible || control.Width <= 0 || control.Height <= 0)
         throw new InvalidOperationException("Action is not visible: " + control.Text);
       Rect client;
-      GetClientRect(new IntPtr(parent), out client);
+      if (!GetClientRect(new IntPtr(parent), out client)) throw new Win32Exception();
       MapWindowPoints(new IntPtr(parent), IntPtr.Zero, ref client, 2);
       if (control.Left < client.Left || control.Top < client.Top ||
           control.Left + control.Width > client.Right || control.Top + control.Height > client.Bottom)
         throw new InvalidOperationException("Action is clipped by the wizard: " + control.Text);
-      var dc = GetDC(window);
-      var font = SendMessage(window, 0x0031, IntPtr.Zero, IntPtr.Zero);
-      var oldFont = font == IntPtr.Zero ? IntPtr.Zero : SelectObject(dc, font);
+      if (string.IsNullOrWhiteSpace(family) || points <= 0 || points > 72 || weight <= 0 || weight > 1000 || control.Dpi == 0)
+        throw new InvalidOperationException("Invalid production font contract or actual window DPI");
+      // WM_GETFONT returns the other process's private HFONT, which cannot be
+      // selected into our DC. Recreate the production theme contract locally
+      // at the real HWND DPI; never silently measure with the default font.
+      // https://learn.microsoft.com/windows/win32/sysinfo/gdi-objects
+      var height = -(int)Math.Round(points * control.Dpi / 72.0, MidpointRounding.AwayFromZero);
+      var font = CreateFont(height, 0, 0, 0, weight, 0, 0, 0, 1, 0, 0, 0, 0, family);
+      if (font == IntPtr.Zero) throw new InvalidOperationException("Could not create the production measurement font");
+      var dc = IntPtr.Zero;
+      var oldFont = IntPtr.Zero;
       try {
+        dc = GetDC(window);
+        if (dc == IntPtr.Zero) throw new InvalidOperationException("Could not obtain control measurement DC");
+        oldFont = SelectObject(dc, font);
+        if (oldFont == IntPtr.Zero || oldFont == new IntPtr(-1))
+          throw new InvalidOperationException("Could not select the production measurement font");
         var measured = new Rect();
         // DT_CALCRECT | DT_SINGLELINE. Ampersands are access-key markers.
-        DrawText(dc, control.Text, -1, ref measured, 0x0420);
+        if (DrawText(dc, control.Text, -1, ref measured, 0x0420) <= 0)
+          throw new InvalidOperationException("Could not measure action text: " + control.Text);
         Rect inner;
-        GetClientRect(window, out inner);
+        if (!GetClientRect(window, out inner)) throw new Win32Exception();
         var style = GetWindowLong(window, -16) & 0xF;
         var checkbox = style == 2 || style == 3 || style == 5 || style == 6;
         var allowance = checkbox ? (int)Math.Ceiling(20 * control.Dpi / 96.0) : 8;
         if (measured.Right - measured.Left + allowance > inner.Right - inner.Left ||
             measured.Bottom - measured.Top > inner.Bottom - inner.Top)
-          throw new InvalidOperationException("Action text does not fit at " + control.Dpi + " DPI: " + control.Text);
+          throw new InvalidOperationException("Action text does not fit at " + control.Dpi + " DPI: " + control.Text +
+            " (font=" + family + ", points=" + points + ", weight=" + weight +
+            ", text=" + (measured.Right - measured.Left) + "x" + (measured.Bottom - measured.Top) +
+            ", allowance=" + allowance + ", client=" + (inner.Right - inner.Left) + "x" + (inner.Bottom - inner.Top) + ")");
       } finally {
-        if (oldFont != IntPtr.Zero) SelectObject(dc, oldFont);
-        ReleaseDC(window, dc);
+        if (oldFont != IntPtr.Zero && oldFont != new IntPtr(-1)) SelectObject(dc, oldFont);
+        if (dc != IntPtr.Zero) ReleaseDC(window, dc);
+        DeleteObject(font);
       }
     }
 

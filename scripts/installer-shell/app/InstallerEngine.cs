@@ -268,6 +268,7 @@ public sealed class InstallerEngine
             new OffsetStream(fileStream, zipSize), System.IO.Compression.ZipArchiveMode.Read);
         var totalBytes = zip.Entries.Sum(entry => entry.Length);
         long doneBytes = 0;
+        var lastReportedPercent = -1;
         foreach (var entry in zip.Entries)
         {
             ct.ThrowIfCancellationRequested();
@@ -293,16 +294,28 @@ public sealed class InstallerEngine
             {
                 await output.WriteAsync(buffer.AsMemory(0, read), ct);
                 doneBytes += read;
-                progress.Report(new EngineEvent(
-                    Type: "progress", Percent: (int)(doneBytes * 100 / Math.Max(totalBytes, 1)),
-                    BytesDone: doneBytes, BytesTotal: totalBytes));
+                ReportPayloadProgress(progress, doneBytes, totalBytes, ref lastReportedPercent);
             }
         }
+        ReportPayloadProgress(progress, totalBytes, totalBytes, ref lastReportedPercent);
         progress.Report(new EngineEvent(
             Type: "phase",
             Label: "安装包已就绪",
             Detail: extractDir));
         payloadDir = extractDir;
+    }
+
+    // The UI displays whole percentages. Reporting every decompressor read
+    // flooded its message queue with tens of thousands of redundant updates.
+    // Emit at most 101 ordered updates per payload, independent of chunk size.
+    internal static void ReportPayloadProgress(IProgress<EngineEvent> progress,
+        long doneBytes, long totalBytes, ref int lastReportedPercent)
+    {
+        var percent = totalBytes == 0 ? 100 : (int)(doneBytes * 100m / totalBytes);
+        if (percent <= lastReportedPercent) return;
+        lastReportedPercent = percent;
+        progress.Report(new EngineEvent(Type: "progress", Percent: percent,
+            BytesDone: doneBytes, BytesTotal: totalBytes));
     }
 
     /// <summary>Reads exactly <paramref name="length"/> bytes from an
@@ -367,17 +380,29 @@ public sealed class InstallerEngine
     private async Task StepStopAppProcesses(CancellationToken ct)
     {
         ReportPhase("正在停止运行中的知远进程");
-        for (var attempt = 0; attempt < 21; attempt++)
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var targets = FindInstallRootProcesses().ToList();
-            if (targets.Count == 0) return;
-            foreach (var proc in targets)
+            for (var attempt = 0; attempt < 21; attempt++)
             {
-                using (proc) { try { proc.Kill(); } catch { /* already exited or access denied */ } }
+                deadline.Token.ThrowIfCancellationRequested();
+                var targets = FindInstallRootProcesses().ToList();
+                if (targets.Count == 0) return;
+                try
+                {
+                    foreach (var proc in targets)
+                        try { proc.Kill(); } catch { /* already exited or access denied */ }
+                    // Kill is asynchronous. A terminating process may disappear
+                    // from MainModule inspection before it releases its files;
+                    // wait on these exact handles before attempting the rename.
+                    await Task.WhenAll(targets.Select(proc => proc.WaitForExitAsync(deadline.Token)));
+                }
+                finally { foreach (var proc in targets) proc.Dispose(); }
+                if (attempt > 0) await Task.Delay(500, deadline.Token);
             }
-            if (attempt > 0) await Task.Delay(500, ct);
         }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* bounded stop timed out */ }
         throw new EngineException("检测到知远进程仍在运行，且无法自动关闭。");
     }
 
@@ -397,7 +422,9 @@ public sealed class InstallerEngine
         foreach (var proc in Process.GetProcesses())
         {
             string? path = null;
-            try { path = proc.MainModule?.FileName; } catch { /* access denied */ }
+            // Keep the process identity alive before path validation. MainModule
+            // alone queries by PID and does not retain a native process handle.
+            try { _ = proc.Handle; path = proc.MainModule?.FileName; } catch { /* exited or access denied */ }
             if (path is null || proc.Id == Environment.ProcessId) { proc.Dispose(); continue; }
             if (roots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
             {
@@ -465,7 +492,7 @@ public sealed class InstallerEngine
             var message = running > 0
                 ? "检测到知远进程仍在运行，且无法自动关闭。请手动退出知远后重试。"
                 : "无法更新安装目录，目录正被其他程序占用。请关闭占用该目录的窗口或程序后重试：" + installDir;
-            throw new EngineException(message, $"running={running}");
+            throw new EngineException(message, $"running={running}\n{DescribeFailure(ex)}");
         }
         if (transaction.BackupDir is not null)
             File.WriteAllText(Path.Combine(appDataRoot, "old-install-path.txt"), transaction.BackupDir);
@@ -609,7 +636,7 @@ public sealed class InstallerEngine
         var helper = Path.Combine(ScriptsDir, "elevated-actions.ps1");
         var startInfo = new ProcessStartInfo
         {
-            FileName = "powershell.exe",
+            FileName = ShellProcessRunner.PowerShellExecutablePath,
             Arguments = $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{helper}\" " +
                 $"-Action install-vc-runtime -Target \"{redist}\" -ResultPath \"{resultPath}\"",
             UseShellExecute = true,
@@ -735,23 +762,36 @@ public sealed class InstallerEngine
         return total;
     }
 
-    private void CreateShortcut(string folder)
+    // Keep method names and HRESULTs for failures in native Windows APIs, but
+    // omit source paths, exception messages and payload/argument values.
+    internal static string DescribeFailure(Exception exception) =>
+        $"{exception.GetType().FullName} (0x{exception.HResult:X8})\n{new StackTrace(exception, fNeedFileInfo: false)}";
+
+    internal void CreateShortcut(string folder)
     {
         var linkPath = Path.Combine(folder, DisplayName + ".lnk");
-        var shellType = Type.GetTypeFromProgID("WScript.Shell")
-            ?? throw new EngineException("无法创建快捷方式");
-        dynamic shell = Activator.CreateInstance(shellType)!;
+        IShellLinkW? shortcut = null;
+        var operation = "IShellLinkW.Activate";
         try
         {
-            dynamic shortcut = shell.CreateShortcut(linkPath);
-            shortcut.TargetPath = LaunchPath;
-            shortcut.WorkingDirectory = installDir;
-            shortcut.IconLocation = LaunchPath + ",0";
-            shortcut.Save();
+            shortcut = (IShellLinkW)new ShellLinkComObject();
+            operation = "IShellLinkW.SetPath";
+            shortcut.SetPath(LaunchPath);
+            operation = "IShellLinkW.SetWorkingDirectory";
+            shortcut.SetWorkingDirectory(installDir);
+            operation = "IShellLinkW.SetIconLocation";
+            shortcut.SetIconLocation(LaunchPath, 0);
+            operation = "IPersistFile.Save";
+            ((System.Runtime.InteropServices.ComTypes.IPersistFile)shortcut).Save(linkPath, true);
+        }
+        catch (Exception ex)
+        {
+            throw new EngineException("无法创建快捷方式", $"{operation}\n{DescribeFailure(ex)}");
         }
         finally
         {
-            try { System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell); } catch { }
+            if (shortcut is not null)
+                try { System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut); } catch { }
         }
     }
 
@@ -805,12 +845,7 @@ public sealed class InstallerEngine
     private void ReportPhase(string label) => progress.Report(new EngineEvent(Type: "phase", Label: label));
 
     private Task RunPowerShellAsync(string script, string arguments, CancellationToken ct, string? failureMessage)
-    {
-        var quoted = $"\"{script}\" {arguments}";
-        return ShellProcessRunner.RunAsync("powershell.exe",
-            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File {quoted}", ct,
-            failureMessage: failureMessage);
-    }
+        => ShellProcessRunner.RunPowerShellAsync(script, arguments, ct, failureMessage);
     internal static void CopyDirectory(string source, string destination)
     {
         // A prior interrupted copy may have created only part of the target.

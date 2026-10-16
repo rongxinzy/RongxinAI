@@ -90,17 +90,28 @@ public sealed class UninstallerEngine
     private async Task StepStopAppProcesses(CancellationToken ct)
     {
         ReportPhase("正在停止运行中的知远进程");
-        for (var attempt = 0; attempt < 21; attempt++)
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(10));
+        try
         {
-            ct.ThrowIfCancellationRequested();
-            var targets = FindInstallRootProcesses().ToList();
-            if (targets.Count == 0) return;
-            foreach (var proc in targets)
+            for (var attempt = 0; attempt < 21; attempt++)
             {
-                using (proc) { try { proc.Kill(); } catch { /* already exited or access denied */ } }
+                deadline.Token.ThrowIfCancellationRequested();
+                var targets = FindInstallRootProcesses().ToList();
+                if (targets.Count == 0) return;
+                try
+                {
+                    foreach (var proc in targets)
+                        try { proc.Kill(); } catch { /* already exited or access denied */ }
+                    // Keep the captured handles until the matching processes
+                    // have really exited and released their installation files.
+                    await Task.WhenAll(targets.Select(proc => proc.WaitForExitAsync(deadline.Token)));
+                }
+                finally { foreach (var proc in targets) proc.Dispose(); }
+                if (attempt > 0) await Task.Delay(500, deadline.Token);
             }
-            if (attempt > 0) await Task.Delay(500, ct);
         }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { /* bounded stop timed out */ }
         throw new EngineException("检测到知远进程仍在运行，且无法自动关闭。");
     }
 
@@ -120,7 +131,7 @@ public sealed class UninstallerEngine
         foreach (var proc in Process.GetProcesses())
         {
             string? path = null;
-            try { path = proc.MainModule?.FileName; } catch { /* access denied */ }
+            try { _ = proc.Handle; path = proc.MainModule?.FileName; } catch { /* exited or access denied */ }
             if (path is null || proc.Id == Environment.ProcessId) { proc.Dispose(); continue; }
             if (roots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
             {
@@ -170,10 +181,9 @@ public sealed class UninstallerEngine
                 Type: "phase", Label: "未找到卸载清理脚本，已跳过运行环境清理"));
             return;
         }
-        await ShellProcessRunner.RunAsync(
-            "powershell.exe",
-            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{script}\" " +
-                $"-InstallDir \"{cleanupRoot}\" -RuntimeRoot \"{runtimeRoot}\"",
+        await ShellProcessRunner.RunPowerShellAsync(
+            script,
+            $"-InstallDir \"{cleanupRoot}\" -RuntimeRoot \"{runtimeRoot}\"",
             ct,
             failureMessage: null);
         progress.Report(new EngineEvent(Type: "progress", Percent: 40));
@@ -231,14 +241,9 @@ public sealed class UninstallerEngine
             "[IO.Directory]::Delete($p) }; " +
             "for ($i=0; $i -lt 60; $i++) { try { Remove-Tree $env:ZY_UNINSTALL_TREE; break } catch { Start-Sleep -Seconds 1 } }";
         var encoded = Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(cleanup));
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "powershell.exe",
-            Arguments = $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}",
-            WorkingDirectory = Path.GetTempPath(),
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        };
+        var startInfo = ShellProcessRunner.CreatePowerShellStartInfo(
+            $"-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand {encoded}");
+        startInfo.WorkingDirectory = Path.GetTempPath();
         startInfo.Environment["ZY_UNINSTALL_TREE"] = detachedInstallDir;
         startInfo.Environment["ZY_UNINSTALL_PID"] = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         using var detached = Process.Start(startInfo);

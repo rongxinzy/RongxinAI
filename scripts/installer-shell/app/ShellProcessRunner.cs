@@ -10,26 +10,56 @@ namespace ZhiYuan.Setup.Shell;
 /// </summary>
 internal static class ShellProcessRunner
 {
-    public static async Task RunAsync(
+    public static string PowerShellExecutablePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.System),
+        "WindowsPowerShell", "v1.0", "powershell.exe");
+
+    public static Task RunAsync(
         string file,
         string arguments,
         CancellationToken ct,
         Action<string>? onOutputLine = null,
         string? failureMessage = null)
+        => RunAsync(new ProcessStartInfo { FileName = file, Arguments = arguments },
+            ct, onOutputLine, failureMessage);
+
+    public static Task RunPowerShellAsync(string script, string arguments,
+        CancellationToken ct, string? failureMessage = null)
+        => RunAsync(CreatePowerShellStartInfo(
+            $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{script}\" {arguments}"),
+            ct, failureMessage: failureMessage);
+
+    public static ProcessStartInfo CreatePowerShellStartInfo(string arguments)
     {
+        // A pwsh parent can export its incompatible PSModulePath. All bundled
+        // scripts use Windows inbox modules (Utility, Management, Security and
+        // CimCmdlets), so bind both the executable and module lookup to that
+        // same trusted Windows PowerShell installation, in this child only.
+        var home = Path.GetDirectoryName(PowerShellExecutablePath)!;
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = PowerShellExecutablePath,
+            Arguments = arguments,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        startInfo.Environment["PSModulePath"] = Path.Combine(home, "Modules");
+        return startInfo;
+    }
+
+    private static async Task RunAsync(ProcessStartInfo startInfo,
+        CancellationToken ct, Action<string>? onOutputLine = null,
+        string? failureMessage = null)
+    {
+        startInfo.RedirectStandardOutput = true;
+        startInfo.RedirectStandardError = true;
+        startInfo.UseShellExecute = false;
+        startInfo.CreateNoWindow = true;
+        startInfo.StandardOutputEncoding = System.Text.Encoding.UTF8;
+        startInfo.StandardErrorEncoding = System.Text.Encoding.UTF8;
         using var process = new Process
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = file,
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                StandardOutputEncoding = System.Text.Encoding.UTF8,
-                StandardErrorEncoding = System.Text.Encoding.UTF8,
-            },
+            StartInfo = startInfo,
         };
         var output = new System.Text.StringBuilder();
         void Append(string? line)

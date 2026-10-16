@@ -443,7 +443,8 @@ const I18N = {
     ]
   }
 };
-let lang = 'zh';
+// Keep the Chinese default, but honor the explicit language passed by the host.
+const lang = new URLSearchParams(location.search).get('lang') === 'en' ? 'en' : 'zh';
 const t = k => I18N[lang][k];
 
 /* deep links for design review: ?page=hero|progress|complete|uninstall&freeze=0.5 */
@@ -472,6 +473,15 @@ function showPage(id) {
 /* ---------- hero ---------- */
 const licenseCheck = document.getElementById('licenseCheck');
 const btnInstall = document.getElementById('btnInstall');
+let startAdmission = Promise.resolve();
+function startShellOperation(start) {
+  // The host returns after admitting the operation, not after installation.
+  const admission = (async () => await Promise.resolve(start()))();
+  startAdmission = admission;
+  admission.catch(error => {
+    if (admission === startAdmission) handleEngineEvent({ type: 'error', message: String(error) });
+  });
+}
 function toggleLicense() {
   const on = licenseCheck.classList.toggle('on');
   licenseCheck.setAttribute('aria-checked', on);
@@ -502,8 +512,8 @@ btnInstall.addEventListener('click', () => {
   showPage('progress');
   if (inShell) {
     resetProgressView();
-    window.chrome.webview.hostObjects.shell.StartInstall(
-      document.getElementById('installPath').textContent, inferenceOn);
+    startShellOperation(() => window.chrome.webview.hostObjects.shell.StartInstall(
+      document.getElementById('installPath').textContent, inferenceOn));
   } else {
     runInstall();
   }
@@ -633,17 +643,26 @@ function runInstall() {
 
 document.getElementById('demoReplay').addEventListener('click', () => { showPage('progress'); runInstall(); });
 document.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => { simToken++; showPage(b.dataset.goto); }));
+async function requestShellClose() {
+  try {
+    await Promise.resolve(window.chrome.webview.hostObjects.shell.RequestClose());
+  } catch (error) {
+    console.error('[Setup] Close request failed:', error);
+    const completed = document.getElementById('page-complete').classList.contains('active');
+    if (completed) handleEngineEvent({ type: 'launch-error', message: String(error) });
+  }
+}
 document.getElementById('btnDone').addEventListener('click', () => {
   simToken++;
-  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  if (inShell) { requestShellClose(); return; }
   showPage('hero');
 });
 document.getElementById('btnLaunch').addEventListener('click', () => {
   if (inShell) {
     const button = document.getElementById('btnLaunch');
     button.disabled = true;
-    window.chrome.webview.hostObjects.shell.LaunchApp().then(started => {
-      if (started) window.chrome.webview.postMessage({ type: 'close' });
+    Promise.resolve(window.chrome.webview.hostObjects.shell.LaunchApp()).then(started => {
+      if (started) requestShellClose();
       else button.disabled = false;
     }).catch(() => { button.disabled = false; });
     return;
@@ -651,18 +670,18 @@ document.getElementById('btnLaunch').addEventListener('click', () => {
   alert(lang === 'zh' ? '将启动 知远智能体' : 'Launching ZhiYuan Agent');
 });
 document.getElementById('btnCancelHero').addEventListener('click', () => {
-  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  if (inShell) { requestShellClose(); return; }
   showPage('hero');
 });
 document.getElementById('btnCancelUninstall').addEventListener('click', () => {
-  if (inShell) { window.chrome.webview.postMessage({ type: 'close' }); return; }
+  if (inShell) { requestShellClose(); return; }
   showPage('hero');
 });
 document.getElementById('btnConfirmUninstall').addEventListener('click', () => {
   showPage('progress');
   document.getElementById('progressTitle').textContent = t('uninstallingTitle');
   resetProgressView();
-  if (inShell) { window.chrome.webview.hostObjects.shell.StartUninstall(); }
+  if (inShell) { startShellOperation(() => window.chrome.webview.hostObjects.shell.StartUninstall()); }
 });
 
 applyI18n();
@@ -715,7 +734,7 @@ document.querySelectorAll('img[data-asset]').forEach(img => {
 if (inShell) {
   document.body.classList.add('shell');
   document.querySelector('.win-btn.close').addEventListener('click', () => {
-    window.chrome.webview.postMessage({ type: 'close' });
+    requestShellClose();
   });
   document.querySelector('.titlebar').addEventListener('pointerdown', e => {
     if (e.button === 0 && !e.target.closest('.win-btn')) {
@@ -730,7 +749,16 @@ if (inShell) {
   });
   const cancelProgress = document.getElementById('btnCancelProgress');
   cancelProgress.style.display = '';
-  cancelProgress.addEventListener('click', () => shell.CancelInstall());
+  cancelProgress.addEventListener('click', async () => {
+    const admission = startAdmission;
+    try {
+      await admission;
+      if (admission !== startAdmission) return; // A pending Cancel belongs to its original attempt.
+      await Promise.resolve(shell.CancelInstall());
+    } catch (error) {
+      console.error('[Setup] Cancel request failed:', error);
+    }
+  });
   window.chrome.webview.addEventListener('message', e => {
     try {
       const evt = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;

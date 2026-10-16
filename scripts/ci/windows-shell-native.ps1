@@ -4,7 +4,9 @@
   [string]$AppPath,
   [string]$Screenshot,
   [string]$WindowClass,
-  [int]$ClickControlId = -1,
+  [long]$WindowHandle = 0,
+  [string]$ExpectedWindowTitle,
+  [string]$AcknowledgeBodyPattern,
   [string]$FilePath,
   [string]$ReadyPath,
   [string]$ReleasePath
@@ -46,16 +48,20 @@ if ($Action -eq 'app') {
   $ids = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath -ieq $AppPath } | ForEach-Object { [int]$_.ProcessId })
 }
 $windows = @([ZhiYuan.Acceptance.InstallerUi]::Windows() | Where-Object {
-  $_.ProcessId -in $ids -and (-not $WindowClass -or $_.ClassName -eq $WindowClass)
+  $_.ProcessId -in $ids -and (-not $WindowClass -or $_.ClassName -eq $WindowClass) -and
+    (-not $WindowHandle -or $_.Handle -eq $WindowHandle)
 })
 if ($Screenshot -and $windows.Count -ne 1) { throw "Expected one visible target window for capture; found $($windows.Count)" }
+if ($AcknowledgeBodyPattern -and ($Action -ne 'inspect' -or $TargetProcessId -le 0 -or
+    $WindowHandle -le 0 -or $WindowClass -ne '#32770' -or -not $ExpectedWindowTitle -or $windows.Count -ne 1)) {
+  throw 'Native acknowledgement requires one exact process, dialog handle, title and expected body'
+}
 $result = foreach ($window in $windows) {
   $controls = @([ZhiYuan.Acceptance.InstallerUi]::Controls($window.Handle))
   if ($Screenshot) { [ZhiYuan.Acceptance.InstallerUi]::Capture($window.Handle, $Screenshot) }
-  if ($ClickControlId -ge 0) {
-    $buttons = @($controls | Where-Object { $_.ControlId -eq $ClickControlId -and $_.ClassName -eq 'Button' -and $_.Visible -and $_.Enabled })
-    if ($buttons.Count -ne 1) { throw 'Expected one visible native dialog action' }
-    [ZhiYuan.Acceptance.InstallerUi]::Click($buttons[0].Handle)
+  if ($AcknowledgeBodyPattern) {
+    [ZhiYuan.Acceptance.InstallerUi]::ClickDialogAcknowledgement(
+      $window.Handle, $TargetProcessId, $ExpectedWindowTitle, $AcknowledgeBodyPattern, 0)
   }
   [ordered]@{ window = $window; controls = $controls }
 }

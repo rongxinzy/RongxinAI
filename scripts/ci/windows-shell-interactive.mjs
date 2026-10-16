@@ -21,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { shellScreenshots, observeDetachedUpgrade } from './windows-shell-evidence.mjs';
+import { Cdp, snapshotExpression } from './windows-shell-browser-evidence.mjs';
 
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -95,87 +96,6 @@ async function availablePort() {
   return port;
 }
 
-class Cdp {
-  next = 0;
-  pending = new Map();
-  constructor(socket) {
-    this.socket = socket;
-    socket.addEventListener('message', event => {
-      const result = JSON.parse(event.data);
-      const pending = this.pending.get(result.id);
-      if (!pending) return;
-      this.pending.delete(result.id);
-      clearTimeout(pending.timer);
-      if (result.error) pending.reject(new Error(JSON.stringify(result.error)));
-      else pending.resolve(result.result);
-    });
-    socket.addEventListener('close', () => {
-      for (const pending of this.pending.values()) {
-        clearTimeout(pending.timer);
-        pending.reject(new Error('WebView2 disconnected'));
-      }
-      this.pending.clear();
-    });
-  }
-  static async connect(url) {
-    assert.equal(new URL(url).hostname, '127.0.0.1', 'CDP must remain on loopback');
-    const socket = new WebSocket(url);
-    await new Promise((resolve, reject) => {
-      socket.addEventListener('open', resolve, { once: true });
-      socket.addEventListener('error', reject, { once: true });
-    });
-    return new Cdp(socket);
-  }
-  send(method, params = {}) {
-    const id = ++this.next;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`CDP timed out: ${method}`));
-      }, 15_000);
-      this.pending.set(id, { resolve, reject, timer });
-      this.socket.send(JSON.stringify({ id, method, params }));
-    });
-  }
-  async evaluate(expression) {
-    const result = await this.send('Runtime.evaluate', { expression, returnByValue: true });
-    assert(!result.exceptionDetails, JSON.stringify(result.exceptionDetails));
-    return result.result.value;
-  }
-  close() {
-    this.socket.close();
-  }
-}
-
-// Read-only DOM evidence. No showPage(), simulated engine messages, preview
-// freeze parameter, host-object invocations or JavaScript .click() are used.
-const snapshotExpression = `(() => {
-  const selectors = ['#licenseCheck', '#btnInstall', '#btnCancelHero', '#btnCancelProgress',
-    '#btnDone', '#btnLaunch', '.win-btn.close', '.switch'];
-  return {
-    hosted: !!window.chrome?.webview && document.body.classList.contains('shell'),
-    url: location.href, language: document.documentElement.lang, userAgent: navigator.userAgent,
-    page: document.querySelector('.page.active')?.id,
-    width: innerWidth, height: innerHeight, dpr: devicePixelRatio,
-    installPath: document.querySelector('#installPath')?.textContent,
-    text: document.querySelector('.page.active')?.innerText,
-    licenseChecked: document.querySelector('#licenseCheck')?.getAttribute('aria-checked'),
-    localInference: document.querySelector('#toggleInference')?.checked,
-    error: document.querySelector('[role=alert]')?.textContent,
-    actions: selectors.map(selector => {
-      const el = document.querySelector(selector);
-      if (!el) return { selector, visible: false };
-      const r = el.getBoundingClientRect(); const css = getComputedStyle(el);
-      const visible = r.width > 0 && r.height > 0 && css.visibility !== 'hidden' && css.display !== 'none';
-      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
-      return { selector, text: el.innerText, visible, enabled: !el.disabled,
-        x: r.x, y: r.y, width: r.width, height: r.height,
-        textFits: el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1,
-        hit: top === el || el.contains(top) };
-    })
-  };
-})()`;
-
 async function native(action, options = {}) {
   const args = [
     '-NoProfile',
@@ -192,6 +112,18 @@ async function native(action, options = {}) {
     windowsHide: true,
   });
   return JSON.parse(stdout.replace(/^\uFEFF/, '').trim());
+}
+
+export async function captureFailurePages(sessions, save, report) {
+  for (const session of sessions) {
+    if (!session.cdp || session.child.exitCode !== null) continue;
+    try {
+      await save(session, `${session.name}-failure`);
+    } catch (error) {
+      report.failureCaptureErrors ??= [];
+      report.failureCaptureErrors.push({ session: session.name, error: String(error) });
+    }
+  }
 }
 
 export async function runShellAcceptance() {
@@ -328,6 +260,7 @@ export async function runShellAcceptance() {
     }, 'the real packaged WebView2 page');
     session.cdp = await Cdp.connect(target.webSocketDebuggerUrl);
     await session.cdp.send('Page.enable');
+    await session.cdp.send('Runtime.enable');
     await waitFor(async () => {
       const snapshot = await session.cdp.evaluate(snapshotExpression);
       return (
@@ -340,6 +273,7 @@ export async function runShellAcceptance() {
       (await session.cdp.evaluate(snapshotExpression)).language,
       language === 'zh' ? 'zh-CN' : 'en',
     );
+    await session.cdp.observeClicks();
     return session;
   }
   async function save(session, name, selectors = []) {
@@ -506,9 +440,13 @@ export async function runShellAcceptance() {
       );
     }, 'explicit missing-WebView2 native failure prompt');
     assert.match(dialog.controls.map(control => control.Text).join('\n'), /Microsoft|微软/);
-    const missingPage = await native('inspect', {
+    const expectedDialog = {
       TargetProcessId: missing.child.pid,
       WindowClass: '#32770',
+      WindowHandle: dialog.window.Handle,
+    };
+    const missingPage = await native('inspect', {
+      ...expectedDialog,
       Screenshot: path.join(evidence, 'missing-webview2.png'),
     });
     await writeFile(
@@ -521,9 +459,10 @@ export async function runShellAcceptance() {
       'Missing WebView2 cannot claim success',
     );
     await native('inspect', {
-      TargetProcessId: missing.child.pid,
-      WindowClass: '#32770',
-      ClickControlId: 1,
+      ...expectedDialog,
+      ExpectedWindowTitle: 'ZhiYuan Agent Setup',
+      AcknowledgeBodyPattern:
+        '(?s)Microsoft Edge WebView2 Runtime is required.*https://developer[.]microsoft[.]com/microsoft-edge/webview2/',
     });
     await waitExit(missing, true);
     assert.equal(missing.child.exitCode, 1, 'Missing WebView2 must exit with failure');
@@ -801,11 +740,31 @@ export async function runShellAcceptance() {
     report.passed = true;
   } catch (error) {
     report.error = error.stack || String(error);
+    await captureFailurePages(sessions, save, report);
     throw error;
   } finally {
     if (await exists(heldApp)) await rename(heldApp, app);
     await writeFile(lockRelease, 'release');
-    for (const session of sessions) session.cdp?.close();
+    for (const session of sessions) {
+      try {
+        if (session.cdp)
+          await writeFile(
+            path.join(evidence, `${session.name}-browser.json`),
+            JSON.stringify(
+              {
+                processId: session.child.pid,
+                events: session.cdp.observations,
+                droppedEvents: session.cdp.droppedObservations,
+              },
+              null,
+              2,
+            ),
+          );
+      } catch (error) {
+        report.browserDiagnosticsError = String(error);
+      }
+      session.cdp?.close();
+    }
     for (const child of children)
       if (child.exitCode === null && child.pid) {
         // Exact owned PID only; never kill an unrelated user application by name.
