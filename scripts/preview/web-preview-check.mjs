@@ -49,7 +49,7 @@ const sidebarViews = [
   ['coding', 'Coding'],
   ['todo', 'Todo'],
   ['scheduled-tasks', 'Automation', 'Daily sales digest'],
-  ['activity', 'Activity'],
+  ['activity', 'Activity', '正在查询'],
   ['expert', 'Expert'],
 ];
 

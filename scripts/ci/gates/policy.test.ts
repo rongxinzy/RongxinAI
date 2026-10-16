@@ -16,6 +16,7 @@ const noPathJobs: PathPlan = {
   [PathJob.PythonRuntimeLinux]: false,
   [PathJob.PythonRuntimeWindows]: false,
   [PathJob.InstallerPreview]: false,
+  [PathJob.BrowserPreview]: false,
 };
 
 const prRef = 'refs/pull/42/merge';
@@ -127,6 +128,14 @@ test('path-owned checks follow the same diff ownership as the former standalone 
   expect(planPathJobs(['scripts/installer-shell/preview/page.tsx'], CiEvent.PullRequest)).toEqual({
     ...noPathJobs,
     [PathJob.InstallerPreview]: true,
+  });
+  expect(planPathJobs(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest)).toEqual({
+    ...noPathJobs,
+    [PathJob.BrowserPreview]: true,
+  });
+  expect(planPathJobs(['scripts/preview/web-preview-check.mjs'], CiEvent.PullRequest)).toEqual({
+    ...noPathJobs,
+    [PathJob.BrowserPreview]: true,
   });
   expect(planPathJobs(['README.md'], CiEvent.PullRequest)).toEqual(noPathJobs);
 });
