@@ -13,11 +13,21 @@ import type {
   MagpieModel,
   MagpieAgents,
   MagpieModelSelection,
+  MagpieProviderSummary,
+  MagpieSaveProviderInput,
+  MagpieTestProviderResult,
+  MagpieDiagnosticSummary,
+  MagpieProviderApi,
 } from '../../shared/magpie/types';
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 const MODEL_FIELDS = new Set(['model', 'large', 'small', 'executor', 'planner']);
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function maskApiKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  if (key.length <= 8) return '****';
+  return `${key.slice(0, 3)}...${key.slice(-4)}`;
+}
 async function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -58,12 +68,18 @@ export class MagpieManager {
   private catalogRead?: Promise<MagpieModel[]>;
   private hostSync: Promise<void> = Promise.resolve();
   private hostSignatures = new Map<string, string>();
+  private recentErrors: { timestamp: number; message: string; providerId?: string }[] = [];
+  private cachedActiveProviderCount = 0;
   constructor(private readonly options: MagpieManagerOptions) {}
   status(): MagpieStatus {
     return {
       ...this.state,
       enabled: this.isServiceEnabled(),
       subscriptionAccountsEnabled: this.options.subscriptionAccounts?.read() === true,
+      diagnostics: {
+        activeProviderCount: this.cachedActiveProviderCount,
+        recentErrors: this.recentErrors,
+      },
     };
   }
   private isServiceEnabled(): boolean {
@@ -312,6 +328,253 @@ export class MagpieManager {
       });
     this.hostSync = run;
     return run;
+  }
+
+  recordError(message: string, providerId?: string): void {
+    this.recentErrors.unshift({ timestamp: Date.now(), message, providerId });
+    if (this.recentErrors.length > 10) this.recentErrors.pop();
+  }
+
+  async providers(): Promise<MagpieProviderSummary[]> {
+    if (this.state.state !== 'running') return [];
+    try {
+      const state = await this.managementJson('/api/providers');
+      const rawList = Array.isArray(state.providers) ? state.providers : [];
+      const list = rawList.flatMap((p: Record<string, unknown>) => {
+        if (!p || typeof p !== 'object' || typeof p.id !== 'string') return [];
+        const id = p.id;
+        const isHostManaged = id.startsWith(HOST_PROVIDER_PREFIX);
+        const chat = typeof p.chat === 'string' ? p.chat : '';
+        const responses = typeof p.responses === 'string' ? p.responses : '';
+        const anthropic = typeof p.anthropic === 'string' ? p.anthropic : '';
+        let api: MagpieProviderApi = 'openai-completions';
+        let baseUrl = chat;
+        if (anthropic) {
+          api = 'anthropic-messages';
+          baseUrl = anthropic;
+        } else if (responses) {
+          api = 'openai-responses';
+          baseUrl = responses;
+        }
+        const models = (
+          Array.isArray(p.models) ? p.models : Array.isArray(p.chosen) ? p.chosen : []
+        ).filter((m): m is string => typeof m === 'string');
+        const fallback = (Array.isArray(p.fallback) ? p.fallback : []).filter(
+          (f): f is string => typeof f === 'string',
+        );
+        const key = typeof p.key === 'string' ? p.key : undefined;
+        const hasKey = Boolean(key && key !== 'magpie-local');
+        return [
+          {
+            id,
+            name: typeof p.name === 'string' ? p.name : id,
+            api,
+            baseUrl,
+            chat: chat || undefined,
+            responses: responses || undefined,
+            anthropic: anthropic || undefined,
+            models,
+            off: p.off === true,
+            isHostManaged,
+            hasKey,
+            keyMasked: isHostManaged ? 'system-managed' : maskApiKey(key),
+            fallback,
+          },
+        ];
+      });
+      this.cachedActiveProviderCount = list.filter(p => !p.off).length;
+      return list;
+    } catch {
+      return [];
+    }
+  }
+
+  async saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
+    if (!input || typeof input !== 'object') throw new Error('Invalid provider payload');
+    const name = input.name?.trim();
+    if (!name || name.length > 100)
+      throw new Error('Provider name is required (max 100 characters)');
+    const baseUrl = input.baseUrl?.trim();
+    if (!baseUrl) throw new Error('Base URL is required');
+    try {
+      const parsedUrl = new URL(baseUrl);
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error();
+    } catch {
+      throw new Error('Base URL must be a valid http or https URL');
+    }
+    if (input.id && input.id.startsWith(HOST_PROVIDER_PREFIX)) {
+      throw new Error('Host-managed providers cannot be modified via user settings');
+    }
+    await this.ensureRunning();
+    const state = await this.managementJson('/api/providers');
+    const existingList = Array.isArray(state.providers) ? state.providers : [];
+    const existing = input.id
+      ? existingList.find((p: Record<string, unknown>) => p.id === input.id)
+      : undefined;
+
+    const id =
+      input.id?.trim() ||
+      `provider-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    if (id.startsWith(HOST_PROVIDER_PREFIX)) {
+      throw new Error('Invalid provider id');
+    }
+
+    let key = input.key?.trim();
+    if (!key && existing && typeof existing.key === 'string') {
+      key = existing.key;
+    }
+    if (!key) key = 'none';
+
+    const targetField =
+      input.api === 'anthropic-messages'
+        ? 'anthropic'
+        : input.api === 'openai-responses'
+          ? 'responses'
+          : 'chat';
+
+    const models = Array.isArray(input.models)
+      ? input.models.filter(m => typeof m === 'string' && m.trim())
+      : [];
+    const fallback = Array.isArray(input.fallback)
+      ? input.fallback.filter(f => typeof f === 'string')
+      : [];
+
+    const payload = {
+      id,
+      from: id,
+      name,
+      chat: '',
+      responses: '',
+      anthropic: '',
+      [targetField]: baseUrl,
+      key,
+      models,
+      noModels: models.length === 0,
+      fallback,
+      proxy: 'direct',
+      unredacted: true,
+      off: existing ? existing.off === true : false,
+      headers: {},
+      extraBody: {},
+      new: !existing,
+    };
+
+    await this.managementJson('/api/provider/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    return this.providers();
+  }
+
+  async setProviderEnabled(id: string, enabled: boolean): Promise<MagpieProviderSummary[]> {
+    if (typeof id !== 'string' || id.startsWith(HOST_PROVIDER_PREFIX)) {
+      throw new Error('Host-managed providers cannot be toggled via user settings');
+    }
+    await this.ensureRunning();
+    await this.managementJson(enabled ? '/api/provider/on' : '/api/provider/off', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    return this.providers();
+  }
+
+  async deleteProvider(id: string): Promise<MagpieProviderSummary[]> {
+    if (typeof id !== 'string' || id.startsWith(HOST_PROVIDER_PREFIX)) {
+      throw new Error('Host-managed providers cannot be deleted via user settings');
+    }
+    await this.ensureRunning();
+    try {
+      await this.managementJson('/api/provider/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      await this.managementJson('/api/provider/off', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    }
+    return this.providers();
+  }
+
+  async testProvider(input: MagpieSaveProviderInput): Promise<MagpieTestProviderResult> {
+    if (!input.baseUrl) return { ok: false, error: 'Base URL is required' };
+    const start = Date.now();
+    try {
+      let key = input.key?.trim();
+      if (!key && input.id) {
+        const state = await this.managementJson('/api/providers');
+        const existing = (Array.isArray(state.providers) ? state.providers : []).find(
+          (p: Record<string, unknown>) => p.id === input.id,
+        );
+        if (existing && typeof existing.key === 'string') key = existing.key;
+      }
+      const url = input.baseUrl.replace(/\/+$/, '');
+      const testEndpoint =
+        input.api === 'anthropic-messages' ? `${url}/v1/messages` : `${url}/models`;
+      const headers: Record<string, string> = {};
+      if (key && key !== 'none') {
+        if (input.api === 'anthropic-messages') {
+          headers['x-api-key'] = key;
+          headers['anthropic-version'] = '2023-06-01';
+        } else {
+          headers['Authorization'] = `Bearer ${key}`;
+        }
+      }
+      const signal = AbortSignal.timeout(8_000);
+      const res = await (this.options.fetch ?? fetch)(testEndpoint, {
+        method: 'GET',
+        headers,
+        signal,
+      });
+      const latencyMs = Date.now() - start;
+      if (res.ok) {
+        let modelCount: number | undefined;
+        try {
+          const body = (await res.json()) as { data?: unknown[] };
+          if (Array.isArray(body.data)) modelCount = body.data.length;
+        } catch {
+          /* ignore json parse on non-json body */
+        }
+        return { ok: true, latencyMs, modelCount };
+      }
+      return { ok: false, latencyMs, error: `HTTP ${res.status}: ${res.statusText}` };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
+  }
+
+  async diagnostics(): Promise<MagpieDiagnosticSummary> {
+    let latencyMs: number | undefined;
+    if (this.state.state === 'running' && this.state.gatewayUrl) {
+      const start = Date.now();
+      try {
+        await this.request(`${this.state.gatewayUrl}/api/hello`, {
+          signal: AbortSignal.timeout(3_000),
+        });
+        latencyMs = Date.now() - start;
+      } catch {
+        /* ignore ping error */
+      }
+    }
+    let activeProviderCount = 0;
+    try {
+      const all = await this.providers();
+      activeProviderCount = all.filter(p => !p.off).length;
+    } catch {
+      /* ignore */
+    }
+    return {
+      latencyMs,
+      activeProviderCount,
+      recentErrors: this.recentErrors,
+    };
   }
 
   /** Called only by the host's explicitly confirmed subscription-account switch. */

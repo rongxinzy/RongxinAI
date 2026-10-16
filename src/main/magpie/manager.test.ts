@@ -128,6 +128,33 @@ describe('Magpie owned lifecycle', () => {
         });
       if (url.endsWith('/v1/models'))
         return Response.json({ data: [{ id: 'm1', owned_by: 'test', key: 'secret' }] });
+      if (url.endsWith('/api/providers'))
+        return Response.json({
+          providers: [
+            {
+              id: 'zhiyuan-host-enterprise',
+              name: 'Enterprise Host',
+              chat: 'http://127.0.0.1:8000',
+              key: 'magpie-local',
+              models: ['ent-1'],
+              off: false,
+            },
+            {
+              id: 'custom-openai',
+              name: 'My OpenAI',
+              chat: 'https://api.openai.com/v1',
+              key: 'sk-secret123456789',
+              models: ['gpt-4o'],
+              off: false,
+            },
+          ],
+        });
+      if (
+        url.endsWith('/api/provider/save') ||
+        url.endsWith('/api/provider/on') ||
+        url.endsWith('/api/provider/off')
+      )
+        return Response.json({ ok: true });
       return Response.json({});
     });
     const manager = new MagpieManager({
@@ -252,5 +279,104 @@ describe('Magpie owned lifecycle', () => {
     expect(results.every(result => result.status === 'rejected')).toBe(true);
     expect(verify).toHaveBeenCalledTimes(1);
     expect(manager.status()).toMatchObject({ state: 'failed', enabled: true });
+  });
+
+  it('lists providers with key masking and host managed flag (A2)', async () => {
+    const { manager, root } = await setup();
+    try {
+      await manager.start();
+      const list = await manager.providers();
+      expect(list).toHaveLength(2);
+
+      const host = list.find(p => p.id === 'zhiyuan-host-enterprise');
+      expect(host).toMatchObject({
+        isHostManaged: true,
+        keyMasked: 'system-managed',
+        hasKey: false,
+      });
+
+      const custom = list.find(p => p.id === 'custom-openai');
+      expect(custom).toMatchObject({
+        isHostManaged: false,
+        name: 'My OpenAI',
+        api: 'openai-completions',
+        baseUrl: 'https://api.openai.com/v1',
+        hasKey: true,
+        keyMasked: 'sk-...6789',
+      });
+      // Ensure the raw secret key is never projected
+      expect((custom as Record<string, unknown>).key).toBeUndefined();
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('strictly protects host-managed providers against save, toggle, or delete (A1)', async () => {
+    const { manager, root } = await setup();
+    try {
+      await manager.start();
+      await expect(
+        manager.saveProvider({
+          id: 'zhiyuan-host-fake',
+          name: 'Hacked',
+          api: 'openai-completions',
+          baseUrl: 'https://evil.test',
+          models: ['m1'],
+        }),
+      ).rejects.toThrow('Host-managed');
+
+      await expect(manager.setProviderEnabled('zhiyuan-host-enterprise', true)).rejects.toThrow(
+        'Host-managed',
+      );
+      await expect(manager.deleteProvider('zhiyuan-host-enterprise')).rejects.toThrow(
+        'Host-managed',
+      );
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('saves provider, retains existing key when omitted (A2), and updates state', async () => {
+    const { manager, root, fetcher } = await setup();
+    try {
+      await manager.start();
+      // Omit key when updating existing provider 'custom-openai'
+      await manager.saveProvider({
+        id: 'custom-openai',
+        name: 'My OpenAI Renamed',
+        api: 'openai-completions',
+        baseUrl: 'https://api.openai.com/v1',
+        models: ['gpt-4o', 'gpt-4o-mini'],
+      });
+
+      const saveCall = fetcher.mock.calls.find(([url]) => url.endsWith('/api/provider/save'));
+      expect(saveCall).toBeDefined();
+      const body = JSON.parse(saveCall![1]?.body as string);
+      expect(body.id).toBe('custom-openai');
+      expect(body.name).toBe('My OpenAI Renamed');
+      // Key retained from existing provider in upstream state
+      expect(body.key).toBe('sk-secret123456789');
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('runs diagnostics and measures gateway latency', async () => {
+    const { manager, root } = await setup();
+    try {
+      await manager.start();
+      manager.recordError('Rate limit exceeded', 'custom-openai');
+      const diag = await manager.diagnostics();
+      expect(diag.activeProviderCount).toBe(2);
+      expect(diag.recentErrors).toHaveLength(1);
+      expect(diag.recentErrors![0].message).toBe('Rate limit exceeded');
+      expect(diag.latencyMs).toBeGreaterThanOrEqual(0);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });

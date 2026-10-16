@@ -1,15 +1,22 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { useEffect, useRef, useState } from 'react';
-import type { MagpieModelCatalog } from '../../../../shared/magpie/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  MagpieDiagnosticSummary,
+  MagpieModelCatalog,
+  MagpieProviderSummary,
+  MagpieSaveProviderInput,
+} from '../../../../shared/magpie/types';
 import {
   applyMagpieCatalog,
   refreshMagpieModels,
   selectMagpieDefaultModel,
 } from '../../../services/availableModels';
 import { i18nService } from '../../../services/i18n';
+import { showAppError } from '../../../services/appToast';
 import { MagpieSubscriptionControl } from './MagpieSubscriptionControl';
 import { ModelCatalogBrowser } from './ModelCatalogBrowser';
+import { ProviderManagerSection } from './ProviderManagerSection';
 
 export default function ModelSettingsPanel() {
   const [catalog, setCatalog] = useState<MagpieModelCatalog | null>(null);
@@ -17,9 +24,30 @@ export default function ModelSettingsPanel() {
   const [busy, setBusy] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(false);
+  const [providers, setProviders] = useState<MagpieProviderSummary[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<MagpieDiagnosticSummary | null>(null);
   const mounted = useRef(false);
   const locked = useRef(false);
   const actionVersion = useRef(0);
+
+  const loadProviders = useCallback(async () => {
+    if (!window.electron.magpie?.providers) return;
+    setProvidersLoading(true);
+    try {
+      const list = await window.electron.magpie.providers();
+      if (mounted.current) setProviders(list);
+      if (window.electron.magpie.diagnostics) {
+        const diag = await window.electron.magpie.diagnostics();
+        if (mounted.current) setDiagnostics(diag);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      if (mounted.current) setProvidersLoading(false);
+    }
+  }, []);
+
   const apply = (next: MagpieModelCatalog, confirmed = false) => {
     if (!mounted.current) return;
     setCatalog(next);
@@ -46,7 +74,10 @@ export default function ModelSettingsPanel() {
   };
   useEffect(() => {
     mounted.current = true;
-    void run(async () => apply(await refreshMagpieModels()));
+    void run(async () => {
+      apply(await refreshMagpieModels());
+      await loadProviders();
+    });
     const timer = window.setInterval(() => {
       if (locked.current) return;
       const version = actionVersion.current;
@@ -72,7 +103,47 @@ export default function ModelSettingsPanel() {
       mounted.current = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [loadProviders]);
+  const handleSaveProvider = async (input: MagpieSaveProviderInput) => {
+    try {
+      const updated = await window.electron.magpie.saveProvider(input);
+      setProviders(updated);
+      apply(await refreshMagpieModels());
+      return true;
+    } catch (err: unknown) {
+      showAppError(err instanceof Error ? err.message : 'Save provider failed');
+      return false;
+    }
+  };
+
+  const handleToggleProvider = async (id: string, enabled: boolean) => {
+    try {
+      const updated = await window.electron.magpie.setProviderEnabled(id, enabled);
+      setProviders(updated);
+      apply(await refreshMagpieModels());
+      return true;
+    } catch (err: unknown) {
+      showAppError(err instanceof Error ? err.message : 'Toggle provider failed');
+      return false;
+    }
+  };
+
+  const handleDeleteProvider = async (id: string) => {
+    try {
+      const updated = await window.electron.magpie.deleteProvider(id);
+      setProviders(updated);
+      apply(await refreshMagpieModels());
+      return true;
+    } catch (err: unknown) {
+      showAppError(err instanceof Error ? err.message : 'Delete provider failed');
+      return false;
+    }
+  };
+
+  const handleTestProvider = async (input: MagpieSaveProviderInput) => {
+    return window.electron.magpie.testProvider(input);
+  };
+
   const running = catalog?.status.state === 'running';
   const models = running ? catalog.models : [];
   const selected = models.find(model => model.id === selection);
@@ -111,6 +182,7 @@ export default function ModelSettingsPanel() {
                   apply(next);
                   if (status.state !== 'running') throw new Error('Not running');
                   apply(await refreshMagpieModels());
+                  await loadProviders();
                 } finally {
                   if (mounted.current) setStarting(false);
                 }
@@ -124,7 +196,12 @@ export default function ModelSettingsPanel() {
           type="button"
           variant="outline"
           disabled={busy}
-          onClick={() => void run(async () => apply(await refreshMagpieModels()))}
+          onClick={() =>
+            void run(async () => {
+              apply(await refreshMagpieModels());
+              await loadProviders();
+            })
+          }
         >
           {i18nService.t('magpieCatalogRefresh')}
         </Button>
@@ -137,6 +214,45 @@ export default function ModelSettingsPanel() {
           {i18nService.t('magpieOpenManagement')}
         </Button>
       </div>
+
+      {running && diagnostics && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/20 px-3.5 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {i18nService.t('magpieDiagnosticsTitle')}:
+          </span>
+          <Badge variant="outline" className="text-[11px] font-normal">
+            {i18nService.t('magpieDiagnosticsActive')}: {diagnostics.activeProviderCount}
+          </Badge>
+          {diagnostics.latencyMs !== undefined && (
+            <span>
+              {i18nService.t('magpieDiagnosticsLatency')}: {diagnostics.latencyMs}ms
+            </span>
+          )}
+          {diagnostics.recentErrors && diagnostics.recentErrors.length > 0 && (
+            <Badge
+              variant="destructive"
+              className="max-w-xs truncate text-[11px] font-normal"
+              title={diagnostics.recentErrors[0].message}
+            >
+              {diagnostics.recentErrors[0].message}
+            </Badge>
+          )}
+        </div>
+      )}
+
+      {running && (
+        <ProviderManagerSection
+          providers={providers}
+          loading={providersLoading}
+          disabled={busy}
+          onRefresh={loadProviders}
+          onSaveProvider={handleSaveProvider}
+          onToggleProvider={handleToggleProvider}
+          onDeleteProvider={handleDeleteProvider}
+          onTestProvider={handleTestProvider}
+        />
+      )}
+
       {running && (
         <>
           <div className="space-y-2">

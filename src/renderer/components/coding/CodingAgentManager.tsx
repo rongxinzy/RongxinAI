@@ -23,13 +23,14 @@ import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { Textarea } from '@shared/components/ui/textarea';
 import { Bot, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 import {
   CodingAgentProfileStatus,
   type AddCodingAgentProfileInput,
   type CodingAgentProfile,
 } from '../../../shared/codingAgent';
+import type { MagpieAgents, MagpieModelSelection } from '../../../shared/magpie/types';
 import { i18nService } from '../../services/i18n';
 import { showAppError } from '../../services/appToast';
 import {
@@ -70,6 +71,7 @@ export const CodingAgentManager = ({
   const submissionInFlight = useRef(false);
   const [discovering, setDiscovering] = useState(false);
   const discoveryInFlight = useRef(false);
+  const [magpieAgents, setMagpieAgents] = useState<MagpieAgents | null>(null);
   const checking = profiles.some(isConnectionCheckRunning);
   const readyCount = profiles.filter(
     profile => profile.status === CodingAgentProfileStatus.Ready,
@@ -78,6 +80,46 @@ export const CodingAgentManager = ({
     .t('codingAgentManagerSummary')
     .replace('{count}', String(profiles.length))
     .replace('{ready}', String(readyCount));
+
+  useEffect(() => {
+    if (open && window.electron?.magpie?.agents) {
+      void window.electron.magpie
+        .agents()
+        .then(res => {
+          setMagpieAgents(res);
+        })
+        .catch(() => {
+          /* ignore */
+        });
+    }
+  }, [open]);
+
+  const handleApplyMagpieModel = async (selection: MagpieModelSelection) => {
+    if (!window.electron?.magpie?.setModel) return false;
+    try {
+      const updated = await window.electron.magpie.setModel(selection);
+      setMagpieAgents(updated);
+      return true;
+    } catch (err: unknown) {
+      showAppError(err instanceof Error ? err.message : 'Apply model failed');
+      return false;
+    }
+  };
+
+  const findMagpieAgent = (profile: CodingAgentProfile) => {
+    if (!magpieAgents?.agents) return null;
+    const id = profile.id.toLowerCase();
+    const name = profile.name.toLowerCase();
+    return (
+      magpieAgents.agents.find(
+        a =>
+          a.id.toLowerCase() === id ||
+          a.name.toLowerCase() === name ||
+          (id.includes('codex') && a.id === 'codex') ||
+          (id.includes('claude') && a.id === 'claude'),
+      ) ?? null
+    );
+  };
 
   const discover = async () => {
     if (discoveryInFlight.current || checking) return;
@@ -210,6 +252,8 @@ export const CodingAgentManager = ({
                         disabled={discovering}
                         onProbe={onProbe}
                         onTrust={onTrust}
+                        magpieAgent={findMagpieAgent(profile)}
+                        onApplyMagpieModel={handleApplyMagpieModel}
                       />
                     ))}
                   </div>
