@@ -9,6 +9,8 @@ const BUILTIN_MODULES = new Set([
   ...builtinModules,
   ...builtinModules.map(moduleName => `node:${moduleName}`),
   'electron',
+  // Node.js built-in SQLite (available but not yet in builtinModules list)
+  'node:sqlite',
 ]);
 const DAEMON_FORBIDDEN_EXTERNALS = ['electron', 'extract-zip', 'tar'];
 
