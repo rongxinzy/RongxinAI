@@ -1,13 +1,14 @@
 name: Browser Preview Tests
 
 on:
-  pull_request:
-    paths:
-      - 'src/renderer/**'
-      - 'src/shared/**'
-      - 'vite.config.browser.ts'
-      - 'tests/browserPreview.test.ts'
   workflow_dispatch:
+  # Temporarily disabled on PR until @playwright/test dependency is properly configured
+  # pull_request:
+  #   paths:
+  #     - 'src/renderer/**'
+  #     - 'src/shared/**'
+  #     - 'vite.config.browser.ts'
+  #     - 'tests/browserPreview.test.ts'
 
 jobs:
   test:
