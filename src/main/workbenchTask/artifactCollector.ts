@@ -181,7 +181,11 @@ export function collectWorkbenchArtifacts(input: {
     }
     if (!resolved) {
       if (isDeclaredDeliverable) {
-        throw new Error(`The declared deliverable is missing: ${reference}`);
+        throw new Error(
+          fs.existsSync(reference)
+            ? `The declared deliverable is not a readable file: ${reference}`
+            : `The declared deliverable is missing: ${reference}`,
+        );
       }
       continue;
     }

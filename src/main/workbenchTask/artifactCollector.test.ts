@@ -192,3 +192,28 @@ test('skips non-deliverable declarations outside the workspace', () => {
     fs.rmSync(outsideDir, { recursive: true, force: true });
   }
 });
+
+test('reports a directory declaration as not a readable file instead of missing', () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-ws-'));
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-dir-'));
+  try {
+    expect(() =>
+      collectWorkbenchArtifacts({
+        taskId: 'task',
+        runId: 'run',
+        workspaceRoot: workspace,
+        finalAnswer: '',
+        artifactCandidates: [
+          {
+            path: outsideDir,
+            role: 'deliverable',
+            source: WorkbenchArtifactCandidateSource.Declaration,
+          },
+        ],
+      }),
+    ).toThrow('The declared deliverable is not a readable file');
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
