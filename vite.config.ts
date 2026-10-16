@@ -95,6 +95,7 @@ export default defineConfig(async ({ command }) => {
   }
 
   return {
+    cacheDir: process.env.VITE_CACHE_DIR || 'node_modules/.vite',
     define: {
       // KaTeX ESM bundle references this compile-time constant.
       __VERSION__: JSON.stringify(katexVersion),

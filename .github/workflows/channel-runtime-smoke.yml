@@ -3,12 +3,32 @@ name: Channel runtime smoke
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'package.json'
+      - 'scripts/channel-runtime-*'
+      - 'scripts/download-channel-runtime.cjs'
+      - 'src/main/im/**'
+      - 'src/main/libs/ccConnect*'
+      - 'src/scheduledTask/ccConnect*'
+      - '.github/workflows/channel-runtime-smoke.yml'
   push:
     branches: [main]
+    paths:
+      - 'package.json'
+      - 'scripts/channel-runtime-*'
+      - 'scripts/download-channel-runtime.cjs'
+      - 'src/main/im/**'
+      - 'src/main/libs/ccConnect*'
+      - 'src/scheduledTask/ccConnect*'
+      - '.github/workflows/channel-runtime-smoke.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: channel-runtime-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,7 +42,21 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
+      - name: Restore channel runtime download
+        id: channel-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: vendor/channel-runtime
+          key: channel-runtime-${{ runner.os }}-${{ hashFiles('package.json', 'scripts/download-channel-runtime.cjs') }}
+          restore-keys: |
+            channel-runtime-${{ runner.os }}-
       - name: Download the pinned channel runtime
         run: npm run channel:runtime:linux-x64
       - name: Verify channel transport and QQ Bot support
         run: npm run channel:runtime:smoke
+      - name: Save channel runtime download
+        if: steps.channel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: vendor/channel-runtime
+          key: ${{ steps.channel-cache.outputs.cache-primary-key }}

@@ -1,4 +1,7 @@
 name: Installer visual review only
+concurrency:
+  group: installer-preview-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 on:
   push:
     branches: [main, style/installer-website-alignment]
@@ -24,6 +27,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Restore Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.58.0-${{ runner.os }}
       - run: pip install playwright==1.58.0
       - run: python -m playwright install --with-deps chromium
       - run: python scripts/ci/installer-style-preview.py

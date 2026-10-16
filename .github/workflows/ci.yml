@@ -30,10 +30,12 @@ jobs:
       linux-install: ${{ steps.plan.outputs.linux-install }}
       windows-install: ${{ steps.plan.outputs.windows-install }}
       memory-leak: ${{ steps.plan.outputs.memory-leak }}
+      enterprise: ${{ steps.plan.outputs.enterprise }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
@@ -61,21 +63,10 @@ jobs:
         # ShellCheck policy is separate; this gate validates every workflow's
         # YAML, expressions, reusable-workflow inputs and dependency graph.
         run: '"$RUNNER_TEMP/actionlint/actionlint" -shellcheck='
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version: '24.x'
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun package cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+          save-cache: 'true'
+
       - name: Validate bundled Skill frontmatter
         run: bun run validate:skills
       - name: Enforce retired runtime decoupling
@@ -88,35 +79,48 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version: '24.x'
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun and Electron caches
-        uses: actions/cache@v5
+          cache-prefix: test
+          include-electron: 'true'
+          save-cache: ${{ matrix.shard == 1 && 'true' || 'false' }}
+      - name: Restore Electron TypeScript cache
+        id: electron-tsc
+        uses: actions/cache/restore@v5
         with:
           path: |
-            ~/.bun/install/cache
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: test-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+            .cache/tsc/electron.tsbuildinfo
+            dist-electron
+          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json') }}-${{ github.sha }}
           restore-keys: |
-            test-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json') }}-
+            tsc-electron-${{ runner.os }}-
       - name: Compile Electron sources used by integration tests
-        run: bun run compile:electron
+        run: |
+          mkdir -p .cache/tsc
+          bun run compile:electron -- --incremental --tsBuildInfoFile .cache/tsc/electron.tsbuildinfo
+      - name: Save Electron TypeScript cache
+        if: matrix.shard == 1 && steps.electron-tsc.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            .cache/tsc/electron.tsbuildinfo
+            dist-electron
+          key: ${{ steps.electron-tsc.outputs.cache-primary-key }}
       - name: Install Electron for native ABI integration tests
         # Dependency lifecycle scripts are disabled above; the ABI probe needs
         # the actual target runtime, rather than a host Node approximation.
         run: node node_modules/electron/install.js
       - name: Run tests
-        run: bun run test
+        run: bun run test -- --shard=${{ matrix.shard }}/4
       - name: Verify Presentation Studio compiler and validator
+        if: matrix.shard == 1
         run: |
           npm ci --prefix SKILLs/presentation-studio --ignore-scripts
           npm test --prefix SKILLs/presentation-studio
@@ -126,89 +130,64 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Restore renderer TypeScript and Vite caches
+        id: renderer-cache
+        uses: actions/cache/restore@v5
         with:
-          node-version: '24.x'
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun package cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          path: |
+            .cache/tsc/renderer.tsbuildinfo
+            .cache/vite
+          key: renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}-${{ github.sha }}
           restore-keys: |
-            bun-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+            renderer-build-${{ runner.os }}-${{ hashFiles('tsconfig.json', 'tsconfig.node.json', 'vite.config.ts', 'bun.lock') }}-
+            renderer-build-${{ runner.os }}-
       - name: Typecheck renderer sources
-        run: bun run build:tsc
+        run: |
+          mkdir -p .cache/tsc
+          bun run build:tsc -- --incremental --tsBuildInfoFile .cache/tsc/renderer.tsbuildinfo
       - name: Build renderer bundle
         run: bun run build:vite
         env:
           VITE_SKIP_ELECTRON: '1'
+          VITE_CACHE_DIR: .cache/vite
       - name: Enforce renderer bundle budgets
         run: bun run test:bundle-budget
+      - name: Save renderer TypeScript and Vite caches
+        if: steps.renderer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            .cache/tsc/renderer.tsbuildinfo
+            .cache/vite
+          key: ${{ steps.renderer-cache.outputs.cache-primary-key }}
 
   enterprise:
+    needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Skip enterprise toolchain
+        if: needs.changes.outputs.enterprise != 'true'
+        run: echo "No enterprise changes; baseline job stays green without an install."
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Check if enterprise checks are required
-        id: gate
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ -n "$PR_BASE_SHA" ] && [ -n "$PR_HEAD_SHA" ]; then
-            CHANGED=$(git diff --name-only --no-renames "$PR_BASE_SHA...$PR_HEAD_SHA" 2>/dev/null || true)
-            if echo "$CHANGED" | grep -qE '^(enterprise/|src/main/enterpriseExtension|package\.json|bun\.lock|electron-builder)'; then
-              echo "required=true" >> "$GITHUB_OUTPUT"
-              echo "Enterprise extension changes detected; executing enterprise checks."
-            else
-              echo "required=false" >> "$GITHUB_OUTPUT"
-              echo "No enterprise changes in PR diff; skipping heavy enterprise build."
-            fi
-          else
-            echo "required=true" >> "$GITHUB_OUTPUT"
-          fi
-      - uses: actions/setup-node@v6
-        if: steps.gate.outputs.required == 'true'
-        with:
-          node-version: '24.x'
-      - uses: oven-sh/setup-bun@v2
-        if: steps.gate.outputs.required == 'true'
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun package cache
-        if: steps.gate.outputs.required == 'true'
-        uses: actions/cache@v5
-        with:
-          path: ~/.bun/install/cache
-          key: enterprise-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            enterprise-${{ runner.os }}-1.4.0-
-      - if: steps.gate.outputs.required == 'true'
-        run: bun install --frozen-lockfile --ignore-scripts
-      - if: steps.gate.outputs.required == 'true'
-        run: bun run apply:patches
+        if: needs.changes.outputs.enterprise == 'true'
+      - uses: ./.github/actions/setup-bun-workspace
+        if: needs.changes.outputs.enterprise == 'true'
       - name: Typecheck enterprise extension
-        if: steps.gate.outputs.required == 'true'
+        if: needs.changes.outputs.enterprise == 'true'
         run: bun run typecheck:enterprise
       - name: Run enterprise extension tests
-        if: steps.gate.outputs.required == 'true'
+        if: needs.changes.outputs.enterprise == 'true'
         run: bun run test:enterprise
       - name: Build enterprise extension bundle and renderer
-        if: steps.gate.outputs.required == 'true'
+        if: needs.changes.outputs.enterprise == 'true'
         run: bun run build:enterprise
       - name: Verify enterprise extension bundle
-        if: steps.gate.outputs.required == 'true'
+        if: needs.changes.outputs.enterprise == 'true'
         run: bun run verify:enterprise:bundle
       - name: Verify enterprise packaging config
-        if: steps.gate.outputs.required == 'true'
+        if: needs.changes.outputs.enterprise == 'true'
         run: bun run verify:enterprise:packaging-config
 
   memory-leak:
@@ -236,6 +215,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout: scripts/ci/gates
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
