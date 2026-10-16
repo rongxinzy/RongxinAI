@@ -1299,7 +1299,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         customTools.push(
           ...buildPiPythonTools({
             service: getPythonRuntimeService(),
-            workspaceRoot,
+            workspace: workspaceRoot,
           }),
         );
         customTools.push(
