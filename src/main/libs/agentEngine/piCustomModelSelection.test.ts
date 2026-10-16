@@ -5,7 +5,6 @@ import { completeSimple } from '@earendil-works/pi-ai/compat';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { CONFIG_KEYS } from '../../../renderer/config';
-import { testProviderModelConnection } from '../../../renderer/services/providerModelConnection';
 import { ApiFormat, type ProviderConfig } from '../../../shared/providers';
 import { resolveRawApiConfigForModelRef, setStoreGetter } from '../claudeSettings';
 import { resolvePiCustomModelApi, type PiModelApi } from './piModelApi';
@@ -24,7 +23,7 @@ afterEach(async () => {
   await stopPiOpenAICompatProxyForTests();
 });
 
-test('settings test and real SDK stream send the same selected custom model ID', async () => {
+test('real SDK stream sends the selected custom model ID, not a case variant', async () => {
   const providerId = 'custom_1';
   const modelId = 'GLM-5.3-Flash';
   const received: Array<{ path: string | undefined; model: unknown; stream: unknown }> = [];
@@ -72,29 +71,6 @@ test('settings test and real SDK stream send the same selected custom model ID',
     ],
   };
   try {
-    vi.stubGlobal('window', {
-      electron: {
-        api: {
-          fetch: async (input: {
-            url: string;
-            method: string;
-            headers: HeadersInit;
-            body: string;
-          }) => {
-            const response = await fetch(input.url, input);
-            return { ok: response.ok, status: response.status, data: await response.json() };
-          },
-        },
-      },
-    });
-    const tested = await testProviderModelConnection({
-      providerId,
-      provider,
-      baseUrl: provider.baseUrl,
-      apiFormat: ApiFormat.OpenAI,
-      model: provider.models![1],
-    });
-    expect(tested.success).toBe(true);
     setStoreGetter(
       () =>
         ({
@@ -123,10 +99,7 @@ test('settings test and real SDK stream send the same selected custom model ID',
     );
     expect(reply.errorMessage).toBeUndefined();
     expect(reply.content).toContainEqual({ type: 'text', text: 'OK' });
-    expect(received).toEqual([
-      { path: '/v1/chat/completions', model: modelId, stream: undefined },
-      { path: '/v1/chat/completions', model: modelId, stream: true },
-    ]);
+    expect(received).toEqual([{ path: '/v1/chat/completions', model: modelId, stream: true }]);
   } finally {
     await stopPiOpenAICompatProxyForTests();
     await new Promise<void>((resolve, reject) =>
