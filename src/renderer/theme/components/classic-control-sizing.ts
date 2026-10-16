@@ -32,7 +32,7 @@ export function classicControlSizing() {
     }),
     // src/renderer/components/Settings.tsx:3428, src/renderer/components/Settings.tsx:3863, src/renderer/components/Settings.tsx:3945
     'control-sizing-3': recipe({ base: { 'padding-right': '5rem' } }),
-    // src/renderer/components/coding/CodingAgentManager.tsx:121, src/renderer/components/coding/CodingAgentPicker.tsx:82, src/renderer/components/coding/CodingWorkbenchView.tsx:888, src/renderer/components/coding/CodingWorkbenchView.tsx:933, src/renderer/components/expert/ExpertDetailDialog.tsx:55, src/renderer/components/im/DingTalkInstanceSettings.tsx:232, src/renderer/components/im/DiscordInstanceSettings.tsx:127, src/renderer/components/im/FeishuInstanceSettings.tsx:137, src/renderer/components/im/QQInstanceSettings.tsx:107, src/renderer/components/im/TelegramInstanceSettings.tsx:110, src/renderer/components/im/WecomInstanceSettings.tsx:117, src/renderer/components/mcp/McpOfficialConnectDialog.tsx:74, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:210, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:237, src/renderer/components/scheduledTasks/TaskList.tsx:48, src/renderer/components/settings/memory/MemoryRecordList.tsx:352, src/renderer/components/skills/MarketplaceSkillDocumentDialog.tsx:128, src/shared/components/ai-elements/context.tsx:153, src/shared/components/ai-elements/model-selector.tsx:38
+    // src/renderer/components/coding/CodingAgentManager.tsx:121, src/renderer/components/coding/CodingAgentPicker.tsx:82, src/renderer/components/coding/codingWorkbenchSidePanel.tsx:234, src/renderer/components/expert/ExpertDetailDialog.tsx:55, src/renderer/components/im/DingTalkInstanceSettings.tsx:232, src/renderer/components/im/DiscordInstanceSettings.tsx:127, src/renderer/components/im/FeishuInstanceSettings.tsx:137, src/renderer/components/im/QQInstanceSettings.tsx:107, src/renderer/components/im/TelegramInstanceSettings.tsx:110, src/renderer/components/im/WecomInstanceSettings.tsx:117, src/renderer/components/mcp/McpOfficialConnectDialog.tsx:74, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:210, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:237, src/renderer/components/scheduledTasks/TaskList.tsx:48, src/renderer/components/settings/memory/MemoryRecordList.tsx:352, src/renderer/components/skills/MarketplaceSkillDocumentDialog.tsx:128, src/shared/components/ai-elements/context.tsx:153, src/shared/components/ai-elements/model-selector.tsx:38
     'control-sizing-4': recipe({ base: { padding: '0rem' } }),
     // src/renderer/components/coding/CodingAgentManager.tsx:271, src/renderer/components/scheduledTasks/TaskFormBody.tsx:244
     'control-sizing-5': recipe({ base: { 'min-height': '5rem' } }),
@@ -40,7 +40,7 @@ export function classicControlSizing() {
     'control-sizing-6': recipe({ base: { 'padding-inline': '0rem' } }),
     // src/renderer/components/coding/CodingGitPanel.tsx:534, src/renderer/components/coding/CodingTaskList.tsx:29
     'control-sizing-7': recipe({ base: { 'padding-inline': '0.5rem', 'padding-block': '0.5rem' } }),
-    // src/renderer/components/coding/CodingWorkbenchView.tsx:1032
+    // src/renderer/components/coding/CodingWorkbenchView.tsx:596
     'control-sizing-8': recipe({ base: { height: '1.5rem', 'padding-inline': '0.5rem' } }),
     // src/renderer/components/coding/CodingWorkspaceDialog.tsx:171, src/renderer/components/cowork/TodoQueue.tsx:103
     'control-sizing-9': recipe({ base: { 'padding-inline': '0.75rem' } }),
