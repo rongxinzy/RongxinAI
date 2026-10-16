@@ -24,6 +24,8 @@ try {
     const settle = () => page.waitForTimeout(1500);
 
     await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    // Wait for fixture-backed content, not just the skeleton.
+    await page.getByText('Calculator', { exact: true }).first().waitFor({ timeout: 60_000 });
     await settle();
     await shot('workbench');
 
