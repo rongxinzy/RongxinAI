@@ -22,7 +22,13 @@ interface PiOpenAICompatUpstreamRegistrationOptions {
 
 function incomingApiKeyMatches(request: IncomingMessage, expected: string): boolean {
   const authorization = request.headers.authorization;
-  const actual = typeof authorization === 'string' ? authorization : '';
+  const apiKey = request.headers['x-api-key'];
+  const actual =
+    typeof authorization === 'string'
+      ? authorization
+      : typeof apiKey === 'string'
+        ? `Bearer ${apiKey}`
+        : '';
   const expectedAuthorization = `Bearer ${expected}`;
   const actualBytes = Buffer.from(actual, 'utf8');
   const expectedBytes = Buffer.from(expectedAuthorization, 'utf8');
@@ -82,6 +88,11 @@ function createFetchHeaders(request: IncomingMessage, upstream: PiOpenAICompatUp
     headers.set('accept', accept);
   }
 
+  for (const name of ['anthropic-version', 'anthropic-beta']) {
+    const value = request.headers[name];
+    if (typeof value === 'string') headers.set(name, value);
+  }
+
   for (const name of Object.values(ZhiyuanModelPoolHeader)) {
     const value = request.headers[name];
     if (typeof value === 'string') headers.set(name, value);
@@ -90,6 +101,7 @@ function createFetchHeaders(request: IncomingMessage, upstream: PiOpenAICompatUp
   const apiKey = upstream.apiKey?.trim();
   if (apiKey) {
     headers.set('authorization', `Bearer ${apiKey}`);
+    if (typeof request.headers['x-api-key'] === 'string') headers.set('x-api-key', apiKey);
   } else if (upstream.forwardIncomingAuthorization !== false) {
     const authorization = request.headers.authorization;
     if (typeof authorization === 'string') {
@@ -528,12 +540,15 @@ async function handleProxyRequest(
     ? buildOpenAIChatCompletionsURL(upstream.baseURL)
     : buildAnthropicMessagesUrl(upstream.baseURL);
   const rejectedApiKey = upstream.apiKey;
-  const fetchUpstream = (): Promise<Response> =>
-    fetch(upstreamURL, {
+  const fetchUpstream = (): Promise<Response> => {
+    const active = upstreams.get(providerId);
+    if (!active) return Promise.reject(new Error('Managed provider authorization was revoked.'));
+    return fetch(upstreamURL, {
       method: 'POST',
-      headers: createFetchHeaders(request, upstream),
+      headers: createFetchHeaders(request, active),
       body: body.toString('utf8'),
     });
+  };
   let upstreamResponse = await fetchUpstream();
 
   if (
@@ -639,6 +654,10 @@ export async function registerPiOpenAICompatUpstream(
     providerId,
   )}`;
   return options?.bareBaseUrl ? loopbackBaseUrl : `${loopbackBaseUrl}/v1`;
+}
+
+export function unregisterPiOpenAICompatUpstream(providerId: string): void {
+  upstreams.delete(providerId);
 }
 
 export function registerPiOpenAICompatTokenRefresher(

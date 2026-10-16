@@ -1,5 +1,7 @@
 import { configService } from './config';
 import { caseDetailTranslations } from './caseDetailTranslations';
+import { magpieTranslations } from './magpieTranslations';
+import { modelBrowseTranslations } from './modelBrowseTranslations';
 
 // 支持的语言类型
 export type LanguageType = 'zh' | 'en';
@@ -8,6 +10,8 @@ export type LanguageType = 'zh' | 'en';
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
     ...caseDetailTranslations.zh,
+    ...magpieTranslations.zh,
+    ...modelBrowseTranslations.zh,
     aisphereTab: '平台模型',
     aisphereAddress: 'AISphere地址',
     aisphereAddressPlaceholder: 'https://平台地址 或 http://平台地址',
@@ -3684,6 +3688,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
   },
   en: {
     ...caseDetailTranslations.en,
+    ...magpieTranslations.en,
+    ...modelBrowseTranslations.en,
     aisphereTab: 'Platform Models',
     aisphereAddress: 'AISphere address',
     aisphereAddressPlaceholder: 'https://platform-address or http://platform-address',

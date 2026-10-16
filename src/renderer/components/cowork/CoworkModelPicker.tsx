@@ -7,7 +7,7 @@ import {
   CommandList,
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
-import { Bot, Check } from 'lucide-react';
+import { Bot, Check, Cpu } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ProviderIcon } from '../../providers/uiRegistry';
@@ -17,9 +17,9 @@ import {
   isSameModelIdentity,
   type Model,
 } from '../../store/slices/modelSlice';
-import { getProviderDisplayName } from '../../config';
 import { SelectorOptionContent } from './SelectorOptionContent';
 import { PromptSelectorButton } from './PromptSelectorButton';
+import { getPreferredReadyLocalModel } from './preferredLocalModel';
 
 type CoworkModelPickerProps = {
   models: Model[];
@@ -42,7 +42,8 @@ export function CoworkModelPicker({
   onSelect,
   compact = false,
 }: CoworkModelPickerProps) {
-  const displayedSelectedModel = models.length > 0 ? selectedModel : null;
+  const displayedSelectedModel = models.find(model => model.id === selectedModel?.id) ?? null;
+  const readyLocalModel = getPreferredReadyLocalModel(models, selectedModel);
   const [searchQuery, setSearchQuery] = useState('');
   const matchingModels = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
@@ -101,6 +102,26 @@ export function CoworkModelPicker({
             onValueChange={setSearchQuery}
           />
           <CommandList>
+            {!searchQuery.trim() && (
+              <CommandGroup heading={i18nService.t('coworkLocalModelsHeading')}>
+                <CommandItem
+                  value="use-ready-local-model"
+                  variant="selector"
+                  disabled={!readyLocalModel}
+                  onSelect={() => {
+                    if (!readyLocalModel) return;
+                    onSelect(readyLocalModel);
+                    handleOpenChange(false);
+                  }}
+                >
+                  <SelectorOptionContent
+                    icon={<Cpu className="size-4" />}
+                    title={i18nService.t('coworkUseLocalModel')}
+                    description={readyLocalModel?.name ?? i18nService.t('coworkLocalModelNotReady')}
+                  />
+                </CommandItem>
+              </CommandGroup>
+            )}
             {models.length === 0 ? (
               <CommandGroup heading={i18nService.t('availableModels')}>
                 <CommandItem disabled value={i18nService.t('modelSelectorNone')}>
@@ -118,7 +139,7 @@ export function CoworkModelPicker({
                     variant="selector"
                     aria-label={model.name}
                     aria-description={[
-                      model.provider || getProviderDisplayName(model.providerKey || 'openai'),
+                      model.provider || model.providerKey || '',
                       displayedSelectedModel && isSameModelIdentity(model, displayedSelectedModel)
                         ? i18nService.t('currentModel')
                         : '',
@@ -137,9 +158,7 @@ export function CoworkModelPicker({
                         />
                       }
                       title={model.name}
-                      description={
-                        model.provider || getProviderDisplayName(model.providerKey || 'openai')
-                      }
+                      description={model.provider || model.providerKey || ''}
                     />
                     <span
                       aria-hidden="true"
