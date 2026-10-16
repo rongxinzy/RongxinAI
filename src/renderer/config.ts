@@ -1,35 +1,7 @@
-import {
-  type ModelCapabilities,
-  type ProviderConfig,
-  ProviderName,
-  ProviderRegistry,
-} from '@shared/providers';
-
 import { WorkMode, type WorkMode as WorkModeValue } from './store/workMode/constants';
 
 // 配置类型定义
 export interface AppConfig {
-  migrations?: {
-    providerModelCatalog: number;
-    modelPoolProvider?: number;
-  };
-  // API 配置
-  api: {
-    key: string;
-    baseUrl: string;
-  };
-  // 模型配置
-  model: {
-    availableModels: Array<{
-      id: string;
-      name: string;
-      supportsImage?: boolean;
-      capabilities?: Partial<ModelCapabilities>;
-    }>;
-    defaultModel: string;
-    defaultModelProvider?: string;
-  };
-  providers?: Record<string, ProviderConfig>;
   // 主题配置
   theme: 'light' | 'dark' | 'system';
   themeStyle?: string;
@@ -56,6 +28,22 @@ export interface AppConfig {
     sendMessage: string;
     [key: string]: string | undefined;
   };
+  // API 与模型可选配置（向下兼容）
+  api?: {
+    key?: string;
+    baseUrl?: string;
+  };
+  model?: {
+    availableModels?: Array<{
+      id: string;
+      name: string;
+      supportsImage?: boolean;
+      capabilities?: Record<string, unknown>;
+    }>;
+    defaultModel?: string;
+    defaultModelProvider?: string;
+  };
+  providers?: Record<string, unknown>;
 }
 
 export const DEFAULT_SHORTCUTS = {
@@ -65,43 +53,8 @@ export const DEFAULT_SHORTCUTS = {
   sendMessage: 'Enter',
 } as const;
 
-const buildDefaultProviders = (): AppConfig['providers'] => {
-  const providers: Record<string, ProviderConfig> = {};
-
-  for (const id of ProviderRegistry.providerIds) {
-    const def = ProviderRegistry.get(id)!;
-    providers[id] = {
-      enabled: id === ProviderName.Zhiyuan,
-      apiKey: '',
-      baseUrl: def.defaultBaseUrl,
-      apiFormat: def.defaultApiFormat,
-      ...(def.codingPlanSupported ? { codingPlanEnabled: false } : {}),
-      models: def.defaultModels.map(m => ({
-        ...m,
-        capabilities: ProviderRegistry.resolveModelCapabilities(id, m.id, def.defaultApiFormat, m),
-      })),
-    };
-  }
-
-  return providers;
-};
-
 // 默认配置
 export const defaultConfig: AppConfig = {
-  migrations: {
-    providerModelCatalog: 1,
-    modelPoolProvider: 1,
-  },
-  api: {
-    key: '',
-    baseUrl: 'https://api.deepseek.com/anthropic',
-  },
-  model: {
-    availableModels: [{ id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false }],
-    defaultModel: 'deepseek-reasoner',
-    defaultModelProvider: 'deepseek',
-  },
-  providers: buildDefaultProviders(),
   theme: 'system',
   language: 'zh',
   workMode: WorkMode.Work,
@@ -121,52 +74,4 @@ export const CONFIG_KEYS = {
   APP_CONFIG: 'app_config',
   AUTH: 'auth_state',
   CONVERSATIONS: 'conversations',
-  PROVIDERS_EXPORT_KEY: 'providers_export_key',
-  SKILLS: 'skills',
-};
-
-// 模型提供商分类
-export const EN_PRIORITY_PROVIDERS = ['openai', 'anthropic', 'gemini'] as const;
-// Provider lists derived from ProviderRegistry — single source of truth
-export const CHINA_PROVIDERS = [...ProviderRegistry.idsByRegion('china')] as const;
-export const GLOBAL_PROVIDERS = ProviderRegistry.idsByRegion('global');
-
-export const getVisibleProviders = (language: 'zh' | 'en'): readonly string[] => {
-  if (language === 'zh') {
-    return CHINA_PROVIDERS.filter(provider => provider !== ProviderName.Zhiyuan);
-  }
-  return ProviderRegistry.idsForEnLocale().filter(provider => provider !== ProviderName.Zhiyuan);
-};
-
-/**
- * 判断 provider key 是否为自定义提供商（custom_0, custom_1, ...）
- */
-export const isCustomProvider = (key: string): boolean => key.startsWith('custom_');
-
-/**
- * 从 custom_N key 中提取默认显示名称（如 custom_0 → "Custom0"）
- */
-export const getCustomProviderDefaultName = (key: string): string => {
-  const suffix = key.replace('custom_', '');
-  return `Custom${suffix}`;
-};
-
-/**
- * 获取 provider 的显示名称，自定义 provider 优先使用 displayName，
- * 内置 provider 使用首字母大写的 key。
- */
-export const getProviderDisplayName = (
-  providerKey: string,
-  providerConfig?: { displayName?: string },
-): string => {
-  if (isCustomProvider(providerKey)) {
-    const name =
-      providerConfig && typeof providerConfig.displayName === 'string'
-        ? providerConfig.displayName
-        : '';
-    return name || getCustomProviderDefaultName(providerKey);
-  }
-  const def = ProviderRegistry.get(providerKey);
-  if (def) return def.label;
-  return providerKey.charAt(0).toUpperCase() + providerKey.slice(1);
 };

@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 
+import { selectMagpieDefaultModel } from '../../services/availableModels';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { Model } from '../../store/slices/modelSlice';
-import { setDefaultSelectedModel, setSelectedModel } from '../../store/slices/modelSlice';
+import { setSelectedModel } from '../../store/slices/modelSlice';
 import { toAgentModelRef } from '../../utils/agentModelRef';
 
 export function usePersistAgentModelSelection({
@@ -42,9 +43,14 @@ export function usePersistAgentModelSelection({
 
         dispatch(setSelectedModel({ agentId, model }));
         if (syncDefaultModel) {
-          dispatch(setDefaultSelectedModel(model));
+          await selectMagpieDefaultModel(model.id);
         }
         return true;
+      } catch {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }),
+        );
+        return false;
       } finally {
         if (requestId === requestIdRef.current) {
           setIsPersistingAgentModel(false);

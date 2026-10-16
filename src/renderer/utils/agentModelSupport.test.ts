@@ -18,7 +18,7 @@ import {
 
 const baseModels: Model[] = [
   {
-    id: 'qwen-local-ok',
+    id: 'llamacpp/qwen-local-ok',
     name: 'qwen-local-ok',
     providerKey: ProviderName.LlamaCpp,
     agentProviderId: ProviderName.LlamaCpp,
@@ -32,7 +32,7 @@ const baseModels: Model[] = [
     },
   },
   {
-    id: 'qwen-local-runtime-small',
+    id: 'llamacpp/qwen-local-runtime-small',
     name: 'qwen-local-runtime-small',
     providerKey: ProviderName.LlamaCpp,
     agentProviderId: ProviderName.LlamaCpp,
@@ -46,7 +46,7 @@ const baseModels: Model[] = [
     },
   },
   {
-    id: 'qwen-local-trained-small',
+    id: 'llamacpp/qwen-local-trained-small',
     name: 'qwen-local-trained-small',
     providerKey: ProviderName.LlamaCpp,
     agentProviderId: ProviderName.LlamaCpp,
@@ -60,7 +60,7 @@ const baseModels: Model[] = [
     },
   },
   {
-    id: 'qwen-local-context-unknown',
+    id: 'llamacpp/qwen-local-context-unknown',
     name: 'qwen-local-context-unknown',
     providerKey: ProviderName.LlamaCpp,
     agentProviderId: ProviderName.LlamaCpp,
@@ -73,7 +73,7 @@ const baseModels: Model[] = [
     },
   },
   {
-    id: 'gpt-5.2',
+    id: 'openai/gpt-5.2',
     name: 'GPT-5.2',
     providerKey: ProviderName.OpenAI,
     agentProviderId: ProviderName.OpenAI,

@@ -725,6 +725,7 @@ interface IElectronAPI {
     ) => Promise<import('../../shared/memory').MemoryIpcResult<boolean>>;
     drainOutbox: () => Promise<import('../../shared/memory').MemoryIpcResult<number>>;
   };
+  magpie: import('../../shared/magpie/types').MagpieApi;
   cowork: {
     getRunSnapshot: (
       sessionId: string,
