@@ -177,13 +177,6 @@ export type CoworkConfigUpdate = Partial<
   >
 >;
 
-export interface CoworkApiConfig {
-  apiKey: string;
-  baseURL: string;
-  model: string;
-  apiType?: 'anthropic' | 'openai';
-}
-
 // Cowork pending permission request
 export interface CoworkPermissionRequest {
   origin: CoworkPermissionOrigin;

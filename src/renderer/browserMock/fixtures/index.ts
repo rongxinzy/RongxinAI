@@ -32,7 +32,6 @@ export type MockWorkspace = ItemOf<
   NonNullable<Resolved<Api['cowork']['listWorkspaces']>['workspaces']>
 >;
 export type MockMcpServer = ItemOf<NonNullable<Resolved<Api['mcp']['list']>['servers']>>;
-export type MockApiConfig = NonNullable<Resolved<Api['getApiConfig']>>;
 
 const NOW = Date.UTC(2026, 9, 16, 7, 0, 0);
 const HOUR = 3_600_000;
@@ -148,13 +147,6 @@ export const mockCoworkConfig: MockCoworkConfig = {
   embeddingRemoteApiKey: '',
   codemodeEnabled: false,
   mcpNativeBridge: true,
-};
-
-export const mockApiConfig: MockApiConfig = {
-  apiKey: 'sk-preview',
-  baseURL: 'https://api.example.com/v1',
-  model: 'preview-model',
-  apiType: 'openai',
 };
 
 export const mockSkills: Skill[] = [

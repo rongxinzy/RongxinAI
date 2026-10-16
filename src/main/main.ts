@@ -198,7 +198,6 @@ import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHand
 import type { LlamaCppModelDaemonController } from './libs/llamacppModelDaemonController';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
-import { registerProviderModelDiscoveryIpcHandler } from './ipcHandlers/providerModelDiscovery';
 import {
   getCronJobService,
   initCronJobServiceManager,
@@ -235,7 +234,6 @@ import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { shutdownPythonRuntime } from './pythonRuntime/host';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
-import { MAGPIE_RUNTIME_API_KEY } from './magpie/modelService';
 import {
   chooseTriageModelSwitch,
   classifyMessage,
@@ -249,7 +247,6 @@ import {
   refreshCopilotTokenNow,
   setCopilotTokenState,
 } from './libs/copilotTokenManager';
-import { saveCoworkApiConfig } from './libs/coworkConfigStore';
 import { getCoworkLogPath } from './libs/coworkLogger';
 import {
   applyApplicationRuntimeEnv,
@@ -6821,43 +6818,7 @@ if (!gotTheLock) {
       .slice(0, boundedLimit);
   });
 
-  ipcMain.handle('get-api-config', async () => {
-    const status = magpieManager?.status();
-    const model = getStore().get<string>('magpie_default_model_id')?.trim();
-    if (!status || status.state !== 'running' || !status.gatewayUrl || !model) return null;
-    const gateway = new URL(status.gatewayUrl);
-    return {
-      apiKey: MAGPIE_RUNTIME_API_KEY,
-      baseURL: `${gateway.origin}/v1`,
-      model,
-      apiType: 'openai' as const,
-    };
-  });
-
   ipcMain.handle(AppConfigIpc.CheckApiConfig, () => modelService.checkReadiness());
-
-  ipcMain.handle(
-    'save-api-config',
-    async (
-      _event,
-      config: {
-        apiKey: string;
-        baseURL: string;
-        model: string;
-        apiType?: 'anthropic' | 'openai';
-      },
-    ) => {
-      try {
-        saveCoworkApiConfig(config);
-        return { success: true };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to save API config',
-        };
-      }
-    },
-  );
 
   // Dialog handlers
   ipcMain.handle('dialog:selectDirectory', async (event, options?: { defaultPath?: string }) => {
@@ -8175,7 +8136,6 @@ if (!gotTheLock) {
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
       userDataPath: app.getPath('userData'),
     });
-    registerProviderModelDiscoveryIpcHandler();
     // Initialize Copilot token manager and restore token state if available
     initCopilotTokenManager(getStore);
     const storedGithubToken = getStore().get('github_copilot_github_token') as string | undefined;

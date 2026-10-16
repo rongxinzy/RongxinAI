@@ -14,7 +14,6 @@ import { z } from 'zod';
 import { CoworkExecutionMode, CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
 import { hasCoworkSubmissionContent } from '../cowork/submissionContent';
 import { ApiRequestPurpose } from './apiRequest';
-import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -74,88 +73,6 @@ export const ModelPoolModelsSchema = {
     models: z.array(z.string()),
     error: z.string().optional(),
   }),
-};
-
-export const ProviderModelDiscoverySchema = {
-  input: z.object({
-    baseUrl: z.string().url(),
-    apiKey: z.string().optional(),
-    apiFormat: z.enum([ApiFormat.OpenAI, ApiFormat.Anthropic, ApiFormat.Gemini]),
-  }),
-  output: z.union([
-    z.object({
-      success: z.literal(true),
-      models: z.array(
-        z.object({
-          id: z.string().min(1),
-          displayName: z.string().optional(),
-          ownedBy: z.string().optional(),
-          contextWindow: z.number().int().positive().optional(),
-          maxTokens: z.number().int().positive().optional(),
-          capabilities: z
-            .object({
-              toolCalling: z
-                .enum([
-                  ModelCapabilityStatus.Supported,
-                  ModelCapabilityStatus.Unsupported,
-                  ModelCapabilityStatus.Unknown,
-                ])
-                .optional(),
-              imageInput: z
-                .enum([
-                  ModelCapabilityStatus.Supported,
-                  ModelCapabilityStatus.Unsupported,
-                  ModelCapabilityStatus.Unknown,
-                ])
-                .optional(),
-              videoInput: z
-                .enum([
-                  ModelCapabilityStatus.Supported,
-                  ModelCapabilityStatus.Unsupported,
-                  ModelCapabilityStatus.Unknown,
-                ])
-                .optional(),
-              audioInput: z
-                .enum([
-                  ModelCapabilityStatus.Supported,
-                  ModelCapabilityStatus.Unsupported,
-                  ModelCapabilityStatus.Unknown,
-                ])
-                .optional(),
-              documentInput: z
-                .enum([
-                  ModelCapabilityStatus.Supported,
-                  ModelCapabilityStatus.Unsupported,
-                  ModelCapabilityStatus.Unknown,
-                ])
-                .optional(),
-              reasoning: z
-                .enum([
-                  ModelCapabilityStatus.Supported,
-                  ModelCapabilityStatus.Unsupported,
-                  ModelCapabilityStatus.Unknown,
-                ])
-                .optional(),
-            })
-            .optional(),
-        }),
-      ),
-    }),
-    z.object({
-      success: z.literal(false),
-      code: z.enum([
-        ProviderModelDiscoveryErrorCode.InvalidConfig,
-        ProviderModelDiscoveryErrorCode.Authentication,
-        ProviderModelDiscoveryErrorCode.EndpointNotFound,
-        ProviderModelDiscoveryErrorCode.Timeout,
-        ProviderModelDiscoveryErrorCode.UnsupportedFormat,
-        ProviderModelDiscoveryErrorCode.ResponseTooLarge,
-        ProviderModelDiscoveryErrorCode.Network,
-        ProviderModelDiscoveryErrorCode.Http,
-      ]),
-      error: z.string(),
-    }),
-  ]),
 };
 
 // ─── Window ─────────────────────────────────────────────────────────────────

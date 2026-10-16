@@ -1,5 +1,4 @@
 export { buildAnthropicMessagesUrl } from './apiUrl';
-export * from './modelDiscovery';
 export type { ModelCapabilities } from './constants';
 export {
   ApiFormat,
