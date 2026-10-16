@@ -428,8 +428,6 @@ function installSkillDependencies() {
 }
 
 async function beforePack(context) {
-  const languages = pinElectronLanguages(context.packager.config);
-  console.log(`[electron-builder-hooks] Chromium locales pinned: ${languages.join(', ')}`);
   configureMagpieResources(context);
   configureMacAutoUpdateMetadata(context);
   ensureBundledChannelRuntime(context);
@@ -610,6 +608,12 @@ async function beforePack(context) {
       'utf8',
     );
   }
+
+  // Pin after resource checks so a missing runtime still fails with its own
+  // error. beforePack returns before Electron copies locales, so this is early
+  // enough to stop an empty platform list from shipping every Chromium locale.
+  const languages = pinElectronLanguages(context.packager.config);
+  console.log(`[electron-builder-hooks] Chromium locales pinned: ${languages.join(', ')}`);
 
   // Re-apply after hooks append extra resources (Magpie, Windows components) so
   // a token file or source map added to those trees cannot be packed.
