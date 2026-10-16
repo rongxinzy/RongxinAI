@@ -1,5 +1,5 @@
 export { resolveCodingPlanBaseUrl } from './codingPlan';
-export { resolveConfiguredProviderModels } from './configuredModels';
+export { findConfiguredProviderModel, resolveConfiguredProviderModels } from './configuredModels';
 export {
   applyProviderModelConnectionTestResults,
   createProviderConnectionTestSignature,

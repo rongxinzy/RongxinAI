@@ -1,33 +1,15 @@
 name: Channel runtime smoke
 
+# Pull request and main-branch checks run inside CI. This workflow remains for manual reruns.
+
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'package.json'
-      - 'scripts/channel-runtime-*'
-      - 'scripts/download-channel-runtime.cjs'
-      - 'src/main/im/**'
-      - 'src/main/libs/ccConnect*'
-      - 'src/scheduledTask/ccConnect*'
-      - '.github/workflows/channel-runtime-smoke.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'package.json'
-      - 'scripts/channel-runtime-*'
-      - 'scripts/download-channel-runtime.cjs'
-      - 'src/main/im/**'
-      - 'src/main/libs/ccConnect*'
-      - 'src/scheduledTask/ccConnect*'
-      - '.github/workflows/channel-runtime-smoke.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: channel-runtime-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: channel-runtime-manual-${{ github.ref }}
   cancel-in-progress: true
 
 env:

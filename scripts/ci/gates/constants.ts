@@ -19,8 +19,19 @@ export const HeavyJob = {
 
 export const BaselineJob = {
   Changes: 'changes',
+  ElectronCompile: 'electron-compile',
   Lint: 'lint',
   Test: 'test',
   Bundle: 'bundle-budget',
   Enterprise: 'enterprise',
 } as const;
+
+export const PathJob = {
+  ChannelRuntime: 'channel-runtime',
+  PythonRuntimeLinux: 'python-runtime-linux',
+  PythonRuntimeWindows: 'python-runtime-windows',
+  InstallerPreview: 'installer-preview',
+  BrowserPreview: 'browser-preview',
+} as const;
+
+export const TestShardCount = 2;

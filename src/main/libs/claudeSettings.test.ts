@@ -1,5 +1,5 @@
 import { getCoworkOpenAICompatProxyStatus } from './coworkOpenAICompatProxy';
-import { defaultConfig } from '../../renderer/config';
+import { CONFIG_KEYS, defaultConfig } from '../../renderer/config';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('./coworkOpenAICompatProxy', () => ({
@@ -10,6 +10,7 @@ vi.mock('./coworkOpenAICompatProxy', () => ({
 }));
 
 import {
+  ApiFormat,
   ModelCapabilityStatus,
   ProviderModelPiApi,
   ProviderModelPiMaxTokensField,
@@ -43,6 +44,44 @@ const createAppConfig = (defaultModel: string) => ({
       models: [],
     },
   },
+});
+
+test('resolves the tested custom model without borrowing a case-colliding entry', () => {
+  const providerId = 'custom_1';
+  const models = [
+    { id: 'GLM-5.3-FLASH', name: 'Uppercase entry', contextWindow: 8192 },
+    { id: 'GLM-5.3-Flash', name: 'Tested entry', contextWindow: 65536 },
+  ];
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === CONFIG_KEYS.APP_CONFIG
+            ? {
+                model: { defaultModel: models[1].id, defaultModelProvider: providerId },
+                providers: {
+                  [providerId]: {
+                    enabled: true,
+                    apiKey: 'test-key',
+                    baseUrl: 'https://gateway.example/v1',
+                    apiFormat: ApiFormat.OpenAI,
+                    models,
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  for (const result of [
+    resolveRawApiConfig(),
+    resolveRawApiConfigForModelRef(`${providerId}/${models[1].id}`),
+  ]) {
+    expect(result.config?.model).toBe(models[1].id);
+    expect(result.endpoint?.modelId).toBe(models[1].id);
+    expect(result.providerMetadata?.modelName).toBe(models[1].name);
+    expect(result.providerMetadata?.contextWindow).toBe(models[1].contextWindow);
+  }
 });
 
 beforeEach(() => {

@@ -1,14 +1,68 @@
 import { expect, test } from 'vitest';
 
 import {
+  ApiFormat,
   clampRuntimeContextWindow,
   createLlamaCppRuntimeSnapshot,
   createOllamaRuntimeSnapshot,
   ModelCapabilityStatus,
   parseLlamaCppRuntimeCapabilities,
   ProviderName,
+  ProviderRegistry,
   resolveModelEndpoint,
 } from './index';
+
+test('keeps case-sensitive custom model identities and their own metadata', () => {
+  const models = [
+    { id: 'GLM-5.3-FLASH', name: 'Uppercase entry', contextWindow: 8192 },
+    { id: 'GLM-5.3-Flash', name: 'Tested entry', contextWindow: 65536 },
+  ];
+  for (const model of models) {
+    const endpoint = resolveModelEndpoint('custom_1', model.id, {
+      providerConfig: { apiFormat: ApiFormat.OpenAI, models },
+    });
+    expect(endpoint.modelId).toBe(model.id);
+    expect(endpoint.displayName).toBe(model.name);
+    expect(endpoint.contextWindow).toBe(model.contextWindow);
+  }
+});
+
+test('does not mistake absent catalog IDs for an alias of another custom model', () => {
+  const endpoint = resolveModelEndpoint('custom_1', 'second-model', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [
+        { id: 'first-model', name: 'First', contextWindow: 8192 },
+        { id: 'second-model', name: 'Second', contextWindow: 65536 },
+      ],
+    },
+  });
+  expect(endpoint.modelId).toBe('second-model');
+  expect(endpoint.displayName).toBe('Second');
+  expect(endpoint.contextWindow).toBe(65536);
+});
+
+test('does not borrow custom model metadata for a missing case variant', () => {
+  const endpoint = resolveModelEndpoint('custom_1', 'GLM-5.3-Flash', {
+    providerConfig: {
+      models: [{ id: 'GLM-5.3-FLASH', name: 'Other model', contextWindow: 8192 }],
+    },
+  });
+  expect(endpoint.modelId).toBe('GLM-5.3-Flash');
+  expect(endpoint.displayName).toBe('GLM-5.3-Flash');
+  expect(endpoint.contextWindow).toBeUndefined();
+});
+
+test('retains configured overrides when a registered model is selected by alias', () => {
+  const endpoint = resolveModelEndpoint(ProviderName.Moonshot, 'KIMI-K3', {
+    providerConfig: {
+      models: [{ id: 'kimi-k3', name: 'Configured Kimi', contextWindow: 65536 }],
+    },
+  });
+  expect(endpoint.modelId).toBe('kimi-k3');
+  expect(endpoint.displayName).toBe('Configured Kimi');
+  expect(endpoint.contextWindow).toBe(65536);
+});
 
 test('resolves aliases to the registry canonical model and keeps registry metadata', () => {
   const endpoint = resolveModelEndpoint(ProviderName.Moonshot, 'KIMI-K3', {
@@ -341,4 +395,54 @@ test('local runtime adapters expose loaded state and detected metadata', () => {
     runtimeContextWindow: 4096,
     trainedContextWindow: 8192,
   });
+});
+
+// ── Provider-key normalization for the alias fallback ──
+
+test('normalizes a case-variant provider key before the alias fallback', () => {
+  const endpoint = resolveModelEndpoint('OpenAI', 'gpt-5.6', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [{ id: 'gpt-5.6-sol', name: 'Configured Sol', contextWindow: 123_456 }],
+    },
+  });
+
+  // Without normalization the exact-key registry lookup misses and the
+  // configured entry silently loses its alias resolution.
+  expect(endpoint.modelId).toBe('gpt-5.6-sol');
+  expect(endpoint.displayName).toBe('Configured Sol');
+  expect(endpoint.contextWindow).toBe(123_456);
+});
+
+test('matches a configured entry stored under an alias id through a case-variant key', () => {
+  const endpoint = resolveModelEndpoint('OpenAI', 'gpt-5.6-sol', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [{ id: 'gpt-5.6', name: 'Alias entry', contextWindow: 65_536 }],
+    },
+  });
+
+  expect(endpoint.modelId).toBe('gpt-5.6');
+  expect(endpoint.displayName).toBe('Alias entry');
+  expect(endpoint.contextWindow).toBe(65_536);
+});
+
+test('maps AgentProviderId and case variants to the canonical provider id', () => {
+  expect(ProviderRegistry.resolveProviderId('qwen-portal')).toBe('qwen');
+  expect(ProviderRegistry.resolveProviderId('OpenAI')).toBe('openai');
+  expect(ProviderRegistry.resolveProviderId('deepseek')).toBe('deepseek');
+  expect(ProviderRegistry.resolveProviderId('  ')).toBeUndefined();
+  expect(ProviderRegistry.resolveProviderId('not-a-provider')).toBeUndefined();
+});
+
+test('unknown provider keys still fall through without alias resolution', () => {
+  const endpoint = resolveModelEndpoint('not-a-provider', 'gpt-5.6', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [{ id: 'gpt-5.6-sol', name: 'Configured Sol', contextWindow: 123_456 }],
+    },
+  });
+
+  expect(endpoint.modelId).toBe('gpt-5.6');
+  expect(endpoint.contextWindow).toBeUndefined();
 });
