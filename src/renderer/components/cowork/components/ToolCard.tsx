@@ -13,6 +13,7 @@ import { i18nService } from '../../../services/i18n';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../../../types/cowork';
 import type { ToolGroupItem } from '../helpers/messageGrouping';
 import {
+  collapseToolText,
   getToolDisplayName,
   getToolInputSummary,
   getToolResultDisplay,
@@ -21,15 +22,13 @@ import { usePersistentToggle } from '../hooks/usePersistentToggle';
 import { CoworkContentNotice } from './CoworkContentNotice';
 import { ToolPermissionActions } from './ToolPermissionActions';
 
-const TOOL_RESULT_COLLAPSE_LINE_LIMIT = 200;
-
 /** Adapts persisted messages to the official Tool components. */
 export const ToolCard: React.FC<{
   group: ToolGroupItem;
   mapDisplayText?: (value: string) => string;
   forceExpand?: boolean;
   pendingPermission?: CoworkPermissionRequest | null;
-  onRespondToPermission?: (result: CoworkPermissionResult) => void;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void | Promise<void>;
 }> = ({
   group,
   mapDisplayText,
@@ -52,16 +51,28 @@ export const ToolCard: React.FC<{
   const result = mapDisplayText ? mapDisplayText(rawResult) : rawResult;
   const [open, setOpen] = usePersistentToggle(`tool-${toolUse.id}`, false);
   const [expanded, setExpanded] = usePersistentToggle(`toolresult-${toolUse.id}`, false);
-  const lines = useMemo(() => result.split('\n'), [result]);
-  const collapsible = !isError && lines.length > TOOL_RESULT_COLLAPSE_LINE_LIMIT;
-  const visibleResult =
-    collapsible && !expanded && !forceExpand
-      ? lines.slice(0, TOOL_RESULT_COLLAPSE_LINE_LIMIT).join('\n')
-      : result;
-  // Preserve display redaction for parameters as well as results.
+  const resultCollapse = useMemo(() => collapseToolText(result), [result]);
+  // Preserve display redaction and size bounds for parameters as well as results.
   const input = toolUse.metadata?.toolInput;
+  const serializedInput = useMemo(() => {
+    if (input == null) return undefined;
+    const raw = JSON.stringify(input, null, 2);
+    return mapDisplayText ? mapDisplayText(raw) : raw;
+  }, [input, mapDisplayText]);
+  const inputCollapse = useMemo(
+    () =>
+      serializedInput ? collapseToolText(serializedInput) : { preview: '', collapsible: false },
+    [serializedInput],
+  );
+  const collapsible = resultCollapse.collapsible || inputCollapse.collapsible;
+  const showFull = expanded || forceExpand;
+  const visibleResult = resultCollapse.collapsible && !showFull ? resultCollapse.preview : result;
   const displayInput =
-    input != null && mapDisplayText ? mapDisplayText(JSON.stringify(input, null, 2)) : undefined;
+    serializedInput === undefined
+      ? undefined
+      : inputCollapse.collapsible && !showFull
+        ? inputCollapse.preview
+        : serializedInput;
   const rawSummary = getToolInputSummary(name, input);
   const summary = rawSummary && mapDisplayText ? mapDisplayText(rawSummary) : rawSummary;
 
@@ -85,7 +96,9 @@ export const ToolCard: React.FC<{
         {toolResult && (
           <ToolOutput
             output={isError ? undefined : visibleResult || undefined}
-            errorText={isError ? result || i18nService.t('coworkToolNoErrorDetail') : undefined}
+            errorText={
+              isError ? visibleResult || i18nService.t('coworkToolNoErrorDetail') : undefined
+            }
           />
         )}
         {collapsible && !forceExpand && (

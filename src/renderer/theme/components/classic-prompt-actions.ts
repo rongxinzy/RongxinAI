@@ -35,6 +35,7 @@ export function classicPromptActions() {
     }),
     'fold-reasoning': recipe({
       base: {
+        'min-height': '2.25rem',
         'font-size': 'var(--zy-component-text-sm)',
         color: 'var(--muted-foreground)',
         'transition-property': 'color, background-color, border-color, box-shadow',

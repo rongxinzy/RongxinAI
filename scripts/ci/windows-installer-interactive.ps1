@@ -11,6 +11,7 @@ if (-not $env:RUNNER_TEMP) { throw 'Run only on a disposable Windows acceptance 
 Add-Type -AssemblyName System.Drawing
 Add-Type -Path (Join-Path $PSScriptRoot 'windows-installer-ui.cs') -ReferencedAssemblies System,System.Core,System.Drawing
 [ZhiYuan.Acceptance.InstallerUi]::UsePhysicalCoordinates()
+$actionFont = [ZhiYuan.Acceptance.InstallerUi]::ReadActionFontContract((Join-Path $ProjectRoot 'scripts/installer-ui/zy-theme.nsh'))
 
 $evidence = Join-Path $ProjectRoot 'acceptance-diagnostics/interactive'
 $installRoot = Join-Path $env:RUNNER_TEMP 'zhiyuan-interactive-acceptance/安装路径'
@@ -35,6 +36,8 @@ $report = [ordered]@{
   installerSha256 = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
   installedExecutable = $app; checks = [ordered]@{}; pages = @(); errors = @()
   dpiCoverage = 'Actual window DPI only; no simulated high-DPI claim'
+  actionFont = $actionFont
+  fontCoverage = 'Production theme font recreated locally; real control bounds and actual HWND DPI'
 }
 
 function Wait-Until {
@@ -106,6 +109,8 @@ function Start-Installer {
   param([ValidateSet(2052, 1033)][int]$Language = 2052)
   # Deliberately no /S: this is the actual packaged wizard. /D stays last,
   # unquoted as required by NSIS, including the Unicode destination.
+  # /LANGUAGE is parsed by production ApplyRequestedInstallerLanguage; it is
+  # not a built-in NSIS/MUI option and must never be assumed to work by itself.
   $process = Start-Process -FilePath $installer.FullName -ArgumentList "/LANGUAGE=$Language /D=$installRoot" -PassThru
   $script:installerProcesses.Add($process.Id) | Out-Null
   $script:wizard = Wait-Until {
@@ -128,12 +133,14 @@ function Begin-Installation {
   param([string]$Name)
   $install = Get-Button -Label '^(安装|安裝|Install)$'
   $license = Get-Button -Label '^(已阅读并同意|已閱讀並同意|I agree to the)$'
+  $licenseLink = Get-Button -Label '^(《许可协议》|《授權協議》|License)$'
   $cancel = Get-Button -Label '^(取消|Cancel)$'
-  if (-not $install -or -not $license -or -not $cancel) { throw 'Welcome page is missing a required action' }
+  if (-not $install -or -not $license -or -not $licenseLink -or -not $cancel) { throw 'Welcome page is missing a required action' }
   if ($install.Enabled) { throw 'Install must be disabled until the license is accepted' }
   if ([ZhiYuan.Acceptance.InstallerUi]::Checked($license.Handle) -ne 0) { throw 'License must start unchecked' }
-  foreach ($control in @($install, $license, $cancel)) {
-    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle)
+  foreach ($control in @($install, $license, $licenseLink, $cancel)) {
+    $weight = if ($control.Handle -eq $license.Handle -or $control.Handle -eq $licenseLink.Handle) { $actionFont.BodyWeight } else { $actionFont.ButtonWeight }
+    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle, $actionFont.Family, $actionFont.Points, $weight)
   }
   Save-Page "$Name-welcome"
   [ZhiYuan.Acceptance.InstallerUi]::Click($license.Handle)
@@ -147,8 +154,9 @@ function Begin-Installation {
 
 function Wait-ForProgressAndFinish {
   param([string]$Name)
+  $expectedTitle = if ($script:language -eq 2052) { '正在安装知远智能体' } else { 'Installing ZhiYuan Agent' }
   $null = Wait-Until {
-    Get-Controls | Where-Object { $_.ControlId -eq 1201 -and $_.Visible }
+    [ZhiYuan.Acceptance.InstallerUi]::HasBrandedProgress($script:wizard.Handle, $expectedTitle)
   } 'real branded installation progress' $TimeoutSeconds
   Save-Page "$Name-progress"
   # Never click Next here. The completed progress page must advance itself;
@@ -158,14 +166,12 @@ function Wait-ForProgressAndFinish {
     $launch = Get-Button -Label '^(启动知远智能体|啟動知遠智能體|Launch ZhiYuan Agent)$'
     if ($button -and $button.Enabled -and $launch -and $launch.Enabled) { return $button }
   } 'automatic transition from progress to actionable finish page' $TimeoutSeconds
-  if (@(Get-Controls | Where-Object { $_.ControlId -ge 1200 -and $_.ControlId -le 1206 }).Count) {
-    throw 'The progress page is still visible over the finish page'
-  }
+  [ZhiYuan.Acceptance.InstallerUi]::AssertProgressRemoved($script:wizard.Handle)
   $launch = Get-Button -Label '^(启动知远智能体|啟動知遠智能體|Launch ZhiYuan Agent)$'
   $expectedLaunch = if ($script:language -eq 2052) { '启动知远智能体' } else { 'Launch ZhiYuan Agent' }
   if ((Normalize-Label $launch.Text) -ne $expectedLaunch) { throw 'Finish page language differs from the selected language' }
   foreach ($control in @($close, $launch)) {
-    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle)
+    [ZhiYuan.Acceptance.InstallerUi]::AssertActionLayout($script:wizard.Handle, $control.Handle, $actionFont.Family, $actionFont.Points, $actionFont.ButtonWeight)
   }
   if ($close.Left -lt ($launch.Left + $launch.Width) -and
       $launch.Left -lt ($close.Left + $close.Width) -and
@@ -368,16 +374,16 @@ try {
   # The only moved file is this runner's freshly installed executable.
   Move-Item -LiteralPath $app -Destination $launchBackup
   [ZhiYuan.Acceptance.InstallerUi]::Click((Get-Button -Label '^(启动知远智能体|啟動知遠智能體|Launch ZhiYuan Agent)$').Handle)
+  $launchErrorPattern = '\AThe app could not be started\. Retry, or close setup and use the Start menu\.\z'
   $launchError = Wait-Until {
     foreach ($window in (Get-InstallerWindows)) {
       if ($window.Handle -eq $script:wizard.Handle) { continue }
-      $ok = Get-Button -Id 1 -Window $window.Handle
-      $message = @(Get-Controls $window.Handle | Where-Object Text -match 'The app could not be started')
-      if ($ok -and $ok.Enabled -and $message.Count) { return $window }
+      $ok = [ZhiYuan.Acceptance.InstallerUi]::FindDialogAcknowledgement($window.Handle, $script:wizard.ProcessId, $script:wizard.Text, $launchErrorPattern, $script:wizard.Handle)
+      if ($ok) { return $window }
     }
   } 'real failed-launch error dialog'
   Save-Page 'finish-launch-error' $launchError.Handle
-  [ZhiYuan.Acceptance.InstallerUi]::Click((Get-Button -Id 1 -Window $launchError.Handle).Handle)
+  [ZhiYuan.Acceptance.InstallerUi]::ClickDialogAcknowledgement($launchError.Handle, $script:wizard.ProcessId, $script:wizard.Text, $launchErrorPattern, $script:wizard.Handle)
   $null = Wait-Until {
     $launch = Get-Button -Label '^Launch ZhiYuan Agent$'
     $close = Get-Button -Label '^Finish$'

@@ -46,13 +46,16 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
       - name: Validate real Windows interaction drivers
-        run: bunx vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
+        # These suites spawn real PowerShell processes and a C# compiler. Avoid
+        # cross-suite CPU contention on the hosted runner; retain every timeout.
+        run: bunx vitest run --maxWorkers=1 scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer-shell/preview-ui.test.ts scripts/installer-shell/powershell-environment.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
       - name: Set up offline Windows runtimes
         run: |
           bun run setup:uv-runtime
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
       - name: Build complete offline installer
+        id: offline-build
         # Keep a stuck packager observable and fail it before the job-level
         # timeout so the diagnostics upload below still gets a chance to run.
         timeout-minutes: 65
@@ -89,6 +92,7 @@ jobs:
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
       - name: Record fresh-run ownership before native install smoke
+        id: acceptance-ownership
         shell: powershell
         run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
       - name: Verify cold install, cache-hit upgrade, and uninstall
@@ -102,10 +106,17 @@ jobs:
         shell: powershell
         run: ./scripts/ci/windows-installer-interactive.ps1
       - name: Verify real WebView2 setup and upgrade recovery
+        id: shell-interaction
+        # Its own install/data/runtime sandbox remains independent of NSIS UI.
+        # Collect both results after a successful package; neither failure is waived.
+        if: ${{ !cancelled() && steps.offline-build.outcome == 'success' && steps.acceptance-ownership.outcome == 'success' }}
         timeout-minutes: 45
         run: node scripts/ci/windows-shell-interactive.mjs
       - name: Bind WebView2 acceptance to the final installer
-        shell: powershell
+        id: shell-evidence
+        if: ${{ !cancelled() && steps.shell-interaction.outcome == 'success' }}
+        # Runner scripts are UTF-8 without a BOM; Windows PowerShell 5 reads ANSI.
+        shell: pwsh
         run: |
           $setup = @(Get-ChildItem release/ZhiYuanAgent-Setup-*.exe -File)
           if ($setup.Count -ne 1) { throw 'Expected exactly one final WebView2 installer' }
@@ -113,6 +124,7 @@ jobs:
           node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $setup[0].FullName $app
           if ($LASTEXITCODE -ne 0) { throw 'Final WebView2 evidence did not match this build' }
       - name: Verify native uninstall of the real WebView2 installation
+        if: ${{ !cancelled() && steps.shell-evidence.outcome == 'success' }}
         timeout-minutes: 15
         shell: powershell
         run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify

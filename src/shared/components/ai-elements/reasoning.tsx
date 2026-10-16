@@ -96,7 +96,7 @@ export const Reasoning = memo(
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
     const startTimeRef = useRef<number | null>(null);
 
-    // Track when streaming starts and compute duration
+    // Track when streaming starts and compute duration when it settles
     useEffect(() => {
       if (isStreaming) {
         hasEverStreamedRef.current = true;
@@ -148,10 +148,10 @@ export const Reasoning = memo(
           open={isOpen}
           {...props}
         >
-          {showConnector && (
+          {showConnector && isOpen && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute top-5 -bottom-3 left-2 w-px bg-border"
+              className="pointer-events-none absolute top-9 bottom-0 left-2 w-px bg-border"
             />
           )}
           {children}
@@ -167,12 +167,16 @@ export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger> & 
 
 const defaultGetThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+    return (
+      <Shimmer as="span" duration={1}>
+        Thinking...
+      </Shimmer>
+    );
   }
   if (duration === undefined) {
-    return <p>Thought for a few seconds</p>;
+    return <span>Thought for a few seconds</span>;
   }
-  return <p>Thought for {duration} seconds</p>;
+  return <span>Thought for {duration} seconds</span>;
 };
 
 export const ReasoningTrigger = memo(
@@ -194,7 +198,10 @@ export const ReasoningTrigger = memo(
             <BrainIcon className="size-4" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
-              className={cn('size-4 transition-transform', isOpen ? 'rotate-180' : 'rotate-0')}
+              className={cn(
+                'size-4 transition-transform motion-reduce:transition-none',
+                isOpen ? 'rotate-180' : 'rotate-0',
+              )}
             />
           </>
         )}
@@ -220,23 +227,58 @@ const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4
 
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { isStreaming, showConnector } = useReasoning();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
 
   const text = typeof children === 'string' ? children : '';
   const { committed, tail } = useStreamingTextSegments(text, isStreaming);
   const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
   const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    const handleScroll = () => {
+      const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+      userScrolledUpRef.current = distanceToBottom > 32;
+    };
+
+    element.addEventListener('scroll', handleScroll, { passive: true });
+    return () => element.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      userScrolledUpRef.current = false;
+    }
+  }, [isStreaming]);
+
+  useEffect(() => {
+    if (isStreaming && scrollRef.current && !userScrolledUpRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [children, isStreaming]);
+
   const base = (
     <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
       {text}
     </Streamdown>
   );
-  const streamingContent = (
-    <>
-      {committed && (
+
+  const committedElement = useMemo(
+    () =>
+      committed ? (
         <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
           {committed}
         </Streamdown>
-      )}
+      ) : null,
+    [committed],
+  );
+
+  const streamingContent = (
+    <>
+      {committedElement}
       {revealedTail && <div className="whitespace-pre-wrap wrap-break-word">{revealedTail}</div>}
     </>
   );
@@ -259,7 +301,10 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
       )}
       {...props}
     >
-      <div className="min-w-0 max-h-64 overflow-y-auto overscroll-contain scrollbar-gutter-stable [overflow-anchor:none]">
+      <div
+        ref={scrollRef}
+        className="min-w-0 max-h-64 overflow-y-auto overscroll-contain scrollbar-gutter-stable [overflow-anchor:none]"
+      >
         {content}
       </div>
     </CollapsibleContent>

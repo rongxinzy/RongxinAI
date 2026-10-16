@@ -3882,6 +3882,7 @@
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -4712,7 +4713,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="classic-light"]) :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -11961,6 +11962,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="classic-dark"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -12791,7 +12793,7 @@ to {
 }
 [data-theme="classic-dark"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -20051,6 +20053,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-light"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -20881,7 +20884,7 @@ to {
 }
 [data-theme="daming-light"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -28130,6 +28133,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="daming-dark"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -28960,7 +28964,7 @@ to {
 }
 [data-theme="daming-dark"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -36222,6 +36226,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-light"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -37052,7 +37057,7 @@ to {
 }
 [data-theme="changan-light"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -44306,6 +44311,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="changan-dark"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -45136,7 +45142,7 @@ to {
 }
 [data-theme="changan-dark"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -52401,6 +52407,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-light"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -53231,7 +53238,7 @@ to {
 }
 [data-theme="weiyang-light"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -60485,6 +60492,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="weiyang-dark"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -61315,7 +61323,7 @@ to {
 }
 [data-theme="weiyang-dark"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -68578,6 +68586,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="xiaoruan-light"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -69408,7 +69417,7 @@ to {
 }
 [data-theme="xiaoruan-light"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);
@@ -76657,6 +76666,7 @@ to {
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="xiaoruan-dark"] :where(.theme-fold-reasoning) {
+  min-height: 2.25rem;
   font-size: var(--zy-component-text-sm);
   color: var(--muted-foreground);
   transition-property: color, background-color, border-color, box-shadow;
@@ -77487,7 +77497,7 @@ to {
 }
 [data-theme="xiaoruan-dark"] :where(.theme-tabs-trigger) {
   height: calc(100% - 1px);
-  transition-property: all;
+  transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--zy-style-radius-md);

@@ -23,6 +23,26 @@ test('engine checks extraction and retains all main repository runtime features'
   expect(form).toContain('public void StartInstall(string installPath, bool localInference)');
 });
 
+test('payload progress is bounded at its source and UI delivery has only one marshal', () => {
+  expect(installer).toContain('if (percent <= lastReportedPercent) return;');
+  expect(installer).toContain(
+    'ReportPayloadProgress(progress, doneBytes, totalBytes, ref lastReportedPercent);',
+  );
+  expect(installer).toContain(
+    'ReportPayloadProgress(progress, totalBytes, totalBytes, ref lastReportedPercent);',
+  );
+  const onEvent = form.slice(
+    form.indexOf('private void OnEngineEvent('),
+    form.indexOf('private void OnWebViewReady('),
+  );
+  expect(onEvent.match(/BeginInvoke\(/g)).toHaveLength(1);
+  expect(onEvent).toContain(
+    'if (InvokeRequired) { BeginInvoke(() => OnEngineEvent(evt)); return; }',
+  );
+  expect(onEvent).toContain('core.PostWebMessageAsJson(json);');
+  expect(form.match(/BeginInvoke\(\(\) => OnEngineEvent\(evt\)\)/g)).toHaveLength(1);
+});
+
 test('mandatory registration finishes before commit and destructive cleanup', () => {
   const run = installer.slice(
     installer.indexOf('public async Task RunAsync'),
@@ -48,6 +68,24 @@ test('mandatory registration finishes before commit and destructive cleanup', ()
   );
 });
 
+test('shortcuts use explicit Unicode COM with bounded native failure diagnostics', () => {
+  for (const operation of [
+    'IShellLinkW.Activate',
+    'IShellLinkW.SetPath',
+    'IShellLinkW.SetWorkingDirectory',
+    'IShellLinkW.SetIconLocation',
+    'IPersistFile.Save',
+  ]) {
+    expect(installer).toContain(`operation = "${operation}"`);
+  }
+  expect(installer).not.toContain('WScript.Shell');
+  expect(installer).toContain('exception.HResult:X8');
+  expect(installer).toContain('new StackTrace(exception, fNeedFileInfo: false)');
+  expect(installer).toContain('Marshal.FinalReleaseComObject(shortcut)');
+  expect(read('WindowsShellLink.cs')).toContain('000214F9-0000-0000-C000-000000000046');
+  expect(read('WindowsShellLink.cs')).toContain('UnmanagedType.LPWStr');
+});
+
 test('install and uninstall reject foreign directories before stopping any process', () => {
   expect(installer.indexOf('transaction.ValidateOwnership();')).toBeLessThan(
     installer.indexOf('await StepStopAppProcesses('),
@@ -61,6 +99,26 @@ test('install and uninstall reject foreign directories before stopping any proce
   );
   expect(ownership).toContain('ReadState()');
   expect(ownership).not.toMatch(/Directory\.(Move|Delete)|File\.(Write|Delete)/);
+});
+
+test('process shutdown waits for the exact matched handles within a cancellable total budget', () => {
+  for (const engine of [installer, uninstaller]) {
+    const stop = engine.slice(
+      engine.indexOf('private async Task StepStopAppProcesses('),
+      engine.indexOf('private IEnumerable<Process> FindInstallRootProcesses()'),
+    );
+    expect(stop).toContain('CancellationTokenSource.CreateLinkedTokenSource(ct)');
+    expect(stop).toContain('deadline.CancelAfter(TimeSpan.FromSeconds(10))');
+    expect(stop).toContain('proc.WaitForExitAsync(deadline.Token)');
+    expect(stop).toContain('finally { foreach (var proc in targets) proc.Dispose(); }');
+    expect(stop).toContain('when (!ct.IsCancellationRequested)');
+    expect(engine).toContain('try { _ = proc.Handle; path = proc.MainModule?.FileName; }');
+    expect(stop.indexOf('proc.WaitForExitAsync')).toBeGreaterThan(stop.indexOf('proc.Kill()'));
+    expect(stop).not.toContain('entireProcessTree');
+  }
+  expect(installer).toContain(
+    'throw new EngineException(message, $"running={running}\\n{DescribeFailure(ex)}")',
+  );
 });
 
 test('upgrade rollback removes partial new files before restoring the previous application', () => {
@@ -127,7 +185,13 @@ test('launch failure remains recoverable and successful launch has an explicit r
 });
 
 test('retry gets a fresh cancellation token and closing waits for the engine to stop', () => {
-  expect(form.match(/installCts = new CancellationTokenSource\(\);/g)).toHaveLength(2);
+  expect(form).toContain('private readonly SetupOperation operation = new();');
+  expect(form).toContain('private bool operationActive => operation.IsActive;');
+  expect(form.match(/var cancellationToken = operation.Begin\(\);/g)).toHaveLength(2);
+  expect(form).toContain('await runEngine.RunAsync(localInference, cancellationToken);');
+  expect(form).toContain('await uninstaller.UninstallAsync(cancellationToken);');
+  expect(form).toContain('operation.Complete();');
+  expect(form).not.toContain('installCts');
   expect(form).toContain('if (!operationActive) return;');
   expect(form).toContain('e.Cancel = true;');
   expect(form).toContain('closeRequested = true;');
@@ -135,6 +199,72 @@ test('retry gets a fresh cancellation token and closing waits for the engine to 
   expect(form).not.toContain(
     'Directory.EnumerateDirectories(Path.GetTempPath(), "zhiyuan-setup-*")',
   );
+});
+
+test('start acknowledges UI admission before cancel and never waits for an engine or browser callback', () => {
+  const startInstall = form.slice(
+    form.indexOf('internal void StartInstall('),
+    form.indexOf('private void FinishOperation()'),
+  );
+  const startUninstall = form.slice(
+    form.indexOf('internal void StartUninstall()'),
+    form.indexOf('internal bool LaunchApp()'),
+  );
+  expect(startInstall).toContain(
+    'Invoke(new Action(() => StartInstall(engineInstallDir, localInference)))',
+  );
+  expect(startUninstall).toContain('Invoke(new Action(StartUninstall))');
+  expect(startInstall).toContain('if (uninstallMode || installState == "done") return;');
+  expect(startUninstall).toContain('if (!uninstallMode || installState == "done") return;');
+  for (const start of [startInstall, startUninstall]) {
+    expect(start).not.toContain('if (operationActive');
+    expect(start.indexOf('var cancellationToken = operation.Begin();')).toBeLessThan(
+      start.indexOf('_ = Task.Run('),
+    );
+    expect(start).not.toMatch(/\.Wait\(|\.Result|GetAwaiter|ExecuteScriptAsync/);
+  }
+  const cancel = form.slice(
+    form.indexOf('internal void CancelInstall()'),
+    form.indexOf('internal string? BrowseInstallDir('),
+  );
+  expect(cancel).toContain('Invoke(new Action(CancelInstall))');
+  expect(cancel).toContain('if (!operationActive || installState == "done") return;');
+  expect(cancel).toContain('operation.Cancel();');
+  expect(form).toContain('RecordLifecycle("operation-admitted")');
+  expect(form).toContain('RecordLifecycle("cancel-received")');
+});
+
+test('host close queues the normal rollback lifecycle and keeps diagnostic output bounded', () => {
+  expect(form).toContain('public void RequestClose() => form.RequestClose();');
+  const close = form.slice(
+    form.indexOf('internal void RequestClose()'),
+    form.indexOf('private void RecordLifecycle('),
+  );
+  expect(close).toContain('BeginInvoke(() =>');
+  expect(close).toContain('RecordLifecycle("bridge-close-dispatched")');
+  expect(close).toContain('Close();');
+  expect(close).not.toMatch(/Environment\.Exit|Application\.Exit|Dispose\(|operationActive\s*=/);
+  const formClosing = form.slice(form.indexOf('FormClosing +='), form.indexOf('FormClosed +='));
+  for (const marker of [
+    'if (!operationActive) return;',
+    'e.Cancel = true;',
+    'closeRequested = true;',
+    'operation.Cancel();',
+  ])
+    expect(formClosing).toContain(marker);
+  expect(form).toContain('if (closeRequested) Close();');
+  expect(form).toContain('if (lifecycleEvents++ >= 64) return;');
+  for (const stage of [
+    'form-closing',
+    'form-close-deferred',
+    'form-closed',
+    'form-cleanup-finished',
+    'operation-finished',
+  ])
+    expect(form).toContain(`RecordLifecycle("${stage}")`);
+  // This fix uses the working host-object transport, not a second subscription.
+  expect(form).toContain('webView.WebMessageReceived += OnWebMessage;');
+  expect(form).not.toContain('webView.CoreWebView2.WebMessageReceived += OnWebMessage;');
 });
 
 test('license is embedded and acceptance debugging is opt-in, loopback-only and isolated', () => {
@@ -166,7 +296,9 @@ test.skipIf(!dotnetAvailable)(
         'InstallDirectoryTransaction.cs',
         'InstallRegistrationSnapshot.cs',
         'ShellProcessRunner.cs',
+        'WindowsShellLink.cs',
         'UninstallerEngine.cs',
+        'SetupOperation.cs',
       ];
       fs.writeFileSync(
         path.join(root, 'Contracts.csproj'),
@@ -181,6 +313,73 @@ static void Check(bool condition, string message) { if (!condition) throw new Ex
 var root = Path.Combine(Path.GetTempPath(), "zy-engine-behavior-" + Guid.NewGuid().ToString("n"));
 Directory.CreateDirectory(root);
 try {
+    using (var operation = new SetupOperation()) {
+        operation.Cancel();
+        var admittedToken = operation.Begin();
+        Check(operation.IsActive && !admittedToken.IsCancellationRequested, "idle cancel poisoned admission");
+        var originalCulture = System.Globalization.CultureInfo.CurrentUICulture;
+        try {
+            foreach (var culture in new[] { "zh-CN", "en-US" }) {
+                System.Globalization.CultureInfo.CurrentUICulture = System.Globalization.CultureInfo.GetCultureInfo(culture);
+                var busyRejected = false;
+                try { operation.Begin(); } catch (InvalidOperationException ex) {
+                    busyRejected = true;
+                    Check(ex.Message.Contains(culture == "zh-CN" ? "请稍候重试" : "Please try again shortly"), "busy admission message did not follow the UI culture");
+                }
+                Check(busyRejected && operation.IsActive, "busy admission silently succeeded or ended the original operation");
+            }
+        } finally { System.Globalization.CultureInfo.CurrentUICulture = originalCulture; }
+        using var startWorker = new ManualResetEventSlim();
+        var queuedWorker = Task.Run(() => {
+            startWorker.Wait();
+            return admittedToken.IsCancellationRequested;
+        });
+        operation.Cancel();
+        startWorker.Set();
+        Check(queuedWorker.GetAwaiter().GetResult(), "cancel between admission and worker start was lost");
+        Check(operation.IsActive, "cancel incorrectly completed the operation before rollback");
+        operation.Complete();
+        Check(!operation.IsActive, "worker completion did not release operation");
+        operation.Cancel();
+        var retryToken = operation.Begin();
+        Check(!retryToken.IsCancellationRequested && retryToken != admittedToken, "retry reused a cancelled token");
+        Check(admittedToken.IsCancellationRequested, "retry changed the previous worker token");
+        operation.Cancel();
+        Check(retryToken.IsCancellationRequested, "active retry cancellation was lost");
+        operation.Complete();
+        var successToken = operation.Begin();
+        operation.Complete();
+        operation.Cancel();
+        Check(!successToken.IsCancellationRequested, "late cancellation changed a completed operation");
+        var nextToken = operation.Begin();
+        Check(!nextToken.IsCancellationRequested, "late cancellation poisoned the next operation");
+        operation.Complete();
+    }
+    Console.WriteLine("PASS: admission cancellation reaches the queued worker; rollback stays active; retries and completed operations are isolated");
+
+    var payloadEvents = new List<EngineEvent>();
+    var payloadProgress = new ContractProgress(payloadEvents.Add);
+    var lastPercent = -1;
+    const int reads = 100_000;
+    for (var bytes = 0; bytes <= reads; bytes++)
+        InstallerEngine.ReportPayloadProgress(payloadProgress, bytes, reads, ref lastPercent);
+    InstallerEngine.ReportPayloadProgress(payloadProgress, reads, reads, ref lastPercent);
+    Check(payloadEvents.Count == 101, "payload queued more than one event per visible percentage");
+    Check(payloadEvents.Select(evt => evt.Percent).SequenceEqual(Enumerable.Range(0, 101).Select(value => (int?)value)), "payload percentages were not monotonic and complete");
+    Check(payloadEvents[^1].BytesDone == reads && payloadEvents[^1].BytesTotal == reads, "payload final byte count was lost");
+    foreach (var terminal in new[] { "done", "error" }) {
+        payloadProgress.Report(new EngineEvent(Type: "phase", Label: "ready"));
+        payloadProgress.Report(new EngineEvent(Type: terminal));
+        InstallerEngine.ReportPayloadProgress(payloadProgress, reads / 2, reads, ref lastPercent);
+        Check(payloadEvents[^2].Type == "phase" && payloadEvents[^1].Type == terminal, "stale progress overtook a phase or terminal event");
+    }
+    var emptyEvents = new List<EngineEvent>();
+    var emptyProgress = new ContractProgress(emptyEvents.Add);
+    lastPercent = -1;
+    InstallerEngine.ReportPayloadProgress(emptyProgress, 0, 0, ref lastPercent);
+    Check(emptyEvents.Count == 1 && emptyEvents[0].Percent == 100, "empty payload did not report completion");
+    Console.WriteLine("PASS: 100000 payload reads produce 101 ordered updates and no stale progress after completion");
+
     var install = Path.Combine(root, "app");
     var data = Path.Combine(root, "user-data");
     Directory.CreateDirectory(data);
@@ -267,6 +466,96 @@ try {
     Check(File.ReadAllText(Path.Combine(migrated, "a")) == "user-newer", "migration overwrote user changes");
     Check(File.ReadAllText(Path.Combine(migrated, "b")) == "missing", "migration retry skipped missing file");
 
+    if (OperatingSystem.IsWindows()) {
+        // Use only the runner's own Windows binary, copied into isolated roots.
+        // Loopback ping remains alive until the real production stop method
+        // terminates it; a sibling-root instance must not be touched.
+        var systemPing = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "PING.EXE");
+        var outsideRoot = Path.Combine(root, "outside-process");
+        Directory.CreateDirectory(outsideRoot);
+        var outsideExe = Path.Combine(outsideRoot, "ping.exe");
+        File.Copy(systemPing, outsideExe);
+        System.Diagnostics.Process StartPing(string executable) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
+            FileName = executable, Arguments = "-t 127.0.0.1", WorkingDirectory = root,
+            UseShellExecute = false, CreateNoWindow = true,
+        }) ?? throw new Exception("Could not start the Windows process fixture");
+        void StopFixture(System.Diagnostics.Process process) {
+            if (process.HasExited) return;
+            process.Kill();
+            Check(process.WaitForExit(10000), "Process fixture cleanup timed out");
+        }
+        using var outsideProcess = StartPing(outsideExe);
+        try {
+            Check(!outsideProcess.WaitForExit(100), "External fixture exited before the test");
+            foreach (var uninstall in new[] { false, true }) {
+                var stopRoot = Path.Combine(root, uninstall ? "停止 卸载" : "停止 安装");
+                Directory.CreateDirectory(Path.Combine(stopRoot, "resources"));
+                File.WriteAllText(Path.Combine(stopRoot, "resources", "app.asar"), "process-fixture-asar");
+                var targetExe = Path.Combine(stopRoot, InstallerEngine.AppExeName);
+                File.Copy(systemPing, targetExe);
+                using var targetProcess = StartPing(targetExe);
+                try {
+                    Check(!targetProcess.WaitForExit(100), "Owned fixture exited before the test");
+                    object stopEngine = uninstall
+                        ? new UninstallerEngine(stopRoot, Path.Combine(root, "runtime"), data, null, new ContractProgress(_ => {}))
+                        : new InstallerEngine(null, stopRoot, Path.Combine(root, "runtime"), data, false, new ContractProgress(_ => {}));
+                    var stopMethod = stopEngine.GetType().GetMethod("StepStopAppProcesses", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                        ?? throw new Exception("Production process-stop method is missing");
+                    using var cancelledStop = new CancellationTokenSource();
+                    cancelledStop.Cancel();
+                    var stopCancelled = false;
+                    try { ((Task)stopMethod.Invoke(stopEngine, new object[] { cancelledStop.Token })!).GetAwaiter().GetResult(); }
+                    catch (OperationCanceledException) { stopCancelled = true; }
+                    Check(stopCancelled && !targetProcess.HasExited, "Pre-cancelled stop killed an app or ignored cancellation");
+                    ((Task)stopMethod.Invoke(stopEngine, new object[] { CancellationToken.None })!).GetAwaiter().GetResult();
+                    Check(targetProcess.HasExited, "Stop returned before the matched process handle signalled exit");
+                    Check(!outsideProcess.HasExited, "Stop killed a process outside its owned roots");
+                    var stoppedTransaction = new InstallDirectoryTransaction(stopRoot);
+                    stoppedTransaction.Begin();
+                    Check(!Directory.Exists(stopRoot) && Directory.Exists(stoppedTransaction.BackupDir), "Immediate rename after stop failed");
+                    stoppedTransaction.Rollback();
+                    Check(File.Exists(targetExe), "Stopped installation could not be restored");
+                } finally { StopFixture(targetProcess); }
+            }
+        } finally { StopFixture(outsideProcess); }
+        Console.WriteLine("PASS: actual Windows install/uninstall stop waits for exit before rename, preserves sibling processes and honors cancellation");
+
+        // Match SetupForm's Task.Run apartment and real Unicode install path,
+        // without touching the user's registry, Desktop or Start Menu.
+        var shortcutInstall = Path.Combine(root, "安装 路径");
+        Directory.CreateDirectory(Path.Combine(shortcutInstall, "resources"));
+        File.WriteAllText(Path.Combine(shortcutInstall, "resources", "app.asar"), "shortcut-asar");
+        File.WriteAllText(Path.Combine(shortcutInstall, InstallerEngine.AppExeName), "shortcut-target");
+        var shortcutEngine = new InstallerEngine(null, shortcutInstall, Path.Combine(root, "runtime"), data, false, new Progress<EngineEvent>());
+        foreach (var folderName in new[] { "开始菜单", "桌面" }) {
+            var shortcutFolder = Path.Combine(root, folderName);
+            Directory.CreateDirectory(shortcutFolder);
+            Task.Run(() => {
+                Check(Thread.CurrentThread.GetApartmentState() == ApartmentState.MTA, "shortcut test must match the engine's MTA worker");
+                try { shortcutEngine.CreateShortcut(shortcutFolder); }
+                catch (EngineException ex) { Console.Error.WriteLine(ex.Detail); throw; }
+                var linkPath = Path.Combine(shortcutFolder, InstallerEngine.DisplayName + ".lnk");
+                Check(File.Exists(linkPath), "shortcut file was not saved");
+                var link = (IShellLinkW)new ShellLinkComObject();
+                try {
+                    ((System.Runtime.InteropServices.ComTypes.IPersistFile)link).Load(linkPath, 0);
+                    var target = new System.Text.StringBuilder(32768);
+                    link.GetPath(target, target.Capacity, IntPtr.Zero, 4);
+                    Check(target.ToString() == shortcutEngine.LaunchPath, "shortcut lost its Unicode executable path");
+                    var workingDirectory = new System.Text.StringBuilder(32768);
+                    link.GetWorkingDirectory(workingDirectory, workingDirectory.Capacity);
+                    Check(workingDirectory.ToString() == shortcutInstall, "shortcut lost its Unicode working directory");
+                    var icon = new System.Text.StringBuilder(32768);
+                    link.GetIconLocation(icon, icon.Capacity, out var iconIndex);
+                    Check(icon.ToString() == shortcutEngine.LaunchPath && iconIndex == 0, "shortcut lost its Unicode icon path");
+                } finally {
+                    System.Runtime.InteropServices.Marshal.FinalReleaseComObject(link);
+                }
+            }).GetAwaiter().GetResult();
+        }
+        Console.WriteLine("PASS: actual Unicode shortcut creation and target readback on MTA worker");
+    }
+
     // Minimal PE32+ envelope with both unsigned and certificate-bearing forms.
     byte[] Sfx(bool signed) {
         var bytes = new byte[signed ? 576 : 560];
@@ -293,6 +582,9 @@ try {
     Check(refused, "corrupt certificate offset accepted");
     Console.WriteLine("PASS: transaction recovery, retention, path guards");
 } finally { Directory.Delete(root, recursive: true); }
+sealed class ContractProgress(Action<EngineEvent> report) : IProgress<EngineEvent> {
+    public void Report(EngineEvent value) => report(value);
+}
 `,
       );
       const result = spawnSync(
@@ -312,6 +604,16 @@ try {
       );
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       expect(result.stdout).toContain('PASS: transaction recovery');
+      expect(result.stdout).toContain('PASS: admission cancellation reaches the queued worker');
+      expect(result.stdout).toContain('PASS: 100000 payload reads produce 101 ordered updates');
+      if (process.platform === 'win32') {
+        expect(result.stdout).toContain(
+          'PASS: actual Windows install/uninstall stop waits for exit before rename',
+        );
+        expect(result.stdout).toContain(
+          'PASS: actual Unicode shortcut creation and target readback on MTA worker',
+        );
+      }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

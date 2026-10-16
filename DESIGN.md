@@ -367,3 +367,12 @@ Codex 基准 `--zy-radius` 为 10px；各派生 token 按下表确定，不依�
 - [ ] 修改 token/recipe/生成器后执行 `bun run theme:generate`；代码改动执行 `bun run lint`（含 theme:check/audit），提交前执行 `bun run format:check`。
 - [ ] 共享契约/引擎改动执行 `bunx vitest run src/renderer src/shared`、`bun run build`、`bun run test:bundle-budget`；新增/修改测试实际运行通过。
 - [ ] UI 改动通过 `bun run electron:dev` 验证相关 Cowork、权限、停止、Artifacts、主题/语言切换流程，记录实际覆盖范围，不以编译或截图代替行为验证。
+
+
+### Windows 安装壳官网风格（2026-10-15 用户要求，待视觉验收）
+
+独立 860×560 WebView2 安装壳采用官网参考的浅天蓝至白背景、柔和静态云感、深墨色文字与黑色胶囊主按钮、白底细边次按钮。仅限 `scripts/installer-shell/preview/index.html` 的独立样式；不扩散到产品 renderer、NSIS 系统向导或官网。复用现有正式字标和蓝点，不新增品牌图片、远程字体、远程请求或运行时依赖。标题使用系统宋体 / serif（32px 首屏、28px 状态），正文 Segoe UI / Microsoft YaHei UI 14px，窗口标题12px；按钮44px高。此标题字阶、胶囊与背景是本轮官网对齐要求的明确局部设计变化。
+
+品牌只在标题栏出现一次，主体用“开始你的 AI 工作台 / Set up your AI workspace”任务标题；进度页用纯细环与“正在安装”，不重复品牌图标或阶段标签。按钮按下立即以墨色/轻微内阴影反馈，无缩放、弹簧、光晕或长延迟；移出松开不得启动。首屏、真实进度、完成、错误重试和卸载沿用原有宿主桥接、事件、许可门、安装位置与按钮状态；主仓保留本地推理选项，知远保留其现有功能范围。路径单行省略，原文保留于 textContent / title / aria-label，低高度允许内容滚动，焦点、禁用、reduced-motion 与 forced-colors 状态须验证。浏览器渲染只证明视觉与 DOM 交互，不代替最终 Windows 单文件安装验收。
+
+参考来源：`rongxinzy/rongxinxzyai-pages` commit `432c14d003fb284f565e49f2ea024ce529ee95f6` 的 `src/editorial/site.css` / `Home.tsx` 与用户截图。官网仓库只读；不复制其字体或 CloudShader 运行时；在独立视觉 CI 中将官网现有 CloudShader 固定 t=0 渲染为 860×560 WebP（4096 bytes），以 data URI 内嵌。该授权官网派生静态资产只用于本安装壳，来源与生成参数在验收记录中保留。

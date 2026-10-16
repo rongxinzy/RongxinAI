@@ -483,7 +483,32 @@ Var /GLOBAL zyDeleteRealAppData
   UninstPage custom ${ZY_UNPREFIX}ZYUnWelcomeCreate ${ZY_UNPREFIX}ZYUnWelcomeLeave
 !macroend
 
+; NSIS/MUI does not implement /LANGUAGE=. Keep the system/MUI choice when
+; absent, and resolve an explicit supported UI language before any page or
+; installation work. Unsupported requests must not silently become English.
+!macro ApplyRequestedInstallerLanguage
+  Push $0
+  Push $1
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "/LANGUAGE=" $1
+  ${IfNot} ${Errors}
+    ${If} $1 == "2052"
+    ${OrIf} $1 == "1028"
+    ${OrIf} $1 == "1033"
+      StrCpy $LANGUAGE $1
+    ${Else}
+      SetErrorLevel 87
+      Quit
+    ${EndIf}
+  ${EndIf}
+  ClearErrors
+  Pop $1
+  Pop $0
+!macroend
+
 !macro customInit
+  !insertmacro ApplyRequestedInstallerLanguage
   !insertmacro StageInstallSafetyScripts
   SetDetailsPrint textonly
   CreateDirectory "$APPDATA\ZhiYuanAgent"

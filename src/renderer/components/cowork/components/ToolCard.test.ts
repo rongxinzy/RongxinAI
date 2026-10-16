@@ -92,6 +92,21 @@ test('shows an error once and keeps detailed output available', () => {
   expect(screen.getAllByText('permission refused')).toHaveLength(1);
 });
 
+test('caps long error output until explicitly expanded', () => {
+  setPersistentToggleNamespace('long-error-output');
+  const fixture = group(
+    'long-error',
+    Array.from({ length: 250 }, (_, index) => `error line ${index + 1}`).join('\n'),
+    true,
+  );
+  render(createElement(ToolCard, { group: fixture }));
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByText(/error line 1 error line 2/).textContent).toContain('error line 200');
+  expect(screen.getByText(/error line 1 error line 2/).textContent).not.toContain('error line 201');
+  fireEvent.click(screen.getByRole('button', { name: i18nService.t('coworkToolResultShowAll') }));
+  expect(screen.getByText(/error line 1 error line 2/).textContent).toContain('error line 250');
+});
+
 test('exports a previously folded tool with the full output', () => {
   setPersistentToggleNamespace('closed-export');
   const fixture = group(
@@ -147,4 +162,14 @@ test('opens approval details and sends the original input when allowed', () => {
     behavior: CoworkPermissionBehavior.Allow,
     updatedInput: input,
   });
+});
+
+test('caps single-line oversized tool output by character limit until expanded', () => {
+  setPersistentToggleNamespace('single-line-huge');
+  const hugeLine = `${'a'.repeat(12_000)}TAIL_MARKER`;
+  render(createElement(ToolCard, { group: group('huge-line', hugeLine) }));
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.queryByText(/TAIL_MARKER/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: i18nService.t('coworkToolResultShowAll') }));
+  expect(screen.getByText(/TAIL_MARKER/)).toBeVisible();
 });

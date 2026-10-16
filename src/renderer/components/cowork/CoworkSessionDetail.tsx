@@ -92,7 +92,7 @@ import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
 import { usePersistedArtifactSeed } from './helpers/usePersistedArtifactSeed';
-import { setPersistentToggleNamespace } from './hooks/usePersistentToggle';
+import { resolveStableSessionKey, setPersistentToggleNamespace } from './hooks/usePersistentToggle';
 // toolUtils helpers used in sub-components
 import {
   normalizeLocalPath,
@@ -648,6 +648,27 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           if (!scrollContainer) {
             throw new Error('Capture target not found');
           }
+          // Wait for React to commit `renderAll` / `forceExpand` and for lazy
+          // subtrees to settle their DOM height before measuring anchors.
+          await waitForNextFrame();
+          let previousHeight = -1;
+          let previousAnchorCount = -1;
+          for (let frame = 0; frame < 6; frame += 1) {
+            await waitForNextFrame();
+            const currentHeight = scrollContainer.scrollHeight;
+            const currentAnchorCount = scrollContainer.querySelectorAll(
+              '[data-export-role="user-message"], [data-export-role="assistant-block"]',
+            ).length;
+            if (
+              currentHeight === previousHeight &&
+              currentAnchorCount === previousAnchorCount &&
+              currentHeight > 0
+            ) {
+              break;
+            }
+            previousHeight = currentHeight;
+            previousAnchorCount = currentAnchorCount;
+          }
           const initialScrollTop = scrollContainer.scrollTop;
           try {
             const scrollRect = domRectToCaptureRect(scrollContainer.getBoundingClientRect());
@@ -896,13 +917,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     [dispatch],
   );
 
+  // Scope persisted collapsible state to this session. Rendered sessions are
+  // shown one at a time, so a render-time namespace assignment is safe.
+  setPersistentToggleNamespace(currentSession?.id ?? '');
+  const stableSessionKey = resolveStableSessionKey(sessionId);
+
   const messages = currentSession?.messages;
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
   const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
   // Stabilize turn object identity so completed turns do not re-render on
   // every streaming token (issue #141).
-  const turns = useStableConversationTurns(rawTurns, sessionId);
+  const turns = useStableConversationTurns(rawTurns, stableSessionKey);
   // 末轮已有匹配工具卡片时，授权按钮画在卡片里，不再单独渲染白底授权卡
   const lastTurnItems = turns[turns.length - 1]?.assistantItems;
   const hasInlineToolPermissionCard = Boolean(
@@ -922,15 +948,33 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     PREVIEWABLE_ARTIFACT_TYPES,
     currentSession?.cwd,
   );
-  // Scope persisted collapsible state to this session. Rendered sessions are
-  // shown one at a time, so a render-time namespace assignment is safe.
-  setPersistentToggleNamespace(currentSession?.id ?? '');
 
   const markInitialHistoryTailPositioned = useSessionHistoryPagination({
     sessionId,
     messagesOffset: currentSession?.messagesOffset ?? 0,
     rootRef: detailRootRef,
   });
+
+  // Automatically ensure interactive prompt/permission cards stay in view
+  useEffect(() => {
+    if (inlineQuestionPermission || (inlinePermission && !hasInlineToolPermissionCard)) {
+      const scrollElement = scrollContainerRef.current?.closest(
+        '.cowork-conversation-scroll',
+      ) as HTMLElement | null;
+      if (scrollElement) {
+        requestAnimationFrame(() => {
+          scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
+        });
+      }
+    }
+  }, [inlineQuestionPermission, inlinePermission, hasInlineToolPermissionCard]);
+
+  const effectiveTurns = useMemo(() => {
+    if (turns.length === 0 && isStreaming) {
+      return [{ id: 'streaming-only', userMessage: null, assistantItems: [] }];
+    }
+    return turns;
+  }, [turns, isStreaming]);
 
   // StickToBottom (Conversation) handles auto-scroll during streaming
 
@@ -941,36 +985,26 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const hideDefaultAssistantHeader = currentSession.mode === CoworkSessionMode.Chat;
 
   const renderConversationTurns = () => {
-    if (turns.length === 0) {
-      if (!isStreaming) return null;
-      return (
-        <div data-export-role="assistant-block">
-          <TurnBlock
-            turn={{
-              id: 'streaming-only',
-              userMessage: null,
-              assistantItems: [],
-            }}
-            resolveLocalFilePath={resolveLocalFilePath}
-            showTypingIndicator={toolActivities.length === 0}
-            toolActivities={toolActivities}
-            showCopyButtons={!isStreaming}
-            isTurnComplete={false}
-            hideDefaultAssistantHeader={hideDefaultAssistantHeader}
-          />
-        </div>
-      );
+    if (effectiveTurns.length === 0) {
+      return null;
     }
 
-    const renderTurn = (turn: (typeof turns)[number], index: number) => {
-      const isLastTurn = index === turns.length - 1;
+    const renderTurn = (turn: (typeof effectiveTurns)[number], index: number) => {
+      if (!turn) return null;
+      const isStreamingOnly = turn.id === 'streaming-only';
+      const isLastTurn = index === effectiveTurns.length - 1;
       const hasActiveToolActivity = isStreaming && isLastTurn && toolActivities.length > 0;
       const showTypingIndicator =
         isStreaming &&
         isLastTurn &&
-        !hasActiveTurnStreamingContent(turn, toolActivities, inlinePermission);
+        (isStreamingOnly
+          ? toolActivities.length === 0
+          : !hasActiveTurnStreamingContent(turn, toolActivities, inlinePermission));
       const showAssistantBlock =
-        turn.assistantItems.length > 0 || showTypingIndicator || hasActiveToolActivity;
+        isStreamingOnly ||
+        turn.assistantItems.length > 0 ||
+        showTypingIndicator ||
+        hasActiveToolActivity;
 
       const turnArtifacts = turnArtifactsMap.get(turn.id) ?? [];
 
@@ -1002,6 +1036,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 // 流式或恢复中禁用继续执行按钮
                 resumeDisabled={resumeDisabled || isStreaming}
                 onResumeTask={onResumeTask ? handleResumeTask : undefined}
+                hideDefaultAssistantHeader={hideDefaultAssistantHeader}
                 // 仅末轮需要工具授权，避免历史轮次误挂授权按钮
                 pendingPermission={isLastTurn ? inlinePermission : null}
                 onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
@@ -1021,9 +1056,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     return (
       <VirtualizedTurnList
-        key={sessionId}
+        key={stableSessionKey}
         ref={virtualizedTurnListRef}
-        turns={turns}
+        turns={effectiveTurns}
         onInitialTailPositioned={markInitialHistoryTailPositioned}
         renderTurn={renderTurn}
         renderAll={isExportingImage}
@@ -1048,7 +1083,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       runIndicator={
         isSessionSwitching ? null : (
           <CoworkRunStatus
-            key={currentSession.id}
+            key={stableSessionKey}
             sessionId={currentSession.id}
             isStreaming={isStreaming}
           />
@@ -1227,7 +1262,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onCancelTaskResume={onCancelTaskResume}
                   sessionId={displayedSessionId ?? currentSession?.id}
                 />
-                <p className="text-center text-xs text-muted opacity-85 mt-2 mb-[-8px] select-none">
+                <p className="text-center text-xs text-muted-foreground mt-2 select-none">
                   {i18nService.t('aiGeneratedDisclaimer')}
                 </p>
               </div>

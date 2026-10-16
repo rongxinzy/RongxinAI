@@ -170,6 +170,7 @@
     "regenerate:icon": "python3 scripts/generate-app-icons.py",
     "fix:mac-icon": "bash scripts/fix-mac-icon-display.sh",
     "check:electron-runtime-dependencies": "node scripts/ci/check-electron-runtime-dependencies.mjs",
+    "python:build:job-runner": "powershell -ExecutionPolicy Bypass -File scripts/python-runtime/build-job-runner.ps1",
     "theme:generate": "bun src/renderer/theme/scripts/generate-css.ts",
     "theme:check": "bun src/renderer/theme/scripts/generate-css.ts --check",
     "theme:audit": "bun src/renderer/theme/scripts/audit-styles.ts"

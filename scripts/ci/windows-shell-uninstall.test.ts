@@ -9,6 +9,17 @@ const scriptPath = path.join(__dirname, 'windows-shell-uninstall.ps1');
 const helperPath = path.join(__dirname, 'windows-shell-uninstall-helpers.ps1');
 const driver = fs.readFileSync(scriptPath, 'utf8');
 const helpers = fs.readFileSync(helperPath, 'utf8');
+const installedPathDefinition = driver.slice(
+  driver.indexOf('$unicodeInstallName ='),
+  driver.indexOf('$customData ='),
+);
+
+test('native uninstall independently constructs Unicode paths safely under Windows PowerShell 5', () => {
+  expect([...driver, ...helpers].every(character => character.codePointAt(0)! < 128)).toBe(true);
+  expect(installedPathDefinition).toContain('$unicodeInstallName =');
+  expect(installedPathDefinition).toContain('$app = Join-Path $installRoot $appName');
+  expect(driver).toContain('Assert-SameAcceptancePath $shellReport.installedExecutable $app');
+});
 
 test('hashing streams bytes and host modules cannot depend on inherited pwsh search paths', () => {
   expect(helpers).not.toContain('Get-FileHash');
@@ -92,6 +103,9 @@ foreach ($file in @(${quote(scriptPath)}, ${quote(helperPath)})) {
 }
 . ${quote(helperPath)}
 $root = ${quote(fixture)}
+$sandbox = Join-Path $root 'zhiyuan-shell-acceptance'
+${installedPathDefinition}
+[IO.File]::WriteAllText((Join-Path $root 'installed-path.txt'), $app, [Text.UTF8Encoding]::new($false))
 $env:PSModulePath = [IO.Path]::Combine($root, 'no-module-search-path')
 Initialize-AcceptanceModules
 $hashFixture = Join-Path $root 'hash [literal] $x.bin'
@@ -169,6 +183,9 @@ Write-Output 'PASS: actual leases, literal paths, host identity and non-destruct
       );
       expect(result.stdout).toContain(
         'PASS: standard SHA256 vectors and real Security/CIM modules with no module search path',
+      );
+      expect(fs.readFileSync(path.join(fixture, 'installed-path.txt'), 'utf8')).toBe(
+        path.join(fixture, 'zhiyuan-shell-acceptance/安装路径/知远.exe'),
       );
     } finally {
       fs.rmSync(fixture, { recursive: true, force: true });

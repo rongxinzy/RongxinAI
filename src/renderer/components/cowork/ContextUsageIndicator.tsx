@@ -1,7 +1,12 @@
-import { ContextUsageState, getContextUsageState } from '@shared/components/ai-elements/context';
+import {
+  ContextUsageGauge,
+  ContextUsageState,
+  getContextUsageState,
+} from '@shared/components/ai-elements/context';
 import { Button } from '@shared/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
+import { useMemo } from 'react';
 import { i18nService } from '../../services/i18n';
 import type { CoworkContextUsage, CoworkMessage, CoworkMessageMetadata } from '../../types/cowork';
 import { formatTokenCount } from '../../utils/tokenFormat';
@@ -19,6 +24,20 @@ interface ContextUsageIndicatorProps {
 
 const estimateTokens = (text: string): number => Math.max(0, Math.round(text.length / 4));
 
+const estimateToolMessageTokens = (message: CoworkMessage): number => {
+  if (message.content) return estimateTokens(message.content);
+  const toolInput = message.metadata?.toolInput;
+  if (toolInput != null) {
+    try {
+      return estimateTokens(JSON.stringify(toolInput));
+    } catch {
+      return 0;
+    }
+  }
+  const fallback = message.metadata?.toolResult ?? message.metadata?.error;
+  return typeof fallback === 'string' ? estimateTokens(fallback) : 0;
+};
+
 export function ContextUsageIndicator({
   usage,
   messageUsage,
@@ -29,6 +48,23 @@ export function ContextUsageIndicator({
   messages = [],
   systemPrompt = '',
 }: ContextUsageIndicatorProps) {
+  const { estimatedSystemTokens, estimatedToolTokens, estimatedMessageTokens } = useMemo(() => {
+    let toolTokens = 0;
+    let messageTokens = 0;
+    for (const message of messages) {
+      if (message.type === 'tool_use' || message.type === 'tool_result') {
+        toolTokens += estimateToolMessageTokens(message);
+      } else if (message.type === 'user' || message.type === 'assistant') {
+        messageTokens += estimateTokens(message.content);
+      }
+    }
+    return {
+      estimatedSystemTokens: estimateTokens(systemPrompt),
+      estimatedToolTokens: toolTokens,
+      estimatedMessageTokens: messageTokens,
+    };
+  }, [messages, systemPrompt]);
+
   // A fresh conversation has no runtime measurement yet. Keep the toolbar
   // clean until the first assistant response provides an actual snapshot.
   if (!usage) return null;
@@ -66,27 +102,10 @@ export function ContextUsageIndicator({
     .replace('{total}', formatTokenCount(totalTokens))
     .replace('{remaining}', formatTokenCount(remainingTokens));
 
-  const circumference = 2 * Math.PI * 8;
-  const dashOffset = circumference * (1 - percent / 100);
-  const estimatedSystemTokens = estimateTokens(systemPrompt);
-  const estimatedToolTokens = messages
-    .filter(message => message.type === 'tool_use' || message.type === 'tool_result')
-    .reduce((total, message) => total + estimateTokens(message.content), 0);
-  const estimatedMessageTokens = messages
-    .filter(message => message.type === 'user' || message.type === 'assistant')
-    .reduce((total, message) => total + estimateTokens(message.content), 0);
   const rows = [
     [i18nService.t('coworkContextUsageSystem'), estimatedSystemTokens, 'var(--zy-text-secondary)'],
-    [
-      i18nService.t('coworkContextUsageTools'),
-      estimatedToolTokens,
-      'var(--zy-model-tag-violet-foreground)',
-    ],
-    [
-      i18nService.t('coworkContextUsageMessages'),
-      estimatedMessageTokens,
-      'var(--zy-skill-blue-foreground)',
-    ],
+    [i18nService.t('coworkContextUsageTools'), estimatedToolTokens, 'var(--primary)'],
+    [i18nService.t('coworkContextUsageMessages'), estimatedMessageTokens, 'var(--foreground)'],
   ] as const;
   const estimatedTotal = rows.reduce((total, [, tokens]) => total + tokens, 0);
   const usedBarWidth = `${percent}%`;
@@ -101,29 +120,11 @@ export function ContextUsageIndicator({
               render={
                 <Button type="button" variant="ghost" size="icon-sm" aria-label={summary}>
                   <span className="sr-only">{summary}</span>
-                  <svg aria-hidden="true" viewBox="0 0 20 20" className={usageStateClassName}>
-                    <circle
-                      cx="10"
-                      cy="10"
-                      r="8"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      opacity="0.25"
-                    />
-                    <circle
-                      cx="10"
-                      cy="10"
-                      r="8"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={dashOffset}
-                      strokeLinecap="round"
-                      style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}
-                    />
-                  </svg>
+                  <ContextUsageGauge
+                    usedTokens={usedTokens}
+                    maxTokens={totalTokens}
+                    className={usageStateClassName}
+                  />
                 </Button>
               }
             />

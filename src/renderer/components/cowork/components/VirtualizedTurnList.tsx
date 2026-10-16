@@ -104,8 +104,15 @@ export const VirtualizedTurnList = React.forwardRef<
 
     // Upward anchor adjustments stay short of the end and must not schedule a
     // later scroll write. Initial row refs can run before the sizer ref attaches,
-    // so a clamped tail write during mounting still needs a retry.
-    const seeksTail = wasAtTail || requestedOffset >= maxScroll - 1;
+    // and the sizer grows in the same turn after this scrollTop assignment, so a
+    // clamped tail write during mounting still needs a retry.
+    const totalSize = typeof instance.getTotalSize === 'function' ? instance.getTotalSize() : null;
+    const virtualizerMaxScroll =
+      totalSize !== null ? Math.max(totalSize - scrollElement.clientHeight, 0) : null;
+    const seeksTail =
+      wasAtTail ||
+      requestedOffset >= maxScroll - 1 ||
+      (virtualizerMaxScroll !== null && requestedOffset >= virtualizerMaxScroll - 1);
     if (!seeksTail && options.behavior === undefined) return;
     const clampedOffset = scrollElement.scrollTop;
     if (requestedOffset - clampedOffset < 1) return;
