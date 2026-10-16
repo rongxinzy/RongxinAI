@@ -136,6 +136,18 @@ The renderer owns the UI, preload provides the communication boundary, and the m
 
 </details>
 
+## Browser preview mode
+
+Preview the renderer in a plain browser without Electron:
+
+```bash
+npm run web:preview
+```
+
+This starts a Vite dev server on port 5176 with mock implementations of all Electron APIs. Use it for rapid UI iteration, visual testing, and screenshots. The mock provides realistic fixture data for sessions, skills, MCP servers, local inference, and all other features.
+
+The mock is only active in browser mode (`import.meta.env.DEV` + no `window.electron`). Production builds and Electron runs use the real preload bridge.
+
 ## Contribute
 
 - [Report a bug](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml) with your system, app version, reproduction steps, and relevant logs.

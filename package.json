@@ -69,6 +69,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "web:preview": "vite --config vite.config.browser.ts",
     "build": "npm run build:tsc && npm run build:vite && npm run check:electron-runtime-dependencies",
     "build:tsc": "tsc",
     "build:vite": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",

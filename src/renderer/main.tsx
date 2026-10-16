@@ -13,11 +13,15 @@ import { EnterpriseSessionGate } from './components/enterprise/EnterpriseSession
 import { ContextMenu } from './components/ContextMenu';
 import { startCodingFailureNoticeListener } from './services/codingFailureNotice';
 import { startRuntimeNoticeListener } from './services/runtimeNotice';
+import { installBrowserMock } from './browserMock/installMock';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Failed to find the root element');
 }
+
+// Install browser mock if running without Electron
+installBrowserMock();
 
 const routeParams = new URLSearchParams(window.location.search);
 const isModelLaunchLogWindow =

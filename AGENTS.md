@@ -12,6 +12,7 @@
 
 ```bash
 bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
+bun run web:preview        # 浏览器预览模式（端口 5176，无需 Electron，有模拟数据）
 bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
 bun run format             # oxfmt；提交前 bun run format:check
@@ -21,6 +22,17 @@ bun run dist:mac|dist:win|dist:linux
 bun run theme:generate     # 改 token/recipe/生成器后必跑
 bun run rebuild:electron-native   # 原生模块依赖变更后
 ```
+
+### 浏览器预览模式
+
+`bun run web:preview` 在普通浏览器（不依赖 Electron）中预览渲染器全部界面，适用于快速 UI 迭代、截图与视觉测试。
+
+- 在 `import.meta.env.DEV` 且无 `window.electron` 时自动启用 mock 实现（`src/renderer/browserMock/`）
+- Mock 提供完整 preload API（会话、Skills、MCP、本地推理、定时任务、IM、记忆、Todos 等）与真实 fixture 数据
+- 生产构建与 Electron 运行时不含 mock 代码，只走真实 IPC bridge
+- 共享 IPC 契约类型（`src/shared/ipc/`）保证 mock 同步，contract 变更时类型错误提示 mock 失效
+
+Playwright 测试（`tests/browserPreview.test.ts`）验证所有主要界面可渲染并生成明暗主题截图（`docs/browser-preview-screenshots/`）。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 
