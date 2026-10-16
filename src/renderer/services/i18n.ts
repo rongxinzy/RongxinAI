@@ -3255,6 +3255,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityGroupYesterday: '昨天',
     activityTimeJustNow: '刚刚',
     activityTimeMinutesAgo: '{n} 分钟前',
+    activityErrorInterrupted: '运行已中断',
+    activityExpand: '展开完整内容',
+    activityCollapse: '收起',
+    activityRunsCount: '{count} 项活动',
 
     scheduledTasksHistoryEmpty: '暂无运行记录',
     scheduledTasksHistoryColTitle: '标题',
@@ -7175,6 +7179,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     activityGroupYesterday: 'Yesterday',
     activityTimeJustNow: 'Just now',
     activityTimeMinutesAgo: '{n} min ago',
+    activityErrorInterrupted: 'Execution was interrupted',
+    activityExpand: 'Expand full content',
+    activityCollapse: 'Collapse',
+    activityRunsCount: '{count} activities',
 
     scheduledTasksHistoryEmpty: 'No run history',
     scheduledTasksHistoryColTitle: 'Title',

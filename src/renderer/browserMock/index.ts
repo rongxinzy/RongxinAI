@@ -7,6 +7,7 @@
  * takes its normal error path instead of crashing.
  */
 import {
+  mockActivityRuns,
   mockAgents,
   mockApiConfig,
   mockCoworkConfig,
@@ -129,7 +130,7 @@ const overrides: MockOverrides = {
     },
   },
   activity: {
-    list: () => Promise.resolve({ success: true, runs: [] }),
+    list: () => Promise.resolve({ success: true, runs: mockActivityRuns }),
   },
   agents: {
     list: () => Promise.resolve(mockAgents),
