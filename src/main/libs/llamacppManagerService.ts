@@ -1,4 +1,3 @@
-import type { ChildProcess } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -41,7 +40,7 @@ import { shouldKeepLlamaCppServiceRunning } from './llamacppProcessLifecycle';
 import { retryLlamaCppReadRequest } from './llamacppRequestRetry';
 import { resolveManagedModelInstallDir } from './llamacppModelInstallation';
 import { shouldEnableLlamaCppModelsAutoload } from './llamacppServe';
-import { isPathInside, mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
+import { mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
 import {
   installModelOnce,
   isModelDownloadNotFoundError,

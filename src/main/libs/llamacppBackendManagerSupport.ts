@@ -25,13 +25,7 @@ import {
 } from './resumableDownload';
 import { DEFAULT_RELEASE_BASE_URL } from './llamacppFallbackManifest';
 import {
-  buildVersionBackend,
-  getLlamaCppBackendDir,
-  getLlamaCppBackendExecutablePath,
-  getLlamaCppCurrentBackendDir,
   getLlamaCppCurrentExecutablePath,
-  getLlamaCppBackendDownloadDir,
-  removeCurrentBackendLink,
   toBackendRef,
 } from './llamacppBackendManagerPaths';
 
