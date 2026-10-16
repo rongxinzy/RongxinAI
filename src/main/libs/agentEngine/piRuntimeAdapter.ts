@@ -73,7 +73,6 @@ import {
   ModelCapabilityStatus,
   ProviderName,
   type ProviderModelPiCompaction,
-  resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
@@ -103,11 +102,10 @@ import type {
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
 import {
-  type ApiConfigResolution,
-  resolveRawApiConfig,
-  resolveRawApiConfigForModelRef,
-} from '../claudeSettings';
-import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
+  getMagpieModelService,
+  hasMagpieModelService,
+  MAGPIE_RUNTIME_API_KEY,
+} from '../../magpie/modelService';
 import type { MagpieModel } from '../../../shared/magpie/types';
 import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
@@ -148,7 +146,6 @@ import {
   ShortcutWorkflowKind,
 } from './piShortcutWorkflow';
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
-import { PI_MANAGED_PROXY_API_KEY, resolvePiCustomModelBaseUrl } from './piManagedModelProxy';
 import {
   PiExtensionEventType,
   type PiExtensionApi,
@@ -159,8 +156,6 @@ import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool, PiCadViewerService } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
-import { resolvePiBuiltinProviderId } from './piProviderIds';
-import { resolvePiCustomModelApi } from './piModelApi';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 import { getPythonRuntimeService } from '../../pythonRuntime/host';
 import { buildPiPythonTools } from './piPythonTools';
@@ -3848,15 +3843,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    * answer, and withholding images stays the conservative outcome.
    */
   private configuredImageInputForActive(active: ActivePiSession): ModelCapabilityStatus {
-    const modelRef = active.requestedModelOverride?.trim();
-    try {
-      const resolution = modelRef
-        ? resolveRawApiConfigForModelRef(modelRef)
-        : resolveRawApiConfig();
-      const configured = resolution.providerMetadata?.capabilities?.imageInput;
-      if (configured) return configured;
-    } catch {
-      // Fall through to the snapshot.
+    const modelId = typeof active.model.id === 'string' ? active.model.id : '';
+    if (hasMagpieModelService() && modelId) {
+      const projected = getMagpieModelService().peekModel(modelId);
+      if (projected) return magpieImageInput(projected);
     }
     return active.capabilities.imageInput;
   }
@@ -3911,6 +3901,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   async resetImageInputCapabilities(): Promise<void> {
     clearImageInputObservations();
+    if (hasMagpieModelService()) {
+      try {
+        await getMagpieModelService().catalog();
+      } catch (error) {
+        console.warn('[PiRuntime] could not refresh model image capabilities:', error);
+      }
+    }
     await this.syncImageInputCapability();
   }
 
@@ -4674,184 +4671,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 }
 
-// ── Provider resolution ──
+// ── Gateway model resolution ──
 
-/**
- * Infer the Pi provider name from environment variables.
- * ZhiYuanAgent stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
- * Pi SDK looks up providers by name (deepseek, anthropic, openai, etc.).
- */
-const DEFAULT_PI_LOCAL_CONTEXT_WINDOW = 32768;
 const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
-const DEFAULT_PI_CLOUD_CONTEXT_WINDOW = 256000;
-const DEFAULT_PI_CLOUD_MAX_TOKENS = 32768;
-const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
 
 interface ModelPoolRequestContext {
   conversationId: string;
   workload: ZhiyuanModelPoolWorkloadValue;
 }
 
-function hasRecordEntries(value: unknown): value is Record<string, unknown> {
-  return Boolean(
-    value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length,
-  );
-}
-
-function buildPiCustomModel(
-  resolution: ApiConfigResolution,
-  baseUrlOverride?: string,
-  modelPoolRequestContext?: ModelPoolRequestContext,
-): Record<string, unknown> {
-  const config = resolution.config;
-  const providerMetadata = resolution.providerMetadata;
-  if (!config || !providerMetadata) {
-    throw new Error(resolution.error || 'Pi model configuration is unavailable.');
-  }
-
-  const isLocalModel = isLocalProviderName(providerMetadata.providerName);
-  const endpoint = resolution.endpoint;
-  const fallbackContextWindow = isLocalModel
-    ? DEFAULT_PI_LOCAL_CONTEXT_WINDOW
-    : DEFAULT_PI_CLOUD_CONTEXT_WINDOW;
-  const fallbackMaxTokens = isLocalModel
-    ? DEFAULT_PI_LOCAL_MAX_TOKENS
-    : DEFAULT_PI_CLOUD_MAX_TOKENS;
-  const capabilities = endpoint?.capabilities ?? providerMetadata.capabilities;
-  const piRuntime = providerMetadata.piRuntime;
-  const compat = piRuntime?.compat;
-  const supportsImage =
-    providerMetadata.supportsImage || capabilities?.imageInput === ModelCapabilityStatus.Supported;
-
-  return {
-    id: endpoint?.modelId ?? config.model,
-    name: endpoint?.displayName || providerMetadata.modelName || config.model,
-    api: resolvePiCustomModelApi(resolution),
-    provider: providerMetadata.providerName,
-    baseUrl: baseUrlOverride || endpoint?.baseUrl || config.baseURL,
-    reasoning: resolveProviderModelPiReasoning(piRuntime, capabilities),
-    ...(piRuntime?.thinkingLevelMap ? { thinkingLevelMap: piRuntime.thinkingLevelMap } : {}),
-    input: supportsImage ? ['text', 'image'] : ['text'],
-    ...(hasRecordEntries(compat) ? { compat } : {}),
-    // Per-model pi-ai settings are emitted only when configured so the
-    // default wire format stays byte-identical (golden-tape discipline).
-    ...(piRuntime?.inputLimits ? { inputLimits: piRuntime.inputLimits } : {}),
-    ...(piRuntime?.promptCache ? { promptCache: piRuntime.promptCache } : {}),
-    ...(piRuntime?.samplingParams ? { samplingParams: piRuntime.samplingParams } : {}),
-    cost: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-    },
-    contextWindow:
-      endpoint?.contextWindow ||
-      providerMetadata.contextWindow ||
-      providerMetadata.contextTokens ||
-      fallbackContextWindow,
-    maxTokens: endpoint?.maxTokens || providerMetadata.maxTokens || fallbackMaxTokens,
-    ...(providerMetadata.providerName === ProviderName.Zhiyuan && modelPoolRequestContext
-      ? {
-          headers: {
-            [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
-            [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
-          },
-        }
-      : {}),
-  };
-}
-
-function normalizePiBaseUrl(baseUrl: unknown): string {
-  return typeof baseUrl === 'string' ? baseUrl.trim().replace(/\/+$/, '') : '';
-}
-
-function canUsePiBuiltinModel(
-  builtinModel: Record<string, unknown> | null,
-  resolution: ApiConfigResolution,
-): boolean {
-  if (!builtinModel || !resolution.config) return false;
-  return normalizePiBaseUrl(builtinModel.baseUrl) === normalizePiBaseUrl(resolution.config.baseURL);
-}
-
-interface PiCustomModelRuntimeResolution {
-  modelRuntime: PiModelRuntime | null;
-  customModel: Record<string, unknown> | null;
-}
-
-async function resolvePiCustomModelRuntime(
-  pi: PiModules,
-  resolution: ApiConfigResolution,
-  builtinModel: Record<string, unknown> | null,
-  existingModelRuntime?: PiModelRuntime | null,
-  modelPoolRequestContext?: ModelPoolRequestContext,
-): Promise<PiCustomModelRuntimeResolution> {
-  const config = resolution.config;
-  const providerMetadata = resolution.providerMetadata;
-  if (!config || !providerMetadata) {
-    return { modelRuntime: existingModelRuntime ?? null, customModel: null };
-  }
-  if (canUsePiBuiltinModel(builtinModel, resolution)) {
-    // Builtin model path (e.g. MiniMax M3 resolves to pi's built-in `minimax-cn`
-    // provider): the agent session authenticates via pi's model registry, which
-    // only knows provider-specific env vars (MINIMAX_CN_API_KEY) that we never
-    // set. Register the user's key under the builtin provider id so the session
-    // can authenticate — otherwise it fails with "No API key found for <id>".
-    const apiKey = config.apiKey?.trim() || '';
-    const builtinProviderId =
-      typeof builtinModel?.provider === 'string' ? builtinModel.provider : null;
-    if (!apiKey || !builtinProviderId) {
-      return { modelRuntime: existingModelRuntime ?? null, customModel: null };
-    }
-    const modelRuntime =
-      existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
-    await modelRuntime.setRuntimeApiKey(builtinProviderId, apiKey);
-    return { modelRuntime, customModel: null };
-  }
-
-  const modelRuntime =
-    existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
-  const api = resolvePiCustomModelApi(resolution);
-  const runtimeBaseUrl = await resolvePiCustomModelBaseUrl(resolution, api);
-  const model = buildPiCustomModel(resolution, runtimeBaseUrl, modelPoolRequestContext);
-  const providerId = providerMetadata.providerName;
-  modelRuntime.registerProvider(providerId, {
-    name: providerId,
-    baseUrl: runtimeBaseUrl,
-    api: model.api,
-    models: [model],
-  });
-  const apiKey =
-    providerMetadata.providerName === ProviderName.Zhiyuan
-      ? PI_MANAGED_PROXY_API_KEY
-      : config.apiKey?.trim() ||
-        (isLocalProviderName(providerMetadata.providerName) ? PI_LOCAL_API_KEY : '');
-  if (apiKey) await modelRuntime.setRuntimeApiKey(providerId, apiKey);
-  return { modelRuntime, customModel: model };
-}
-
-function buildPiBuiltinModel(
-  pi: PiModules,
-  resolution: ApiConfigResolution,
-): Record<string, unknown> | null {
-  const config = resolution.config;
-  const providerMetadata = resolution.providerMetadata;
-  if (!config || !providerMetadata || isLocalProviderName(providerMetadata.providerName)) {
-    return null;
-  }
-
-  const providerId = resolvePiBuiltinProviderId(providerMetadata.providerName);
-  if (!providerId) {
-    return null;
-  }
-
-  try {
-    const builtinModel = pi.getModel(providerId, config.model);
-    return builtinModel && typeof builtinModel === 'object'
-      ? (builtinModel as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
+function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
+  if (!model.modalities) return ModelCapabilityStatus.Unknown;
+  return model.modalities.input?.includes('image')
+    ? ModelCapabilityStatus.Supported
+    : ModelCapabilityStatus.Unsupported;
 }
 
 const MAGPIE_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
@@ -4898,7 +4731,8 @@ function buildMagpiePiModel(
   const contextWindow = selected.context_window ?? 32768;
   const maxTokens = Math.min(selected.max_output_tokens ?? 4096, contextWindow);
   const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
-  const supportsImage = selected.modalities?.input?.includes('image') ?? false;
+  const imageInput = magpieImageInput(selected);
+  const supportsImage = imageInput === ModelCapabilityStatus.Supported;
 
   const model: Record<string, unknown> = {
     id: selected.id,
@@ -4940,7 +4774,6 @@ async function resolvePiModel(
       model: customModel,
       baseUrl,
       api,
-      supportsImage,
       maxTokens,
     } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
     const modelRuntime =
@@ -4951,114 +4784,36 @@ async function resolvePiModel(
       api,
       models: [customModel],
     });
-    await modelRuntime.setRuntimeApiKey('magpie', 'magpie-zhiyuan');
+    await modelRuntime.setRuntimeApiKey('magpie', MAGPIE_RUNTIME_API_KEY);
+
+    const imageInput = magpieImageInput(resolution.model);
+    const effectiveImageInput = imageInputVerdict(
+      imageInput,
+      ProviderName.Magpie,
+      resolution.model.id,
+      {
+        supportsImage: imageInput === ModelCapabilityStatus.Supported,
+        imageInput,
+        endpointKey: baseUrl,
+      },
+    );
+    const model =
+      effectiveImageInput === ImageInputVerdict.Supported
+        ? customModel
+        : { ...customModel, input: ['text'] as Array<'text' | 'image'> };
 
     return {
-      model: customModel,
+      model,
       endpointKey: baseUrl,
       modelRuntime,
       maxOutputTokens: maxTokens,
       providerName: ProviderName.Magpie,
-      capabilities: {
-        imageInput: supportsImage
-          ? ModelCapabilityStatus.Supported
-          : ModelCapabilityStatus.Unsupported,
-      },
-      requestOptions: { apiKey: 'magpie-zhiyuan' },
+      capabilities: { imageInput },
+      requestOptions: { apiKey: MAGPIE_RUNTIME_API_KEY },
     };
   }
 
-  const normalizedModelRef = modelRef?.trim() || '';
-  const resolution = normalizedModelRef
-    ? resolveRawApiConfigForModelRef(normalizedModelRef)
-    : resolveRawApiConfig();
-
-  if (!resolution.config || !resolution.providerMetadata) {
-    throw new Error(resolution.error || 'Pi model configuration is unavailable.');
-  }
-
-  const builtinModel = buildPiBuiltinModel(pi, resolution);
-  const customRuntime = await resolvePiCustomModelRuntime(
-    pi,
-    resolution,
-    builtinModel,
-    existingModelRuntime,
-    modelPoolRequestContext,
-  );
-  const modelRuntime = customRuntime.modelRuntime;
-  const customModel =
-    customRuntime.customModel ?? buildPiCustomModel(resolution, undefined, modelPoolRequestContext);
-  const registeredModel = modelRuntime?.getModel(
-    resolution.providerMetadata.providerName,
-    resolution.config.model,
-  );
-  const useBuiltinModel = canUsePiBuiltinModel(builtinModel, resolution);
-  const selectedModel =
-    (useBuiltinModel ? builtinModel : null) ??
-    (registeredModel && typeof registeredModel === 'object'
-      ? (registeredModel as Record<string, unknown>)
-      : customModel);
-  // One endpoint identity for the whole image-capability decision: the model
-  // gate here, the host-side attachment gate, and the failure path all have to
-  // agree, or a rejection recorded by one stays invisible to the others.
-  const endpointKey = resolution.endpoint?.baseUrl || resolution.config.baseURL || '';
-  const configuredImageInput =
-    resolution.endpoint?.capabilities?.imageInput ??
-    resolution.providerMetadata.capabilities?.imageInput ??
-    ModelCapabilityStatus.Unknown;
-  const effectiveImageInput = imageInputVerdict(
-    configuredImageInput,
-    resolution.providerMetadata.providerName,
-    resolution.config.model,
-    {
-      supportsImage: configuredImageInput === ModelCapabilityStatus.Supported,
-      imageInput: configuredImageInput,
-      endpointKey,
-    },
-  );
-  // A model that cannot read images must not advertise image input, whatever
-  // source it came from: Pi downgrades every image block — attachments, native
-  // `read` results, replayed history — to a text placeholder for such a model,
-  // so an image can never re-enter a request the server already rejected.
-  const resolvedModel =
-    effectiveImageInput === ImageInputVerdict.Supported
-      ? selectedModel
-      : { ...selectedModel, input: ['text'] as Array<'text' | 'image'> };
-  // pi keys compaction.modelOverrides by the model's own provider/id pair, so
-  // read both off the final model object (builtin catalog models use pi's
-  // provider ids, not our provider names).
-  const perModelCompaction = resolution.providerMetadata.piRuntime?.compaction;
-  const modelProviderId =
-    typeof resolvedModel.provider === 'string' ? resolvedModel.provider : undefined;
-  const modelId = typeof resolvedModel.id === 'string' ? resolvedModel.id : undefined;
-
-  return {
-    model: resolvedModel,
-    endpointKey,
-    modelRuntime,
-    maxOutputTokens:
-      resolution.endpoint?.maxTokens ||
-      resolution.providerMetadata.maxTokens ||
-      (isLocalProviderName(resolution.providerMetadata.providerName)
-        ? DEFAULT_PI_LOCAL_MAX_TOKENS
-        : DEFAULT_PI_CLOUD_MAX_TOKENS),
-    providerName: resolution.providerMetadata.providerName,
-    capabilities: resolution.endpoint?.capabilities ?? resolution.providerMetadata.capabilities,
-    requestOptions:
-      resolution.providerMetadata.providerName === ProviderName.Zhiyuan
-        ? { apiKey: PI_MANAGED_PROXY_API_KEY }
-        : resolution.config.apiKey
-          ? { apiKey: resolution.config.apiKey }
-          : undefined,
-    ...(perModelCompaction && modelProviderId && modelId
-      ? {
-          modelCompactionOverride: {
-            key: `${modelProviderId}/${modelId}`,
-            compaction: perModelCompaction,
-          },
-        }
-      : {}),
-  };
+  throw new Error('Enable the unified model service in model settings before starting a task.');
 }
 
 /** Normalize Pi tool args into a plain record for CoworkMessage metadata. */
