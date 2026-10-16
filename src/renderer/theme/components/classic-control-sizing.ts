@@ -60,9 +60,9 @@ export function classicControlSizing() {
     'control-sizing-16': recipe({ base: { 'padding-block': '0.625rem' } }),
     // src/renderer/components/im/IMSettings.tsx:1203, src/shared/components/ai-elements/attachments.tsx:381
     'control-sizing-17': recipe({ base: { padding: '0.5rem' } }),
-    // src/renderer/components/localInference/LocalInferenceView.tsx:1315
+    // src/renderer/components/localInference/components/ModelStartedDialog.tsx:48
     'control-sizing-18': recipe({ base: { 'padding-top': '0rem' } }),
-    // src/renderer/components/localInference/LocalInferenceView.tsx:1341, src/renderer/components/localInference/components/LocalInferenceAccessSettingsDialog.tsx:67, src/renderer/components/localInference/components/LocalInferenceMemorySettingsDialog.tsx:62, src/renderer/components/localInference/components/ModelLibrarySettingsModal.tsx:44, src/renderer/components/mcp/McpServerFormModal.tsx:292, src/renderer/components/settings/memory/MemoryRecordList.tsx:545
+    // src/renderer/components/localInference/LocalInferenceView.tsx:683, src/renderer/components/localInference/components/LocalInferenceAccessSettingsDialog.tsx:67, src/renderer/components/localInference/components/LocalInferenceMemorySettingsDialog.tsx:62, src/renderer/components/localInference/components/ModelLibrarySettingsModal.tsx:44, src/renderer/components/mcp/McpServerFormModal.tsx:292, src/renderer/components/settings/memory/MemoryRecordList.tsx:545
     'control-sizing-19': recipe({ base: { 'padding-right': '2rem' } }),
     // src/renderer/components/localInference/components/MarketplaceCardLayout.tsx:23, src/shared/components/ai-elements/prompt-input.tsx:983
     'control-sizing-20': recipe({ base: { 'min-height': '4rem' } }),
