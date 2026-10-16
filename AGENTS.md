@@ -12,6 +12,7 @@
 
 ```bash
 bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
+bun run electron:dev:enterprise # 构建并加载当前工作树的企业扩展后启动开发模式
 bun run web:preview        # 浏览器预览（端口 5176，无需 Electron）
 bun run web:preview:check  # 浅色/深色走查主要界面，console error 即失败
 bun run build              # 生产构建（TS + Vite）
@@ -93,6 +94,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 - `enterprise/` 是知远企业客户端扩展（自 zhiyuanAaaS 仓库迁入，源提交 `7adec4a`）：企业会话、托管模型投影、Agent 控制循环、托管 Skill 与企业设置渲染器。迁移代码保持原仓库结构（`enterprise/src/`），不适用本仓 renderer 的主题与设计体系。
 - 独立构建：`bun run build:enterprise` 产出 `enterprise/dist/extension.cjs`（tsup 单文件 CJS）与 `enterprise/dist/ui/`；测试 `bun run test:enterprise`，类型检查 `bun run typecheck:enterprise`，包体验证 `bun run verify:enterprise:bundle`。根 `npm test` 的 include 不覆盖 `enterprise/`。
+- 开发启动：`bun run electron:dev:enterprise` 自动构建并加载当前工作树的企业扩展，复用 `electron:dev`。默认 AEP 地址 `http://localhost:8080`，通过 `ZHIYUAN_AEP_BASE_URL` 覆盖；分离部署可设置 `ZHIYUAN_AGENT_CONTROL_BASE_URL`。开发配置生成于 git 忽略的 `.work/enterprise-dev/config.json`，或用 `ZHIYUAN_ENTERPRISE_CONFIG_DEV_PATH` 指定现有文件；打包应用忽略开发配置覆盖。修改企业源码后重新运行命令构建。
 - 宿主经 `src/main/enterpriseExtension` 契约加载：打包产物位于 `resources/zhiyuan-enterprise/extension.cjs`，开发覆盖用 `ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH` 指向本地 bundle。UI bundle 是独立 document，不进入主渲染器主题系统。
 - 企业版 Windows 打包走手动 workflow「Build Zhiyuan Enterprise Windows package (manual)」（输入 version 与 aep_base_url），overlay 配置是 `electron-builder.enterprise.cjs`（社区流程 `electron-builder.json` 不加载它），本地入口 `bun run dist:win:enterprise`。打包产物有意不含 Admin Console bundle（控制台仍是 zhiyuanAaaS 的 Web 部署应用）。
 
