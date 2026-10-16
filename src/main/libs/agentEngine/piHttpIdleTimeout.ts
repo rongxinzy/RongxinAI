@@ -1,11 +1,10 @@
 import { Agent, setGlobalDispatcher } from 'undici';
 
 /**
- * HTTP idle ceiling for the embedded Pi runtime, aligned with the 600s
- * local-provider stream-stall window (STREAM_STALL_TIMEOUT_LOCAL_MS in
- * piStreamStallRecovery.ts). llama.cpp/Ollama emit nothing during prompt
- * evaluation, so undici's 300s default bodyTimeout and the Pi SDK's 300s
- * default request timeout would both cut healthy long turns early.
+ * HTTP idle ceiling for the embedded Pi runtime. llama.cpp/Ollama emit
+ * nothing during prompt evaluation, so undici's 300s default bodyTimeout and
+ * the Pi SDK's 300s default request timeout would both cut healthy long turns
+ * early.
  */
 export const PI_EMBEDDED_HTTP_IDLE_TIMEOUT_MS = 600_000;
 
