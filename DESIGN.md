@@ -5,15 +5,15 @@
 > **Positioning**: P0 mandatory constraint for all frontend work, paired with `AGENTS.md` engineering rules.  
 > **Philosophy**: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
 
-Zenith is a premium futuristic design language inspired by next-generation AI interfaces, characterized by ethereal glassmorphism, fluid motion, generous spacing, and luminous accents. Every element breathes, surfaces float with depth, and interactions feel instantaneous and delightful.
+Zenith is a modern premium design system that balances futuristic aesthetics with desktop efficiency, characterized by subtle glassmorphism, clean typography, efficient spacing, and smooth interactions. Surfaces have depth without distraction, typography is crisp and readable, and the interface feels light yet information-dense.
 
 ## Design Principles
 
-1. **Ethereal Depth** - Use glassmorphism, backdrop blur, and layered shadows to create floating surfaces that feel light yet substantial
-2. **Generous Breathing Room** - 30% more whitespace than traditional desktop apps; let content breathe
-3. **Fluid Everything** - Smooth spring-physics animations, morphing shapes, seamless transitions
-4. **Luminous Accents** - Strategic use of glowing gradients and colored shadows for visual hierarchy
-5. **Tech-Forward Precision** - Clean typography, perfect alignment, modern geometric forms
+1. **Subtle Glassmorphism** - Light backdrop blur and translucency for depth without overwhelming
+2. **Efficient Density** - Compact spacing optimized for desktop productivity, not mobile bloat
+3. **Smooth Transitions** - 150-200ms animations for responsive, polished feel
+4. **Clean Hierarchy** - Clear visual relationships through weight, size, and color
+5. **Tech-Forward Polish** - Modern aesthetics without sacrificing usability or information density
 
 ## 一、Color System - 色彩系统
 
@@ -72,25 +72,23 @@ Zenith is a premium futuristic design language inspired by next-generation AI in
 --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
 ```
 
-### Type Scale (30% larger than traditional)
+### Type Scale (Desktop-optimized: light and dense)
 
 | Role | Size / Line Height | Weight | Usage |
 | --- | --- | --- | --- |
-| Display | 32px / 40px | 700 | Hero headings, welcome screens |
-| H1 | 28px / 36px | 650 | Page titles |
-| H2 | 24px / 32px | 600 | Section headers |
-| H3 | 20px / 28px | 600 | Card titles |
-| Body Large | 17px / 26px | 450 | Emphasized content |
-| Body | 15px / 24px | 400 | Default UI text |
-| Body Small | 14px / 22px | 400 | Compact lists, metadata |
-| Caption | 13px / 18px | 450 | Labels, auxiliary |
-| Tiny | 12px / 16px | 500 | Badges, tags |
+| Display | 24px / 32px | 650 | Hero headings, welcome screens |
+| H1 | 20px / 28px | 600 | Page titles |
+| H2 | 17px / 24px | 600 | Section headers |
+| H3 | 15px / 22px | 600 | Card titles |
+| Body | 13px / 20px | 400 | Default UI text, lists |
+| Caption | 12px / 18px | 400 | Labels, auxiliary, metadata |
+| Tiny | 11px / 16px | 500 | Badges, tags, compact info |
 
 ### Typography Rules
 
-1. **Generous Line Height** - 1.5-1.6x for body text, giving airy feel
-2. **Variable Fonts** - Use Inter's variable weight axis (400-700) for smooth hierarchy
-3. **Letter Spacing** - Slight negative tracking (-0.01em) for titles, normal for body
+1. **Tight Line Height** - 1.45-1.55x for UI text, optimized for density
+2. **Variable Fonts** - Use Inter's variable weight axis (400-650) for smooth hierarchy
+3. **Compact Hierarchy** - Clear differentiation without excessive size jumps
 4. **Sentence Case** - Use sentence case for UI labels, not UPPERCASE (except acronyms)
 
 ## 三、Spacing & Layout - 间距与布局
@@ -109,25 +107,25 @@ All spacing uses 8px base unit for consistency and scale:
 | `space-6` | 48px | Hero spacing |
 | `space-8` | 64px | Major layout divisions |
 
-### Component Sizing
+### Component Sizing (Desktop-optimized: light and dense)
 
 | Component | Height | Padding (H×V) | Notes |
 | --- | --- | --- | --- |
-| Button Default | 44px | 24px × 12px | Large touch targets |
-| Button Small | 36px | 16px × 8px | Compact contexts |
-| Button Large | 52px | 32px × 16px | Primary CTAs |
-| Input Field | 48px | 16px × 14px | Spacious typing area |
-| Navigation Item | 40px | 16px × 12px | Comfortable clicking |
-| Card | - | 32px | Generous internal padding |
-| Dialog | - | 40px | Premium modal padding |
-| Sidebar | 280px | - | Wider than traditional 260px |
+| Button Default | 32px | 16px × 8px | Standard desktop size |
+| Button Small | 28px | 12px × 6px | Compact contexts |
+| Button Large | 36px | 20px × 10px | Primary CTAs |
+| Input Field | 32px | 12px × 8px | Efficient typing area |
+| Navigation Item | 32px | 12px × 8px | Comfortable clicking |
+| Card | - | 20px | Balanced internal padding |
+| Dialog | - | 24px | Modal padding |
+| Sidebar | 240px | - | Compact but usable |
 
 ### Layout Principles
 
-1. **30% More Space** - Every dimension is 20-30% larger than traditional desktop apps
-2. **Max Width 1440px** - Content container maxes at 1440px for premium feel
-3. **Asymmetric Padding** - Use 40/48/64px padding on sides, 32px top/bottom for visual interest
-4. **Floating Islands** - Content lives in elevated glassmorphic cards, not edge-to-edge
+1. **Efficient Density** - Desktop-optimized spacing, not mobile-first bloat
+2. **Max Width 1600px** - Wide-screen friendly content container
+3. **Smart Padding** - 16/20/24px padding based on hierarchy
+4. **Clean Surfaces** - Subtle glassmorphism without excessive decoration
 
 ## 四、Elevation & Shadows - 高度与阴影
 
