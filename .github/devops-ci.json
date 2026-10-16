@@ -1,46 +1,10 @@
 {
   "workflows": [
     {
-      "name": "Channel runtime smoke",
-      "path": ".github/workflows/channel-runtime-smoke.yml",
-      "paths": [
-        "package.json",
-        "scripts/channel-runtime-*",
-        "scripts/download-channel-runtime.cjs",
-        "src/main/im/**",
-        "src/main/libs/ccConnect*",
-        "src/scheduledTask/ccConnect*",
-        ".github/workflows/channel-runtime-smoke.yml"
-      ],
-      "branches": [
-        "main"
-      ]
-    },
-    {
       "name": "CI",
       "path": ".github/workflows/ci.yml",
       "branches": [
         "main"
-      ]
-    },
-    {
-      "name": "Installer visual review only",
-      "path": ".github/workflows/installer-style-preview.yml",
-      "paths": [
-        "scripts/installer-shell/preview/**",
-        "scripts/installer-shell/preview-ui.test.ts",
-        "scripts/ci/installer-style-preview.py",
-        ".github/workflows/installer-style-preview.yml"
-      ]
-    },
-    {
-      "name": "Python runtime process containment",
-      "path": ".github/workflows/python-runtime.yml",
-      "paths": [
-        "src/main/pythonRuntime/**",
-        "src/main/libs/agentEngine/piPythonTools*",
-        "scripts/python-runtime/**",
-        ".github/workflows/python-runtime.yml"
       ]
     }
   ]
