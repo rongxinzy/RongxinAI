@@ -1,0 +1,46 @@
+name: Browser Preview Tests
+
+on:
+  pull_request:
+    paths:
+      - 'src/renderer/**'
+      - 'src/shared/**'
+      - 'vite.config.browser.ts'
+      - 'tests/browserPreview.test.ts'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      
+      - name: Start preview server
+        run: npm run web:preview &
+        env:
+          CI: true
+      
+      - name: Wait for server
+        run: npx wait-on http://localhost:5176 --timeout 60000
+      
+      - name: Run Playwright tests
+        run: npx playwright test tests/browserPreview.test.ts
+      
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-preview-screenshots
+          path: docs/browser-preview-screenshots/
+          retention-days: 30
