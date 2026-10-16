@@ -82,6 +82,7 @@
     "knip": "knip --no-progress",
     "check:python-dead-code": "node scripts/ci/check-python-dead-code.mjs",
     "check:large-files": "node scripts/ci/check-large-files.mjs",
+    "check:source-line-limit": "node scripts/ci/check-source-line-limit.mjs",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "prepare": "husky",

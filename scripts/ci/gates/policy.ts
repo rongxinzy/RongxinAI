@@ -24,7 +24,7 @@ const browserPreviewChange =
 
 // CI-only edits must not pull expensive integration jobs onto the critical path.
 const ciMetaOnly =
-  /^(?:\.github\/|scripts\/ci\/(?:gates\/|check-|ruff-dead-code|large-file-allowlist)|knip\.ts$|AGENTS\.md$|DEVOPS\.md$|CLAUDE\.md$)/;
+  /^(?:\.github\/|scripts\/ci\/(?:gates\/|check-|ruff-dead-code|large-file-allowlist|source-line-baseline)|knip\.ts$|AGENTS\.md$|DEVOPS\.md$|CLAUDE\.md$)/;
 
 function ciInfrastructureOnly(paths: string[]): boolean {
   return (

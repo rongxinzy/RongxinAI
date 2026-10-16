@@ -59,11 +59,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Fail on oversized committed files
+      - name: Fail on oversized committed binaries in the diff
         run: node scripts/ci/check-large-files.mjs
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      - name: Fail on oversized hand-written source files
+        run: node scripts/ci/check-source-line-limit.mjs
       - name: Install checksum-pinned workflow validator
         run: |
           mkdir -p "$RUNNER_TEMP/actionlint"

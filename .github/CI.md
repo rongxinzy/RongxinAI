@@ -68,7 +68,8 @@ the miss and investigate the measured bottleneck without relaxing installation t
 The default branch requires `ci-gate` from GitHub Actions (app ID 15368), with the branch up to
 date before merging. The `ci-gate` job aggregates every baseline and path-selected job via
 `scripts/ci/gates/verify.ts`. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB
-large-file gate with an explicit asset allowlist. Do not require conditional platform jobs
+source line-limit gate (1000 lines; shrinking-only baseline for legacy files), and a diff-only
+binary size gate with an explicit asset allowlist. Do not require conditional platform jobs
 directly on branch protection.
 
 All PRs, including documentation, require one independent GitHub approval. New
@@ -110,7 +111,7 @@ Reproduce child audits with `bash scripts/ci/audit-npm-projects.sh /tmp/npm-audi
 Before the October 16, 2026 dead-code and gate streamlining, successful PR CI runs on
 main (for example run 38931409654) took about 330 seconds wall clock. The critical path
 was `test` (about 218 seconds across two shards after `electron-compile`) plus
-`merge-gate` (about 8 seconds). Baseline jobs (`lint`, former standalone `knip`,
+`ci-gate` (about 8 seconds). Baseline jobs (`lint`, former standalone `knip`,
 `bundle-budget`, `electron-compile`) ran in parallel and were not on the critical path.
 Removing the standalone `pr-metadata` and `knip` jobs saves one runner bootstrap each
 (typically 10–20 seconds of queue plus checkout per job) without weakening gates: Knip
