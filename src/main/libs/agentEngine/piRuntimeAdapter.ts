@@ -3826,6 +3826,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       error => {
         console.error(`[PiRuntimeAdapter] completion failed for session ${sessionId}:`, error);
         this.workbenchTaskService?.failRun?.(sessionId, { message: String(error) });
+        if (
+          active.harnessModelProfile?.provider === ProviderName.Magpie &&
+          hasMagpieModelService()
+        ) {
+          try {
+            getMagpieModelService().recordError(String(error));
+          } catch {
+            /* ignore */
+          }
+        }
         this.emit('error', sessionId, classifyCoworkError(String(error)));
       },
     );
@@ -4070,6 +4080,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     classified: CoworkError,
     rawMessage: string,
   ): void {
+    if (active.harnessModelProfile?.provider === ProviderName.Magpie && hasMagpieModelService()) {
+      try {
+        getMagpieModelService().recordError(rawMessage);
+      } catch {
+        /* ignore */
+      }
+    }
     active.errorSurfaced = true;
     active.turnFailed = true;
     active.isRunning = false;
@@ -4105,6 +4122,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private endTerminatedWorkbenchTurn(sessionId: string, message: string): void {
     const active = this.activeSessions.get(sessionId);
     if (!active || active.aborted || active.turnFailed) return;
+    if (active.harnessModelProfile?.provider === ProviderName.Magpie && hasMagpieModelService()) {
+      try {
+        getMagpieModelService().recordError(message);
+      } catch {
+        /* ignore */
+      }
+    }
     console.warn(`[PiRuntime] ending the turn of session ${sessionId}: ${message}`);
     active.pendingError = { message, classified: classifyCoworkError(message) };
     active.piSession.abortBash();
@@ -4912,6 +4936,9 @@ function buildMagpiePiModel(
       ...(modelPoolRequestContext?.conversationId
         ? {
             'X-Magpie-Session': modelPoolRequestContext.conversationId,
+            ...(modelPoolRequestContext.workload
+              ? { 'X-Magpie-Workload': modelPoolRequestContext.workload }
+              : {}),
             [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
             [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
           }

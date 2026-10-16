@@ -1,9 +1,16 @@
-import type { MagpieModel, MagpieModelCatalog, MagpieStatus } from '../../shared/magpie/types';
+import type {
+  MagpieModel,
+  MagpieModelCatalog,
+  MagpieProviderSummary,
+  MagpieStatus,
+} from '../../shared/magpie/types';
 
 export interface MagpieModelBackend {
   status(): MagpieStatus;
   ensureRunning?(): Promise<MagpieStatus>;
   models(): Promise<MagpieModel[]>;
+  providers?(): Promise<MagpieProviderSummary[]>;
+  recordError?(message: string, providerId?: string): void;
 }
 export interface MagpieModelServiceOptions {
   readDefaultModelId(): string | undefined | null;
@@ -18,6 +25,9 @@ export class MagpieModelService {
     private readonly backend: MagpieModelBackend,
     private readonly options: MagpieModelServiceOptions,
   ) {}
+  recordError(message: string, providerId?: string): void {
+    this.backend.recordError?.(message, providerId);
+  }
   async catalog(): Promise<MagpieModelCatalog> {
     const status = this.backend.status();
     if (status.state !== 'running')
@@ -49,7 +59,28 @@ export class MagpieModelService {
       throw new Error('Enable the unified model service in model settings before starting a task.');
     const id = modelRef?.trim() || catalog.defaultModelId;
     if (!id) throw new Error('Choose a default model in model settings before starting a task.');
-    const model = catalog.models.find(candidate => candidate.id === id);
+    let model = catalog.models.find(candidate => candidate.id === id);
+    if (!model && this.backend.providers) {
+      try {
+        const providers = await this.backend.providers();
+        const provider = providers.find(p => !p.off && (p.models.includes(id) || p.id === id));
+        if (provider && Array.isArray(provider.fallback) && provider.fallback.length > 0) {
+          for (const fallbackId of provider.fallback) {
+            const candidate = catalog.models.find(m => m.id === fallbackId);
+            if (candidate) {
+              if (provider.api === 'anthropic-messages') {
+                const endpoints = candidate.native_endpoints ?? [];
+                if (!endpoints.includes('/v1/messages')) continue;
+              }
+              model = candidate;
+              break;
+            }
+          }
+        }
+      } catch {
+        /* ignore fallback resolution error */
+      }
+    }
     if (!model)
       throw new Error(
         'The selected model is no longer available or is restricted. Choose a model in model settings.',
