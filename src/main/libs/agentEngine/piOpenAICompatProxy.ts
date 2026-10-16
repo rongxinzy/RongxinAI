@@ -1,3 +1,11 @@
+/**
+ * Loopback credential bridge for enterprise host providers.
+ *
+ * The unified gateway accepts only a loopback base URL and a local capability
+ * key. This process holds the upstream token, injects it on the way out, and
+ * refreshes it after a 401 or 403. OpenAI chat completions rewrite a developer
+ * role to system on the way out; Kimi rejects that role. Other bytes pass through.
+ */
 import http, { type IncomingMessage, type ServerResponse } from 'http';
 
 import { timingSafeEqual } from 'crypto';
@@ -6,7 +14,7 @@ import { ZhiyuanModelPoolHeader } from '../../../shared/modelPool/constants';
 import { buildAnthropicMessagesUrl } from '../../../shared/providers';
 
 /** Join an OpenAI-compatible base URL with the chat completions path. */
-export function buildOpenAIChatCompletionsURL(baseURL: string): string {
+function buildOpenAIChatCompletionsURL(baseURL: string): string {
   const normalized = baseURL.trim().replace(/\/+$/, '');
   if (!normalized) return '/v1/chat/completions';
   if (normalized.endsWith('/chat/completions')) return normalized;
@@ -30,8 +38,6 @@ interface PiOpenAICompatUpstream {
   apiKey?: string;
   requiredIncomingApiKey?: string;
   forwardIncomingAuthorization?: boolean;
-  /** Rewrite the outgoing `model` field, e.g. map a cloud model id to an intranet one. */
-  upstreamModel?: string;
 }
 
 interface PiOpenAICompatUpstreamRegistrationOptions {
@@ -61,14 +67,7 @@ interface PiOpenAICompatTokenRefreshRegistration {
   refreshPromise: Promise<string> | null;
 }
 
-interface OpenAIStreamNormalizeState {
-  hasFinishReason: boolean;
-  sentDone: boolean;
-}
-
 const PI_OPENAI_COMPAT_PROXY_PREFIX = '/__pi_openai_compat';
-const OPENAI_STREAM_DONE_MARKER = '[DONE]';
-const FALLBACK_FINISH_REASON = 'stop';
 
 const upstreams = new Map<string, PiOpenAICompatUpstream>();
 const tokenRefreshers = new Map<string, PiOpenAICompatTokenRefreshRegistration>();
@@ -186,22 +185,9 @@ async function readRequestBody(request: IncomingMessage): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-function extractRequestModel(body: Buffer): string | undefined {
-  try {
-    const parsed = JSON.parse(body.toString('utf8')) as { model?: unknown };
-    return typeof parsed.model === 'string' ? parsed.model : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
- * OpenAI's newer protocol uses the 'developer' role; most self-hosted
- * OpenAI-compatible gateways (new-api / one-api and similar) validate
- * roles against user/assistant/system/tool and reject it. The proxy
- * serves user-added providers exactly, so remap developer to system
- * before forwarding. Both roles are accepted by the models themselves;
- * system is the broadly supported spelling.
+ * Kimi rejects OpenAI's developer role. system is the spelling both Kimi and
+ * the gateway accept.
  */
 export function remapDeveloperRolesForOpenAICompletions(body: Buffer): Buffer {
   try {
@@ -209,9 +195,7 @@ export function remapDeveloperRolesForOpenAICompletions(body: Buffer): Buffer {
     const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
     let changed = false;
     for (const message of messages) {
-      if (typeof message !== 'object' || message === null || Array.isArray(message)) {
-        continue;
-      }
+      if (typeof message !== 'object' || message === null || Array.isArray(message)) continue;
       const record = message as Record<string, unknown>;
       if (record.role === 'developer') {
         record.role = 'system';
@@ -221,197 +205,8 @@ export function remapDeveloperRolesForOpenAICompletions(body: Buffer): Buffer {
     if (!changed) return body;
     return Buffer.from(JSON.stringify(parsed), 'utf8');
   } catch {
-    // Non-JSON or an unexpected payload shape: pass through unchanged.
     return body;
   }
-}
-
-/** Point the request at the upstream's own model id when it differs from the advertised one. */
-export function rewriteOpenAICompletionsModel(body: Buffer, upstreamModel?: string): Buffer {
-  const target = upstreamModel?.trim();
-  if (!target) return body;
-  try {
-    const parsed = JSON.parse(body.toString('utf8')) as Record<string, unknown>;
-    if (parsed.model === target) return body;
-    parsed.model = target;
-    return Buffer.from(JSON.stringify(parsed), 'utf8');
-  } catch {
-    return body;
-  }
-}
-
-function requestWantsStream(body: Buffer): boolean {
-  try {
-    const parsed = JSON.parse(body.toString('utf8')) as { stream?: unknown };
-    return parsed.stream === true;
-  } catch {
-    return false;
-  }
-}
-
-function getSSEDataPayload(packet: string): string | null {
-  const dataLines = packet
-    .split(/\r?\n/)
-    .filter(line => line.startsWith('data:'))
-    .map(line => line.slice(5).trimStart());
-  return dataLines.length > 0 ? dataLines.join('\n') : null;
-}
-
-export function openAIStreamPayloadHasFinishReason(payload: string): boolean {
-  if (!payload || payload === OPENAI_STREAM_DONE_MARKER) {
-    return false;
-  }
-
-  try {
-    const parsed = JSON.parse(payload) as { choices?: Array<{ finish_reason?: unknown }> };
-    return Array.isArray(parsed.choices)
-      ? parsed.choices.some(
-          choice => typeof choice?.finish_reason === 'string' && choice.finish_reason,
-        )
-      : false;
-  } catch {
-    return false;
-  }
-}
-
-export function createOpenAIMissingFinishReasonChunk(model?: string): Record<string, unknown> {
-  return {
-    id: `chatcmpl-${Date.now().toString(36)}`,
-    object: 'chat.completion.chunk',
-    created: Math.floor(Date.now() / 1000),
-    ...(model ? { model } : {}),
-    choices: [
-      {
-        index: 0,
-        delta: {},
-        finish_reason: FALLBACK_FINISH_REASON,
-      },
-    ],
-  };
-}
-
-function formatOpenAISSEData(data: unknown): string {
-  return `data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`;
-}
-
-function toRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function toArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function toNonEmptyString(value: unknown): string | null {
-  return typeof value === 'string' && value.length > 0 ? value : null;
-}
-
-export function convertOpenAIChatCompletionTextToSSEForPi(
-  text: string,
-  fallbackModel?: string,
-): string | null {
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = toRecord(JSON.parse(text));
-  } catch {
-    return null;
-  }
-
-  const choices = toArray(parsed.choices);
-  if (choices.length === 0) {
-    return `${formatOpenAISSEData(
-      createOpenAIMissingFinishReasonChunk(toNonEmptyString(parsed.model) ?? fallbackModel),
-    )}${formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER)}`;
-  }
-
-  const id = toNonEmptyString(parsed.id) ?? `chatcmpl-${Date.now().toString(36)}`;
-  const model = toNonEmptyString(parsed.model) ?? fallbackModel;
-  const created =
-    typeof parsed.created === 'number' ? parsed.created : Math.floor(Date.now() / 1000);
-  let output = '';
-
-  choices.forEach((choiceValue, fallbackIndex) => {
-    const choice = toRecord(choiceValue);
-    const message = toRecord(choice.message);
-    const delta: Record<string, unknown> = {};
-    const content = toNonEmptyString(message.content);
-    const reasoning =
-      toNonEmptyString(message.reasoning) ?? toNonEmptyString(message.reasoning_content);
-    const toolCalls = toArray(message.tool_calls);
-
-    if (content) {
-      delta.content = content;
-    }
-    if (reasoning) {
-      delta.reasoning_content = reasoning;
-    }
-    if (toolCalls.length > 0) {
-      delta.tool_calls = toolCalls;
-    }
-
-    output += formatOpenAISSEData({
-      id,
-      object: 'chat.completion.chunk',
-      created,
-      ...(model ? { model } : {}),
-      choices: [
-        {
-          index: typeof choice.index === 'number' ? choice.index : fallbackIndex,
-          delta,
-          finish_reason: toNonEmptyString(choice.finish_reason) ?? FALLBACK_FINISH_REASON,
-        },
-      ],
-    });
-  });
-
-  output += formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER);
-  return output;
-}
-
-function normalizeOpenAISSEPacketForPi(
-  packet: string,
-  state: OpenAIStreamNormalizeState,
-  model?: string,
-): string {
-  const payload = getSSEDataPayload(packet);
-  if (payload === null) {
-    return packet ? `${packet}\n\n` : '';
-  }
-
-  if (payload === OPENAI_STREAM_DONE_MARKER) {
-    state.sentDone = true;
-    return state.hasFinishReason
-      ? formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER)
-      : `${formatOpenAISSEData(createOpenAIMissingFinishReasonChunk(model))}${formatOpenAISSEData(
-          OPENAI_STREAM_DONE_MARKER,
-        )}`;
-  }
-
-  if (openAIStreamPayloadHasFinishReason(payload)) {
-    state.hasFinishReason = true;
-  }
-  return `${packet}\n\n`;
-}
-
-export function normalizeOpenAISSETextForPi(text: string, model?: string): string {
-  const state: OpenAIStreamNormalizeState = { hasFinishReason: false, sentDone: false };
-  const packets = text.split(/\r?\n\r?\n/).filter(packet => packet.trim().length > 0);
-  let output = '';
-
-  for (const packet of packets) {
-    output += normalizeOpenAISSEPacketForPi(packet, state, model);
-  }
-
-  if (!state.sentDone) {
-    if (!state.hasFinishReason) {
-      output += formatOpenAISSEData(createOpenAIMissingFinishReasonChunk(model));
-    }
-    output += formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER);
-  }
-
-  return output;
 }
 
 function copyResponseHeaders(response: Response, serverResponse: ServerResponse): void {
@@ -424,70 +219,6 @@ function copyResponseHeaders(response: Response, serverResponse: ServerResponse)
     headers[key] = value;
   });
   serverResponse.writeHead(response.status, headers);
-}
-
-function normalizeNonStreamOpenAIResponse(text: string): string {
-  try {
-    const parsed = JSON.parse(text) as { choices?: Array<{ finish_reason?: unknown }> };
-    if (Array.isArray(parsed.choices)) {
-      for (const choice of parsed.choices) {
-        if (!choice.finish_reason) {
-          choice.finish_reason = FALLBACK_FINISH_REASON;
-        }
-      }
-    }
-    return JSON.stringify(parsed);
-  } catch {
-    return text;
-  }
-}
-
-async function pipeNormalizedOpenAIStream(
-  body: ReadableStream<Uint8Array>,
-  response: ServerResponse,
-  model?: string,
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  const state: OpenAIStreamNormalizeState = { hasFinishReason: false, sentDone: false };
-  let buffer = '';
-
-  const flushPackets = (): void => {
-    const packets = buffer.split(/\r?\n\r?\n/);
-    buffer = packets.pop() ?? '';
-    for (const packet of packets) {
-      if (packet.trim().length === 0) {
-        continue;
-      }
-      response.write(normalizeOpenAISSEPacketForPi(packet, state, model));
-    }
-  };
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        buffer += decoder.decode();
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-      flushPackets();
-    }
-
-    const remaining = buffer.trim();
-    if (remaining) {
-      response.write(normalizeOpenAISSEPacketForPi(remaining, state, model));
-    }
-
-    if (!state.sentDone) {
-      if (!state.hasFinishReason) {
-        response.write(formatOpenAISSEData(createOpenAIMissingFinishReasonChunk(model)));
-      }
-      response.write(formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER));
-    }
-  } finally {
-    response.end();
-  }
 }
 
 async function pipeRawStream(
@@ -547,14 +278,7 @@ async function handleProxyRequest(
   }
 
   const rawBody = await readRequestBody(request);
-  // Anthropic payloads are forwarded byte-identically; the developer-role
-  // remap and model rewrite are OpenAI-compatibility concerns only.
-  const body = openAICompletions
-    ? remapDeveloperRolesForOpenAICompletions(
-        rewriteOpenAICompletionsModel(rawBody, upstream.upstreamModel),
-      )
-    : rawBody;
-  const model = extractRequestModel(body);
+  const body = openAICompletions ? remapDeveloperRolesForOpenAICompletions(rawBody) : rawBody;
   const upstreamURL = openAICompletions
     ? buildOpenAIChatCompletionsURL(upstream.baseURL)
     : buildAnthropicMessagesUrl(upstream.baseURL);
@@ -593,30 +317,13 @@ async function handleProxyRequest(
       'cache-control': 'no-cache',
       connection: 'keep-alive',
     });
-    if (anthropicMessages) {
-      await pipeRawStream(upstreamResponse.body, response);
-    } else {
-      await pipeNormalizedOpenAIStream(upstreamResponse.body, response, model);
-    }
+    await pipeRawStream(upstreamResponse.body, response);
     return;
   }
 
   const text = await upstreamResponse.text();
-  if (openAICompletions && requestWantsStream(body)) {
-    const converted = convertOpenAIChatCompletionTextToSSEForPi(text, model);
-    if (converted) {
-      response.writeHead(upstreamResponse.status, {
-        'content-type': 'text/event-stream; charset=utf-8',
-        'cache-control': 'no-cache',
-        connection: 'keep-alive',
-      });
-      response.end(converted);
-      return;
-    }
-  }
-
   copyResponseHeaders(upstreamResponse, response);
-  response.end(openAICompletions ? normalizeNonStreamOpenAIResponse(text) : text);
+  response.end(text);
 }
 
 async function ensurePiOpenAICompatProxyServer(): Promise<number> {
@@ -667,7 +374,6 @@ export async function registerPiOpenAICompatUpstream(
     apiKey: upstream.apiKey,
     requiredIncomingApiKey: upstream.requiredIncomingApiKey,
     forwardIncomingAuthorization: upstream.forwardIncomingAuthorization,
-    upstreamModel: upstream.upstreamModel,
   });
   const loopbackBaseUrl = `http://127.0.0.1:${port}${PI_OPENAI_COMPAT_PROXY_PREFIX}/${encodeURIComponent(
     providerId,
