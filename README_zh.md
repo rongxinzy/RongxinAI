@@ -7,8 +7,6 @@
 
 <h1 align="center">知远智能体</h1>
 
-<p align="center"><sub>（仓库名：RongxinAI）</sub></p>
-
 <p align="center"><strong>开源、本地优先的桌面 AI 智能体：内置免费模型开箱即用，支持本地 GGUF 模型，还能在微信、飞书、钉钉里直接派活。</strong></p>
 
 <p align="center">

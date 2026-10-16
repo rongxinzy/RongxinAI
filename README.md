@@ -7,8 +7,6 @@
 
 <h1 align="center">ZhiYuan Agent</h1>
 
-<p align="center"><sub>(repo: RongxinAI)</sub></p>
-
 <p align="center"><strong>The open-source, local-first desktop AI agent — start free with a built-in model, run GGUF models locally, and assign tasks from WeChat, Feishu or DingTalk.</strong></p>
 
 <p align="center">
