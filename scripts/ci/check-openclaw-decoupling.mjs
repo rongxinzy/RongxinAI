@@ -2,6 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
+import {
+  listGuardedWorkflowFiles,
+  validateWorkflowFile,
+} from './openclaw-decoupling-workflows.mjs';
+
 const root = process.cwd();
 const expectedSidecarVersion = 'zhiyuan-sidecar-v4';
 const expectedSidecarRevision = 'ecf720f875e31b3df3464d820e6c485775719abe';
@@ -19,12 +24,6 @@ const productionRoots = [
 ];
 
 const buildRoots = ['scripts', 'resources'];
-const workflowFiles = [
-  '.github/workflows/build-platforms.yml',
-  '.github/workflows/linux-install-pr.yml',
-  '.github/workflows/online-update-release.yml',
-  '.github/workflows/windows-installer-pr.yml',
-];
 
 const forbiddenPaths = [
   '.github/workflows/openclaw-check.yml',
@@ -82,7 +81,13 @@ for (const sourceRoot of productionRoots) {
 
 for (const buildRoot of buildRoots) {
   for (const relativePath of walk(buildRoot)) {
-    if (relativePath.endsWith('check-openclaw-decoupling.mjs')) continue;
+    if (/\.test\.[cm]?[jt]sx?$/i.test(relativePath)) continue;
+    if (
+      relativePath.endsWith('check-openclaw-decoupling.mjs') ||
+      relativePath.endsWith('openclaw-decoupling-workflows.mjs')
+    ) {
+      continue;
+    }
     checkFile(relativePath, [forbiddenRuntimePattern, forbiddenStoragePattern]);
   }
 }
@@ -122,23 +127,17 @@ for (const dependencyGroup of ['dependencies', 'devDependencies', 'optionalDepen
 checkFile('electron-builder.json', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 checkFile('vite.config.ts', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 
-for (const workflowFile of workflowFiles) {
+for (const workflowFile of listGuardedWorkflowFiles(root)) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
-  // pi-connect sidecars must come from package.json channelRuntime assets, not source builds.
-  // Magpie (#1021) is built from pinned yetone/magpie via magpie:build; setup-go is allowed
-  // only when the workflow also runs that script (not for pi-connect checkout builds).
-  const buildsPiConnectFromSource =
-    /repository:\s*rongxinzy\/pi-connect|ZHIYUAN_CC_CONNECT_SOURCE/.test(content);
-  const setupGoWithoutMagpieBuild =
-    /actions\/setup-go/.test(content) && !/magpie:build/.test(content);
-  if (buildsPiConnectFromSource || setupGoWithoutMagpieBuild) {
-    failures.push(
-      `${workflowFile} must consume the published channel runtime, not pi-connect source`,
-    );
-  }
+  failures.push(...validateWorkflowFile(workflowFile, content));
   const contentWithoutGateCommand = content
     .split(/\r?\n/)
-    .filter(line => !line.includes('check-openclaw-decoupling'))
+    .filter(
+      line =>
+        !/(?:check:openclaw-decoupling|check-openclaw-decoupling|openclaw-decoupling-workflows)/.test(
+          line,
+        ),
+    )
     .join('\n');
   if (forbiddenRuntimePattern.test(contentWithoutGateCommand)) {
     failures.push(`${workflowFile} contains retired runtime build or cache logic`);
