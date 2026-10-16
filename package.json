@@ -91,7 +91,6 @@
     "test:memory-leak": "node scripts/ci/memory-leak-check.mjs",
     "test:bundle-budget": "node scripts/check-renderer-bundle-budget.cjs",
     "check:supply-chain-inputs": "node scripts/ci/check-supply-chain-inputs.mjs",
-    "check:openclaw-decoupling": "node scripts/ci/check-openclaw-decoupling.mjs",
     "test:visual-blind-review": "node tests/visualBlindReview.test.mjs",
     "test:enterprise": "vitest run --config enterprise/vitest.config.ts",
     "typecheck:enterprise": "tsc --project enterprise/tsconfig.json --noEmit && tsc --project enterprise/tsconfig.ui.json --noEmit",

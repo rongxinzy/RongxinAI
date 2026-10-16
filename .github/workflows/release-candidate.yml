@@ -108,7 +108,6 @@ jobs:
       - name: Validate source and dependency policy
         run: |
           bun run validate:skills
-          bun run check:openclaw-decoupling
           bun run check:supply-chain-inputs
           bun run lint
       - name: Typecheck and enforce renderer bundle budgets

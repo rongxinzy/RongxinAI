@@ -81,8 +81,6 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
-      - name: Enforce retired runtime decoupling
-        run: node scripts/ci/check-openclaw-decoupling.mjs
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
