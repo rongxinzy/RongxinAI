@@ -150,7 +150,7 @@ export const getToolInputString = (
 
 // ── Cron tool summary ──
 
-export const getCronToolSummary = (input: Record<string, unknown>): string | null => {
+const getCronToolSummary = (input: Record<string, unknown>): string | null => {
   const action = getToolInputString(input, ['action']);
   if (!action) return null;
   const job =
@@ -192,7 +192,7 @@ const normalizeTodoStatus = (value: unknown): TodoStatus => {
   return 'unknown';
 };
 
-export const parseTodoWriteItems = (input: unknown): ParsedTodoItem[] | null => {
+const parseTodoWriteItems = (input: unknown): ParsedTodoItem[] | null => {
   if (!input || typeof input !== 'object') return null;
   const record = input as Record<string, unknown>;
   if (!Array.isArray(record.todos)) return null;
@@ -214,7 +214,7 @@ export const parseTodoWriteItems = (input: unknown): ParsedTodoItem[] | null => 
   return parsedItems.length > 0 ? parsedItems : null;
 };
 
-export const getTodoWriteSummary = (items: ParsedTodoItem[]): string => {
+const getTodoWriteSummary = (items: ParsedTodoItem[]): string => {
   const completedCount = items.filter(item => item.status === 'completed').length;
   const inProgressCount = items.filter(item => item.status === 'in_progress').length;
   const pendingCount = items.length - completedCount - inProgressCount;

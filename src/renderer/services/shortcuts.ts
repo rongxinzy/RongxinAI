@@ -69,7 +69,7 @@ const normalizeKey = (key: string) => {
   return keyAliases[normalized] ?? normalized;
 };
 
-export const parseShortcut = (shortcut?: string): ParsedShortcut | null => {
+const parseShortcut = (shortcut?: string): ParsedShortcut | null => {
   if (!shortcut) return null;
   const tokens = shortcut
     .split('+')
