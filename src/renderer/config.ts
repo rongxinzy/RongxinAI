@@ -43,7 +43,7 @@ export interface AppConfig {
     defaultModel?: string;
     defaultModelProvider?: string;
   };
-  providers?: Record<string, any>;
+  providers?: Record<string, unknown>;
 }
 
 export const DEFAULT_SHORTCUTS = {
