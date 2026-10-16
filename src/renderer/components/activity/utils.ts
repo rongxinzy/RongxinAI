@@ -2,7 +2,7 @@ import { ActivityErrorCode } from '../../../shared/activity/constants';
 import { i18nService } from '../../services/i18n';
 
 /** Simple template: replace `{key}` placeholders with values. */
-const tpl = (template: string, vars: Record<string, string>): string =>
+export const tpl = (template: string, vars: Record<string, string>): string =>
   template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? '');
 
 const MINUTE_MS = 60_000;
