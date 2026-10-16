@@ -30,7 +30,7 @@ export interface ZhiyuanModelProviderDependencies {
   readonly getEntitlementToken?: () => string | null;
   readonly requireEntitlement?: boolean;
   readonly onEntitlementChange?: (listener: () => void) => () => void;
-  readonly refreshEntitlement?: () => Promise<unknown>;
+  readonly refreshEntitlement?: (modelScopes: readonly string[]) => Promise<unknown>;
   /** Host managed-provider capability version; hosts below v2 only receive OpenAI-compatible models. */
   readonly hostManagedProviderApiVersion?: number;
 }
@@ -45,7 +45,7 @@ export class ZhiyuanModelProvider implements ZhiyuanManagedProviderSource {
   readonly #getEntitlementToken: (() => string | null) | null;
   readonly #requireEntitlement: boolean;
   readonly #onEntitlementChange: ((listener: () => void) => () => void) | null;
-  readonly #refreshEntitlement: (() => Promise<unknown>) | null;
+  readonly #refreshEntitlement: ((modelScopes: readonly string[]) => Promise<unknown>) | null;
   readonly #hostManagedProviderApiVersion: number;
   #entitlementUnsubscribe: (() => void) | null = null;
   readonly #listeners = new Set<() => void>();
@@ -71,11 +71,9 @@ export class ZhiyuanModelProvider implements ZhiyuanManagedProviderSource {
   }
 
   async snapshot(): Promise<ProviderConfig> {
-    await this.#refreshEntitlement?.();
-    const [models, connection] = await Promise.all([
-      this.#readModels(),
-      this.#session.getModelConnection(),
-    ]);
+    const models = await this.#readModels();
+    const connection = await this.#session.getModelConnection();
+    await this.#refreshEntitlement?.(models.map(model => model.id));
     validateGatewayConnection(connection);
     const entitlementToken = this.#getEntitlementToken?.() ?? null;
     if (this.#requireEntitlement && !entitlementToken) {
@@ -141,8 +139,8 @@ export class ZhiyuanModelProvider implements ZhiyuanManagedProviderSource {
     if (this.#pollInFlight) return;
     this.#pollInFlight = true;
     try {
-      await this.#refreshEntitlement?.();
-      await this.#readModels();
+      const models = await this.#readModels();
+      await this.#refreshEntitlement?.(models.map(model => model.id));
     } catch {
       // The host refresh below will clear the stale provider snapshot.
     } finally {

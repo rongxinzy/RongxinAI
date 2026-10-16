@@ -81,7 +81,7 @@ export async function createZhiyuanSessionRuntimeComponents(
     activeClient = buildClient(currentBase);
     return activeClient;
   });
-  const licenseActivation = ZhiyuanLicenseActivation.create({ session, client });
+  const licenseActivation = ZhiyuanLicenseActivation.create({ session, client: session });
   return Object.freeze({
     session,
     client,
