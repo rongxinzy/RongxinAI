@@ -111,13 +111,6 @@ export async function screenshot(page, name) {
   return target;
 }
 
-export async function focusCoworkConversationView(page) {
-  const newConversation = page.getByTestId('sidebar-new-conversation');
-  await newConversation.click();
-  await newConversation.waitFor({ state: 'visible', timeout: 30_000 });
-  await delay(400);
-}
-
 export function readMemoryPromptCapture(userDataPath, sessionId) {
   const target = path.join(userDataPath, 'e2e-memory-prompt-captures', `${sessionId}.json`);
   if (!existsSync(target)) return null;
@@ -176,17 +169,6 @@ export async function summarizeInjectionSession(page, sessionId, { distinctiveWo
     },
     { targetSessionId: sessionId, word: distinctiveWord },
   );
-}
-
-export async function collectMainLogs(electronApp) {
-  try {
-    return await electronApp.evaluate(() => {
-      const lines = [];
-      return lines;
-    });
-  } catch {
-    return '';
-  }
 }
 
 const LEGACY_MEMORY_DDL = `
@@ -269,7 +251,7 @@ export async function downloadFile(url, destinationPath, timeoutMs = 900_000) {
   return destinationPath;
 }
 
-export async function parseCcConnectBridgeFromConfig(userDataPath) {
+async function parseCcConnectBridgeFromConfig(userDataPath) {
   const configPath = path.join(userDataPath, 'cc-connect', 'runtime', 'config.toml');
   const raw = await readFile(configPath, 'utf8');
   const bridgeUrl = raw.match(/bridge_url\s*=\s*"([^"]+)"/)?.[1];
