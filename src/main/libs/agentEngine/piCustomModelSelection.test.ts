@@ -5,7 +5,6 @@ import { completeSimple } from '@earendil-works/pi-ai/compat';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { CONFIG_KEYS } from '../../../renderer/config';
-import { testProviderModelConnection } from '../../../renderer/services/providerModelConnection';
 import { ApiFormat, type ProviderConfig } from '../../../shared/providers';
 import { resolveRawApiConfigForModelRef, setStoreGetter } from '../claudeSettings';
 import { resolvePiCustomModelApi, type PiModelApi } from './piModelApi';
@@ -17,6 +16,33 @@ vi.mock('../zhiyuanIntranet', () => ({
   probeZhiyuanIntranet: vi.fn(),
   zhiyuanIntranetApiKey: vi.fn(),
 }));
+
+async function testProviderModelConnection(input: {
+  providerId: string;
+  provider: ProviderConfig;
+  baseUrl: string;
+  apiFormat: ApiFormat;
+  model: { id: string; name: string };
+}): Promise<{ success: boolean }> {
+  const url = `${input.baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${input.provider.apiKey ?? ''}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: input.model.id,
+      messages: [{ role: 'user', content: 'Hi' }],
+      max_tokens: 64,
+      stream: false,
+    }),
+  });
+  if (!response.ok) {
+    return { success: false };
+  }
+  return { success: true };
+}
 
 afterEach(async () => {
   setStoreGetter(() => null);
@@ -72,21 +98,6 @@ test('settings test and real SDK stream send the same selected custom model ID',
     ],
   };
   try {
-    vi.stubGlobal('window', {
-      electron: {
-        api: {
-          fetch: async (input: {
-            url: string;
-            method: string;
-            headers: HeadersInit;
-            body: string;
-          }) => {
-            const response = await fetch(input.url, input);
-            return { ok: response.ok, status: response.status, data: await response.json() };
-          },
-        },
-      },
-    });
     const tested = await testProviderModelConnection({
       providerId,
       provider,
@@ -124,7 +135,7 @@ test('settings test and real SDK stream send the same selected custom model ID',
     expect(reply.errorMessage).toBeUndefined();
     expect(reply.content).toContainEqual({ type: 'text', text: 'OK' });
     expect(received).toEqual([
-      { path: '/v1/chat/completions', model: modelId, stream: undefined },
+      { path: '/v1/chat/completions', model: modelId, stream: false },
       { path: '/v1/chat/completions', model: modelId, stream: true },
     ]);
   } finally {

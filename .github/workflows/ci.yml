@@ -130,6 +130,9 @@ jobs:
         run: |
           mkdir -p .cache/tsc
           bun run compile:electron -- --incremental --tsBuildInfoFile .cache/tsc/electron.tsbuildinfo
+      - name: Build node-pty for the Node test runtime
+        # Bun installs with --ignore-scripts, and node-pty ships no Linux prebuild.
+        run: npm rebuild node-pty --build-from-source
       - name: Save Electron TypeScript cache
         if: steps.electron-tsc.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
@@ -138,13 +141,14 @@ jobs:
             .cache/tsc/electron.tsbuildinfo
             dist-electron
           key: ${{ steps.electron-tsc.outputs.cache-primary-key }}
-      - name: Upload compiled Electron artifacts for test shards
+      - name: Upload compiled Electron and native test artifacts
         uses: actions/upload-artifact@v4
         with:
           name: electron-dist-${{ github.run_id }}
           path: |
             dist-electron
             .cache/tsc/electron.tsbuildinfo
+            node_modules/node-pty/build
           retention-days: 1
 
   test:
