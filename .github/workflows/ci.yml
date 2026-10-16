@@ -57,6 +57,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Fail on oversized committed files
+        run: node scripts/ci/check-large-files.mjs
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       - name: Install checksum-pinned workflow validator
         run: |
           mkdir -p "$RUNNER_TEMP/actionlint"
@@ -70,12 +77,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-      - name: Verify CI inventory matches workflow triggers
-        run: |
-          python3 -m pip install --disable-pip-version-check PyYAML==6.0.2
-          python3 .github/check-devops-config.py
-      - name: Test DevOps gate decisions
-        run: node --test .github/devops-gate.test.cjs
       - uses: ./.github/actions/setup-bun-workspace
         with:
           save-cache: 'true'

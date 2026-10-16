@@ -81,6 +81,7 @@
     "lint": "oxlint src/ enterprise/ && bun run theme:check && bun run theme:audit",
     "knip": "knip --no-progress",
     "check:python-dead-code": "node scripts/ci/check-python-dead-code.mjs",
+    "check:large-files": "node scripts/ci/check-large-files.mjs",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "prepare": "husky",

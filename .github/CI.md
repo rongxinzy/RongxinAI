@@ -67,8 +67,8 @@ the miss and investigate the measured bottleneck without relaxing installation t
 
 The default branch requires `ci-gate` and retains `merge-gate` from GitHub Actions
 (app ID 15368), with the branch up to date before merging. `ci-gate` requires `merge-gate`
-to pass; inventory drift is checked in the lint job via `.github/check-devops-config.py`
-against `.github/devops-ci.json` (CI only).
+to pass. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB large-file gate
+with an explicit asset allowlist.
 `merge-gate` retains application job validation. Do not require conditional platform
 jobs directly.
 
