@@ -6,7 +6,16 @@ import { planGates, verifyGateResults, type GatePlan } from './policy.ts';
 
 const prRef = 'refs/pull/42/merge';
 const light = planGates(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest, prRef);
-const full = planGates(['package.json'], CiEvent.PullRequest, prRef);
+const full: GatePlan = {
+  [HeavyJob.Linux]: true,
+  [HeavyJob.Windows]: true,
+  [HeavyJob.Memory]: true,
+};
+const prPackaging: GatePlan = {
+  [HeavyJob.Linux]: false,
+  [HeavyJob.Windows]: false,
+  [HeavyJob.Memory]: true,
+};
 
 test.each([
   'README.md',
@@ -51,9 +60,12 @@ test.each([
   '.github/workflows/ci.yml',
   'src/main/main.ts',
   'src/main/newPlatformModule.ts',
-])('packaging and main-process changes run all heavy checks: %s', file => {
-  expect(Object.values(planGates([file], CiEvent.PullRequest, prRef))).toEqual([true, true, true]);
-});
+])(
+  'packaging and main-process changes in PR run memory regression without install checks: %s',
+  file => {
+    expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(prPackaging);
+  },
+);
 
 test.each([
   'src/renderer/services/cowork.ts',
@@ -75,12 +87,9 @@ test('manual runs and unknown events fail closed to the complete suite', () => {
   expect(planGates([], 'unexpected-event', 'refs/heads/main')).toEqual(full);
 });
 
-test('main pushes are light while tag releases retain mandatory memory regression', () => {
+test('main pushes are light while tag releases retain all heavy checks', () => {
   expect(planGates(['package.json'], CiEvent.Push, 'refs/heads/main')).toEqual(light);
-  expect(planGates([], CiEvent.Push, 'refs/tags/v2026.9.5')).toEqual({
-    ...light,
-    [HeavyJob.Memory]: true,
-  });
+  expect(planGates([], CiEvent.Push, 'refs/tags/v2026.9.5')).toEqual(full);
 });
 
 function resultsFor(plan: GatePlan) {

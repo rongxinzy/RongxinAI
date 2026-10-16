@@ -232,6 +232,7 @@ import { TodoReminderScheduler } from './todo/reminderScheduler';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
+import { shutdownPythonRuntime } from './pythonRuntime/host';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
   getCurrentApiConfig,
@@ -7786,6 +7787,10 @@ if (!gotTheLock) {
     // Stop all active Pi sessions without blocking shutdown.
     console.log('[Main] Stopping cowork sessions...');
     if (piRuntimeAdapter) piRuntimeAdapter.stopAllSessions();
+
+    await shutdownPythonRuntime().catch(error => {
+      console.error('[PythonRuntime] Failed to shut down Python runtime on quit:', error);
+    });
 
     await piModelCatalogRefreshCoordinator?.stop();
     piModelCatalogRefreshCoordinator = null;
