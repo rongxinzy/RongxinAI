@@ -400,8 +400,8 @@ jobs:
     if: needs.changes.outputs.windows-install == 'true'
     uses: ./.github/workflows/windows-installer-pr.yml
 
-  merge-gate:
-    name: merge-gate
+  ci-gate:
+    name: ci-gate
     if: always()
     needs:
       [
@@ -436,13 +436,3 @@ jobs:
           GATE_PLAN: ${{ needs.changes.outputs.plan }}
           GATE_PATH_PLAN: ${{ needs.changes.outputs.path-plan }}
           GATE_RESULTS: ${{ toJSON(needs) }}
-
-  ci-gate:
-    name: ci-gate
-    if: always() && github.event_name == 'pull_request'
-    needs: [merge-gate]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require merge gate
-        run: test "${{ needs.merge-gate.result }}" = "success"

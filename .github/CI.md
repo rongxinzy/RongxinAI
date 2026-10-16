@@ -4,7 +4,7 @@ Every PR runs workflow validation, lint (including Knip unused-code and `scripts
 renderer type checking/build/bundle budgets, Electron compilation, unit tests, and Presentation Studio tests.
 Documentation-only and website-only PRs keep these baseline checks. They do not run install, memory,
 enterprise toolchain, or channel-runtime smoke jobs. Unknown paths never skip the baseline. Unit tests run
-as two shards of one `test` job; `merge-gate` still requires that job to succeed.
+as two shards of one `test` job; `ci-gate` still requires that job to succeed.
 
 `scripts/ci/gates/policy.ts` owns expensive-check selection:
 
@@ -18,12 +18,12 @@ The planner uses the full Git merge-base diff, with NUL-separated paths and rena
 detection disabled. Deleted paths and both sides of renames participate. Invalid SHAs
 or diff failures stop the planner; no API pagination or 300-file filter limit applies.
 
-`merge-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped
-required jobs. Path-owned checks (channel runtime smoke, Python runtime containment,
-installer preview, browser preview) now run as conditional jobs inside CI instead of separate pull
-request workflows. Browser preview runs when the renderer, shared contracts, or
-`scripts/preview` change. Linux and Windows install workflows remain reusable/manual workflows.
-The parent CI owns concurrency cancellation and exposes the required `ci-gate` check after merge-gate succeeds.
+`ci-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped required
+jobs. Path-owned checks (channel runtime smoke, Python runtime containment, installer preview,
+browser preview) run as conditional jobs inside CI. Browser preview runs when the renderer, shared
+contracts, or `scripts/preview` change. Linux and Windows install workflows remain reusable/manual
+workflows. The parent CI owns concurrency cancellation and exposes `ci-gate` as the sole required
+GitHub check for pull requests.
 
 ## Release and nightly checks
 
@@ -65,12 +65,11 @@ the miss and investigate the measured bottleneck without relaxing installation t
 
 ## Required-check rollout and measurement
 
-The default branch requires `ci-gate` and retains `merge-gate` from GitHub Actions
-(app ID 15368), with the branch up to date before merging. `ci-gate` requires `merge-gate`
-to pass. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB large-file gate
-with an explicit asset allowlist.
-`merge-gate` retains application job validation. Do not require conditional platform
-jobs directly.
+The default branch requires `ci-gate` from GitHub Actions (app ID 15368), with the branch up to
+date before merging. The `ci-gate` job aggregates every baseline and path-selected job via
+`scripts/ci/gates/verify.ts`. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB
+large-file gate with an explicit asset allowlist. Do not require conditional platform jobs
+directly on branch protection.
 
 All PRs, including documentation, require one independent GitHub approval. New
 commits dismiss stale approvals; the latest push must be approved by another person.

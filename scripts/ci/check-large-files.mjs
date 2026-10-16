@@ -49,22 +49,32 @@ function changedPaths() {
   const base = process.env.PR_BASE_SHA;
   const head = process.env.PR_HEAD_SHA;
   if (base && head && /^[a-f0-9]{40}$/.test(base) && /^[a-f0-9]{40}$/.test(head)) {
-    return execFileSync('git', ['diff', '--name-only', '--diff-filter=AM', '-z', `${base}...${head}`], {
-      cwd: root,
-      encoding: 'utf8',
-    })
+    return execFileSync(
+      'git',
+      ['diff', '--name-only', '--diff-filter=AM', '-z', `${base}...${head}`],
+      {
+        cwd: root,
+        encoding: 'utf8',
+      },
+    )
       .split('\0')
       .filter(Boolean);
   }
   if (process.env.GITHUB_EVENT_NAME === 'push') {
-    return execFileSync('git', ['show', '--name-only', '--pretty=format:', '-z', '--diff-filter=AM', 'HEAD'], {
-      cwd: root,
-      encoding: 'utf8',
-    })
+    return execFileSync(
+      'git',
+      ['show', '--name-only', '--pretty=format:', '-z', '--diff-filter=AM', 'HEAD'],
+      {
+        cwd: root,
+        encoding: 'utf8',
+      },
+    )
       .split('\0')
       .filter(Boolean);
   }
-  return execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  return execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean);
 }
 
 const violations = [];
@@ -88,7 +98,9 @@ if (violations.length) {
   for (const entry of violations) {
     console.error(`  ${entry.relative} (${entry.sizeMb} MiB)`);
   }
-  console.error(`Update ${path.relative(root, allowlistPath)} only for intentional shipped assets.`);
+  console.error(
+    `Update ${path.relative(root, allowlistPath)} only for intentional shipped assets.`,
+  );
   process.exit(1);
 }
 

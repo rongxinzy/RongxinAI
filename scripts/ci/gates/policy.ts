@@ -24,7 +24,7 @@ const browserPreviewChange =
 
 // CI-only edits must not pull expensive integration jobs onto the critical path.
 const ciMetaOnly =
-  /^\.github\/(?:workflows\/ci\.ya?ml$|devops-ci\.json$|CI\.md$|check-devops-config\.py$|devops-gate(?:\.test)?\.cjs$)|^scripts\/ci\/(?:gates\/|check-(?:large-files|python-dead-code)|ruff-dead-code\.toml|large-file-allowlist\.txt)|^knip\.ts$|^AGENTS\.md$|^DEVOPS\.md$/;
+  /^(?:\.github\/|scripts\/ci\/(?:gates\/|check-|ruff-dead-code|large-file-allowlist)|knip\.ts$|AGENTS\.md$|DEVOPS\.md$|CLAUDE\.md$)/;
 
 function ciInfrastructureOnly(paths: string[]): boolean {
   return (
@@ -40,16 +40,16 @@ export function enterpriseRequired(paths: string[], event: string): boolean {
   return paths.some(file => !ciMetaOnly.test(file) && enterpriseChange.test(file));
 }
 
-function pathJobSelected(paths: string[], event: string, matcher: (file: string) => boolean): boolean {
+function pathJobSelected(
+  paths: string[],
+  event: string,
+  matcher: (file: string) => boolean,
+): boolean {
   const full = event === CiEvent.Manual;
   const unknown =
     event !== CiEvent.PullRequest && event !== CiEvent.Push && event !== CiEvent.Manual;
   if (!full && !unknown && ciInfrastructureOnly(paths)) return false;
-  return (
-    full ||
-    unknown ||
-    paths.some(file => !ciMetaOnly.test(file) && matcher(file))
-  );
+  return full || unknown || paths.some(file => !ciMetaOnly.test(file) && matcher(file));
 }
 
 export function planPathJobs(paths: string[], event: string): PathPlan {

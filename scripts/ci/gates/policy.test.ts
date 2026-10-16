@@ -258,7 +258,7 @@ test('CI waits for every selected reusable check and always runs the merge gate'
   const ci = workflow('ci.yml');
   expect(ci.on).toHaveProperty(CiEvent.PullRequest);
   expect(ci.jobs['ci-gate'].name).toBe('ci-gate');
-  const gate = ci.jobs['merge-gate'];
+  const gate = ci.jobs['ci-gate'];
   expect(gate.if).toBe('always()');
   expect(gate.needs).toEqual(
     expect.arrayContaining([
