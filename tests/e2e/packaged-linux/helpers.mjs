@@ -116,9 +116,9 @@ export async function focusCoworkConversationView(page) {
   await delay(400);
 }
 
-export async function analyzeMemoryInjectionSession(page, sessionId, marker) {
+export async function analyzeMemoryInjectionSession(page, sessionId, { marker, distinctiveWord }) {
   return page.evaluate(
-    async ({ targetSessionId, needle }) => {
+    async ({ targetSessionId, needle, word }) => {
       const isUserMessage = message => message.role === 'user' || message.type === 'user';
       const isMemoryToolMessage = message => {
         const toolName = message.metadata?.toolName;
@@ -143,30 +143,26 @@ export async function analyzeMemoryInjectionSession(page, sessionId, marker) {
         .map(message => String(message.content ?? ''))
         .join('\n');
       const memoryToolUsed = messages.some(isMemoryToolMessage);
-      const nonUserText = messages
-        .filter(message => !isUserMessage(message))
-        .map(message => {
-          const chunks = [String(message.content ?? '')];
-          if (message.metadata?.toolResult) chunks.push(String(message.metadata.toolResult));
-          return chunks.join('\n');
-        })
+      const normalizedWord = String(word).toLowerCase();
+      const userQuestionHasDistinctiveWord = userText.toLowerCase().includes(normalizedWord);
+      const assistantText = messages
+        .filter(message => message.role === 'assistant' || message.type === 'assistant')
+        .map(message => String(message.content ?? ''))
         .join('\n');
-      const userPromptHasMarker = userText.includes(needle);
-      const assistantOrSystemHasMarker = nonUserText.includes(needle);
-      const userPromptHasInjectionBlock = messages.some(message => {
-        if (!isUserMessage(message)) return false;
+      const assistantHasDistinctiveWord = assistantText.toLowerCase().includes(normalizedWord);
+      const injectionBlockHasMarker = messages.some(message => {
         const content = String(message.content ?? '');
         return content.includes('Relevant memory') && content.includes(needle);
       });
 
       return {
         memoryToolUsed,
-        userPromptHasMarker,
-        assistantOrSystemHasMarker,
-        userPromptHasInjectionBlock,
+        injectionBlockHasMarker,
+        assistantHasDistinctiveWord,
+        userQuestionHasDistinctiveWord,
       };
     },
-    { targetSessionId: sessionId, needle: marker },
+    { targetSessionId: sessionId, needle: marker, word: distinctiveWord },
   );
 }
 
@@ -327,46 +323,34 @@ export function waitForRunCompletion(page, sessionId, timeoutMs = 600_000) {
   );
 }
 
-export async function configureGlmProvider(page, apiKey, { baseURL, model }) {
+export async function configureGlmProvider(page, { model }) {
   return page.evaluate(
-    async ({ baseURL: resolvedBaseUrl, model: resolvedModel, key }) => {
-      const result = await window.electron.saveApiConfig({
-        apiKey: key,
-        baseURL: resolvedBaseUrl,
-        model: resolvedModel,
-        apiType: 'openai',
-      });
-      if (!result.success) throw new Error(result.error || 'saveApiConfig failed');
-      if (window.electron.magpie?.start) {
-        const started = await window.electron.magpie.start();
-        if (started && started.state && started.state !== 'running') {
-          throw new Error(`magpie.start state=${started.state} ${started.error || ''}`);
-        }
+    async ({ resolvedModel }) => {
+      if (!window.electron.magpie?.start || !window.electron.magpie?.models) {
+        throw new Error('Magpie APIs are unavailable in renderer');
       }
-      if (window.electron.magpie?.models) {
-        const res = await window.electron.magpie.models();
-        const list = Array.isArray(res) ? res : (res?.data ?? res?.models ?? []);
-        const ids = list.map(entry => entry?.id ?? entry?.modelId ?? String(entry));
-        const pick = ids.find(id =>
-          String(id).toLowerCase().includes(String(resolvedModel).toLowerCase()),
+      const started = await window.electron.magpie.start();
+      if (started && started.state && started.state !== 'running') {
+        throw new Error(`magpie.start state=${started.state} ${started.error || ''}`);
+      }
+      const res = await window.electron.magpie.models();
+      const list = Array.isArray(res) ? res : (res?.data ?? res?.models ?? []);
+      const ids = list.map(entry => entry?.id ?? entry?.modelId ?? String(entry));
+      const pick = ids.find(id =>
+        String(id).toLowerCase().includes(String(resolvedModel).toLowerCase()),
+      );
+      if (!pick) {
+        throw new Error(
+          `no magpie model matches ${resolvedModel}; ids=${JSON.stringify(ids).slice(0, 800)}`,
         );
-        if (!pick) {
-          throw new Error(
-            `no magpie model matches ${resolvedModel}; ids=${JSON.stringify(ids).slice(0, 800)}`,
-          );
-        }
-        const sel = await window.electron.magpie.selectDefault(pick);
-        if (sel?.success === false) {
-          throw new Error(sel.error || `selectDefault failed for ${pick}`);
-        }
       }
-      const readiness = await window.electron.checkApiConfig({ probeModel: true });
-      if (!readiness.hasConfig) {
-        throw new Error(readiness.error || 'checkApiConfig failed after GLM setup');
+      const sel = await window.electron.magpie.selectDefault(pick);
+      if (sel?.success === false) {
+        throw new Error(sel.error || `selectDefault failed for ${pick}`);
       }
-      return readiness;
+      return { modelId: pick, magpieState: started?.state ?? 'running' };
     },
-    { baseURL, model, key: apiKey },
+    { resolvedModel: model },
   );
 }
 

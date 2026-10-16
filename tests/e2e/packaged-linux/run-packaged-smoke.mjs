@@ -17,7 +17,6 @@ import {
   E2E_LLAMA_MODEL_FILENAME,
   E2E_LLAMA_MODEL_URL,
   E2E_LLAMACPP_BIN,
-  GLM_BASE_URL,
   GLM_MODEL,
 } from './constants.mjs';
 import { existsSync } from 'node:fs';
@@ -213,13 +212,14 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
   const decisionToken = `packaged-e2e-decision-${Date.now()}`;
   const memoryInjectionMarker =
     'standardize on SQLite for workspace persistence in packaged Linux E2E';
+  const memoryInjectionDistinctiveWord = 'packaged';
   const teamDecisionFact = `Team decision (${decisionToken}): ${memoryInjectionMarker}.`;
   try {
     ({ electronApp, page } = await launchPackagedApp(
       executablePath,
       buildLaunchEnv(profile.home, profile.userDataPath),
     ));
-    await configureGlmProvider(page, glmKey, { baseURL: GLM_BASE_URL, model: GLM_MODEL });
+    await configureGlmProvider(page, { model: GLM_MODEL });
 
     const session = await page.evaluate(
       async ({ cwd, teamDecisionFact: fact }) => {
@@ -274,16 +274,15 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
       { cwd: workspaceDir },
     );
     const injectionSnapshot = await waitForRunCompletion(page, injectionSession, 480_000);
-    const injectionAnalysis = await analyzeMemoryInjectionSession(
-      page,
-      injectionSession,
-      memoryInjectionMarker,
-    );
+    const injectionAnalysis = await analyzeMemoryInjectionSession(page, injectionSession, {
+      marker: memoryInjectionMarker,
+      distinctiveWord: memoryInjectionDistinctiveWord,
+    });
     const injected =
       !injectionAnalysis.memoryToolUsed &&
-      !injectionAnalysis.userPromptHasMarker &&
-      (injectionAnalysis.userPromptHasInjectionBlock ||
-        injectionAnalysis.assistantOrSystemHasMarker);
+      (injectionAnalysis.injectionBlockHasMarker ||
+        (injectionAnalysis.assistantHasDistinctiveWord &&
+          !injectionAnalysis.userQuestionHasDistinctiveWord));
 
     await focusCoworkConversationView(page);
     const shot = await screenshot(page, 'glm-work-memory-tool');
@@ -293,14 +292,14 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
       recalled &&
       injected &&
       injectionSnapshot.phase === 'completed';
-    record(
-      'glm-work-memory-tool',
-      ok ? 'pass' : 'fail',
-      ok
-        ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified via "${memoryInjectionMarker}"`
-        : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}; injection=${JSON.stringify(injectionAnalysis)}`,
-      [shot, `session:${session.sessionId}`, `injection:${injectionSession}`],
-    );
+    const glmWorkDetail = ok
+      ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified via "${memoryInjectionMarker}" or "${memoryInjectionDistinctiveWord}"`
+      : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}; injection=${JSON.stringify(injectionAnalysis)}`;
+    record('glm-work-memory-tool', ok ? 'pass' : 'fail', glmWorkDetail, [
+      shot,
+      `session:${session.sessionId}`,
+      `injection:${injectionSession}`,
+    ]);
   } catch (error) {
     const shot = page
       ? await focusCoworkConversationView(page)
@@ -334,7 +333,7 @@ async function scenarioImBridgeReply(executablePath, glmKey) {
       executablePath,
       buildLaunchEnv(profile.home, profile.userDataPath),
     ));
-    await configureGlmProvider(page, glmKey, { baseURL: GLM_BASE_URL, model: GLM_MODEL });
+    await configureGlmProvider(page, { model: GLM_MODEL });
 
     const imSetup = await page.evaluate(async workspacePath => {
       const ensured = await window.electron.cowork.ensureWorkspace({
