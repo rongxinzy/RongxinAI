@@ -109,6 +109,67 @@ export async function screenshot(page, name) {
   return target;
 }
 
+export async function focusCoworkConversationView(page) {
+  const newConversation = page.getByTestId('sidebar-new-conversation');
+  await newConversation.click();
+  await newConversation.waitFor({ state: 'visible', timeout: 30_000 });
+  await delay(400);
+}
+
+export async function analyzeMemoryInjectionSession(page, sessionId, marker) {
+  return page.evaluate(
+    async ({ targetSessionId, needle }) => {
+      const isUserMessage = message => message.role === 'user' || message.type === 'user';
+      const isMemoryToolMessage = message => {
+        const toolName = message.metadata?.toolName;
+        if (typeof toolName === 'string' && toolName.toLowerCase() === 'memory') {
+          return true;
+        }
+        if (message.type !== 'tool_use' && message.type !== 'tool_result') {
+          return false;
+        }
+        const toolInput = message.metadata?.toolInput;
+        if (toolInput && typeof toolInput === 'object' && 'action' in toolInput) {
+          return true;
+        }
+        const payload = `${message.content ?? ''}${message.metadata?.toolResult ?? ''}`;
+        return /"action"\s*:\s*"(?:recall|save|list|propose_personal)"/i.test(payload);
+      };
+
+      const result = await window.electron.cowork.getSession(targetSessionId);
+      const messages = (result.session ?? result)?.messages ?? [];
+      const userText = messages
+        .filter(isUserMessage)
+        .map(message => String(message.content ?? ''))
+        .join('\n');
+      const memoryToolUsed = messages.some(isMemoryToolMessage);
+      const nonUserText = messages
+        .filter(message => !isUserMessage(message))
+        .map(message => {
+          const chunks = [String(message.content ?? '')];
+          if (message.metadata?.toolResult) chunks.push(String(message.metadata.toolResult));
+          return chunks.join('\n');
+        })
+        .join('\n');
+      const userPromptHasMarker = userText.includes(needle);
+      const assistantOrSystemHasMarker = nonUserText.includes(needle);
+      const userPromptHasInjectionBlock = messages.some(message => {
+        if (!isUserMessage(message)) return false;
+        const content = String(message.content ?? '');
+        return content.includes('Relevant memory') && content.includes(needle);
+      });
+
+      return {
+        memoryToolUsed,
+        userPromptHasMarker,
+        assistantOrSystemHasMarker,
+        userPromptHasInjectionBlock,
+      };
+    },
+    { targetSessionId: sessionId, needle: marker },
+  );
+}
+
 export async function collectMainLogs(electronApp) {
   try {
     return await electronApp.evaluate(() => {

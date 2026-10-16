@@ -24,12 +24,14 @@ import { existsSync } from 'node:fs';
 
 import {
   cleanupProfile,
+  analyzeMemoryInjectionSession,
   configureGlmProvider,
   createCcConnectProtocolHeaders,
   createIsolatedProfile,
   delay,
   downloadFile,
   findActiveMemoryRow,
+  focusCoworkConversationView,
   launchPackagedApp,
   resolveGlmApiKey,
   resolvePackagedExecutable,
@@ -209,7 +211,9 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
   let electronApp;
   let page;
   const decisionToken = `packaged-e2e-decision-${Date.now()}`;
-  const teamDecisionFact = `Team decision (${decisionToken}): standardize on SQLite for workspace persistence in packaged Linux E2E.`;
+  const memoryInjectionMarker =
+    'standardize on SQLite for workspace persistence in packaged Linux E2E';
+  const teamDecisionFact = `Team decision (${decisionToken}): ${memoryInjectionMarker}.`;
   try {
     ({ electronApp, page } = await launchPackagedApp(
       executablePath,
@@ -254,11 +258,11 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
     );
 
     const injectionSession = await page.evaluate(
-      async ({ cwd, token }) => {
+      async ({ cwd }) => {
         const started = await window.electron.cowork.startSession({
           prompt:
-            `What team decision about SQLite workspace persistence is recorded for this workspace (${token})? ` +
-            'Quote the stored decision verbatim if you have it in context.',
+            'What persistence technology did the team decide to standardize on for this workspace? ' +
+            'Answer in one short sentence using only prior context. Do not call any tools.',
           cwd,
           mode: 'work',
         });
@@ -267,17 +271,21 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
         }
         return started.session.id;
       },
-      { cwd: workspaceDir, token: decisionToken },
+      { cwd: workspaceDir },
     );
     const injectionSnapshot = await waitForRunCompletion(page, injectionSession, 480_000);
-    const injectionMessages = await page.evaluate(async sessionId => {
-      const result = await window.electron.cowork.getSession(sessionId);
-      const sessionRecord = result.session ?? result;
-      const messageList = sessionRecord?.messages ?? [];
-      return messageList.map(message => message.content).join('\n');
-    }, injectionSession);
-    const injected = injectionMessages.includes(decisionToken);
+    const injectionAnalysis = await analyzeMemoryInjectionSession(
+      page,
+      injectionSession,
+      memoryInjectionMarker,
+    );
+    const injected =
+      !injectionAnalysis.memoryToolUsed &&
+      !injectionAnalysis.userPromptHasMarker &&
+      (injectionAnalysis.userPromptHasInjectionBlock ||
+        injectionAnalysis.assistantOrSystemHasMarker);
 
+    await focusCoworkConversationView(page);
     const shot = await screenshot(page, 'glm-work-memory-tool');
     const ok =
       snapshot.phase === 'completed' &&
@@ -289,13 +297,15 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
       'glm-work-memory-tool',
       ok ? 'pass' : 'fail',
       ok
-        ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified for ${decisionToken}`
-        : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}`,
+        ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified via "${memoryInjectionMarker}"`
+        : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}; injection=${JSON.stringify(injectionAnalysis)}`,
       [shot, `session:${session.sessionId}`, `injection:${injectionSession}`],
     );
   } catch (error) {
     const shot = page
-      ? await screenshot(page, 'glm-work-memory-tool-failure').catch(() => null)
+      ? await focusCoworkConversationView(page)
+          .then(() => screenshot(page, 'glm-work-memory-tool-failure'))
+          .catch(() => null)
       : null;
     record(
       'glm-work-memory-tool',
