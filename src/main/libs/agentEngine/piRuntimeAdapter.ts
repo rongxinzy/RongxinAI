@@ -46,7 +46,6 @@ import {
   type CoworkSessionInterruption,
 } from '../../../shared/cowork/interruption';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
-import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import {
   HarnessVersion,
   type HarnessActivationEvent,
@@ -199,7 +198,6 @@ import {
   haveSameStringList,
   InitializingPiSession,
   mergeSkillIds,
-  MESSAGE_UPDATE_THROTTLE_MS,
   normalizeSkillIds,
   PiChatRuntimeLimit,
   PiEvent,
@@ -209,13 +207,12 @@ import {
   PiResourceState,
   PiSettingsManager,
   PiStartupLatency,
-  PiUsage,
   preparePiPrompt,
   sendPiPrompt,
-  STORE_UPDATE_THROTTLE_MS,
   yieldToEventLoop,
 } from './piRuntimeSessionState';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, magpieImageInput, resolvePiModel } from './piMagpiePiModel';
+import { PiAssistantTranscript } from './piAssistantTranscript';
 // ── PiRuntimeAdapter ──
 
 // Force ANSI color output from CLI tools (npm, git, jest, etc.) run by
@@ -229,6 +226,17 @@ if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 let hasAppliedApplicationRuntimeEnv = false;
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
+  private readonly transcript = new PiAssistantTranscript({
+    getStore: () => this.store,
+    emitMessage: (sessionId, message) => {
+      this.emit('message', sessionId, message);
+    },
+    emitMessageUpdate: (sessionId, messageId, content, metadata) => {
+      this.emit('messageUpdate', sessionId, messageId, content, metadata);
+    },
+    getActiveSession: sessionId => this.activeSessions.get(sessionId),
+  });
+
   private static readonly MAX_RESIDENT_IDLE_SESSIONS = 4;
   private static readonly IDLE_SESSION_TTL_MS = 30 * 60 * 1000;
   private readonly activeSessions = new Map<string, ActivePiSession>();
@@ -307,9 +315,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return persistCoworkImageAttachments(this.imageAttachmentRoot, sessionId, attachments);
   }
 
-  private noteThrottleMessage(sessionId: string, messageId: string): void {
-    this.throttleSessionByMessageId.set(messageId, sessionId);
-  }
   /**
    * Bundled SKILLs root (resources/SKILLs in production). Injected so the
    * live member source matches the main-session preset snapshot; getSkillsRoot
@@ -362,22 +367,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return this.mcpInjected;
   }
   private mcpInjected = false;
-
-  // Throttle state
-  private readonly lastMessageUpdateEmitTime = new Map<string, number>();
-  private readonly pendingMessageUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly pendingMessageUpdate = new Map<
-    string,
-    { content: string; metadata?: Record<string, unknown> }
-  >();
-  // Separate throttle for synchronous SQLite writes (see STORE_UPDATE_THROTTLE_MS).
-  private readonly lastStoreUpdateTime = new Map<string, number>();
-  private readonly pendingStoreUpdate = new Map<
-    string,
-    { content: string; metadata: Record<string, unknown> }
-  >();
-  private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly throttleSessionByMessageId = new Map<string, string>();
 
   // ── PiRuntime.on/off ──
 
@@ -1616,7 +1605,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const wasRunning = active.isRunning;
     if (!wasRunning && active.aborted) return;
 
-    this.finalizeActiveThinking(sessionId, active);
+    this.transcript.finalizeActiveThinking(sessionId, active);
     // Close in-flight tools before the turn is marked paused. Otherwise resume
     // starts a new command while the previous one still looks "running".
     this.closeInterruptedToolUses(sessionId);
@@ -1652,7 +1641,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.releaseStoppedSession(sessionId);
     // Stopping flushes the throttled store write, which may carry isStreaming; the
     // partial answer bubble must not stay in flight after the run is gone.
-    this.closeIdlePlaceholders(sessionId, active);
+    this.transcript.closeIdlePlaceholders(sessionId, active);
 
     if (shouldDrainFollowUp) {
       const next = this.pendingMessageQueue.findNextPending(
@@ -2146,7 +2135,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.delete(sessionId);
-    this.clearThrottleStateBySession(sessionId, true);
+    this.transcript.clearThrottleStateBySession(sessionId, true);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
   }
@@ -2184,7 +2173,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.memoryInjectionDedup.reset(session.sessionId);
       this.activeSessions.delete(session.sessionId);
       this.retainedSessionIds.add(session.sessionId);
-      this.clearThrottleStateBySession(session.sessionId, true);
+      this.transcript.clearThrottleStateBySession(session.sessionId, true);
       console.debug(`[PiRuntime] evicted idle session ${session.sessionId} from memory`);
     }
   }
@@ -2193,7 +2182,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.memoryInjectionDedup.reset(sessionId);
     this.activeSessions.delete(sessionId);
     this.retainedSessionIds.add(sessionId);
-    this.clearThrottleStateBySession(sessionId, true);
+    this.transcript.clearThrottleStateBySession(sessionId, true);
   }
 
   // ── Pi session resources and context limits ──
@@ -2715,16 +2704,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (thinking && thinking !== active.thinkingText) {
           active.thinkingText = thinking;
           if (!thinkingEnded) active.thinkingLifecycle.start();
-          this.streamInto(sessionId, active, 'thinking', thinking);
+          this.transcript.streamInto(sessionId, active, 'thinking', thinking);
         }
         if (thinkingEnded) {
-          this.finalizeActiveThinking(sessionId, active);
+          this.transcript.finalizeActiveThinking(sessionId, active);
         }
         if (text && text !== active.answerText) {
           this.recordFirstVisibleToken(sessionId, active);
-          this.finalizeActiveThinking(sessionId, active);
+          this.transcript.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
-          this.streamInto(sessionId, active, 'answer', text);
+          this.transcript.streamInto(sessionId, active, 'answer', text);
         }
         break;
       }
@@ -2744,7 +2733,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               active.answerText = text;
               this.recordFirstVisibleToken(sessionId, active);
             }
-            this.finalizeActiveThinking(sessionId, active);
+            this.transcript.finalizeActiveThinking(sessionId, active);
             const errMsg = event.message.errorMessage || 'Pi agent error';
             const errDetail = event.message.content
               ? typeof event.message.content === 'string'
@@ -2777,7 +2766,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             active.turnFailed = true;
             // A failed turn leaves its bubble behind too; a retry streams into the
             // same id and flips the flag back on by itself.
-            this.closeIdlePlaceholders(sessionId, active);
+            this.transcript.closeIdlePlaceholders(sessionId, active);
             if (
               !active.errorSurfaced &&
               active.pendingError.classified.kind !== CoworkErrorKind.Unknown &&
@@ -2835,7 +2824,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               active.thinkingLifecycle.markContentStreaming();
             }
             active.thinkingText = finalThinking;
-            this.finalizeActiveThinking(sessionId, active);
+            this.transcript.finalizeActiveThinking(sessionId, active);
           }
           // Finalize the answer bubble on its own id.
           if (finalAnswer.trim()) {
@@ -2843,12 +2832,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             const startupLatency = active.startupLatency;
             active.startupLatency = undefined;
             active.answerText = finalAnswer;
-            this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
+            this.transcript.finalizeMessage(sessionId, active, 'answer', finalAnswer);
             if (isPiFinalResponse(event.message)) {
               active.lastCompletedAnswerMessageId = active.assistantMessageId;
               active.lastCompletedAnswerText = finalAnswer;
             }
-            this.scheduleContextUsageSync(
+            this.transcript.scheduleContextUsageSync(
               sessionId,
               active.assistantMessageId,
               event.message.usage,
@@ -2863,7 +2852,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           // Its placeholder bubbles must still be closed: they were created with
           // isStreaming and would otherwise keep every later view of the session
           // spinning.
-          this.closeIdlePlaceholders(sessionId, active);
+          this.transcript.closeIdlePlaceholders(sessionId, active);
 
           // Turn's segments are done; next turn starts fresh messages.
           active.assistantMessageId = null;
@@ -2985,7 +2974,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'agent_end': {
         if (active.completionPending) break;
-        this.finalizeActiveThinking(sessionId, active);
+        this.transcript.finalizeActiveThinking(sessionId, active);
         active.toolStartedAtByCallId.clear();
         const clearActivity = active.toolActivityTracker.clear();
         if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
@@ -3125,8 +3114,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       );
       return;
     }
-    this.markFinalAnswer(sessionId, active);
-    this.clearThrottleStateBySession(sessionId, false);
+    this.transcript.markFinalAnswer(sessionId, active);
+    this.transcript.clearThrottleStateBySession(sessionId, false);
     active.lastUsedAt = Date.now();
     agentResourceDiagnostics.finishPiTurn(
       sessionId,
@@ -3357,7 +3346,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
     active.pendingError = null;
     if (active.answerText.trim()) {
-      this.finalizeMessage(sessionId, active, 'answer', active.answerText);
+      this.transcript.finalizeMessage(sessionId, active, 'answer', active.answerText);
       active.assistantMessageId = null;
       active.answerText = '';
     }
@@ -3470,378 +3459,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       console.warn('[PiRuntime] failed to abort a terminated workbench run:', error);
     });
     this.flushPendingError(sessionId, active);
-  }
-
-  // ── Private: assistant message lifecycle ──
-
-  /**
-   * Lazily create the answer or thinking message for the current turn, returning its id.
-   *
-   * The message is persisted via store.addMessage() (which assigns its own id) and the
-   * initial 'message' event is emitted ONCE, so the rendered bubble and the DB row share
-   * the same id. Streaming updates and the final content go out as 'messageUpdate' on this
-   * same id — never a second 'message' event — which prevents the duplicate-render bug.
-   *
-   * Thinking messages carry metadata.isThinking so the frontend renders them as a
-   * ThinkingBlock instead of a normal answer bubble.
-   */
-  private ensureMessage(
-    sessionId: string,
-    active: ActivePiSession,
-    kind: 'answer' | 'thinking',
-    initialContent: string,
-  ): string {
-    const existing = kind === 'thinking' ? active.thinkingMessageId : active.assistantMessageId;
-    if (existing) return existing;
-
-    const seed: CoworkMessage = {
-      id: randomUUID(),
-      type: 'assistant',
-      content: initialContent,
-      timestamp: Date.now(),
-      metadata:
-        kind === 'thinking'
-          ? { isStreaming: true, isFinal: false, isThinking: true }
-          : {
-              isStreaming: true,
-              isFinal: false,
-              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-            },
-    };
-    if (kind === 'thinking') {
-      active.thinkingLifecycle.start(seed.timestamp);
-    }
-    const created = this.store ? this.store.addMessage(sessionId, seed) : seed;
-    if (kind === 'thinking') active.thinkingMessageId = created.id;
-    else active.assistantMessageId = created.id;
-    this.emit('message', sessionId, created);
-    return created.id;
-  }
-
-  /** Push a streaming (non-final) content snapshot to the answer/thinking message. */
-  private streamInto(
-    sessionId: string,
-    active: ActivePiSession,
-    kind: 'answer' | 'thinking',
-    content: string,
-  ): void {
-    const messageId = this.ensureMessage(sessionId, active, kind, content);
-    const metadata =
-      kind === 'thinking'
-        ? { isStreaming: true, isFinal: false, isThinking: true }
-        : {
-            isStreaming: true,
-            isFinal: false,
-            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-          };
-    if (kind === 'thinking') {
-      active.thinkingLifecycle.markContentStreaming();
-    }
-    // Throttle the synchronous SQLite write separately from the IPC emit so a
-    // fast Pi stream doesn't block the main-process event loop every frame.
-    this.throttledStoreUpdate(sessionId, messageId, content, metadata);
-    this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
-  }
-
-  /** Finalize the answer/thinking message: flush throttles, mark final, emit last update. */
-  private finalizeMessage(
-    sessionId: string,
-    active: ActivePiSession,
-    kind: 'answer' | 'thinking',
-    content: string,
-  ): void {
-    const messageId = this.ensureMessage(sessionId, active, kind, content);
-    this.clearPendingMessageUpdate(messageId);
-    this.clearPendingStoreUpdate(messageId);
-    const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
-    const metadata =
-      kind === 'thinking'
-        ? {
-            isStreaming: false,
-            isFinal: true,
-            isThinking: true,
-            ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-          }
-        : {
-            isStreaming: false,
-            isFinal: true,
-            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-          };
-    if (this.store) {
-      this.store.updateMessage(sessionId, messageId, { content, metadata });
-    }
-    this.emit('messageUpdate', sessionId, messageId, content, metadata);
-    if (kind === 'thinking') {
-      active.thinkingLifecycle.markMessageFinalized();
-    }
-  }
-
-  /**
-   * Closes placeholder bubbles that never received text, so a finished turn can
-   * no longer look like it is still streaming.
-   */
-  private closeIdlePlaceholders(sessionId: string, active: ActivePiSession): void {
-    const placeholderIds = [active.thinkingMessageId, active.assistantMessageId].filter(
-      (messageId): messageId is string => Boolean(messageId),
-    );
-    for (const messageId of placeholderIds) {
-      this.clearPendingMessageUpdate(messageId);
-      this.clearPendingStoreUpdate(messageId);
-    }
-    if (!this.store || placeholderIds.length === 0) return;
-
-    const messages = this.store.getSession(sessionId)?.messages ?? [];
-    for (const messageId of placeholderIds) {
-      const message = messages.find(candidate => candidate.id === messageId);
-      // A bubble finalizeMessage already closed (the ordinary turn with text) needs
-      // no second write, emit, or session updated_at bump.
-      if (!message || message.metadata?.isStreaming !== true) continue;
-      const metadata = { ...message.metadata, isStreaming: false, isFinal: true };
-      this.store.updateMessage(sessionId, messageId, { metadata });
-      // Republish the row with its own content, so a live view stops spinning
-      // without waiting for the session to be reloaded.
-      this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
-      console.debug('[PiRuntime] closed an idle placeholder message for', sessionId);
-    }
-  }
-
-  private finalizeActiveThinking(sessionId: string, active: ActivePiSession): void {
-    if (!active.thinkingText.trim() || active.thinkingLifecycle.isMessageFinalized) return;
-    this.finalizeMessage(sessionId, active, 'thinking', active.thinkingText);
-  }
-
-  private markFinalAnswer(sessionId: string, active: ActivePiSession): void {
-    const messageId = active.lastCompletedAnswerMessageId;
-    const content = active.lastCompletedAnswerText;
-    if (!messageId || !content.trim()) return;
-
-    const metadata = {
-      isStreaming: false,
-      isFinal: true,
-      isFinalAnswer: true,
-      ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
-    };
-    if (this.store) {
-      const message = this.store
-        .getSession(sessionId)
-        ?.messages.find(candidate => candidate.id === messageId);
-      this.store.updateMessage(sessionId, messageId, {
-        content,
-        metadata: { ...message?.metadata, ...metadata },
-      });
-    }
-    this.emit('messageUpdate', sessionId, messageId, content, metadata);
-  }
-
-  /**
-   * Pi commits usage after emitting the terminal assistant event. Deferring one
-   * task ensures the snapshot corresponds to the response just persisted.
-   */
-  private scheduleContextUsageSync(
-    sessionId: string,
-    messageId: string | null,
-    piUsage: PiUsage | undefined,
-    model: string | undefined,
-    requestStartedAt: number | null,
-    firstVisibleTextAt: number | null,
-    startupLatency?: PiStartupLatency,
-  ): void {
-    if (!messageId) return;
-    setTimeout(() => {
-      const active = this.activeSessions.get(sessionId);
-      const contextUsage = active?.piSession.getContextUsage?.();
-      const hasValidContextUsage = Boolean(
-        contextUsage &&
-        contextUsage.tokens != null &&
-        Number.isFinite(contextUsage.tokens) &&
-        Number.isFinite(contextUsage.contextWindow) &&
-        contextUsage.tokens >= 0 &&
-        contextUsage.contextWindow > 0,
-      );
-      if (!hasValidContextUsage && !piUsage && requestStartedAt === null && !startupLatency) {
-        return;
-      }
-
-      const message = this.store
-        ?.getSession(sessionId)
-        ?.messages.find(item => item.id === messageId);
-      if (!message) return;
-
-      const usage = hasValidContextUsage
-        ? (() => {
-            const contextWindowTokens = Math.round(contextUsage!.contextWindow);
-            return {
-              usedTokens: Math.min(Math.round(contextUsage!.tokens!), contextWindowTokens),
-              contextWindowTokens,
-              updatedAt: Date.now(),
-            };
-          })()
-        : undefined;
-      // Pi materializes `usage` with zeros and only fills it once the provider
-      // reports one; persisting that default would read as a real zero in the
-      // stats line (see hasReportedTokenUsage).
-      const reportedUsage = piUsage
-        ? {
-            inputTokens: piUsage.input,
-            outputTokens: piUsage.output,
-            cacheReadTokens: piUsage.cacheRead,
-            cacheWriteTokens: piUsage.cacheWrite,
-            reasoningTokens: piUsage.reasoning,
-            totalTokens: piUsage.totalTokens,
-          }
-        : null;
-      const metadata = {
-        ...message.metadata,
-        ...(usage ? { contextUsage: usage } : {}),
-        ...(model ? { model } : {}),
-        ...(requestStartedAt !== null
-          ? {
-              metrics: {
-                requestStartedAt,
-                ...(firstVisibleTextAt !== null ? { firstVisibleTextAt } : {}),
-                completedAt: Date.now(),
-                ...(startupLatency ?? {}),
-              },
-            }
-          : {}),
-        ...(reportedUsage && hasReportedTokenUsage(reportedUsage) ? { usage: reportedUsage } : {}),
-      };
-      this.store?.updateMessage(sessionId, messageId, { metadata });
-      this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
-    }, 0);
-  }
-
-  // ── Private: throttling ──
-
-  private throttledEmitMessageUpdate(
-    sessionId: string,
-    messageId: string,
-    content: string,
-    metadata?: Record<string, unknown>,
-  ): void {
-    this.noteThrottleMessage(sessionId, messageId);
-    const now = Date.now();
-    const lastEmit = this.lastMessageUpdateEmitTime.get(messageId) ?? 0;
-    const elapsed = now - lastEmit;
-
-    if (elapsed >= MESSAGE_UPDATE_THROTTLE_MS) {
-      this.clearPendingMessageUpdate(messageId);
-      this.lastMessageUpdateEmitTime.set(messageId, now);
-      this.emit('messageUpdate', sessionId, messageId, content, metadata);
-      return;
-    }
-
-    // Within the throttle window: record the latest content and arm a single
-    // trailing emit at the window's end. Do NOT re-arm on every frame, or a
-    // continuous fast stream keeps pushing the deadline back and the UI freezes
-    // until the stream pauses ("burst-freeze" jank).
-    this.pendingMessageUpdate.set(messageId, { content, metadata });
-    if (!this.pendingMessageUpdateTimer.has(messageId)) {
-      this.pendingMessageUpdateTimer.set(
-        messageId,
-        setTimeout(() => {
-          this.pendingMessageUpdateTimer.delete(messageId);
-          const pending = this.pendingMessageUpdate.get(messageId);
-          this.pendingMessageUpdate.delete(messageId);
-          this.lastMessageUpdateEmitTime.set(messageId, Date.now());
-          if (pending) {
-            this.emit('messageUpdate', sessionId, messageId, pending.content, pending.metadata);
-          }
-        }, MESSAGE_UPDATE_THROTTLE_MS - elapsed),
-      );
-    }
-  }
-
-  private clearPendingMessageUpdate(messageId: string): void {
-    const timer = this.pendingMessageUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingMessageUpdateTimer.delete(messageId);
-    }
-    this.pendingMessageUpdate.delete(messageId);
-  }
-
-  /**
-   * Throttle synchronous SQLite writes. Leading write fires immediately; further
-   * writes within the window are coalesced into a single trailing write that
-   * persists the latest content. Prevents per-frame event-loop stalls.
-   */
-  private throttledStoreUpdate(
-    sessionId: string,
-    messageId: string,
-    content: string,
-    metadata: Record<string, unknown>,
-  ): void {
-    this.noteThrottleMessage(sessionId, messageId);
-    if (!this.store) return;
-    const now = Date.now();
-    const lastWrite = this.lastStoreUpdateTime.get(messageId) ?? 0;
-    const elapsed = now - lastWrite;
-
-    if (elapsed >= STORE_UPDATE_THROTTLE_MS) {
-      this.clearPendingStoreUpdate(messageId);
-      this.lastStoreUpdateTime.set(messageId, now);
-      this.store.updateMessage(
-        sessionId,
-        messageId,
-        { content, metadata },
-        { touchUpdatedAt: false },
-      );
-      return;
-    }
-
-    // Coalesce: remember the latest content and (re)arm a single trailing write.
-    this.pendingStoreUpdate.set(messageId, { content, metadata });
-    if (!this.pendingStoreUpdateTimer.has(messageId)) {
-      this.pendingStoreUpdateTimer.set(
-        messageId,
-        setTimeout(() => {
-          this.pendingStoreUpdateTimer.delete(messageId);
-          const pending = this.pendingStoreUpdate.get(messageId);
-          this.pendingStoreUpdate.delete(messageId);
-          this.lastStoreUpdateTime.set(messageId, Date.now());
-          if (pending && this.store) {
-            this.store.updateMessage(sessionId, messageId, pending, { touchUpdatedAt: false });
-          }
-        }, STORE_UPDATE_THROTTLE_MS - elapsed),
-      );
-    }
-  }
-
-  private clearPendingStoreUpdate(messageId: string): void {
-    const timer = this.pendingStoreUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingStoreUpdateTimer.delete(messageId);
-    }
-    this.pendingStoreUpdate.delete(messageId);
-  }
-
-  private clearThrottleStateBySession(sessionId: string, flush: boolean): void {
-    for (const [messageId, owner] of this.throttleSessionByMessageId) {
-      if (owner !== sessionId) continue;
-      if (flush && this.store) {
-        const pending = this.pendingStoreUpdate.get(messageId);
-        if (pending) this.store.updateMessage(sessionId, messageId, pending);
-      }
-      if (flush) {
-        const pendingEmit = this.pendingMessageUpdate.get(messageId);
-        if (pendingEmit) {
-          this.emit(
-            'messageUpdate',
-            sessionId,
-            messageId,
-            pendingEmit.content,
-            pendingEmit.metadata,
-          );
-        }
-      }
-      this.clearPendingMessageUpdate(messageId);
-      this.clearPendingStoreUpdate(messageId);
-      this.lastMessageUpdateEmitTime.delete(messageId);
-      this.lastStoreUpdateTime.delete(messageId);
-      this.throttleSessionByMessageId.delete(messageId);
-    }
   }
 
   private clearApprovalsBySession(sessionId: string): void {
