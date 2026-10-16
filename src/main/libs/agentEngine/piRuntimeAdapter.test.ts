@@ -108,11 +108,6 @@ const hoisted = vi.hoisted(() => {
       completeSimple: mockCompleteSimple,
     },
     mockModelRuntimeCreate: vi.fn(),
-    mockRegisterPiOpenAICompatUpstream: vi.fn(
-      async (providerId: string) => `http://127.0.0.1:19191/__pi_openai_compat/${providerId}/v1`,
-    ),
-    mockRegisterPiOpenAICompatTokenRefresher: vi.fn(),
-    mockGetCommunityAuthAccessToken: vi.fn(async () => 'community-access-token'),
     mockResolveRawApiConfig: vi.fn(() => ({
       config: {
         apiKey: 'sk-test',
@@ -234,15 +229,6 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 vi.mock('@earendil-works/pi-ai/compat', () => ({
   getModel: hoisted.mockGetModel,
   completeSimple: hoisted.mockCompleteSimple,
-}));
-
-vi.mock('./piOpenAICompatProxy', () => ({
-  registerPiOpenAICompatTokenRefresher: hoisted.mockRegisterPiOpenAICompatTokenRefresher,
-  registerPiOpenAICompatUpstream: hoisted.mockRegisterPiOpenAICompatUpstream,
-}));
-
-vi.mock('../../communityAuthSession', () => ({
-  getModelPoolAccessToken: hoisted.mockGetCommunityAuthAccessToken,
 }));
 
 vi.mock('../coworkUtil', async importOriginal => {
