@@ -215,7 +215,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 > [!IMPORTANT]
 > **代码冻结期约束（Code Freeze）**：当前仓库进入代码冻结期。CI 门禁已开启强校验，**仅允许 `fix` 开头的 PR 合并入 main 分支**（如 `fix(cowork): ...`、`fix: ...`）。其余任何新功能（feat）、重构（refactor）、架构调整等均禁止合入；此类工作转移至 fork 仓库推进。
 
-**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 按 PR diff 路径选择；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
+**CI**：统一必需检查 `ci-gate` 校验 PR 元数据，并汇总当前提交适用的现有流水线；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）；`merge-gate`（`scripts/ci/gates/verify.ts`）继续汇总本仓应用检查。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（daily-release、release-candidate、online-update-* 等）独立于 PR 门禁。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 
