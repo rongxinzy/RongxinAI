@@ -24,7 +24,6 @@
     "src/main/workbenchTask/taskService.test.ts": 1124,
     "src/renderer/theme/components/contract.ts": 1143,
     "src/renderer/types/electron.d.ts": 2082,
-    "src/shared/components/ai-elements/prompt-input.tsx": 1028,
     "src/shared/providers/constants.ts": 1637
   }
 }
