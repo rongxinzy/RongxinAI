@@ -3,13 +3,8 @@ import http from 'http';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-  convertOpenAIChatCompletionTextToSSEForPi,
-  normalizeOpenAISSETextForPi,
-  openAIStreamPayloadHasFinishReason,
   registerPiOpenAICompatTokenRefresher,
   registerPiOpenAICompatUpstream,
-  remapDeveloperRolesForOpenAICompletions,
-  rewriteOpenAICompletionsModel,
   stopPiOpenAICompatProxyForTests,
 } from './piOpenAICompatProxy';
 
@@ -18,144 +13,7 @@ describe('piOpenAICompatProxy', () => {
     await stopPiOpenAICompatProxyForTests();
   });
 
-  it('remaps developer roles to system for gateway compatibility', () => {
-    const body = Buffer.from(
-      JSON.stringify({
-        model: 'kimi-for-coding',
-        stream: true,
-        messages: [
-          { role: 'developer', content: 'You are a helpful assistant.' },
-          { role: 'user', content: 'Hi' },
-          { role: 'assistant', content: 'Hello' },
-        ],
-      }),
-      'utf8',
-    );
-
-    const remapped = remapDeveloperRolesForOpenAICompletions(body);
-
-    const parsed = JSON.parse(remapped.toString('utf8')) as {
-      stream?: boolean;
-      messages: Array<{ role: string; content: string }>;
-    };
-    expect(parsed.messages.map(message => message.role)).toEqual(['system', 'user', 'assistant']);
-    expect(parsed.stream).toBe(true);
-    expect(parsed.messages[0].content).toBe('You are a helpful assistant.');
-  });
-
-  it('passes payloads without developer roles through unchanged', () => {
-    const body = Buffer.from(
-      JSON.stringify({ messages: [{ role: 'user', content: 'Hi' }] }),
-      'utf8',
-    );
-    expect(remapDeveloperRolesForOpenAICompletions(body)).toEqual(body);
-  });
-
-  it('passes malformed payloads through unchanged', () => {
-    const body = Buffer.from('not-json', 'utf8');
-    expect(remapDeveloperRolesForOpenAICompletions(body)).toEqual(body);
-  });
-
-  it('rewrites the model field when an upstream model is configured', () => {
-    const body = Buffer.from(
-      JSON.stringify({ model: 'zhiyuan-free', messages: [{ role: 'user', content: 'Hi' }] }),
-      'utf8',
-    );
-
-    const rewritten = rewriteOpenAICompletionsModel(body, 'GLM-5.3-Flash');
-
-    const parsed = JSON.parse(rewritten.toString('utf8')) as {
-      model: string;
-      messages: Array<{ role: string }>;
-    };
-    expect(parsed.model).toBe('GLM-5.3-Flash');
-    expect(parsed.messages.map(message => message.role)).toEqual(['user']);
-  });
-
-  it('passes the model field through when no upstream model is configured', () => {
-    const body = Buffer.from(JSON.stringify({ model: 'zhiyuan-free' }), 'utf8');
-    expect(rewriteOpenAICompletionsModel(body, undefined)).toEqual(body);
-    expect(rewriteOpenAICompletionsModel(body, '  ')).toEqual(body);
-  });
-  it('detects OpenAI stream finish reasons', () => {
-    expect(
-      openAIStreamPayloadHasFinishReason(
-        JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }),
-      ),
-    ).toBe(true);
-    expect(
-      openAIStreamPayloadHasFinishReason(
-        JSON.stringify({ choices: [{ index: 0, delta: { content: 'hello' } }] }),
-      ),
-    ).toBe(false);
-  });
-
-  it('injects a final finish_reason chunk before DONE when upstream omits it', () => {
-    const normalized = normalizeOpenAISSETextForPi(
-      ['data: {"choices":[{"index":0,"delta":{"content":"hello"}}]}', '', 'data: [DONE]', ''].join(
-        '\n',
-      ),
-      'agent-model',
-    );
-
-    expect(normalized).toContain('"finish_reason":"stop"');
-    expect(normalized).toContain('"model":"agent-model"');
-    expect(normalized.trim().endsWith('data: [DONE]')).toBe(true);
-  });
-
-  it('converts non-stream OpenAI chat completions into SSE when stream was requested', () => {
-    const converted = convertOpenAIChatCompletionTextToSSEForPi(
-      JSON.stringify({
-        id: 'chatcmpl-test',
-        model: 'agent-model',
-        created: 123,
-        choices: [
-          {
-            index: 0,
-            message: {
-              role: 'assistant',
-              content: 'hello',
-              tool_calls: [
-                {
-                  id: 'call_1',
-                  type: 'function',
-                  function: { name: 'AskUserQuestion', arguments: '{}' },
-                },
-              ],
-            },
-            finish_reason: null,
-          },
-        ],
-      }),
-      'fallback-model',
-    );
-
-    expect(converted).not.toBeNull();
-    expect(converted).toContain('data: {');
-    expect(converted).toContain('"content":"hello"');
-    expect(converted).toContain('"tool_calls"');
-    expect(converted).toContain('"finish_reason":"stop"');
-    expect(converted?.trim().endsWith('data: [DONE]')).toBe(true);
-  });
-
-  it('does not inject another finish_reason when upstream already provides one', () => {
-    const normalized = normalizeOpenAISSETextForPi(
-      [
-        'data: {"choices":[{"index":0,"delta":{"content":"hello"}}]}',
-        '',
-        'data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}',
-        '',
-        'data: [DONE]',
-        '',
-      ].join('\n'),
-      'agent-model',
-    );
-
-    expect((normalized.match(/finish_reason/g) ?? []).length).toBe(1);
-    expect(normalized).toContain('"finish_reason":"tool_calls"');
-  });
-
-  it('remaps developer roles to system before forwarding to the upstream', async () => {
+  it('forwards chat payloads unchanged, including developer roles', async () => {
     let receivedBody = '';
     const upstream = http.createServer(async (request, response) => {
       for await (const chunk of request) {
@@ -201,7 +59,7 @@ describe('piOpenAICompatProxy', () => {
       expect(response.ok).toBe(true);
 
       const parsed = JSON.parse(receivedBody) as { messages: Array<{ role: string }> };
-      expect(parsed.messages.map(message => message.role)).toEqual(['system', 'user']);
+      expect(parsed.messages.map(message => message.role)).toEqual(['developer', 'user']);
     } finally {
       upstream.close();
     }
@@ -237,7 +95,7 @@ describe('piOpenAICompatProxy', () => {
     }
   });
 
-  it('proxies upstream SSE and injects missing finish_reason through the local server', async () => {
+  it('proxies upstream SSE bytes without injecting a finish reason', async () => {
     const upstream = http.createServer((request, response) => {
       expect(request.url).toBe('/v1/chat/completions');
       expect(request.headers.authorization).toBe('Bearer sk-test');
@@ -273,8 +131,8 @@ describe('piOpenAICompatProxy', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('text/event-stream');
       expect(text).toContain('"content":"hello"');
-      expect(text).toContain('"finish_reason":"stop"');
-      expect(text.trim().endsWith('data: [DONE]')).toBe(true);
+      expect(text).not.toContain('finish_reason');
+      expect(text).toContain('data: [DONE]');
     } finally {
       await new Promise<void>(resolve => upstream.close(() => resolve()));
     }

@@ -26,7 +26,6 @@ import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
 import { CoworkStore } from '../../src/main/coworkStore';
 import { composeCoworkSystemPrompt } from '../../src/main/coworkPrompt/composer';
 import { installTestMagpie } from '../helpers/installTestMagpie';
-import { stopPiOpenAICompatProxyForTests } from '../../src/main/libs/agentEngine/piOpenAICompatProxy';
 import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
 import { SqliteStore } from '../../src/main/sqliteStore';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
@@ -396,7 +395,6 @@ export async function runLongTaskScenario(
   } finally {
     if (adapter) await adapter.stopAllSessions();
     disposeGateway?.();
-    await stopPiOpenAICompatProxyForTests();
     if (tapeServer) await tapeServer.close();
     if (store) store.close();
     vi.useRealTimers();
