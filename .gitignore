@@ -122,3 +122,14 @@ reasonix.toml
 /scripts/installer-shell/app/bin/
 /scripts/installer-shell/app/obj/
 preview-screenshots/
+
+# Build intermediates and generated caches (dist/ and dist-electron/ are above)
+*.tsbuildinfo
+*.js.map
+*.css.map
+*.mjs.map
+*.cjs.map
+/coverage/
+/.vite/
+/.turbo/
+/*.log
