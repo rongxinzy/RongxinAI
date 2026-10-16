@@ -1,0 +1,33 @@
+/* Reference only — each mockup HTML inlines these values for self-containment. */
+:root, [data-theme="light"] {
+  --zy-background: #FAFBFD;
+  --zy-surface: rgba(255, 255, 255, 0.92);
+  --zy-surface-raised: rgba(255, 255, 255, 0.96);
+  --zy-text-primary: #0A1628;
+  --zy-text-secondary: #4A5568;
+  --zy-text-muted: #A0AEC0;
+  --zy-primary-start: #3B82F6;
+  --zy-primary-end: #8B5CF6;
+  --zy-success: #10B981;
+  --zy-warning: #F59E0B;
+  --zy-error: #EF4444;
+  --zy-border: rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 20px rgba(59, 130, 246, 0.06);
+  --font: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', Menlo, monospace;
+}
+[data-theme="dark"] {
+  --zy-background: #0A0E1A;
+  --zy-surface: rgba(20, 24, 36, 0.88);
+  --zy-surface-raised: rgba(30, 35, 50, 0.92);
+  --zy-text-primary: #E8EBF0;
+  --zy-text-secondary: #A0AEC0;
+  --zy-text-muted: #4A5568;
+  --zy-primary-start: #60A5FA;
+  --zy-primary-end: #A78BFA;
+  --zy-success: #34D399;
+  --zy-warning: #FBBF24;
+  --zy-error: #F87171;
+  --zy-border: rgba(255, 255, 255, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35), 0 0 24px rgba(96, 165, 250, 0.1);
+}

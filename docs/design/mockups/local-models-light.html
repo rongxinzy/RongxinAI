@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>本地模型</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 13px; line-height: 1.5;
+  color: #0A1628;
+  background: #FAFBFD;
+  min-height: 100vh;
+}
+.mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
+.app { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header h1 { font-size: 20px; font-weight: 600; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.search {
+  width: 280px; height: 32px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.9);
+  color: inherit;
+}
+.btn {
+  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+}
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+  box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+}
+.btn-outline {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.1);
+  color: inherit;
+}
+.glass {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.profile { padding: 16px 20px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+.profile-meta { display: flex; flex-wrap: wrap; gap: 16px 24px; }
+.profile-item label { display: block; font-size: 11px; color: #A0AEC0; margin-bottom: 4px; }
+.profile-item strong { font-size: 13px; }
+.gpu-bars { display: flex; gap: 12px; }
+.gpu-mini { width: 140px; }
+.bar-track { height: 6px; border-radius: 3px; background: #E2E8F0; overflow: hidden; margin-top: 6px; }
+.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.tab {
+  height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px;
+  border: 1px solid rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.6);
+  color: #4A5568;
+}
+.tab.active {
+  background: #fff;
+  color: #0A1628;
+  border-color: rgba(59,130,246,0.35);
+}
+.tab.disabled { opacity: 0.45; }
+.section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.card { padding: 16px 18px; }
+.card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.card .sub { font-size: 12px; color: #4A5568; margin-bottom: 10px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #F1F5F9; color: #4A5568; }
+.fit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.fit-bar { flex: 1; height: 8px; border-radius: 4px; background: #E2E8F0; overflow: hidden; display: flex; }
+.seg-w { width: 45%; background: #3B82F6; }
+.seg-k { width: 30%; background: #8B5CF6; }
+.seg-b { width: 10%; background: #94A3B8; }
+.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
+.badge-ok { background: #D1FAE5; color: #047857; }
+.badge-warn { background: #FEF3C7; color: #B45309; }
+.badge-muted { background: #F1F5F9; color: #64748B; }
+.carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+.carousel .card { min-width: 260px; flex-shrink: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+th { font-size: 11px; font-weight: 500; color: #A0AEC0; }
+.stack-bar { height: 24px; border-radius: 8px; overflow: hidden; display: flex; margin: 12px 0; }
+.stack-bar span { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
+.s-w { background: #3B82F6; flex: 4.2; }
+.s-k { background: #8B5CF6; flex: 2.1; }
+.s-b { background: #64748B; flex: 0.5; }
+.s-free { flex: 1.2; background: #E2E8F0; color: #64748B; }
+.two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+.sidebar-panel { padding: 20px; position: sticky; top: 24px; }
+.steps { list-style: none; }
+.steps li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.step-num { width: 24px; height: 24px; border-radius: 50%; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.step-num.done { background: #D1FAE5; color: #059669; }
+.progress { height: 8px; border-radius: 4px; background: #E2E8F0; overflow: hidden; margin-top: 8px; }
+.progress > div { height: 100%; background: linear-gradient(90deg, #3B82F6, #8B5CF6); width: 67%; }
+.radio-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.radio { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }
+.radio.selected { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.04); }
+.banner { padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.banner-warn { background: #FFFBEB; border: 1px solid #FDE68A; }
+.banner-info { background: #EFF6FF; border: 1px solid #BFDBFE; }
+.empty { text-align: center; padding: 48px 24px; }
+.empty h2 { font-size: 17px; margin-bottom: 8px; }
+.empty p { color: #4A5568; max-width: 420px; margin: 0 auto 20px; }
+.footer-sticky { margin-top: 24px; padding: 16px 20px; display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; }
+.mock-label { position: fixed; top: 8px; right: 8px; font-size: 10px; opacity: 0.5; }
+</style>
+</head>
+<body>
+<span class="mock-label">静态稿 · 浅色</span>
+<div class="app">
+<div class="header">
+  <h1>本地模型</h1>
+  <div class="header-actions">
+    <span class="mono" style="color:#888">磁盘占用 42.3 GB</span>
+    <button class="btn btn-outline">导入 GGUF</button>
+    <button class="btn btn-primary">前往模型市场</button>
+  </div>
+</div>
+
+<div class="glass profile">
+  <div class="profile-meta">
+    <div class="profile-item"><label>推理后端</label><strong>CUDA · llama-server b9244 · sm_89</strong></div>
+    <div class="profile-item"><label>系统内存</label><strong class="mono">64 GB</strong></div>
+    <div class="profile-item"><label>Work 模式建议上下文</label><strong class="mono">32K</strong></div>
+    <div class="gpu-bars">
+      <div class="gpu-mini"><label style="font-size:11px;color:var(--m,#888)">GPU 0 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:18%"></div></div><span class="mono" style="font-size:11px">2.9 / 16 GB 空闲</span></div>
+      <div class="gpu-mini"><label style="font-size:11px">GPU 1 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:12%"></div></div><span class="mono" style="font-size:11px">14.1 / 16 GB 空闲</span></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline">重新检测</button>
+    <button class="btn btn-outline">诊断 · 导出 JSON</button>
+  </div>
+</div>
+<div class="glass card">
+  <table>
+    <tr><th>模型</th><th>大小</th><th>状态</th><th>显存</th><th>上下文</th><th>操作</th></tr>
+    <tr>
+      <td><strong>Qwen3-8B-Instruct</strong><br/><span class="mono" style="font-size:11px;color:#888">Q4_K_M</span></td>
+      <td class="mono">5.1 GB</td>
+      <td><span class="badge badge-ok">运行中</span></td>
+      <td class="mono">6.8 / 32 GB</td>
+      <td class="mono">32K</td>
+      <td><button class="btn btn-outline">卸载</button> <button class="btn btn-primary">设置</button></td>
+    </tr>
+    <tr>
+      <td><strong>DeepSeek-R1-7B</strong></td>
+      <td class="mono">4.8 GB</td>
+      <td><span class="badge badge-muted">未加载</span></td>
+      <td class="mono">—</td>
+      <td class="mono">16K</td>
+      <td><button class="btn btn-primary">加载</button></td>
+    </tr>
+  </table>
+</div>
+<div class="glass card" style="margin-top:16px">
+  <h3>服务与并发</h3>
+  <p class="sub">llama-server · 端口 8081 · 并发 slot 2 · 默认 keep-alive 30 分钟</p>
+  <button class="btn btn-outline" style="margin-top:8px">打开启动日志</button>
+</div></div>
+</body>
+</html>

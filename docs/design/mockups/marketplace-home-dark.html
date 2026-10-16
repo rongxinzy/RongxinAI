@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>模型市场首页</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 13px; line-height: 1.5;
+  color: #E8EBF0;
+  background: #0A0E1A;
+  min-height: 100vh;
+}
+.mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
+.app { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header h1 { font-size: 20px; font-weight: 600; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.search {
+  width: 280px; height: 32px; padding: 0 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(30,35,50,0.9);
+  color: inherit;
+}
+.btn {
+  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+}
+.btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
+  box-shadow: 0 4px 12px rgba(96,165,250,0.3);
+}
+.btn-outline {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.12);
+  color: inherit;
+}
+.glass {
+  background: rgba(20,24,36,0.88);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+.profile { padding: 16px 20px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
+.profile-meta { display: flex; flex-wrap: wrap; gap: 16px 24px; }
+.profile-item label { display: block; font-size: 11px; color: #4A5568; margin-bottom: 4px; }
+.profile-item strong { font-size: 13px; }
+.gpu-bars { display: flex; gap: 12px; }
+.gpu-mini { width: 140px; }
+.bar-track { height: 6px; border-radius: 3px; background: #1E293B; overflow: hidden; margin-top: 6px; }
+.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.tab {
+  height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(30,35,50,0.6);
+  color: #A0AEC0;
+}
+.tab.active {
+  background: rgba(96,165,250,0.15);
+  color: #E8EBF0;
+  border-color: rgba(96,165,250,0.4);
+}
+.tab.disabled { opacity: 0.45; }
+.section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.card { padding: 16px 18px; }
+.card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.card .sub { font-size: 12px; color: #A0AEC0; margin-bottom: 10px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #1E293B; color: #A0AEC0; }
+.fit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.fit-bar { flex: 1; height: 8px; border-radius: 4px; background: #1E293B; overflow: hidden; display: flex; }
+.seg-w { width: 45%; background: #3B82F6; }
+.seg-k { width: 30%; background: #8B5CF6; }
+.seg-b { width: 10%; background: #94A3B8; }
+.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
+.badge-ok { background: rgba(52,211,153,0.15); color: #34D399; }
+.badge-warn { background: rgba(251,191,36,0.15); color: #FBBF24; }
+.badge-muted { background: #1E293B; color: #94A3B8; }
+.carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+.carousel .card { min-width: 260px; flex-shrink: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+th { font-size: 11px; font-weight: 500; color: #64748B; }
+.stack-bar { height: 24px; border-radius: 8px; overflow: hidden; display: flex; margin: 12px 0; }
+.stack-bar span { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
+.s-w { background: #3B82F6; flex: 4.2; }
+.s-k { background: #8B5CF6; flex: 2.1; }
+.s-b { background: #64748B; flex: 0.5; }
+.s-free { flex: 1.2; background: #334155; color: #94A3B8; }
+.two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
+.sidebar-panel { padding: 20px; position: sticky; top: 24px; }
+.steps { list-style: none; }
+.steps li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.step-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(96,165,250,0.2); color: #60A5FA; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.step-num.done { background: rgba(52,211,153,0.2); color: #34D399; }
+.progress { height: 8px; border-radius: 4px; background: #1E293B; overflow: hidden; margin-top: 8px; }
+.progress > div { height: 100%; background: linear-gradient(90deg, #3B82F6, #8B5CF6); width: 67%; }
+.radio-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.radio { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+.radio.selected { border-color: rgba(96,165,250,0.5); background: rgba(96,165,250,0.08); }
+.banner { padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.banner-warn { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); }
+.banner-info { background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.3); }
+.empty { text-align: center; padding: 48px 24px; }
+.empty h2 { font-size: 17px; margin-bottom: 8px; }
+.empty p { color: #A0AEC0; max-width: 420px; margin: 0 auto 20px; }
+.footer-sticky { margin-top: 24px; padding: 16px 20px; display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; }
+.mock-label { position: fixed; top: 8px; right: 8px; font-size: 10px; opacity: 0.5; }
+</style>
+</head>
+<body>
+<span class="mock-label">静态稿 · 深色</span>
+<div class="app">
+<div class="header">
+  <h1>模型市场</h1>
+  <div class="header-actions">
+    <input class="search" placeholder="搜索模型、发布者、标签…" />
+    <button class="btn btn-outline">下载队列 · 1</button>
+  </div>
+</div>
+
+<div class="glass profile">
+  <div class="profile-meta">
+    <div class="profile-item"><label>推理后端</label><strong>CUDA · llama-server b9244 · sm_89</strong></div>
+    <div class="profile-item"><label>系统内存</label><strong class="mono">64 GB</strong></div>
+    <div class="profile-item"><label>Work 模式建议上下文</label><strong class="mono">32K</strong></div>
+    <div class="gpu-bars">
+      <div class="gpu-mini"><label style="font-size:11px;color:var(--m,#888)">GPU 0 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:18%"></div></div><span class="mono" style="font-size:11px">2.9 / 16 GB 空闲</span></div>
+      <div class="gpu-mini"><label style="font-size:11px">GPU 1 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:12%"></div></div><span class="mono" style="font-size:11px">14.1 / 16 GB 空闲</span></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-outline">重新检测</button>
+    <button class="btn btn-outline">一键诊断</button>
+  </div>
+</div>
+<div class="tabs">
+  <span class="tab active">全部</span><span class="tab">对话</span><span class="tab">推理</span><span class="tab">代码</span>
+  <span class="tab">视觉 / OCR</span><span class="tab">向量</span><span class="tab disabled">语音 · 即将推出</span>
+  <span class="tab disabled">视频 · 16GB+</span>
+</div>
+<p class="section-title">为本机精选</p>
+<div class="carousel">
+  <div class="glass card"><h3>Qwen3-8B-Instruct</h3><p class="sub">Qwen · 对话 / 代码</p><span class="badge badge-ok">流畅</span> <span class="mono" style="margin-left:8px">22–30 tok/s · Q4_K_M</span></div>
+  <div class="glass card"><h3>DeepSeek-R1-Distill-7B</h3><p class="sub">推理专用</p><span class="badge badge-ok">流畅</span> <span class="mono" style="margin-left:8px">18–26 tok/s</span></div>
+  <div class="glass card"><h3>Qwen2.5-VL-7B</h3><p class="sub">视觉 · 需 mmproj</p><span class="badge badge-warn">可玩</span> <span class="mono" style="margin-left:8px">12–18 tok/s</span></div>
+</div>
+<p class="section-title">全部模型</p>
+<div class="grid">
+  <div class="glass card">
+    <h3>Qwen3-14B-GGUF</h3><p class="sub">ModelScope · Apache-2.0</p>
+    <div class="tags"><span class="tag">对话</span><span class="tag">工具调用</span></div>
+    <div class="fit-row"><div class="fit-bar"><div class="seg-w"></div><div class="seg-k"></div><div class="seg-b"></div></div><span class="badge badge-warn">可玩</span></div>
+    <p class="mono" style="font-size:11px;color:#888;margin-bottom:12px">推荐 Q4_K_M · 预估 VRAM 11.2 GB / 32K 上下文</p>
+    <button class="btn btn-primary" style="width:100%">查看详情</button>
+  </div>
+  <div class="glass card">
+    <h3>Llama-3.1-8B-Instruct</h3><p class="sub">hf-mirror 同步</p>
+    <div class="tags"><span class="tag">对话</span></div>
+    <div class="fit-row"><div class="fit-bar"><div class="seg-w" style="width:35%"></div><div class="seg-k" style="width:25%"></div></div><span class="badge badge-ok">流畅</span></div>
+    <button class="btn btn-primary" style="width:100%">查看详情</button>
+  </div>
+</div></div>
+</body>
+</html>

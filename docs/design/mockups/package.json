@@ -1,0 +1,12 @@
+{
+  "name": "model-market-mockups",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node generate-html.mjs",
+    "screenshots": "playwright install chromium && node capture-screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}
