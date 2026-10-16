@@ -56,14 +56,13 @@ export const mockCoworkMessages = [
 
 export const mockRunSnapshot: CoworkRunSnapshot = {
   sessionId: 'session-1',
-  status: 'idle',
-  turn: 1,
-  messages: [],
-  toolActivity: [],
-  artifacts: [],
-  permissionRequests: [],
-  expertStates: [],
-  memoryBudget: { project: 900, personal: 250, session: 350 },
+  runId: 'run-1',
+  sequence: 0,
+  phase: 'waiting' as const,
+  running: false,
+  startedAt: Date.now() - 60000,
+  confirmedAt: Date.now() - 59000,
+  lastProgressAt: Date.now() - 1000,
 };
 
 export const mockCoworkConfig = {

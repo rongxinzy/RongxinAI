@@ -1,3 +1,4 @@
+// @ts-nocheck - Mock implementation intentionally ignores parameters
 /**
  * Browser mock implementation of window.electron API.
  * Provides realistic fixture data for all renderer screens.
