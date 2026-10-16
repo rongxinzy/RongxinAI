@@ -89,6 +89,7 @@
     "test": "node scripts/test-with-native-restore.cjs",
     "preview:screenshots": "node scripts/preview/web-preview-check.mjs",
     "test:memory-leak": "node scripts/ci/memory-leak-check.mjs",
+    "test:e2e:packaged-linux": "bash tests/e2e/packaged-linux/run-with-headless-deps.sh",
     "test:bundle-budget": "node scripts/check-renderer-bundle-budget.cjs",
     "check:supply-chain-inputs": "node scripts/ci/check-supply-chain-inputs.mjs",
     "check:openclaw-decoupling": "node scripts/ci/check-openclaw-decoupling.mjs",

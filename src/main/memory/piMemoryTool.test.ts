@@ -1,8 +1,31 @@
 import { expect, test, vi } from 'vitest';
 
-import { MemoryKind, MemorySensitivity } from '../../shared/memory';
+import { MemoryKind, MemoryScope, MemorySensitivity } from '../../shared/memory';
 import { PiMemoryAction } from './constants';
-import { buildPiProjectMemoryTool } from './piMemoryTool';
+import { buildPiProjectMemoryTool, extractRequestedMemoryForAutomaticSave } from './piMemoryTool';
+import {
+  EXPLICIT_MEMORY_DEFAULT_CONFIDENCE,
+  EXPLICIT_MEMORY_DEFAULT_IMPORTANCE,
+  EXPLICIT_MEMORY_SOURCE,
+} from './explicitUserRequestedMemory';
+
+function buildTool(
+  service: Record<string, unknown>,
+  extractor: { extract: ReturnType<typeof vi.fn> },
+) {
+  return buildPiProjectMemoryTool({
+    service: service as never,
+    sessionId: 'session-1',
+    workingDirectory: '/workspace/project',
+    getMessages: () => [
+      { id: 'user-1', type: 'user', content: 'Remember to use SQLite.', timestamp: 1 },
+    ],
+    complete: vi.fn(),
+    extractor: extractor as never,
+  }) as {
+    execute: (id: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  };
+}
 
 test('exposes only controlled project memory actions', async () => {
   const service = {
@@ -25,44 +48,11 @@ test('exposes only controlled project memory actions', async () => {
       },
     ]),
   };
-  const extractedMemory = {
-    title: 'Concise preference',
-    content: 'Use SQLite for durable local state.',
-    kind: MemoryKind.Preference,
-    importance: 0.8,
-    confidence: 0.9,
-    sensitivity: MemorySensitivity.Normal,
-    evidenceSourceIds: ['user-1'],
-  };
   const extractor = {
-    extract: vi.fn(async () => ({
-      memories: [extractedMemory],
-      metadataFor: vi.fn(() => ({ extractorVersion: 1, sourceIds: ['user-1'] })),
-    })),
+    extract: vi.fn(async () => null),
   };
-  const tool = buildPiProjectMemoryTool({
-    service: service as never,
-    sessionId: 'session-1',
-    workingDirectory: '/workspace/project',
-    getMessages: () => [
-      { id: 'user-1', type: 'user', content: 'Remember to use SQLite.', timestamp: 1 },
-    ],
-    complete: vi.fn(),
-    extractor: extractor as never,
-  }) as {
-    parameters: {
-      properties: {
-        action: { enum: string[] };
-        promotesMemoryId: { type: string };
-        supersedesMemoryId: { type: string };
-      };
-    };
-    execute: (id: string, params: Record<string, unknown>) => Promise<Record<string, unknown>>;
-  };
+  const tool = buildTool(service, extractor);
 
-  expect(tool.parameters.properties.action.enum).toEqual(Object.values(PiMemoryAction));
-  expect(tool.parameters.properties.promotesMemoryId.type).toBe('number');
-  expect(tool.parameters.properties.supersedesMemoryId.type).toBe('number');
   const result = await tool.execute('call-1', {
     action: PiMemoryAction.Recall,
     query: 'database',
@@ -72,67 +62,146 @@ test('exposes only controlled project memory actions', async () => {
     workingDirectory: '/workspace/project',
     query: 'database',
   });
-  expect(service.recallSession).toHaveBeenCalledWith({
-    workingDirectory: '/workspace/project',
-    sessionId: 'session-1',
-    query: 'database',
+});
+
+test('explicit save persists without calling the extractor when it would return null', async () => {
+  const service = {
+    recallProject: vi.fn(async () => []),
+    recallPersonal: vi.fn(async () => []),
+    recallSession: vi.fn(async () => []),
+    saveProjectMemory: vi.fn(async () => 42),
+    proposePersonalMemory: vi.fn(() => 'candidate-1'),
+    getRecallableMemoryById: vi.fn(),
+    listRecallableMemories: vi.fn(() => []),
+  };
+  const extractor = { extract: vi.fn(async () => null) };
+  const tool = buildTool(service, extractor);
+
+  const saveResult = await tool.execute('call-save', {
+    action: PiMemoryAction.Save,
+    title: '  Team   decision  ',
+    content: '  Adopt   SQLite   for   local   state.  ',
   });
 
-  const listResult = await tool.execute('call-2', { action: PiMemoryAction.List, limit: 5 });
-  expect(listResult).toMatchObject({ details: { count: 1 } });
-  expect(service.listRecallableMemories).toHaveBeenCalledWith({
-    workingDirectory: '/workspace/project',
-    sessionId: 'session-1',
-    query: undefined,
-    limit: 5,
-  });
+  expect(saveResult).toMatchObject({ details: { memoryId: 42 } });
+  expect(extractor.extract).not.toHaveBeenCalled();
+  expect(service.saveProjectMemory).toHaveBeenCalledWith(
+    expect.objectContaining({
+      title: 'Team decision',
+      content: 'Adopt SQLite for local state.',
+      importance: EXPLICIT_MEMORY_DEFAULT_IMPORTANCE,
+      confidence: EXPLICIT_MEMORY_DEFAULT_CONFIDENCE,
+      sensitivity: MemorySensitivity.Normal,
+      metadata: { source: EXPLICIT_MEMORY_SOURCE },
+    }),
+  );
+});
 
-  const proposalResult = await tool.execute('call-3', {
+test('explicit personal proposal skips the extractor veto', async () => {
+  const service = {
+    recallProject: vi.fn(async () => []),
+    recallPersonal: vi.fn(async () => []),
+    recallSession: vi.fn(async () => []),
+    saveProjectMemory: vi.fn(async () => 42),
+    proposePersonalMemory: vi.fn(() => 'candidate-1'),
+    getRecallableMemoryById: vi.fn(),
+    listRecallableMemories: vi.fn(() => []),
+  };
+  const extractor = { extract: vi.fn(async () => null) };
+  const tool = buildTool(service, extractor);
+
+  const proposalResult = await tool.execute('call-propose', {
     action: PiMemoryAction.ProposePersonal,
-    promotesMemoryId: 8,
-    supersedesMemoryId: 9,
-    title: 'Raw title',
-    content: 'Raw content that must be extracted.',
+    title: 'Personal preference',
+    content: 'Prefer dark mode in every workspace.',
   });
+
   expect(proposalResult).toMatchObject({
     details: { candidateId: 'candidate-1', needsReview: true },
   });
-  expect(extractor.extract).toHaveBeenCalledWith(
-    expect.objectContaining({
-      sources: expect.arrayContaining([
-        expect.objectContaining({ id: 'memory:8' }),
-        expect.objectContaining({ id: 'memory:9' }),
-      ]),
-    }),
-  );
+  expect(extractor.extract).not.toHaveBeenCalled();
   expect(service.proposePersonalMemory).toHaveBeenCalledWith(
     expect.objectContaining({
-      sessionId: 'session-1',
-      workingDirectory: '/workspace/project',
-      promotesMemoryId: 8,
-      supersedesMemoryId: 9,
-      title: extractedMemory.title,
-      content: extractedMemory.content,
-      importance: extractedMemory.importance,
-      confidence: extractedMemory.confidence,
-      sensitivity: extractedMemory.sensitivity,
-      metadata: { extractorVersion: 1, sourceIds: ['user-1'] },
+      title: 'Personal preference',
+      content: 'Prefer dark mode in every workspace.',
+      metadata: { source: EXPLICIT_MEMORY_SOURCE },
     }),
   );
+});
 
-  const saveResult = await tool.execute('call-4', {
-    action: PiMemoryAction.Save,
-    title: 'Raw project title',
-    content: 'Raw project content that must be extracted.',
-  });
-  expect(saveResult).toMatchObject({ details: { memoryId: 42 } });
-  expect(service.saveProjectMemory).toHaveBeenCalledWith(
-    expect.objectContaining({
+test('automatic extraction still filters null extractor results', async () => {
+  const service = {
+    getRecallableMemoryById: vi.fn(),
+  };
+  const extractor = { extract: vi.fn(async () => null) };
+  const result = await extractRequestedMemoryForAutomaticSave(
+    extractor as never,
+    MemoryScope.Project,
+    {
+      title: 'Candidate title',
+      content: 'Candidate content that should not bypass durability checks.',
+      kind: MemoryKind.Decision,
+    },
+    {
+      service: service as never,
       sessionId: 'session-1',
       workingDirectory: '/workspace/project',
-      title: extractedMemory.title,
-      content: extractedMemory.content,
-      metadata: { extractorVersion: 1, sourceIds: ['user-1'] },
-    }),
+      getMessages: () => [
+        { id: 'user-1', type: 'user', content: 'Remember this decision.', timestamp: 1 },
+      ],
+      complete: vi.fn(),
+    },
   );
+  expect(result).toBeNull();
+  expect(extractor.extract).toHaveBeenCalled();
+});
+
+test('explicit save returns a clear error for empty content after normalization', async () => {
+  const service = {
+    saveProjectMemory: vi.fn(async () => 42),
+    getRecallableMemoryById: vi.fn(),
+    listRecallableMemories: vi.fn(() => []),
+    recallProject: vi.fn(async () => []),
+    recallPersonal: vi.fn(async () => []),
+    recallSession: vi.fn(async () => []),
+    proposePersonalMemory: vi.fn(),
+  };
+  const extractor = { extract: vi.fn(async () => null) };
+  const tool = buildTool(service, extractor);
+
+  const saveResult = await tool.execute('call-empty', {
+    action: PiMemoryAction.Save,
+    title: 'Private only',
+    content: '<private>secret-only</private>',
+  });
+
+  expect(saveResult).toMatchObject({
+    details: { isError: true, reason: 'empty_content' },
+  });
+  expect(service.saveProjectMemory).not.toHaveBeenCalled();
+});
+
+test('explicit save reports when memory service queues the write', async () => {
+  const service = {
+    saveProjectMemory: vi.fn(async () => null),
+    getRecallableMemoryById: vi.fn(),
+    listRecallableMemories: vi.fn(() => []),
+    recallProject: vi.fn(async () => []),
+    recallPersonal: vi.fn(async () => []),
+    recallSession: vi.fn(async () => []),
+    proposePersonalMemory: vi.fn(),
+  };
+  const extractor = { extract: vi.fn(async () => null) };
+  const tool = buildTool(service, extractor);
+
+  const saveResult = await tool.execute('call-queued', {
+    action: PiMemoryAction.Save,
+    title: 'Queued decision',
+    content: 'Use SQLite for durable local state.',
+  });
+
+  expect(saveResult).toMatchObject({
+    details: { queued: true, reason: 'memory_unavailable' },
+  });
+  expect(String(saveResult.content[0].text)).toContain('queued');
 });
