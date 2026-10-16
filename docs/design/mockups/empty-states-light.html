@@ -1,126 +1,52 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>空态</title>
-<style>
+<html lang="zh-CN"><head><meta charset="utf-8"/><title>空态</title><style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 13px; line-height: 1.45;
-  color: #0F172A;
-  background: #F4F5F7;
-  min-height: 100vh;
-}
-.mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
-.app { max-width: 1180px; margin: 0 auto; padding: 12px 20px 32px; }
-.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.toolbar h1 { font-size: 18px; font-weight: 600; flex: 1; }
-.search {
-  width: 240px; height: 30px; padding: 0 10px; border-radius: 6px;
-  border: 1px solid #E2E5EB; background: #FFFFFF; color: inherit; font-size: 12px;
-}
-.btn {
-  height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;
-}
-.btn-solid {
-  background: #2563EB; color: #fff; border: none;
-}
-.btn-ghost {
-  background: #FFFFFF; border: 1px solid #E2E5EB; color: inherit;
-}
-.panel {
-  background: #FFFFFF; border: 1px solid #E2E5EB; border-radius: 8px;
-}
-.profile {
-  padding: 10px 14px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
-}
-.profile-row { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 12px; }
-.profile-row dt { color: #64748B; margin-bottom: 2px; }
-.gpu-alloc { margin-top: 10px; width: 100%; }
-.gpu-alloc table { width: 100%; font-size: 12px; border-collapse: collapse; }
-.gpu-alloc th { text-align: left; color: #64748B; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #E2E5EB; }
-.gpu-alloc td { padding: 8px; border-bottom: 1px solid #E2E5EB; vertical-align: middle; }
-.vram-bar { height: 5px; border-radius: 2px; background: #E2E8F0; margin-top: 4px; overflow: hidden; }
-.vram-bar i { display: block; height: 100%; background: #2563EB; border-radius: 2px; }
-.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
-.tab {
-  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px;
-  border: 1px solid #E2E5EB; background: #FFFFFF; color: #64748B;
-}
-.tab.on { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
-.tab.dim { opacity: 0.5; }
-.section-h { font-size: 12px; font-weight: 600; color: #64748B; text-transform: none; margin: 12px 0 6px; letter-spacing: 0.02em; }
-.pick-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
-.pick {
-  flex: 0 0 220px; padding: 10px 12px; border: 1px solid #E2E5EB; border-radius: 8px; background: #FFFFFF;
-}
-.pick strong { font-size: 13px; display: block; }
-.pick p { font-size: 11px; color: #64748B; margin: 4px 0 6px; line-height: 1.35; }
-.model-list { border: 1px solid #E2E5EB; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
-.model-row {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
-  padding: 10px 14px; border-bottom: 1px solid #E2E5EB; font-size: 12px;
-}
-.model-row:last-child { border-bottom: none; }
-.model-row:hover { background: #F8FAFC; }
-.model-name { font-weight: 600; font-size: 13px; }
-.model-meta { color: #64748B; font-size: 11px; margin-top: 2px; }
-.tags { display: inline-flex; gap: 4px; margin-top: 4px; }
-.tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #F1F5F9; color: #64748B; }
-.badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+body { font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 13px; line-height: 1.45; color: #0F172A; background: #EEEFF2; }
+.app { max-width: 1120px; margin: 0 auto; padding: 10px 16px 28px; }
+.row-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.row-bar h1 { font-size: 17px; font-weight: 600; flex: 1; }
+.profile-line { padding: 10px 12px; margin-bottom: 8px; background: #FFFFFF; border: 1px solid #DDE1E8; border-radius: 8px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+.profile-line a { font-size: 12px; color: #2563EB; text-decoration: none; }
+.tabs { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.tab { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid #DDE1E8; background: #FFFFFF; color: #64748B; }
+.tab.on { background: #EFF6FF; color: #1D4ED8; border-color: #93C5FD; }
+.section { font-size: 11px; font-weight: 600; color: #64748B; margin: 10px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+.pick { background: #FFFFFF; border: 1px solid #DDE1E8; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.pick strong { display: block; font-size: 12px; margin-bottom: 4px; }
+.pick .reason { color: #64748B; font-size: 11px; line-height: 1.35; min-height: 2.6em; }
+.list { background: #FFFFFF; border: 1px solid #DDE1E8; border-radius: 8px; overflow: hidden; }
+.lrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 9px 12px; border-bottom: 1px solid #DDE1E8; align-items: center; font-size: 12px; }
+.lrow:last-child { border-bottom: none; }
+.badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; margin-right: 4px; }
 .b-ok { background: #DCFCE7; color: #166534; }
 .b-mid { background: #FEF9C3; color: #854D0E; }
 .b-no { background: #FEE2E2; color: #B91C1C; }
-.link { color: #2563EB; font-size: 12px; text-decoration: none; }
-.conclusion-box { padding: 14px 16px; margin-bottom: 10px; }
-.conclusion-box h2 { font-size: 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-.conclusion-box .lead { font-size: 13px; margin-bottom: 8px; }
-.conclusion-box .speed { font-size: 14px; font-weight: 600; }
-.conclusion-box .hint { font-size: 11px; color: #64748B; margin-top: 4px; }
-details { margin-top: 10px; border: 1px solid #E2E5EB; border-radius: 8px; padding: 0 12px 12px; background: #FFFFFF; }
-summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 12px; color: #64748B; list-style: none; }
+.b-agent { background: #E0E7FF; color: #3730A3; }
+.b-chat { background: #F1F5F9; color: #64748B; }
+.btn { height: 30px; padding: 0 14px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #DDE1E8; background: #FFFFFF; color: inherit; }
+.btn-main { background: #2563EB; color: #fff; border: none; }
+.panel { background: #FFFFFF; border: 1px solid #DDE1E8; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+.hero h2 { font-size: 16px; margin-bottom: 8px; }
+.hero .lead { margin-bottom: 8px; font-size: 13px; }
+.hero .speed { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.hero .license { font-size: 11px; color: #64748B; }
+details { border: 1px solid #DDE1E8; border-radius: 8px; padding: 0 12px 10px; background: #FFFFFF; margin-bottom: 8px; font-size: 12px; }
+summary { padding: 10px 0; cursor: pointer; color: #64748B; font-weight: 600; list-style: none; }
 summary::-webkit-details-marker { display: none; }
-.stack { height: 18px; border-radius: 4px; overflow: hidden; display: flex; margin: 8px 0; font-size: 9px; color: #fff; }
-.sw { background: #2563EB; flex: 5; display:flex;align-items:center;justify-content:center; }
-.sk { background: #6366F1; flex: 1; display:flex;align-items:center;justify-content:center; }
-.sb { background: #64748B; flex: 0.3; }
-table.data { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid #E2E5EB; text-align: left; }
-table.data th { color: #64748B; font-weight: 500; }
-.two { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
-.side { padding: 12px 14px; }
-.steps { list-style: none; font-size: 12px; }
-.steps li { padding: 8px 0; border-bottom: 1px solid #E2E5EB; display: flex; gap: 8px; }
-.progress { height: 6px; background: #E2E8F0; border-radius: 3px; margin-top: 6px; }
-.progress i { display: block; height: 100%; width: 67%; background: #2563EB; border-radius: 3px; }
-.radio { border: 1px solid #E2E5EB; border-radius: 6px; padding: 10px; margin: 6px 0; font-size: 12px; }
-.radio.on { border-color: #2563EB; background: #F0F7FF; }
-.banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+td, th { padding: 6px 8px; border-bottom: 1px solid #DDE1E8; text-align: left; }
+th { color: #64748B; font-weight: 500; }
+.banner { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .banner-info { background: #EFF6FF; border: 1px solid #BFDBFE; }
 .banner-warn { background: #FFFBEB; border: 1px solid #FDE68A; }
-.empty { text-align: center; padding: 36px 20px; }
+.progress { height: 6px; background: #E2E8F0; border-radius: 3px; margin-top: 6px; }
+.progress i { display: block; height: 100%; width: 62%; background: #2563EB; border-radius: 3px; }
 .mock-label { position: fixed; top: 6px; right: 8px; font-size: 10px; color: #64748B; }
-</style>
-</head>
-<body>
-<span class="mock-label">静态稿 · 浅色 · dual-4060ti-16g</span>
-<div class="app">
-<div class="toolbar"><h1>模型市场</h1></div>
-<div class="banner banner-info">
-  <div>尚未安装本地推理组件，可先浏览精选；下载与运行需安装 CPU 或 CUDA 引擎。</div>
-  <button class="btn btn-solid">安装引擎</button>
-</div>
-<div class="panel empty">
-  <h2 style="font-size:16px;margin-bottom:8px">暂时连不上模型目录</h2>
-  <p style="font-size:12px;color:#64748B;max-width:400px;margin:0 auto 16px">可使用本机内置精选包继续浏览；网络恢复后会自动同步。</p>
-  <button class="btn btn-solid">使用内置精选</button>
-  <button class="btn btn-ghost" style="margin-left:6px">重试</button>
-</div>
-<div class="banner banner-warn" style="margin-top:12px">
-  <div>未检测到 NVIDIA 显卡，CUDA 加速不可用。可改用 CPU 引擎或选择更小模型。</div>
-  <button class="btn btn-ghost">改用 CPU 引擎</button>
-</div></div>
-</body>
-</html>
+.empty { text-align: center; padding: 32px 16px; }
+</style></head>
+<body><span class="mock-label">rev3 · 浅 · dual-4090-16g</span><div class="app">
+<div class="row-bar"><h1>模型市场</h1></div>
+<div class="banner banner-info"><span><strong>浏览版</strong> · 可以逛模型市场，下载和运行请从<strong>官网</strong>安装完整版。</span><button class="btn btn-main">打开官网下载</button></div>
+<div class="panel empty"><h2 style="font-size:15px">暂时连不上模型目录，先用内置推荐。</h2><button class="btn btn-main" style="margin-top:12px">使用内置推荐</button><button class="btn" style="margin-left:6px">重试</button></div>
+<div class="banner banner-warn"><span>当前 CUDA 安装包无法使用这块显卡，已改用 CPU 运行。建议从官网安装 <strong>CPU 版</strong>。</span><button class="btn">了解 CPU 版</button></div></div></body></html>
