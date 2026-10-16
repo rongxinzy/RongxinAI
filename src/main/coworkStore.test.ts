@@ -161,18 +161,6 @@ function setupDb(): void {
     );
   `);
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS cowork_user_memories (
-      id TEXT PRIMARY KEY,
-      text TEXT NOT NULL,
-      fingerprint TEXT NOT NULL DEFAULT '',
-      confidence REAL NOT NULL DEFAULT 0.5,
-      is_explicit INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'active',
-      created_at INTEGER NOT NULL
-    );
-  `);
-
   // CoworkStore only needs (db)
   store = new CoworkStore(db);
 }
@@ -467,10 +455,6 @@ test('listWorkspaces and getWorkspace include attached folders', () => {
 });
 
 test('deleteWorkspace removes attached folders', () => {
-  db.exec(`
-    CREATE TABLE user_memories (id INTEGER PRIMARY KEY, is_explicit INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'created', updated_at INTEGER NOT NULL DEFAULT 0);
-    CREATE TABLE user_memory_sources (memory_id INTEGER NOT NULL, session_id TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1);
-  `);
   const workspace = store.createWorkspace('/tmp/workspace-delete-folders', 'delete-me');
   store.setWorkspaceFolders(workspace.id, ['/tmp/a']);
 

@@ -128,11 +128,6 @@ import {
 import { AgentManager } from './agentManager';
 import { ConversationHistoryService } from './conversationHistory/service';
 import { EngramManager } from './memory/engramManager';
-import { LegacyMemoryMigrationService } from './memory/legacyMemoryMigrationService';
-import {
-  importLegacyMemoryFileCandidates,
-  importLegacySqliteMemoryCandidates,
-} from './memory/legacyMemoryFileImportService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { resolveProjectIdentity } from './memory/projectIdentity';
 import { MemoryRepository } from './memory/repository';
@@ -1658,13 +1653,6 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setSessionSummaryBackfillService(
       new SessionSummaryBackfillService(getProjectMemoryService(), getCoworkStore()),
     );
-    piRuntimeAdapter.setLegacyMemoryMigrationService(
-      new LegacyMemoryMigrationService(
-        getProjectMemoryService(),
-        getCoworkStore(),
-        getWorkbenchTaskService(),
-      ),
-    );
     piRuntimeAdapter.setConversationHistoryService(
       new ConversationHistoryService(getStore().getDatabase()),
     );
@@ -2092,9 +2080,6 @@ const getStore = (): SqliteStore => {
   return store;
 };
 
-const getMainAgentWorkspace = (): string =>
-  path.join(app.getPath('userData'), 'agent-workspaces', 'main');
-
 const buildAvailableAgentProviders = (): Record<string, { models: Array<{ id: string }> }> => {
   const providerMap: Record<string, { models: Array<{ id: string }> }> = {};
   for (const provider of resolveAllEnabledProviderConfigs()) {
@@ -2157,10 +2142,6 @@ const getCoworkStore = () => {
   if (!coworkStore) {
     const sqliteStore = getStore();
     coworkStore = new CoworkStore(sqliteStore.getDatabase());
-    const cleaned = coworkStore.autoDeleteNonPersonalMemories();
-    if (cleaned > 0) {
-      console.info(`[cowork-memory] Auto-deleted ${cleaned} non-personal/procedural memories`);
-    }
   }
   return coworkStore;
 };
@@ -8084,25 +8065,6 @@ if (!gotTheLock) {
     }
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
-    try {
-      const legacyMemoryImport = importLegacyMemoryFileCandidates({
-        agentWorkspace: getMainAgentWorkspace(),
-        service: getProjectMemoryService(),
-      });
-      const legacySqliteMemoryImport = importLegacySqliteMemoryCandidates({
-        store: getCoworkStore(),
-        service: getProjectMemoryService(),
-      });
-      const importedLegacyMemories =
-        legacyMemoryImport.imported + legacySqliteMemoryImport.imported;
-      if (importedLegacyMemories > 0) {
-        console.log(
-          `[MemoryMigration] imported ${importedLegacyMemories} legacy entries for review`,
-        );
-      }
-    } catch (error) {
-      console.warn('[MemoryMigration] Failed to import legacy memory sources:', error);
-    }
     void getEngramManager()
       .start()
       .then(connection => {
