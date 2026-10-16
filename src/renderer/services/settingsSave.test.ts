@@ -35,50 +35,21 @@ test('saves only appearance changes without rewriting model configuration', () =
     useSystemProxy: defaultConfig.useSystemProxy,
     sqliteAutoBackupEnabled: defaultConfig.sqliteAutoBackupEnabled ?? false,
     shortcuts: defaultConfig.shortcuts!,
-    providers: defaultConfig.providers,
-    api: defaultConfig.api,
-    model: defaultConfig.model,
   });
 
   expect(patch).toEqual({ theme: 'dark' });
 });
 
-test('includes API and model configuration only when providers changed', () => {
-  const providers = {
-    ...defaultConfig.providers,
-    deepseek: {
-      ...defaultConfig.providers!.deepseek,
-      apiKey: 'test-key',
-    },
-  };
+test('saving appearance does not overwrite a stored legacy style identifier', () => {
+  const current = { ...defaultConfig, themeStyle: 'legacy-custom-style' };
   const patch = buildAppSettingsSavePatch({
-    current: defaultConfig,
-    theme: defaultConfig.theme,
-    language: defaultConfig.language,
-    useSystemProxy: defaultConfig.useSystemProxy,
-    sqliteAutoBackupEnabled: defaultConfig.sqliteAutoBackupEnabled ?? false,
-    shortcuts: defaultConfig.shortcuts!,
-    providers,
-    api: { key: 'test-key', baseUrl: defaultConfig.api.baseUrl },
-    model: defaultConfig.model,
+    current,
+    theme: 'dark',
+    language: current.language,
+    useSystemProxy: current.useSystemProxy,
+    sqliteAutoBackupEnabled: current.sqliteAutoBackupEnabled ?? false,
+    shortcuts: current.shortcuts!,
   });
-
-  expect(patch).toMatchObject({ providers, api: { key: 'test-key' }, model: defaultConfig.model });
-});
-
-test('saves a style change independently from appearance and model settings', () => {
-  const input = {
-    current: defaultConfig,
-    theme: defaultConfig.theme,
-    themeStyle: 'paper',
-    language: defaultConfig.language,
-    useSystemProxy: defaultConfig.useSystemProxy,
-    sqliteAutoBackupEnabled: defaultConfig.sqliteAutoBackupEnabled ?? false,
-    shortcuts: defaultConfig.shortcuts!,
-    providers: defaultConfig.providers,
-    api: defaultConfig.api,
-    model: defaultConfig.model,
-  };
-  expect(buildAppSettingsSavePatch(input)).toEqual({ themeStyle: 'paper' });
-  expect(buildAppSettingsSavePatch({ ...input, themeStyle: 'codex' })).toEqual({});
+  expect(patch).toEqual({ theme: 'dark' });
+  expect({ ...current, ...patch }.themeStyle).toBe('legacy-custom-style');
 });

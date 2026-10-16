@@ -1,5 +1,4 @@
 import type { AppUpdateRuntimeState } from '../../../shared/appUpdate/constants';
-import type { ProviderType } from './model/constants';
 
 export type TabType =
   | 'general'
@@ -22,7 +21,7 @@ export const fromEnterpriseTab = (tab: EnterpriseTabType): string => tab.slice('
 
 export type SettingsOpenOptions = {
   initialTab?: SettingsTabType;
-  initialProvider?: ProviderType;
+  initialProvider?: string;
   notice?: string;
   noticeI18nKey?: string;
   noticeExtra?: string;

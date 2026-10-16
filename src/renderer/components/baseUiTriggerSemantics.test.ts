@@ -7,7 +7,6 @@ const NATIVE_BUTTON_TRIGGER_FILES = [
   'cowork/PermissionModeMenu.tsx',
   'cowork/CoworkModelPicker.tsx',
   'cowork/ContextUsageIndicator.tsx',
-  'cowork/SessionExpertPicker.tsx',
   'skills/SkillsPopover.tsx',
   'scheduledTasks/TaskTimePicker.tsx',
   'scheduledTasks/DateInput.tsx',

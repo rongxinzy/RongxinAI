@@ -1,6 +1,12 @@
 import crypto from 'crypto';
 import { spawn } from 'child_process';
 import type { WebContents } from 'electron';
+import { MagpieManager } from './magpie/manager';
+import { ManagedMagpieProviderBindings } from './magpie/managedProviderBindings';
+import { MagpieModelService, installMagpieModelService } from './magpie/modelService';
+import { registerMagpieIpc } from './magpie/registerIpc';
+import { readOllamaProviderSnapshot } from './magpie/ollamaProviderBinding';
+import { buildLlamaCppRunningModelBinding } from './libs/llamacppAgentBinding';
 import {
   app,
   BrowserWindow,
@@ -2991,6 +2997,10 @@ const ensureWindowsTaskbarBrand = (): void => {
 
 // 保存对主窗口的引用
 let mainWindow: BrowserWindow | null = null;
+let magpieManager: MagpieManager | undefined;
+let managedMagpieBindings: ManagedMagpieProviderBindings | undefined;
+let disposeMagpieModels: (() => void) | undefined;
+let disposeMagpie: (() => Promise<void>) | undefined;
 
 let isQuitting = false;
 
@@ -3440,6 +3450,10 @@ if (!gotTheLock) {
     ipcMain.handle(ManagedProviderIpc.Policy, () => zhiyuanManagedProviderBridge.accessPolicy());
     ipcMain.handle(ManagedProviderIpc.Catalog, () => zhiyuanManagedProviderBridge.catalog());
     zhiyuanManagedProviderBridge.onDidChange(() => {
+      if (magpieManager?.status().state === 'running')
+        void managedMagpieBindings
+          ?.synchronize()
+          .catch(error => console.error('[Magpie] Managed catalog sync failed', error));
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(ManagedProviderIpc.Changed);
       }
@@ -4679,6 +4693,55 @@ if (!gotTheLock) {
       };
     }
   });
+
+  magpieManager = new MagpieManager({
+    resourcesRoot: app.isPackaged
+      ? path.join(process.resourcesPath, 'magpie')
+      : path.join(app.getAppPath(), 'resources/magpie'),
+    privateHome: path.join(app.getPath('userData'), 'magpie'),
+    serviceEnabled: {
+      read: () => getStore().get<boolean>('magpie_service_enabled') === true,
+      write: enabled => getStore().set('magpie_service_enabled', enabled),
+    },
+    subscriptionAccounts: {
+      read: () => getStore().get<boolean>('magpie_subscription_accounts_enabled') === true,
+      write: enabled => getStore().set('magpie_subscription_accounts_enabled', enabled),
+    },
+  });
+  managedMagpieBindings = new ManagedMagpieProviderBindings(
+    zhiyuanManagedProviderBridge,
+    magpieManager,
+  );
+  managedMagpieBindings.setOllamaReader(() => readOllamaProviderSnapshot(getOllamaManager()));
+  managedMagpieBindings.setGpuReader(async () => {
+    const daemon = llamaCppModelDaemonController;
+    if (!daemon) return { baseUrl: null, models: [] };
+    const models = await daemon.listRunningModels();
+    return {
+      baseUrl: daemon.gatewayBaseUrl(),
+      models: models
+        .map(buildLlamaCppRunningModelBinding)
+        .filter((model): model is NonNullable<typeof model> => Boolean(model)),
+    };
+  });
+  const modelService = new MagpieModelService(magpieManager, {
+    readDefaultModelId: () => getStore().get<string>('magpie_default_model_id'),
+    writeDefaultModelId: id => getStore().set('magpie_default_model_id', id),
+    beforeCatalog: () => managedMagpieBindings!.beforeCatalog(),
+    allowedModel: model => managedMagpieBindings!.allowedModel(model.id),
+  });
+  disposeMagpieModels = installMagpieModelService(modelService);
+  disposeMagpie = registerMagpieIpc(
+    magpieManager,
+    event =>
+      Boolean(
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        event.sender === mainWindow.webContents &&
+        event.senderFrame === mainWindow.webContents.mainFrame,
+      ),
+    modelService,
+  );
 
   // Cowork IPC handlers
   ipcMain.handle(CoworkSessionIpc.Start, async (_event, rawOptions: unknown) => {
@@ -7780,9 +7843,15 @@ if (!gotTheLock) {
     destroyTray();
     skillManager?.stopWatching();
 
+    await disposeMagpie?.();
+    disposeMagpie = undefined;
+
     await disposeZhiyuanEnterpriseExtension().catch(error => {
       console.error('[EnterpriseExtension] Failed to dispose enterprise extension:', error);
     });
+
+    disposeMagpieModels?.();
+    disposeMagpieModels = undefined;
 
     // Stop all active Pi sessions without blocking shutdown.
     console.log('[Main] Stopping cowork sessions...');
@@ -8017,7 +8086,6 @@ if (!gotTheLock) {
       db: store.getDatabase(),
       dbPath: path.join(app.getPath('userData'), DB_FILENAME),
     });
-    zhiyuanManagedProviderBridge.attachStore(store);
     if (getBranding().features.enableAISphere) {
       try {
         const aisphereGateway = await startAISphereGateway();
@@ -8208,12 +8276,20 @@ if (!gotTheLock) {
     localInferenceManager.initializeModelsDir();
     llamaCppModelDaemonController = registerLlamaCppIpcHandlers(localInferenceManager, {
       getStore,
+      onModelBindingsChanged: async (url, models) => {
+        managedMagpieBindings?.setGpuSnapshot(url, models);
+        if (magpieManager?.status().state === 'running') await managedMagpieBindings?.synchronize();
+      },
     });
     // Warm the short-lived backend cache before the runtime settings dialog is opened.
     void localInferenceManager.listBackends();
     registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
+      onModelBindingsChanged: async snapshot => {
+        managedMagpieBindings?.setOllamaSnapshot(snapshot);
+        if (magpieManager?.status().state === 'running') await managedMagpieBindings?.synchronize();
+      },
     });
     registerMarketplaceIpcHandlers({
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
@@ -8356,6 +8432,11 @@ if (!gotTheLock) {
     const appConfig = getStore().get<AppConfigSettings>('app_config');
     await applyProxyPreference(getUseSystemProxyFromConfig(appConfig));
     profiler.measure('applyProxyPreference');
+    if (getStore().get<boolean>('magpie_service_enabled') === true) {
+      await magpieManager?.ensureRunning().catch(error => {
+        console.warn('[Magpie] Previously enabled model service could not start:', error);
+      });
+    }
 
     profiler.mark('coworkOpenAICompatProxy');
     await startCoworkOpenAICompatProxy().catch(error => {

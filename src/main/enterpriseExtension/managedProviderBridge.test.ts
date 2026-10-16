@@ -1,358 +1,172 @@
-import { describe, expect, test, vi } from 'vitest';
-
-import { ManagedProviderAccessMode } from '../../shared/managedProviders';
+import http from 'node:http';
+import { afterEach, describe, expect, test } from 'vitest';
+import { once } from 'node:events';
 import type { ProviderConfig } from '../../shared/providers';
-import type { ZhiyuanManagedProviderSource } from './contract';
-import { EnterpriseExtensionStoreKey, LegacyManagedProviderKey } from './constants';
 import { ZhiyuanManagedProviderBridge } from './managedProviderBridge';
-
-describe('Zhiyuan managed provider bridge', () => {
-  test('projects a managed source into the existing custom provider configuration', async () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: {
-        model: { defaultModel: 'old-model', defaultModelProvider: 'deepseek' },
-        providers: {
-          deepseek: providerConfig({
-            displayName: 'DeepSeek',
-            models: [{ id: 'old-model', name: 'Old Model' }],
-          }),
-        },
-      },
-    });
-    let notifyChanged: (() => void) | null = null;
-    const source: ZhiyuanManagedProviderSource = {
-      providerKey: LegacyManagedProviderKey.Enterprise,
-      exclusive: true,
-      snapshot: vi.fn(async () => providerConfig()),
-      onDidChange: listener => {
-        notifyChanged = listener;
-        return vi.fn();
-      },
-    };
-    let refreshToken: (() => Promise<string>) | null = null;
-    const unregisterTokenRefresher = vi.fn();
-    const registerTokenRefresher = vi.fn((_providerId, refresher) => {
-      refreshToken = refresher;
-      return unregisterTokenRefresher;
-    });
-    const bridge = new ZhiyuanManagedProviderBridge(registerTokenRefresher);
-    const changed = vi.fn();
-    bridge.onDidChange(changed);
-    const unregister = bridge.registerSource(source);
-
-    bridge.attachStore(store);
-    await bridge.refresh();
-
-    expect(bridge.accessPolicy()).toEqual({
-      mode: ManagedProviderAccessMode.Exclusive,
-      providerKeys: [LegacyManagedProviderKey.Enterprise],
-    });
-    expect(bridge.catalog()).toEqual([
-      expect.objectContaining({
-        id: 'enterprise-chat',
-        providerKey: LegacyManagedProviderKey.Enterprise,
-        providerDisplayName: 'Zhiyuan',
-        isDefault: true,
-      }),
-    ]);
-    expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig)).toMatchObject({
-      model: {
-        defaultModel: 'enterprise-chat',
-        defaultModelProvider: LegacyManagedProviderKey.Enterprise,
-      },
-      providers: {
-        deepseek: { displayName: 'DeepSeek' },
-        [LegacyManagedProviderKey.Enterprise]: {
-          enabled: true,
-          apiKey: 'model-token',
-          baseUrl: 'http://127.0.0.1:8090/v1',
-          apiFormat: 'openai',
-        },
-      },
-    });
-    expect(registerTokenRefresher).toHaveBeenCalledWith(
-      LegacyManagedProviderKey.Enterprise,
-      expect.any(Function),
-    );
-
-    vi.mocked(source.snapshot).mockResolvedValue(providerConfig({ apiKey: 'refreshed-token' }));
-    await expect(refreshToken?.()).resolves.toBe('refreshed-token');
-    expect(
-      store.get<any>(EnterpriseExtensionStoreKey.AppConfig).providers[
-        LegacyManagedProviderKey.Enterprise
-      ].apiKey,
-    ).toBe('refreshed-token');
-
-    notifyChanged?.();
-    await bridge.refresh();
-    expect(source.snapshot).toHaveBeenCalled();
-    expect(changed).toHaveBeenCalled();
-
-    unregister();
-    expect(unregisterTokenRefresher).toHaveBeenCalledOnce();
-    expect(
-      store.get<any>(EnterpriseExtensionStoreKey.AppConfig).providers[
-        LegacyManagedProviderKey.Enterprise
-      ],
-    ).toBeUndefined();
-    expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig).providers.deepseek).toBeDefined();
-    expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig).model).toMatchObject({
-      defaultModel: 'old-model',
-      defaultModelProvider: 'deepseek',
-    });
-    expect(store.get(EnterpriseExtensionStoreKey.ManagedProviderProjection)).toBeUndefined();
-  });
-
-  test('removes an orphaned legacy enterprise projection and selects a valid provider', () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: {
-        model: {
-          defaultModel: 'exclusive-ui-e2e',
-          defaultModelProvider: LegacyManagedProviderKey.Enterprise,
-        },
-        providers: {
-          deepseek: providerConfig({
-            displayName: 'DeepSeek',
-            models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }],
-          }),
-          [LegacyManagedProviderKey.Enterprise]: providerConfig({
-            models: [{ id: 'exclusive-ui-e2e', name: 'Enterprise Authorized Model' }],
-          }),
-        },
-      },
-    });
-
-    new ZhiyuanManagedProviderBridge().attachStore(store);
-
-    expect(
-      store.get<any>(EnterpriseExtensionStoreKey.AppConfig).providers[
-        LegacyManagedProviderKey.Enterprise
-      ],
-    ).toBeUndefined();
-    expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig).model).toMatchObject({
-      defaultModel: 'deepseek-chat',
-      defaultModelProvider: 'deepseek',
-    });
-  });
-
-  test('restores a persisted selection when a managed source is absent after restart', () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: {
-        model: {
-          defaultModel: 'enterprise-chat',
-          defaultModelProvider: LegacyManagedProviderKey.Enterprise,
-        },
-        providers: {
-          deepseek: providerConfig({
-            displayName: 'DeepSeek',
-            models: [{ id: 'deepseek-reasoner', name: 'DeepSeek Reasoner' }],
-          }),
-          [LegacyManagedProviderKey.Enterprise]: providerConfig(),
-        },
-      },
-      [EnterpriseExtensionStoreKey.ManagedProviderProjection]: {
-        providerKey: LegacyManagedProviderKey.Enterprise,
-        previousDefaultModel: 'deepseek-reasoner',
-        previousDefaultModelProvider: 'deepseek',
-      },
-    });
-
-    new ZhiyuanManagedProviderBridge().attachStore(store);
-
-    expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig).model).toMatchObject({
-      defaultModel: 'deepseek-reasoner',
-      defaultModelProvider: 'deepseek',
-    });
-    expect(store.get(EnterpriseExtensionStoreKey.ManagedProviderProjection)).toBeUndefined();
-  });
-
-  test('rejects non-custom keys and clears an unavailable managed snapshot', async () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
-    });
+import { stopPiOpenAICompatProxyForTests } from '../libs/agentEngine/piOpenAICompatProxy';
+const servers: http.Server[] = [];
+afterEach(async () => {
+  await stopPiOpenAICompatProxyForTests();
+  for (const server of servers.splice(0)) {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+const config = (
+  baseUrl = 'http://127.0.0.1:19999/v1',
+  apiKey = 'fixture-enterprise-token',
+): ProviderConfig => ({
+  enabled: true,
+  apiKey,
+  baseUrl,
+  displayName: 'Enterprise',
+  models: [{ id: 'test-model', name: 'Test model', contextWindow: 8192 }],
+});
+async function server(handler: http.RequestListener): Promise<string> {
+  const s = http.createServer(handler);
+  servers.push(s);
+  s.listen(0, '127.0.0.1');
+  await once(s, 'listening');
+  return `http://127.0.0.1:${(s.address() as import('node:net').AddressInfo).port}/v1`;
+}
+describe('enterprise provider loopback bridge', () => {
+  test('keeps upstream token out of host definitions and exposes a precise exclusive model policy', async () => {
     const bridge = new ZhiyuanManagedProviderBridge();
-    expect(() =>
-      bridge.registerSource({
-        providerKey: 'external.zhiyuan',
-        exclusive: true,
-        snapshot: async () => providerConfig(),
-      }),
-    ).toThrow('custom provider namespace');
-
-    bridge.registerSource({
-      providerKey: LegacyManagedProviderKey.Enterprise,
+    const dispose = bridge.registerSource({
+      providerKey: 'custom_enterprise',
+      exclusive: true,
+      snapshot: async () => config(),
+    });
+    await bridge.refresh();
+    const [provider] = bridge.hostProviders();
+    expect(provider.id).toMatch(/^zhiyuan-host-enterprise-/);
+    expect(provider.baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\//);
+    expect(provider.apiKey).not.toBe('fixture-enterprise-token');
+    expect(JSON.stringify(bridge.catalog())).not.toContain('token');
+    expect(JSON.stringify(bridge.hostProviders())).not.toContain('fixture-enterprise-token');
+    expect(bridge.allowedModel(`${provider.id}/test-model`)).toBe(true);
+    expect(bridge.allowedModel('ordinary/model')).toBe(false);
+    expect(bridge.allowedModel('group/enterprise-alias')).toBe(false);
+    dispose();
+    expect(bridge.hostProviders()).toEqual([]);
+  });
+  test('forwards through the existing proxy and refreshes expired tokens without persisting them', async () => {
+    const observed: string[] = [];
+    const baseUrl = await server((req, res) => {
+      observed.push(req.headers.authorization ?? '');
+      if (req.headers.authorization === 'Bearer token-old') {
+        res.writeHead(401);
+        res.end('{}');
+        return;
+      }
+      res.setHeader('content-type', 'application/json');
+      res.end(
+        JSON.stringify({
+          id: 'fixture',
+          choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+        }),
+      );
+    });
+    let calls = 0;
+    const bridge = new ZhiyuanManagedProviderBridge();
+    const dispose = bridge.registerSource({
+      providerKey: 'custom_enterprise',
+      exclusive: true,
+      snapshot: async () => config(baseUrl, ++calls <= 2 ? 'token-old' : 'token-new'),
+    });
+    await bridge.refresh();
+    const [p] = bridge.hostProviders();
+    const response = await fetch(`${p.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${p.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'test-model', messages: [], stream: false }),
+    });
+    expect(response.status).toBe(200);
+    expect(observed).toEqual(['Bearer token-old', 'Bearer token-new']);
+    dispose();
+  });
+  test('revocation immediately removes proxy capability and denies all exclusive models', async () => {
+    let notify = () => {};
+    let signedIn = true;
+    const bridge = new ZhiyuanManagedProviderBridge();
+    const dispose = bridge.registerSource({
+      providerKey: 'custom_enterprise',
       exclusive: true,
       snapshot: async () => {
-        throw new Error('control plane unavailable');
+        if (!signedIn) throw new Error('signed out');
+        return config();
+      },
+      onDidChange: listener => {
+        notify = listener;
+        return () => {};
       },
     });
-    bridge.attachStore(store);
     await bridge.refresh();
-
-    expect(bridge.accessPolicy().mode).toBe(ManagedProviderAccessMode.Exclusive);
-    expect(bridge.catalog()).toEqual([]);
-    expect(store.get<any>(EnterpriseExtensionStoreKey.AppConfig).providers).toEqual({});
-  });
-
-  test('defaults the API format to openai when the source omits it', async () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+    const [p] = bridge.hostProviders();
+    signedIn = false;
+    notify();
+    expect(bridge.hostProviders()).toEqual([]);
+    expect(bridge.allowedModel(`${p.id}/test-model`)).toBe(false);
+    const response = await fetch(`${p.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${p.apiKey}` },
+      body: '{}',
     });
-    const bridge = new ZhiyuanManagedProviderBridge();
-    const unregister = bridge.registerSource({
-      providerKey: LegacyManagedProviderKey.Enterprise,
-      exclusive: true,
-      snapshot: async () => providerConfig(),
-    });
-    bridge.attachStore(store);
+    expect(response.status).toBe(404);
     await bridge.refresh();
-
-    expect(projectedProvider(store)?.apiFormat).toBe('openai');
-    unregister();
+    dispose();
   });
-
-  test('passes through declared openai and anthropic API formats', async () => {
-    for (const apiFormat of ['openai', 'anthropic'] as const) {
-      const store = new MemoryStore({
-        [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
-      });
-      const bridge = new ZhiyuanManagedProviderBridge();
-      const unregister = bridge.registerSource({
-        providerKey: LegacyManagedProviderKey.Enterprise,
-        exclusive: true,
-        snapshot: async () => providerConfig({ apiFormat }),
-      });
-      bridge.attachStore(store);
-      await bridge.refresh();
-
-      expect(projectedProvider(store)?.apiFormat).toBe(apiFormat);
-      unregister();
-    }
-  });
-
-  test('rejects an unsupported API format and clears the managed snapshot', async () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
-    });
+  test('rejects stale snapshot completion after source disposal', async () => {
+    let finish!: (value: ProviderConfig) => void;
     const bridge = new ZhiyuanManagedProviderBridge();
-    bridge.registerSource({
-      providerKey: LegacyManagedProviderKey.Enterprise,
+    const dispose = bridge.registerSource({
+      providerKey: 'custom_enterprise',
       exclusive: true,
-      snapshot: async () => providerConfig({ apiFormat: 'gemini' }),
-    });
-    bridge.attachStore(store);
-    await bridge.refresh();
-
-    expect(bridge.catalog()).toEqual([]);
-    expect(projectedProvider(store)).toBeUndefined();
-  });
-
-  test('passes through a validated per-model baseUrl', async () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
-    });
-    const bridge = new ZhiyuanManagedProviderBridge();
-    const unregister = bridge.registerSource({
-      providerKey: LegacyManagedProviderKey.Enterprise,
-      exclusive: true,
-      snapshot: async () =>
-        providerConfig({
-          apiFormat: 'anthropic',
-          models: [
-            {
-              id: 'bench-anthropic',
-              name: 'Bench Anthropic',
-              baseUrl: 'https://gateway.example.test/bench-anthropic/',
-            },
-          ],
+      snapshot: () =>
+        new Promise(resolve => {
+          finish = resolve;
         }),
     });
-    bridge.attachStore(store);
-    await bridge.refresh();
-
-    const projected = projectedProvider(store);
-    expect(projected?.apiFormat).toBe('anthropic');
-    expect(projected?.models?.[0]?.baseUrl).toBe('https://gateway.example.test/bench-anthropic');
-    unregister();
+    const pending = bridge.refresh();
+    dispose();
+    finish(config());
+    await pending;
+    expect(bridge.hostProviders()).toEqual([]);
   });
-
-  test('rejects an invalid per-model baseUrl and clears the managed snapshot', async () => {
-    const store = new MemoryStore({
-      [EnterpriseExtensionStoreKey.AppConfig]: { providers: {} },
+  test('keeps Anthropic routing and replaces only the local capability with the in-memory token', async () => {
+    let observed: Record<string, unknown> = {};
+    const base = await server((req, res) => {
+      observed = {
+        url: req.url,
+        key: req.headers['x-api-key'],
+        version: req.headers['anthropic-version'],
+      };
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ type: 'message', content: [{ type: 'text', text: 'ok' }] }));
     });
     const bridge = new ZhiyuanManagedProviderBridge();
-    bridge.registerSource({
-      providerKey: LegacyManagedProviderKey.Enterprise,
+    const dispose = bridge.registerSource({
+      providerKey: 'custom_enterprise',
       exclusive: true,
-      snapshot: async () =>
-        providerConfig({
-          models: [
-            {
-              id: 'bench-anthropic',
-              name: 'Bench Anthropic',
-              baseUrl: 'ftp://gateway.example.test/bench-anthropic',
-            },
-          ],
-        }),
+      snapshot: async () => ({ ...config(base.replace(/\/v1$/, '')), apiFormat: 'anthropic' }),
     });
-    bridge.attachStore(store);
     await bridge.refresh();
-
-    expect(bridge.catalog()).toEqual([]);
-    expect(projectedProvider(store)).toBeUndefined();
-  });
-
-  test('reports only the registered source key as a managed provider', () => {
-    const bridge = new ZhiyuanManagedProviderBridge();
-    expect(bridge.isManagedProvider(LegacyManagedProviderKey.Enterprise)).toBe(false);
-
-    const unregister = bridge.registerSource({
-      providerKey: LegacyManagedProviderKey.Enterprise,
-      exclusive: true,
-      snapshot: async () => providerConfig(),
+    const [p] = bridge.hostProviders();
+    const response = await fetch(`${p.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': p.apiKey!,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model: 'test-model', messages: [], max_tokens: 32 }),
     });
-
-    expect(bridge.isManagedProvider(LegacyManagedProviderKey.Enterprise)).toBe(true);
-    expect(bridge.isManagedProvider('custom_community')).toBe(false);
-
-    unregister();
-    expect(bridge.isManagedProvider(LegacyManagedProviderKey.Enterprise)).toBe(false);
+    expect(response.status).toBe(200);
+    expect(observed).toEqual({
+      url: '/v1/messages',
+      key: 'fixture-enterprise-token',
+      version: '2023-06-01',
+    });
+    dispose();
   });
 });
-
-function projectedProvider(store: MemoryStore): ProviderConfig | undefined {
-  return store.get<{ providers: Record<string, ProviderConfig> }>(
-    EnterpriseExtensionStoreKey.AppConfig,
-  )?.providers[LegacyManagedProviderKey.Enterprise];
-}
-
-function providerConfig(overrides: Partial<ProviderConfig> = {}): ProviderConfig {
-  return {
-    enabled: true,
-    apiKey: 'model-token',
-    baseUrl: 'http://127.0.0.1:8090/v1/',
-    displayName: 'Zhiyuan',
-    models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
-    ...overrides,
-  };
-}
-
-class MemoryStore {
-  readonly #values = new Map<string, unknown>();
-
-  constructor(initial: Record<string, unknown>) {
-    for (const [key, value] of Object.entries(initial)) this.#values.set(key, value);
-  }
-
-  get<T>(key: string): T | undefined {
-    return this.#values.get(key) as T | undefined;
-  }
-
-  set(key: string, value: unknown): void {
-    this.#values.set(key, value);
-  }
-
-  delete(key: string): void {
-    this.#values.delete(key);
-  }
-}

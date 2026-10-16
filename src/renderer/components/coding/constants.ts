@@ -26,6 +26,7 @@ export const CodingAgentStatusI18nKey: Record<CodingAgentProfileStatus, string> 
 export const CodingAgentManagerTab = {
   Local: 'local',
   Custom: 'custom',
+  Magpie: 'magpie',
 } as const;
 export type CodingAgentManagerTab =
   (typeof CodingAgentManagerTab)[keyof typeof CodingAgentManagerTab];

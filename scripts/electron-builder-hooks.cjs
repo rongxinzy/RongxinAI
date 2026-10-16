@@ -18,6 +18,7 @@ const {
 } = require('fs');
 const { spawnSync } = require('child_process');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
+const { configureMagpieResources, verifyPackagedMagpie } = require('./magpie-runtime.cjs');
 const {
   ensurePortableUvRuntime,
   checkRuntimeHealth: checkUvRuntimeHealth,
@@ -422,6 +423,7 @@ function installSkillDependencies() {
 }
 
 async function beforePack(context) {
+  configureMagpieResources(context);
   configureMacAutoUpdateMetadata(context);
   ensureBundledChannelRuntime(context);
   // Install skill dependencies first (for all platforms)
@@ -608,6 +610,7 @@ async function beforePack(context) {
 }
 
 async function afterPack(context) {
+  verifyPackagedMagpie(context);
   if (isMacTarget(context)) {
     const appName = context.packager.appInfo.productFilename;
     const appPath = path.join(context.appOutDir, `${appName}.app`);

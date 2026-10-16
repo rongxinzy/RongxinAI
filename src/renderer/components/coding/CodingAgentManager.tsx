@@ -37,6 +37,7 @@ import {
   type CodingAgentManagerTab as CodingAgentManagerTabValue,
 } from './constants';
 import { CodingAgentConnectionRow } from './CodingAgentConnectionRow';
+import { MagpieAgentsPanel } from './MagpieAgentsPanel';
 import { isConnectionCheckRunning } from './agentConnectionFeedback';
 
 interface CodingAgentManagerProps {
@@ -128,22 +129,28 @@ export const CodingAgentManager = ({
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-2">
               <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
-              <DialogDescription>{summary}</DialogDescription>
+              <DialogDescription>
+                {activeTab === CodingAgentManagerTab.Magpie
+                  ? i18nService.t('magpieManagerDescription')
+                  : summary}
+              </DialogDescription>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={discovering || checking}
-              onClick={() => void discover()}
-            >
-              {discovering ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <RefreshCw data-icon="inline-start" />
-              )}
-              {i18nService.t(discovering ? 'codingAgentScanning' : 'codingAgentRescan')}
-            </Button>
+            {activeTab !== CodingAgentManagerTab.Magpie && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={discovering || checking}
+                onClick={() => void discover()}
+              >
+                {discovering ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <RefreshCw data-icon="inline-start" />
+                )}
+                {i18nService.t(discovering ? 'codingAgentScanning' : 'codingAgentRescan')}
+              </Button>
+            )}
           </div>
         </DialogHeader>
 
@@ -165,6 +172,7 @@ export const CodingAgentManager = ({
                 value: CodingAgentManagerTab.Custom,
                 label: i18nService.t('codingAgentCustomAgent'),
               },
+              { value: CodingAgentManagerTab.Magpie, label: i18nService.t('magpieTitle') },
             ]}
           />
 
@@ -206,6 +214,14 @@ export const CodingAgentManager = ({
                     ))}
                   </div>
                 )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value={CodingAgentManagerTab.Magpie} className="min-h-0">
+            <ScrollArea className="h-full">
+              <div className="p-6 pt-4">
+                {open && activeTab === CodingAgentManagerTab.Magpie && <MagpieAgentsPanel />}
               </div>
             </ScrollArea>
           </TabsContent>

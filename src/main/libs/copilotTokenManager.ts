@@ -90,16 +90,6 @@ export function getCurrentCopilotToken(): TokenState | null {
 }
 
 /**
- * Check if the current token is expired or close to expiry.
- */
-export function isCopilotTokenExpired(): boolean {
-  if (!tokenState) {
-    return true;
-  }
-  return tokenState.expiresAt - Date.now() < MIN_REFRESH_DELAY_MS;
-}
-
-/**
  * Attempt to refresh the Copilot token on demand (e.g. after an auth error).
  * Returns the new token state, or throws if refresh fails.
  * Deduplicates concurrent refresh requests.
@@ -168,43 +158,6 @@ export async function refreshCopilotTokenNow(): Promise<TokenState> {
 
   await refreshInFlight;
   return tokenState!;
-}
-
-/**
- * Detect if an error message indicates a Copilot auth failure that warrants token refresh.
- */
-export function isCopilotAuthError(errorText: string): boolean {
-  if (!errorText) return false;
-  const lower = errorText.toLowerCase();
-  return (
-    lower.includes('401') ||
-    lower.includes('unauthorized') ||
-    lower.includes('token expired') ||
-    lower.includes('invalid token') ||
-    lower.includes('authentication') ||
-    lower.includes('auth') ||
-    // GitHub Copilot specific
-    lower.includes('editor-version') ||
-    lower.includes('ide auth')
-  );
-}
-
-/**
- * Register a callback to be invoked whenever the Copilot token is refreshed.
- * Returns an unsubscribe function.
- */
-export function onCopilotTokenRefreshed(
-  callback: (state: {
-    copilotToken: string;
-    baseUrl: string;
-    expiresAt: number;
-    githubToken: string;
-  }) => void,
-): () => void {
-  onTokenRefreshCallbacks.push(callback);
-  return () => {
-    onTokenRefreshCallbacks = onTokenRefreshCallbacks.filter(cb => cb !== callback);
-  };
 }
 
 // ── Internal helpers ──
