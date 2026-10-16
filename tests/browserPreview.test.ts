@@ -104,9 +104,7 @@ test.describe('Browser Preview Mode', () => {
   });
 
   test('should display local inference', async ({ page }) => {
-    const localInferenceLink = page
-      .locator('a:has-text("Local"), a:has-text("本地")')
-      .first();
+    const localInferenceLink = page.locator('a:has-text("Local"), a:has-text("本地")').first();
     if (await localInferenceLink.isVisible()) {
       await localInferenceLink.click();
       await page.waitForTimeout(500);
@@ -146,9 +144,7 @@ test.describe('Browser Preview Mode', () => {
 
     const criticalErrors = errors.filter(
       err =>
-        !err.includes('[Browser Mock]') &&
-        !err.includes('favicon') &&
-        !err.includes('sourcemap'),
+        !err.includes('[Browser Mock]') && !err.includes('favicon') && !err.includes('sourcemap'),
     );
 
     expect(criticalErrors).toEqual([]);

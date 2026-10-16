@@ -139,7 +139,8 @@ export const browserMockElectron = {
       onPush('ollama:statusChanged', callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>
       onPush('ollama:installProgress', callback),
-    onPullProgress: (callback: (payload: unknown) => void) => onPush('ollama:pullProgress', callback),
+    onPullProgress: (callback: (payload: unknown) => void) =>
+      onPush('ollama:pullProgress', callback),
     onChatStreamChunk: (callback: (payload: unknown) => void) =>
       onPush('ollama:chatStreamChunk', callback),
   },
@@ -196,8 +197,9 @@ export const browserMockElectron = {
       onPush('llamacpp:modelLaunchLogCleared', callback),
     onModelLaunchLogWindowTargetChanged: (callback: (target: unknown) => void) =>
       onPush('llamacpp:modelLaunchLogWindowTargetChanged', callback),
-    onPullProgress: (callback: (payload: { name: string; chunk: Record<string, unknown> }) => void) =>
-      onPush('llamacpp:pullProgress', callback),
+    onPullProgress: (
+      callback: (payload: { name: string; chunk: Record<string, unknown> }) => void,
+    ) => onPush('llamacpp:pullProgress', callback),
   },
 
   marketplace: {
@@ -329,7 +331,8 @@ export const browserMockElectron = {
     captureImageChunk: (options: any) => mockPromise({ base64: '' }),
     saveResultImage: (options: any) => mockPromise({ success: true }),
     exportSessionText: (options: any) => mockPromise({ success: true }),
-    respondToPermission: (options: { requestId: string; result: unknown }) => mockPromise(undefined),
+    respondToPermission: (options: { requestId: string; result: unknown }) =>
+      mockPromise(undefined),
     getConfig: () => mockPromise(mockCoworkConfig),
     setConfig: (config: any) => mockPromise(undefined),
     onStreamUiEvent: (callback: (event: any) => void) => onPush('cowork:stream:uiEvent', callback),
@@ -487,7 +490,8 @@ export const browserMockElectron = {
     cancelDownload: () => mockPromise(undefined),
     installReady: () => mockPromise(undefined),
     revealDownload: () => mockPromise(undefined),
-    onStateChanged: (callback: (data: unknown) => void) => onPush('appUpdate:stateChanged', callback),
+    onStateChanged: (callback: (data: unknown) => void) =>
+      onPush('appUpdate:stateChanged', callback),
   },
 
   log: {
@@ -618,7 +622,8 @@ export const browserMockElectron = {
 
   dingtalk: {
     install: {
-      qrcode: () => mockPromise({ deviceCode: 'mock-device-code', qrcodeUrl: 'https://example.com' }),
+      qrcode: () =>
+        mockPromise({ deviceCode: 'mock-device-code', qrcodeUrl: 'https://example.com' }),
       poll: (deviceCode: string) => mockPromise({ status: 'pending' }),
       verify: (clientId: string, clientSecret: string) => mockPromise({ success: true }),
     },
