@@ -31,7 +31,6 @@ import {
 import {
   CoworkSessionExpertSource,
   normalizeSingleExpertIds,
-  type CoworkMessageExpertIdentity,
 } from '../../../shared/cowork/sessionExperts';
 import {
   CoworkQueueDelivery,
@@ -53,11 +52,7 @@ import {
   type HarnessActivationEvent,
   type HarnessModelProfileInput,
 } from '../../../shared/harness';
-import {
-  ZhiyuanModelPoolHeader,
-  ZhiyuanModelPoolWorkload,
-  type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
-} from '../../../shared/modelPool/constants';
+import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import {
   WorkbenchApprovalMode,
   WorkbenchContractKind,
@@ -69,12 +64,10 @@ import {
 } from '../../../shared/workbenchTask';
 import {
   isLocalProviderName,
-  type ModelCapabilities,
   ModelCapabilityStatus,
-  ProviderName,
   type ProviderModelPiCompaction,
 } from '../../../shared/providers';
-import { persistCoworkImageAttachments, readCoworkImageBase64 } from '../../coworkImageAttachments';
+import { persistCoworkImageAttachments } from '../../coworkImageAttachments';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import type { CoworkMessage } from '../../coworkStore';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -100,12 +93,7 @@ import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
-import {
-  getMagpieModelService,
-  hasMagpieModelService,
-  MAGPIE_RUNTIME_API_KEY,
-} from '../../magpie/modelService';
-import type { MagpieModel } from '../../../shared/magpie/types';
+import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
 import type { McpServerManager } from '../mcpServerManager';
@@ -122,12 +110,11 @@ import {
   type PiCodingElicitationInput,
   type PiCodingElicitationResponse,
 } from './piCodingElicitation';
-import { PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
+import { PiAgentLoopMode } from './piAgentLoop';
 import { createPiPlanTool, isPlanModeBlockedTool, PiPlanModePrompt } from './piPlanTool';
 import {
   buildPiBackgroundCompletionContext,
   extractPiBackgroundCompletionText,
-  type PiBackgroundCompletionResult,
 } from './piBackgroundCompletion';
 import {
   calculatePiConversationHistoryCharLimit,
@@ -203,544 +190,32 @@ import {
   isImagePayloadRejection,
   markImageInputRejected,
   type ImageCapabilityConfiguration,
-  type ImageInputAttachmentRef,
   type ImagePromptPreparation,
 } from './piImageInputFallback';
 
-// ── Types ──
-
-const PiChatRuntimeLimit = {
-  HistoryChars: 16_000,
-  MaxOutputTokens: 8_192,
-} as const;
-
-/** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
-interface PiSession {
-  prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
-  sendUserMessage?(
-    content:
-      | string
-      | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
-    options?: { deliverAs?: 'steer' | 'followUp' },
-  ): Promise<void>;
-  steer(text: string): Promise<void>;
-  abort(): Promise<void>;
-  abortBash(): void;
-  reload(): Promise<void>;
-  setModel(model: unknown): Promise<void>;
-  setThinkingLevel?(level: string): unknown;
-  bindExtensions?(bindings: Record<string, unknown>): Promise<void>;
-  compact?(customInstructions?: string): Promise<{ cancelled?: boolean }>;
-  getContextUsage?():
-    | {
-        tokens: number | null;
-        contextWindow: number;
-        percent: number | null;
-      }
-    | undefined;
-  subscribe(listener: (event: PiEvent) => void): () => void;
-}
-
-interface PiContentBlock {
-  type: string;
-  text?: string;
-  thinking?: string;
-  id?: string;
-  name?: string;
-  arguments?: Record<string, unknown>;
-}
-
-interface PiUsage {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  reasoning?: number;
-  totalTokens: number;
-  cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
-}
-
-interface PiEvent {
-  displayResultText?: string;
-  type: string;
-  success?: boolean;
-  attempt?: number;
-  finalError?: string;
-  message?: {
-    id?: string;
-    role: string;
-    // For message_update / message_end this is the FULL accumulating snapshot
-    // (blocks: {type:'text',text} / {type:'thinking',thinking}), NOT a delta.
-    content: string | PiContentBlock[];
-    model?: string;
-    usage?: PiUsage;
-    stopReason?: string;
-    errorMessage?: string;
-  };
-  // message_update carries the fine-grained streaming delta here.
-  assistantMessageEvent?: {
-    type: string; // text_delta | thinking_delta | text_end | thinking_end | ...
-    delta?: string;
-    content?: string;
-    contentIndex?: number;
-    partial?: unknown;
-    toolCall?: unknown;
-  };
-  // tool_execution_start / _update / _end fields
-  toolCallId?: string;
-  toolName?: string;
-  args?: unknown;
-  result?: unknown;
-  partialResult?: unknown;
-  isError?: boolean;
-}
-
-interface ActivePiSession {
-  eventProjection?: PiEventProjectionQueue<PiEvent>;
-  sessionId: string;
-  piSession: PiSession;
-  abortController: AbortController;
-  model: Record<string, unknown>;
-  modelRuntime: PiModelRuntime | null;
-  modelRequestOptions?: { apiKey?: string };
-  /** Per-model compaction budgets applied on create and every reload. */
-  modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
-  /** Whether this session runs with the pi 1.0 codemode tool active. */
-  codemodeEnabled: boolean;
-  /** Whether pi's builtin MCP extension owns this session's MCP tools. */
-  mcpNativeBridge: boolean;
-  capabilities: ModelCapabilities;
-  /** Endpoint identity behind the current model; scopes image observations. */
-  imageEndpointKey?: string;
-  harnessModelProfile: HarnessModelProfileInput;
-  /** System prompt requested by the current Cowork session snapshot. */
-  requestedSystemPrompt: string;
-  requestedModelOverride?: string;
-  requestedSkillIds: string[] | undefined;
-  requestedWorkflowSkillIds: string[] | undefined;
-  requestedExpertIds: string[];
-  /** Experts selected for the current turn, retained when messages are persisted. */
-  turnExperts: CoworkMessageExpertIdentity[];
-  resourceState: PiResourceState;
-  /** Message id for the visible answer (text) bubble of the current turn. */
-  assistantMessageId: string | null;
-  /** Message id for the thinking bubble of the current turn. */
-  thinkingMessageId: string | null;
-  /** Latest full snapshot of answer text for the current turn. */
-  answerText: string;
-  /** Latest full snapshot of thinking text for the current turn. */
-  thinkingText: string;
-  streamAccumulator: PiStreamAccumulator;
-  thinkingLifecycle: PiThinkingLifecycle;
-  /** Latest completed answer message, promoted to final only when the agent run ends. */
-  lastCompletedAnswerMessageId: string | null;
-  lastCompletedAnswerText: string;
-  /**
-   * Set once a settled turn's error was shown, preventing duplicate reporting.
-   */
-  errorSurfaced: boolean;
-  /** One retry notice per turn: the user learns the model answered with an error. */
-  retryNoticeEmitted: boolean;
-  /** Retry attempts Pi reported in the current turn. */
-  retryAttempts: number;
-  completionPending?: Promise<void>;
-  requestStartedAt: number | null;
-  firstVisibleTextAt: number | null;
-  /** Timestamp when this in-process Pi AgentSession finished creation. */
-  piSessionCreatedAt: number;
-  /** First agent_start timestamp for this Pi AgentSession. */
-  agentStartedAt: number | null;
-  /** Startup timings are recorded once, on the first visible token. */
-  startupLatencyRecorded: boolean;
-  startupLatency?: PiStartupLatency;
-  confirmationMode: 'modal' | 'text';
-  unsubscribe: () => void;
-  /** Set to true once stopSession has aborted the turn. continueSession must not
-   * reuse the underlying Pi session object after it has been aborted; instead it
-   * should reconstruct the conversation from SQLite and create a fresh session. */
-  aborted: boolean;
-  /** toolCallId → tool_result message id, for streaming updates + de-dup */
-  toolResultMessageIdByCallId: Map<string, string>;
-  toolStartedAtByCallId: Map<string, number>;
-  preparingToolCallIdByContentIndex: Map<number, string>;
-  toolActivityTracker: ToolActivityTracker;
-  /** Long-horizon agent loop controller for this session (agent_loop tool). */
-  agentLoop: PiAgentLoopController;
-  /** Present only for the controlled academic-research workflow. */
-  researchRun: PiResearchRunController | null;
-  /** Present for every other first-class sidebar shortcut workflow. */
-  shortcutWorkflow: PiShortcutWorkflowController | null;
-  goalMode: boolean;
-  /** Whether the current turn runs in read-only plan mode. */
-  planMode: boolean;
-  writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
-  /**
-   * Error from the latest failed attempt (message_end with stopReason=error).
-   * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
-   * flushPendingError surfaces it once the run settles (auto_retry_end /
-   * agent_settled). Cleared when a retry succeeds or the turn is reset.
-   *
-   * `sticky` marks a terminal error (including an explicitly cancelled retry).
-   * Pi can report aborted turns with a plain
-   * stop reason, so a later successful-looking assistant message must not erase
-   * them the way it erases a recovered retry.
-   */
-  pendingError: { message: string; classified: CoworkError; sticky?: boolean } | null;
-  workbenchRunId: string | null;
-  workbenchContract: WorkbenchTaskContract;
-  workspaceRoot: string;
-  settingsManager: PiSettingsManager | null;
-  approvalMode: WorkbenchApprovalMode;
-  unattended: boolean;
-  /** True while Pi is executing the current Work/Chat turn. */
-  isRunning: boolean;
-  /** Last time this session was used by a turn; idle sessions may be rebuilt from SQLite. */
-  lastUsedAt: number;
-  /** True when the current turn settled with an unrecoverable Pi error. */
-  turnFailed: boolean;
-  /**
-   * Image attachments of the turn currently in flight. Kept so an image-payload
-   * rejection can be retried as text and explained to the user; cleared on every
-   * new user prompt so a stale turn can never drive the fallback.
-   */
-  lastImagePrompt: {
-    text: string;
-    sentImages: ImageInputAttachmentRef[];
-    omittedImages: ImageInputAttachmentRef[];
-    retried: boolean;
-  } | null;
-  /** Set when the failed turn carried images and deserves one text-only retry. */
-  imageRetryPending: boolean;
-  /**
-   * True once this turn's failure has been attributed to an image payload
-   * rejection, so repeated SDK retries cannot resurface it as a generic error.
-   */
-  imageRejectionHandled: boolean;
-  /** Prevents duplicate queue drains when Pi emits multiple settled events. */
-  queueFlushInFlight: boolean;
-  /** MCP tool manifest generation captured when this Pi session was created. */
-  mcpToolManifestGeneration: number;
-}
-
-// ── Dynamic imports ──
-
-interface PiModules {
-  createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
-  DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
-  SessionManager?: {
-    inMemory(cwd?: string): unknown;
-  };
-  SettingsManager?: {
-    create(cwd: string, agentDir?: string): PiSettingsManager;
-    inMemory?(): PiSettingsManager;
-  };
-  getAgentDir: () => string;
-  getModel: (provider: string, modelId: string) => unknown;
-  ModelRuntime: {
-    create(options?: PiModelRuntimeCreateOptions): Promise<PiModelRuntime>;
-  };
-  /** Registers the codemode sandbox tool (inactive until defaultTools names it). */
-  createCodemodeExtension?: (options?: Record<string, unknown>) => unknown;
-  /** Registers the deferred tool-loading tool (inactive until defaultTools names it). */
-  createToolSearchExtension?: () => unknown;
-  /** Registers the builtin MCP extension (config/transport injectable). */
-  createMcpExtension?: (options?: Record<string, unknown>) => unknown;
-  completeSimple: (
-    model: unknown,
-    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
-    options?: { apiKey?: string },
-  ) => Promise<PiBackgroundCompletionResult>;
-}
-
-interface PiResourceLoader {
-  reload(): Promise<void>;
-  settingsManager?: PiSettingsManager | null;
-}
-
-interface PiSettingsManager {
-  applyOverrides(overrides: {
-    shellPath?: string;
-    compaction?: {
-      enabled?: boolean;
-      reserveTokens?: number;
-      keepRecentTokens?: number;
-      /** Per-model budget overrides keyed by provider/modelId (pi 1.0.0). */
-      modelOverrides?: Record<string, { reserveTokens?: number; keepRecentTokens?: number }>;
-    };
-    /** Tool activation overrides; "+name"/"-name" add/remove relative to defaults. */
-    defaultTools?: string[];
-  }): void;
-  getShellPath?(): string | undefined;
-  setHttpIdleTimeoutMs?(timeoutMs: number): void;
-}
-
-interface PiResourceState {
-  systemPrompt: string;
-  skillIds: string[] | undefined;
-  maxOutputTokens: number;
-  fileToolsEnabled: boolean;
-  unattended: boolean;
-  /** Chat keeps the Pi kernel but opts out of Work resource discovery. */
-  chatMode: boolean;
-  /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
-  expertSkillDirs: string[];
-  skillRoots: Record<string, string>;
-}
-
-interface PiStartupLatency {
-  sessionCreatedAt: number;
-  agentStartedAt: number;
-  firstTokenAt: number;
-  sessionCreateToAgentStartMs: number;
-  agentStartToFirstTokenMs: number;
-  sessionCreateToFirstTokenMs: number;
-}
-
-interface InitializingPiSession {
-  abortController: AbortController;
-  generation: symbol;
-}
-
-interface PiModelRuntime {
-  registerProvider(provider: string, config: Record<string, unknown>): void;
-  setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
-  getModel(provider: string, modelId: string): unknown;
-  completeSimple?(
-    model: unknown,
-    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
-  ): Promise<PiBackgroundCompletionResult>;
-}
-
-interface PiModelRuntimeCreateOptions {
-  allowModelNetwork?: boolean;
-}
-
-type PiResolvedModel = {
-  /** Base URL identity of the endpoint the model was resolved against. */
-  endpointKey: string;
-  model: Record<string, unknown>;
-  modelRuntime: PiModelRuntime | null;
-  maxOutputTokens: number;
-  providerName: string;
-  capabilities?: Partial<ModelCapabilities>;
-  requestOptions?: {
-    apiKey?: string;
-  };
-  /** Per-model compaction budgets keyed for pi's compaction.modelOverrides. */
-  modelCompactionOverride?: {
-    key: string;
-    compaction: ProviderModelPiCompaction;
-  };
-};
-
-function preparePiPrompt(
-  text: string,
-  attachments: PiStartOptions['imageAttachments'] | undefined,
-  verdict: ImageInputVerdict,
-  ocrCommandFor?: (imagePath: string) => string,
-  pathImageReferences: readonly ImageInputAttachmentRef[] = [],
-): {
-  content:
-    | string
-    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
-  hasImages: boolean;
-  sentImages: ImageInputAttachmentRef[];
-  omittedImages: ImageInputAttachmentRef[];
-} {
-  const sendImages = verdict === ImageInputVerdict.Supported;
-  // A path-only image is only worth explaining when the model cannot open it as
-  // an image: a vision-capable model just reads the file.
-  const pathOnly = sendImages ? [] : pathImageReferences;
-  if (!attachments?.length && pathOnly.length === 0) {
-    return { content: text, hasImages: false, sentImages: [], omittedImages: [] };
-  }
-  const imageAttachments = (attachments ?? []).filter(item => item.mimeType.startsWith('image/'));
-  const references = imageAttachments.map(item => ({ name: item.name, path: item.path }));
-  if (sendImages) {
-    const images = imageAttachments
-      .filter(item => item.base64Data || item.path)
-      .map(item => ({
-        type: 'image' as const,
-        data: readCoworkImageBase64(item),
-        mimeType: item.mimeType,
-      }))
-      .filter(item => item.data.length > 0);
-    if (images.length > 0) {
-      return {
-        content: [{ type: 'text', text }, ...images],
-        hasImages: true,
-        sentImages: references,
-        omittedImages: [],
-      };
-    }
-  }
-  // Pi answers a non-vision model's `read` with an in-band note instead of a
-  // failed request; Cowork images never pass through `read`, so the same facts
-  // (why the picture is absent, plus the file paths) have to travel with the
-  // prompt itself. Images withheld by capability and images the UI could only
-  // attach by path share one note: in both cases the model holds a path, not
-  // pixels.
-  const notice = buildImageOmittedNotice([...references, ...pathOnly], { verdict, ocrCommandFor });
-  return {
-    content: text.trim() ? `${text}\n\n${notice}` : notice,
-    hasImages: false,
-    sentImages: [],
-    omittedImages: references,
-  };
-}
-
-/** Yields one macrotask so settling bookkeeping (e.g. a cancelled retry) can run. */
-const yieldToEventLoop = (): Promise<void> => {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 0);
-  return promise;
-};
-
-/**
- * Prompt content prepared for one Pi turn: the text, plus image blocks when the
- * model may receive them, and the attachment bookkeeping the failure path needs.
- */
-interface PreparedPiPrompt {
-  content:
-    | string
-    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
-  hasImages: boolean;
-  sentImages: ImageInputAttachmentRef[];
-  omittedImages: ImageInputAttachmentRef[];
-}
-
-/**
- * Sends a prompt that was already prepared (and recorded) by the caller.
- *
- * Preparation is deliberately separated from sending: the SDK can report a
- * rejected payload through events that land before the send promise settles, so
- * the turn's image state must be recorded *before* the request leaves.
- */
-async function sendPiPrompt(
-  session: PiSession,
-  prepared: PreparedPiPrompt,
-  streamingBehavior?: 'steer' | 'followUp',
-): Promise<void> {
-  if (prepared.hasImages) {
-    if (!session.sendUserMessage) {
-      throw new Error('The installed agent runtime cannot send image attachments.');
-    }
-    await session.sendUserMessage(
-      prepared.content,
-      streamingBehavior ? { deliverAs: streamingBehavior } : undefined,
-    );
-    return;
-  }
-  if (streamingBehavior) {
-    await session.prompt(prepared.content as string, { streamingBehavior });
-  } else {
-    await session.prompt(prepared.content as string);
-  }
-}
-
-let _piModules: PiModules | null = null;
-
-async function getPiModules(): Promise<PiModules> {
-  if (!_piModules) {
-    try {
-      // Pi packages are ESM-only (package.json "exports" with only "import" condition).
-      // Vite/esbuild resolves them correctly at build time. Type declarations are provided
-      // by piModules.d.ts for tsc --noEmit.
-      const codingAgent = await import('@earendil-works/pi-coding-agent');
-      const compat = await import('@earendil-works/pi-ai/compat');
-      _piModules = {
-        createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
-        DefaultResourceLoader:
-          codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
-        SessionManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SessionManager')
-          ? ((codingAgent as typeof codingAgent & { SessionManager?: unknown })
-              .SessionManager as PiModules['SessionManager'])
-          : undefined,
-        SettingsManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SettingsManager')
-          ? ((codingAgent as typeof codingAgent & { SettingsManager?: unknown })
-              .SettingsManager as PiModules['SettingsManager'])
-          : undefined,
-        getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
-        ModelRuntime: codingAgent.ModelRuntime as unknown as PiModules['ModelRuntime'],
-        createCodemodeExtension: Object.prototype.hasOwnProperty.call(
-          codingAgent,
-          'createCodemodeExtension',
-        )
-          ? ((
-              codingAgent as typeof codingAgent & {
-                createCodemodeExtension?: unknown;
-              }
-            ).createCodemodeExtension as PiModules['createCodemodeExtension'])
-          : undefined,
-        createToolSearchExtension: Object.prototype.hasOwnProperty.call(
-          codingAgent,
-          'createToolSearchExtension',
-        )
-          ? ((
-              codingAgent as typeof codingAgent & {
-                createToolSearchExtension?: unknown;
-              }
-            ).createToolSearchExtension as PiModules['createToolSearchExtension'])
-          : undefined,
-        createMcpExtension: Object.prototype.hasOwnProperty.call(codingAgent, 'createMcpExtension')
-          ? ((
-              codingAgent as typeof codingAgent & {
-                createMcpExtension?: unknown;
-              }
-            ).createMcpExtension as PiModules['createMcpExtension'])
-          : undefined,
-        // getModel is the current API (deprecated but functional); will migrate to createModels() later
-        getModel: compat.getModel as unknown as PiModules['getModel'],
-        completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
-      };
-    } catch (err) {
-      throw new Error(
-        `[PiRuntime] Pi engine packages not found. ` +
-          `Ensure @earendil-works/pi-coding-agent and @earendil-works/pi-ai are installed.\n${err}`,
-      );
-    }
-  }
-  return _piModules;
-}
-
-// ── Constants ──
-
-/** How often the renderer receives streaming content updates. */
-const MESSAGE_UPDATE_THROTTLE_MS = 200;
-/**
- * How often streaming content is written to SQLite. better-sqlite3 is synchronous
- * and blocks the main-process event loop, so writing on every Pi frame causes
- * visible streaming jank. Store writes are throttled
- * and flush the latest content on finalize.
- */
-const STORE_UPDATE_THROTTLE_MS = 250;
-
-const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined =>
-  skillIds === undefined
-    ? undefined
-    : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
-
-/**
- * Skills are additive: a queued turn keeps whatever the session already runs
- * and adds the ones the user attached to that queued input. Both sides unknown
- * keeps the session's implicit "no explicit skill set" state instead of
- * materializing an empty list, which would force a session rebuild.
- */
-const mergeSkillIds = (
-  base: string[] | undefined,
-  added: string[] | undefined,
-): string[] | undefined =>
-  base === undefined && added === undefined
-    ? undefined
-    : [...new Set([...(base ?? []), ...(added ?? [])])];
-
-const haveSameStringList = (left: string[] | undefined, right: string[] | undefined): boolean =>
-  left === right ||
-  (left !== undefined &&
-    right !== undefined &&
-    left.length === right.length &&
-    left.every((value, index) => value === right[index]));
-
+import {
+  ActivePiSession,
+  getPiModules,
+  haveSameStringList,
+  InitializingPiSession,
+  mergeSkillIds,
+  MESSAGE_UPDATE_THROTTLE_MS,
+  normalizeSkillIds,
+  PiChatRuntimeLimit,
+  PiEvent,
+  PiModelRuntime,
+  PiModules,
+  PiResourceLoader,
+  PiResourceState,
+  PiSettingsManager,
+  PiStartupLatency,
+  PiUsage,
+  preparePiPrompt,
+  sendPiPrompt,
+  STORE_UPDATE_THROTTLE_MS,
+  yieldToEventLoop,
+} from './piRuntimeSessionState';
+import { DEFAULT_PI_LOCAL_MAX_TOKENS, magpieImageInput, resolvePiModel } from './piMagpiePiModel';
 // ── PiRuntimeAdapter ──
 
 // Force ANSI color output from CLI tools (npm, git, jest, etc.) run by
@@ -4550,151 +4025,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       },
     };
   }
-}
-
-// ── Gateway model resolution ──
-
-const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
-
-interface ModelPoolRequestContext {
-  conversationId: string;
-  workload: ZhiyuanModelPoolWorkloadValue;
-}
-
-function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
-  if (!model.modalities) return ModelCapabilityStatus.Unknown;
-  return model.modalities.input?.includes('image')
-    ? ModelCapabilityStatus.Supported
-    : ModelCapabilityStatus.Unsupported;
-}
-
-const MAGPIE_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-
-function buildMagpiePiModel(
-  selected: MagpieModel,
-  gatewayUrl: string,
-  modelPoolRequestContext?: ModelPoolRequestContext,
-): {
-  model: Record<string, unknown>;
-  baseUrl: string;
-  api: string;
-  supportsImage: boolean;
-  maxTokens: number;
-} {
-  const url = new URL(gatewayUrl);
-  if (
-    url.protocol !== 'http:' ||
-    url.hostname !== '127.0.0.1' ||
-    !url.port ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    url.pathname !== '/'
-  ) {
-    throw new Error('Invalid owned model gateway URL');
-  }
-  const endpoints = selected.native_endpoints ?? [];
-  const api = endpoints.includes('/v1/responses')
-    ? 'openai-responses'
-    : endpoints.includes('/v1/messages')
-      ? 'anthropic-messages'
-      : 'openai-completions';
-  const levels = selected.supported_reasoning_levels?.map(level => level.effort) ?? [];
-  const thinkingLevelMap = levels.length
-    ? Object.fromEntries(
-        MAGPIE_THINKING_LEVELS.map(level => {
-          const effort = level === 'off' ? 'none' : level;
-          return [level, levels.includes(effort) ? effort : null];
-        }),
-      )
-    : undefined;
-  const contextWindow = selected.context_window ?? 32768;
-  const maxTokens = Math.min(selected.max_output_tokens ?? 4096, contextWindow);
-  const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
-  const imageInput = magpieImageInput(selected);
-  const supportsImage = imageInput === ModelCapabilityStatus.Supported;
-
-  const model: Record<string, unknown> = {
-    id: selected.id,
-    name: selected.display_name || selected.id,
-    provider: 'magpie',
-    api,
-    baseUrl,
-    reasoning: selected.reasoning === true,
-    input: supportsImage ? ['text', 'image'] : ['text'],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow,
-    maxTokens,
-    ...(thinkingLevelMap ? { thinkingLevelMap } : {}),
-    compat: { sendSessionAffinityHeaders: true },
-    headers: {
-      ...(modelPoolRequestContext?.conversationId
-        ? {
-            'X-Magpie-Session': modelPoolRequestContext.conversationId,
-            [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
-            [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
-          }
-        : {}),
-    },
-  };
-
-  return { model, baseUrl, api, supportsImage, maxTokens };
-}
-
-async function resolvePiModel(
-  pi: PiModules,
-  modelRef?: string,
-  existingModelRuntime?: PiModelRuntime | null,
-  modelPoolRequestContext?: ModelPoolRequestContext,
-): Promise<PiResolvedModel> {
-  if (hasMagpieModelService()) {
-    const magpieService = getMagpieModelService();
-    const resolution = await magpieService.resolve(modelRef);
-    const {
-      model: customModel,
-      baseUrl,
-      api,
-      maxTokens,
-    } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
-    const modelRuntime =
-      existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
-    modelRuntime.registerProvider('magpie', {
-      name: 'magpie',
-      baseUrl,
-      api,
-      models: [customModel],
-    });
-    await modelRuntime.setRuntimeApiKey('magpie', MAGPIE_RUNTIME_API_KEY);
-
-    const imageInput = magpieImageInput(resolution.model);
-    const effectiveImageInput = imageInputVerdict(
-      imageInput,
-      ProviderName.Magpie,
-      resolution.model.id,
-      {
-        supportsImage: imageInput === ModelCapabilityStatus.Supported,
-        imageInput,
-        endpointKey: baseUrl,
-      },
-    );
-    const model =
-      effectiveImageInput === ImageInputVerdict.Supported
-        ? customModel
-        : { ...customModel, input: ['text'] as Array<'text' | 'image'> };
-
-    return {
-      model,
-      endpointKey: baseUrl,
-      modelRuntime,
-      maxOutputTokens: maxTokens,
-      providerName: ProviderName.Magpie,
-      capabilities: { imageInput },
-      requestOptions: { apiKey: MAGPIE_RUNTIME_API_KEY },
-    };
-  }
-
-  throw new Error('Enable the unified model service in model settings before starting a task.');
 }
 
 /** Normalize Pi tool args into a plain record for CoworkMessage metadata. */
